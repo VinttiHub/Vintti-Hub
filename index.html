@@ -1,16 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Página Web</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vintti HUB</title>
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+    <header class="navbar">
+        <div class="navbar-container">
+            <img src="assets/img/vintti_logo.png" alt="Vintti Logo" class="logo">
+            <nav class="nav-links">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="opportunities.html" class="nav-link">Opportunities</a>
+                <a href="candidates.html" class="nav-link">Candidates</a>
+                <a href="crm.html" class="nav-link">CRM</a>
+            </nav>
+        </div>
+    </header>
 
-  <h1>¡Hola Mundo!</h1>
-  <p>Bienvenido a mi primera página web.</p>
-
-  <script src="assets/js/main.js"></script>
+    <main class="main-content fade-in">
+        <h1 class="welcome-title">Welcome to Vintti HUB</h1>
+        <p class="subtitle">Manage opportunities, candidates, and CRM in one place.</p>
+        <div class="button-group">
+          <a href="opportunities.html" class="button-primary">View Opportunities</a>
+          <a href="candidates.html" class="button-primary">Manage Candidates</a>
+          <a href="crm.html" class="button-primary">Manage Relationships</a>
+        </div>
+        <footer class="footer">
+            &copy; © 2025 Vintti. All rights reserved.
+        </footer>
+    </main>
 </body>
 </html>
