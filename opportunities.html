@@ -1,15 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Opportunities - VINTTI HUB</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opportunities</title>
+  <link rel="stylesheet" href="./assets/css/opportunities.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div class="sidebar">
+    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
+    <div class="menu-item">Candidates</div>
+    <div class="menu-item">CRM</div>
+    <div class="menu-item active">Opportunities</div>
+  </div>
 
-  <h1>Oportunidades</h1>
-  <a href="index.html" class="button">Volver a Home</a>
+  <div class="main-content">
+    <div class="filters-top-bar fade-in delay-1">
+      <button id="toggleFilters" class="filter-btn">🔍 Filters</button>
+      <button class="new-btn">＋ New Opportunity</button>
+    </div>
 
+    <div class="filters-card collapse hidden fade-in delay-2" id="filtersCard">
+      <div class="filter-group">
+        <label for="salesLead">Sales Lead</label>
+        <select id="salesLead">
+          <option>Choose Sales Lead</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="hrLead">HR Lead</label>
+        <select id="hrLead">
+          <option>Choose HR Lead</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="account">Account</label>
+        <select id="account">
+          <option>Choose Account</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="status">Status</label>
+        <select id="status">
+          <option>Filter by status...</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table fade-in delay-3">
+      <div class="table-header">
+        <div>Stage</div>
+        <div>Account</div>
+        <div>Position</div>
+        <div>Type</div>
+        <div>Model</div>
+        <div>Sales Lead</div>
+        <div>HR Lead</div>
+        <div>Comment</div>
+        <div>Days</div>
+      </div>
+      <div class="table-row">
+        <div>Interview</div>
+        <div>Acme Inc.</div>
+        <div>Backend Developer</div>
+        <div>Full-time</div>
+        <div>Remote</div>
+        <div>Maria Gomez</div>
+        <div>John Doe</div>
+        <div>Waiting for feedback</div>
+        <div>3</div>
+      </div>
+      <div class="table-row">
+        <div>Offer</div>
+        <div>Globex</div>
+        <div>Data Scientist</div>
+        <div>Contract</div>
+        <div>Hybrid</div>
+        <div>Samuel Vega</div>
+        <div>Ana Ruiz</div>
+        <div>Offer sent</div>
+        <div>1</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./assets/js/main.js"></script>
 </body>
 </html>
