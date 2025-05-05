@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Opportunity Details</title>
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css" />
+  <link rel="stylesheet" href="./assets/css/pipeline.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
+<script src="./assets/js/pipeline.js"></script>
 <body>
   <header class="detail-header">
     <div class="header-left">
@@ -24,108 +26,273 @@
   </header>
 
   <main class="detail-main">
-    <!-- Aquí va el contenido dinámico por sección -->
-    <section id="overview" class="detail-section overview-section">
+    <section id="overview" class="detail-section">
       <div class="section-header">
         <h2>Overview</h2>
-        <p class="section-subtext">See all the details of this opportunity.</p>
+        <p class="section-subtext"> </p>
         <span class="status-pill">Active</span>
       </div>
     
-      <!-- Stage -->
-      <div class="overview-card">
-        <div class="overview-card-header">
-          <span class="label">Stage</span>
-          <div class="id-box">1743530791757×951353617622761500 <button class="copy-btn">📋</button></div>
-        </div>
-        <h3 class="stage-title">Negotiating</h3>
-        <div class="overview-grid">
-          <div class="input-group">
-            <label>Start Date</label>
-            <input type="text" value="03.04.2025" />
-          </div>
-          <div class="input-group">
-            <label>Signed</label>
-            <div class="info-tag">31 days ago</div>
-          </div>
-          
-          <div class="input-group">
-            <label>Closed Date</label>
-            <input type="text" placeholder="Closed Date" />
-          </div>
-          <div class="input-group">
-            <label>Hire</label>
-            <select><option>Select Hire...</option></select>
-          </div>
+      <!-- Stage (no colapsable, se queda fija) -->
+<div class="overview-card">
+  <div class="stage-top">
+    <div>
+      <label class="section-label">Opportunity ID</label>
+      <div class="stage-id">
+        <span>1743530791757×951353617622761500</span>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/></svg>
+        </button>
+      </div>
+    </div>
+    <span class="status-pill blue">Negotiating</span>
+  </div>
+
+  <div class="overview-grid">
+    <div class="input-group">
+      <label>Start Date</label>
+      <input type="text" value="03.04.2025" />
+    </div>
+    <div class="input-group">
+      <label>Signed</label>
+      <div class="info-tag">31 days ago</div>
+    </div>
+    <div class="input-group">
+      <label>Closed Date</label>
+      <input type="text" placeholder="Closed Date" />
+    </div>
+    <div class="input-group">
+      <label>Hire</label>
+      <select><option>Select Hire...</option></select>
+    </div>
+  </div>
+</div>
+
+<!-- Client -->
+<div class="overview-card">
+  <div class="card-title-row">
+    <button class="card-toggle">
+      <h3>Client</h3>
+      <span class="toggle-icon">▾</span>
+    </button>
+  </div>
+  <div class="card-content">
+    <div class="overview-grid">
+      <div class="input-group"><label>Name</label><input value="Nova Teleclinic" readonly/></div>
+      <div class="input-group"><label>Size</label><input value="11-50" readonly/></div>
+      <div class="input-group"><label>City</label><input value="-" readonly/></div>
+      <div class="input-group"><label>State</label><input value="Florida" readonly/></div>
+      <div class="input-group"><label>Linkedin</label><input value="-" readonly/></div>
+      <div class="input-group"><label>Website</label><input value="Novateleclinic.com" readonly/></div>
+      <div class="input-group full"><label>Mail</label><input value="novateleclinic@gmail.com" readonly/></div>
+      <div class="input-group full"><label>About</label><textarea readonly>Nova Teleclinic provides evidence-based healthcare services to YOU at affordable prices...</textarea></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Details -->
+<div class="overview-card">
+  <button class="card-toggle">
+    <h3>Details</h3>
+    <span class="toggle-icon">▾</span>
+  </button>
+  <div class="card-content">
+    <div class="overview-grid">
+      <div class="input-group"><label>Opportunity Name</label><input value="Virtual Assistant" readonly/></div>
+      <div class="input-group"><label>Account</label><input value="Nova Teleclinic" readonly/></div>
+      <div class="input-group"><label>Sales Lead</label><select disabled><option>Bahia Larcamón</option></select></div>
+      <div class="input-group"><label>HR Lead</label><select disabled><option>Pilar Flores Levalle</option></select></div>
+      <div class="input-group"><label>Model</label><select disabled><option>Staffing</option></select></div>
+      <div class="input-group"><label>QL</label><select disabled><option>MQL</option></select></div>
+    </div>
+  </div>
+</div>
+
+<!-- First Meeting -->
+<div class="overview-card">
+  <button class="card-toggle">
+    <h3>First Meeting Information</h3>
+    <span class="toggle-icon">▾</span>
+  </button>
+  <div class="card-content">
+    <div class="overview-grid">
+      <div class="input-group"><label>Client Budget</label><input value="$1,300" readonly/></div>
+      <div class="input-group"><label>&nbsp;</label><input value="$1,500" readonly/></div>
+      <div class="input-group"><label>Candidate Salary Range</label><input value="$800" readonly/></div>
+      <div class="input-group"><label>&nbsp;</label><input value="$1,000" readonly/></div>
+      <div class="input-group"><label>Model</label><select disabled><option>Staffing</option></select></div>
+      <div class="input-group"><label>Years of Experience</label><input value="1" readonly/></div>
+      <div class="input-group"><label>Set Up Fee</label><input value="2,000" readonly/></div>
+      <div class="input-group"><label>Time Zone</label><select disabled><option>Central Standard Time</option></select></div>
+      <div class="input-group full"><label>Comments</label><textarea readonly>Add comments here...</textarea></div>
+      <div class="input-group full"><label>First Meeting Recording</label><input value="https://tldv.io/app/meetings/67ec260df8d23000130dd853" readonly/></div>
+    </div>
+  </div>
+</div>
+
+<!-- Documents -->
+<div class="overview-card">
+  <button class="card-toggle">
+    <h3>Documents</h3>
+    <span class="toggle-icon">▾</span>
+  </button>
+  <div class="card-content">
+    <div class="card-title-row">
+      <button class="upload-btn">Upload</button>
+    </div>
+    <div class="empty-state">
+      <p>There are no documents</p>
+      <span class="subtext">Documents will be shown here.</span>
+    </div>
+  </div>
+</div>
+    </section>
+    
+
+    <section id="job" class="detail-section hidden">
+      <p class="coming-soon">Coming soon...</p>
+    </section>
+
+    <section id="pipeline" class="detail-section hidden pipeline-section">
+      <div class="pipeline-header">
+        <h2>Pipeline</h2>
+        <div class="pipeline-actions">
+          <button id="addCandidateBtn">+ Add Candidate</button>
+          <button id="signOffBtn">Sign off</button>
         </div>
       </div>
     
-      <!-- Client Section -->
-      <div class="overview-card">
-        <div class="card-title-row">
-          <h3>Client</h3>
-          <button class="edit-btn">Edit Account</button>
+      <div class="pipeline-columns">
+        <!-- Column 1 -->
+        <div class="column" data-status="contacted">
+          <h3>Contactado</h3>
+          <div class="card-container" id="contacted">
+            <div class="candidate-card" draggable="true">
+              <strong>Julia Benedetti Murin</strong>
+              <p class="status">Contactado</p>
+              <div class="preview">
+                <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Julia">
+                <div class="info">
+                  <span class="name">Julia Benedetti Murin</span>
+                  <span class="title">UI/UX Designer</span>
+                  <span class="email">julia.b@nova.co</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="overview-grid">
-          <div class="input-group"><label>Name</label><input value="Nova Teleclinic" readonly/></div>
-          <div class="input-group"><label>Size</label><input value="11-50" readonly/></div>
-          <div class="input-group"><label>City</label><input value="-" readonly/></div>
-          <div class="input-group"><label>State</label><input value="Florida" readonly/></div>
-          <div class="input-group"><label>Linkedin</label><input value="-" readonly/></div>
-          <div class="input-group"><label>Website</label><input value="Novateleclinic.com" readonly/></div>
-          <div class="input-group full"><label>Mail</label><input value="novateleclinic@gmail.com" readonly/></div>
-          <div class="input-group full"><label>About</label><textarea readonly>Nova Teleclinic provides evidence-based healthcare services to YOU at affordable prices...</textarea></div>
+        <!-- Column: No avanza primera -->
+        <div class="column" data-status="no-advance">
+          <h3>No avanza primera</h3>
+          <div class="card-container" id="no-advance">
+            <!-- puedes dejarlo vacío por ahora -->
+          </div>
         </div>
-      </div>
+        <!-- Column 2 -->
+        <div class="column" data-status="first-interview">
+          <h3>Primera entrevista</h3>
+          <div class="card-container" id="first-interview">
+            <div class="candidate-card" draggable="true">
+              <strong>Fernanda De Castro Schindel</strong>
+              <p class="status">Primera entrevista</p>
+              <div class="preview">
+                <img src="https://randomuser.me/api/portraits/women/45.jpg" alt="Fernanda">
+                <div class="info">
+                  <span class="name">Fernanda De Castro Schindel</span>
+                  <span class="title">Front-End Dev</span>
+                  <span class="email">fernanda.c@nova.co</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
     
-      <!-- Details Section -->
-      <div class="overview-card">
-        <h3>Details</h3>
-        <div class="overview-grid">
-          <div class="input-group"><label>Opportunity Name</label><input value="Virtual Assistant" readonly/></div>
-          <div class="input-group"><label>Account</label><input value="Nova Teleclinic" readonly/></div>
-          <div class="input-group"><label>Sales Lead</label><select disabled><option>Bahia Larcamón</option></select></div>
-          <div class="input-group"><label>HR Lead</label><select disabled><option>Pilar Flores Levalle</option></select></div>
-          <div class="input-group"><label>Model</label><select disabled><option>Staffing</option></select></div>
-          <div class="input-group"><label>QL</label><select disabled><option>MQL</option></select></div>
-        </div>
-      </div>
-    
-      <!-- First Meeting Section -->
-      <div class="overview-card">
-        <h3>First Meeting Information</h3>
-        <div class="overview-grid">
-          <div class="input-group"><label>Client Budget</label><input value="$1,300" readonly/></div>
-          <div class="input-group"><label></label><input value="$1,500" readonly/></div>
-          <div class="input-group"><label>Candidate Salary Range</label><input value="$800" readonly/></div>
-          <div class="input-group"><label></label><input value="$1,000" readonly/></div>
-          <div class="input-group"><label>Model</label><select disabled><option>Staffing</option></select></div>
-          <div class="input-group"><label>Years of Experience</label><input value="1" readonly/></div>
-          <div class="input-group"><label>Set Up Fee</label><input value="2,000" readonly/></div>
-          <div class="input-group"><label>Time Zone</label><select disabled><option>Central Standard Time</option></select></div>
-          <div class="input-group full"><label>Comments</label><textarea readonly>Add comments here...</textarea></div>
-          <div class="input-group full"><label>First Meeting Recording</label><input value="https://tldv.io/app/meetings/67ec260df8d23000130dd853" readonly/></div>
-        </div>
-      </div>
-    
-      <!-- Documents Section -->
-      <div class="overview-card">
-        <div class="card-title-row">
-          <h3>Documents</h3>
-          <button class="upload-btn">Upload</button>
-        </div>
-        <div class="empty-state">
-          <p>There are no documents</p>
-          <span class="subtext">Documents will be shown here.</span>
+        <!-- Column 3 -->
+        <div class="column" data-status="client-process">
+          <h3>En proceso con Cliente</h3>
+          <div class="card-container" id="client-process">
+            <div class="candidate-card" draggable="true">
+              <strong>Igor Neves</strong>
+              <p class="status">En proceso con Cliente</p>
+              <div class="preview">
+                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Igor">
+                <div class="info">
+                  <span class="name">Igor Neves</span>
+                  <span class="title">Fullstack Engineer</span>
+                  <span class="email">igor.n@nova.co</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
     
-    <section id="job" class="detail-section hidden">Job description...</section>
-    <section id="pipeline" class="detail-section hidden">Pipeline here...</section>
-    <section id="candidates" class="detail-section hidden">Candidate list...</section>
+    
+    <section id="candidates" class="detail-section hidden">
+      <p class="coming-soon">Coming soon...</p>
+    </section>
   </main>
 
-  <script src="./assets/js/opportunity-detail.js"></script>
+  <script>
+    // ✅ Tema
+    function setTheme(theme) {
+      if (theme === 'light') {
+        document.body.classList.add('light-mode');
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.body.classList.remove('light-mode');
+        localStorage.setItem('theme', 'dark');
+      }
+    }
+  
+    // ✅ Principal
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      setTheme(savedTheme);
+  
+      const tabs = document.querySelectorAll('.nav-item');
+      const sections = document.querySelectorAll('.detail-section');
+      const indicator = document.querySelector('.nav-indicator');
+  
+      function activateTab(index) {
+        tabs.forEach((t, i) => {
+          t.classList.toggle('active', i === index);
+          sections[i].classList.toggle('hidden', i !== index);
+        });
+  
+        const tab = tabs[index];
+        indicator.style.left = `${tab.offsetLeft}px`;
+        indicator.style.width = `${tab.offsetWidth}px`;
+      }
+  
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activateTab(index));
+      });
+  
+      activateTab(0);
+  
+      // ✅ Card toggle
+      document.querySelectorAll('.card-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const card = btn.closest('.overview-card');
+          card.classList.toggle('open');
+        });
+      });
+  
+      // ✅ Copy button
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.parentElement.querySelector('span').innerText;
+          navigator.clipboard.writeText(id).then(() => {
+            btn.title = "Copied!";
+            setTimeout(() => btn.title = "Copy to clipboard", 2000);
+          });
+        });
+      });
+    });
+  </script>  
 </body>
 </html>
+
