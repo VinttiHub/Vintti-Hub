@@ -1,11 +1,27 @@
-/* Reset y fuentes */
+/* Base Reset */
 body {
   margin: 0;
   font-family: 'Onest', sans-serif;
-  background: radial-gradient(circle at top left, #0a1f44 0%, #071a37 50%, #06162e 100%);
-  color: #f0f4f8;
   overflow-x: hidden;
   min-height: 100vh;
+  transition: background 0.5s ease, color 0.5s ease;
+}
+
+/* Theme toggle icons */
+.theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  gap: 15px;
+  font-size: 22px;
+  color: #f0f4f8;
+  cursor: pointer;
+}
+
+.theme-toggle i:hover {
+  transform: scale(1.2);
 }
 
 /* Fade-in animation */
@@ -18,7 +34,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Main content */
+/* Main layout */
 .main-content {
   max-width: 1000px;
   margin: 0 auto;
@@ -48,7 +64,7 @@ body {
   margin-bottom: 40px;
 }
 
-/* Botones */
+/* Buttons */
 .button-group {
   display: flex;
   gap: 20px;
@@ -84,22 +100,9 @@ body {
   text-align: center;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .main-content {
-    padding-top: 100px;
-  }
-}
-body {
-  background: #0a1f44;
-  color: #f0f4f8;
-  overflow-x: hidden;
-  position: relative;
-  min-height: 100vh;
-}
-
-/* Abstract crystal-style background layers */
-body::before, body::after {
+/* Background decorations */
+body::before,
+body::after {
   content: '';
   position: absolute;
   width: 150%;
@@ -122,9 +125,55 @@ body::after {
   clip-path: polygon(10% 0, 30% 10%, 50% 0, 80% 15%, 100% 0, 90% 40%, 70% 50%, 50% 40%, 20% 60%, 0 50%);
 }
 
-/* Keep content above abstract background */
+/* Keep content above background */
 main, footer {
   position: relative;
   z-index: 2;
+}
+
+/* Dark Mode (default) */
+body {
+  background: radial-gradient(circle at top left, #0a1f44 0%, #071a37 50%, #06162e 100%);
+  color: #f0f4f8;
+}
+
+/* Light Mode */
+body.light-mode {
+  background: radial-gradient(circle at top left, #e0ecf8 0%, #ffffff 50%, #dceeff 100%);
+  color: #1a202c;
+}
+
+body.light-mode .gradient-text {
+  background: linear-gradient(to right, #2f80ed, #56ccf2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body.light-mode .subtitle {
+  color: #4a5568;
+}
+
+body.light-mode .button-primary {
+  background: #ffffff;
+  color: #1a202c;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+body.light-mode .button-primary:hover {
+  background: #edf2f7;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .footer {
+  color: #4a5568;
+}
+
+body.light-mode .theme-toggle {
+  color: #1a202c;
+}
+
+body.light-mode::before,
+body.light-mode::after {
+  display: none;
 }
 
