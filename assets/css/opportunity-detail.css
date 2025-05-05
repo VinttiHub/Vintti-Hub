@@ -1,3 +1,4 @@
+
 body {
   background-color: #0a1f44;
   font-family: 'Inter', sans-serif;
@@ -42,10 +43,7 @@ body {
   transition: color 0.3s ease;
 }
 
-.nav-item:hover {
-  color: #ffffff;
-}
-
+.nav-item:hover,
 .nav-item.active {
   color: #ffffff;
 }
@@ -78,7 +76,7 @@ body {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-/* ---- Overview Section Styling ---- */
+
 .overview-section {
   display: flex;
   flex-direction: column;
@@ -114,14 +112,15 @@ body {
   border-radius: 999px;
   font-weight: 500;
 }
+
 .overview-card {
-  padding: 0;
+  background-color: #0d1a2d;
+  padding: 1.5rem;
   margin-bottom: 2rem;
-  border: none;
-  background: none;
-  box-shadow: none;
-  border-radius: 0;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
+
 .input-group {
   display: flex;
   flex-direction: column;
@@ -155,9 +154,10 @@ body {
 .input-group.full {
   grid-column: span 2;
 }
+
 .overview-grid {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 2rem;
   align-items: start;
 }
@@ -187,12 +187,10 @@ body {
 }
 
 .info-tag {
-  background-color: #132c4a;
+  background-color: transparent;
   color: #a0aec0;
-  font-size: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  align-self: center;
+  font-size: 0.85rem;
+  padding-left: 0.4rem;
 }
 
 .empty-state {
@@ -207,17 +205,161 @@ body {
   margin-top: 0.25rem;
   display: block;
 }
-.info-tag {
-  background-color: transparent;
-  color: #a0aec0;
-  font-size: 0.85rem;
-  padding-left: 0.4rem;
-}
+
 .overview-section h3 {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 600;
   margin-top: 2rem;
   margin-bottom: 1rem;
-  border-bottom: 1px solid #1f2f45;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
   padding-bottom: 0.5rem;
+}
+
+/* Light mode overrides */
+body.light-mode {
+  background-color: #ffffff;
+  color: #0a1f44;
+}
+
+body.light-mode .detail-header {
+  background: #f4f7fb;
+  border-bottom: 1px solid #d0d7e2;
+}
+
+body.light-mode .nav-item {
+  color: #4a5568;
+}
+
+body.light-mode .nav-item.active {
+  color: #1a202c;
+}
+
+body.light-mode .nav-indicator {
+  background: #2f80ed;
+}
+
+body.light-mode .section-subtext,
+body.light-mode .info-tag {
+  color: #718096;
+}
+
+body.light-mode .overview-card {
+  background-color: #f8f9fc;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+body.light-mode .input-group input,
+body.light-mode .input-group select,
+body.light-mode .input-group textarea {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e0;
+  color: #1a202c;
+}
+
+body.light-mode .edit-btn,
+body.light-mode .upload-btn {
+  background-color: #2b6cb0;
+}
+.coming-soon {
+  text-align: center;
+  padding: 3rem;
+  font-style: italic;
+  color: #718096;
+}
+.stage-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.stage-id {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: inherit;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.copy-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.section-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.status-pill.blue {
+  background-color: #2f80ed;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.card-toggle {
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+  font: inherit;
+  color: inherit;
+}
+
+.card-toggle h3 {
+  margin: 0;
+}
+
+.toggle-icon {
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.card-content {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.overview-card.open .card-content {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+.overview-card.open .toggle-icon {
+  transform: rotate(180deg);
+}
+.card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-direction: row-reverse;
 }
