@@ -16,4 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-  
+  // Popup logic
+function openPopup() {
+  document.getElementById('popup').style.display = 'flex';
+}
+
+function closePopup() {
+  document.getElementById('popup').style.display = 'none';
+}
+function openOpportunity(id) {
+  window.location.href = `opportunity-detail.html?id=${id}`;
+}
