@@ -36,12 +36,21 @@
     border: none;
     border-radius: 8px;
     font-weight: 500;
-    background-color: var(--card-bg);
-    color: var(--text-dark);
     box-shadow: 0 4px 12px var(--card-shadow);
     cursor: pointer;
     transition: background-color var(--transition-fast), transform var(--transition-fast);
   }
+  
+  body:not(.light-mode) .pipeline-actions button {
+    background-color: var(--accent);
+    color: var(--text-light);
+  }
+  
+  body.light-mode .pipeline-actions button {
+    background-color: var(--card-bg);
+    color: var(--text-dark);
+  }
+  
   
   .pipeline-actions button:hover {
     background-color: var(--accent);
@@ -66,7 +75,7 @@
     max-width: 220px;
     padding: 0 0.5rem;
     border-right: 1px solid rgba(255,255,255,0.08);
-    position: relative; /* 👈 necesario para el ::after */
+    position: static;
   }
   
   
@@ -102,6 +111,7 @@
     cursor: grab;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     max-width: 100%;
+    position: relative;
   }
   
   .candidate-card:hover {
@@ -152,19 +162,23 @@
   }
   
   .preview {
-    position: absolute;
-    left: 105%;
+    position: fixed; /* Cambio clave */
     top: 0;
+    left: 0;
+    transform: translate(100px, 100px); /* Posición inicial fuera de la vista */
     background-color: white;
     color: #1a1a1a;
     border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     width: 240px;
     padding: 1rem;
     display: none;
     transition: all 0.3s ease;
-    z-index: 20;
+    z-index: 99999; /* Muy por encima de todo */
+    pointer-events: none;
   }
+  
+  
   
   .preview img {
     width: 48px;
@@ -215,4 +229,259 @@
     background: rgba(255, 255, 255, 0.2);
     border-radius: 10px;
   }
+  .candidate-card:hover .preview {
+    display: block;
+    animation: fadeInUp 0.3s ease-out forwards;
+  }
   
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .pipeline-columns,
+.card-container,
+.column {
+  overflow: visible !important;
+  position: relative;
+  z-index: 1;
+}
+.pipeline-section {
+  position: relative;
+  z-index: 0;
+}
+
+.pipeline-columns {
+  position: relative;
+  z-index: 0;
+  overflow-x: visible;
+}
+
+.column {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
+}
+
+.card-container {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
+}
+
+.candidate-card {
+  position: relative;
+  z-index: 10;
+}
+
+.candidate-card:hover {
+  z-index: 100;
+}
+
+.preview {
+  position: absolute;
+  z-index: 9999;
+  pointer-events: none;
+}
+/* Candidates section */
+#candidates {
+  padding: 2rem 3rem;
+}
+
+.candidates-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.candidates-header .subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+}
+
+
+.badge {
+  background: var(--accent);
+  color: white;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  margin-left: 1rem;
+}
+
+.batch-table table {
+  width: 100%;
+  margin: 1rem 0 2rem;
+  border-collapse: collapse;
+}
+
+.batch-table th, .batch-table td {
+  text-align: left;
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.view-btn {
+  padding: 0.4rem 1rem;
+  border: none;
+  background-color: var(--accent);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.batch-detail {
+  background-color: var(--card-bg);
+  border-radius: var(--card-radius);
+  box-shadow: 0 0 10px var(--card-shadow);
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.batch-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.candidate-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.candidate-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.budget {
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  background: #e0f4ff;
+}
+
+.budget-negative {
+  background: #ffe0e0;
+  color: red;
+}
+
+.status, .comment-btn, .delete-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.btn-add, .btn-send, .btn-create {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-add {
+  background-color: var(--accent);
+  color: white;
+}
+
+.btn-send {
+  background-color: #e0e0e0;
+}
+
+.btn-create {
+  background-color: #0057ff;
+  color: white;
+  margin-top: 2rem;
+}
+
+.create-batch-wrap {
+  text-align: center;
+}
+/* Light theme overrides */
+body.light-mode {
+  --bg-light: #f8f9fa;
+  --text-dark: #0a1f44;
+  --text-subtle: #5f6b7a;
+  --card-bg: #ffffff;
+  --divider: #ddd;
+  --budget-text: #0a1f44;
+  --status-text: #0a1f44;
+  --budget-bg: rgba(122, 182, 249, 0.25);
+}
+
+/* Dark theme */
+body {
+  --bg-dark: #0a1f44;
+  --text-light: #f0f4f8;
+  --text-subtle: #a0aec0;
+  --card-bg: #121e36;
+  --divider: #2f3e55;
+}
+.candidate-card-static {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--divider);
+  border-radius: var(--card-radius);
+  cursor: default;
+  box-shadow: none;
+  transition: none;
+}
+
+.candidate-card-static .candidate-name {
+  font-weight: 600;
+  flex: 1;
+}
+/* Mejor contraste para modo oscuro */
+body:not(.light-mode) {
+  --card-bg: #131c31;
+  --divider: #2b3750;
+  --text-light: #f0f4f8;
+  --text-subtle: #9aaac2;
+  --badge-bg: #7ab6f9;
+  --accent: #339CFF;
+  --budget-text: #f0f4f8;
+}
+.budget {
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  background: var(--budget-bg);
+  color: var(--budget-text);
+  font-weight: 600;
+}
+
+
+.budget-negative {
+  background: rgba(255, 0, 0, 0.15); /* rojo semitransparente */
+  color: #ff4d4d;
+}
+.status {
+  background-color: transparent;
+  color: var(--status-text);
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+}
+
+
+.comment-btn, .delete-btn {
+  color: var(--text-light);
+  font-size: 1rem;
+  transition: opacity 0.2s ease;
+}
+
+.comment-btn:hover, .delete-btn:hover {
+  opacity: 0.7;
+}
