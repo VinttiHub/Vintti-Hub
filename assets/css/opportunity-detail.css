@@ -363,3 +363,126 @@ body.light-mode .upload-btn {
   align-items: flex-start;
   flex-direction: row-reverse;
 }
+/* ==== JOB DESCRIPTION SECTION ==== */
+
+/* ==== JOB SECTION ==== */
+
+#job .job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+#job .job-header-left h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0;
+  color: inherit;
+}
+
+#job .job-header-left .subtitle {
+  font-size: 0.9rem;
+  color: #a0aec0;
+  margin-top: 0.25rem;
+}
+
+#job .job-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+#job .header-btn {
+  background-color: #2f80ed;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#job .header-btn:hover {
+  background-color: #1c62c5;
+}
+
+#job .status-pill.gray {
+  background-color: #cbd5e0;
+  color: #1a202c;
+}
+
+/* Modo oscuro */
+body:not(.light-mode) #job .status-pill.gray {
+  background-color: #718096;
+  color: white;
+}
+
+/* Contenedor */
+#job .job-card {
+  background-color: #0d1a2d;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  max-width: 900px;
+  margin: auto;
+  line-height: 1.6;
+  color: #f0f4f8;
+}
+
+#job .job-title-input {
+  font-size: 1.5rem;
+  font-weight: 600;
+  background: none;
+  border: none;
+  color: inherit;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+#job .job-title-input:read-only {
+  border-bottom: 1px solid transparent;
+}
+
+/* Textos */
+#job .job-card p {
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+#job .job-card h4 {
+  font-size: 1.1rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #cbd5e0;
+}
+
+#job .job-card ul {
+  padding-left: 1.2rem;
+  margin-top: 0.5rem;
+}
+
+#job .job-card li {
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+/* Light mode */
+body.light-mode #job .job-card {
+  background-color: #f8f9fc;
+  border: 1px solid #e2e8f0;
+  color: #1a202c;
+}
+
+body.light-mode #job .job-title-input {
+  color: #1a202c;
+}
+
+body.light-mode #job .job-card h4 {
+  color: #2d3748;
+}

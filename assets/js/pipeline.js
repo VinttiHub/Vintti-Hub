@@ -42,4 +42,22 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById("contacted").appendChild(newCard);
     });
   });
+  document.querySelectorAll(".candidate-card").forEach(card => {
+    const preview = card.querySelector(".preview");
+  
+    card.addEventListener("mouseenter", (e) => {
+      if (preview) {
+        const rect = card.getBoundingClientRect();
+        preview.style.top = `${rect.top + window.scrollY}px`;
+        preview.style.left = `${rect.right + 10}px`;
+        preview.style.display = "block";
+      }
+    });
+  
+    card.addEventListener("mouseleave", () => {
+      if (preview) {
+        preview.style.display = "none";
+      }
+    });
+  });
   
