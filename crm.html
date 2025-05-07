@@ -1,15 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CRM - VINTTI HUB</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CRM</title>
+  <link rel="stylesheet" href="./assets/css/crm.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div class="sidebar">
+    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
+    <a class="menu-item" href="candidates.html">Candidates</a>
+    <a class="menu-item active" href="crm.html">CRM</a>
+    <a class="menu-item" href="opportunities.html">Opportunities</a>
+  </div>
 
-  <h1>CRM</h1>
-  <a href="index.html" class="button">Volver a Home</a>
+  <div class="main-content">
+    <div class="filters-top-bar fade-in delay-1">
+      <button id="toggleFilters" class="filter-btn">🔍 Filters</button>
+      <button class="new-btn" onclick="openPopup()">＋ New Account</button>
+    </div>
 
+    <div class="filters-card collapse hidden fade-in delay-2" id="filtersCard">
+      <div class="filter-group">
+        <label for="accountSearch">Account</label>
+        <input type="text" id="accountSearch" placeholder="Search account..." />
+      </div>
+      <div class="filter-group">
+        <label for="accountManager">Account Manager</label>
+        <select id="accountManager">
+          <option>Choose Manager</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="crmStatus">Status</label>
+        <select id="crmStatus">
+          <option>Choose Status</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table fade-in delay-3">
+      <div class="table-header">
+        <div>Account</div>
+        <div>Status</div>
+        <div>Account Manager</div>
+        <div>Contract</div>
+        <div>TRR</div>
+        <div>TSF</div>
+        <div>TSR</div>
+      </div>
+      <div class="table-row">
+        <div>Acme Corp</div>
+        <div>Active</div>
+        <div>Maria Gomez</div>
+        <div>Yes</div>
+        <div>85%</div>
+        <div>60%</div>
+        <div>75%</div>
+      </div>
+      <div class="table-row">
+        <div>Globex</div>
+        <div>Prospect</div>
+        <div>Samuel Vega</div>
+        <div>No</div>
+        <div>70%</div>
+        <div>40%</div>
+        <div>50%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup -->
+<div id="popup" class="popup-overlay">
+  <div class="popup-content">
+    <span class="close-btn" onclick="closePopup()">&times;</span>
+    <h2 class="popup-title">New Account</h2>
+    <form class="popup-form two-columns">
+      <div class="popup-field">
+        <label>Name</label>
+        <input type="text" placeholder="Account name" />
+      </div>
+      <div class="popup-field">
+        <label>Size</label>
+        <select>
+          <option>1–10</option>
+          <option>11–50</option>
+          <option>51–200</option>
+          <option>201–500</option>
+          <option>+500</option>
+        </select>
+      </div>
+    
+      <div class="popup-field">
+        <label>Timezone</label>
+        <select>
+          <option>EST</option>
+          <option>CST</option>
+          <option>PST</option>
+          <option>GMT</option>
+          <option>CET</option>
+        </select>
+      </div>
+      <div class="popup-field">
+        <label>State</label>
+        <select>
+          <option>Florida</option>
+          <option>California</option>
+          <option>Texas</option>
+          <option>New York</option>
+          <option>Other</option>
+        </select>
+      </div>
+    
+      <div class="popup-field">
+        <label>Type</label>
+        <select>
+          <option>Client</option>
+          <option>Partner</option>
+          <option>Provider</option>
+        </select>
+      </div>
+      <div class="popup-field">
+        <label>Qualified Lead</label>
+        <select>
+          <option>Yes</option>
+          <option>No</option>
+        </select>
+      </div>
+    
+      <div class="popup-field">
+        <label>Origin</label>
+        <select>
+          <option>Inbound</option>
+          <option>Outbound</option>
+          <option>Referral</option>
+          <option>Event</option>
+        </select>
+      </div>
+      <div class="popup-field">
+        <label>Role</label>
+        <input type="text" placeholder="E.g. CTO, Manager" />
+      </div>
+    
+      <div class="popup-field">
+        <label>Main Contact</label>
+        <input type="text" placeholder="Full name" />
+      </div>
+      <div class="popup-field">
+        <label>Possible Opportunities</label>
+        <input type="text" placeholder="Search..." />
+      </div>
+    
+      <div class="popup-field">
+        <label>Website</label>
+        <input type="text" placeholder="e.g. example.com" />
+      </div>
+      <div class="popup-field">
+        <label>LinkedIn</label>
+        <input type="text" placeholder="LinkedIn URL" />
+      </div>
+    
+      <div class="popup-field">
+        <label>Date</label>
+        <input type="date" />
+      </div>
+    
+      <div class="popup-field full">
+        <label>About</label>
+        <textarea placeholder="Write a description..."></textarea>
+      </div>
+    
+      <button type="submit" class="create-btn">Create</button>
+    </form>    
+  </div>
+</div>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  <script src="./assets/js/crm.js"></script>
 </body>
 </html>

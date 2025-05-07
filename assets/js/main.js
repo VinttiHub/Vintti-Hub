@@ -49,3 +49,7 @@ function closePopup() {
 function openOpportunity(id) {
   window.location.href = `opportunity-detail.html?id=${id}`;
 }
+function navigateTo(section) {
+  alert(`Navigation to "${section}" would happen here.`); 
+  // Aquí reemplaza el alert con lógica de carga dinámica si tienes HTML para las otras secciones
+}
