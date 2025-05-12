@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Account Details</title>
+  <link rel="stylesheet" href="./assets/css/account-details.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div class="main-content">
+    <h1 class="page-title">Account Details</h1>
+    <div class="tab-selector">
+      <button class="tab-btn active" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="employees">Employees</button>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div class="tab-content active" id="overview">
+      <!-- SECTION: Account Info (abierto por defecto) -->
+      <div class="accordion-section open">
+        <div class="accordion-header">Account Info</div>
+        <div class="accordion-content">
+          <div class="grid-two-cols">
+            <p><strong>Name:</strong> Acme Corp</p>
+            <p><strong>Size:</strong> 51–200</p>
+            <p><strong>Timezone:</strong> EST</p>
+            <p><strong>Location:</strong> New York</p>
+            <p><strong>State:</strong> NY</p>
+            <p><strong>Active Time:</strong> 2 years</p>
+            <p><strong>LinkedIn:</strong> <a href="#">linkedin.com/acme</a></p>
+            <p><strong>Website:</strong> <a href="#">acme.com</a></p>
+            <p><strong>Contract:</strong> Yes</p>
+            <p><strong>Referral:</strong> No</p>
+            <p><strong>Total Staffing Fee:</strong> $45,000</p>
+            <p><strong>Total Staffing Revenue:</strong> $95,000</p>
+            <p><strong>Staffing Discount:</strong> 10%</p>
+            <p><strong>Qualified Lead:</strong> Yes</p>
+          </div>
+          <div class="comment-box">
+            <label for="comments"><strong>Comments:</strong></label>
+            <textarea id="comments" placeholder="Write comments here..."></textarea>
+          </div>
+        </div>
+      </div>
+    
+      <!-- SECTION: Associated Opportunities -->
+      <div class="accordion-section">
+        <div class="accordion-header">Associated Opportunities</div>
+        <div class="accordion-content">
+          <table class="styled-table">
+            <thead>
+              <tr><th>Position</th><th>Stage</th><th>Hire</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Backend Developer</td><td>Interview</td><td>Yes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    
+      <!-- SECTION: Hires – Staffing -->
+      <div class="accordion-section">
+        <div class="accordion-header">Hires – Staffing</div>
+        <div class="accordion-content">
+          <div class="card-grid">
+            <div class="info-card square">
+              <div class="info-title">👤 John Smith</div>
+              <div class="info-details">
+                <div><strong>Revenue:</strong> $10,000</div>
+                <div><strong>Fee:</strong> $2,000</div>
+                <div><strong>Salary:</strong> $80,000</div>
+                <div><strong>Type:</strong> Full Time</div>
+              </div>
+            </div>
+            <div class="info-card square">
+              <div class="info-title">👤 Ana Taylor</div>
+              <div class="info-details">
+                <div><strong>Revenue:</strong> $8,000</div>
+                <div><strong>Fee:</strong> $1,500</div>
+                <div><strong>Salary:</strong> $60,000</div>
+                <div><strong>Type:</strong> Contractor</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+      <!-- SECTION: Hires – Recruiting -->
+      <div class="accordion-section">
+        <div class="accordion-header">Hires – Recruiting</div>
+        <div class="accordion-content">
+          <div class="card-grid">
+            <div class="info-card square">
+              <div class="info-title">👤 Mark T.</div>
+              <div class="info-details">
+                <div><strong>Revenue:</strong> $12,000</div>
+                <div><strong>Fee:</strong> $1,800</div>
+                <div><strong>Salary:</strong> $75,000</div>
+                <div><strong>Type:</strong> Probation</div>
+              </div>
+            </div>
+            <div class="info-card square">
+              <div class="info-title">👤 Lisa P.</div>
+              <div class="info-details">
+                <div><strong>Revenue:</strong> $9,500</div>
+                <div><strong>Fee:</strong> $1,400</div>
+                <div><strong>Salary:</strong> $70,000</div>
+                <div><strong>Type:</strong> Permanent</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+
+    <!-- Tab: Employees -->
+    <div class="tab-content" id="employees">
+      <!-- Staffing Employees -->
+      <div class="card">
+        <h2>Employees – Staffing</h2>
+        <table class="styled-table expandable">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Employee</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Position</th>
+              <th>Fee</th>
+              <th>Salary</th>
+              <th>Revenue</th>
+              <th class="toggle-col-btn">Details</th>
+              <th class="hidden-column">Referral</th>
+              <th class="hidden-column">Referral $</th>
+              <th class="hidden-column">Referral Date Range</th>
+              <th class="hidden-column">Discount</th>
+              <th class="hidden-column">Discount $</th>
+              <th class="hidden-column">Discount Date Range</th>
+              <th class="hidden-column">Buy Out</th>
+              <th class="hidden-column">Buy Out $</th>
+              <th class="hidden-column">Buy Out Month</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Active</td>
+              <td>Emily R.</td>
+              <td>2023-01-15</td>
+              <td>–</td>
+              <td>UX Designer</td>
+              <td>$2,500</td>
+              <td>$70,000</td>
+              <td>$8,000</td>
+              <td class="toggle-col-btn"><button class="expand-btn">＋</button></td>
+              <td class="hidden-column">No</td>
+              <td class="hidden-column">–</td>
+              <td class="hidden-column">–</td>
+              <td class="hidden-column">Yes</td>
+              <td class="hidden-column">$500</td>
+              <td class="hidden-column">Jan–Mar 2024</td>
+              <td class="hidden-column">No</td>
+              <td class="hidden-column">–</td>
+              <td class="hidden-column">–</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Recruiting Employees -->
+      <div class="card">
+        <h2>Employees – Recruiting</h2>
+        <table class="styled-table expandable">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Employee</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              <th>Position</th>
+              <th>Probation (Days)</th>
+              <th>Salary</th>
+              <th>Revenue</th>
+              <th class="toggle-col-btn">Details</th>
+              <th class="hidden-column">Referral</th>
+              <th class="hidden-column">Referral $</th>
+              <th class="hidden-column">Referral Date Range</th>
+              <th class="hidden-column">Discount</th>
+              <th class="hidden-column">Discount $</th>
+              <th class="hidden-column">Discount Months</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Completed</td>
+              <td>Mark T.</td>
+              <td>2022-10-01</td>
+              <td>2023-10-01</td>
+              <td>Project Manager</td>
+              <td>90</td>
+              <td>$95,000</td>
+              <td>$12,000</td>
+              <td class="toggle-col-btn"><button class="expand-btn">＋</button></td>
+              <td class="hidden-column">Yes</td>
+              <td class="hidden-column">$1,000</td>
+              <td class="hidden-column">Oct–Dec 2022</td>
+              <td class="hidden-column">No</td>
+              <td class="hidden-column">–</td>
+              <td class="hidden-column">–</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="./assets/js/account-details.js"></script>
+</body>
+</html>

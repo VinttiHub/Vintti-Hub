@@ -40,4 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function closePopup() {
     document.getElementById('popup').style.display = 'none';
   }
+  document.querySelectorAll('.table-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const accountId = row.getAttribute('data-account');
+      window.location.href = `account-details.html?id=${accountId}`;
+    });
+  });
   
