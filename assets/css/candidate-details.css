@@ -1,0 +1,266 @@
+:root {
+  --bg: #f9fafb;
+  --text: #111827;
+  --card: #ffffff;
+  --label: #4b5563;
+  --tab-bg: #e5e7eb;
+  --tab-active: #3b82f6;
+  --shadow: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --bg: #1f2937;
+  --card: #1e293b;  /* azul marino oscuro elegante */
+  --tab-bg: #4b5563;
+  --tab-active: #2563eb;
+  --shadow: rgba(255, 255, 255, 0.05);
+  --text: #f9fafb;
+  --label: #cbd5e1;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  padding: 40px;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+#toggle-theme {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 20px;
+  background-color: var(--tab-bg);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.tab:hover {
+  opacity: 0.9;
+}
+
+.tab.active {
+  background-color: var(--tab-active);
+  color: white;
+  font-weight: bold;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px 32px;
+  padding: 40px;
+  background-color: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 6px 16px var(--shadow);
+  row-gap: 36px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.field.full {
+  grid-column: 1 / -1;
+}
+
+label {
+  font-weight: 500;
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: var(--label);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.field div {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.field.textarea {
+  grid-column: 1 / -1;
+  align-self: start;
+  background-color: transparent;
+  padding: 0;
+}
+
+.field.textarea textarea {
+  resize: vertical;
+  width: 100%;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  background-color: rgba(0, 0, 0, 0.03);
+  color: var(--text);
+  transition: all 0.2s ease-in-out;
+  min-height: 60px;
+}
+
+.field.textarea textarea:focus {
+  outline: none;
+  background-color: #fff;
+  box-shadow: 0 0 0 2px var(--tab-active);
+}
+
+[data-theme="dark"] .field.textarea textarea {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+[data-theme="dark"] .field.textarea textarea:focus {
+  background-color: #1e293b;
+  box-shadow: 0 0 0 2px var(--tab-active);
+}
+
+.field.textarea:hover {
+  background-color: transparent;
+}
+a:hover {
+  text-decoration: none;
+  color: #2563eb;
+}
+
+a {
+  color: var(--tab-active);
+  text-decoration: underline;
+}
+.field.textarea textarea#redFlags {
+  background-color: rgba(239, 68, 68, 0.07); /* rojo suave */
+}
+
+.field.textarea textarea#comments {
+  background-color: rgba(59, 130, 246, 0.05); /* azul suave */
+}
+
+.field-group {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px; /* MUCHO MÁS ESPACIO entre cuadros */
+  margin-top: 32px;
+  align-items: flex-start; /* evita que se alineen por el centro si son de diferente altura */
+}
+
+.field-group .field {
+  flex: 1 1 300px;
+}
+.field {
+  background-color: rgba(0, 0, 0, 0.015);
+  padding: 12px 16px;
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+.field:hover {
+  background-color: rgba(0, 0, 0, 0.035);
+}
+[data-theme="dark"] .field {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .field:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: middle;
+  stroke: var(--label);
+  fill: none;
+  stroke-width: 2;
+}
+
+.field label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.linkedin-link {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  color: var(--tab-active);
+}
+
+.linkedin-link:hover {
+  background: rgba(59, 130, 246, 0.1);
+  cursor: pointer;
+}
+.linkedin-icon img {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  opacity: 0.9;
+}
+
+.linkedin-icon:hover img {
+  transform: scale(1.1);
+  opacity: 1;
+  cursor: pointer;
+}
+/* TEXTAREAS con fondo adaptado a modo oscuro */
+[data-theme="dark"] .field.textarea textarea#redFlags {
+  background-color: rgba(239, 68, 68, 0.15); /* rojo más opaco */
+  color: #fef2f2;
+}
+
+[data-theme="dark"] .field.textarea textarea#comments {
+  background-color: rgba(59, 130, 246, 0.12); /* azul más opaco */
+  color: #e0f2fe;
+}
+
+/* LinkedIn PNG ícono en dark: baja brillo si es imagen */
+[data-theme="dark"] .linkedin-icon img {
+  filter: brightness(0.85);
+}
+
+/* Mejora general para cajas en dark: sombra o contorno */
+[data-theme="dark"] .field {
+  background-color: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+/* Evita fondos oscuros heredados por error */
+[data-theme="dark"] .field.textarea {
+  background-color: transparent;
+  box-shadow: none !important;
+}

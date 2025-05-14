@@ -1,15 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Candidates - VINTTI HUB</title>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Candidates</title>
+  <link rel="stylesheet" href="./assets/css/candidates.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+  <div class="sidebar">
+    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
+    <a class="menu-item active" href="candidates.html">Candidates</a>
+    <a class="menu-item" href="crm.html">CRM</a>
+    <a class="menu-item" href="opportunities.html">Opportunities</a>
+  </div>
 
-  <h1>Candidatos</h1>
-  <a href="index.html" class="button">Volver a Home</a>
+  <div class="main-content">
+    <div class="filters-top-bar fade-in delay-1">
+      <button id="toggleFilters" class="filter-btn">🔍 Filters</button>
+    </div>
 
+    <div class="filters-card collapse hidden fade-in delay-2" id="filtersCard">
+      <div class="filter-group">
+        <label for="conditionFilter">Condition</label>
+        <select id="conditionFilter">
+          <option value="">All Conditions</option>
+          <option value="Candidate">Candidate</option>
+          <option value="Hired">Hired</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="nameSearch">Search by name</label>
+        <input type="text" id="nameSearch" placeholder="Enter name...">
+      </div>
+    </div>
+
+    <div class="table fade-in delay-3">
+      <div class="table-header">
+        <div>Condition</div>
+        <div>Full Name</div>
+        <div>Country</div>
+        <div>Whatsapp</div>
+        <div>LinkedIn</div>
+      </div>
+
+      <div class="table-row" onclick="goToDetails()">
+        <div><span class="tag">Candidate</span></div>
+        <div>Aaron Mainero</div>
+        <div>Argentina</div>
+        <div><button class="whatsapp">Contact</button></div>
+        <div><button class="linkedin">LinkedIn</button></div>
+      </div>
+
+      <!-- Agrega más candidatos aquí -->
+    </div>
+  </div>
+  <script src="./assets/js/candidate.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 </body>
 </html>
