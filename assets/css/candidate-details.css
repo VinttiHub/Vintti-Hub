@@ -264,3 +264,67 @@ a {
   background-color: transparent;
   box-shadow: none !important;
 }
+.cv-container {
+  padding: 40px;
+  background-color: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 6px 16px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.cv-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cv-heading {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--text);
+  border-bottom: 2px solid var(--tab-active);
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cv-card {
+  background-color: rgba(0, 0, 0, 0.015);
+  padding: 16px 20px;
+  border-radius: 12px;
+  transition: background 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.cv-card:hover {
+  background-color: rgba(0, 0, 0, 0.035);
+}
+
+.cv-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.cv-subtitle {
+  font-size: 13px;
+  color: var(--label);
+  margin-bottom: 8px;
+}
+
+.cv-card p {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .cv-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .cv-card:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
