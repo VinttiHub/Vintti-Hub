@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 📦 Obtener datos desde Flask
-  fetch('http://127.0.0.1:5000/data')
+  fetch('https://vintti-backend.onrender.com/data')
     .then(res => res.json())
     .then(data => {
       console.log("Datos recibidos desde el backend:", data);
