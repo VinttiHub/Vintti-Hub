@@ -470,3 +470,29 @@ body:not(.light-mode) {
   justify-self: center;
   margin-top: 1rem;
 }
+/* 🌙 Modo oscuro para DataTables */
+[data-theme="dark"] table.dataTable {
+  color: #f9fafb;
+  background-color: #1f2937;
+}
+
+[data-theme="dark"] table.dataTable thead th {
+  background-color: #374151;
+  color: #f9fafb;
+}
+
+[data-theme="dark"] table.dataTable tbody td {
+  background-color: #1f2937;
+}
+
+[data-theme="dark"] .dataTables_wrapper .dataTables_filter input,
+[data-theme="dark"] .dataTables_wrapper .dataTables_length select {
+  background-color: #374151;
+  color: #f9fafb;
+  border: 1px solid #4b5563;
+}
+
+[data-theme="dark"] .dataTables_wrapper .dataTables_info,
+[data-theme="dark"] .dataTables_wrapper .dataTables_paginate {
+  color: #f9fafb;
+}

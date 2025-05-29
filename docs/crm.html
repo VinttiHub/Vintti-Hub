@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CRM</title>
   <link rel="stylesheet" href="./assets/css/crm.css" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -40,19 +41,23 @@
       </div>
     </div>
 
-    <div class="table fade-in delay-3">
-      <div class="table-header">
-        <div>Account</div>
-        <div>Status</div>
-        <div>Account Manager</div>
-        <div>Contract</div>
-        <div>TRR</div>
-        <div>TSF</div>
-        <div>TSR</div>
-      </div>
-      <div id="accountTableRows"></div>
-    </div>
-  </div>
+    <table id="accountTable" class="display">
+      <thead>
+        <tr>
+          <th>Client Name</th>
+          <th>Status</th>
+          <th>Manager</th>
+          <th>Contract</th>
+          <th>Campo 1</th>
+          <th>Campo 2</th>
+          <th>Campo 3</th>
+        </tr>
+      </thead>
+      <tbody id="accountTableBody">
+        <!-- Se insertan filas desde JS -->
+      </tbody>
+    </table>
+
 
   <!-- Popup -->
 <div id="popup" class="popup-overlay">
@@ -162,5 +167,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <script src="./assets/js/crm.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 </body>
 </html>

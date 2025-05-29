@@ -39,28 +39,51 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(res => res.json())
     .then(data => {
       console.log("Datos recibidos desde el backend:", data);
-      const tableContainer = document.getElementById('accountTableRows');
-      tableContainer.innerHTML = '';
+      // Destruir DataTable previa si ya existe
+      if ($.fn.DataTable.isDataTable('#accountTable')) {
+        $('#accountTable').DataTable().destroy();
+      }
+
+      const tableBody = document.getElementById('accountTableBody');
+      tableBody.innerHTML = '';
 
       if (!Array.isArray(data) || data.length === 0) {
-        tableContainer.innerHTML = '<div class="table-row"><div colspan="7">No data found</div></div>';
-        return;
-      }
+  tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
+  return;
+}
+
 
       data.forEach(item => {
         const htmlRow = `
-          <div class="table-row">
-            <div>${item.client_name || '—'}</div>
-            <div>${item.account_status || '—'}</div>
-            <div>${item.account_manager || '—'}</div>
-            <div>${item.contract || '—'}</div>
-            <div>—</div>
-            <div>—</div>
-            <div>—</div>
-          </div>
+          <tr>
+            <td>${item.client_name || '—'}</td>
+            <td>${item.account_status || '—'}</td>
+            <td>${item.account_manager || '—'}</td>
+            <td>${item.contract || '—'}</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
         `;
-        tableContainer.innerHTML += htmlRow;
+        tableBody.innerHTML += htmlRow;
       });
+      $('#accountTable').DataTable({
+  responsive: true,
+  pageLength: 10,
+  dom: 'Bfrtip',
+  language: {
+    search: "🔍 Buscar:",
+    lengthMenu: "Mostrar _MENU_ registros por página",
+    zeroRecords: "No se encontraron resultados",
+    info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+    paginate: {
+      first: "Primero",
+      last: "Último",
+      next: "Siguiente",
+      previous: "Anterior"
+    }
+  }
+});
     })
     .catch(err => {
       console.error('Error fetching account data:', err);
