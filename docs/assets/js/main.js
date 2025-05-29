@@ -1,29 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // ✅ Mover esta función arriba
-  const setTheme = (theme) => {
-    if (theme === 'light') {
-      document.body.classList.add('light-mode');
-      localStorage.setItem('theme', 'light');
-    } else {
-      document.body.classList.remove('light-mode');
-      localStorage.setItem('theme', 'dark');
-    }
-  };
-
-  // ✅ Aplica el tema guardado al cargar
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  setTheme(savedTheme);
-
-  // ✅ Espera a que todo el DOM esté listo y los íconos existan
-  setTimeout(() => {
-    const lightButtons = document.querySelectorAll('.theme-light');
-    const darkButtons = document.querySelectorAll('.theme-dark');
-
-    lightButtons.forEach(btn => btn.addEventListener('click', () => setTheme('light')));
-    darkButtons.forEach(btn => btn.addEventListener('click', () => setTheme('dark')));
-  }, 0);
-
-  // ✅ Filtros (si existen)
+  document.body.classList.add('light-mode');
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
 
@@ -35,9 +11,72 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleButton.textContent = isExpanded ? '🔍 Filters' : '❌ Close Filters';
     });
   }
+
+  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities')
+    .then(response => response.json())
+    .then(data => {
+      const tbody = document.getElementById('opportunityTableBody');
+      tbody.innerHTML = '';
+
+      if (!Array.isArray(data) || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9">No data available</td></tr>`;
+        return;
+      }
+
+      data.forEach(opp => {
+        const row = `
+          <tr onclick="openOpportunity('${opp.opp_id || ''}')">
+            <td>${opp.opp_stage || '—'}</td>
+            <td>${opp.account_id || '—'}</td>
+            <td>${opp.opp_position_name || '—'}</td>
+            <td>—</td>
+            <td>${opp.opp_model || '—'}</td>
+            <td>${opp.opp_sales_lead || '—'}</td>
+            <td>${opp.opp_hr_lead || '—'}</td>
+            <td>${opp.opp_comments || '—'}</td>
+            <td>—</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+
+      // Inicializa DataTables
+      const table = $('#opportunityTable').DataTable({
+        responsive: true,
+        pageLength: 10,
+        dom: 'lrtip',
+        lengthMenu: [[10, 20, 50], [10, 20, 50]],
+        language: {
+          search: "🔍 Buscar:",
+          lengthMenu: "Mostrar _MENU_ registros por página",
+          zeroRecords: "No se encontraron resultados",
+          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+          paginate: {
+            first: "Primero",
+            last: "Último",
+            next: "Siguiente",
+            previous: "Anterior"
+          }
+        }
+      });
+document.getElementById('opportunityTable').addEventListener('click', function(e) {
+  const target = e.target.closest('.column-filter');
+  if (target) {
+    e.preventDefault();
+    e.stopPropagation();
+    const columnIndex = parseInt(target.getAttribute('data-column'), 10);
+    const table = $('#opportunityTable').DataTable();
+    createColumnFilter(columnIndex, table);
+  }
 });
 
-// ✅ Otras funciones
+
+    })
+    .catch(err => {
+      console.error('Error fetching opportunities:', err);
+    });
+});
+
 function openPopup() {
   document.getElementById('popup').style.display = 'flex';
 }
@@ -49,45 +88,66 @@ function closePopup() {
 function openOpportunity(id) {
   window.location.href = `opportunity-detail.html?id=${id}`;
 }
+
 function navigateTo(section) {
-  alert(`Navigation to "${section}" would happen here.`); 
-  // Aquí reemplaza el alert con lógica de carga dinámica si tienes HTML para las otras secciones
+  alert(`Navigation to "${section}" would happen here.`);
 }
-document.addEventListener('DOMContentLoaded', () => {
-  // ...todo lo que ya tienes...
 
-  // 📦 Fetch para oportunidades
-  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities')
-    .then(response => response.json())
-    .then(data => {
-      const container = document.getElementById('opportunityTableBody');
-      container.innerHTML = ''; // Limpia antes de agregar
+// 🔍 Filtro por columna con múltiples checkboxes
+function createColumnFilter(columnIndex, table) {
+  document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
 
-      if (!Array.isArray(data) || data.length === 0) {
-        container.innerHTML = `<div class="table-row"><div colspan="9">No data available</div></div>`;
-        return;
-      }
+  const columnData = table
+    .column(columnIndex)
+    .data()
+    .toArray()
+    .map(item => item.trim())
+    .filter((v, i, a) => v && a.indexOf(v) === i)
+    .sort();
 
-      data.forEach(opp => {
-        const row = document.createElement('div');
-        row.className = 'table-row';
-        row.onclick = () => openOpportunity(opp.id || ''); // Cambia esto si el ID tiene otro nombre
+  const container = document.createElement('div');
+  container.classList.add('filter-dropdown');
 
-        row.innerHTML = `
-          <div>${opp.opp__stage || '—'}</div>
-          <div>${opp.account__id || '—'}</div>
-          <div>${opp.opp__position__name || '—'}</div>
-          <div>—</div>
-          <div>${opp.opp__model || '—'}</div>
-          <div>${opp.opp__sales__lead || '—'}</div>
-          <div>${opp.opp__hr__lead || '—'}</div>
-          <div>${opp.opp__comments || '—'}</div>
-          <div>—</div>
-        `;
-        container.appendChild(row);
-      });
-    })
-    .catch(err => {
-      console.error('Error fetching opportunities:', err);
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search...';
+  container.appendChild(searchInput);
+
+  const checkboxContainer = document.createElement('div');
+  checkboxContainer.classList.add('checkbox-list');
+
+  columnData.forEach(value => {
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = value;
+    label.appendChild(checkbox);
+    label.append(' ' + value);
+    checkboxContainer.appendChild(label);
+  });
+
+  container.appendChild(checkboxContainer);
+
+  const headerCell = document.querySelectorAll(`#opportunityTable thead th`)[columnIndex];
+  headerCell.appendChild(container);
+
+  searchInput.addEventListener('input', () => {
+    const searchTerm = searchInput.value.toLowerCase();
+    checkboxContainer.querySelectorAll('label').forEach(label => {
+      const text = label.textContent.toLowerCase();
+      label.style.display = text.includes(searchTerm) ? 'block' : 'none';
     });
+  });
+
+  checkboxContainer.addEventListener('change', () => {
+    const selected = Array.from(checkboxContainer.querySelectorAll('input:checked')).map(c => c.value);
+    table.column(columnIndex).search(selected.length ? selected.join('|') : '', true, false).draw();
+  });
+}
+
+// ✅ Cierra dropdowns si haces clic fuera
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.filter-dropdown') && !e.target.classList.contains('column-filter')) {
+    document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
+  }
 });

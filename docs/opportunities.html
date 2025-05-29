@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Opportunities</title>
   <link rel="stylesheet" href="./assets/css/opportunities.css" />
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="light-mode">
   <div class="sidebar">
     <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
     <a class="menu-item" href="candidates.html">Candidates</a>
@@ -48,20 +50,24 @@
       </div>
     </div>
 
-    <div class="table fade-in delay-3">
-      <div class="table-header">
-        <div>Stage</div>
-        <div>Account</div>
-        <div>Position</div>
-        <div>Type</div>
-        <div>Model</div>
-        <div>Sales Lead</div>
-        <div>HR Lead</div>
-        <div>Comment</div>
-        <div>Days</div>
-      </div>
-      <div id="opportunityTableBody"></div>
-    </div>
+  <table id="opportunityTable" class="display">
+<thead>
+  <tr>
+    <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Stage</th>
+    <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Account</th>
+    <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Position</th>
+    <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Type</th>
+    <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> Model</th>
+    <th><span class="column-filter" data-column="5"><i class="fa-solid fa-filter"></i></span> Sales Lead</th>
+    <th><span class="column-filter" data-column="6"><i class="fa-solid fa-filter"></i></span> HR Lead</th>
+    <th><span class="column-filter" data-column="7"><i class="fa-solid fa-filter"></i></span> Comment</th>
+    <th><span class="column-filter" data-column="8"><i class="fa-solid fa-filter"></i></span> Days</th>
+  </tr>
+</thead>
+
+    <tbody id="opportunityTableBody"></tbody>
+  </table>
+
   </div>
 <!-- Popup -->
 <div id="popup" class="popup-overlay">
@@ -117,5 +123,7 @@
 <!-- Esto va primero -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 <script src="./assets/js/main.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 </body>
 </html>

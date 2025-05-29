@@ -10,8 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  setTheme(savedTheme);
+  setTheme('light');
 
   setTimeout(() => {
     const lightButtons = document.querySelectorAll('.theme-light');

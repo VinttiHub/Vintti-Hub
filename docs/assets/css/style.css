@@ -215,3 +215,7 @@ body.light-mode .main-action-button {
 body.light-mode .main-action-button:hover {
   background: linear-gradient(135deg, #56ccf2, #2f80ed);
 }
+body {
+  background: radial-gradient(circle at top left, #e0ecf8 0%, #ffffff 50%, #dceeff 100%) !important;
+  color: #1a202c !important;
+}

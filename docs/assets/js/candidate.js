@@ -24,15 +24,9 @@ function goToDetails() {
         }
       });
     }
-  
-    // Aplicar el modo guardado en localStorage
-    const storedTheme = localStorage.getItem("theme");
-    if (storedTheme === "light") {
-      document.body.classList.add("light-mode");
-    } else {
-      document.body.classList.remove("light-mode");
-    }
-  });
+    setTheme('light');
+  }
+);
   
   function setLightMode() {
     document.body.classList.add("light-mode");
