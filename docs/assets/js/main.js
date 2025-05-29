@@ -53,3 +53,41 @@ function navigateTo(section) {
   alert(`Navigation to "${section}" would happen here.`); 
   // Aquí reemplaza el alert con lógica de carga dinámica si tienes HTML para las otras secciones
 }
+document.addEventListener('DOMContentLoaded', () => {
+  // ...todo lo que ya tienes...
+
+  // 📦 Fetch para oportunidades
+  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities')
+    .then(response => response.json())
+    .then(data => {
+      const container = document.getElementById('opportunityTableBody');
+      container.innerHTML = ''; // Limpia antes de agregar
+
+      if (!Array.isArray(data) || data.length === 0) {
+        container.innerHTML = `<div class="table-row"><div colspan="9">No data available</div></div>`;
+        return;
+      }
+
+      data.forEach(opp => {
+        const row = document.createElement('div');
+        row.className = 'table-row';
+        row.onclick = () => openOpportunity(opp.id || ''); // Cambia esto si el ID tiene otro nombre
+
+        row.innerHTML = `
+          <div>${opp.opp__stage || '—'}</div>
+          <div>${opp.account__id || '—'}</div>
+          <div>${opp.opp__position__name || '—'}</div>
+          <div>—</div>
+          <div>${opp.opp__model || '—'}</div>
+          <div>${opp.opp__sales__lead || '—'}</div>
+          <div>${opp.opp__hr__lead || '—'}</div>
+          <div>${opp.opp__comments || '—'}</div>
+          <div>—</div>
+        `;
+        container.appendChild(row);
+      });
+    })
+    .catch(err => {
+      console.error('Error fetching opportunities:', err);
+    });
+});

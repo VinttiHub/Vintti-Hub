@@ -15,27 +15,45 @@ def get_connection():
         password="Elementum54!"
     )
 
-@app.route('/')
-def home():
-    return 'API running 🎉'
-
-@app.route('/data')
-def get_data():
+def fetch_data_from_table(table_name):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM account LIMIT 10")
+        cursor.execute(f"SELECT * FROM {table_name}")
         colnames = [desc[0] for desc in cursor.description]
         rows = cursor.fetchall()
         data = [dict(zip(colnames, row)) for row in rows]
         cursor.close()
         conn.close()
-        return jsonify(data)
+        return data
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}
 
+@app.route('/')
+def home():
+    return 'API running 🎉'
+
+@app.route('/data')
+def get_accounts():
+    result = fetch_data_from_table("account")
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
+
+@app.route('/opportunities')
+def get_opportunities():
+    result = fetch_data_from_table("opportunity")
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
+
+@app.route('/candidates')
+def get_candidates():
+    result = fetch_data_from_table("candidates")
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify(result)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
-
