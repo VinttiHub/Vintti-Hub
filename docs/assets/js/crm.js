@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
       $('#accountTable').DataTable({
   responsive: true,
   pageLength: 10,
-  dom: 'Bfrtip',
+  dom: 'lrtip',
+  lengthMenu: [ [10, 20, 50], [10, 20, 50] ],
   language: {
     search: "🔍 Buscar:",
     lengthMenu: "Mostrar _MENU_ registros por página",
@@ -98,3 +99,75 @@ function openPopup() {
 function closePopup() {
   document.getElementById('popup').style.display = 'none';
 }
+// 🔍 Filtro por columna con múltiples checkboxes
+function createColumnFilter(columnIndex, table) {
+  // Eliminar otros filtros abiertos
+  document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
+
+  const columnData = table
+    .column(columnIndex)
+    .data()
+    .toArray()
+    .map(item => item.trim())
+    .filter((v, i, a) => v && a.indexOf(v) === i)
+    .sort();
+
+  const container = document.createElement('div');
+  container.classList.add('filter-dropdown');
+
+  // Agrega input de búsqueda
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.placeholder = 'Search...';
+  container.appendChild(searchInput);
+
+  // Agrega lista de opciones
+  const checkboxContainer = document.createElement('div');
+  checkboxContainer.classList.add('checkbox-list');
+  columnData.forEach(value => {
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = value;
+    label.appendChild(checkbox);
+    label.append(' ' + value);
+    checkboxContainer.appendChild(label);
+  });
+  container.appendChild(checkboxContainer);
+
+  // Insertar en DOM cerca del header
+  const headerCell = document.querySelectorAll(`#accountTable thead th`)[columnIndex];
+  headerCell.appendChild(container);
+
+  // Lógica de búsqueda
+  searchInput.addEventListener('input', () => {
+    const searchTerm = searchInput.value.toLowerCase();
+    checkboxContainer.querySelectorAll('label').forEach(label => {
+      const text = label.textContent.toLowerCase();
+      label.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+  });
+
+  // Aplicar filtro al hacer clic en checkboxes
+  checkboxContainer.addEventListener('change', () => {
+    const selected = Array.from(checkboxContainer.querySelectorAll('input:checked')).map(c => c.value);
+    table.column(columnIndex).search(selected.length ? selected.join('|') : '', true, false).draw();
+  });
+}
+
+// Detectar clic en iconos de lupa
+document.querySelectorAll('.column-filter').forEach(icon => {
+  icon.addEventListener('click', (e) => {
+    e.stopPropagation(); // evitar que se cierre al hacer clic en el mismo
+    const columnIndex = parseInt(icon.getAttribute('data-column'), 10);
+    const table = $('#accountTable').DataTable();
+    createColumnFilter(columnIndex, table);
+  });
+});
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.filter-dropdown') && !e.target.classList.contains('column-filter')) {
+    document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
+  }
+});

@@ -496,3 +496,53 @@ body:not(.light-mode) {
 [data-theme="dark"] .dataTables_wrapper .dataTables_paginate {
   color: #f9fafb;
 }
+.filter-dropdown {
+  position: absolute;
+  z-index: 9999;
+  background-color: #1c253a;
+  color: white;
+  border: 1px solid #3b3b3b;
+  border-radius: 6px;
+  padding: 0.5rem;
+  width: 200px;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-top: 0.5rem;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+body.light-mode .filter-dropdown {
+  background-color: #fff;
+  color: #111827;
+  border: 1px solid #cbd5e0;
+}
+
+.filter-dropdown input[type="text"] {
+  width: 100%;
+  padding: 0.4rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+  border: none;
+  background-color: #2b3a59;
+  color: white;
+}
+
+body.light-mode .filter-dropdown input[type="text"] {
+  background-color: #edf2f7;
+  color: #1a202c;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.checkbox-list label {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}

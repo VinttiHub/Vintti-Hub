@@ -18,43 +18,36 @@
 
   <div class="main-content">
     <div class="filters-top-bar fade-in delay-1">
-      <button id="toggleFilters" class="filter-btn">🔍 Filters</button>
       <button class="new-btn" onclick="openPopup()">＋ New Account</button>
-    </div>
-
-    <div class="filters-card collapse hidden fade-in delay-2" id="filtersCard">
-      <div class="filter-group">
-        <label for="accountSearch">Account</label>
-        <input type="text" id="accountSearch" placeholder="Search account..." />
-      </div>
-      <div class="filter-group">
-        <label for="accountManager">Account Manager</label>
-        <select id="accountManager">
-          <option>Choose Manager</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="crmStatus">Status</label>
-        <select id="crmStatus">
-          <option>Choose Status</option>
-        </select>
-      </div>
     </div>
 
     <table id="accountTable" class="display">
       <thead>
         <tr>
-          <th>Client Name</th>
-          <th>Status</th>
-          <th>Manager</th>
-          <th>Contract</th>
-          <th>Campo 1</th>
-          <th>Campo 2</th>
-          <th>Campo 3</th>
+          <th>Client Name
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
+          <th>Status
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
+          <th>Manager
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
+          <th>Contract
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
+          <th>Campo 1
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
+          <th>Campo 2
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
+          <th>Campo 3
+            <span class="column-filter" data-column="0">🔍</span>
+          </th>
         </tr>
       </thead>
       <tbody id="accountTableBody">
-        <!-- Se insertan filas desde JS -->
       </tbody>
     </table>
 
