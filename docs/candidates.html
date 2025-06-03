@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Candidates</title>
   <link rel="stylesheet" href="./assets/css/candidates.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body class="light-mode">
@@ -16,10 +17,6 @@
   </div>
 
   <div class="main-content">
-    <div class="filters-top-bar fade-in delay-1">
-      <button id="toggleFilters" class="filter-btn">🔍 Filters</button>
-    </div>
-
     <div class="filters-card collapse hidden fade-in delay-2" id="filtersCard">
       <div class="filter-group">
         <label for="conditionFilter">Condition</label>
@@ -35,23 +32,22 @@
       </div>
     </div>
 
-      <div class="table fade-in delay-3">
-  <div class="table-header">
-    <div>Condition</div>
-    <div>Full Name</div>
-    <div>Country</div>
-    <div>Whatsapp</div>
-    <div>LinkedIn</div>
+<table id="candidatesTable" class="display">
+  <thead>
+    <tr>
+      <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Condition</th>
+      <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Full Name</th>
+      <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Country</th>
+      <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Whatsapp</th>
+      <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> LinkedIn</th>
+    </tr>
+  </thead>
+  <tbody id="candidatesTableBody"></tbody>
+</table>
   </div>
-
-  <!-- Aquí se insertarán dinámicamente las filas -->
-</div>
-
-
-      <!-- Agrega más candidatos aquí -->
-    </div>
-  </div>
-  <script src="./assets/js/candidate.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+<script src="./assets/js/candidate.js"></script>
 </body>
 </html>
