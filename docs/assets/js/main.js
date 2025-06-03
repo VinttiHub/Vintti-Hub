@@ -151,3 +151,34 @@ document.addEventListener('click', (e) => {
     document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
   }
 });
+document.getElementById('login-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  try {
+    const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      const nickname = data.nickname;
+      document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
+      document.getElementById('login-container').style.display = 'none';
+      document.getElementById('welcome-container').style.display = 'block';
+    } else {
+      alert(data.message || 'Correo o contraseña incorrectos.');
+    }
+  } catch (err) {
+    console.error('Error en login:', err);
+    alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
+  }
+});
+

@@ -9,12 +9,23 @@
   <link rel="stylesheet" href="./assets/css/style.css">
 </head>
 <body>
-  <main class="main-content fade-in">
-    <h1 class="welcome-title">Welcome to <span class="gradient-text">Vintti HUB</span></h1>
-    <p class="subtitle">Your intelligent workspace for hiring excellence.</p>
+  <div id="login-container">
+  <h2>Login</h2>
+  <form id="login-form">
+    <input type="email" id="email" placeholder="Enter your email" required>
+    <input type="password" id="password" placeholder="Enter your password" required>
+    <button type="submit">Login</button>
+  </form>
+</div>
+  <main id="welcome-container" class="main-content fade-in" style="display: none;">
+  <h1 class="welcome-title">
+    <span id="personalized-greeting"></span>
+    Welcome to <span class="gradient-text">Vintti HUB</span>
+  </h1>
+  <p class="subtitle">Your intelligent workspace for hiring excellence.</p>
+  <a href="opportunities.html" class="main-action-button">🚀 Launch</a>
+</main>
 
-    <a href="opportunities.html" class="main-action-button">🚀 Launch</a>
-  </main>
 
   <footer class="footer">
     &copy; 2025 Vintti. All rights reserved.

@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
 import os
@@ -53,6 +53,32 @@ def get_candidates():
     if "error" in result:
         return jsonify(result), 500
     return jsonify(result)
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        query = """
+            SELECT nickname FROM users 
+            WHERE email_vintti = %s AND password = %s
+        """
+        cursor.execute(query, (email, password))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if result:
+            return jsonify({"success": True, "nickname": result[0]})
+        else:
+            return jsonify({"success": False, "message": "Correo o contraseña incorrectos"}), 401
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
