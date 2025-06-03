@@ -54,18 +54,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
       data.forEach(item => {
         const htmlRow = `
-          <tr>
-            <td>${item.client_name || '—'}</td>
-            <td>${item.account_status || '—'}</td>
-            <td>${item.account_manager || '—'}</td>
-            <td>${item.contract || '—'}</td>
-            <td>—</td>
-            <td>—</td>
-            <td>—</td>
-          </tr>
-        `;
-        tableBody.innerHTML += htmlRow;
+  <tr data-id="${item.candidate_id}">
+    <td>${item.client_name || '—'}</td>
+    <td>${item.account_status || '—'}</td>
+    <td>${item.account_manager || '—'}</td>
+    <td>${item.contract || '—'}</td>
+    <td>—</td>
+    <td>—</td>
+    <td>—</td>
+  </tr>
+`;
+tableBody.innerHTML += htmlRow;
+
       });
+      document.querySelectorAll('#accountTableBody tr').forEach(row => {
+  row.addEventListener('click', () => {
+    const id = row.getAttribute('data-id');
+    if (id) {
+      window.location.href = `account-details.html?id=${id}`;
+    }
+  });
+});
+
       $('#accountTable').DataTable({
   responsive: true,
   pageLength: 10,
