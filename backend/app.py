@@ -178,13 +178,20 @@ def create_opportunity():
             return jsonify({'error': f'No account found for client_name: {client_name}'}), 400
 
         account_id = account_row[0]
+        # 🔢 Buscar el ID más alto y sumarle 1
+        cursor.execute("SELECT MAX(opportunity_id) FROM opportunity")
+        max_id = cursor.fetchone()[0]
+        new_id = (max_id or 0) + 1
+        
         query = """
             INSERT INTO opportunity (
-                account_id, opp_model, opp_position_name, opp_sales_lead, opp_type
-            ) VALUES (%s, %s, %s, %s, %s)
-        """
-        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type))
+                opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead, opp_type
+            ) VALUES (%s, %s, %s, %s, %s, %s)
+            """
+        cursor.execute(query, (new_id, account_id, opp_model, position_name, sales_lead, opp_type))
+
         conn.commit()
+
         cursor.close()
         conn.close()
 
