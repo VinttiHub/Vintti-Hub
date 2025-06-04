@@ -65,23 +65,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 function fillAccountDetails(data) {
   const container = document.querySelector('.grid-two-cols');
-
   container.innerHTML = `
     <p><strong>Name:</strong> ${data.client_name || '—'}</p>
-    <p><strong>Size:</strong> ${data.company_size || '—'}</p>
+    <p><strong>Size:</strong> ${data.Size || '—'}</p>
     <p><strong>Timezone:</strong> ${data.timezone || '—'}</p>
-    <p><strong>Location:</strong> ${data.location || '—'}</p>
     <p><strong>State:</strong> ${data.state || '—'}</p>
-    <p><strong>Active Time:</strong> ${data.active_time || '—'}</p>
     <p><strong>LinkedIn:</strong> <a href="${data.linkedin}" target="_blank">${data.linkedin || '—'}</a></p>
     <p><strong>Website:</strong> <a href="${data.website}" target="_blank">${data.website || '—'}</a></p>
     <p><strong>Contract:</strong> ${data.contract || '—'}</p>
-    <p><strong>Referral:</strong> ${data.referral || '—'}</p>
-    <p><strong>Total Staffing Fee:</strong> ${data.total_fee || '—'}</p>
-    <p><strong>Total Staffing Revenue:</strong> ${data.total_revenue || '—'}</p>
-    <p><strong>Staffing Discount:</strong> ${data.discount || '—'}</p>
-    <p><strong>Qualified Lead:</strong> ${data.qualified_lead || '—'}</p>
+    <p><strong>Total Staffing Fee:</strong> —</p>
+    <p><strong>Total Staffing Revenue:</strong> —</p>
   `;
 }
+
 
     
