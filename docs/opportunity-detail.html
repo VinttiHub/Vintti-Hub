@@ -34,12 +34,13 @@
       </div>
     
       <!-- Stage (no colapsable, se queda fija) -->
+<!-- Stage (no colapsable, se queda fija) -->
 <div class="overview-card">
   <div class="stage-top">
     <div>
       <label class="section-label">Opportunity ID</label>
       <div class="stage-id">
-        <span>1743530791757×951353617622761500</span>
+        <span id="opportunity-id-text">—</span>
         <button class="copy-btn" title="Copy to clipboard">
           <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/></svg>
         </button>
@@ -51,15 +52,15 @@
   <div class="overview-grid">
     <div class="input-group">
       <label>Start Date</label>
-      <input type="text" value="03.04.2025" />
+      <input type="text" id="start-date-input" value="03.04.2025" />
     </div>
     <div class="input-group">
       <label>Signed</label>
-      <div class="info-tag">31 days ago</div>
+      <div class="info-tag" id="signed-tag">31 days ago</div>
     </div>
     <div class="input-group">
       <label>Closed Date</label>
-      <input type="text" placeholder="Closed Date" />
+      <input type="text" id="close-date-input" placeholder="Closed Date" />
     </div>
     <div class="input-group">
       <label>Hire</label>
@@ -67,6 +68,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- Client -->
 <div class="overview-card">

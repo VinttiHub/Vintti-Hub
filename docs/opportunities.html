@@ -45,50 +45,45 @@
   <div class="popup-content">
     <span class="close-btn" onclick="closePopup()">&times;</span>
     <h2 class="popup-title">New Opportunity</h2>
-    <form class="popup-form">
-      <div class="popup-row">
-        <div class="popup-field">
-          <label>Client Name</label>
-          <div class="input-with-button">
-            <input type="text" placeholder="Search by name..." />
-            <button type="button">＋</button>
-          </div>
-        </div>
-        <div class="popup-field">
-          <label>Model</label>
-          <select>
-            <option>Staffing/Recruiting</option>
-            <option>Outsourcing</option>
-            <option>Project-based</option>
-          </select>
-        </div>
+   <form id="createOpportunityForm" class="popup-form">
+  <div class="popup-row">
+    <div class="popup-field">
+      <label>Client Name</label>
+      <div class="input-with-button">
+        <input type="text" id="client_name" name="client_name" list="accountList" placeholder="Search by name..." />
+        <datalist id="accountList"></datalist>
+        <button type="button">＋</button>
       </div>
+    </div>
+    <div class="popup-field">
+      <label>Model</label>
+      <select id="opp_model" name="opp_model">
+        <option>Staffing</option>
+        <option>Recruiting</option>
+      </select>
+    </div>
+  </div>
 
-      <div class="popup-field">
-        <label>Position Name</label>
-        <input type="text" placeholder="E.g. Senior Accountant" />
-      </div>
+  <div class="popup-field">
+    <label>Position Name</label>
+    <input type="text" id="position_name" name="position_name" placeholder="E.g. Senior Accountant" />
+  </div>
 
-      <div class="popup-field">
-        <label>Sales Lead</label>
-        <select>
-          <option>Please select...</option>
-          <option>Maria Gomez</option>
-          <option>Samuel Vega</option>
-        </select>
-      </div>
+  <div class="popup-field">
+    <label>Sales Lead</label>
+    <select id="sales_lead" name="sales_lead"></select>
+  </div>
 
-      <div class="popup-field">
-        <label>Opportunity type</label>
-        <select>
-          <option>New or Replacement</option>
-          <option>New</option>
-          <option>Replacement</option>
-        </select>
-      </div>
+  <div class="popup-field">
+    <label>Opportunity type</label>
+    <select id="opp_type" name="opp_type">
+      <option>New</option>
+      <option>Replacement</option>
+    </select>
+  </div>
 
-      <button type="submit" class="create-btn">Create</button>
-    </form>
+  <button type="submit" class="create-btn">Create</button>
+</form>
   </div>
 </div>
 <!-- Esto va primero -->

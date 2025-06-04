@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       data.forEach(opp => {
         const row = `
-          <tr onclick="openOpportunity('${opp.opp_id || ''}')">
+          <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
             <td>${opp.opp_stage || '—'}</td>
             <td>${opp.account_id || '—'}</td>
             <td>${opp.opp_position_name || '—'}</td>
@@ -182,3 +182,64 @@ document.getElementById('login-form').addEventListener('submit', async function 
   }
 });
 
+document.getElementById('createOpportunityForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const formData = {
+    client_name: form.client_name.value.trim(),
+    opp_model: form.opp_model.value,
+    position_name: form.position_name.value.trim(),
+    sales_lead: form.sales_lead.value,
+    opp_type: form.opp_type.value
+  };
+
+  try {
+    const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert('Opportunity created successfully!');
+      closePopup();
+      location.reload(); // si prefieres, luego lo cambiamos para que se actualice sin recargar
+    } else {
+      alert('Error: ' + (result.message || 'Unexpected error'));
+    }
+  } catch (err) {
+    console.error('Error creating opportunity:', err);
+    alert('Connection error. Please try again.');
+  }
+});
+fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users')
+  .then(response => response.json())
+  .then(users => {
+    const select = document.getElementById('sales_lead');
+    select.innerHTML = '<option disabled selected>Select a user</option>';
+    users.forEach(user => {
+      const option = document.createElement('option');
+      option.value = user;
+      option.textContent = user;
+      select.appendChild(option);
+    });
+  })
+  .catch(err => {
+    console.error('Error loading users:', err);
+  });
+fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts')
+  .then(response => response.json())
+  .then(accounts => {
+    const datalist = document.getElementById('accountList');
+    accounts.forEach(account => {
+      const option = document.createElement('option');
+      option.value = account.account_name;  // asegúrate de usar el nombre correcto
+      datalist.appendChild(option);
+    });
+  })
+  .catch(err => {
+    console.error('Error loading accounts:', err);
+  });

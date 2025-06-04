@@ -122,10 +122,41 @@ def get_opportunities_by_account(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/opportunities/<opportunity_id>')
+def get_opportunity_by_id(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM opportunity WHERE opp_id = %s", (opportunity_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"error": "Opportunity not found"}), 404
 
+        colnames = [desc[0] for desc in cursor.description]
+        opportunity = dict(zip(colnames, row))
 
+        cursor.close()
+        conn.close()
 
+        return jsonify(opportunity)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
+@app.route('/users', methods=['GET'])
+def get_users():
+    cur = conn.cursor()
+    cur.execute("SELECT user_name FROM users")
+    users = [row[0] for row in cur.fetchall()]
+    cur.close()
+    return jsonify(users)
+
+@app.route('/account', methods=['GET'])
+def get_accounts():
+    cur = conn.cursor()
+    cur.execute("SELECT client_name FROM account")
+    accounts = [{'client_name': row[0]} for row in cur.fetchall()]
+    cur.close()
+    return jsonify(accounts)
 
 
 if __name__ == '__main__':

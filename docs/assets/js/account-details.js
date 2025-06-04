@@ -102,9 +102,9 @@ function fillOpportunitiesTable(opportunities) {
   opportunities.forEach(opp => {
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td>${opp.position || '—'}</td>
-      <td>${opp.stage || '—'}</td>
-      <td>${opp.hire || '—'}</td>
+      <td>${opp.opp_position_name || '—'}</td>
+      <td>${opp.opp_stage || '—'}</td>
+      <td>${opp.candidato_contratado || '—'}</td>
     `;
     tbody.appendChild(row);
   });

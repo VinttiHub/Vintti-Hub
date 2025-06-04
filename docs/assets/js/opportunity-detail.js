@@ -41,9 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
+
+  // ✅ Cargar datos reales de la oportunidad
+  loadOpportunityData();
 });
 
-// ✅ Tema
 function setTheme(theme) {
   if (theme === 'light') {
     document.body.classList.add('light-mode');
@@ -54,3 +56,21 @@ function setTheme(theme) {
   }
 }
 
+async function loadOpportunityData() {
+  const params = new URLSearchParams(window.location.search);
+  const opportunityId = params.get('id');
+  if (!opportunityId) return;
+
+  try {
+    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
+    const data = await res.json();
+
+    document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
+    document.getElementById('start-date-input').value = data.ida_signature_or_start_date || '';
+    document.getElementById('close-date-input').value = data.opp_close_date || '';
+    document.getElementById('signed-tag').textContent = '—'; // Puedes calcular días después
+
+  } catch (err) {
+    console.error("Error loading opportunity:", err);
+  }
+}
