@@ -102,33 +102,40 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.querySelector('.popup-form');
 
   if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-      const formData = new FormData(form);
-      const data = Object.fromEntries(formData.entries());
+  const formData = new FormData(form);
+  const data = Object.fromEntries(formData.entries());
 
-      try {
-        const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
+  console.log("📤 Enviando datos al backend:", data);  // ✅ Ver qué datos se envían
 
-        if (response.ok) {
-          alert('✅ Account created!');
-          location.reload();
-        } else {
-          const error = await response.text();
-          alert('Error: ' + error);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('⚠️ Error sending request');
-      }
+  try {
+    const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
     });
+
+    console.log("📥 Respuesta recibida:", response);  // ✅ Ver el status y headers
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log("✅ Éxito al crear account:", responseData);
+      alert('✅ Account created!');
+      location.reload();
+    } else {
+      const errorText = await response.text();
+      console.warn("⚠️ Error al crear account:", errorText);
+      alert('Error: ' + errorText);
+    }
+  } catch (err) {
+    console.error("❌ Error inesperado al enviar request:", err);
+    alert('⚠️ Error sending request');
+  }
+});
   }
 });
 

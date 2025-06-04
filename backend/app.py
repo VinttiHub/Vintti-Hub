@@ -211,8 +211,8 @@ def accounts():
 
             query = """
                 INSERT INTO account (
-                    client_name, account_size, timezone, state,
-                    website, linkedin, about
+                    client_name, Size, timezone, state,
+                    website, linkedin, comments
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
 
