@@ -178,15 +178,13 @@ def create_opportunity():
             return jsonify({'error': f'No account found for client_name: {client_name}'}), 400
 
         account_id = account_row[0]
-
-        # 📝 Insertar nueva oportunidad
         query = """
-            INSERT INTO opportunity (account_id, opp_model, opp_position_name, opp_sales_lead, opp_type)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO opportunity (
+                account_id, opp_model, opp_position_name, opp_sales_lead, opp_type
+            ) VALUES (%s, %s, %s, %s, %s)
         """
         cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type))
         conn.commit()
-
         cursor.close()
         conn.close()
 
@@ -194,7 +192,7 @@ def create_opportunity():
 
     except Exception as e:
         import traceback
-        print(traceback.format_exc())  # Para ver detalles en logs de App Runner
+        print(traceback.format_exc())  # También útil por si miras logs luego
         return jsonify({'error': str(e)}), 500
 
 
