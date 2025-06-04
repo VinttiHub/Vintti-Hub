@@ -100,6 +100,34 @@ def get_account_by_id(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/accounts/<account_id>/opportunities')
+def get_opportunities_by_account(account_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM opportunity WHERE account_id = %s
+        """, (account_id,))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify([])
+
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)

@@ -58,11 +58,23 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(res => res.json())
     .then(data => {
       fillAccountDetails(data);  // función para llenar el HTML
+      loadAssociatedOpportunities(id); 
     })
     .catch(err => {
       console.error('Error fetching accounts details:', err);
     });
 });
+function loadAssociatedOpportunities(accountId) {
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
+    .then(res => res.json())
+    .then(data => {
+      console.log("Oportunidades asociadas:", data);
+      fillOpportunitiesTable(data);
+    })
+    .catch(err => {
+      console.error("Error cargando oportunidades asociadas:", err);
+    });
+}
 function fillAccountDetails(data) {
   const container = document.querySelector('.grid-two-cols');
   container.innerHTML = `
@@ -76,6 +88,26 @@ function fillAccountDetails(data) {
     <p><strong>Total Staffing Fee:</strong> —</p>
     <p><strong>Total Staffing Revenue:</strong> —</p>
   `;
+}
+
+function fillOpportunitiesTable(opportunities) {
+  const tbody = document.querySelector('#overview .accordion-section:nth-of-type(2) tbody');
+  tbody.innerHTML = '';
+
+  if (!opportunities.length) {
+    tbody.innerHTML = `<tr><td colspan="3">No opportunities found</td></tr>`;
+    return;
+  }
+
+  opportunities.forEach(opp => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${opp.position || '—'}</td>
+      <td>${opp.stage || '—'}</td>
+      <td>${opp.hire || '—'}</td>
+    `;
+    tbody.appendChild(row);
+  });
 }
 
 
