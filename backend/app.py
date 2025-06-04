@@ -142,21 +142,19 @@ def get_opportunity_by_id(opportunity_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/users', methods=['GET'])
+@app.route('/users')
 def get_users():
-    cur = conn.cursor()
-    cur.execute("SELECT user_name FROM users")
-    users = [row[0] for row in cur.fetchall()]
-    cur.close()
-    return jsonify(users)
+    result = fetch_data_from_table("users")
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify([row["user_name"] for row in result])  # 🔹 Devuelve solo la columna que necesitas
 
-@app.route('/account', methods=['GET'])
-def get_accounts():
-    cur = conn.cursor()
-    cur.execute("SELECT client_name FROM account")
-    accounts = [{'client_name': row[0]} for row in cur.fetchall()]
-    cur.close()
-    return jsonify(accounts)
+@app.route('/accounts')
+def get_accounts_list():
+    result = fetch_data_from_table("account")
+    if "error" in result:
+        return jsonify(result), 500
+    return jsonify([{"account_name": row["client_name"]} for row in result])  # 🔹 Devuelve account_name renombrado
 
 
 if __name__ == '__main__':
