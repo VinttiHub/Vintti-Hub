@@ -149,12 +149,6 @@ def get_users():
         return jsonify(result), 500
     return jsonify([row["user_name"] for row in result])  # 🔹 Devuelve solo la columna que necesitas
 
-@app.route('/accounts')
-def get_accounts_list():
-    result = fetch_data_from_table("account")
-    if "error" in result:
-        return jsonify(result), 500
-    return jsonify([{"account_name": row["client_name"]} for row in result])  # 🔹 Devuelve account_name renombrado
 
 @app.route('/opportunities', methods=['POST'])
 def create_opportunity():
@@ -196,6 +190,52 @@ def create_opportunity():
         import traceback
         print(traceback.format_exc())  # También útil por si miras logs luego
         return jsonify({'error': str(e)}), 500
+    
+
+
+@app.route('/accounts', methods=['GET', 'POST'])
+def accounts():
+    if request.method == 'GET':
+        result = fetch_data_from_table("account")
+        if "error" in result:
+            return jsonify(result), 500
+        return jsonify([{"account_name": row["client_name"]} for row in result])
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            print("🟢 Datos recibidos en POST /accounts:", data)
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            query = """
+                INSERT INTO account (
+                    client_name, account_size, timezone, state,
+                    website, linkedin, about
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+
+            cursor.execute(query, (
+                data.get("name"),
+                data.get("size"),
+                data.get("timezone"),
+                data.get("state"),
+                data.get("website"),
+                data.get("linkedin"),
+                data.get("about")
+            ))
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return jsonify({"message": "Account created successfully"}), 201
+
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return jsonify({"error": str(e)}), 500
 
 
 

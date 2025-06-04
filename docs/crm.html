@@ -46,11 +46,12 @@
     <form class="popup-form two-columns">
       <div class="popup-field">
         <label>Name</label>
-        <input type="text" placeholder="Account name" />
+        <input type="text" name="name" placeholder="Account name" />
       </div>
+
       <div class="popup-field">
         <label>Size</label>
-        <select>
+        <select name="size">
           <option>1–10</option>
           <option>11–50</option>
           <option>51–200</option>
@@ -58,90 +59,96 @@
           <option>+500</option>
         </select>
       </div>
-    
+
       <div class="popup-field">
         <label>Timezone</label>
-        <select>
+        <select name="timezone">
           <option>EST</option>
           <option>CST</option>
           <option>PST</option>
-          <option>GMT</option>
-          <option>CET</option>
+          <option>MST</option>
+          <option>AST</option>
+          <option>HST</option>
         </select>
       </div>
+
       <div class="popup-field">
         <label>State</label>
-        <select>
-          <option>Florida</option>
+        <select name="state">
+          <option>Alabama</option>
+          <option>Alaska</option>
+          <option>Arizona</option>
+          <option>Arkansas</option>
           <option>California</option>
-          <option>Texas</option>
+          <option>Colorado</option>
+          <option>Connecticut</option>
+          <option>Delaware</option>
+          <option>Florida</option>
+          <option>Georgia</option>
+          <option>Hawaii</option>
+          <option>Idaho</option>
+          <option>Illinois</option>
+          <option>Indiana</option>
+          <option>Iowa</option>
+          <option>Kansas</option>
+          <option>Kentucky</option>
+          <option>Louisiana</option>
+          <option>Maine</option>
+          <option>Maryland</option>
+          <option>Massachusetts</option>
+          <option>Michigan</option>
+          <option>Minnesota</option>
+          <option>Mississippi</option>
+          <option>Missouri</option>
+          <option>Montana</option>
+          <option>Nebraska</option>
+          <option>Nevada</option>
+          <option>New Hampshire</option>
+          <option>New Jersey</option>
+          <option>New Mexico</option>
           <option>New York</option>
+          <option>North Carolina</option>
+          <option>North Dakota</option>
+          <option>Ohio</option>
+          <option>Oklahoma</option>
+          <option>Oregon</option>
+          <option>Pennsylvania</option>
+          <option>Rhode Island</option>
+          <option>South Carolina</option>
+          <option>South Dakota</option>
+          <option>Tennessee</option>
+          <option>Texas</option>
+          <option>Utah</option>
+          <option>Vermont</option>
+          <option>Virginia</option>
+          <option>Washington</option>
+          <option>West Virginia</option>
+          <option>Wisconsin</option>
+          <option>Wyoming</option>
           <option>Other</option>
         </select>
       </div>
-    
-      <div class="popup-field">
-        <label>Type</label>
-        <select>
-          <option>Client</option>
-          <option>Partner</option>
-          <option>Provider</option>
-        </select>
-      </div>
-      <div class="popup-field">
-        <label>Qualified Lead</label>
-        <select>
-          <option>Yes</option>
-          <option>No</option>
-        </select>
-      </div>
-    
-      <div class="popup-field">
-        <label>Origin</label>
-        <select>
-          <option>Inbound</option>
-          <option>Outbound</option>
-          <option>Referral</option>
-          <option>Event</option>
-        </select>
-      </div>
-      <div class="popup-field">
-        <label>Role</label>
-        <input type="text" placeholder="E.g. CTO, Manager" />
-      </div>
-    
-      <div class="popup-field">
-        <label>Main Contact</label>
-        <input type="text" placeholder="Full name" />
-      </div>
-      <div class="popup-field">
-        <label>Possible Opportunities</label>
-        <input type="text" placeholder="Search..." />
-      </div>
-    
+
       <div class="popup-field">
         <label>Website</label>
-        <input type="text" placeholder="e.g. example.com" />
+        <input type="text" name="website" placeholder="e.g. example.com" />
       </div>
+
       <div class="popup-field">
         <label>LinkedIn</label>
-        <input type="text" placeholder="LinkedIn URL" />
+        <input type="text" name="linkedin" placeholder="LinkedIn URL" />
       </div>
-    
-      <div class="popup-field">
-        <label>Date</label>
-        <input type="date" />
-      </div>
-    
+
       <div class="popup-field full">
         <label>About</label>
-        <textarea placeholder="Write a description..."></textarea>
+        <textarea name="about" placeholder="Write a description..."></textarea>
       </div>
-    
+
       <button type="submit" class="create-btn">Create</button>
-    </form>    
+    </form>
   </div>
 </div>
+
 
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>

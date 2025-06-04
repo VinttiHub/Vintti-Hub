@@ -47,57 +47,89 @@ document.addEventListener('DOMContentLoaded', () => {
       tableBody.innerHTML = '';
 
       if (!Array.isArray(data) || data.length === 0) {
-  tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
-  return;
-}
-
+        tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
+        return;
+      }
 
       data.forEach(item => {
         const htmlRow = `
-  <tr data-id="${item.account_id}">
-    <td>${item.client_name || '—'}</td>
-    <td>${item.account_status || '—'}</td>
-    <td>${item.account_manager || '—'}</td>
-    <td>${item.contract || '—'}</td>
-    <td>—</td>
-    <td>—</td>
-    <td>—</td>
-  </tr>
-`;
-tableBody.innerHTML += htmlRow;
-
+          <tr data-id="${item.account_id}">
+            <td>${item.client_name || '—'}</td>
+            <td>${item.account_status || '—'}</td>
+            <td>${item.account_manager || '—'}</td>
+            <td>${item.contract || '—'}</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+        `;
+        tableBody.innerHTML += htmlRow;
       });
+
       document.querySelectorAll('#accountTableBody tr').forEach(row => {
-  row.addEventListener('click', () => {
-    const id = row.getAttribute('data-id');
-    if (id) {
-      window.location.href = `account-details.html?id=${id}`;
-    }
-  });
-});
+        row.addEventListener('click', () => {
+          const id = row.getAttribute('data-id');
+          if (id) {
+            window.location.href = `account-details.html?id=${id}`;
+          }
+        });
+      });
 
       $('#accountTable').DataTable({
-  responsive: true,
-  pageLength: 10,
-  dom: 'lrtip',
-  lengthMenu: [ [10, 20, 50], [10, 20, 50] ],
-  language: {
-    search: "🔍 Buscar:",
-    lengthMenu: "Mostrar _MENU_ registros por página",
-    zeroRecords: "No se encontraron resultados",
-    info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-    paginate: {
-      first: "Primero",
-      last: "Último",
-      next: "Siguiente",
-      previous: "Anterior"
-    }
-  }
-});
+        responsive: true,
+        pageLength: 10,
+        dom: 'lrtip',
+        lengthMenu: [ [10, 20, 50], [10, 20, 50] ],
+        language: {
+          search: "🔍 Buscar:",
+          lengthMenu: "Mostrar _MENU_ registros por página",
+          zeroRecords: "No se encontraron resultados",
+          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+          paginate: {
+            first: "Primero",
+            last: "Último",
+            next: "Siguiente",
+            previous: "Anterior"
+          }
+        }
+      });
     })
     .catch(err => {
       console.error('Error fetching account data:', err);
     });
+
+  // 🆕 Crear nuevo account desde el formulario
+  const form = document.querySelector('.popup-form');
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+
+      try {
+        const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+          alert('✅ Account created!');
+          location.reload();
+        } else {
+          const error = await response.text();
+          alert('Error: ' + error);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('⚠️ Error sending request');
+      }
+    });
+  }
 });
 
 // 🪟 Funciones popup
@@ -108,9 +140,9 @@ function openPopup() {
 function closePopup() {
   document.getElementById('popup').style.display = 'none';
 }
+
 // 🔍 Filtro por columna con múltiples checkboxes
 function createColumnFilter(columnIndex, table) {
-  // Eliminar otros filtros abiertos
   document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
 
   const columnData = table
@@ -124,13 +156,11 @@ function createColumnFilter(columnIndex, table) {
   const container = document.createElement('div');
   container.classList.add('filter-dropdown');
 
-  // Agrega input de búsqueda
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
   searchInput.placeholder = 'Search...';
   container.appendChild(searchInput);
 
-  // Agrega lista de opciones
   const checkboxContainer = document.createElement('div');
   checkboxContainer.classList.add('checkbox-list');
   columnData.forEach(value => {
@@ -144,11 +174,9 @@ function createColumnFilter(columnIndex, table) {
   });
   container.appendChild(checkboxContainer);
 
-  // Insertar en DOM cerca del header
   const headerCell = document.querySelectorAll(`#accountTable thead th`)[columnIndex];
   headerCell.appendChild(container);
 
-  // Lógica de búsqueda
   searchInput.addEventListener('input', () => {
     const searchTerm = searchInput.value.toLowerCase();
     checkboxContainer.querySelectorAll('label').forEach(label => {
@@ -157,7 +185,6 @@ function createColumnFilter(columnIndex, table) {
     });
   });
 
-  // Aplicar filtro al hacer clic en checkboxes
   checkboxContainer.addEventListener('change', () => {
     const selected = Array.from(checkboxContainer.querySelectorAll('input:checked')).map(c => c.value);
     table.column(columnIndex).search(selected.length ? selected.join('|') : '', true, false).draw();
@@ -167,7 +194,7 @@ function createColumnFilter(columnIndex, table) {
 // Detectar clic en iconos de lupa
 document.querySelectorAll('.column-filter').forEach(icon => {
   icon.addEventListener('click', (e) => {
-    e.stopPropagation(); // evitar que se cierre al hacer clic en el mismo
+    e.stopPropagation();
     const columnIndex = parseInt(icon.getAttribute('data-column'), 10);
     const table = $('#accountTable').DataTable();
     createColumnFilter(columnIndex, table);
