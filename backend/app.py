@@ -156,6 +156,39 @@ def get_accounts_list():
         return jsonify(result), 500
     return jsonify([{"account_name": row["client_name"]} for row in result])  # 🔹 Devuelve account_name renombrado
 
+@app.route('/opportunities', methods=['POST'])
+def create_opportunity():
+    data = request.get_json()
+
+    client_name = data.get('client_name')
+    opp_model = data.get('opp_model')
+    position_name = data.get('position_name')
+    sales_lead = data.get('sales_lead')
+    opp_type = data.get('opp_type')
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 🔹 Asumiendo que solo guardas los campos que ya tienes en la base
+        query = """
+            INSERT INTO opportunity (account_id, opp_model, opp_position_name, opp_sales_lead, opp_type)
+            VALUES (
+                (SELECT account_id FROM account WHERE client_name = %s LIMIT 1),
+                %s, %s, %s, %s
+            )
+        """
+        cursor.execute(query, (client_name, opp_model, position_name, sales_lead, opp_type))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({'message': 'Opportunity created successfully'}), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
