@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       data.forEach(item => {
         const htmlRow = `
-  <tr data-id="${item.candidate_id}">
+  <tr data-id="${item.account_id}">
     <td>${item.client_name || '—'}</td>
     <td>${item.account_status || '—'}</td>
     <td>${item.account_manager || '—'}</td>

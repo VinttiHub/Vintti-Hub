@@ -79,23 +79,24 @@ def login():
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-@app.route('/candidates/<candidate_id>')
-def get_candidate_by_id(candidate_id):
+    
+@app.route('/accounts/<account_id>')
+def get_account_by_id(account_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM candidates WHERE candidate_id = %s", (candidate_id,))
+        cursor.execute("SELECT * FROM account WHERE account_id = %s", (account_id,))
         row = cursor.fetchone()
         if not row:
-            return jsonify({"error": "Candidate not found"}), 404
+            return jsonify({"error": "Account not found"}), 404
 
         colnames = [desc[0] for desc in cursor.description]
-        candidate = dict(zip(colnames, row))
+        account = dict(zip(colnames, row))
 
         cursor.close()
         conn.close()
 
-        return jsonify(candidate)
+        return jsonify(account)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

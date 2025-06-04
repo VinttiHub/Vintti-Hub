@@ -54,13 +54,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!id) return;
 
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${id}`)
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${id}`)
     .then(res => res.json())
     .then(data => {
       fillAccountDetails(data);  // función para llenar el HTML
     })
     .catch(err => {
-      console.error('Error fetching candidate details:', err);
+      console.error('Error fetching accounts details:', err);
     });
 });
 function fillAccountDetails(data) {
