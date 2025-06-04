@@ -159,7 +159,7 @@ def get_accounts_list():
 @app.route('/opportunities', methods=['POST'])
 def create_opportunity():
     data = request.get_json()
-
+    print("🟢 Datos recibidos en POST /opportunities:", data)
     client_name = data.get('client_name')
     opp_model = data.get('opp_model')
     position_name = data.get('position_name')
@@ -170,15 +170,21 @@ def create_opportunity():
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 🔹 Asumiendo que solo guardas los campos que ya tienes en la base
+        # 🔍 Buscar el account_id según el client_name
+        cursor.execute("SELECT account_id FROM account WHERE client_name = %s LIMIT 1", (client_name,))
+        account_row = cursor.fetchone()
+
+        if not account_row:
+            return jsonify({'error': f'No account found for client_name: {client_name}'}), 400
+
+        account_id = account_row[0]
+
+        # 📝 Insertar nueva oportunidad
         query = """
             INSERT INTO opportunity (account_id, opp_model, opp_position_name, opp_sales_lead, opp_type)
-            VALUES (
-                (SELECT account_id FROM account WHERE client_name = %s LIMIT 1),
-                %s, %s, %s, %s
-            )
+            VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(query, (client_name, opp_model, position_name, sales_lead, opp_type))
+        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type))
         conn.commit()
 
         cursor.close()
@@ -187,7 +193,10 @@ def create_opportunity():
         return jsonify({'message': 'Opportunity created successfully'}), 201
 
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # Para ver detalles en logs de App Runner
         return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':
