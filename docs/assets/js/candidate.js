@@ -1,18 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.body.classList.add('light-mode');
 
-  const toggleButton = document.getElementById('toggleFilters');
-  const filtersCard = document.getElementById('filtersCard');
-
-  if (toggleButton && filtersCard) {
-    toggleButton.addEventListener('click', () => {
-      const isExpanded = filtersCard.classList.contains('expanded');
-      filtersCard.classList.toggle('expanded', !isExpanded);
-      filtersCard.classList.toggle('hidden', isExpanded);
-      toggleButton.textContent = isExpanded ? '🔍 Filters' : '❌ Close Filters';
-    });
-  }
-
   fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates')
     .then(response => response.json())
     .then(data => {
@@ -27,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let rows = '';
       data.forEach(candidate => {
         rows += `
-          <tr onclick="goToDetails()">
+          <tr data-id="${candidate.id || ''}">
             <td>Candidate</td>
             <td>${candidate.Name || candidate.name || '—'}</td>
             <td>${candidate.country || '—'}</td>
@@ -39,58 +27,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
       tbody.innerHTML = rows;
 
-      // Esperar a que las filas se rendericen antes de inicializar DataTable
-      setTimeout(() => {
-        const table = $('#candidatesTable').DataTable({
-          responsive: true,
-          pageLength: 10,
-          dom: 'lrtip',
-          lengthMenu: [[10, 20, 50], [10, 20, 50]],
-          language: {
-            search: "🔍 Buscar:",
-            lengthMenu: "Mostrar _MENU_ registros por página",
-            zeroRecords: "No se encontraron resultados",
-            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-            paginate: {
-              first: "Primero",
-              last: "Último",
-              next: "Siguiente",
-              previous: "Anterior"
-            }
+      const table = $('#candidatesTable').DataTable({
+        responsive: true,
+        pageLength: 10,
+        dom: 'lrtip',
+        lengthMenu: [[10, 20, 50], [10, 20, 50]],
+        language: {
+          search: "🔍 Buscar:",
+          lengthMenu: "Mostrar _MENU_ registros por página",
+          zeroRecords: "No se encontraron resultados",
+          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+          paginate: {
+            first: "Primero",
+            last: "Último",
+            next: "Siguiente",
+            previous: "Anterior"
           }
-        });
+        }
+      });
 
-        document.getElementById('candidatesTable').addEventListener('click', function (e) {
-          const target = e.target.closest('.column-filter');
-          if (target) {
-            e.preventDefault();
-            e.stopPropagation();
-            const columnIndex = parseInt(target.getAttribute('data-column'), 10);
-            createColumnFilter(columnIndex, table);
+      // Hacer clic en fila -> ir a detalles
+      document.querySelectorAll('#candidatesTableBody tr').forEach(row => {
+        row.addEventListener('click', () => {
+          const id = row.getAttribute('data-id');
+          if (id) {
+            window.location.href = `candidate-details.html?id=${id}`;
           }
         });
-      }, 50);
+      });
+
+      // Filtros tipo Excel (activar después de DataTables)
+      document.querySelectorAll('.column-filter').forEach(icon => {
+        icon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const columnIndex = parseInt(icon.getAttribute('data-column'), 10);
+          createColumnFilter(columnIndex, table);
+        });
+      });
     })
     .catch(err => {
       console.error('❌ Error al obtener candidatos:', err);
     });
 });
 
-function goToDetails() {
-  window.location.href = "candidate-details.html";
-}
-
-function setLightMode() {
-  document.body.classList.add("light-mode");
-  localStorage.setItem("theme", "light");
-}
-
-function setDarkMode() {
-  document.body.classList.remove("light-mode");
-  localStorage.setItem("theme", "dark");
-}
-
-// Filtros tipo Excel con checkboxes
+// Filtros tipo Excel
 function createColumnFilter(columnIndex, table) {
   document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
 
@@ -142,10 +122,9 @@ function createColumnFilter(columnIndex, table) {
   });
 }
 
-// Cierra los filtros si haces clic fuera
+// Cerrar dropdown si haces clic fuera
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.filter-dropdown') && !e.target.classList.contains('column-filter')) {
     document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
   }
 });
-

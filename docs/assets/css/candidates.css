@@ -269,3 +269,45 @@ body.light-mode .table-row {
 body.light-mode .table-row:hover {
   background-color: #e2e8f0;
 }
+/* Filtro tipo Excel bonito */
+.filter-dropdown {
+  position: absolute;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+.filter-dropdown input[type="text"] {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 6px;
+  background-color: #f4f6fa;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkbox-list label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.checkbox-list input[type="checkbox"] {
+  margin-right: 6px;
+}
