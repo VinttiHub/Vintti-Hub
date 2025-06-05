@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  fetch('https://vinttihub.vintti.com/candidates')
+  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates')
     .then(response => response.json())
     .then(data => {
       const tbody = document.getElementById('candidatesTableBody');
