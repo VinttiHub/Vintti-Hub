@@ -27,7 +27,6 @@ document.getElementById('spinner-overlay').classList.remove('hidden');
       }
 
       data.forEach(opp => {
-        console.log('Stage:', opp.opp_stage);
         const row = `
           <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
             <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
@@ -208,7 +207,6 @@ document.getElementById('login-form')?.addEventListener('submit', async function
 
 document.getElementById('createOpportunityForm')?.addEventListener('submit', async function (e) {
   e.preventDefault();
-  console.log("🟢 Formulario detectado"); 
   const form = e.target;
   const formData = {
     client_name: form.client_name.value.trim(),
@@ -219,8 +217,6 @@ document.getElementById('createOpportunityForm')?.addEventListener('submit', asy
   };
 
 try {
-  console.log("🟢 Enviando datos:", formData);
-  console.log("📤 A dónde se envía:", 'https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities');
 
   const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities', {
     method: 'POST',

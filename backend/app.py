@@ -237,6 +237,33 @@ def accounts():
             print(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
 
+@app.route('/opportunities/<int:opportunity_id>', methods=['PATCH'])
+def update_opportunity_stage(opportunity_id):
+    data = request.get_json()
+    new_stage = data.get('opp_stage')
+
+    if new_stage is None:
+        return jsonify({'error': 'opp_stage is required'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE opportunity
+            SET opp_stage = %s
+            WHERE opportunity_id = %s
+        """, (new_stage, opportunity_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        print("Error updating stage:", e)
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
