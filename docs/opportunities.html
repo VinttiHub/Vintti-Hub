@@ -18,27 +18,28 @@
   </div>
 
   <div class="main-content">
-    <div class="filters-top-bar fade-in delay-1">
-      <button class="new-btn" onclick="openPopup()">＋ New Opportunity</button>
+    <div class="page-header">
+      <h1 class="page-title">Opportunities</h1>
+      <button class="new-btn" onclick="openPopup()">New</button>
     </div>
+  <div class="table-card">
   <table id="opportunityTable" class="display">
-<thead>
-  <tr>
-    <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Stage</th>
-    <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Account</th>
-    <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Position</th>
-    <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Type</th>
-    <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> Model</th>
-    <th><span class="column-filter" data-column="5"><i class="fa-solid fa-filter"></i></span> Sales Lead</th>
-    <th><span class="column-filter" data-column="6"><i class="fa-solid fa-filter"></i></span> HR Lead</th>
-    <th><span class="column-filter" data-column="7"><i class="fa-solid fa-filter"></i></span> Comment</th>
-    <th><span class="column-filter" data-column="8"><i class="fa-solid fa-filter"></i></span> Days</th>
-  </tr>
-</thead>
-
+    <thead>
+      <tr>
+        <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Stage</th>
+        <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Account</th>
+        <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Position</th>
+        <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Type</th>
+        <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> Model</th>
+        <th><span class="column-filter" data-column="5"><i class="fa-solid fa-filter"></i></span> Sales Lead</th>
+        <th><span class="column-filter" data-column="6"><i class="fa-solid fa-filter"></i></span> HR Lead</th>
+        <th><span class="column-filter" data-column="7"><i class="fa-solid fa-filter"></i></span> Comment</th>
+        <th><span class="column-filter" data-column="8"><i class="fa-solid fa-filter"></i></span> Days</th>
+      </tr>
+    </thead>
     <tbody id="opportunityTableBody"></tbody>
   </table>
-
+  </div> 
   </div>
 <!-- Popup -->
 <div id="popup" class="popup-overlay">

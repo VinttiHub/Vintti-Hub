@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
       data.forEach(opp => {
         const row = `
           <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
-            <td>${opp.opp_stage || 'â€”'}</td>
+            <td>${getStagePill(opp.opp_stage)}</td>
             <td>${opp.account_id || 'â€”'}</td>
             <td>${opp.opp_position_name || 'â€”'}</td>
             <td>â€”</td>
@@ -95,12 +95,13 @@ function createColumnFilter(columnIndex, table) {
   document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
 
   const columnData = table
-    .column(columnIndex)
-    .data()
-    .toArray()
-    .map(item => item.trim())
-    .filter((v, i, a) => v && a.indexOf(v) === i)
-    .sort();
+  .column(columnIndex)
+  .data()
+  .toArray()
+  .map(item => extractTextFromHTML(item).trim())
+  .filter((v, i, a) => v && a.indexOf(v) === i)
+  .sort();
+
 
   const container = document.createElement('div');
   container.classList.add('filter-dropdown');
@@ -249,3 +250,28 @@ fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts')
   .catch(err => {
     console.error('Error loading accounts:', err);
   });
+  function getStagePill(stage) {
+  switch (stage) {
+    case 'Close Win':
+      return '<span class="stage-pill stage-closewin">Close Win</span>';
+    case 'Closed Lost':
+      return '<span class="stage-pill stage-closewin">Close Win</span>';
+    case 'Negotiating':
+      return '<span class="stage-pill stage-negotiating">Negotiating</span>';
+    case 'Interviewing':
+      return '<span class="stage-pill stage-interviewing">Interviewing</span>';
+    case 'Sourcing':
+      return '<span class="stage-pill stage-sourcing">Sourcing</span>';
+    case 'NDA Sent':
+      return '<span class="stage-pill stage-nda">NDA Sent</span>';
+    case 'Deep Dive':
+      return '<span class="stage-pill stage-deepdive">Deep Dive</span>';
+    default:
+      return stage ? `<span class="stage-pill">${stage}</span>` : '—';
+  }
+}
+function extractTextFromHTML(htmlString) {
+  const div = document.createElement('div');
+  div.innerHTML = htmlString;
+  return div.textContent || div.innerText || '';
+}
