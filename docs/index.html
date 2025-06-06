@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/style.css">
 </head>
+<audio id="click-sound" src="./assets/sounds/click.mp3" preload="auto"></audio>
 <body>
   <div id="login-container" class="login-box">
   <h2>Login</h2>
@@ -18,6 +19,11 @@
   </form>
 </div>
   <main id="welcome-container" class="main-content fade-in" style="display: none;">
+    <!-- Animación post-login -->
+    <div id="login-animation" class="login-animation hidden">
+      <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="login-animation-logo">
+      <p class="login-animation-text">Entering Vintti HUB...</p>
+    </div>
   <h1 class="welcome-title">
     <span id="personalized-greeting"></span>
     Welcome to <span class="gradient-text">Vintti HUB</span>

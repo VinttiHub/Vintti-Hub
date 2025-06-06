@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleButton.textContent = isExpanded ? 'ðŸ” Filters' : 'âŒ Close Filters';
     });
   }
+  // Mostrar spinner al comenzar
+document.getElementById('spinner-overlay').classList.remove('hidden');
 
   fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities')
     .then(response => response.json())
@@ -25,9 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       data.forEach(opp => {
+        console.log('Stage:', opp.opp_stage);
         const row = `
           <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
-            <td>${getStagePill(opp.opp_stage)}</td>
+            <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
             <td>${opp.account_id || 'â€”'}</td>
             <td>${opp.opp_position_name || 'â€”'}</td>
             <td>â€”</td>
@@ -42,23 +45,43 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       const table = $('#opportunityTable').DataTable({
-        responsive: true,
-        pageLength: 10,
-        dom: 'lrtip',
-        lengthMenu: [[10, 20, 50], [10, 20, 50]],
-        language: {
-          search: "ðŸ” Buscar:",
-          lengthMenu: "Mostrar _MENU_ registros por pÃ¡gina",
-          zeroRecords: "No se encontraron resultados",
-          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-          paginate: {
-            first: "Primero",
-            last: "Ãšltimo",
-            next: "Siguiente",
-            previous: "Anterior"
+  responsive: true,
+  pageLength: 10,
+  dom: 'lrtip',
+  lengthMenu: [[10, 20, 50], [10, 20, 50]],
+  columnDefs: [
+    {
+      targets: 0, // Columna Stage
+      render: function (data, type, row, meta) {
+        if (type === 'filter' || type === 'sort') {
+          // Aquí devolvemos solo el texto de la opción seleccionada
+          const div = document.createElement('div');
+          div.innerHTML = data;
+          const select = div.querySelector('select');
+          if (select) {
+            return select.options[select.selectedIndex].textContent;
+          } else {
+            return data;
           }
         }
-      });
+        // para 'display' devolvemos el HTML completo
+        return data;
+      }
+    }
+  ],
+  language: {
+    search: "🔍 Buscar:",
+    lengthMenu: "Mostrar _MENU_ registros por página",
+    zeroRecords: "No se encontraron resultados",
+    info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+    paginate: {
+      first: "Primero",
+      last: "Último",
+      next: "Siguiente",
+      previous: "Anterior"
+    }
+  }
+});
 
       document.getElementById('opportunityTable').addEventListener('click', function(e) {
         const target = e.target.closest('.column-filter');
@@ -69,9 +92,12 @@ document.addEventListener('DOMContentLoaded', () => {
           createColumnFilter(columnIndex, table);
         }
       });
+      // Ocultar spinner al terminar
+document.getElementById('spinner-overlay').classList.add('hidden');
     })
     .catch(err => {
       console.error('Error fetching opportunities:', err);
+      document.getElementById('spinner-overlay').classList.add('hidden');
     });
 });
 
@@ -154,7 +180,7 @@ document.getElementById('login-form')?.addEventListener('submit', async function
 
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-
+  document.getElementById('click-sound').play();
   try {
     const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/login', {
       method: 'POST',
@@ -273,5 +299,68 @@ fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts')
 function extractTextFromHTML(htmlString) {
   const div = document.createElement('div');
   div.innerHTML = htmlString;
+
+  // Caso especial para la columna Stage con <select>
+  const select = div.querySelector('select');
+  if (select) {
+    return select.options[select.selectedIndex].textContent;
+  }
+
   return div.textContent || div.innerText || '';
 }
+
+// Particle trail en hover para las burbujas
+document.querySelectorAll('.bubble-button').forEach(bubble => {
+  bubble.addEventListener('mousemove', e => {
+    const particle = document.createElement('span');
+    particle.classList.add('bubble-particle');
+    particle.style.left = `${e.offsetX}px`;
+    particle.style.top = `${e.offsetY}px`;
+
+    bubble.appendChild(particle);
+
+    setTimeout(() => {
+      particle.remove();
+    }, 500); // la partícula desaparece en 500ms
+  });
+});
+function getStageDropdown(currentStage, opportunityId) {
+  const stages = [
+    'Close Win',
+    'Closed Lost',
+    'Negotiating',
+    'Interviewing',
+    'Sourcing',
+    'NDA Sent',
+    'Deep Dive'
+  ];
+
+  // Mapeo de posibles variantes
+  const stageMapping = {
+    'Closed Win': 'Close Win',
+    'Closed Lost': 'Closed Lost',
+    'Negotiating': 'Negotiating',
+    'Interviewing': 'Interviewing',
+    'Sourcing': 'Sourcing',
+    'NDA Sent': 'NDA Sent',
+    'Deep Dive': 'Deep Dive'
+  };
+
+  // Normalizamos el valor que viene de la base
+  const normalizedStage = stageMapping[(currentStage || '').trim()] || '';
+
+  // 👇 AQUI es donde agregamos el data-id
+  let dropdown = `<select class="stage-dropdown" data-id="${opportunityId}">`;
+
+  stages.forEach(stage => {
+    const selected = (stage === normalizedStage) ? 'selected' : '';
+    dropdown += `<option value="${stage}" ${selected}>${stage}</option>`;
+  });
+
+  dropdown += `</select>`;
+
+  return dropdown;
+}
+
+
+
