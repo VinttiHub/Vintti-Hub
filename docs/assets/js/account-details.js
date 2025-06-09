@@ -116,6 +116,7 @@ function loadCandidates(accountId) {
     .then(data => {
       console.log("Candidates asociados:", data);
       fillCandidatesCards(data);
+      fillEmployeesTables(data);
     })
     .catch(err => {
       console.error("Error cargando candidates asociados:", err);
@@ -152,5 +153,57 @@ function fillCandidatesCards(candidates) {
   });
 }
 
+function fillEmployeesTables(candidates) {
+  const staffingTableBody = document.querySelector('#employees .card:nth-of-type(1) tbody');
+  const recruitingTableBody = document.querySelector('#employees .card:nth-of-type(2) tbody');
 
-    
+  staffingTableBody.innerHTML = '';   // Limpiar
+  recruitingTableBody.innerHTML = '';
+
+  if (!candidates.length) return;
+
+  candidates.forEach(candidate => {
+    // Crear fila de tabla:
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${candidate.status || '—'}</td>
+      <td>${candidate.name || '—'}</td>
+      <td>${candidate.startingdate || '—'}</td>
+      <td>${candidate.enddate || '—'}</td>
+      <td>${candidate.opportunity_id || '—'}</td>
+      <td>$${candidate.employee_fee ?? '—'}</td>
+      <td>$${candidate.employee_salary ?? '—'}</td>
+      <td>$${candidate.employee_revenue ?? '—'}</td>
+      <td class="toggle-col-btn"><button class="expand-btn">＋</button></td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+      <td class="hidden-column">—</td>
+    `;
+
+    // Según peoplemodel lo metemos en la tabla correcta:
+    if (candidate.peoplemodel === 'Staffing') {
+      staffingTableBody.appendChild(row);
+    } else if (candidate.peoplemodel === 'Recruiting') {
+      recruitingTableBody.appendChild(row);
+    }
+  });
+
+  // Re-asignar eventos a los botones expand-btn:
+  document.querySelectorAll('.expand-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const table = button.closest('table');
+      const isOpen = button.classList.toggle('opened');
+      
+      const toggleCells = table.querySelectorAll('.hidden-column');
+      toggleCells.forEach(cell => {
+        cell.style.display = isOpen ? 'table-cell' : 'none';
+      });
+    });
+  });
+}
