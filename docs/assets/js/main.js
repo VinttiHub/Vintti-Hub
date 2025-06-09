@@ -86,35 +86,6 @@ document.getElementById('spinner-overlay').classList.remove('hidden');
     }
   }
 });
-document.querySelectorAll('.stage-dropdown').forEach(dropdown => {
-  dropdown.addEventListener('change', async (e) => {
-    const newStage = e.target.value;
-    const opportunityId = e.target.getAttribute('data-id');
-
-    console.log('🟡 Stage dropdown changed! Opportunity ID:', opportunityId, 'New Stage:', newStage);
-
-    try {
-      const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opp_stage: newStage })
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        console.log('✅ Stage updated successfully!');
-      } else {
-        console.error('❌ Error updating stage:', result.error || result);
-        alert('Error updating stage: ' + (result.error || 'Unexpected error'));
-      }
-
-    } catch (err) {
-      console.error('❌ Network error updating stage:', err);
-      alert('Network error. Please try again.');
-    }
-  });
-});
       document.getElementById('opportunityTable').addEventListener('click', function(e) {
         const target = e.target.closest('.column-filter');
         if (target) {
@@ -131,6 +102,43 @@ document.getElementById('spinner-overlay').classList.add('hidden');
       console.error('Error fetching opportunities:', err);
       document.getElementById('spinner-overlay').classList.add('hidden');
     });
+    document.addEventListener('change', async (e) => {
+  if (e.target && e.target.classList.contains('stage-dropdown')) {
+    const newStage = e.target.value;
+    const opportunityId = e.target.getAttribute('data-id');
+
+    console.log('🟡 Stage dropdown changed! Opportunity ID:', opportunityId, 'New Stage:', newStage);
+
+    try {
+      const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opp_stage: newStage })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+      console.log('✅ Stage updated successfully!');
+      
+      // 🔹 Efecto visual → verde clarito que desaparece
+      e.target.style.backgroundColor = '#d4edda'; // verde clarito
+      setTimeout(() => {
+        e.target.style.backgroundColor = ''; // volver al color normal
+      }, 1000);
+    }
+      else {
+        console.error('❌ Error updating stage:', result.error || result);
+        alert('Error updating stage: ' + (result.error || 'Unexpected error'));
+      }
+
+    } catch (err) {
+      console.error('❌ Network error updating stage:', err);
+      alert('Network error. Please try again.');
+    }
+  }
+});
+
 });
 
 function openPopup() {
