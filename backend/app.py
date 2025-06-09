@@ -310,7 +310,7 @@ def get_candidates_by_opportunity(opportunity_id):
                 candidate_id,
                 Name,
                 Email,
-                stage_1
+                stage
             FROM candidates
             WHERE opportunity_id = %s
         """, (opportunity_id,))

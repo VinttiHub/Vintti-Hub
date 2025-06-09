@@ -2,22 +2,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const containers = document.querySelectorAll(".card-container");
     let draggedCard = null;
   
-    function enableDrag(card) {
-      card.draggable = true;
-  
-      card.addEventListener("dragstart", () => {
-        draggedCard = card;
-        setTimeout(() => card.style.display = "none", 0);
-      });
-  
-      card.addEventListener("dragend", () => {
-        setTimeout(() => {
-          draggedCard.style.display = "block";
-          draggedCard = null;
-        }, 0);
-      });
-    }
-  
     // Activar drag para tarjetas iniciales
     document.querySelectorAll(".candidate-card").forEach(enableDrag);
   
@@ -80,49 +64,67 @@ function loadPipelineCandidates() {
         container.innerHTML = '';
       });
 
-      candidates.forEach(candidate => {
-        const card = document.createElement('div');
-        card.className = 'candidate-card';
-        card.innerHTML = `
-          <strong>${candidate.Name}</strong>
-          <div class="preview">
-            <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="${candidate.Name}">
-            <div class="info">
-              <span class="name">${candidate.name}</span>
-              <span class="email">${candidate.email ?? ''}</span>
-            </div>
-          </div>
-        `;
+candidates.forEach(candidate => {
+  const card = document.createElement('div');
+  card.className = 'candidate-card';
+  card.innerHTML = `
+    <strong>${candidate.name}</strong>
+    <div class="preview">
+      <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="${candidate.name}">
+      <div class="info">
+        <span class="name">${candidate.name}</span>
+        <span class="email">${candidate.email ?? ''}</span>
+      </div>
+    </div>
+  `;
 
-        enableDrag(card);
+  enableDrag(card);
 
-        // Mapeo del stage → columna id
-        let columnId = '';
-        switch (candidate.stage_1) {
-          case 'Contactado':
-            columnId = 'contacted';
-            break;
-          case 'No avanza primera':
-            columnId = 'no-advance';
-            break;
-          case 'Primera entrevista':
-            columnId = 'first-interview';
-            break;
-          case 'En proceso con Cliente':
-            columnId = 'client-process';
-            break;
-          default:
-            console.warn(`Stage desconocido: ${candidate.stage_1}`);
-            columnId = 'contacted'; // fallback
-        }
+  // Mapeo del stage → columna id
+  let columnId = '';
+  switch (candidate.stage) {
+    case 'Contactado':
+      columnId = 'contacted';
+      break;
+    case 'No avanza primera':
+      columnId = 'no-advance';
+      break;
+    case 'Primera entrevista':
+      columnId = 'first-interview';
+      break;
+    case 'En proceso con Cliente':
+      columnId = 'client-process';
+      break;
+    default:
+      console.warn(`Stage desconocido: ${candidate.stage}`);
+      columnId = 'contacted'; // fallback
+  }
 
-        const container = document.getElementById(columnId);
-        if (container) {
-          container.appendChild(card);
-        }
-      });
+  const container = document.getElementById(columnId);
+  if (container) {
+    container.appendChild(card);
+  }
+});
+
     })
     .catch(error => {
       console.error('Error loading candidates:', error);
     });
 }
+window.loadPipelineCandidates = loadPipelineCandidates;
+
+function enableDrag(card) {
+      card.draggable = true;
+  
+      card.addEventListener("dragstart", () => {
+        draggedCard = card;
+        setTimeout(() => card.style.display = "none", 0);
+      });
+  
+      card.addEventListener("dragend", () => {
+        setTimeout(() => {
+          draggedCard.style.display = "block";
+          draggedCard = null;
+        }, 0);
+      });
+    }

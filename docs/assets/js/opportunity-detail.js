@@ -17,9 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
     indicator.style.width = `${tab.offsetWidth}px`;
   }
 
-  tabs.forEach((tab, index) => {
-    tab.addEventListener('click', () => activateTab(index));
-  });
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => {
+        activateTab(index);
+
+        // Si la pestaña es "Pipeline", cargar los candidatos
+        if (tab.textContent.trim() === 'Pipeline') {
+          loadPipelineCandidates();
+        }
+        if (tab.textContent.trim() === 'Candidates') {
+          loadCandidatesForBatch();
+        }
+      });
+    });
 
   activateTab(0);
 
@@ -75,7 +85,6 @@ async function loadOpportunityData() {
 });
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
-    loadPipelineCandidates();
     document.getElementById('start-date-input').value = formatDate(data.nda_signature_or_start_date);
     document.getElementById('close-date-input').value = formatDate(data.opp_close_date);
     // Client section
@@ -135,3 +144,41 @@ function calculateDaysAgo(dateStr) {
   return diffDays;
 }
 
+function loadCandidatesForBatch() {
+  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  if (opportunityId === '—' || opportunityId === '') {
+    console.error('Opportunity ID not found');
+    return;
+  }
+
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+    .then(response => response.json())
+    .then(candidates => {
+      console.log('🔵 Candidates for Batch:', candidates);
+
+      const batchDetail = document.querySelector('.batch-detail');
+      // Limpiar las tarjetas que existan actualmente (excepto el .batch-actions)
+      const cardsToRemove = batchDetail.querySelectorAll('.candidate-card-static');
+      cardsToRemove.forEach(card => card.remove());
+
+      candidates.forEach(candidate => {
+        const card = document.createElement('div');
+        card.className = 'candidate-card-static';
+        card.innerHTML = `
+          <span class="candidate-name">${candidate.name}</span>
+          <span class="budget">${candidate.employee_salary ? `$${candidate.employee_salary}` : '$0'}</span>
+          <select class="status">
+            <option ${candidate.stage === 'Client rejected after' ? 'selected' : ''}>Client rejected after</option>
+            <option ${candidate.stage === 'Client Hired' ? 'selected' : ''}>Client Hired</option>
+          </select>
+          <button class="comment-btn">💬</button>
+          <button class="delete-btn">🗑️</button>
+        `;
+
+        batchDetail.appendChild(card);
+      });
+    })
+    .catch(error => {
+      console.error('Error loading batch candidates:', error);
+    });
+}
