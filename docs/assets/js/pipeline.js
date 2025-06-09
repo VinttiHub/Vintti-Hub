@@ -60,4 +60,70 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   });
-  
+  // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline
+function loadPipelineCandidates() {
+  // Leer el opportunity_id que ya está en la página
+  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  if (opportunityId === '—' || opportunityId === '') {
+    console.error('Opportunity ID not found');
+    return;
+  }
+
+  // Hacer fetch al backend
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+    .then(response => response.json())
+    .then(candidates => {
+      console.log('🔵 Candidates:', candidates);
+      
+      // Limpiar todas las columnas antes
+      document.querySelectorAll('.card-container').forEach(container => {
+        container.innerHTML = '';
+      });
+
+      candidates.forEach(candidate => {
+        const card = document.createElement('div');
+        card.className = 'candidate-card';
+        card.innerHTML = `
+          <strong>${candidate.Name}</strong>
+          <div class="preview">
+            <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="${candidate.Name}">
+            <div class="info">
+              <span class="name">${candidate.Name}</span>
+              <span class="title">${candidate.Title ?? ''}</span>
+              <span class="email">${candidate.Email ?? ''}</span>
+            </div>
+          </div>
+        `;
+
+        enableDrag(card);
+
+        // Mapeo del stage → columna id
+        let columnId = '';
+        switch (candidate.stage_1) {
+          case 'Contactado':
+            columnId = 'contacted';
+            break;
+          case 'No avanza primera':
+            columnId = 'no-advance';
+            break;
+          case 'Primera entrevista':
+            columnId = 'first-interview';
+            break;
+          case 'En proceso con Cliente':
+            columnId = 'client-process';
+            break;
+          default:
+            console.warn(`Stage desconocido: ${candidate.stage_1}`);
+            columnId = 'contacted'; // fallback
+        }
+
+        const container = document.getElementById(columnId);
+        if (container) {
+          container.appendChild(card);
+        }
+      });
+    })
+    .catch(error => {
+      console.error('Error loading candidates:', error);
+    });
+}

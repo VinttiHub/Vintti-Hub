@@ -75,6 +75,7 @@ async function loadOpportunityData() {
 });
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
+    loadPipelineCandidates();
     document.getElementById('start-date-input').value = formatDate(data.nda_signature_or_start_date);
     document.getElementById('close-date-input').value = formatDate(data.opp_close_date);
     // Client section

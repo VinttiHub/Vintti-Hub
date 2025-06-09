@@ -300,6 +300,34 @@ def get_candidates_by_account(account_id):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/opportunities/<int:opportunity_id>/candidates')
+def get_candidates_by_opportunity(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                candidate_id,
+                Name,
+                Title,
+                Email,
+                stage_1
+            FROM candidates
+            WHERE opportunity_id = %s
+        """, (opportunity_id,))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify([])
+
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
