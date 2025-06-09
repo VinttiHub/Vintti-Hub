@@ -18,34 +18,25 @@
   </div>
 
   <div class="main-content">
-    <div class="filters-card collapse hidden fade-in delay-2" id="filtersCard">
-      <div class="filter-group">
-        <label for="conditionFilter">Condition</label>
-        <select id="conditionFilter">
-          <option value="">All Conditions</option>
-          <option value="Candidate">Candidate</option>
-          <option value="Hired">Hired</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label for="nameSearch">Search by name</label>
-        <input type="text" id="nameSearch" placeholder="Enter name...">
-      </div>
+    <!-- TÍTULO EN BLOQUE AZUL -->
+    <div class="title-container">
+      <h1 class="page-title">Candidates</h1>
     </div>
 
-<table id="candidatesTable" class="display">
-  <thead>
-    <tr>
-      <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Condition</th>
-      <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Full Name</th>
-      <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Country</th>
-      <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Whatsapp</th>
-      <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> LinkedIn</th>
-    </tr>
-  </thead>
-  <tbody id="candidatesTableBody"></tbody>
-</table>
-  </div>
+    <!-- TABLA DE CANDIDATOS -->
+    <table id="candidatesTable" class="display">
+      <thead>
+        <tr>
+          <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Condition</th>
+          <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Full Name</th>
+          <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Country</th>
+          <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Whatsapp</th>
+          <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> LinkedIn</th>
+        </tr>
+      </thead>
+      <tbody id="candidatesTableBody"></tbody>
+    </table>
+  </div> <!-- ← Este cierre va DESPUÉS de la tabla -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>

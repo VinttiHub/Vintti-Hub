@@ -58,15 +58,6 @@ body {
 }
 
 /* FILTERS TOP BAR → tu botón New Account */
-.filters-top-bar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 20px;
-    background-color: #0044ff;
-    border-radius: 20px;
-    padding: 20px 30px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
 
 .filters-top-bar .new-btn {
     background-color: #cdff30;
@@ -414,4 +405,26 @@ body {
 .popup-form .create-btn:hover {
     background-color: #b6ea2a;
     transform: scale(1.03);
+}
+.page-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+}
+.title-container {
+    background-color: #0044ff;
+    border-radius: 20px;
+    padding: 20px 30px;
+    margin-bottom: 20px;
+}
+.filters-top-bar {
+    display: flex;
+    justify-content: space-between;  /* ← Ojo! para que queden a izquierda y derecha */
+    align-items: center;              /* ← Para centrar verticalmente */
+    margin-bottom: 20px;
+    background-color: #0044ff;
+    border-radius: 20px;
+    padding: 20px 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
