@@ -27,7 +27,6 @@ document.getElementById('spinner-overlay').classList.remove('hidden');
       }
 
     data.forEach(opp => {
-      // Calcular days
       let daysAgo = '';
       if (opp.nda_signature_or_start_date) {
         daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
@@ -38,18 +37,16 @@ document.getElementById('spinner-overlay').classList.remove('hidden');
           <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
           <td>${opp.account_id || ''}</td>
           <td>${opp.opp_position_name || ''}</td>
-          <td>${opp.opp_type || ''}</td> <!-- aquí Type -->
+          <td>${opp.opp_type || ''}</td> <!-- Type -->
           <td>${opp.opp_model || ''}</td>
           <td>${opp.opp_sales_lead || ''}</td>
           <td>${opp.opp_hr_lead || ''}</td>
-          <td>${opp.comments || ''}</td> <!-- aquí Comment -->
-          <td>${daysAgo}</td> <!-- aquí Days -->
+          <td>${opp.opp_comments || ''}</td> <!-- Comment -->
+          <td>${daysAgo}</td> <!-- Days -->
         </tr>
       `;
       tbody.innerHTML += row;
     });
-
-
 
       const table = $('#opportunityTable').DataTable({
   responsive: true,
