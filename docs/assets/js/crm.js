@@ -141,12 +141,19 @@ form.addEventListener('submit', async (e) => {
 
 // 🪟 Funciones popup
 function openPopup() {
-  document.getElementById('popup').style.display = 'flex';
+  const popup = document.getElementById('popup');
+  popup.style.display = 'flex';
+  popup.classList.add('show');  // ⭐ Agregas clase show
 }
 
 function closePopup() {
-  document.getElementById('popup').style.display = 'none';
+  const popup = document.getElementById('popup');
+  popup.classList.remove('show');  // ⭐ Quitas clase show
+  setTimeout(() => {
+    popup.style.display = 'none';
+  }, 300);  // Esperas a que termine la animación de fade-out
 }
+
 
 // 🔍 Filtro por columna con múltiples checkboxes
 function createColumnFilter(columnIndex, table) {
