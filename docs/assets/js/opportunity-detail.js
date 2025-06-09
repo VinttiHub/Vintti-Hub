@@ -165,16 +165,20 @@ function loadCandidatesForBatch() {
         const card = document.createElement('div');
         card.className = 'candidate-card-static';
         card.innerHTML = `
-          <span class="candidate-name">${candidate.name}</span>
-          <span class="budget">${candidate.employee_salary ? `$${candidate.employee_salary}` : '$0'}</span>
-          <select class="status">
-            <option ${candidate.stage === 'Client rejected after' ? 'selected' : ''}>Client rejected after</option>
-            <option ${candidate.stage === 'Client Hired' ? 'selected' : ''}>Client Hired</option>
-          </select>
-          <button class="comment-btn">💬</button>
-          <button class="delete-btn">🗑️</button>
-        `;
-
+        <span class="candidate-name">${candidate.name}</span>
+        <span class="budget">${candidate.employee_salary ? `$${candidate.employee_salary}` : '$0'}</span>
+        <select class="status">
+          <option ${candidate.stage === 'Client rejected after' ? 'selected' : ''}>Client rejected after</option>
+          <option ${candidate.stage === 'Client Hired' ? 'selected' : ''}>Client Hired</option>
+          <option ${candidate.stage === 'En proceso con Cliente' ? 'selected' : ''}>En proceso con Cliente</option>
+          <option ${candidate.stage === 'Primera entrevista' ? 'selected' : ''}>Primera entrevista</option>
+          <option ${candidate.stage === 'Contactado' ? 'selected' : ''}>Contactado</option>
+          <option ${candidate.stage === 'No avanza primera' ? 'selected' : ''}>No avanza primera</option>
+          <option ${(candidate.stage === '(deleted option)' || !candidate.stage) ? 'selected' : ''}>(deleted option)</option>
+        </select>
+        <button class="comment-btn">💬</button>
+        <button class="delete-btn">🗑️</button>
+      `;
         batchDetail.appendChild(card);
       });
     })
