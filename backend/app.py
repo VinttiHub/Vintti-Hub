@@ -328,6 +328,38 @@ def get_candidates_by_opportunity(opportunity_id):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/candidates/<int:candidate_id>')
+def get_candidate_by_id(candidate_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                name,
+                country,
+                phone,
+                email,
+                linkedin,
+                english_level,
+                salary_range,
+                red_flags,
+                comments
+            FROM candidates
+            WHERE candidate_id = %s
+        """, (candidate_id,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({"error": "Candidate not found"}), 404
+
+        colnames = [desc[0] for desc in cursor.description]
+        candidate = dict(zip(colnames, row))
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(candidate)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

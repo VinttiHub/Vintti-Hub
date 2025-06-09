@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let rows = '';
       data.forEach(candidate => {
         rows += `
-          <tr data-id="${candidate.id || ''}">
+          <tr data-id="${candidate.candidate_id || ''}">
             <td>Candidate</td>
             <td>${candidate.Name || candidate.name || '—'}</td>
             <td>${candidate.country || '—'}</td>
