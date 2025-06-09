@@ -138,6 +138,7 @@ function closePopup() {
 
 function openOpportunity(id) {
   window.location.href = `opportunity-detail.html?id=${id}`;
+  console.log("🔵 openOpportunity - sending id:", id);
 }
 
 function navigateTo(section) {

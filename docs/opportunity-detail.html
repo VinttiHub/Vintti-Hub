@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Opportunity Details</title>
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css" />
-  <link rel="stylesheet" href="./assets/css/pipeline.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <script src="./assets/js/pipeline.js"></script>
@@ -32,18 +31,13 @@
         <p class="section-subtext"> </p>
         <span class="status-pill">Active</span>
       </div>
-    
-      <!-- Stage (no colapsable, se queda fija) -->
-<!-- Stage (no colapsable, se queda fija) -->
+
 <div class="overview-card">
   <div class="stage-top">
     <div>
       <label class="section-label">Opportunity ID</label>
       <div class="stage-id">
         <span id="opportunity-id-text">—</span>
-        <button class="copy-btn" title="Copy to clipboard">
-          <svg xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16h14c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/></svg>
-        </button>
       </div>
     </div>
     <span class="status-pill blue">Negotiating</span>
@@ -52,11 +46,11 @@
   <div class="overview-grid">
     <div class="input-group">
       <label>Start Date</label>
-      <input type="text" id="start-date-input" value="03.04.2025" />
+      <input type="text" id="start-date-input" value="" />
     </div>
     <div class="input-group">
       <label>Signed</label>
-      <div class="info-tag" id="signed-tag">31 days ago</div>
+      <div class="info-tag" id="signed-tag">—</div>
     </div>
     <div class="input-group">
       <label>Closed Date</label>
@@ -64,11 +58,10 @@
     </div>
     <div class="input-group">
       <label>Hire</label>
-      <select><option>Select Hire...</option></select>
+      <select id="hire-select"><option>Select Hire...</option></select>
     </div>
   </div>
 </div>
-
 
 <!-- Client -->
 <div class="overview-card">
@@ -80,19 +73,21 @@
   </div>
   <div class="card-content">
     <div class="overview-grid">
-      <div class="input-group"><label>Name</label><input value="Nova Teleclinic" readonly/></div>
-      <div class="input-group"><label>Size</label><input value="11-50" readonly/></div>
-      <div class="input-group"><label>City</label><input value="-" readonly/></div>
-      <div class="input-group"><label>State</label><input value="Florida" readonly/></div>
-      <div class="input-group"><label>Linkedin</label><input value="-" readonly/></div>
-      <div class="input-group"><label>Website</label><input value="Novateleclinic.com" readonly/></div>
-      <div class="input-group full"><label>Mail</label><input value="novateleclinic@gmail.com" readonly/></div>
-      <div class="input-group full"><label>About</label><textarea readonly>Nova Teleclinic provides evidence-based healthcare services to YOU at affordable prices...</textarea></div>
+      <div class="input-group"><label>Name</label><input id="client-name-input" value="" readonly/></div>
+      <div class="input-group"><label>Size</label><input id="client-size-input" value="" readonly/></div>
+      <div class="input-group"><label>City</label><input id="client-city-input" value="" readonly/></div>
+      <div class="input-group"><label>State</label><input id="client-state-input" value="" readonly/></div>
+      <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value="" readonly/></div>
+      <div class="input-group"><label>Website</label><input id="client-website-input" value="" readonly/></div>
+      <div class="input-group full"><label>Mail</label><input id="client-mail-input" value="" readonly/></div>
+      <div class="input-group full"><label>About</label><textarea id="client-about-textarea" readonly></textarea></div>
     </div>
   </div>
 </div>
 
 
+
+<!-- Details -->
 <!-- Details -->
 <div class="overview-card">
   <button class="card-toggle">
@@ -101,15 +96,15 @@
   </button>
   <div class="card-content">
     <div class="overview-grid">
-      <div class="input-group"><label>Opportunity Name</label><input value="Virtual Assistant" readonly/></div>
-      <div class="input-group"><label>Account</label><input value="Nova Teleclinic" readonly/></div>
-      <div class="input-group"><label>Sales Lead</label><select disabled><option>Bahia Larcamón</option></select></div>
-      <div class="input-group"><label>HR Lead</label><select disabled><option>Pilar Flores Levalle</option></select></div>
-      <div class="input-group"><label>Model</label><select disabled><option>Staffing</option></select></div>
-      <div class="input-group"><label>QL</label><select disabled><option>MQL</option></select></div>
+      <div class="input-group"><label>Opportunity Name</label><input id="details-opportunity-name" value="" readonly/></div>
+      <div class="input-group"><label>Account</label><input id="details-account-name" value="" readonly/></div>
+      <div class="input-group"><label>Sales Lead</label><select id="details-sales-lead" disabled><option></option></select></div>
+      <div class="input-group"><label>HR Lead</label><select id="details-hr-lead" disabled><option></option></select></div>
+      <div class="input-group"><label>Model</label><select id="details-model" disabled><option></option></select></div>
     </div>
   </div>
 </div>
+
 
 <!-- First Meeting -->
 <div class="overview-card">
@@ -165,22 +160,9 @@
           <span class="status-pill gray">Not Sent</span>
         </div>
       </div>
-    
+  
       <div class="job-card">
-        <input type="text" value="Virtual Assistant" class="job-title-input" readonly />
-    
-        <p><strong>Time:</strong> Full-time schedule. Availability between 10 AM and 8 PM US time and rotating Saturday shifts from 8 AM to either morning or afternoon.</p>
-        
-        <h4>Overview:</h4>
-        <p>
-          We are seeking a dedicated and proactive Virtual Assistant to join our team. This role will be crucial in providing efficient and effective support to our patients, primarily through WhatsApp communication, while also handling basic administrative tasks and ensuring a smooth patient experience. The ideal candidate will have some prior experience in a healthcare setting, enabling them to understand patient inquiries related to medication, prescriptions, and basic medical information. This position requires excellent communication skills in both English and Portuguese, as well as the ability to work independently and manage tasks effectively.
-        </p>
-    
-        <h4>Responsibilities:</h4>
-        <ul>
-          <li>Promptly and accurately respond to patient inquiries received via WhatsApp, addressing questions about medication refills, dosage instructions, prescription status, lab results, and other related concerns from the previous day and current morning.</li>
-          <li>Review daily appointment schedules to ensure all consultations are paid for and verify the active status of patient insurance.</li>
-        </ul>
+        <textarea id="job-description-textarea" readonly style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
       </div>
     </section>
     
@@ -338,65 +320,7 @@
     </section>
     
   </main>
-
-  <script>
-    // ✅ Tema
-    function setTheme(theme) {
-      if (theme === 'light') {
-        document.body.classList.add('light-mode');
-        localStorage.setItem('theme', 'light');
-      } else {
-        document.body.classList.remove('light-mode');
-        localStorage.setItem('theme', 'dark');
-      }
-    }
-  
-    // ✅ Principal
-    document.addEventListener('DOMContentLoaded', () => {
-      const savedTheme = localStorage.getItem('theme') || 'dark';
-      setTheme(savedTheme);
-  
-      const tabs = document.querySelectorAll('.nav-item');
-      const sections = document.querySelectorAll('.detail-section');
-      const indicator = document.querySelector('.nav-indicator');
-  
-      function activateTab(index) {
-        tabs.forEach((t, i) => {
-          t.classList.toggle('active', i === index);
-          sections[i].classList.toggle('hidden', i !== index);
-        });
-  
-        const tab = tabs[index];
-        indicator.style.left = `${tab.offsetLeft}px`;
-        indicator.style.width = `${tab.offsetWidth}px`;
-      }
-  
-      tabs.forEach((tab, index) => {
-        tab.addEventListener('click', () => activateTab(index));
-      });
-  
-      activateTab(0);
-  
-      // ✅ Card toggle
-      document.querySelectorAll('.card-toggle').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const card = btn.closest('.overview-card');
-          card.classList.toggle('open');
-        });
-      });
-  
-      // ✅ Copy button
-      document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.parentElement.querySelector('span').innerText;
-          navigator.clipboard.writeText(id).then(() => {
-            btn.title = "Copied!";
-            setTimeout(() => btn.title = "Copy to clipboard", 2000);
-          });
-        });
-      });
-    });
-  </script>  
+<script src="./assets/js/opportunity-detail.js"></script>
 </body>
 </html>
 

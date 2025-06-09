@@ -122,12 +122,26 @@ def get_opportunities_by_account(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/opportunities/<opportunity_id>')
+@app.route('/opportunities/<int:opportunity_id>')
 def get_opportunity_by_id(opportunity_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM opportunity WHERE opportunity_id = %s", (opportunity_id,))
+        cursor.execute("""
+            SELECT 
+    o.*, 
+    a.account_name AS account_name,
+    a.size AS account_size,
+    a.city AS account_city,
+    a.state AS account_state,
+    a.linkedin AS account_linkedin,
+    a.website AS account_website,
+    a.mail AS account_mail,
+    a.comments AS account_about
+FROM opportunity o
+LEFT JOIN account a ON o.account_id = a.account_id
+WHERE o.opportunity_id = %s
+            """, (opportunity_id,))
         row = cursor.fetchone()
         if not row:
             return jsonify({"error": "Opportunity not found"}), 404
