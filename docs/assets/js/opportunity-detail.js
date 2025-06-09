@@ -59,12 +59,20 @@ function setTheme(theme) {
 async function loadOpportunityData() {
   const params = new URLSearchParams(window.location.search);
   const opportunityId = params.get('id');
-  console.log("🟢 loadOpportunityData - opportunityId:", opportunityId);
   if (!opportunityId) return;
 
   try {
     const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
     const data = await res.json();
+          console.log("🔎 Client data:", {
+  name: data.account_name,
+  size: data.account_size,
+  state: data.account_state,
+  linkedin: data.account_linkedin,
+  website: data.account_website,
+  mail: data.account_mail,
+  about: data.account_about
+});
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
     document.getElementById('start-date-input').value = formatDate(data.nda_signature_or_start_date);
@@ -72,7 +80,6 @@ async function loadOpportunityData() {
     // Client section
     document.getElementById('client-name-input').value = data.account_name || '';
     document.getElementById('client-size-input').value = data.account_size || '';
-    document.getElementById('client-city-input').value = data.account_city || '';
     document.getElementById('client-state-input').value = data.account_state || '';
     document.getElementById('client-linkedin-input').value = data.account_linkedin || '';
     document.getElementById('client-website-input').value = data.account_website || '';
