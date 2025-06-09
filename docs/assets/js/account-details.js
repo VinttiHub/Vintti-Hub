@@ -134,7 +134,7 @@ function fillCandidatesCards(candidates) {
     const card = document.createElement('div');
     card.classList.add('info-card', 'square');
     card.innerHTML = `
-      <div class="info-title">👤 ${candidate.Name || '—'}</div>
+      <div class="info-title">👤 ${candidate.name || '—'}</div>
       <div class="info-details">
         <div><strong>Revenue:</strong> $${candidate.employee_revenue || '—'}</div>
         <div><strong>Fee:</strong> $${candidate.employee_fee || '—'}</div>
