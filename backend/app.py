@@ -130,7 +130,7 @@ def get_opportunity_by_id(opportunity_id):
         cursor.execute("""
             SELECT 
     o.*, 
-    a.account_name AS account_name,
+    a.client_name AS account_name,
     a.size AS account_size,
     a.city AS account_city,
     a.state AS account_state,
