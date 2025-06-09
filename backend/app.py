@@ -166,7 +166,6 @@ def get_users():
 @app.route('/opportunities', methods=['POST'])
 def create_opportunity():
     data = request.get_json()
-    print("🟢 Datos recibidos en POST /opportunities:", data)
     client_name = data.get('client_name')
     opp_model = data.get('opp_model')
     position_name = data.get('position_name')
@@ -278,6 +277,29 @@ def update_opportunity_stage(opportunity_id):
         print("Error updating stage:", e)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/accounts/<account_id>/candidates')
+def get_candidates_by_account(account_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT Name, employee_revenue, employee_fee, employee_salary, employee_type, peoplemodel
+            FROM candidates
+            WHERE account_id = %s
+        """, (account_id,))
+        rows = cursor.fetchall()
+        if not rows:
+            return jsonify([])
+
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

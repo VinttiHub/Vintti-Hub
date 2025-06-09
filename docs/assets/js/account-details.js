@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(data => {
       fillAccountDetails(data);  // función para llenar el HTML
       loadAssociatedOpportunities(id); 
+      loadCandidates(id); 
     })
     .catch(err => {
       console.error('Error fetching accounts details:', err);
@@ -107,6 +108,47 @@ function fillOpportunitiesTable(opportunities) {
       <td>${opp.candidato_contratado || '—'}</td>
     `;
     tbody.appendChild(row);
+  });
+}
+function loadCandidates(accountId) {
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/candidates`)
+    .then(res => res.json())
+    .then(data => {
+      console.log("Candidates asociados:", data);
+      fillCandidatesCards(data);
+    })
+    .catch(err => {
+      console.error("Error cargando candidates asociados:", err);
+    });
+}
+function fillCandidatesCards(candidates) {
+  const staffingContainer = document.querySelector('#overview .accordion-section:nth-of-type(3) .card-grid');
+  const recruitingContainer = document.querySelector('#overview .accordion-section:nth-of-type(4) .card-grid');
+
+  staffingContainer.innerHTML = '';   // Limpiar
+  recruitingContainer.innerHTML = '';
+
+  if (!candidates.length) return;
+
+  candidates.forEach(candidate => {
+    const card = document.createElement('div');
+    card.classList.add('info-card', 'square');
+    card.innerHTML = `
+      <div class="info-title">👤 ${candidate.Name || '—'}</div>
+      <div class="info-details">
+        <div><strong>Revenue:</strong> $${candidate.employee_revenue || '—'}</div>
+        <div><strong>Fee:</strong> $${candidate.employee_fee || '—'}</div>
+        <div><strong>Salary:</strong> $${candidate.employee_salary || '—'}</div>
+        <div><strong>Type:</strong> ${candidate.employee_type || '—'}</div>
+      </div>
+    `;
+
+    // Según peoplemodel lo metemos en el contenedor correcto:
+    if (candidate.peoplemodel === 'Staffing') {
+      staffingContainer.appendChild(card);
+    } else if (candidate.peoplemodel === 'Recruiting') {
+      recruitingContainer.appendChild(card);
+    }
   });
 }
 
