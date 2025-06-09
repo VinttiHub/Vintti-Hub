@@ -127,7 +127,7 @@ def get_opportunity_by_id(opportunity_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM opportunity WHERE opp_id = %s", (opportunity_id,))
+        cursor.execute("SELECT * FROM opportunity WHERE opportunity_id = %s", (opportunity_id,))
         row = cursor.fetchone()
         if not row:
             return jsonify({"error": "Opportunity not found"}), 404

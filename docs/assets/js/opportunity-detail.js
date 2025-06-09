@@ -65,12 +65,41 @@ async function loadOpportunityData() {
     const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
     const data = await res.json();
 
+    console.log('Opportunity Data:', data); // te ayuda a debuggear
+
+    // Opportunity ID
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
-    document.getElementById('start-date-input').value = data.ida_signature_or_start_date || '';
-    document.getElementById('close-date-input').value = data.opp_close_date || '';
-    document.getElementById('signed-tag').textContent = '—'; // Puedes calcular días después
+
+    // Start Date
+    document.getElementById('start-date-input').value = formatDate(data.ida_signature_or_start_date);
+
+    // Closed Date
+    document.getElementById('close-date-input').value = formatDate(data.opp_close_date);
+
+    // Signed: si tienes un campo de fecha de firma, calcula días
+    if (data.ida_signature_or_start_date) {
+      const signedDays = calculateDaysAgo(data.ida_signature_or_start_date);
+      document.getElementById('signed-tag').textContent = `${signedDays} days ago`;
+    } else {
+      document.getElementById('signed-tag').textContent = '—';
+    }
 
   } catch (err) {
     console.error("Error loading opportunity:", err);
   }
 }
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date)) return ''; // por si el backend devuelve formato raro
+  return date.toISOString().slice(0, 10); // YYYY-MM-DD (puedes cambiar formato si quieres)
+}
+
+function calculateDaysAgo(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffTime = Math.abs(now - date);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+
