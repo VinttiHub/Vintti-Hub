@@ -132,7 +132,6 @@ def get_opportunity_by_id(opportunity_id):
     o.*, 
     a.client_name AS account_name,
     a.size AS account_size,
-    a.city AS account_city,
     a.state AS account_state,
     a.linkedin AS account_linkedin,
     a.website AS account_website,
