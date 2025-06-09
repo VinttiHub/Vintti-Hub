@@ -58,9 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${item.account_status || '—'}</td>
             <td>${item.account_manager || '—'}</td>
             <td>${item.contract || '—'}</td>
-            <td>—</td>
-            <td>—</td>
-            <td>—</td>
+            <td>$${item.trr ?? '—'}</td>
+            <td>$${item.tsf ?? '—'}</td>
+            <td>$${item.tsr ?? '—'}</td>
           </tr>
         `;
         tableBody.innerHTML += htmlRow;

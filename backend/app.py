@@ -35,10 +35,41 @@ def home():
 
 @app.route('/data')
 def get_accounts():
-    result = fetch_data_from_table("account")
-    if "error" in result:
-        return jsonify(result), 500
-    return jsonify(result)
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Traer todas las accounts
+        cursor.execute("SELECT * FROM account")
+        accounts_rows = cursor.fetchall()
+        accounts_columns = [desc[0] for desc in cursor.description]
+
+        accounts = [dict(zip(accounts_columns, row)) for row in accounts_rows]
+
+        # Para cada account, calcular TRR, TSF, TSR
+        for account in accounts:
+            account_id = account['account_id']
+
+            cursor.execute("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN peoplemodel = 'Recruiting' THEN employee_revenue ELSE 0 END), 0) AS trr,
+                    COALESCE(SUM(CASE WHEN peoplemodel = 'Staffing' THEN employee_fee ELSE 0 END), 0) AS tsf,
+                    COALESCE(SUM(CASE WHEN peoplemodel = 'Staffing' THEN employee_revenue ELSE 0 END), 0) AS tsr
+                FROM candidates
+                WHERE account_id = %s
+            """, (account_id,))
+            
+            sums_row = cursor.fetchone()
+            account['trr'] = sums_row[0]
+            account['tsf'] = sums_row[1]
+            account['tsr'] = sums_row[2]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(accounts)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/opportunities')
 def get_opportunities():
