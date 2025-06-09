@@ -308,9 +308,10 @@ def get_candidates_by_opportunity(opportunity_id):
         cursor.execute("""
             SELECT 
                 candidate_id,
-                Name,
-                Email,
-                stage
+                name,
+                email,
+                stage,
+                employee_salary       
             FROM candidates
             WHERE opportunity_id = %s
         """, (opportunity_id,))
