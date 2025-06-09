@@ -26,28 +26,29 @@ document.getElementById('spinner-overlay').classList.remove('hidden');
         return;
       }
 
-      data.forEach(opp => {
-  // Calcular days
-  let daysAgo = '—';
-  if (opp.nda_signature_or_start_date) {
-    daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
-  }
+    data.forEach(opp => {
+      // Calcular days
+      let daysAgo = '';
+      if (opp.nda_signature_or_start_date) {
+        daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
+      }
 
-    const row = `
-      <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
-        <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
-        <td>${opp.account_id || '—'}</td>
-        <td>${opp.opp_position_name || '—'}</td>
-        <td>—</td>
-        <td>${opp.opp_model || '—'}</td>
-        <td>${opp.opp_sales_lead || '—'}</td>
-        <td>${opp.opp_hr_lead || '—'}</td>
-        <td>${opp.comments || '—'}</td> <!-- Aquí uso comments, no opp_comments -->
-        <td>${daysAgo}</td> <!-- Aquí ponemos los days -->
-      </tr>
-    `;
-    tbody.innerHTML += row;
-  });
+      const row = `
+        <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
+          <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
+          <td>${opp.account_id || ''}</td>
+          <td>${opp.opp_position_name || ''}</td>
+          <td>${opp.opp_type || ''}</td> <!-- aquí Type -->
+          <td>${opp.opp_model || ''}</td>
+          <td>${opp.opp_sales_lead || ''}</td>
+          <td>${opp.opp_hr_lead || ''}</td>
+          <td>${opp.comments || ''}</td> <!-- aquí Comment -->
+          <td>${daysAgo}</td> <!-- aquí Days -->
+        </tr>
+      `;
+      tbody.innerHTML += row;
+    });
+
 
 
       const table = $('#opportunityTable').DataTable({
