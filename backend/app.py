@@ -309,7 +309,6 @@ def get_candidates_by_opportunity(opportunity_id):
             SELECT 
                 candidate_id,
                 Name,
-                Title,
                 Email,
                 stage_1
             FROM candidates

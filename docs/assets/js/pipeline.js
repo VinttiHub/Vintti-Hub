@@ -88,9 +88,8 @@ function loadPipelineCandidates() {
           <div class="preview">
             <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="${candidate.Name}">
             <div class="info">
-              <span class="name">${candidate.Name}</span>
-              <span class="title">${candidate.Title ?? ''}</span>
-              <span class="email">${candidate.Email ?? ''}</span>
+              <span class="name">${candidate.name}</span>
+              <span class="email">${candidate.email ?? ''}</span>
             </div>
           </div>
         `;
