@@ -111,7 +111,7 @@ function fillOpportunitiesTable(opportunities) {
   });
 }
 function loadCandidates(accountId) {
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/candidates`)
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities/candidates`)
     .then(res => res.json())
     .then(data => {
       console.log("Candidates asociados:", data);
