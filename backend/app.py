@@ -491,6 +491,33 @@ def update_account_fields(account_id):
     except Exception as e:
         print("Error updating account fields:", e)
         return jsonify({'error': str(e)}), 500
+@app.route('/candidates/<int:candidate_id>/stage', methods=['PATCH'])
+def update_candidate_stage(candidate_id):
+    data = request.get_json()
+    new_stage = data.get('stage')
+
+    if new_stage is None:
+        return jsonify({'error': 'stage is required'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE candidates
+            SET stage = %s
+            WHERE candidate_id = %s
+        """, (new_stage, candidate_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        print("Error updating candidate stage:", e)
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

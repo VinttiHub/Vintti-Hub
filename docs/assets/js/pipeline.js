@@ -8,10 +8,33 @@ document.addEventListener("DOMContentLoaded", () => {
     // Permitir soltar en columnas
     containers.forEach(container => {
       container.addEventListener("dragover", e => e.preventDefault());
-  
       container.addEventListener("drop", () => {
         if (draggedCard) {
           container.appendChild(draggedCard);
+
+          // 🚀 Obtener candidate_id y nuevo stage
+          const candidateId = draggedCard.getAttribute('data-candidate-id');
+          const newStage = container.getAttribute('data-status');
+
+          console.log(`➡️ Updating candidate ${candidateId} to stage ${newStage}`);
+
+          // 🚀 Hacer PATCH al backend
+          fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/stage`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ stage: newStage })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Error updating candidate stage');
+            }
+            console.log('✅ Candidate stage updated successfully');
+          })
+          .catch(error => {
+            console.error('Error updating candidate stage:', error);
+          });
         }
       });
     });
@@ -67,6 +90,7 @@ function loadPipelineCandidates() {
 candidates.forEach(candidate => {
   const card = document.createElement('div');
   card.className = 'candidate-card';
+  card.setAttribute('data-candidate-id', candidate.candidate_id); 
   card.innerHTML = `
     <strong>${candidate.name}</strong>
     <div class="preview">

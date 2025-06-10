@@ -160,8 +160,6 @@ async function loadOpportunityData() {
     // DETAILS
     document.getElementById('details-opportunity-name').value = data.opp_position_name || '';
     document.getElementById('details-account-name').value = data.account_name || '';
-    document.getElementById('details-sales-lead').innerHTML = `<option>${data.opp_sales_lead || ''}</option>`;
-    document.getElementById('details-hr-lead').innerHTML = `<option>${data.opp_hr_lead || ''}</option>`;
     document.getElementById('details-model').value = data.opp_model || '';
     
     // JOB DESCRIPTION
