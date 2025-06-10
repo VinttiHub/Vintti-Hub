@@ -38,7 +38,6 @@ def get_accounts():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
         # Traer todas las accounts
         cursor.execute("SELECT * FROM account")
         accounts_rows = cursor.fetchall()
@@ -46,10 +45,10 @@ def get_accounts():
 
         accounts = [dict(zip(accounts_columns, row)) for row in accounts_rows]
 
-        # Para cada account, calcular TRR, TSF, TSR
         for account in accounts:
             account_id = account['account_id']
 
+            # Calcular TRR, TSF, TSR
             cursor.execute("""
                 SELECT
                     COALESCE(SUM(CASE WHEN peoplemodel = 'Recruiting' THEN employee_revenue ELSE 0 END), 0) AS trr,
@@ -64,12 +63,51 @@ def get_accounts():
             account['tsf'] = sums_row[1]
             account['tsr'] = sums_row[2]
 
+            ### Calcular Status:
+            # 1️⃣ Traer opportunities
+            cursor.execute("""
+                SELECT opportunity_id, opp_stage
+                FROM opportunity
+                WHERE account_id = %s
+            """, (account_id,))
+            opp_rows = cursor.fetchall()
+            if not opp_rows:
+                # Si no hay opportunities, entonces Pending
+                account['status'] = 'Pending'
+                continue
+
+            opp_ids = [row[0] for row in opp_rows]
+            opp_stages = [row[1] for row in opp_rows]
+
+            # 2️⃣ Traer candidates de esas opportunities
+            cursor.execute("""
+                SELECT condition
+                FROM candidates
+                WHERE opportunity_id = ANY(%s)
+            """, (opp_ids,))
+            candidate_rows = cursor.fetchall()
+            candidate_stages = [row[0] for row in candidate_rows]
+
+            # 3️⃣ Aplicar reglas:
+            status = 'Pending'
+
+            # Priority order:
+            if 'active' in (s.lower() for s in candidate_stages):
+                status = 'Active'
+            elif 'inactive' in (s.lower() for s in candidate_stages):
+                status = 'Inactive'
+            elif any(stage.lower() in ['interviewing', 'sourcing', 'nda sent', 'negotiating'] for stage in opp_stages):
+                status = 'In Process'
+
+            account['status'] = status
+
         cursor.close()
         conn.close()
 
         return jsonify(accounts)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/opportunities')
 def get_opportunities():
