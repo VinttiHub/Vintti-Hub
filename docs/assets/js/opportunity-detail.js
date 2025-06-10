@@ -101,14 +101,14 @@ document.getElementById('details-sales-lead').addEventListener('change', async (
   const emailValue = e.target.value; // el value es el email
   console.log('🟡 Sales Lead changed:', emailValue);
 
-  await patchOpportunityField('opp_sales_lead', emailValue);
+  await updateOpportunityField('opp_sales_lead', emailValue);
 });
 
 document.getElementById('details-hr-lead').addEventListener('change', async (e) => {
   const emailValue = e.target.value; // el value es el email
   console.log('🟡 HR Lead changed:', emailValue);
 
-  await patchOpportunityField('opp_hr_lead', emailValue);
+  await updateOpportunityField('opp_hr_lead', emailValue);
 });
 
 document.getElementById('details-model').addEventListener('change', async (e) => {

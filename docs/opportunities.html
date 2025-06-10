@@ -45,7 +45,7 @@
 </div>
   </div>
 <!-- Popup -->
-<div id="popup" class="popup-overlay">
+<div id="popup" class="popup-overlay" style="display:none;">
   <div class="popup-content">
     <span class="close-btn" onclick="closePopup()">&times;</span>
     <h2 class="popup-title">New Opportunity</h2>
@@ -89,7 +89,32 @@
 </form>
   </div>
 </div>
-<!-- Esto va primero -->
+<!-- Popup Sourcing -->
+<div id="sourcingPopup" class="popup-overlay" style="display:none;">
+  <div class="popup-content">
+    <span class="close-btn" onclick="closeSourcingPopup()">&times;</span>
+    <h2>Set Sourcing Date</h2>
+    <input type="date" id="sourcingDate" />
+    <button id="saveSourcingDate">Save</button>
+  </div>
+</div>
+
+
+<!-- Popup Close Win -->
+<div id="closeWinPopup" class="popup-overlay" style="display:none;">
+  <div class="popup-content">
+    <span class="close-btn" onclick="closeCloseWinPopup()">&times;</span>
+    <h2>Set Close Win Info</h2>
+    <label>Hire:</label>
+    <input type="text" id="closeWinHireInput" list="closeWinCandidates" placeholder="Search candidate by name..." />
+    <datalist id="closeWinCandidates"></datalist>
+    <label>Close Date:</label>
+    <input type="date" id="closeWinDate" />
+    <button id="saveCloseWin">Save</button>
+  </div>
+</div>
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 <script src="./assets/js/main.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>

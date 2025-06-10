@@ -102,42 +102,81 @@ document.getElementById('spinner-overlay').classList.add('hidden');
       console.error('Error fetching opportunities:', err);
       document.getElementById('spinner-overlay').classList.add('hidden');
     });
-    document.addEventListener('change', async (e) => {
+    
+document.addEventListener('change', async (e) => {
   if (e.target && e.target.classList.contains('stage-dropdown')) {
     const newStage = e.target.value;
     const opportunityId = e.target.getAttribute('data-id');
 
     console.log('🟡 Stage dropdown changed! Opportunity ID:', opportunityId, 'New Stage:', newStage);
 
-    try {
-      const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opp_stage: newStage })
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-      console.log('✅ Stage updated successfully!');
-      
-      // 🔹 Efecto visual → verde clarito que desaparece
-      e.target.style.backgroundColor = '#d4edda'; // verde clarito
-      setTimeout(() => {
-        e.target.style.backgroundColor = ''; // volver al color normal
-      }, 1000);
+    if (newStage === 'Sourcing') {
+      openSourcingPopup(opportunityId, e.target);
+      return;
     }
-      else {
-        console.error('❌ Error updating stage:', result.error || result);
-        alert('Error updating stage: ' + (result.error || 'Unexpected error'));
-      }
 
-    } catch (err) {
-      console.error('❌ Network error updating stage:', err);
-      alert('Network error. Please try again.');
+    if (newStage === 'Close Win') {
+      openCloseWinPopup(opportunityId, e.target);
+      return;
     }
+
+    await patchOpportunityStage(opportunityId, newStage, e.target);
   }
 });
+
+async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
+  try {
+    const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opp_stage: newStage })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      console.log('✅ Stage updated successfully!');
+      dropdownElement.style.backgroundColor = '#d4edda';
+      setTimeout(() => {
+        dropdownElement.style.backgroundColor = '';
+      }, 1000);
+    } else {
+      console.error('❌ Error updating stage:', result.error || result);
+      alert('Error updating stage: ' + (result.error || 'Unexpected error'));
+    }
+  } catch (err) {
+    console.error('❌ Network error updating stage:', err);
+    alert('Network error. Please try again.');
+  }
+}
+
+
+// PATCH genérico (lo separo para reutilizar)
+async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
+  try {
+    const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opp_stage: newStage })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      console.log('✅ Stage updated successfully!');
+      dropdownElement.style.backgroundColor = '#d4edda';
+      setTimeout(() => {
+        dropdownElement.style.backgroundColor = '';
+      }, 1000);
+    } else {
+      console.error('❌ Error updating stage:', result.error || result);
+      alert('Error updating stage: ' + (result.error || 'Unexpected error'));
+    }
+  } catch (err) {
+    console.error('❌ Network error updating stage:', err);
+    alert('Network error. Please try again.');
+  }
+}
 
 });
 
@@ -246,42 +285,59 @@ document.getElementById('login-form')?.addEventListener('submit', async function
     alert('OcurriÃ³ un error inesperado. Intenta de nuevo mÃ¡s tarde.');
   }
 });
+const createOpportunityForm = document.getElementById('createOpportunityForm');
+const createButton = createOpportunityForm?.querySelector('.create-btn');
 
-document.getElementById('createOpportunityForm')?.addEventListener('submit', async function (e) {
-  e.preventDefault();
-  const form = e.target;
-  const formData = {
-    client_name: form.client_name.value.trim(),
-    opp_model: form.opp_model.value,
-    position_name: form.position_name.value.trim(),
-    sales_lead: form.sales_lead.value,
-    opp_type: form.opp_type.value
-  };
+if (createOpportunityForm && createButton) {
 
-try {
+  // Validación dinámica → activar o desactivar botón
+  createOpportunityForm.addEventListener('input', () => {
+    const clientName = createOpportunityForm.client_name.value.trim();
+    const oppModel = createOpportunityForm.opp_model.value;
+    const positionName = createOpportunityForm.position_name.value.trim();
+    const salesLead = createOpportunityForm.sales_lead.value;
+    const oppType = createOpportunityForm.opp_type.value;
 
-  const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(formData)
+    const allFilled = clientName && oppModel && positionName && salesLead && oppType;
+    createButton.disabled = !allFilled;
   });
 
-  const result = await response.json(); // ✅ Solo se hace una vez
+  // Validación al hacer submit
+  createOpportunityForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
 
-  if (response.ok) {
-    alert('Opportunity created successfully!');
-    closePopup();
-    location.reload();
-  } else {
-    console.log("🔴 Backend error:", result.error);
-    alert('Error: ' + (result.error || 'Unexpected error'));
-  }
+    const formData = {
+      client_name: createOpportunityForm.client_name.value.trim(),
+      opp_model: createOpportunityForm.opp_model.value,
+      position_name: createOpportunityForm.position_name.value.trim(),
+      sales_lead: createOpportunityForm.sales_lead.value,
+      opp_type: createOpportunityForm.opp_type.value,
+      opp_stage: 'NDA Sent' // <<< ⚠️ IMPORTANTE - esto se añade para forzar el stage
+    };
 
-} catch (err) {
-  console.error('Error creating opportunity:', err);
-  alert('Connection error. Please try again.');
+    try {
+      const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert('Opportunity created successfully!');
+        closePopup();
+        location.reload();
+      } else {
+        console.log("🔴 Backend error:", result.error);
+        alert('Error: ' + (result.error || 'Unexpected error'));
+      }
+    } catch (err) {
+      console.error('Error creating opportunity:', err);
+      alert('Connection error. Please try again.');
+    }
+  });
 }
-});
 
 fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users')
   .then(response => response.json())
@@ -409,3 +465,80 @@ function calculateDaysAgo(dateStr) {
 }
 
 
+// Popup Sourcing
+function openSourcingPopup(opportunityId, dropdownElement) {
+  const popup = document.getElementById('sourcingPopup');
+  popup.style.display = 'flex';
+
+  const saveBtn = document.getElementById('saveSourcingDate');
+  saveBtn.onclick = async () => {
+    const date = document.getElementById('sourcingDate').value;
+    if (!date) {
+      alert('Please select a date.');
+      return;
+    }
+
+    await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nda_signature_or_start_date: date
+      })
+    });
+
+    await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+    popup.style.display = 'none';
+  };
+}
+
+// Popup Close Win
+function openCloseWinPopup(opportunityId, dropdownElement) {
+  const popup = document.getElementById('closeWinPopup');
+  popup.style.display = 'flex';
+
+  loadCandidatesForCloseWin();
+
+  const saveBtn = document.getElementById('saveCloseWin');
+  saveBtn.onclick = async () => {
+    const date = document.getElementById('closeWinDate').value;
+    const hire = document.getElementById('closeWinHireInput').value;
+
+    if (!date || !hire) {
+      alert('Please select a hire and date.');
+      return;
+    }
+
+    await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        opp_close_date: date,
+        candidato_contratado: hire
+      })
+    });
+
+    await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
+    popup.style.display = 'none';
+  };
+}
+
+function loadCandidatesForCloseWin() {
+  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates')
+    .then(response => response.json())
+    .then(candidates => {
+      const datalist = document.getElementById('closeWinCandidates');
+      datalist.innerHTML = '';
+      candidates.forEach(candidate => {
+        const option = document.createElement('option');
+        option.value = candidate.candidate_id + ' - ' + candidate.name;
+        datalist.appendChild(option);
+      });
+    });
+}
+function closeSourcingPopup() {
+  document.getElementById('sourcingPopup').style.display = 'none';
+}
+
+function closeCloseWinPopup() {
+  document.getElementById('closeWinPopup').style.display = 'none';
+}

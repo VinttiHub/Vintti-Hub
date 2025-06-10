@@ -137,8 +137,13 @@ def get_opportunities_by_account(account_id):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT * FROM opportunity WHERE account_id = %s
-        """, (account_id,))
+                SELECT 
+                    o.*, 
+                    c.name AS candidate_name
+                FROM opportunity o
+                LEFT JOIN candidates c ON o.candidato_contratado = c.candidate_id
+                WHERE o.account_id = %s
+            """, (account_id,))
         rows = cursor.fetchall()
         if not rows:
             return jsonify([])
@@ -223,10 +228,11 @@ def create_opportunity():
         account_id = account_row[0]
         query = """
             INSERT INTO opportunity (
-                account_id, opp_model, opp_position_name, opp_sales_lead, opp_type
-            ) VALUES (%s, %s, %s, %s, %s)
+                account_id, opp_model, opp_position_name, opp_sales_lead, opp_type, opp_stage
+            ) VALUES (%s, %s, %s, %s, %s, %s)
             """
-        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type))
+        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type, 'NDA Sent'))
+
 
         conn.commit()
 

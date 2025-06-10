@@ -105,7 +105,7 @@ function fillOpportunitiesTable(opportunities) {
     row.innerHTML = `
       <td>${opp.opp_position_name || '—'}</td>
       <td>${opp.opp_stage || '—'}</td>
-      <td>${opp.candidato_contratado || '—'}</td>
+      <td>${opp.candidate_name || '—'}</td>
     `;
     tbody.appendChild(row);
   });
