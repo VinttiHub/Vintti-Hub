@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Opportunity Details</title>
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <script src="./assets/js/pipeline.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <body>
   <header class="detail-header">
     <div class="header-left">
@@ -58,7 +60,7 @@
     </div>
     <div class="input-group">
       <label>Hire</label>
-      <select id="hire-select"><option>Select Hire...</option></select>
+      <select id="hire-select" class="choices-hire"></select>
     </div>
   </div>
 </div>
@@ -73,20 +75,27 @@
   </div>
   <div class="card-content">
     <div class="overview-grid">
-      <div class="input-group"><label>Name</label><input id="client-name-input" value="" readonly/></div>
-      <div class="input-group"><label>Size</label><input id="client-size-input" value="" readonly/></div>
-      <div class="input-group"><label>State</label><input id="client-state-input" value="" readonly/></div>
-      <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value="" readonly/></div>
-      <div class="input-group"><label>Website</label><input id="client-website-input" value="" readonly/></div>
-      <div class="input-group full"><label>Mail</label><input id="client-mail-input" value="" readonly/></div>
-      <div class="input-group full"><label>About</label><textarea id="client-about-textarea" readonly></textarea></div>
+      <div class="input-group"><label>Name</label><input id="client-name-input" value="" ></div>
+      <div class="input-group"><label>Size</label>
+          <select id="client-size-input">
+            <option value="">Select Size...</option>
+            <option value="1-10">1-10</option>
+            <option value="11-50">11-50</option>
+            <option value="51-200">51-200</option>
+            <option value="201-500">201-500</option>
+            <option value="+500">+500</option>
+          </select>
+          </div>
+      <div class="input-group"><label>State</label><input id="client-state-input" value="" ></div>
+      <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value="" ></div>
+      <div class="input-group"><label>Website</label><input id="client-website-input" value="" ></div>
+      <div class="input-group full"><label>Mail</label><input id="client-mail-input" value="" ></div>
+      <div class="input-group full"><label>About</label><textarea id="client-about-textarea" ></textarea></div>
     </div>
   </div>
 </div>
 
 
-
-<!-- Details -->
 <!-- Details -->
 <div class="overview-card">
   <button class="card-toggle">
@@ -95,11 +104,16 @@
   </button>
   <div class="card-content">
     <div class="overview-grid">
-      <div class="input-group"><label>Opportunity Name</label><input id="details-opportunity-name" value="" readonly/></div>
+      <div class="input-group"><label>Opportunity Name</label><input id="details-opportunity-name" value="" ></div>
       <div class="input-group"><label>Account</label><input id="details-account-name" value="" readonly/></div>
-      <div class="input-group"><label>Sales Lead</label><select id="details-sales-lead" disabled><option></option></select></div>
-      <div class="input-group"><label>HR Lead</label><select id="details-hr-lead" disabled><option></option></select></div>
-      <div class="input-group"><label>Model</label><select id="details-model" disabled><option></option></select></div>
+      <div class="input-group"><label>Sales Lead</label><select id="details-sales-lead"><option></option></select></div>
+      <div class="input-group"><label>HR Lead</label><select id="details-hr-lead"><option></option></select></div>
+      <div class="input-group"><label>Model</label>
+        <select id="details-model">
+          <option value="Staffing">Staffing</option>
+          <option value="Recruiting">Recruiting</option>
+        </select>
+      </div>
     </div>
   </div>
 </div>

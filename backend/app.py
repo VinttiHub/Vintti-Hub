@@ -191,7 +191,13 @@ def get_users():
     result = fetch_data_from_table("users")
     if "error" in result:
         return jsonify(result), 500
-    return jsonify([row["user_name"] for row in result])  # 🔹 Devuelve solo la columna que necesitas
+    return jsonify([
+        {
+            "user_name": row["user_name"],
+            "email_vintti": row["email_vintti"]
+        }
+        for row in result
+    ])
 
 
 @app.route('/opportunities', methods=['POST'])
@@ -391,6 +397,101 @@ def get_candidate_by_id(candidate_id):
         return jsonify(candidate)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@app.route('/opportunities/<int:opportunity_id>/fields', methods=['PATCH'])
+def update_opportunity_fields(opportunity_id):
+    data = request.get_json()
+
+    allowed_fields = [
+        'nda_signature_or_start_date',
+        'opp_close_date',
+        'opp_position_name',
+        'opp_sales_lead',
+        'opp_hr_lead',
+        'opp_model'
+    ]
+
+    updates = []
+    values = []
+
+    for field in allowed_fields:
+        if field in data:
+            updates.append(f"{field} = %s")
+            values.append(data[field])
+
+    if not updates:
+        return jsonify({'error': 'No valid fields provided'}), 400
+
+    values.append(opportunity_id)
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f"""
+            UPDATE opportunity
+            SET {', '.join(updates)}
+            WHERE opportunity_id = %s
+        """, values)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        print("Error updating opportunity fields:", e)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/accounts/<account_id>', methods=['PATCH'])
+def update_account_fields(account_id):
+    data = request.get_json()
+
+    allowed_fields = [
+        'client_name',
+        'size',
+        'state',
+        'linkedin',
+        'website',
+        'mail',
+        'comments'
+    ]
+
+    updates = []
+    values = []
+
+    for field in allowed_fields:
+        if field in data:
+            updates.append(f"{field} = %s")
+            values.append(data[field])
+
+    if not updates:
+        return jsonify({'error': 'No valid fields provided'}), 400
+
+    values.append(account_id)
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f"""
+            UPDATE account
+            SET {', '.join(updates)}
+            WHERE account_id = %s
+        """, values)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        print("Error updating account fields:", e)
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

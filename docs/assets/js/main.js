@@ -291,8 +291,8 @@ fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users')
     select.innerHTML = '<option disabled selected>Select a user</option>';
     users.forEach(user => {
       const option = document.createElement('option');
-      option.value = user;
-      option.textContent = user;
+      option.value = user.email_vintti; // el VALUE será el email (como en la base de datos)
+      option.textContent = user.user_name; // el texto que ve el usuario será el nombre
       select.appendChild(option);
     });
   })
