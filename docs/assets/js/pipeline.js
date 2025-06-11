@@ -1,5 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
     const containers = document.querySelectorAll(".card-container");
+    const stageMap = {
+      'contacted': 'Contactado',
+      'no-advance': 'No avanza primera',
+      'first-interview': 'Primera entrevista',
+      'client-process': 'En proceso con Cliente'
+    };
+
     let draggedCard = null;
   
     // Activar drag para tarjetas iniciales
@@ -7,36 +14,59 @@ document.addEventListener("DOMContentLoaded", () => {
   
     // Permitir soltar en columnas
     containers.forEach(container => {
-      container.addEventListener("dragover", e => e.preventDefault());
-      container.addEventListener("drop", () => {
-        if (draggedCard) {
-          container.appendChild(draggedCard);
+      container.addEventListener("dragover", e => {
+        e.preventDefault();
+        container.parentElement.classList.add('drag-over'); // añade clase visual a .column
+      });
 
-          // 🚀 Obtener candidate_id y nuevo stage
-          const candidateId = draggedCard.getAttribute('data-candidate-id');
-          const newStage = container.getAttribute('data-status');
+      container.addEventListener("dragleave", () => {
+        container.parentElement.classList.remove('drag-over');
+      });
+      container.addEventListener("drop", (e) => {
+        e.preventDefault();
+        console.log('📥 Drop event triggered');
 
-          console.log(`➡️ Updating candidate ${candidateId} to stage ${newStage}`);
+        // Recuperar candidateId desde dataTransfer
+        const candidateId = e.dataTransfer.getData("text/plain");
+        console.log('📥 CandidateID from dataTransfer:', candidateId);
 
-          // 🚀 Hacer PATCH al backend
-          fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/stage`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ stage: newStage })
-          })
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Error updating candidate stage');
-            }
-            console.log('✅ Candidate stage updated successfully');
-          })
-          .catch(error => {
-            console.error('Error updating candidate stage:', error);
-          });
+        if (candidateId) {
+          // Buscar la tarjeta en el DOM
+          const draggedCardElement = document.querySelector(`.candidate-card[data-candidate-id='${candidateId}']`);
+          if (draggedCardElement) {
+            console.log('📥 Found draggedCardElement:', draggedCardElement);
+
+            container.appendChild(draggedCardElement);
+
+            const newStage = container.parentElement.getAttribute('data-status');
+            const mappedStage = stageMap[newStage] || null;
+            console.log(`➡️ Updating candidate ${candidateId} to stage ${mappedStage}`);
+
+            fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/stage`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ stage: mappedStage })
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Error updating candidate stage');
+              }
+              console.log('✅ Candidate stage updated successfully');
+              setTimeout(() => {
+                loadPipelineCandidates();
+              }, 200);
+            })
+            .catch(error => {
+              console.error('Error updating candidate stage:', error);
+            });
+          } else {
+            console.warn('⚠️ No draggedCardElement found!');
+          }
         }
       });
+
     });
   
     // Agregar tarjeta al hacer clic en “+ Add Candidate”
@@ -106,23 +136,23 @@ candidates.forEach(candidate => {
 
   // Mapeo del stage → columna id
   let columnId = '';
-  switch (candidate.stage) {
-    case 'Contactado':
-      columnId = 'contacted';
-      break;
-    case 'No avanza primera':
-      columnId = 'no-advance';
-      break;
-    case 'Primera entrevista':
-      columnId = 'first-interview';
-      break;
-    case 'En proceso con Cliente':
-      columnId = 'client-process';
-      break;
-    default:
-      console.warn(`Stage desconocido: ${candidate.stage}`);
-      columnId = 'contacted'; // fallback
-  }
+  switch (candidate.stage?.trim()) {
+      case 'Contactado':
+        columnId = 'contacted';
+        break;
+      case 'No avanza primera':
+        columnId = 'no-advance';
+        break;
+      case 'Primera entrevista':
+        columnId = 'first-interview';
+        break;
+      case 'En proceso con Cliente':
+        columnId = 'client-process';
+        break;
+      default:
+        console.warn(`Stage desconocido: ${candidate.stage}`);
+        columnId = 'contacted'; // fallback
+    }
 
   const container = document.getElementById(columnId);
   if (container) {
@@ -140,14 +170,15 @@ window.loadPipelineCandidates = loadPipelineCandidates;
 function enableDrag(card) {
       card.draggable = true;
   
-      card.addEventListener("dragstart", () => {
+      card.addEventListener("dragstart", (e) => {
         draggedCard = card;
-        setTimeout(() => card.style.display = "none", 0);
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", card.getAttribute("data-candidate-id"));
       });
+
   
       card.addEventListener("dragend", () => {
         setTimeout(() => {
-          draggedCard.style.display = "block";
           draggedCard = null;
         }, 0);
       });

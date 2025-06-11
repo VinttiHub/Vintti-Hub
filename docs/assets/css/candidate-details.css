@@ -433,3 +433,70 @@ a {
     background-color: transparent;
   }
 }
+/* Mejoras para el pipeline */
+
+.pipeline-columns {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+}
+
+.column {
+  flex: 1;
+  background-color: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 6px 12px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.column h3 {
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--label);
+  letter-spacing: 0.5px;
+}
+
+.card-container {
+  flex: 1;
+  min-height: 200px; /* IMPORTANTE para permitir drop */
+  padding: 10px;
+  border: 2px dashed rgba(0, 0, 0, 0.1); /* borde para indicar zona de drop */
+  border-radius: 8px;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.column.drag-over .card-container {
+  background-color: rgba(59, 130, 246, 0.1); /* azul suave al hacer hover con tarjeta */
+  border-color: var(--tab-active);
+}
+
+.candidate-card {
+  background-color: var(--card);
+  padding: 12px 16px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 10px;
+  cursor: grab;
+  transition: box-shadow 0.2s ease, transform 0.1s ease;
+}
+
+.candidate-card:active {
+  cursor: grabbing;
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark mode */
+[data-theme="dark"] .card-container {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .column.drag-over .card-container {
+  background-color: rgba(37, 99, 235, 0.15);
+  border-color: var(--tab-active);
+}
