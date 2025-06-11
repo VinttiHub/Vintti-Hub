@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const htmlRow = `
           <tr data-id="${item.account_id}">
             <td>${item.client_name || '—'}</td>
-            <td>${item.account_status || '—'}</td>
+            <td>${item.calculated_status || '—'}</td>
             <td>${item.account_manager || '—'}</td>
             <td>${item.contract || '—'}</td>
             <td>$${item.trr ?? '—'}</td>

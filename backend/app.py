@@ -73,7 +73,7 @@ def get_accounts():
             opp_rows = cursor.fetchall()
             if not opp_rows:
                 # Si no hay opportunities, entonces Pending
-                account['status'] = 'Pending'
+                account['calculated_status'] = 'Pending'
                 continue
 
             opp_ids = [row[0] for row in opp_rows]
@@ -84,7 +84,7 @@ def get_accounts():
                 SELECT condition
                 FROM candidates
                 WHERE opportunity_id = ANY(%s)
-            """, (opp_ids,))
+            """, (tuple(opp_ids),))
             candidate_rows = cursor.fetchall()
             candidate_stages = [row[0] for row in candidate_rows]
 
@@ -99,7 +99,8 @@ def get_accounts():
             elif any((stage or '').lower() in ['interviewing', 'sourcing', 'nda sent', 'negotiating'] for stage in opp_stages):
                 status = 'In Process'
 
-            account['status'] = status
+            account['calculated_status'] = status
+
 
 
         cursor.close()
@@ -614,6 +615,102 @@ def get_candidates_by_account_opportunities(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/resumes/<int:candidate_id>', methods=['GET'])
+def get_resume(candidate_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                about, 
+                work_experience, 
+                education, 
+                tools, 
+                video_link
+            FROM resume
+            WHERE candidate_id = %s
+        """, (candidate_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            # Si no hay resume creado aún, retornar vacío
+            return jsonify({
+                "about": "",
+                "work_experience": "[]",
+                "education": "[]",
+                "tools": "[]",
+                "video_link": "[]"
+            })
+
+        colnames = [desc[0] for desc in cursor.description]
+        resume = dict(zip(colnames, row))
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(resume)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/resumes/<int:candidate_id>', methods=['POST', 'PATCH'])
+def update_resume(candidate_id):
+    data = request.get_json()
+
+    allowed_fields = [
+        'about',
+        'work_experience',
+        'education',
+        'tools',
+        'video_link'
+    ]
+
+    updates = []
+    values = []
+
+    for field in allowed_fields:
+        if field in data:
+            updates.append(f"{field} = %s")
+            values.append(data[field])
+
+    if not updates:
+        return jsonify({'error': 'No valid fields provided'}), 400
+
+    values.append(candidate_id)
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Si el resume no existe aún → INSERT
+        cursor.execute("""
+            SELECT 1 FROM resume WHERE candidate_id = %s
+        """, (candidate_id,))
+        exists = cursor.fetchone()
+
+        if exists:
+            # UPDATE
+            cursor.execute(f"""
+                UPDATE resume
+                SET {', '.join(updates)}
+                WHERE candidate_id = %s
+            """, values)
+        else:
+            # INSERT
+            insert_fields = ", ".join(["candidate_id"] + [f for f in allowed_fields if f in data])
+            insert_values = ", ".join(["%s"] * (1 + len(updates)))
+            cursor.execute(f"""
+                INSERT INTO resume ({insert_fields})
+                VALUES ({insert_values})
+            """, [candidate_id] + values[:-1])  # values[:-1] → no repetimos candidate_id al final
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
