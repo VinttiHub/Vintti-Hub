@@ -92,14 +92,15 @@ def get_accounts():
             status = 'Pending'
 
             # Priority order:
-            if 'active' in (s.lower() for s in candidate_stages if s):
+            if any((s or '').lower() == 'active' for s in candidate_stages):
                 status = 'Active'
-            elif 'inactive' in (s.lower() for s in candidate_stages if s):
+            elif any((s or '').lower() == 'inactive' for s in candidate_stages):
                 status = 'Inactive'
-            elif any(stage.lower() in ['interviewing', 'sourcing', 'nda sent', 'negotiating'] for stage in opp_stages if stage):
+            elif any((stage or '').lower() in ['interviewing', 'sourcing', 'nda sent', 'negotiating'] for stage in opp_stages):
                 status = 'In Process'
 
             account['status'] = status
+
 
         cursor.close()
         conn.close()
