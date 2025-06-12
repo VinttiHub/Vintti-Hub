@@ -2,6 +2,32 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import psycopg2
 import os
+from dotenv import load_dotenv
+import boto3
+import os
+import uuid
+from botocore.exceptions import NoCredentialsError
+from affinda import AffindaAPI, TokenCredential
+import openai
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
+affinda = AffindaAPI(
+  credential=TokenCredential(token=os.getenv('AFFINDA_API_KEY'))
+)
+WORKSPACE_ID = os.getenv('AFFINDA_WORKSPACE_ID')
+DOC_TYPE_ID = os.getenv('AFFINDA_DOCUMENT_TYPE_ID')
+
+load_dotenv()
+
+# Configurar cliente S3
+s3_client = boto3.client(
+    's3',
+    region_name=os.getenv('AWS_REGION'),
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+)
+
+S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 CORS(app)
@@ -626,7 +652,9 @@ def get_resume(candidate_id):
                 work_experience, 
                 education, 
                 tools, 
-                video_link
+                video_link,
+                extract_cv_pdf,
+                cv_pdf_s3
             FROM resume
             WHERE candidate_id = %s
         """, (candidate_id,))
@@ -635,12 +663,14 @@ def get_resume(candidate_id):
         if not row:
             # Si no hay resume creado aún, retornar vacío
             return jsonify({
-                "about": "",
-                "work_experience": "[]",
-                "education": "[]",
-                "tools": "[]",
-                "video_link": "[]"
-            })
+                    "about": "",
+                    "work_experience": "[]",
+                    "education": "[]",
+                    "tools": "[]",
+                    "video_link": "[]",
+                    "extract_cv_pdf": "",
+                    "cv_pdf_s3": ""
+                })
 
         colnames = [desc[0] for desc in cursor.description]
         resume = dict(zip(colnames, row))
@@ -783,6 +813,195 @@ def extract_linkedin():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/upload_pdf', methods=['POST'])
+def upload_pdf():
+    candidate_id = request.form.get('candidate_id')
+    pdf_file = request.files.get('pdf')
+
+    if not candidate_id or not pdf_file:
+        return jsonify({"error": "Missing candidate_id or pdf file"}), 400
+
+    try:
+        # Nombre único en S3
+        filename = f"cvs/{candidate_id}_{uuid.uuid4()}.pdf"
+
+        # Subir a S3
+        s3_client.upload_fileobj(
+            pdf_file,
+            S3_BUCKET,
+            filename,
+            ExtraArgs={'ContentType': 'application/pdf'}
+        )
+
+        # Generar signed URL (válida por 1 hora)
+        signed_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': filename},
+            ExpiresIn=3600
+        )
+
+        # Guardar en base de datos
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE resume
+            SET cv_pdf_s3 = %s
+            WHERE candidate_id = %s
+        """, (signed_url, candidate_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "PDF uploaded", "pdf_url": signed_url}), 200
+
+    except NoCredentialsError:
+        return jsonify({"error": "AWS credentials not available"}), 500
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/extract_pdf_affinda', methods=['POST'])
+def extract_pdf_affinda():
+  candidate_id = request.form.get('candidate_id')
+  pdf_file = request.files.get('pdf')
+  if not candidate_id or not pdf_file:
+    return jsonify({"error": "candidate_id and pdf required"}), 400
+
+  try:
+    # 1. Cargar a Affinda
+    doc = affinda.create_document(
+      file=pdf_file,
+      workspace=WORKSPACE_ID,
+      document_type=DOC_TYPE_ID,
+      wait=True
+    )
+    data = doc.data  # JSON con campos extraídos
+
+    # 2. Convertir JSON a string
+    data_str = json.dumps(data)
+
+    # 3. Guardar en base de datos
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+      UPDATE resume
+      SET extract_cv_pdf = %s
+      WHERE candidate_id = %s
+    """, (data_str, candidate_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({"success": True, "extracted": data}), 200
+
+  except Exception as e:
+    return jsonify({"error": str(e)}), 500
+@app.route('/generate_resume_fields', methods=['POST'])
+def generate_resume_fields():
+    data = request.json
+    candidate_id = data.get('candidate_id')
+    extract_cv_pdf = data.get('extract_cv_pdf', '')
+    cv_pdf_s3 = data.get('cv_pdf_s3', '')
+    comments = data.get('comments', '')
+
+    # Construir el prompt
+    prompt = f"""
+You are an expert resume assistant. You will generate structured resume data in JSON format based on the following information:
+
+EXTRACTED_CV_PDF (Affinda or other CV extract): 
+{extract_cv_pdf}
+
+CV_PDF_S3 (LinkedIn or PDF extract):
+{cv_pdf_s3}
+
+Additional user comments:
+{comments}
+
+Please generate the following in ENGLISH:
+1. ABOUT: a professional summary paragraph.
+2. WORK_EXPERIENCE: a JSON array of objects with fields:
+   - title
+   - company
+   - start_date (YYYY-MM-DD or empty)
+   - end_date (YYYY-MM-DD or empty)
+   - current (true or false)
+   - description
+
+3. EDUCATION: a JSON array of objects with fields:
+   - institution
+   - start_date (YYYY-MM-DD or empty)
+   - end_date (YYYY-MM-DD or empty)
+   - current (true or false)
+   - description
+
+4. TOOLS: a JSON array of objects with fields:
+   - tool
+   - level (Basic, Intermediate, Advanced)
+
+Please respond in strict JSON format. Example:
+
+{
+  "about": "Experienced software engineer with a strong background in full-stack development and cloud technologies.",
+  "work_experience": [
+    {
+      "title": "Software Engineer",
+      "company": "Tech Corp",
+      "start_date": "2022-01-01",
+      "end_date": "",
+      "current": true,
+      "description": "Developed and maintained web applications using Python and React."
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of Technology",
+      "start_date": "2018-09-01",
+      "end_date": "2022-06-01",
+      "current": false,
+      "description": "Bachelor's Degree in Computer Science."
+    }
+  ],
+  "tools": [
+    {
+      "tool": "Python",
+      "level": "Advanced"
+    },
+    {
+      "tool": "React",
+      "level": "Intermediate"
+    }
+  ]
+}
+
+"""
+
+    try:
+        completion = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert assistant specialized in resume generation."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        response_text = completion['choices'][0]['message']['content']
+
+        # intentar parsear como JSON
+        try:
+            ai_data = json.loads(response_text)
+        except json.JSONDecodeError:
+            # fallback simple por si responde con ```json ... ```
+            response_text_clean = response_text.strip('```json').strip('```').strip()
+            ai_data = json.loads(response_text_clean)
+
+        return jsonify(ai_data)
+
+    except Exception as e:
+        print("❌ Error in generate_resume_fields:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

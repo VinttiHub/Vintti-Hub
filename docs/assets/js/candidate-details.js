@@ -200,15 +200,86 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     document.getElementById('ai-submit').addEventListener('click', () => {
       const pdfFile = document.getElementById('ai-pdf').files[0];
+      if (pdfFile) {
+        const formData = new FormData();
+        formData.append('candidate_id', candidateId);
+        formData.append('pdf', pdfFile);
+
+        // 1️⃣ Primero subir a S3
+        fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/upload_pdf', {
+          method: 'POST',
+          body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+          console.log('✅ PDF uploaded:', data.pdf_url);
+          alert('PDF uploaded successfully!');
+
+          // 2️⃣ Después enviar a Affinda
+          return fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/extract_pdf_affinda', {
+            method: 'POST',
+            body: formData
+          });
+        })
+        .then(res => res.json())
+        .then(data => {
+          console.log('✅ Extracción completa', data.extracted);
+        })
+        .catch(error => {
+          console.error('❌ Error en el flujo de carga y extracción:', error);
+          alert('Error uploading or extracting PDF');
+        });
+      }
+
       const comments = document.getElementById('ai-comments').value.trim();
 
       console.log('🚀 AI Action Triggered');
       console.log('LinkedIn:', aiLinkedIn.value);
       console.log('PDF File:', pdfFile);
       console.log('Comments:', comments);
+      // 3️⃣ Obtener extract_cv_pdf y cv_pdf_s3 del backend
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/resumes/${candidateId}`)
+        .then(res => res.json())
+        .then(data => {
+          const extractCvPdf = data.extract_cv_pdf || '';
+          const cvPdfS3 = data.cv_pdf_s3 || '';
 
-      // Aquí puedes agregar la lógica para subir el PDF y enviar los datos si quieres.
-      alert('AI Action sent! 🚀');
+          // 4️⃣ Enviar todo a ChatGPT a través de tu nuevo endpoint
+          return fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/generate_resume_fields', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              candidate_id: candidateId,
+              extract_cv_pdf: extractCvPdf,
+              cv_pdf_s3: cvPdfS3,
+              comments: comments
+            })
+          });
+        })
+        .then(res => res.json())
+        .then(aiData => {
+          console.log('✅ AI completed:', aiData);
+
+          // 5️⃣ Guardar automáticamente la respuesta en la tabla resume
+          return fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              about: aiData.about,
+              work_experience: JSON.stringify(aiData.work_experience),
+              education: JSON.stringify(aiData.education),
+              tools: JSON.stringify(aiData.tools),
+            })
+          });
+        })
+        .then(() => {
+          alert('Resume fields updated successfully!');
+          location.reload(); // refrescar para ver los nuevos datos
+        })
+        .catch(err => {
+          console.error('❌ Error in AI flow:', err);
+          alert('Error generating resume fields');
+        });
 
       // Opcional: cerrar popup
       aiPopup.classList.add('hidden');
