@@ -711,6 +711,78 @@ def update_resume(candidate_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/extract_linkedin', methods=['POST'])
+def extract_linkedin():
+    try:
+        data = request.json
+        resume_id = data.get('resume_id')  # el id de la fila en tu tabla resume
+
+        if not resume_id:
+            return jsonify({'error': 'resume_id is required'}), 400
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Obtener el candidate_id asociado al resume
+        cursor.execute("""
+            SELECT candidate_id FROM resume WHERE id = %s
+        """, (resume_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Resume not found'}), 404
+
+        candidate_id = result[0]
+
+        # Obtener el linkedin_url del candidate
+        cursor.execute("""
+            SELECT linkedin FROM candidates WHERE id = %s
+        """, (candidate_id,))
+        result = cursor.fetchone()
+
+        if not result or not result[0]:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'LinkedIn URL not found for candidate'}), 404
+
+        linkedin_url = result[0]
+
+        # Llamar a Outscraper
+        api_key = 'TU_API_KEY'  # reemplaza por tu API key real
+
+        response = requests.get(
+            'https://api.app.outscraper.com/v1/linkedin-profiles',
+            params={
+                'queries': linkedin_url,
+                'api_key': api_key
+            }
+        )
+
+        if response.status_code != 200:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Error calling Outscraper', 'status_code': response.status_code}), 500
+
+        linkedin_data = response.json()
+
+        # Guardar el JSON en extract_linkedin
+        cursor.execute("""
+            UPDATE resume
+            SET extract_linkedin = %s
+            WHERE id = %s
+        """, (json.dumps(linkedin_data), resume_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'linkedin_data': linkedin_data})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -8,6 +8,27 @@
 </head>
 <body>
   <div class="main-content">
+    <!-- AI Action Button -->
+    <div id="ai-action-button">
+      <span style="font-size: 20px; margin-right: 8px;">✨</span>
+      <span>AI Assistant</span>
+    </div>
+
+    <!-- AI Popup -->
+    <div id="ai-popup" class="hidden">
+      <h3>✨ AI Assistant</h3>
+      
+      <label>LinkedIn</label>
+      <input type="text" id="ai-linkedin">
+      
+      <label>Upload PDF</label>
+      <input type="file" id="ai-pdf">
+      
+      <label>Do you want me to take something into account?</label>
+      <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
+      
+      <button id="ai-submit">✨ Let's Go!</button>
+    </div>
     <div class="tabs">
       <button class="tab active" data-tab="overview">Overview</button>
       <button class="tab" data-tab="resume">Resume</button>

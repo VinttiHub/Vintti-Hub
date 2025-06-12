@@ -182,11 +182,39 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       }),
     });
   }
+  // === AI Popup Logic ===
+    const aiButton = document.getElementById('ai-action-button');
+    const aiPopup = document.getElementById('ai-popup');
+    const aiLinkedIn = document.getElementById('ai-linkedin');
+
+    // Mostrar LinkedIn automáticamente en popup
+    fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
+      .then(response => response.json())
+      .then(data => {
+        aiLinkedIn.value = data.linkedin || '';
+      });
+
+    aiButton.addEventListener('click', () => {
+      aiPopup.classList.toggle('hidden');
+    });
+
+    document.getElementById('ai-submit').addEventListener('click', () => {
+      const pdfFile = document.getElementById('ai-pdf').files[0];
+      const comments = document.getElementById('ai-comments').value.trim();
+
+      console.log('🚀 AI Action Triggered');
+      console.log('LinkedIn:', aiLinkedIn.value);
+      console.log('PDF File:', pdfFile);
+      console.log('Comments:', comments);
+
+      // Aquí puedes agregar la lógica para subir el PDF y enviar los datos si quieres.
+      alert('AI Action sent! 🚀');
+
+      // Opcional: cerrar popup
+      aiPopup.classList.add('hidden');
+    });
 });
 
-
-
-// Código para tabs (ya tenías esto bien)
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const tabId = tab.dataset.tab;
@@ -196,5 +224,17 @@ document.querySelectorAll('.tab').forEach(tab => {
 
     tab.classList.add('active');
     document.getElementById(tabId).classList.add('active');
+
+    // Mostrar / ocultar el botón de AI Assistant solo en Resume
+    const aiButton = document.getElementById('ai-action-button');
+    const aiPopup = document.getElementById('ai-popup');
+    
+    if (tabId === 'resume') {
+      aiButton.style.display = 'flex';
+    } else {
+      aiButton.style.display = 'none';
+      aiPopup.classList.add('hidden'); // Cierra popup si cambian de pestaña
+    }
   });
 });
+
