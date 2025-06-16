@@ -1077,3 +1077,10 @@ body:not(.light-mode) {
   background-color: #ccc;
   margin-left: 10px;
 }
+.batch-box {
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background-color: var(--background-color, #fff);
+}

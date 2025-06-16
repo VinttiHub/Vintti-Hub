@@ -39,7 +39,7 @@
     <div>
       <label class="section-label">Opportunity ID</label>
       <div class="stage-id">
-        <span id="opportunity-id-text">—</span>
+        <span id="opportunity-id-text" data-id="">—</span>
       </div>
     </div>
     <span class="status-pill blue">Negotiating</span>
@@ -281,15 +281,9 @@
         </table>
       </div>
     
-      <div class="batch-detail">
-        <div class="batch-actions">
-          <h3>Batch #1</h3>
-          <div>
-            <button class="btn-add">Add candidate</button>
-            <button class="btn-send">Send for Approval</button>
-          </div>
-        </div>
-    
+      <div class="batch-detail" id="batch-detail-container">
+        <!-- Aquí se insertarán dinámicamente los batch-box -->
+      </div>
       <div class="create-batch-wrap">
         <button class="btn-create">Create new batch</button>
       </div>

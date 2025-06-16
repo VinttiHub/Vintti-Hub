@@ -188,6 +188,7 @@ async function loadOpportunityData() {
         });
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
+    document.getElementById('opportunity-id-text').setAttribute('data-id', data.opportunity_id);
     document.getElementById('start-date-input').value = formatDate(data.nda_signature_or_start_date);
     document.getElementById('close-date-input').value = formatDate(data.opp_close_date);
     // Client section
@@ -305,7 +306,7 @@ function calculateDaysAgo(dateStr) {
   return diffDays;
 }
 async function updateOpportunityField(fieldName, fieldValue) {
-  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   if (opportunityId === '—' || opportunityId === '') {
     console.error('Opportunity ID not found');
     return;
@@ -407,3 +408,40 @@ function loadCandidatesForBatch() {
       console.error('Error loading batch candidates:', error);
     });
 }
+document.querySelector('.btn-create').addEventListener('click', async () => {
+  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+
+  if (!opportunityId || opportunityId === '—') {
+    alert('Opportunity ID not found');
+    return;
+  }
+
+  try {
+    console.log("📌 Creating batch for opportunity ID:", opportunityId);
+    console.log("🚀 Calling URL:", `https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`, {
+      method: 'POST'
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      const batchContainer = document.createElement('div');
+      batchContainer.classList.add('batch-box');
+      batchContainer.innerHTML = `
+        <div class="batch-actions">
+          <h3>Batch #${data.batch_number}</h3>
+          <div>
+            <button class="btn-add">Add candidate</button>
+            <button class="btn-send">Send for Approval</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('batch-detail-container').appendChild(batchContainer);
+    } else {
+      alert('Failed to create batch');
+    }
+  } catch (err) {
+    console.error('Error creating batch:', err);
+  }
+});

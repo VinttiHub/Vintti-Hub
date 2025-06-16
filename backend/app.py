@@ -1003,6 +1003,42 @@ Please respond in strict JSON format. Example:
         print("❌ Error in generate_resume_fields:", str(e))
         return jsonify({"error": str(e)}), 500
 
+@app.route('/opportunities/<int:opportunity_id>/batches', methods=['POST'])
+def create_batch(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Obtener el batch_id más alto actual
+        cursor.execute("SELECT COALESCE(MAX(batch_id), 0) FROM batch")
+        current_max_batch_id = cursor.fetchone()[0]
+        new_batch_id = current_max_batch_id + 1
+
+        # Obtener cuántos batches tiene esta oportunidad
+        cursor.execute("SELECT COUNT(*) FROM batch WHERE opportunity_id = %s", (opportunity_id,))
+        batch_count = cursor.fetchone()[0]
+        batch_number = batch_count + 1
+
+        # Insertar el nuevo batch
+        cursor.execute("""
+            INSERT INTO batch (batch_id, batch_number, opportunity_id)
+            VALUES (%s, %s, %s)
+        """, (new_batch_id, batch_number, opportunity_id))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "batch_id": new_batch_id,
+            "batch_number": batch_number,
+            "opportunity_id": opportunity_id
+        }), 201
+
+    except Exception as e:
+        print("Error creating batch:", e)
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
