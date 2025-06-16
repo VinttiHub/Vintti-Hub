@@ -76,7 +76,7 @@ document.getElementById("createCandidateBtn").addEventListener("click", () => {
 document.getElementById("closePopup").addEventListener("click", () => {
   document.getElementById("candidatePopup").classList.add("hidden");
 
-  ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary"]
+  ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary", "candidate-country"]
     .forEach(id => document.getElementById(id).value = '');
 });
 
@@ -91,6 +91,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
   const comments = document.getElementById("candidate-comments").value;
   const english_level = document.getElementById("candidate-english").value;
   const salary_range = document.getElementById("candidate-salary").value;
+  const country = document.getElementById("candidate-country").value;
   const stage = "Contactado";
 
   if (!opportunityId || opportunityId === '—') {
@@ -112,10 +113,12 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     comments,
     english_level,
     salary_range,
+    country,
     stage
   };
 
   try {
+    console.log("Payload:", payload);
     const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -127,7 +130,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     document.getElementById("candidatePopup").classList.add("hidden");
 
     // Limpiar campos
-    ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary"]
+    ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary", "candidate-country"]
       .forEach(id => document.getElementById(id).value = '');
 
     loadPipelineCandidates();

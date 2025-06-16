@@ -1104,19 +1104,21 @@ def update_candidate_fields(candidate_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+
 @app.route('/opportunities/<int:opportunity_id>/candidates', methods=['POST'])
 def create_candidate(opportunity_id):
     data = request.get_json()
-    name = data.get("name")
-    email = data.get("email")
-    phone = data.get("phone")
-    linkedin = data.get("linkedin")
-    red_flags = data.get("red_flags")
-    comments = data.get("comments")
-    stage = data.get("stage", "Contactado")
-
-    if not name or not email or not phone or not linkedin:
-        return jsonify({'error': 'Missing required fields'}), 400
+    name = data.get('name')
+    email = data.get('email')
+    phone = data.get('phone')
+    linkedin = data.get('linkedin')
+    red_flags = data.get('red_flags')
+    comments = data.get('comments')
+    english_level = data.get('english_level')
+    salary_range = data.get('salary_range')
+    stage = data.get('stage', 'Contactado')
+    country = data.get('country')
 
     try:
         conn = get_connection()
@@ -1124,35 +1126,29 @@ def create_candidate(opportunity_id):
 
         # Obtener el siguiente candidate_id
         cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
-        current_max_id = cursor.fetchone()[0]
-        new_candidate_id = current_max_id + 1
-
-        cursor.execute("""
+        max_id = cursor.fetchone()[0]
+        new_candidate_id = max_id + 1
+        query = """
             INSERT INTO candidates (
-                candidate_id, opportunity_id, name, email, phone, linkedin, red_flags, comments, stage
+                candidate_id, opportunity_id, name, email, phone, linkedin,
+                red_flags, comments, english_level, salary_range, country, stage
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            new_candidate_id,
-            opportunity_id,
-            name,
-            email,
-            phone,
-            linkedin,
-            red_flags,
-            comments,
-            stage
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (
+            new_candidate_id, opportunity_id, name, email, phone, linkedin,
+            red_flags, comments, english_level, salary_range, country, stage
         ))
 
         conn.commit()
         cursor.close()
         conn.close()
 
-        return jsonify({'message': 'Candidate created', 'candidate_id': new_candidate_id}), 201
+        return jsonify({"message": "Candidate created successfully", "candidate_id": new_candidate_id}), 201
 
     except Exception as e:
-        print("Error creating candidate:", e)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
