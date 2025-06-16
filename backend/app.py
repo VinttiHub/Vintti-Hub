@@ -110,7 +110,7 @@ def get_accounts():
                 SELECT condition
                 FROM candidates
                 WHERE opportunity_id = ANY(%s)
-            """, (tuple(opp_ids),))
+                """, ([*opp_ids],))  # o simplemente (opp_ids,) si ya es una lista
             candidate_rows = cursor.fetchall()
             candidate_stages = [row[0] for row in candidate_rows]
 
