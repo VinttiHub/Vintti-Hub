@@ -1003,7 +1003,7 @@ Please respond in strict JSON format. Example:
         print("❌ Error in generate_resume_fields:", str(e))
         return jsonify({"error": str(e)}), 500
 
-@app.route('/opportunities/<int:opportunity_id>/batches', methods=['POST'])
+@app.route('/opportunities/<opportunity_id>/batches', methods=['POST'])
 def create_batch(opportunity_id):
     try:
         conn = get_connection()
@@ -1039,7 +1039,7 @@ def create_batch(opportunity_id):
         print("Error creating batch:", e)
         return jsonify({"error": str(e)}), 500
     
-@app.route('/opportunities/<int:opportunity_id>/batches', methods=['GET'])
+@app.route('/opportunities/<opportunity_id>/batches', methods=['GET'])
 def get_batches(opportunity_id):
     try:
         conn = get_connection()
