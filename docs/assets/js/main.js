@@ -12,8 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleButton.textContent = isExpanded ? 'ðŸ” Filters' : 'âŒ Close Filters';
     });
   }
-  // Mostrar spinner al comenzar
-document.getElementById('spinner-overlay').classList.remove('hidden');
 
   fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities')
     .then(response => response.json())
@@ -95,8 +93,6 @@ document.getElementById('spinner-overlay').classList.remove('hidden');
           createColumnFilter(columnIndex, table);
         }
       });
-      // Ocultar spinner al terminar
-document.getElementById('spinner-overlay').classList.add('hidden');
     })
     .catch(err => {
       console.error('Error fetching opportunities:', err);
