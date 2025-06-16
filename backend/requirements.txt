@@ -5,3 +5,4 @@ boto3
 requests
 python-dotenv
 affinda>=4.27.0
+openai
