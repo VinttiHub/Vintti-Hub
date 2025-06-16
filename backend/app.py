@@ -1038,6 +1038,28 @@ def create_batch(opportunity_id):
     except Exception as e:
         print("Error creating batch:", e)
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/opportunities/<int:opportunity_id>/batches', methods=['GET'])
+def get_batches(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT batch_id, batch_number, opportunity_id
+            FROM batch
+            WHERE opportunity_id = %s
+            ORDER BY batch_number ASC
+        """, (opportunity_id,))
+        rows = cursor.fetchall()
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

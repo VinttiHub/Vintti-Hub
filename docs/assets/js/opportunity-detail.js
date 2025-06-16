@@ -25,9 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tab.textContent.trim() === 'Pipeline') {
           loadPipelineCandidates();
         }
-        if (tab.textContent.trim() === 'Candidates') {
-          loadCandidatesForBatch();
-        }
       });
     });
 
@@ -137,7 +134,10 @@ tabs.forEach((tab, index) => {
     showAIAssistantButton(tabName);
 
     if (tabName === 'Pipeline') loadPipelineCandidates();
-    if (tabName === 'Candidates') loadCandidatesForBatch();
+    if (tabName === 'Candidates') {
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  loadBatchesForOpportunity(opportunityId);
+}
   });
 });
 
@@ -366,48 +366,6 @@ function getAccountId() {
   return window.currentAccountId || null;
 }
 
-function loadCandidatesForBatch() {
-  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
-  if (opportunityId === '—' || opportunityId === '') {
-    console.error('Opportunity ID not found');
-    return;
-  }
-
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
-    .then(response => response.json())
-    .then(candidates => {
-      console.log('🔵 Candidates for Batch:', candidates);
-
-      const batchDetail = document.querySelector('.batch-detail');
-      // Limpiar las tarjetas que existan actualmente (excepto el .batch-actions)
-      const cardsToRemove = batchDetail.querySelectorAll('.candidate-card-static');
-      cardsToRemove.forEach(card => card.remove());
-
-      candidates.forEach(candidate => {
-        const card = document.createElement('div');
-        card.className = 'candidate-card-static';
-        card.innerHTML = `
-        <span class="candidate-name">${candidate.name}</span>
-        <span class="budget">${candidate.employee_salary ? `$${candidate.employee_salary}` : '$0'}</span>
-        <select class="status">
-          <option ${candidate.stage === 'Client rejected after' ? 'selected' : ''}>Client rejected after</option>
-          <option ${candidate.stage === 'Client Hired' ? 'selected' : ''}>Client Hired</option>
-          <option ${candidate.stage === 'En proceso con Cliente' ? 'selected' : ''}>En proceso con Cliente</option>
-          <option ${candidate.stage === 'Primera entrevista' ? 'selected' : ''}>Primera entrevista</option>
-          <option ${candidate.stage === 'Contactado' ? 'selected' : ''}>Contactado</option>
-          <option ${candidate.stage === 'No avanza primera' ? 'selected' : ''}>No avanza primera</option>
-          <option ${(candidate.stage === '(deleted option)' || !candidate.stage) ? 'selected' : ''}>(deleted option)</option>
-        </select>
-        <button class="comment-btn">💬</button>
-        <button class="delete-btn">🗑️</button>
-      `;
-        batchDetail.appendChild(card);
-      });
-    })
-    .catch(error => {
-      console.error('Error loading batch candidates:', error);
-    });
-}
 document.querySelector('.btn-create').addEventListener('click', async () => {
   const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
 
@@ -445,3 +403,29 @@ document.querySelector('.btn-create').addEventListener('click', async () => {
     console.error('Error creating batch:', err);
   }
 });
+async function loadBatchesForOpportunity(opportunityId) {
+  try {
+    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const batches = await res.json();
+
+    const container = document.getElementById('batch-detail-container');
+    container.innerHTML = ''; // Limpia
+
+    batches.forEach(batch => {
+      const box = document.createElement('div');
+      box.classList.add('batch-box');
+      box.innerHTML = `
+        <div class="batch-actions">
+          <h3>Batch #${batch.batch_number}</h3>
+          <div>
+            <button class="btn-add">Add candidate</button>
+            <button class="btn-send">Send for Approval</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(box);
+    });
+  } catch (err) {
+    console.error('Error loading batches:', err);
+  }
+}
