@@ -973,3 +973,107 @@ body:not(.light-mode) {
 .comment-btn:hover, .delete-btn:hover {
   opacity: 0.7;
 }
+#ai-assistant-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fad0c4, #fbc2eb, #a18cd1);
+  color: white;
+  padding: 15px 25px;
+  border-radius: 50px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+  animation: shimmer 1.5s infinite;
+  z-index: 9999;
+}
+
+@keyframes shimmer {
+  0% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.8); }
+  50% { box-shadow: 0 0 40px rgba(255, 255, 255, 1); }
+  100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.8); }
+}
+
+.ai-popup {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.ai-popup.hidden {
+  display: none;
+}
+
+.ai-popup-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 15px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+  animation: popupIn 0.4s ease;
+}
+
+@keyframes popupIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.ai-popup-content h2 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.ai-popup-content label {
+  display: block;
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+.ai-popup-content textarea,
+.ai-popup-content input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.file-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.file-upload input[type="file"] {
+  flex: 1;
+}
+
+.upload-icon {
+  font-size: 24px;
+}
+
+#ai-assistant-go, #ai-assistant-close {
+  margin-top: 20px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#ai-assistant-go {
+  background-color: #8e44ad;
+  color: white;
+}
+
+#ai-assistant-close {
+  background-color: #ccc;
+  margin-left: 10px;
+}

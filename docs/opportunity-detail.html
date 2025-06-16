@@ -296,6 +296,35 @@
     </section>
     
   </main>
+  <!-- AI Assistant Button -->
+  <div id="ai-assistant-btn" style="display: none;">
+    ✨ AI Assistant ✨
+  </div>
+
+  <!-- AI Assistant Popup -->
+  <div id="ai-assistant-popup" class="ai-popup hidden">
+    <div class="ai-popup-content">
+      <h2>AI Assistant</h2>
+      <label>Intro Call</label>
+      <textarea placeholder="00:00 Speaker: Text here..."></textarea>
+
+      <label>Deep Dive Call</label>
+      <input type="text" placeholder="2nd_Call_Transcript" />
+
+      <label>Notes / Emails</label>
+      <textarea placeholder="Your notes here..."></textarea>
+
+      <label>Files</label>
+      <div class="file-upload">
+        <input type="file" />
+        <div class="upload-icon">☁️⬆️</div>
+      </div>
+
+      <button id="ai-assistant-go">Let's Go 🚀</button>
+      <button id="ai-assistant-close">Close</button>
+    </div>
+  </div>
+
 <script src="./assets/js/opportunity-detail.js"></script>
 </body>
 </html>

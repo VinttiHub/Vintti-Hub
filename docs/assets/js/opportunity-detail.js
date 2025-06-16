@@ -114,6 +114,48 @@ document.getElementById('details-hr-lead').addEventListener('change', async (e) 
 document.getElementById('details-model').addEventListener('change', async (e) => {
   await updateOpportunityField('opp_model', e.target.value);
 });
+// AI Assistant logic
+const aiBtn = document.getElementById('ai-assistant-btn');
+const aiPopup = document.getElementById('ai-assistant-popup');
+const aiClose = document.getElementById('ai-assistant-close');
+const aiGo = document.getElementById('ai-assistant-go');
+
+// Mostrar solo en pestaña "Job Description"
+function showAIAssistantButton(tabName) {
+  if (tabName === 'Job Description') {
+    aiBtn.style.display = 'block';
+  } else {
+    aiBtn.style.display = 'none';
+  }
+}
+
+tabs.forEach((tab, index) => {
+  tab.addEventListener('click', () => {
+    activateTab(index);
+
+    const tabName = tab.textContent.trim();
+    showAIAssistantButton(tabName);
+
+    if (tabName === 'Pipeline') loadPipelineCandidates();
+    if (tabName === 'Candidates') loadCandidatesForBatch();
+  });
+});
+
+// Botón abre popup
+aiBtn.addEventListener('click', () => {
+  aiPopup.classList.remove('hidden');
+});
+
+// Botón Close
+aiClose.addEventListener('click', () => {
+  aiPopup.classList.add('hidden');
+});
+
+// Botón Let's Go (por ahora solo cierra popup)
+aiGo.addEventListener('click', () => {
+  alert('✨ AI Assistant is processing your inputs...');
+  aiPopup.classList.add('hidden');
+});
 
 });
 
