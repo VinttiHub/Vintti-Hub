@@ -134,9 +134,13 @@ tabs.forEach((tab, index) => {
     showAIAssistantButton(tabName);
 
     if (tabName === 'Pipeline') loadPipelineCandidates();
-    if (tabName === 'Candidates') {
+if (tabName === 'Candidates') {
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
-  loadBatchesForOpportunity(opportunityId);
+  if (opportunityId && opportunityId !== '—') {
+    loadBatchesForOpportunity(opportunityId);
+  } else {
+    console.error('Opportunity ID is invalid:', opportunityId);
+  }
 }
   });
 });
@@ -367,8 +371,7 @@ function getAccountId() {
 }
 
 document.querySelector('.btn-create').addEventListener('click', async () => {
-  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
-
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   if (!opportunityId || opportunityId === '—') {
     alert('Opportunity ID not found');
     return;
