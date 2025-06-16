@@ -68,16 +68,75 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
     });
-  
-    // Agregar tarjeta al hacer clic en “+ Add Candidate”
-    document.getElementById("addCandidateBtn").addEventListener("click", () => {
-      const newCard = document.createElement("div");
-      newCard.className = "candidate-card";
-      newCard.innerHTML = `<strong>New Candidate</strong><p class="status">Contactado</p>`;
-      
-      enableDrag(newCard);
-      document.getElementById("contacted").appendChild(newCard);
+// Mostrar popup al hacer clic en “+ Add Candidate”
+document.getElementById("addCandidateBtn").addEventListener("click", () => {
+  document.getElementById("candidatePopup").classList.remove("hidden");
+});
+
+document.getElementById("closePopup").addEventListener("click", () => {
+  document.getElementById("candidatePopup").classList.add("hidden");
+
+  // Limpiar campos
+  document.getElementById("candidate-name").value = '';
+  document.getElementById("candidate-email").value = '';
+  document.getElementById("candidate-phone").value = '';
+  document.getElementById("candidate-linkedin").value = '';
+  document.getElementById("candidate-redfalgs").value = '';
+  document.getElementById("candidate-comments").value = '';
+});
+
+// Crear candidato desde popup
+document.getElementById("createCandidateBtn").addEventListener("click", async () => {
+  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  const name = document.getElementById("candidate-name").value;
+  const email = document.getElementById("candidate-email").value;
+  const phone = document.getElementById("candidate-phone").value;
+  const linkedin = document.getElementById("candidate-linkedin").value;
+  const redfalgs = document.getElementById("candidate-redfalgs").value;
+  const comments = document.getElementById("candidate-comments").value;
+  const stage = "Contactado";
+
+  if (!opportunityId || opportunityId === '—') {
+    alert('Opportunity ID not found');
+    return;
+  }
+
+  if (!name || !email || !phone || !linkedin) {
+  alert("Please fill in all fields before creating the candidate.");
+  return;
+  }
+  const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  try {
+    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
+
+    if (!res.ok) throw new Error('Failed to create candidate');
+
+    document.getElementById("candidatePopup").classList.add("hidden");
+
+    // Limpiar campos
+    document.getElementById("candidate-name").value = '';
+    document.getElementById("candidate-email").value = '';
+    document.getElementById("candidate-phone").value = '';
+    document.getElementById("candidate-linkedin").value = '';
+    document.getElementById("candidate-redfalgs").value = '';
+    document.getElementById("candidate-comments").value = '';
+
+    loadPipelineCandidates();
+  } catch (err) {
+    console.error("Error creating candidate:", err);
+    alert("Failed to create candidate");
+  }
+});
+
   });
   document.querySelectorAll(".candidate-card").forEach(card => {
     const preview = card.querySelector(".preview");

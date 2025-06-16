@@ -1084,3 +1084,73 @@ body:not(.light-mode) {
   margin-bottom: 20px;
   background-color: var(--background-color, #fff);
 }
+.popup {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10000;
+}
+
+
+.popup.hidden {
+  display: none;
+}
+
+.popup-content {
+  background-color: #ffffff; /* blanco fijo */
+  color: #0a1f44;
+  padding: 2rem;
+  border-radius: 12px;
+  position: relative;
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.popup-content input {
+  border: 1px solid #1a202c; /* gris oscuro */
+  background-color: white;
+  color: #0a1f44;
+}
+
+
+.popup-content button {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background-color: #2f80ed;
+  color: white;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.popup-content button:hover {
+  background-color: #1c62c5;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 20px;
+  cursor: pointer;
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-appearance: none !important;
+  box-shadow: 0 0 0px 1000px white inset !important;
+  background-clip: content-box !important;
+}
+input::-webkit-contacts-auto-fill-button {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute;
+  right: 0;
+}
