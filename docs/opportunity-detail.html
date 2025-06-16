@@ -181,7 +181,7 @@
       <div class="pipeline-header">
         <h2>Pipeline</h2>
         <div class="pipeline-actions">
-          <button id="createCandidateBtn">+ Add Candidate</button>
+          <button id="createCandidateBtn">+ Create Candidate</button>
           <button id="signOffBtn">Sign off</button>
         </div>
       </div>
@@ -327,9 +327,20 @@
         <input type="text" id="candidate-linkedin" placeholder="LinkedIn URL" />
         <input type="text" id="candidate-redflags" placeholder="Red Flags" />
         <input type="text" id="candidate-comments" placeholder="Comments" />
-        <button id="createCandidateBtn">Create Candidate</button>
+        <input type="text" id="candidate-redflags" placeholder="Red Flags" />
+        <input type="text" id="candidate-comments" placeholder="Comments" />
+        <select id="candidate-english" placeholder="English Level">
+          <option value="">Select English Level</option>
+          <option value="Bad">Bad</option>
+          <option value="Regular">Regular</option>
+          <option value="Good">Good</option>
+          <option value="Excellent">Excellent</option>
+        </select>
+        <input type="number" id="candidate-salary" placeholder="Minimum Salary (USD)" />
+        <button id="popupcreateCandidateBtn">Create Candidate</button>
       </div>
     </div>
+
 <!-- Popup para agregar candidato a batch -->
 <div id="batchCandidatePopup" class="popup hidden">
   <div class="popup-content">

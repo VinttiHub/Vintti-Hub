@@ -76,24 +76,21 @@ document.getElementById("createCandidateBtn").addEventListener("click", () => {
 document.getElementById("closePopup").addEventListener("click", () => {
   document.getElementById("candidatePopup").classList.add("hidden");
 
-  // Limpiar campos
-  document.getElementById("candidate-name").value = '';
-  document.getElementById("candidate-email").value = '';
-  document.getElementById("candidate-phone").value = '';
-  document.getElementById("candidate-linkedin").value = '';
-  document.getElementById("candidate-redfalgs").value = '';
-  document.getElementById("candidate-comments").value = '';
+  ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary"]
+    .forEach(id => document.getElementById(id).value = '');
 });
 
-// Crear candidato desde popup
-document.getElementById("createCandidateBtn").addEventListener("click", async () => {
+
+document.getElementById("popupcreateCandidateBtn").addEventListener("click", async () => {
   const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
   const name = document.getElementById("candidate-name").value;
   const email = document.getElementById("candidate-email").value;
   const phone = document.getElementById("candidate-phone").value;
   const linkedin = document.getElementById("candidate-linkedin").value;
-  const redfalgs = document.getElementById("candidate-redflags").value;
+  const red_flags = document.getElementById("candidate-redflags").value;
   const comments = document.getElementById("candidate-comments").value;
+  const english_level = document.getElementById("candidate-english").value;
+  const salary_range = document.getElementById("candidate-salary").value;
   const stage = "Contactado";
 
   if (!opportunityId || opportunityId === '—') {
@@ -102,14 +99,21 @@ document.getElementById("createCandidateBtn").addEventListener("click", async ()
   }
 
   if (!name || !email || !phone || !linkedin) {
-  alert("Please fill in all fields before creating the candidate.");
-  return;
+    alert("Please fill in all fields before creating the candidate.");
+    return;
   }
-  const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+
+  const payload = {
+    name,
+    email,
+    phone,
+    linkedin,
+    red_flags,
+    comments,
+    english_level,
+    salary_range,
+    stage
+  };
 
   try {
     const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
@@ -123,12 +127,8 @@ document.getElementById("createCandidateBtn").addEventListener("click", async ()
     document.getElementById("candidatePopup").classList.add("hidden");
 
     // Limpiar campos
-    document.getElementById("candidate-name").value = '';
-    document.getElementById("candidate-email").value = '';
-    document.getElementById("candidate-phone").value = '';
-    document.getElementById("candidate-linkedin").value = '';
-    document.getElementById("candidate-redfalgs").value = '';
-    document.getElementById("candidate-comments").value = '';
+    ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary"]
+      .forEach(id => document.getElementById(id).value = '');
 
     loadPipelineCandidates();
   } catch (err) {
@@ -136,6 +136,7 @@ document.getElementById("createCandidateBtn").addEventListener("click", async ()
     alert("Failed to create candidate");
   }
 });
+
 
   });
   document.querySelectorAll(".candidate-card").forEach(card => {
