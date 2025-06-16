@@ -181,6 +181,57 @@ document.addEventListener("click", async (e) => {
         li.classList.add("search-result-item");
         li.setAttribute("data-candidate-id", c.candidate_id);
         resultsList.appendChild(li);
+        li.addEventListener("click", async () => {
+  const candidateId = li.getAttribute("data-candidate-id");
+
+  // Buscar el batch_id de la caja donde se hizo clic en “Add Candidate”
+  const batchBox = e.target.closest(".batch-box");
+  if (!batchBox) return;
+
+  // Buscar el número del batch en el h3
+  const batchTitle = batchBox.querySelector("h3").textContent.trim();
+  const match = batchTitle.match(/#(\d+)/);
+  const batchNumber = match ? parseInt(match[1]) : null;
+
+  if (!batchNumber) {
+    alert("Batch number not found");
+    return;
+  }
+
+  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+
+  try {
+    // Llamar al backend para obtener los batch_id de la oportunidad
+    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const data = await res.json();
+
+    // Buscar el batch con ese número
+    const selectedBatch = data.find(b => b.batch_number === batchNumber);
+    if (!selectedBatch) {
+      alert("Batch not found");
+      return;
+    }
+
+    const patchRes = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/batch`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ batch_id: selectedBatch.batch_id })
+    });
+
+    if (!patchRes.ok) {
+      throw new Error("Failed to update candidate batch");
+    }
+
+    alert("✅ Candidate assigned to batch");
+    document.getElementById("batchCandidatePopup").classList.add("hidden");
+
+  } catch (err) {
+    console.error("Error assigning batch:", err);
+    alert("❌ Error assigning candidate to batch");
+  }
+});
       });
 
       document.getElementById("batchCandidatePopup").classList.remove("hidden");

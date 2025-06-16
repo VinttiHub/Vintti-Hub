@@ -99,7 +99,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     return;
   }
 
-  if (!name || !email || !phone || !linkedin) {
+  if (!name || !email || !phone || !linkedin || !country || !salary_range || !english_level ) {
     alert("Please fill in all fields before creating the candidate.");
     return;
   }

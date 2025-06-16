@@ -1149,6 +1149,28 @@ def create_candidate(opportunity_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/candidates/<int:candidate_id>/batch', methods=['PATCH'])
+def update_candidate_batch(candidate_id):
+    data = request.get_json()
+    batch_id = data.get('batch_id')
+
+    if batch_id is None:
+        return jsonify({'error': 'batch_id is required'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE candidates
+            SET batch_id = %s
+            WHERE candidate_id = %s
+        """, (batch_id, candidate_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
