@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     });
 // Mostrar popup al hacer clic en “+ Add Candidate”
-document.getElementById("addCandidateBtn").addEventListener("click", () => {
+document.getElementById("createCandidateBtn").addEventListener("click", () => {
   document.getElementById("candidatePopup").classList.remove("hidden");
 });
 
@@ -92,7 +92,7 @@ document.getElementById("createCandidateBtn").addEventListener("click", async ()
   const email = document.getElementById("candidate-email").value;
   const phone = document.getElementById("candidate-phone").value;
   const linkedin = document.getElementById("candidate-linkedin").value;
-  const redfalgs = document.getElementById("candidate-redfalgs").value;
+  const redfalgs = document.getElementById("candidate-redflags").value;
   const comments = document.getElementById("candidate-comments").value;
   const stage = "Contactado";
 

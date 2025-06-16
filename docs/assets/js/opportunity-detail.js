@@ -160,6 +160,51 @@ aiGo.addEventListener('click', () => {
   alert('✨ AI Assistant is processing your inputs...');
   aiPopup.classList.add('hidden');
 });
+// Popup para agregar candidato al batch
+document.addEventListener("click", async (e) => {
+  if (e.target.classList.contains("btn-add")) {
+    const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+    if (!opportunityId || opportunityId === '—') return;
+
+    // Obtener candidatos de la oportunidad
+    try {
+      const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
+      const candidates = await res.json();
+
+      // Limpiar resultados anteriores
+      const resultsList = document.getElementById("candidateSearchResults");
+      resultsList.innerHTML = "";
+
+      candidates.forEach(c => {
+        const li = document.createElement("li");
+        li.textContent = c.name;
+        li.classList.add("search-result-item");
+        li.setAttribute("data-candidate-id", c.candidate_id);
+        resultsList.appendChild(li);
+      });
+
+      document.getElementById("batchCandidatePopup").classList.remove("hidden");
+
+      // Filtro dinámico
+      const searchInput = document.getElementById("candidateSearchInput");
+      searchInput.value = '';
+      searchInput.addEventListener("input", () => {
+        const term = searchInput.value.toLowerCase();
+        document.querySelectorAll(".search-result-item").forEach(item => {
+          item.style.display = item.textContent.toLowerCase().includes(term) ? "block" : "none";
+        });
+      });
+
+    } catch (err) {
+      console.error("Error loading candidates for batch:", err);
+    }
+  }
+});
+
+// Cerrar popup
+document.getElementById("closeBatchPopup").addEventListener("click", () => {
+  document.getElementById("batchCandidatePopup").classList.add("hidden");
+});
 
 });
 

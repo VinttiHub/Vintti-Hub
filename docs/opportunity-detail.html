@@ -181,7 +181,7 @@
       <div class="pipeline-header">
         <h2>Pipeline</h2>
         <div class="pipeline-actions">
-          <button id="addCandidateBtn">+ Add Candidate</button>
+          <button id="createCandidateBtn">+ Add Candidate</button>
           <button id="signOffBtn">Sign off</button>
         </div>
       </div>
@@ -330,6 +330,15 @@
         <button id="createCandidateBtn">Create Candidate</button>
       </div>
     </div>
+<!-- Popup para agregar candidato a batch -->
+<div id="batchCandidatePopup" class="popup hidden">
+  <div class="popup-content">
+    <span class="close-btn" id="closeBatchPopup">&times;</span>
+    <h2>Select Candidate</h2>
+    <input type="text" id="candidateSearchInput" placeholder="Search by name..." />
+    <ul id="candidateSearchResults" class="search-results-list"></ul>
+  </div>
+</div>
 
 <script src="./assets/js/opportunity-detail.js"></script>
 </body>
