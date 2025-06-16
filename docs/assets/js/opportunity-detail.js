@@ -183,6 +183,12 @@ document.addEventListener("click", async (e) => {
         resultsList.appendChild(li);
         li.addEventListener("click", async () => {
   const candidateId = li.getAttribute("data-candidate-id");
+  const selectedCandidate = {
+  candidate_id: candidateId,
+  name: li.textContent,
+  email: '' // puedes actualizar esto si luego quieres mostrar el email
+};
+
 
   // Buscar el batch_id de la caja donde se hizo clic en “Add Candidate”
   const batchBox = e.target.closest(".batch-box");
@@ -225,8 +231,11 @@ document.addEventListener("click", async (e) => {
     }
 
     alert("✅ Candidate assigned to batch");
+    await reloadBatchCandidates();
     document.getElementById("batchCandidatePopup").classList.add("hidden");
-
+    await loadBatchesForOpportunity(opportunityId);
+    // Recargar sección de batches
+    await loadBatchesForOpportunity(opportunityId);
   } catch (err) {
     console.error("Error assigning batch:", err);
     alert("❌ Error assigning candidate to batch");
@@ -256,6 +265,14 @@ document.addEventListener("click", async (e) => {
 document.getElementById("closeBatchPopup").addEventListener("click", () => {
   document.getElementById("batchCandidatePopup").classList.add("hidden");
 });
+// Cargar batches si estamos ya en la pestaña "Candidates"
+const activeTab = document.querySelector(".nav-item.active");
+if (activeTab && activeTab.textContent.trim() === "Candidates") {
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (opportunityId && opportunityId !== '—') {
+    loadBatchesForOpportunity(opportunityId);
+  }
+}
 
 });
 
@@ -378,6 +395,9 @@ async function loadOpportunityData() {
 
         } catch (err) {
           console.error("Error loading opportunity:", err);
+        }
+        if (data.opportunity_id) {
+          reloadBatchCandidates();
         }
       }
       function formatDate(dateStr) {
@@ -504,15 +524,22 @@ document.querySelector('.btn-create').addEventListener('click', async () => {
 });
 async function loadBatchesForOpportunity(opportunityId) {
   try {
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
-    const batches = await res.json();
+    const [batchesRes, candidatesRes] = await Promise.all([
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+    ]);
+
+    const batches = await batchesRes.json();
+    const candidates = await candidatesRes.json();
 
     const container = document.getElementById('batch-detail-container');
-    container.innerHTML = ''; // Limpia
+    container.innerHTML = '';
 
     batches.forEach(batch => {
-      const box = document.createElement('div');
-      box.classList.add('batch-box');
+      const box = document.createElement("div");
+      box.classList.add("batch-box");
+      box.setAttribute("data-batch-id", batch.batch_id); // ✅ para referencia directa
+
       box.innerHTML = `
         <div class="batch-actions">
           <h3>Batch #${batch.batch_number}</h3>
@@ -521,10 +548,151 @@ async function loadBatchesForOpportunity(opportunityId) {
             <button class="btn-send">Send for Approval</button>
           </div>
         </div>
+        <div class="batch-candidates"></div>
       `;
+
+      const candidateContainer = box.querySelector(".batch-candidates");
+
+      candidates
+        .filter(c => c.batch_id === batch.batch_id)
+        .forEach(c => {
+          const card = document.createElement("div");
+          card.classList.add("candidate-card");
+          card.innerHTML = `
+            <strong>${c.name}</strong>
+            <div class="preview">
+              <img src="https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg" />
+              <div class="info">
+                <span class="name">${c.name}</span>
+                <span class="email">${c.email || ''}</span>
+              </div>
+            </div>
+          `;
+          candidateContainer.appendChild(card);
+        });
+
       container.appendChild(box);
     });
   } catch (err) {
     console.error('Error loading batches:', err);
+  }
+}
+
+async function reloadBatchCandidates() {
+  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+  if (!opportunityId || opportunityId === '—') return;
+
+  try {
+    const [batchesRes, candidatesRes] = await Promise.all([
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+    ]);
+
+    const batches = await batchesRes.json();
+    const candidates = await candidatesRes.json();
+
+    const container = document.getElementById("batch-detail-container");
+    container.innerHTML = "";
+
+    batches.forEach(batch => {
+      const box = document.createElement("div");
+      box.classList.add("batch-box");
+      box.setAttribute("data-batch-id", batch.batch_id);
+
+      box.innerHTML = `
+        <div class="batch-actions">
+          <h3>Batch #${batch.batch_number}</h3>
+          <div>
+            <button class="btn-add">Add candidate</button>
+            <button class="btn-send">Send for Approval</button>
+          </div>
+        </div>
+        <div class="batch-candidates"></div>
+      `;
+
+      const candidateContainer = box.querySelector(".batch-candidates");
+
+      candidates
+        .filter(c => c.batch_id === batch.batch_id)
+        .forEach(c => {
+          const card = document.createElement("div");
+          card.classList.add("candidate-card");
+          card.innerHTML = `
+            <strong>${c.name}</strong>
+            <div class="preview">
+              <img src="https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg" />
+              <div class="info">
+                <span class="name">${c.name}</span>
+                <span class="email">${c.email || ''}</span>
+              </div>
+            </div>
+          `;
+          candidateContainer.appendChild(card);
+        });
+
+      container.appendChild(box);
+    });
+
+  } catch (err) {
+    console.error("❌ Error reloading batch candidates:", err);
+  }
+}
+
+async function loadBatchesAndCandidates() {
+  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+  if (!opportunityId || opportunityId === '—') return;
+
+  const container = document.getElementById("batch-detail-container");
+  container.innerHTML = "";
+
+  try {
+    const [batchesRes, candidatesRes] = await Promise.all([
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
+      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+    ]);
+
+    const batches = await batchesRes.json();
+    const candidates = await candidatesRes.json();
+
+    batches.forEach(batch => {
+    const box = document.createElement("div");
+    box.classList.add("batch-box");
+    box.setAttribute("data-batch-id", batch.batch_id); // ✅ Aquí se asigna el batch_id
+
+    box.innerHTML = `
+      <div class="batch-actions">
+        <h3>Batch #${batch.batch_number}</h3>
+        <div>
+          <button class="btn-add">Add candidate</button>
+          <button class="btn-send">Send for Approval</button>
+        </div>
+      </div>
+      <div class="batch-candidates"></div>
+    `;
+      const candidateContainer = box.querySelector(".batch-candidates");
+
+      candidates
+        .filter(c => c.batch_id === batch.batch_id)
+        .forEach(c => {
+          const card = document.createElement("div");
+          card.classList.add("candidate-card");
+          card.innerHTML = `
+            <strong>${c.name}</strong>
+            <div class="preview">
+              <img src="https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg" />
+              <div class="info">
+                <span class="name">${c.name}</span>
+                <span class="email">${c.email}</span>
+              </div>
+            </div>
+          `;
+          candidateContainer.appendChild(card);
+        });
+
+      container.appendChild(box);
+    });
+
+  } catch (err) {
+    console.error("Error loading batches and candidates:", err);
   }
 }
