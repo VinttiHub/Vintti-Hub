@@ -127,8 +127,6 @@ def get_accounts():
 
             account['calculated_status'] = status
 
-
-
         cursor.close()
         conn.close()
 
@@ -1058,6 +1056,52 @@ def get_batches(opportunity_id):
         cursor.close()
         conn.close()
         return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/candidates/<int:candidate_id>', methods=['PATCH'])
+def update_candidate_fields(candidate_id):
+    data = request.get_json()
+
+    allowed_fields = [
+        'name',
+        'country',
+        'phone',
+        'email',
+        'linkedin',
+        'english_level',
+        'salary_range',
+        'red_flags',
+        'comments'
+    ]
+
+    updates = []
+    values = []
+
+    for field in allowed_fields:
+        if field in data:
+            updates.append(f"{field} = %s")
+            values.append(data[field])
+
+    if not updates:
+        return jsonify({'error': 'No valid fields provided'}), 400
+
+    values.append(candidate_id)
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            UPDATE candidates
+            SET {', '.join(updates)}
+            WHERE candidate_id = %s
+        """, values)
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

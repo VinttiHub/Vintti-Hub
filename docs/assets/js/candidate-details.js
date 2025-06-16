@@ -28,6 +28,43 @@ document.addEventListener("DOMContentLoaded", () => {
 fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   .then(response => response.json())
   .then(data => {
+    const overviewFields = {
+      'field-name': 'name',
+      'field-country': 'country',
+      'field-phone': 'phone',
+      'field-email': 'email',
+      'field-english-level': 'english_level',
+      'field-salary-range': 'salary_range',
+    };
+
+    Object.entries(overviewFields).forEach(([elementId, fieldName]) => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.contentEditable = true;
+        el.addEventListener('blur', () => {
+          const updatedValue = el.innerText.trim();
+          fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [fieldName]: updatedValue })
+          });
+        });
+      }
+    });
+
+    // === Guardar cambios de comentarios y red flags ===
+    ['redFlags', 'comments'].forEach(id => {
+      const textarea = document.getElementById(id);
+      textarea.addEventListener('blur', () => {
+        const field = id === 'redFlags' ? 'red_flags' : 'comments';
+        fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: textarea.value.trim() })
+        });
+      });
+    });
+
     document.querySelectorAll('#overview .field').forEach(field => {
       const label = field.querySelector('label');
       const div = field.querySelector('div');

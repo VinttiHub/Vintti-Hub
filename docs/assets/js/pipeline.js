@@ -133,6 +133,12 @@ candidates.forEach(candidate => {
   `;
 
   enableDrag(card);
+  card.addEventListener('click', () => {
+    const candidateId = card.getAttribute('data-candidate-id');
+    if (candidateId) {
+      window.location.href = `https://vinttihub.vintti.com/candidate-details.html?id=${candidateId}`;
+    }
+  });
 
   // Mapeo del stage → columna id
   let columnId = '';
