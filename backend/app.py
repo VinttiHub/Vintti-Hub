@@ -543,7 +543,7 @@ def update_account_fields(account_id):
         'linkedin',
         'website',
         'mail',
-        'comments'
+        'comments',
         'timezone'
     ]
 

@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Funcionalidad de pestañas
-  const tabs = document.querySelectorAll('.tab-btn');
+  const tabs = document.querySelectorAll('.tab-btn');ƒ
   const contents = document.querySelectorAll('.tab-content');
 
   tabs.forEach(tab => {
@@ -80,7 +80,7 @@ function fillAccountDetails(data) {
   const container = document.querySelector('.grid-two-cols');
   container.innerHTML = `
     <p><strong>Name:</strong> ${data.client_name || '—'}</p>
-    <p><strong>Size:</strong> ${data.Size || '—'}</p>
+    <p><strong>Size:</strong> ${data.size || '—'}</p>
     <p><strong>Timezone:</strong> ${data.timezone || '—'}</p>
     <p><strong>State:</strong> ${data.state || '—'}</p>
     <p><strong>LinkedIn:</strong> <a href="${data.linkedin}" target="_blank">${data.linkedin || '—'}</a></p>
