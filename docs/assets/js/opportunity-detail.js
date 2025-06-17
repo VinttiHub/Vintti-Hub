@@ -117,7 +117,7 @@ document.getElementById('fee-input').addEventListener('blur', e =>
   updateOpportunityField('fee', e.target.value));
 
 document.getElementById('comments-firstmeeting-textarea').addEventListener('blur', e =>
-  updateOpportunityField('comments_firstmeeting', e.target.value));
+  updateOpportunityField('opp_comments', e.target.value));
 
 document.getElementById('recording-input').addEventListener('blur', e =>
   updateOpportunityField('first_meeting_recording', e.target.value));
@@ -365,7 +365,7 @@ async function loadOpportunityData() {
     document.getElementById('years-experience-input').value = data.years_experience || '';
     document.getElementById('fee-input').value = data.fee || '';
     document.getElementById('timezone-input').value = data.account_timezone || '';
-    document.getElementById('comments-firstmeeting-textarea').value = data.comments_firstmeeting || '';
+    document.getElementById('comments-firstmeeting-textarea').value = data.opp_comments || '';
     document.getElementById('recording-input').value = data.first_meeting_recording || '';
 
     // Signed: si tienes un campo de fecha de firma, calcula días
@@ -430,7 +430,9 @@ async function loadOpportunityData() {
           // Ahora cruzas: en data.opp_sales_lead y opp_hr_lead tienes el EMAIL → debes setear el value del <select> con ese email:
           salesLeadSelect.value = data.opp_sales_lead || '';
           hrLeadSelect.value = data.opp_hr_lead || '';
-
+          if (data.opportunity_id) {
+            reloadBatchCandidates();
+          }
         } catch (err) {
           console.error('Error loading users for Sales/HR Lead:', err);
         }
@@ -438,9 +440,6 @@ async function loadOpportunityData() {
 
         } catch (err) {
           console.error("Error loading opportunity:", err);
-        }
-        if (data.opportunity_id) {
-          reloadBatchCandidates();
         }
       }
       function formatDate(dateStr) {
