@@ -483,10 +483,7 @@ def update_opportunity_fields(opportunity_id):
 
     allowed_fields = [
         'nda_signature_or_start_date',
-        'opp_close_date',
         'opp_position_name',
-        'opp_sales_lead',
-        'opp_hr_lead',
         'opp_model',
         'min_budget',
         'max_budget',
@@ -494,14 +491,11 @@ def update_opportunity_fields(opportunity_id):
         'max_salary',
         'years_experience',
         'fee',
-        'comments_firstmeeting',
-        'first_meeting_recording'
-        'nda_signature_or_start_date',
+        'opp_comments',
+        'first_meeting_recording',
         'opp_close_date',
-        'opp_position_name',
         'opp_sales_lead',
         'opp_hr_lead',
-        'opp_model',
         'hr_job_description'
     ]
 

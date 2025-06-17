@@ -488,7 +488,10 @@ async function updateOpportunityField(fieldName, fieldValue) {
     });
 
     if (!res.ok) {
-      console.error(`Failed to update ${fieldName}`);
+      const errorText = await res.text();
+      console.error(`❌ Error updating ${fieldName}:`, errorText);
+    } else {
+      console.log(`✅ ${fieldName} updated successfully`);
     }
 
   } catch (err) {

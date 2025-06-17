@@ -119,61 +119,6 @@ document.addEventListener('change', async (e) => {
     await patchOpportunityStage(opportunityId, newStage, e.target);
   }
 });
-
-async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
-  try {
-    const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opp_stage: newStage })
-    });
-
-    const result = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Stage updated successfully!');
-      dropdownElement.style.backgroundColor = '#d4edda';
-      setTimeout(() => {
-        dropdownElement.style.backgroundColor = '';
-      }, 1000);
-    } else {
-      console.error('❌ Error updating stage:', result.error || result);
-      alert('Error updating stage: ' + (result.error || 'Unexpected error'));
-    }
-  } catch (err) {
-    console.error('❌ Network error updating stage:', err);
-    alert('Network error. Please try again.');
-  }
-}
-
-
-// PATCH genérico (lo separo para reutilizar)
-async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
-  try {
-    const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opp_stage: newStage })
-    });
-
-    const result = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Stage updated successfully!');
-      dropdownElement.style.backgroundColor = '#d4edda';
-      setTimeout(() => {
-        dropdownElement.style.backgroundColor = '';
-      }, 1000);
-    } else {
-      console.error('❌ Error updating stage:', result.error || result);
-      alert('Error updating stage: ' + (result.error || 'Unexpected error'));
-    }
-  } catch (err) {
-    console.error('❌ Network error updating stage:', err);
-    alert('Network error. Please try again.');
-  }
-}
-
 });
 
 function openPopup() {
@@ -475,8 +420,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
     }
 
     try {
-      // Guardar la fecha
-      await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+      const updateResponse = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -484,17 +428,18 @@ function openSourcingPopup(opportunityId, dropdownElement) {
         })
       });
 
-      // Cambiar el estado a Sourcing manualmente (incluso si no se hace click en dropdown)
+      if (!updateResponse.ok) {
+        const errData = await updateResponse.json();
+        throw new Error(`Error updating sourcing date: ${errData.error || 'Unknown error'}`);
+      }
+
       await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
 
-      // Cerrar popup manualmente
       closeSourcingPopup();
-
-      // Refrescar tabla o página (opcional)
       location.reload();
     } catch (err) {
       console.error('❌ Error updating sourcing date/stage:', err);
-      alert('Error updating sourcing info.');
+      alert('Error updating sourcing info: ' + err.message);
     }
   };
 }
@@ -550,4 +495,29 @@ function closeSourcingPopup() {
 
 function closeCloseWinPopup() {
   document.getElementById('closeWinPopup').style.display = 'none';
+}
+async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
+  try {
+    const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opp_stage: newStage })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      console.log('✅ Stage updated successfully!');
+      dropdownElement.style.backgroundColor = '#d4edda';
+      setTimeout(() => {
+        dropdownElement.style.backgroundColor = '';
+      }, 1000);
+    } else {
+      console.error('❌ Error updating stage:', result.error || result);
+      alert('Error updating stage: ' + (result.error || 'Unexpected error'));
+    }
+  } catch (err) {
+    console.error('❌ Network error updating stage:', err);
+    alert('Network error. Please try again.');
+  }
 }
