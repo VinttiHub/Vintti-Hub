@@ -82,7 +82,7 @@ document.getElementById("closePopup").addEventListener("click", () => {
 
 
 document.getElementById("popupcreateCandidateBtn").addEventListener("click", async () => {
-  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   const name = document.getElementById("candidate-name").value;
   const email = document.getElementById("candidate-email").value;
   const phone = document.getElementById("candidate-phone").value;

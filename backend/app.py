@@ -236,7 +236,7 @@ def get_opportunity_by_id(opportunity_id):
     a.linkedin AS account_linkedin,
     a.website AS account_website,
     a.mail AS account_mail,
-    a.comments AS account_about
+    a.comments AS account_about,
     a.timezone AS account_timezone
 FROM opportunity o
 LEFT JOIN account a ON o.account_id = a.account_id

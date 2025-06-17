@@ -127,21 +127,21 @@
   </button>
   <div class="card-content">
     <div class="overview-grid">
-      <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
-      <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
-      <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
-      <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
-      <div class="input-group"><label>Model</label>
-        <select id="model-select">
-          <option value="Staffing">Staffing</option>
-          <option value="Recruiting">Recruiting</option>
-        </select>
-      </div>
-      <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
-      <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
-      <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
-      <div class="input-group full"><label>Comments</label><textarea id="comments-firstmeeting-textarea"></textarea></div>
-      <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
+    <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
+    <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
+    <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
+    <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
+    <div class="input-group"><label>Model</label>
+      <select id="model-select">
+        <option value="Staffing">Staffing</option>
+        <option value="Recruiting">Recruiting</option>
+      </select>
+    </div>
+    <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
+    <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
+    <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
+    <div class="input-group full"><label>Comments</label><textarea id="comments-firstmeeting-textarea"></textarea></div>
+    <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
     </div>
   </div>
 </div>
@@ -161,7 +161,7 @@
       </div>
   
       <div class="job-card">
-        <textarea id="job-description-textarea" style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
+        <textarea id="job-description-textarea" readonly style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
       </div>
     </section>
     
@@ -179,16 +179,6 @@
         <div class="column" data-status="contacted">
           <h3>Contactado</h3>
           <div class="card-container" id="contacted">
-            <div class="candidate-card" draggable="true">
-              <strong>Julia Benedetti Murin</strong>
-              <div class="preview">
-                <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Julia">
-                <div class="info">
-                  <span class="name">Julia Benedetti Murin</span>
-                  <span class="email">julia.b@nova.co</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
         <!-- Column: No avanza primera -->
@@ -202,17 +192,6 @@
         <div class="column" data-status="first-interview">
           <h3>Primera entrevista</h3>
           <div class="card-container" id="first-interview">
-            <div class="candidate-card" draggable="true">
-              <strong>Fernanda De Castro Schindel</strong>
-              <div class="preview">
-                <img src="https://randomuser.me/api/portraits/women/45.jpg" alt="Fernanda">
-                <div class="info">
-                  <span class="name">Fernanda De Castro Schindel</span>
-                  <span class="title">Front-End Dev</span>
-                  <span class="email">fernanda.c@nova.co</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
     
@@ -220,17 +199,6 @@
         <div class="column" data-status="client-process">
           <h3>En proceso con Cliente</h3>
           <div class="card-container" id="client-process">
-            <div class="candidate-card" draggable="true">
-              <strong>Igor Neves</strong>
-              <div class="preview">
-                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Igor">
-                <div class="info">
-                  <span class="name">Igor Neves</span>
-                  <span class="title">Fullstack Engineer</span>
-                  <span class="email">igor.n@nova.co</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
