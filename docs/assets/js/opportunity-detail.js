@@ -55,6 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('start-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
 });
+document.getElementById('job-description-textarea').addEventListener('blur', e =>
+  updateOpportunityField('hr_job_description', e.target.value));
 
 document.getElementById('close-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('opp_close_date', e.target.value);
@@ -93,6 +95,35 @@ document.getElementById('client-about-textarea').addEventListener('blur', async 
 document.getElementById('details-opportunity-name').addEventListener('blur', async (e) => {
   await updateOpportunityField('opp_position_name', e.target.value);
 });
+document.getElementById('min-budget-input').addEventListener('blur', e =>
+  updateOpportunityField('min_budget', e.target.value));
+
+document.getElementById('max-budget-input').addEventListener('blur', e =>
+  updateOpportunityField('max_budget', e.target.value));
+
+document.getElementById('min-salary-input').addEventListener('blur', e =>
+  updateOpportunityField('min_salary', e.target.value));
+
+document.getElementById('max-salary-input').addEventListener('blur', e =>
+  updateOpportunityField('max_salary', e.target.value));
+
+document.getElementById('model-select').addEventListener('change', e =>
+  updateOpportunityField('opp_model', e.target.value));
+
+document.getElementById('years-experience-input').addEventListener('blur', e =>
+  updateOpportunityField('years_experience', e.target.value));
+
+document.getElementById('fee-input').addEventListener('blur', e =>
+  updateOpportunityField('fee', e.target.value));
+
+document.getElementById('comments-firstmeeting-textarea').addEventListener('blur', e =>
+  updateOpportunityField('comments_firstmeeting', e.target.value));
+
+document.getElementById('recording-input').addEventListener('blur', e =>
+  updateOpportunityField('first_meeting_recording', e.target.value));
+
+document.getElementById('timezone-input').addEventListener('blur', e =>
+  updateAccountField('timezone', e.target.value));
 
 document.getElementById('details-sales-lead').addEventListener('change', async (e) => {
   const emailValue = e.target.value; // el value es el email
@@ -324,6 +355,18 @@ async function loadOpportunityData() {
     
     // JOB DESCRIPTION
     document.getElementById('job-description-textarea').value = data.hr_job_description || '';
+
+    // FIRST MEETING INFO
+    document.getElementById('min-budget-input').value = data.min_budget || '';
+    document.getElementById('max-budget-input').value = data.max_budget || '';
+    document.getElementById('min-salary-input').value = data.min_salary || '';
+    document.getElementById('max-salary-input').value = data.max_salary || '';
+    document.getElementById('model-select').value = data.opp_model || '';
+    document.getElementById('years-experience-input').value = data.years_experience || '';
+    document.getElementById('fee-input').value = data.fee || '';
+    document.getElementById('timezone-input').value = data.account_timezone || '';
+    document.getElementById('comments-firstmeeting-textarea').value = data.comments_firstmeeting || '';
+    document.getElementById('recording-input').value = data.first_meeting_recording || '';
 
     // Signed: si tienes un campo de fecha de firma, calcula días
     if (data.nda_signature_or_start_date) {

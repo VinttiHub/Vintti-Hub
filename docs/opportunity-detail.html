@@ -127,33 +127,21 @@
   </button>
   <div class="card-content">
     <div class="overview-grid">
-      <div class="input-group"><label>Client Budget</label><input value="$1,300" readonly/></div>
-      <div class="input-group"><label>&nbsp;</label><input value="$1,500" readonly/></div>
-      <div class="input-group"><label>Candidate Salary Range</label><input value="$800" readonly/></div>
-      <div class="input-group"><label>&nbsp;</label><input value="$1,000" readonly/></div>
-      <div class="input-group"><label>Model</label><select disabled><option>Staffing</option></select></div>
-      <div class="input-group"><label>Years of Experience</label><input value="1" readonly/></div>
-      <div class="input-group"><label>Set Up Fee</label><input value="2,000" readonly/></div>
-      <div class="input-group"><label>Time Zone</label><select disabled><option>Central Standard Time</option></select></div>
-      <div class="input-group full"><label>Comments</label><textarea readonly>Add comments here...</textarea></div>
-      <div class="input-group full"><label>First Meeting Recording</label><input value="https://tldv.io/app/meetings/67ec260df8d23000130dd853" readonly/></div>
-    </div>
-  </div>
-</div>
-
-<!-- Documents -->
-<div class="overview-card">
-  <button class="card-toggle">
-    <h3>Documents</h3>
-    <span class="toggle-icon">▾</span>
-  </button>
-  <div class="card-content">
-    <div class="card-title-row">
-      <button class="upload-btn">Upload</button>
-    </div>
-    <div class="empty-state">
-      <p>There are no documents</p>
-      <span class="subtext">Documents will be shown here.</span>
+      <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
+      <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
+      <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
+      <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
+      <div class="input-group"><label>Model</label>
+        <select id="model-select">
+          <option value="Staffing">Staffing</option>
+          <option value="Recruiting">Recruiting</option>
+        </select>
+      </div>
+      <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
+      <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
+      <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
+      <div class="input-group full"><label>Comments</label><textarea id="comments-firstmeeting-textarea"></textarea></div>
+      <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
     </div>
   </div>
 </div>
@@ -173,7 +161,7 @@
       </div>
   
       <div class="job-card">
-        <textarea id="job-description-textarea" readonly style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
+        <textarea id="job-description-textarea" style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
       </div>
     </section>
     

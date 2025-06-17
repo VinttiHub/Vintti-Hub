@@ -237,6 +237,7 @@ def get_opportunity_by_id(opportunity_id):
     a.website AS account_website,
     a.mail AS account_mail,
     a.comments AS account_about
+    a.timezone AS account_timezone
 FROM opportunity o
 LEFT JOIN account a ON o.account_id = a.account_id
 WHERE o.opportunity_id = %s
@@ -295,7 +296,7 @@ def create_opportunity():
                 account_id, opp_model, opp_position_name, opp_sales_lead, opp_type, opp_stage
             ) VALUES (%s, %s, %s, %s, %s, %s)
             """
-        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type, 'NDA Sent'))
+        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type, 'Deep Dive'))
 
 
         conn.commit()
@@ -331,8 +332,8 @@ def accounts():
             query = """
                 INSERT INTO account (
                     client_name, Size, timezone, state,
-                    website, linkedin, comments
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    website, linkedin, comments, mail
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             cursor.execute(query, (
@@ -342,7 +343,8 @@ def accounts():
                 data.get("state"),
                 data.get("website"),
                 data.get("linkedin"),
-                data.get("about")
+                data.get("about"),
+                data.get("mail")  # ✅ Nuevo campo mail
             ))
 
             conn.commit()
@@ -412,16 +414,20 @@ def get_candidates_by_opportunity(opportunity_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
             SELECT 
-                candidate_id,
-                name,
-                email,
-                stage,
-                employee_salary       
-            FROM candidates
-            WHERE opportunity_id = %s
+                c.candidate_id,
+                c.name,
+                c.email,
+                c.stage,
+                c.employee_salary,
+                c.batch_id
+            FROM candidates c
+            INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
+            WHERE oc.opportunity_id = %s
         """, (opportunity_id,))
+
         rows = cursor.fetchall()
         if not rows:
             return jsonify([])
@@ -433,8 +439,10 @@ def get_candidates_by_opportunity(opportunity_id):
         conn.close()
 
         return jsonify(data)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 @app.route('/candidates/<int:candidate_id>')
 def get_candidate_by_id(candidate_id):
     try:
@@ -479,7 +487,22 @@ def update_opportunity_fields(opportunity_id):
         'opp_position_name',
         'opp_sales_lead',
         'opp_hr_lead',
-        'opp_model'
+        'opp_model',
+        'min_budget',
+        'max_budget',
+        'min_salary',
+        'max_salary',
+        'years_experience',
+        'fee',
+        'comments_firstmeeting',
+        'first_meeting_recording'
+        'nda_signature_or_start_date',
+        'opp_close_date',
+        'opp_position_name',
+        'opp_sales_lead',
+        'opp_hr_lead',
+        'opp_model',
+        'hr_job_description'
     ]
 
     updates = []
@@ -527,6 +550,7 @@ def update_account_fields(account_id):
         'website',
         'mail',
         'comments'
+        'timezone'
     ]
 
     updates = []
@@ -1128,26 +1152,34 @@ def create_candidate(opportunity_id):
         cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
         max_id = cursor.fetchone()[0]
         new_candidate_id = max_id + 1
-        query = """
+
+        # Insertar en tabla candidates SIN opportunity_id
+        cursor.execute("""
             INSERT INTO candidates (
-                candidate_id, opportunity_id, name, email, phone, linkedin,
+                candidate_id, name, email, phone, linkedin,
                 red_flags, comments, english_level, salary_range, country, stage
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        cursor.execute(query, (
-            new_candidate_id, opportunity_id, name, email, phone, linkedin,
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            new_candidate_id, name, email, phone, linkedin,
             red_flags, comments, english_level, salary_range, country, stage
         ))
+
+        # Insertar en tabla intermedia
+        cursor.execute("""
+            INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
+            VALUES (%s, %s)
+        """, (opportunity_id, new_candidate_id))
 
         conn.commit()
         cursor.close()
         conn.close()
 
-        return jsonify({"message": "Candidate created successfully", "candidate_id": new_candidate_id}), 201
+        return jsonify({"message": "Candidate created and linked successfully", "candidate_id": new_candidate_id}), 201
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/candidates/<int:candidate_id>/batch', methods=['PATCH'])
 def update_candidate_batch(candidate_id):
@@ -1171,6 +1203,25 @@ def update_candidate_batch(candidate_id):
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/candidates/<int:candidate_id>/opportunities')
+def get_opportunities_by_candidate(candidate_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT o.*
+            FROM opportunity o
+            JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
+            WHERE oc.candidate_id = %s
+        """, (candidate_id,))
+        rows = cursor.fetchall()
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+        cursor.close()
+        conn.close()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -321,6 +321,28 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       // Opcional: cerrar popup
       aiPopup.classList.add('hidden');
     });
+    function loadOpportunitiesForCandidate() {
+    const candidateId = new URLSearchParams(window.location.search).get('id');
+    if (!candidateId) return;
+    fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
+      .then(res => res.json())
+      .then(data => {
+        const tbody = document.querySelector("#opportunitiesTable tbody");
+        tbody.innerHTML = "";
+        data.forEach(opp => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${opp.opportunity_id}</td>
+            <td>${opp.opp_model || ''}</td>
+            <td>${opp.opp_position_name || ''}</td>
+            <td>${opp.opp_sales_lead || ''}</td>
+            <td>${opp.opp_stage || ''}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      });
+  }
+
 });
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -343,6 +365,10 @@ document.querySelectorAll('.tab').forEach(tab => {
       aiButton.style.display = 'none';
       aiPopup.classList.add('hidden'); // Cierra popup si cambian de pestaña
     }
+    if (tabId === 'opportunities') {
+      loadOpportunitiesForCandidate();
+    }
+
   });
 });
 

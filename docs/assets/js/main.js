@@ -308,7 +308,7 @@ if (createOpportunityForm && createButton) {
       position_name: createOpportunityForm.position_name.value.trim(),
       sales_lead: createOpportunityForm.sales_lead.value,
       opp_type: createOpportunityForm.opp_type.value,
-      opp_stage: 'NDA Sent' // <<< ⚠️ IMPORTANTE - esto se añade para forzar el stage
+      opp_stage: 'Deep Dive'
     };
 
     try {
@@ -474,18 +474,31 @@ function openSourcingPopup(opportunityId, dropdownElement) {
       return;
     }
 
-    await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nda_signature_or_start_date: date
-      })
-    });
+    try {
+      // Guardar la fecha
+      await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nda_signature_or_start_date: date
+        })
+      });
 
-    await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
-    popup.style.display = 'none';
+      // Cambiar el estado a Sourcing manualmente (incluso si no se hace click en dropdown)
+      await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+
+      // Cerrar popup manualmente
+      closeSourcingPopup();
+
+      // Refrescar tabla o página (opcional)
+      location.reload();
+    } catch (err) {
+      console.error('❌ Error updating sourcing date/stage:', err);
+      alert('Error updating sourcing info.');
+    }
   };
 }
+
 
 // Popup Close Win
 function openCloseWinPopup(opportunityId, dropdownElement) {
