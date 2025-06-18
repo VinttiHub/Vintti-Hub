@@ -142,12 +142,16 @@ def get_opportunities():
         return jsonify(result), 500
     return jsonify(result)
 
-@app.route('/candidates')
+@app.route('/candidates', methods=['GET'])
 def get_candidates():
-    result = fetch_data_from_table("candidates")
-    if "error" in result:
-        return jsonify(result), 500
-    return jsonify(result)
+    search = request.args.get('search')
+    if search:
+        return search_candidates()
+    else:
+        result = fetch_data_from_table("candidates")
+        if "error" in result:
+            return jsonify(result), 500
+        return jsonify(result)
 def search_candidates():
     q = request.args.get('search', '').strip()
     conn = get_connection()

@@ -69,8 +69,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     });
 // Mostrar popup al hacer clic en “+ Add Candidate”
+// Mostrar popup al hacer clic en “+ Add Candidate”
 document.getElementById("createCandidateBtn").addEventListener("click", () => {
-    const nameInput = document.getElementById("candidate-name");
+  const nameInput = document.getElementById("candidate-name");
   const resultsList = document.getElementById("candidateSearchResults");
   const warning = document.getElementById("name-warning");
   const createBtn = document.getElementById("popupcreateCandidateBtn");
@@ -78,6 +79,15 @@ document.getElementById("createCandidateBtn").addEventListener("click", () => {
   const extraFields = document.getElementById("extra-fields");
 
   let selectedExisting = null;
+
+  // mostrar siempre warning y ambos botones
+  warning.style.display = "block";
+  createBtn.style.display = "";
+  addExistingBtn.style.display = "";
+
+  nameInput.value = "";
+  resultsList.innerHTML = "";
+  extraFields.style.display = "";
 
   nameInput.addEventListener("input", async () => {
     const query = nameInput.value.trim();
@@ -99,28 +109,12 @@ document.getElementById("createCandidateBtn").addEventListener("click", () => {
         selectedExisting = c;
         nameInput.value = c.name;
         resultsList.innerHTML = "";
-        warning.style.display = "none";
         extraFields.style.display = "none";
         createBtn.style.display = "none";
         addExistingBtn.style.display = "";
       });
       resultsList.appendChild(li);
     });
-  });
-
-  addExistingBtn.addEventListener("click", async () => {
-    const opportunityId = document.getElementById('opportunity-id-text').dataset.id;
-    const candidateId = selectedExisting?.candidate_id;
-    if (!opportunityId || !candidateId) return;
-
-    await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidate_id: candidateId })
-    });
-
-    document.getElementById("candidatePopup").classList.add("hidden");
-    loadPipelineCandidates();
   });
 
   nameInput.addEventListener("change", () => {
