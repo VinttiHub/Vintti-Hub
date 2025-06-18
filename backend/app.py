@@ -1216,6 +1216,33 @@ def get_opportunities_by_candidate(candidate_id):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/opportunity_candidates/stage_batch', methods=['PATCH'])
+def update_stage_batch():
+    data = request.get_json()
+    opportunity_id = data.get('opportunity_id')
+    candidate_id = data.get('candidate_id')
+    stage_batch = data.get('stage_batch')
+
+    if not all([opportunity_id, candidate_id, stage_batch]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE opportunity_candidates
+            SET stage_batch = %s
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (stage_batch, opportunity_id, candidate_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

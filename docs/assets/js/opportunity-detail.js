@@ -601,20 +601,54 @@ async function loadBatchesForOpportunity(opportunityId) {
       candidates
         .filter(c => c.batch_id === batch.batch_id)
         .forEach(c => {
-          const card = document.createElement("div");
-          card.classList.add("candidate-card");
-          card.innerHTML = `
-            <strong>${c.name}</strong>
-            <div class="preview">
-              <img src="https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg" />
-              <div class="info">
-                <span class="name">${c.name}</span>
-                <span class="email">${c.email || ''}</span>
-              </div>
-            </div>
-          `;
-          candidateContainer.appendChild(card);
+          const template = document.getElementById("candidate-card-template");
+          const cardFragment = template.content.cloneNode(true);
+          const cardElement = cardFragment.querySelector('.candidate-card');
+
+          // Mostrar datos del candidato
+          cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+          cardElement.querySelector(".candidate-email").textContent = c.email || '';
+          cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+          // Actualizar valor actual del dropdown si existe stage_batch
+          const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+          if (dropdown && c.stage_batch) {
+            dropdown.value = c.stage_batch;
+          }
+
+          // Agregar listener para actualizar stage_batch en la base de datos
+          dropdown.addEventListener('change', async (e) => {
+            const stageBatch = e.target.value;
+            const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+            const candidateId = c.candidate_id;
+
+            try {
+              const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunity_candidates/stage_batch`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  opportunity_id: opportunityId,
+                  candidate_id: candidateId,
+                  stage_batch: stageBatch
+                })
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error("❌ Error updating stage_batch:", errorText);
+              } else {
+                console.log(`✅ stage_batch updated to "${stageBatch}" for candidate ${candidateId}`);
+              }
+            } catch (err) {
+              console.error("❌ Error updating stage_batch:", err);
+            }
+          });
+
+          candidateContainer.appendChild(cardElement);
         });
+
 
       container.appendChild(box);
     });
@@ -715,25 +749,19 @@ async function loadBatchesAndCandidates() {
       <div class="batch-candidates"></div>
     `;
       const candidateContainer = box.querySelector(".batch-candidates");
-
       candidates
         .filter(c => c.batch_id === batch.batch_id)
         .forEach(c => {
-          const card = document.createElement("div");
-          card.classList.add("candidate-card");
-          card.innerHTML = `
-            <strong>${c.name}</strong>
-            <div class="preview">
-              <img src="https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg" />
-              <div class="info">
-                <span class="name">${c.name}</span>
-                <span class="email">${c.email}</span>
-              </div>
-            </div>
-          `;
-          candidateContainer.appendChild(card);
-        });
+          const template = document.getElementById("candidate-card-template");
+          const cardFragment = template.content.cloneNode(true);
+          const cardElement = cardFragment.querySelector('.candidate-card');
 
+          cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+          cardElement.querySelector(".candidate-email").textContent = c.email || '';
+          cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+          candidateContainer.appendChild(cardElement);
+        });
       container.appendChild(box);
     });
 

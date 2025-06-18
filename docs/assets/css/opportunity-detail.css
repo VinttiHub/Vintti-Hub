@@ -1183,3 +1183,33 @@ input::-webkit-contacts-auto-fill-button {
 .search-result-item:hover {
   background-color: #f0f0f0;
 }
+.candidate-card {
+  position: relative;
+  padding: 1rem;
+  border-radius: 12px;
+  background-color: var(--card-bg, #fff);
+  box-shadow: 0 0 4px rgba(0,0,0,0.05);
+  margin-bottom: 1rem;
+}
+
+.candidate-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.candidate-status-dropdown {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: white;
+}
+.candidate-card-header strong {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: unset;
+}
