@@ -416,16 +416,17 @@ def get_candidates_by_opportunity(opportunity_id):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT 
-                c.candidate_id,
-                c.name,
-                c.email,
-                c.stage,
-                c.employee_salary,
-                c.batch_id
-            FROM candidates c
-            INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
-            WHERE oc.opportunity_id = %s
+                SELECT 
+                    c.candidate_id,
+                    c.name,
+                    c.email,
+                    c.stage,
+                    c.employee_salary,
+                    c.batch_id,
+                    oc.stage_batch
+                FROM candidates c
+                INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
+                WHERE oc.opportunity_id = %s
         """, (opportunity_id,))
 
         rows = cursor.fetchall()
