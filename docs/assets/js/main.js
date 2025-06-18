@@ -458,7 +458,7 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
     const hireInput = document.getElementById('closeWinHireInput').value;
     const candidateId = hireInput.split(' - ')[0];  // Extrae solo el ID
 
-    if (!date || !hire) {
+    if (!date || !candidato_contratado) {
       alert('Please select a hire and date.');
       return;
     }

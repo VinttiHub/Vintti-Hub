@@ -51,7 +51,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ✅ Cargar datos reales de la oportunidad
   loadOpportunityData();
-  // OVERVIEW
+document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
+  document.getElementById('emailPopup').classList.remove('hidden');
+
+  const jobDesc = document.getElementById('job-description-textarea').value;
+  document.getElementById('email-message').value = jobDesc;
+  document.getElementById('email-subject').value = 'Job Description for Opportunity';
+
+  const toSelect = document.getElementById('email-to');
+  const ccSelect = document.getElementById('email-cc');
+  toSelect.innerHTML = '';
+  ccSelect.innerHTML = '';
+
+  const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users');
+  const users = await res.json();
+
+  users.forEach(user => {
+    const optionTo = document.createElement('option');
+    optionTo.value = user.email_vintti;
+    optionTo.textContent = user.user_name;
+    toSelect.appendChild(optionTo);
+
+    const optionCc = optionTo.cloneNode(true);
+    ccSelect.appendChild(optionCc);
+  });
+
+  new Choices(toSelect, { removeItemButton: true, placeholder: true });
+  new Choices(ccSelect, { removeItemButton: true, placeholder: true });
+});
+
+document.getElementById('closeEmailPopup').addEventListener('click', () => {
+  document.getElementById('emailPopup').classList.add('hidden');
+});
+
 document.getElementById('start-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
 });

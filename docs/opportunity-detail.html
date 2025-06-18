@@ -156,12 +156,11 @@
         </div>
         <div class="job-header-right">
           <button class="header-btn">Send</button>
-          <span class="status-pill gray">Not Sent</span>
         </div>
       </div>
   
       <div class="job-card">
-        <textarea id="job-description-textarea" readonly style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
+        <textarea id="job-description-textarea" style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
       </div>
     </section>
     
@@ -334,6 +333,26 @@
     </div>
   </div>
 </template>
+<div id="emailPopup" class="popup hidden">
+  <div class="popup-content email-popup-content">
+    <span class="close-btn" id="closeEmailPopup">&times;</span>
+    <h2>Send Job Description</h2>
+
+    <label>To</label>
+    <select id="email-to" multiple></select>
+
+    <label>CC</label>
+    <select id="email-cc" multiple></select>
+
+    <label>Subject</label>
+    <input type="text" id="email-subject" placeholder="Subject..." />
+
+    <label>Message</label>
+    <textarea id="email-message" style="height: 200px;"></textarea>
+
+    <button id="sendEmailBtn">Send</button>
+  </div>
+</div>
 
 <script src="./assets/js/opportunity-detail.js"></script>
 </body>

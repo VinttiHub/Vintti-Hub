@@ -1213,3 +1213,19 @@ input::-webkit-contacts-auto-fill-button {
   overflow: visible;
   text-overflow: unset;
 }
+.email-popup-content {
+  width: 600px;
+  max-width: 90%;
+}
+.email-popup-content label {
+  margin-top: 10px;
+  display: block;
+  font-weight: bold;
+}
+.email-popup-content input,
+.email-popup-content textarea,
+.email-popup-content select {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 8px;
+}
