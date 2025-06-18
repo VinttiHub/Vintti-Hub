@@ -455,7 +455,8 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
   const saveBtn = document.getElementById('saveCloseWin');
   saveBtn.onclick = async () => {
     const date = document.getElementById('closeWinDate').value;
-    const hire = document.getElementById('closeWinHireInput').value;
+    const hireInput = document.getElementById('closeWinHireInput').value;
+    const candidateId = hireInput.split(' - ')[0];  // Extrae solo el ID
 
     if (!date || !hire) {
       alert('Please select a hire and date.');
@@ -467,7 +468,7 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         opp_close_date: date,
-        candidato_contratado: hire
+        candidato_contratado: parseInt(candidateId)
       })
     });
 

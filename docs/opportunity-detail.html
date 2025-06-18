@@ -277,7 +277,11 @@
       <div class="popup-content">
         <span class="close-btn" id="closePopup">&times;</span>
         <h2>Add Candidate</h2>
-        <input type="text" id="candidate-name" placeholder="Full name" />
+        <input type="text" id="candidate-name" placeholder="Full name or search..." autocomplete="off"/>
+        <span id="name-warning" style="color: #c00; font-size: .9em; display:none;">
+          Try searching before creating
+        </span>
+        <div id="extra-fields">
         <input type="text" id="candidate-email" placeholder="Email" />
         <input type="text" id="candidate-country" placeholder="Country" />
         <input type="text" id="candidate-phone" placeholder="Phone number" />
@@ -293,6 +297,8 @@
         </select>
         <input type="number" id="candidate-salary" placeholder="Minimum Salary (USD)" />
         <button id="popupcreateCandidateBtn">Create Candidate</button>
+        </div>
+        <button id="popupAddExistingBtn" style="display:none;">Add Candidate to Pipeline</button>
       </div>
     </div>
 

@@ -292,19 +292,22 @@ document.addEventListener("click", async (e) => {
   }
 });
 
-// Cerrar popup
-document.getElementById("closeBatchPopup").addEventListener("click", () => {
-  document.getElementById("batchCandidatePopup").classList.add("hidden");
-});
-// Cargar batches si estamos ya en la pestaña "Candidates"
-const activeTab = document.querySelector(".nav-item.active");
-if (activeTab && activeTab.textContent.trim() === "Candidates") {
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
-  if (opportunityId && opportunityId !== '—') {
-    loadBatchesForOpportunity(opportunityId);
-  }
-}
-
+    // Cerrar popup
+    document.getElementById("closeBatchPopup").addEventListener("click", () => {
+      document.getElementById("batchCandidatePopup").classList.add("hidden");
+    });
+    // Cargar batches si estamos ya en la pestaña "Candidates"
+    const activeTab = document.querySelector(".nav-item.active");
+    if (activeTab && activeTab.textContent.trim() === "Candidates") {
+      const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+      if (opportunityId && opportunityId !== '—') {
+        loadBatchesForOpportunity(opportunityId);
+      }
+    }
+    document.getElementById('hire-select').addEventListener('change', async (e) => {
+      const selectedCandidateId = e.target.value;
+      await updateOpportunityField('candidato_contratado', selectedCandidateId);
+    });
 });
 
 function setTheme(theme) {
@@ -376,34 +379,35 @@ async function loadOpportunityData() {
       document.getElementById('signed-tag').textContent = '—';
     }
     // Cargar el select de hire con los candidatos
-      try {
-        const hireSelect = document.getElementById('hire-select');
+    // Cargar el select de hire con los candidatos
+    try {
+      const hireSelect = document.getElementById('hire-select');
+      const candidatoContratadoId = data.candidato_contratado;
 
-        // Llama al endpoint que ya usas para cargar los candidatos del batch
-        const resCandidates = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates`);
-        const candidates = await resCandidates.json();
+      const resCandidates = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates`);
+      const candidates = await resCandidates.json();
 
-        // Limpia el select
-        hireSelect.innerHTML = '<option value="">Select Hire...</option>';
+      hireSelect.innerHTML = '<option value="">Select Hire...</option>';
 
-        // Llena el select con las opciones
-        candidates.forEach(candidate => {
-          const option = document.createElement('option');
-          option.value = candidate.name;
-          option.textContent = candidate.name;
-          hireSelect.appendChild(option);
-        });
+      candidates.forEach(candidate => {
+        const option = document.createElement('option');
+        option.value = candidate.candidate_id;
+        option.textContent = candidate.name;
+        if (candidate.candidate_id === candidatoContratadoId) {
+          option.selected = true;
+        }
+        hireSelect.appendChild(option);
+      });
 
-        // Inicializa Choices.js en el select
-        const choices = new Choices(hireSelect, {
-          searchEnabled: true,
-          itemSelectText: '',
-          shouldSort: false
-        });
+      new Choices(hireSelect, {
+        searchEnabled: true,
+        itemSelectText: '',
+        shouldSort: false
+      });
 
-      } catch (error) {
-        console.error('Error loading hire candidates:', error);
-      }
+    } catch (error) {
+      console.error('Error loading hire candidates:', error);
+    }
       window.currentAccountId = data.account_id;
         try {
           const resUsers = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/users`);

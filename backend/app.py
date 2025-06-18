@@ -148,6 +148,22 @@ def get_candidates():
     if "error" in result:
         return jsonify(result), 500
     return jsonify(result)
+def search_candidates():
+    q = request.args.get('search', '').strip()
+    conn = get_connection()
+    cur = conn.cursor()
+    # fuzzy match en nombre
+    cur.execute("""
+      SELECT candidate_id, name 
+      FROM candidates
+      WHERE name ILIKE %s
+      ORDER BY similarity(name, %s) DESC
+      LIMIT 5;
+    """, (f'%{q}%', q))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -497,7 +513,8 @@ def update_opportunity_fields(opportunity_id):
         'opp_close_date',
         'opp_sales_lead',
         'opp_hr_lead',
-        'hr_job_description'
+        'hr_job_description',
+        'candidato_contratado'
     ]
 
     updates = []
@@ -1126,54 +1143,64 @@ def update_candidate_fields(candidate_id):
     
 
 @app.route('/opportunities/<int:opportunity_id>/candidates', methods=['POST'])
-def create_candidate(opportunity_id):
+def link_or_create_candidate(opportunity_id):
     data = request.get_json()
-    name = data.get('name')
-    email = data.get('email')
-    phone = data.get('phone')
-    linkedin = data.get('linkedin')
-    red_flags = data.get('red_flags')
-    comments = data.get('comments')
-    english_level = data.get('english_level')
-    salary_range = data.get('salary_range')
-    stage = data.get('stage', 'Contactado')
-    country = data.get('country')
-
-    try:
+    candidate_id = data.get('candidate_id')
+    if candidate_id:
         conn = get_connection()
-        cursor = conn.cursor()
-
-        # Obtener el siguiente candidate_id
-        cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
-        max_id = cursor.fetchone()[0]
-        new_candidate_id = max_id + 1
-
-        # Insertar en tabla candidates SIN opportunity_id
-        cursor.execute("""
-            INSERT INTO candidates (
-                candidate_id, name, email, phone, linkedin,
-                red_flags, comments, english_level, salary_range, country, stage
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            new_candidate_id, name, email, phone, linkedin,
-            red_flags, comments, english_level, salary_range, country, stage
-        ))
-
-        # Insertar en tabla intermedia
-        cursor.execute("""
-            INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
-            VALUES (%s, %s)
-        """, (opportunity_id, new_candidate_id))
-
+        cur = conn.cursor()
+        cur.execute("INSERT INTO opportunity_candidates (opportunity_id, candidate_id) VALUES (%s, %s)", (opportunity_id, candidate_id))
         conn.commit()
-        cursor.close()
-        conn.close()
+        cur.close(); conn.close()
+        return jsonify({"message": "Linked existing candidate"}), 200
+    else:
+        data = request.get_json()
+        name = data.get('name')
+        email = data.get('email')
+        phone = data.get('phone')
+        linkedin = data.get('linkedin')
+        red_flags = data.get('red_flags')
+        comments = data.get('comments')
+        english_level = data.get('english_level')
+        salary_range = data.get('salary_range')
+        stage = data.get('stage', 'Contactado')
+        country = data.get('country')
 
-        return jsonify({"message": "Candidate created and linked successfully", "candidate_id": new_candidate_id}), 201
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            # Obtener el siguiente candidate_id
+            cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
+            max_id = cursor.fetchone()[0]
+            new_candidate_id = max_id + 1
+
+            # Insertar en tabla candidates SIN opportunity_id
+            cursor.execute("""
+                INSERT INTO candidates (
+                    candidate_id, name, email, phone, linkedin,
+                    red_flags, comments, english_level, salary_range, country, stage
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                new_candidate_id, name, email, phone, linkedin,
+                red_flags, comments, english_level, salary_range, country, stage
+            ))
+
+            # Insertar en tabla intermedia
+            cursor.execute("""
+                INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
+                VALUES (%s, %s)
+            """, (opportunity_id, new_candidate_id))
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return jsonify({"message": "Candidate created and linked successfully", "candidate_id": new_candidate_id}), 201
+
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
 
 @app.route('/candidates/<int:candidate_id>/batch', methods=['PATCH'])

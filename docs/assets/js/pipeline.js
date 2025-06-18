@@ -70,6 +70,70 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 // Mostrar popup al hacer clic en “+ Add Candidate”
 document.getElementById("createCandidateBtn").addEventListener("click", () => {
+    const nameInput = document.getElementById("candidate-name");
+  const resultsList = document.getElementById("candidateSearchResults");
+  const warning = document.getElementById("name-warning");
+  const createBtn = document.getElementById("popupcreateCandidateBtn");
+  const addExistingBtn = document.getElementById("popupAddExistingBtn");
+  const extraFields = document.getElementById("extra-fields");
+
+  let selectedExisting = null;
+
+  nameInput.addEventListener("input", async () => {
+    const query = nameInput.value.trim();
+    if (query.length < 2) {
+      resultsList.innerHTML = "";
+      return;
+    }
+
+    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(query)}`);
+    const data = await res.json();
+
+    resultsList.innerHTML = "";
+    data.forEach(c => {
+      const li = document.createElement("li");
+      li.textContent = c.name;
+      li.dataset.id = c.candidate_id;
+      li.style.cursor = "pointer";
+      li.addEventListener("click", () => {
+        selectedExisting = c;
+        nameInput.value = c.name;
+        resultsList.innerHTML = "";
+        warning.style.display = "none";
+        extraFields.style.display = "none";
+        createBtn.style.display = "none";
+        addExistingBtn.style.display = "";
+      });
+      resultsList.appendChild(li);
+    });
+  });
+
+  addExistingBtn.addEventListener("click", async () => {
+    const opportunityId = document.getElementById('opportunity-id-text').dataset.id;
+    const candidateId = selectedExisting?.candidate_id;
+    if (!opportunityId || !candidateId) return;
+
+    await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId })
+    });
+
+    document.getElementById("candidatePopup").classList.add("hidden");
+    loadPipelineCandidates();
+  });
+
+  nameInput.addEventListener("change", () => {
+    if (!selectedExisting || nameInput.value !== selectedExisting.name) {
+      selectedExisting = null;
+      warning.style.display = "block";
+      extraFields.style.display = "";
+      createBtn.style.display = "";
+      addExistingBtn.style.display = "none";
+      resultsList.innerHTML = "";
+    }
+  });
+
   document.getElementById("candidatePopup").classList.remove("hidden");
 });
 
