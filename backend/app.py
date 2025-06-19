@@ -10,6 +10,7 @@ from botocore.exceptions import NoCredentialsError
 from affinda import AffindaAPI, TokenCredential
 import openai
 from openai import OpenAI
+import httpx
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 affinda = AffindaAPI(
@@ -1300,7 +1301,9 @@ EMAILS AND COMMENTS:
 Please respond with only the job description in markdown-style plain text.
 """
 
-        client = OpenAI()
+        client = OpenAI(
+            timeout=httpx.Timeout(60.0)  # ⏱️ puedes subir esto si es necesario
+        )
 
         chat = client.chat.completions.create(
             model="gpt-4o",
