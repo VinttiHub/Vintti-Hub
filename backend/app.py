@@ -9,6 +9,7 @@ import uuid
 from botocore.exceptions import NoCredentialsError
 from affinda import AffindaAPI, TokenCredential
 import openai
+from openai import OpenAI
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 affinda = AffindaAPI(
@@ -1275,6 +1276,7 @@ def update_stage_batch():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/ai/generate_jd', methods=['POST'])
 def generate_job_description():
     try:
@@ -1298,7 +1300,9 @@ EMAILS AND COMMENTS:
 Please respond with only the job description in markdown-style plain text.
 """
 
-        completion = openai.ChatCompletion.create(
+        client = OpenAI()
+
+        chat = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are an expert recruiter and job description writer."},
@@ -1307,6 +1311,9 @@ Please respond with only the job description in markdown-style plain text.
             temperature=0.7,
             max_tokens=1200
         )
+
+        response_text = chat.choices[0].message.content
+
 
         content = completion['choices'][0]['message']['content']
 

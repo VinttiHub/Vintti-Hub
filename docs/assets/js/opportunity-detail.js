@@ -323,11 +323,12 @@ aiClose.addEventListener('click', () => {
   aiPopup.classList.add('hidden');
 });
 
-// Botón Let's Go (por ahora solo cierra popup)
 aiGo.addEventListener('click', async () => {
-  const intro = document.querySelector('#ai-assistant-popup textarea[placeholder*="Intro"]').value;
-  const deepDive = document.querySelector('#ai-assistant-popup input[placeholder*="2nd"]').value;
-  const notes = document.querySelector('#ai-assistant-popup textarea[placeholder*="Your notes"]').value;
+  const intro = document.querySelector('#ai-assistant-popup textarea[placeholder="00:00 Speaker: Text here..."]').value;
+  const deepDive = document.querySelector('#ai-assistant-popup input[placeholder="2nd_Call_Transcript"]').value;
+  const notes = document.querySelector('#ai-assistant-popup textarea[placeholder="Your notes here..."]').value;
+
+  console.log("📤 Enviando a AI Assistant:", { intro, deepDive, notes });
 
   if (!intro && !deepDive && !notes) {
     alert("❌ Please fill at least one field");
@@ -343,15 +344,23 @@ aiGo.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ intro, deepDive, notes })
     });
+
     const data = await res.json();
+    console.log("📥 Respuesta de AI Assistant:", data);
 
     if (data.job_description) {
-      document.getElementById('job-description-textarea').value = data.job_description;
-      await updateOpportunityField('hr_job_description', data.job_description);
+      const jd = data.job_description;
+
+      // Mostrar y guardar en textarea
+      document.getElementById('job-description-textarea').value = jd;
+
+      // Guardar en la base de datos
+      await updateOpportunityField('hr_job_description', jd);
+      console.log("✅ Job description saved in DB");
+
       alert("✅ Job description generated!");
     } else {
       alert("⚠️ Unexpected response from AI");
-      console.log("AI raw response:", data);
     }
   } catch (err) {
     console.error("❌ AI Assistant error:", err);
