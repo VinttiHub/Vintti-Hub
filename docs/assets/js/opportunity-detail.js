@@ -1,4 +1,109 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // 🔹 Mostrar popup para elegir acción
+document.getElementById('createCandidateBtn').addEventListener('click', () => {
+  document.getElementById('chooseCandidateActionPopup').classList.remove('hidden');
+});
+
+// 🔹 Cerrar popup de elección
+document.getElementById('closeChoosePopup').addEventListener('click', () => {
+  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
+});
+
+document.getElementById('openNewCandidatePopup').addEventListener('click', () => {
+  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
+  document.getElementById('candidatePopup').classList.remove('hidden');
+
+  // Mostrar campos
+  document.getElementById('extra-fields').style.display = 'block';
+  document.getElementById('popupcreateCandidateBtn').style.display = 'block';
+  document.getElementById('popupAddExistingBtn').style.display = 'none';
+  document.getElementById('name-warning').style.display = 'none';
+  document.getElementById('pipelineCandidateSearchResults').innerHTML = '';
+
+  // Campo de nombre como input normal (sin buscador)
+  const input = document.getElementById('candidate-name');
+  input.value = '';
+  input.placeholder = 'Full name';
+  input.removeAttribute('data-candidate-id');
+
+  // ⚠️ Eliminar cualquier buscador anterior
+  const newInput = input.cloneNode(true);
+  input.parentNode.replaceChild(newInput, input);
+});
+
+
+document.getElementById('openExistingCandidatePopup').addEventListener('click', async () => {
+  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
+
+  // Mostrar solo buscador y botón azul
+  document.getElementById('candidatePopup').classList.remove('hidden');
+  document.getElementById('popupAddExistingBtn').style.display = 'block';
+  document.getElementById('popupcreateCandidateBtn').style.display = 'none';
+  document.getElementById('extra-fields').style.display = 'none';
+  document.getElementById('name-warning').style.display = 'block';
+
+  const input = document.getElementById('candidate-name');
+  const list = document.getElementById('pipelineCandidateSearchResults');
+  input.value = '';
+  list.innerHTML = '';
+  input.placeholder = 'Full name or search...';
+  input.removeAttribute('data-candidate-id');
+
+  // ⚠️ Limpiar buscador viejo si existe
+  const newInput = input.cloneNode(true);
+  input.parentNode.replaceChild(newInput, input);
+
+  const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates');
+  const candidates = await response.json();
+
+  newInput.addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase().trim().split(' ');
+    list.innerHTML = '';
+    candidates.forEach(c => {
+      const nameTokens = c.name.toLowerCase().split(' ');
+      const match = term.every(t => nameTokens.some(n => n.includes(t)));
+      if (match) {
+        const li = document.createElement('li');
+        li.textContent = c.name;
+        li.classList.add('search-result-item');
+        li.setAttribute('data-candidate-id', c.candidate_id);
+        list.appendChild(li);
+        li.addEventListener('click', () => {
+          newInput.value = c.name;
+          newInput.setAttribute('data-candidate-id', c.candidate_id);
+        });
+      }
+    });
+  });
+});
+
+// 🔹 Agregar candidato existente al pipeline
+document.getElementById('popupAddExistingBtn').addEventListener('click', async () => {
+  const input = document.getElementById('candidate-name');
+  const candidateId = input.getAttribute('data-candidate-id');
+  const name = input.value;
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (!candidateId || !opportunityId) return alert('❌ Select a candidate first');
+
+  // Crear en tabla intermedia
+  await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ candidate_id: candidateId })
+  });
+
+  // Mostrar tarjeta en el pipeline
+  const cardTemplate = document.getElementById('candidate-card-template');
+  const newCard = cardTemplate.content.cloneNode(true);
+  newCard.querySelectorAll('.candidate-name').forEach(el => el.textContent = name);
+  newCard.querySelector('.candidate-email').textContent = ''; // puedes mejorar esto si tienes el email
+  newCard.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${candidateId % 10}.jpg`;
+
+  document.querySelector('#contacted').appendChild(newCard); // agregar a columna inicial
+
+  document.getElementById('candidatePopup').classList.add('hidden');
+});
+
   const savedTheme = localStorage.getItem('theme') || 'dark';
   setTheme(savedTheme);
 
@@ -219,10 +324,45 @@ aiClose.addEventListener('click', () => {
 });
 
 // Botón Let's Go (por ahora solo cierra popup)
-aiGo.addEventListener('click', () => {
-  alert('✨ AI Assistant is processing your inputs...');
-  aiPopup.classList.add('hidden');
+aiGo.addEventListener('click', async () => {
+  const intro = document.querySelector('#ai-assistant-popup textarea[placeholder*="Intro"]').value;
+  const deepDive = document.querySelector('#ai-assistant-popup input[placeholder*="2nd"]').value;
+  const notes = document.querySelector('#ai-assistant-popup textarea[placeholder*="Your notes"]').value;
+
+  if (!intro && !deepDive && !notes) {
+    alert("❌ Please fill at least one field");
+    return;
+  }
+
+  aiGo.textContent = '⏳ Generating...';
+  aiGo.disabled = true;
+
+  try {
+    const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/ai/generate_jd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intro, deepDive, notes })
+    });
+    const data = await res.json();
+
+    if (data.job_description) {
+      document.getElementById('job-description-textarea').value = data.job_description;
+      await updateOpportunityField('hr_job_description', data.job_description);
+      alert("✅ Job description generated!");
+    } else {
+      alert("⚠️ Unexpected response from AI");
+      console.log("AI raw response:", data);
+    }
+  } catch (err) {
+    console.error("❌ AI Assistant error:", err);
+    alert("❌ Error generating job description");
+  } finally {
+    aiGo.textContent = "Let's Go 🚀";
+    aiGo.disabled = false;
+    aiPopup.classList.add('hidden');
+  }
 });
+
 // Popup para agregar candidato al batch
 document.addEventListener("click", async (e) => {
   if (e.target.classList.contains("btn-add")) {

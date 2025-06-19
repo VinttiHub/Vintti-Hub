@@ -1229,3 +1229,42 @@ input::-webkit-contacts-auto-fill-button {
   margin-bottom: 10px;
   padding: 8px;
 }
+/* Popup de elección de acción */
+#chooseCandidateActionPopup .popup-content {
+  width: 400px;
+  max-width: 90%;
+  padding: 30px;
+  border-radius: 12px;
+  background: var(--card-bg, #fff);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+#chooseCandidateActionPopup h2 {
+  margin-top: 0;
+  font-size: 1.4rem;
+}
+
+#chooseCandidateActionPopup p {
+  margin: 10px 0 20px;
+  font-size: 1rem;
+  color: #555;
+}
+
+#chooseCandidateActionPopup button {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  margin: 10px 0;
+  background-color: var(--primary-color, #2d72d9);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+#chooseCandidateActionPopup button:hover {
+  background-color: var(--primary-hover, #1e56b0);
+}

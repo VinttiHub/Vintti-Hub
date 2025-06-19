@@ -1275,6 +1275,46 @@ def update_stage_batch():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/ai/generate_jd', methods=['POST'])
+def generate_job_description():
+    try:
+        data = request.get_json()
+        intro = data.get('intro', '')
+        deep_dive = data.get('deepDive', '')
+        notes = data.get('notes', '')
+
+        prompt = f"""
+You are a job posting assistant. Based on the following input, generate a complete and professional **Job Description** for LinkedIn that includes sections such as Role Summary, Key Responsibilities, Requirements, and Nice to Haves. Use clear and inclusive language.
+
+INTRO CALL TRANSCRIPT:
+{intro}
+
+DEEP DIVE NOTES:
+{deep_dive}
+
+EMAILS AND COMMENTS:
+{notes}
+
+Please respond with only the job description in markdown-style plain text.
+"""
+
+        completion = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert recruiter and job description writer."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1200
+        )
+
+        content = completion['choices'][0]['message']['content']
+
+        return jsonify({"job_description": content})
+
+    except Exception as e:
+        print("❌ AI Job Description Error:", e)
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

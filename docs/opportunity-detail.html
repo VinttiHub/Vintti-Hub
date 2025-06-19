@@ -276,11 +276,8 @@
       <div class="popup-content">
         <span class="close-btn" id="closePopup">&times;</span>
         <h2>Add Candidate</h2>
-        <input type="text" id="candidate-name" placeholder="Full name or search..." autocomplete="off"/>
+        <input type="text" id="candidate-name" placeholder="Full name" autocomplete="off"/>
         <ul id="pipelineCandidateSearchResults" class="search-results-list"></ul>
-        <span id="name-warning" style="color: #c00; font-size: .9em; display:none;">
-          Try searching before creating
-        </span>
         <div id="extra-fields">
         <input type="text" id="candidate-email" placeholder="Email" />
         <input type="text" id="candidate-country" placeholder="Country" />
@@ -351,6 +348,19 @@
     <textarea id="email-message" style="height: 200px;"></textarea>
 
     <button id="sendEmailBtn">Send</button>
+  </div>
+</div>
+<!-- Popup inicial para elegir acción -->
+<div id="chooseCandidateActionPopup" class="popup hidden">
+  <div class="popup-content">
+    <span class="close-btn" id="closeChoosePopup">&times;</span>
+    <h2>Add to Pipeline</h2>
+    <p>How would you like to add a candidate?</p>
+        <span id="name-warning" style="color: #c00; font-size: .9em; display:none;">
+          Try searching before creating
+        </span>
+    <button id="openExistingCandidatePopup">Add Existing Candidate</button>
+    <button id="openNewCandidatePopup">Create New Candidate</button>
   </div>
 </div>
 
