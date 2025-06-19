@@ -11,6 +11,7 @@ from affinda import AffindaAPI, TokenCredential
 import openai
 from openai import OpenAI
 import httpx
+from flask_cors import CORS
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 affinda = AffindaAPI(
@@ -32,7 +33,7 @@ s3_client = boto3.client(
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://vinttihub.vintti.com"], supports_credentials=True)
 
 def get_connection():
     return psycopg2.connect(
