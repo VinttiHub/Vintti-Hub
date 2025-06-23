@@ -1270,6 +1270,8 @@ def update_stage_batch():
     
 @app.route('/ai/generate_jd', methods=['POST', 'OPTIONS'])
 def generate_job_description():
+    if request.method == 'OPTIONS':
+        return '', 200
     try:
         data = request.get_json()
         intro = data.get('intro', '')
@@ -1307,14 +1309,13 @@ Please respond with only the job description in markdown-style plain text.
 
         response_text = chat.choices[0].message.content
 
-
-        content = completion['choices'][0]['message']['content']
-
+        content = chat.choices[0].message.content
         return jsonify({"job_description": content})
 
     except Exception as e:
         print("❌ AI Job Description Error:", e)
         return jsonify({"error": str(e)}), 500
+    
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'

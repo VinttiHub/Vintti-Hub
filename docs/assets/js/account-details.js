@@ -38,7 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
-
+  function getIdFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('id');
+  }
   // Cargar datos
   const id = getIdFromURL();
   if (!id) return;
