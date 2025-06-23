@@ -12,6 +12,8 @@ import openai
 from openai import OpenAI
 import httpx
 from flask_cors import CORS
+import traceback
+
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 affinda = AffindaAPI(
@@ -1267,16 +1269,34 @@ def update_stage_batch():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
 @app.route('/ai/generate_jd', methods=['POST', 'OPTIONS'])
 def generate_job_description():
     if request.method == 'OPTIONS':
-        return '', 200
+        print("🔁 OPTIONS request recibida para /ai/generate_jd")
+        response = jsonify({"message": "Preflight OK"})
+        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+        return response, 200
+
+    print("📡 POST request recibida en /ai/generate_jd")
+
     try:
         data = request.get_json()
+        if not data:
+            print("❗ No se recibió JSON o está vacío")
+            raise ValueError("No JSON payload received")
+
         intro = data.get('intro', '')
         deep_dive = data.get('deepDive', '')
         notes = data.get('notes', '')
+
+        print("📥 Datos recibidos:")
+        print("   - Intro:", intro[:100] + "..." if intro else "VACÍO")
+        print("   - DeepDive:", deep_dive[:100] + "..." if deep_dive else "VACÍO")
+        print("   - Notes:", notes[:100] + "..." if notes else "VACÍO")
 
         prompt = f"""
 You are a job posting assistant. Based on the following input, generate a complete and professional **Job Description** for LinkedIn that includes sections such as Role Summary, Key Responsibilities, Requirements, and Nice to Haves. Use clear and inclusive language.
@@ -1293,9 +1313,9 @@ EMAILS AND COMMENTS:
 Please respond with only the job description in markdown-style plain text.
 """
 
-        client = OpenAI(
-            timeout=httpx.Timeout(60.0)  # ⏱️ puedes subir esto si es necesario
-        )
+        print("🧠 Prompt construido correctamente, conectando con OpenAI...")
+
+        client = OpenAI(timeout=httpx.Timeout(60.0))
 
         chat = client.chat.completions.create(
             model="gpt-4o",
@@ -1307,14 +1327,26 @@ Please respond with only the job description in markdown-style plain text.
             max_tokens=1200
         )
 
-        response_text = chat.choices[0].message.content
+        print("✅ OpenAI respondió sin errores")
 
         content = chat.choices[0].message.content
-        return jsonify({"job_description": content})
+        print("📝 Respuesta de OpenAI (primeros 200 caracteres):")
+        print(content[:200] + "..." if content else "VACÍO")
+
+        response = jsonify({"job_description": content})
+        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 200
 
     except Exception as e:
-        print("❌ AI Job Description Error:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ ERROR al generar la job description:")
+        print(traceback.format_exc())
+
+        response = jsonify({"error": str(e)})
+        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response, 500
+
     
 @app.after_request
 def add_cors_headers(response):
