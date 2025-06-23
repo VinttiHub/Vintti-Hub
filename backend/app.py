@@ -33,7 +33,8 @@ s3_client = boto3.client(
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
-CORS(app, origins=["https://vinttihub.vintti.com"], supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": ["https://vinttihub.vintti.com"]}}, supports_credentials=True)
+
 
 def get_connection():
     return psycopg2.connect(
