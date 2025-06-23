@@ -32,12 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.createElement('tr');
 
       tr.addEventListener('click', (e) => {
-        if (e.target.closest('.stage-dropdown')) {
-          // 👇 evita redireccionar si se hizo clic en el dropdown
-          e.stopPropagation();
-          return;
+        const clickedCellIndex = Array.from(e.currentTarget.children).indexOf(e.target.closest('td'));
+        if (clickedCellIndex > 0) {
+          openOpportunity(opp.opportunity_id);
         }
-        openOpportunity(opp.opportunity_id);
       });
 
       tr.innerHTML = `
