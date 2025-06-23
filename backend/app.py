@@ -1273,12 +1273,12 @@ def update_stage_batch():
 def generate_job_description():
     if request.method == 'OPTIONS':
         print("🔁 OPTIONS request recibida para /ai/generate_jd")
-        response = jsonify({"message": "Preflight OK"})
+        response = app.response_class(status=204)
         response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
         response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-        return response, 200
+        return response
 
     print("📡 POST request recibida en /ai/generate_jd")
 
