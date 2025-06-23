@@ -24,6 +24,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const videoLinkInput = document.getElementById('videoLinkInput');
   videoLinkInput.addEventListener('blur', () => saveResume());
+  const hireWorkingSchedule = document.getElementById('hire-working-schedule');
+  const hirePTO = document.getElementById('hire-pto');
+
+  hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
+  hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
+
   // === Fetch candidate info ===
 fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   .then(response => response.json())
@@ -432,5 +438,7 @@ function loadHireData() {
       document.getElementById('hire-computer').value = data.computer || '';
       document.getElementById('hire-extraperks').value = data.extraperks || '';
       document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
+      document.getElementById('hire-working-schedule').value = data.working_schedule || '';
+      document.getElementById('hire-pto').value = data.pto || '';
     });
 }
