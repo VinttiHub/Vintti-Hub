@@ -1,24 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Obtener preferencia del usuario y del sistema
+  // Tema claro/oscuro
   const savedTheme = localStorage.getItem('theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.body.classList.add((savedTheme === 'dark' || (!savedTheme && prefersDark)) ? 'dark-mode' : 'light-mode');
 
-  // Aplicar el modo adecuado
-  if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-    document.body.classList.add('dark-mode');
-  } else {
-    document.body.classList.add('light-mode');
-  }
-
-  // Funcionalidad de pestañas
-  const tabs = document.querySelectorAll('.tab-btn');ƒ
+  // Tabs
+  const tabs = document.querySelectorAll('.tab-btn');
   const contents = document.querySelectorAll('.tab-content');
-
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
       tabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-
       const target = tab.getAttribute('data-tab');
       contents.forEach(c => {
         c.classList.remove('active');
@@ -26,45 +18,43 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   });
-});
-document.querySelectorAll('.accordion-header').forEach(header => {
-  header.addEventListener('click', () => {
-    const section = header.parentElement;
-    section.classList.toggle('open');
-  });
-});
-document.querySelectorAll('.expand-btn').forEach(button => {
-  button.addEventListener('click', () => {
-    const table = button.closest('table');
-    const isOpen = button.classList.toggle('opened');
-    
-    const toggleCells = table.querySelectorAll('.hidden-column');
 
-    toggleCells.forEach(cell => {
-      cell.style.display = isOpen ? 'table-cell' : 'none';
+  // Accordion
+  document.querySelectorAll('.accordion-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const section = header.parentElement;
+      section.classList.toggle('open');
     });
   });
-});
-function getIdFromURL() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('id');
-}
-document.addEventListener('DOMContentLoaded', () => {
-  const id = getIdFromURL();
 
+  // Expandable rows
+  document.querySelectorAll('.expand-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const table = button.closest('table');
+      const isOpen = button.classList.toggle('opened');
+      const toggleCells = table.querySelectorAll('.hidden-column');
+      toggleCells.forEach(cell => {
+        cell.style.display = isOpen ? 'table-cell' : 'none';
+      });
+    });
+  });
+
+  // Cargar datos
+  const id = getIdFromURL();
   if (!id) return;
 
   fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${id}`)
     .then(res => res.json())
     .then(data => {
-      fillAccountDetails(data);  // función para llenar el HTML
-      loadAssociatedOpportunities(id); 
-      loadCandidates(id); 
+      fillAccountDetails(data);
+      loadAssociatedOpportunities(id);
+      loadCandidates(id);
     })
     .catch(err => {
       console.error('Error fetching accounts details:', err);
     });
 });
+
 function loadAssociatedOpportunities(accountId) {
   fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
     .then(res => res.json())
