@@ -29,21 +29,31 @@ document.addEventListener('DOMContentLoaded', () => {
       if (opp.nda_signature_or_start_date) {
         daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
       }
+      const tr = document.createElement('tr');
 
-      const row = `
-        <tr onclick="openOpportunity('${opp.opportunity_id || ''}')">
-          <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
-          <td>${opp.account_id || ''}</td>
-          <td>${opp.opp_position_name || ''}</td>
-          <td>${opp.opp_type || ''}</td> <!-- Type -->
-          <td>${opp.opp_model || ''}</td>
-          <td>${opp.opp_sales_lead || ''}</td>
-          <td>${opp.opp_hr_lead || ''}</td>
-          <td>${opp.opp_comments || ''}</td> <!-- Comment -->
-          <td>${daysAgo}</td> <!-- Days -->
-        </tr>
+      tr.addEventListener('click', (e) => {
+        if (e.target.closest('.stage-dropdown')) {
+          // 👇 evita redireccionar si se hizo clic en el dropdown
+          e.stopPropagation();
+          return;
+        }
+        openOpportunity(opp.opportunity_id);
+      });
+
+      tr.innerHTML = `
+        <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
+        <td>${opp.account_id || ''}</td>
+        <td>${opp.opp_position_name || ''}</td>
+        <td>${opp.opp_type || ''}</td>
+        <td>${opp.opp_model || ''}</td>
+        <td>${opp.opp_sales_lead || ''}</td>
+        <td>${opp.opp_hr_lead || ''}</td>
+        <td>${opp.opp_comments || ''}</td>
+        <td>${daysAgo}</td>
       `;
-      tbody.innerHTML += row;
+
+      tbody.appendChild(tr);
+
     });
 
       const table = $('#opportunityTable').DataTable({
