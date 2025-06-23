@@ -1,20 +1,15 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import psycopg2
 import os
 from dotenv import load_dotenv
 import boto3
-import os
 import uuid
 from botocore.exceptions import NoCredentialsError
 from affinda import AffindaAPI, TokenCredential
 import openai
-from openai import OpenAI
 import httpx
-from flask_cors import CORS
 import traceback
 import logging
-from flask_cors import CORS
 from ai_basic import bp_ai
 
 
