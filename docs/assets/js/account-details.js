@@ -145,9 +145,9 @@ function fillCandidatesCards(candidates) {
     `;
 
     // Según peoplemodel lo metemos en el contenedor correcto:
-    if (candidate.peoplemodel === 'Staffing') {
+    if (candidate.opp_model === 'Staffing') {
       staffingContainer.appendChild(card);
-    } else if (candidate.peoplemodel === 'Recruiting') {
+    } else if (candidate.opp_model === 'Recruiting') {
       recruitingContainer.appendChild(card);
     }
   });
@@ -187,9 +187,9 @@ function fillEmployeesTables(candidates) {
     `;
 
     // Según peoplemodel lo metemos en la tabla correcta:
-    if (candidate.peoplemodel === 'Staffing') {
+    if (candidate.opp_model === 'Staffing') {
       staffingTableBody.appendChild(row);
-    } else if (candidate.peoplemodel === 'Recruiting') {
+    } else if (candidate.opp_model === 'Recruiting') {
       recruitingTableBody.appendChild(row);
     }
   });

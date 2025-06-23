@@ -632,47 +632,34 @@ def update_candidate_stage(candidate_id):
     except Exception as e:
         print("Error updating candidate stage:", e)
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/accounts/<account_id>/opportunities/candidates')
 def get_candidates_by_account_opportunities(account_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 1️⃣ Primero obtener las opportunities asociadas al account
         cursor.execute("""
-            SELECT opportunity_id
-            FROM opportunity
-            WHERE account_id = %s
-        """, (account_id,))
-        opportunity_rows = cursor.fetchall()
-
-        # Si no hay opportunities → retornar vacío
-        if not opportunity_rows:
-            return jsonify([])
-
-        opportunity_ids = [row[0] for row in opportunity_rows]
-
-        # 2️⃣ Ahora obtener los candidates cuyo opportunity_id esté en esa lista
-        query = """
             SELECT 
-                candidate_id,
-                name,
-                stage,
-                opportunity_id,
-                peoplemodel,
-                employee_salary,
-                employee_fee,
-                employee_revenue,
-                employee_type,
-                startingdate,
-                enddate,
-                status
-            FROM candidates
-            WHERE opportunity_id = ANY(%s)
-        """
-        cursor.execute(query, (opportunity_ids,))
+                c.candidate_id,
+                c.name,
+                c.stage,
+                c.opportunity_id,
+                o.opp_model,
+                c.employee_salary,
+                c.employee_fee,
+                c.employee_revenue,
+                c.employee_type,
+                c.startingdate,
+                c.enddate,
+                c.status
+            FROM candidates c
+            JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
+            JOIN opportunity o ON oc.opportunity_id = o.opportunity_id
+            WHERE o.account_id = %s
+        """, (account_id,))
+        
         rows = cursor.fetchall()
-
         colnames = [desc[0] for desc in cursor.description]
         data = [dict(zip(colnames, row)) for row in rows]
 
@@ -682,6 +669,7 @@ def get_candidates_by_account_opportunities(account_id):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/resumes/<int:candidate_id>', methods=['GET'])
 def get_resume(candidate_id):
