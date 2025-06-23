@@ -1268,7 +1268,7 @@ def update_stage_batch():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/ai/generate_jd', methods=['POST'])
+@app.route('/ai/generate_jd', methods=['POST', 'OPTIONS'])
 def generate_job_description():
     try:
         data = request.get_json()
@@ -1315,6 +1315,13 @@ Please respond with only the job description in markdown-style plain text.
     except Exception as e:
         print("❌ AI Job Description Error:", e)
         return jsonify({"error": str(e)}), 500
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+    return response
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
