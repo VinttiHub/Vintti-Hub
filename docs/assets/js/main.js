@@ -247,17 +247,22 @@ document.getElementById('login-form')?.addEventListener('submit', async function
 
     if (response.ok && data.success) {
       const nickname = data.nickname;
+
+      // ✅ Guarda el email del usuario logueado
+      localStorage.setItem('user_email', email);
+
       document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
       document.getElementById('login-container').style.display = 'none';
       document.getElementById('welcome-container').style.display = 'block';
     } else {
-      alert(data.message || 'Correo o contraseÃ±a incorrectos.');
+      alert(data.message || 'Correo o contraseña incorrectos.');
     }
   } catch (err) {
     console.error('Error en login:', err);
-    alert('OcurriÃ³ un error inesperado. Intenta de nuevo mÃ¡s tarde.');
+    alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
   }
 });
+
 const createOpportunityForm = document.getElementById('createOpportunityForm');
 const createButton = createOpportunityForm?.querySelector('.create-btn');
 
@@ -513,6 +518,9 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
 
     await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
     popup.style.display = 'none';
+    // 🔁 Redirigir automáticamente a la pestaña Hire del candidato contratado
+    localStorage.setItem('fromCloseWin', 'true');
+    window.location.href = `candidate-details.html?id=${candidateId}#hire`;
   };
 }
 

@@ -172,7 +172,8 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     english_level,
     salary_range,
     country,
-    stage
+    stage,
+    created_by: localStorage.getItem('user_email') // ✅ esto lo agrega
   };
 
   try {

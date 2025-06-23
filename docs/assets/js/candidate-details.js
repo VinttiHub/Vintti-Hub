@@ -360,17 +360,11 @@ if (hash === '#hire') {
     localStorage.removeItem('fromCloseWin'); // Limpiamos el flag para que no se repita
 
     // 🎆 Animación de fuegos artificiales
-    const particles = document.createElement('div');
-    particles.className = 'fireworks';
-    document.body.appendChild(particles);
-    setTimeout(() => particles.remove(), 2000);
-
-    // 💬 Mensaje sutil en estilo nube de polvo
     const msg = document.createElement('div');
-    msg.className = 'floating-msg';
-    msg.textContent = 'Now complete the hire fields!';
+    msg.className = 'apple-hire-notice';
+    msg.textContent = 'Now please complete the Hire fields';
     document.body.appendChild(msg);
-    setTimeout(() => msg.remove(), 2500);
+    setTimeout(() => msg.remove(), 6000);
   }
 }
 

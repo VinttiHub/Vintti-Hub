@@ -451,7 +451,7 @@ def get_candidates_by_opportunity(opportunity_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
+        
         cursor.execute("""
                 SELECT 
                     c.candidate_id,
@@ -1182,17 +1182,17 @@ def link_or_create_candidate(opportunity_id):
             cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
             max_id = cursor.fetchone()[0]
             new_candidate_id = max_id + 1
-
+            created_by = data.get('created_by')
             # Insertar en tabla candidates SIN opportunity_id
             cursor.execute("""
                 INSERT INTO candidates (
                     candidate_id, name, email, phone, linkedin,
-                    red_flags, comments, english_level, salary_range, country, stage
+                    red_flags, comments, english_level, salary_range, country, stage, created_by
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 new_candidate_id, name, email, phone, linkedin,
-                red_flags, comments, english_level, salary_range, country, stage
+                red_flags, comments, english_level, salary_range, country, stage, created_by
             ))
 
             # Insertar en tabla intermedia
