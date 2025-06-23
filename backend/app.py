@@ -13,7 +13,12 @@ from openai import OpenAI
 import httpx
 from flask_cors import CORS
 import traceback
+import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 affinda = AffindaAPI(
@@ -1271,8 +1276,10 @@ def update_stage_batch():
 
 @app.route('/ai/generate_jd', methods=['POST', 'OPTIONS'])
 def generate_job_description():
+    logging.info("🔁 Entrando a /ai/generate_jd")
+
     if request.method == 'OPTIONS':
-        print("🔁 OPTIONS request recibida para /ai/generate_jd")
+        logging.info("🔁 OPTIONS request recibida para /ai/generate_jd")
         response = app.response_class(status=204)
         response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -1280,22 +1287,22 @@ def generate_job_description():
         response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
         return response
 
-    print("📡 POST request recibida en /ai/generate_jd")
+    logging.info("📡 POST request recibida en /ai/generate_jd")
 
     try:
         data = request.get_json()
         if not data:
-            print("❗ No se recibió JSON o está vacío")
+            logging.warning("❗ No se recibió JSON o está vacío")
             raise ValueError("No JSON payload received")
 
         intro = data.get('intro', '')
         deep_dive = data.get('deepDive', '')
         notes = data.get('notes', '')
 
-        print("📥 Datos recibidos:")
-        print("   - Intro:", intro[:100] + "..." if intro else "VACÍO")
-        print("   - DeepDive:", deep_dive[:100] + "..." if deep_dive else "VACÍO")
-        print("   - Notes:", notes[:100] + "..." if notes else "VACÍO")
+        logging.info("📥 Datos recibidos:")
+        logging.info(f"   - Intro: {intro[:100] + '...' if intro else 'VACÍO'}")
+        logging.info(f"   - DeepDive: {deep_dive[:100] + '...' if deep_dive else 'VACÍO'}")
+        logging.info(f"   - Notes: {notes[:100] + '...' if notes else 'VACÍO'}")
 
         prompt = f"""
 You are a job posting assistant. Based on the following input, generate a complete and professional **Job Description** for LinkedIn that includes sections such as Role Summary, Key Responsibilities, Requirements, and Nice to Haves. Use clear and inclusive language.
@@ -1311,12 +1318,9 @@ EMAILS AND COMMENTS:
 
 Please respond with only the job description in markdown-style plain text.
 """
+        logging.info("🧠 Prompt construido correctamente, conectando con OpenAI...")
 
-        print("🧠 Prompt construido correctamente, conectando con OpenAI...")
-
-        client = OpenAI(timeout=httpx.Timeout(60.0))
-
-        chat = client.chat.completions.create(
+        chat = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are an expert recruiter and job description writer."},
@@ -1326,11 +1330,9 @@ Please respond with only the job description in markdown-style plain text.
             max_tokens=1200
         )
 
-        print("✅ OpenAI respondió sin errores")
-
+        logging.info("✅ OpenAI respondió sin errores")
         content = chat.choices[0].message.content
-        print("📝 Respuesta de OpenAI (primeros 200 caracteres):")
-        print(content[:200] + "..." if content else "VACÍO")
+        logging.info(f"📝 Respuesta de OpenAI (primeros 200 caracteres): {content[:200] + '...' if content else 'VACÍO'}")
 
         response = jsonify({"job_description": content})
         response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
@@ -1338,13 +1340,13 @@ Please respond with only the job description in markdown-style plain text.
         return response, 200
 
     except Exception as e:
-        print("❌ ERROR al generar la job description:")
-        print(traceback.format_exc())
-
+        logging.error("❌ ERROR al generar la job description:")
+        logging.error(traceback.format_exc())
         response = jsonify({"error": str(e)})
         response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         return response, 500
+
 
     
 @app.after_request
