@@ -33,6 +33,7 @@
       <button class="tab active" data-tab="overview">Overview</button>
       <button class="tab" data-tab="resume">Resume</button>
       <button class="tab" data-tab="opportunities">Opportunities</button>
+      <button class="tab" data-tab="hire">Hire</button>
     </div>
 
     <div id="overview" class="tab-content active">
@@ -195,6 +196,34 @@
         <tbody></tbody>
       </table>
     </div>
+    <div id="hire" class="tab-content">
+  <div class="grid">
+    <div class="field">
+      <label>Salary</label>
+      <input type="number" id="hire-salary" />
+    </div>
+    <div class="field">
+      <label>Fee</label>
+      <input type="number" id="hire-fee" />
+    </div>
+    <div class="field">
+      <label>Revenue</label>
+      <input type="number" id="hire-revenue" disabled />
+    </div>
+    <div class="field">
+      <label>Computer</label>
+      <select id="hire-computer">
+        <option value="">—</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </div>
+    <div class="field textarea">
+      <label for="hire-extraperks">Extra Perks</label>
+      <textarea id="hire-extraperks" placeholder="Extra perks..."></textarea>
+    </div>
+  </div>
+</div>
 
   <script src="./assets/js/candidate-details.js"></script>
 </body>

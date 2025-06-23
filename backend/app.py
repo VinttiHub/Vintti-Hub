@@ -14,6 +14,8 @@ import httpx
 from flask_cors import CORS
 import traceback
 import logging
+from flask_cors import CORS
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +43,8 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["https://vinttihub.vintti.com"]}}, supports_credentials=True)
+CORS(app, origins=["http://127.0.0.1:5500", "http://localhost:5500", "https://vinttihub.vintti.com"], supports_credentials=True)
+
 
 
 def get_connection():
@@ -1346,16 +1350,56 @@ Please respond with only the job description in markdown-style plain text.
         response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         return response, 500
-
-
     
-@app.after_request
-def add_cors_headers(response):
-    response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-    return response
+@app.route('/candidates/<int:candidate_id>/hire', methods=['GET', 'PATCH'])
+def handle_candidate_hire_data(candidate_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        if request.method == 'GET':
+            cursor.execute("""
+                SELECT employee_salary, employee_fee, computer, extraperks
+                FROM candidates
+                WHERE candidate_id = %s
+            """, (candidate_id,))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Candidate not found'}), 404
+            return jsonify({
+                'employee_salary': row[0],
+                'employee_fee': row[1],
+                'computer': row[2],
+                'extraperks': row[3],
+                'employee_revenue': (row[0] or 0) + (row[1] or 0)
+            })
+
+        if request.method == 'PATCH':
+            data = request.get_json()
+            allowed_fields = ['employee_salary', 'employee_fee', 'computer', 'extraperks']
+            updates = []
+            values = []
+
+            for field in allowed_fields:
+                if field in data:
+                    updates.append(f"{field} = %s")
+                    values.append(data[field])
+
+            if not updates:
+                return jsonify({'error': 'No valid fields provided'}), 400
+
+            values.append(candidate_id)
+            cursor.execute(f"""
+                UPDATE candidates
+                SET {', '.join(updates)}
+                WHERE candidate_id = %s
+            """, values)
+            conn.commit()
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

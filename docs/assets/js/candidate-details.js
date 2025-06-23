@@ -325,6 +325,46 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   if (document.querySelector('.tab.active')?.dataset.tab === 'opportunities') {
     loadOpportunitiesForCandidate();
   }
+  const hireSalary = document.getElementById('hire-salary');
+const hireFee = document.getElementById('hire-fee');
+const hireRevenue = document.getElementById('hire-revenue');
+const hireComputer = document.getElementById('hire-computer');
+const hirePerks = document.getElementById('hire-extraperks');
+
+function loadHireData() {
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
+    .then(res => res.json())
+    .then(data => {
+      hireSalary.value = data.employee_salary || '';
+      hireFee.value = data.employee_fee || '';
+      hireComputer.value = data.computer || '';
+      hirePerks.value = data.extraperks || '';
+      hireRevenue.value = (data.employee_revenue || 0);
+    });
+}
+
+function updateHireField(field, value) {
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [field]: value })
+  }).then(() => loadHireData());
+}
+
+[hireSalary, hireFee].forEach(input => {
+  input.addEventListener('blur', () => {
+    updateHireField(input.id === 'hire-salary' ? 'employee_salary' : 'employee_fee', Number(input.value));
+  });
+});
+
+hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
+hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.value));
+
+// Cargar si se abre la pestaña
+if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
+  loadHireData();
+}
+
 });
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -350,7 +390,9 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tabId === 'opportunities') {
       loadOpportunitiesForCandidate();
     }
-
+    if (tabId === 'hire') {
+      loadHireData();
+    }
   });
 });
 
