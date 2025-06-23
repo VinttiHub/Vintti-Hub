@@ -15,6 +15,8 @@ from flask_cors import CORS
 import traceback
 import logging
 from flask_cors import CORS
+from ai_basic import bp_ai
+app.register_blueprint(bp_ai)
 
 
 logging.basicConfig(

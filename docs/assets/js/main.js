@@ -96,7 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .catch(err => {
       console.error('Error fetching opportunities:', err);
-      document.getElementById('spinner-overlay').classList.add('hidden');
+      const spinner = document.getElementById('spinner-overlay');
+      if (spinner) spinner.classList.add('hidden');
     });
     
 document.addEventListener('change', async (e) => {
