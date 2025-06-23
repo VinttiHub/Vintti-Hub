@@ -119,6 +119,32 @@ document.addEventListener('change', async (e) => {
     await patchOpportunityStage(opportunityId, newStage, e.target);
   }
 });
+  const helloBtn = document.getElementById('helloGPT');
+  const chatResponse = document.getElementById('chatResponse');
+
+  if (helloBtn && chatResponse) {
+    helloBtn.addEventListener('click', async () => {
+      console.log("🚀 Enviando solicitud a /ai/hello...");
+
+      try {
+        const res = await fetch('https://vinttihub.vintti.com/ai/hello', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await res.json();
+        console.log("📥 Respuesta recibida:", data);
+
+        chatResponse.innerText = data.message || '❌ No se recibió mensaje.';
+      } catch (err) {
+        console.error("❌ Error al contactar ChatGPT:", err);
+        chatResponse.innerText = 'Ocurrió un error al hablar con ChatGPT.';
+      }
+    });
+  }
+
 });
 
 function openPopup() {

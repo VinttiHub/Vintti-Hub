@@ -331,18 +331,9 @@ const hireRevenue = document.getElementById('hire-revenue');
 const hireComputer = document.getElementById('hire-computer');
 const hirePerks = document.getElementById('hire-extraperks');
 
-function loadHireData() {
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
-    .then(res => res.json())
-    .then(data => {
-      hireSalary.value = data.employee_salary || '';
-      hireFee.value = data.employee_fee || '';
-      hireComputer.value = data.computer || '';
-      hirePerks.value = data.extraperks || '';
-      hireRevenue.value = (data.employee_revenue || 0);
-    });
+if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
+  loadHireData();
 }
-
 function updateHireField(field, value) {
   fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
     method: 'PATCH',
@@ -359,11 +350,6 @@ function updateHireField(field, value) {
 
 hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
 hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.value));
-
-// Cargar si se abre la pestaña
-if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
-  loadHireData();
-}
 
 });
 
@@ -417,3 +403,17 @@ window.loadOpportunitiesForCandidate = function () {
       });
     });
 };
+function loadHireData() {
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  if (!candidateId) return;
+
+  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById('hire-salary').value = data.employee_salary || '';
+      document.getElementById('hire-fee').value = data.employee_fee || '';
+      document.getElementById('hire-computer').value = data.computer || '';
+      document.getElementById('hire-extraperks').value = data.extraperks || '';
+      document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
+    });
+}
