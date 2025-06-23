@@ -124,32 +124,31 @@ document.addEventListener('change', async (e) => {
   const chatResponse = document.getElementById('chatResponse');
 
   if (helloBtn && chatResponse) {
-    helloBtn.addEventListener('click', async () => {
-      console.log("🚀 Enviando solicitud a /ai/hello...");
+helloBtn.addEventListener('click', async () => {
+  console.log("🚀 Enviando solicitud a /ai/hello...");
 
-      try {
-        const res = await fetch('https://vinttihub.vintti.com/ai/hello', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({})
-        });
-
-        if (!res.ok) {
-          const text = await res.text(); // para que no explote con .json()
-          throw new Error(`HTTP ${res.status}: ${text}`);
-        }
-
-        const data = await res.json();
-        console.log("📥 Respuesta recibida:", data);
-
-        chatResponse.innerText = data.message || '❌ No se recibió mensaje.';
-      } catch (err) {
-        console.error("❌ Error al contactar ChatGPT:", err);
-        chatResponse.innerText = 'Ocurrió un error al hablar con ChatGPT.';
-      }
+  try {
+    const res = await fetch('https://vinttihub.vintti.com/ai/hello', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
     });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+
+    const data = await res.json();
+    console.log("📥 Respuesta recibida:", data);
+    chatResponse.innerText = data.message || '❌ No se recibió mensaje.';
+  } catch (err) {
+    console.error("❌ Error al contactar ChatGPT:", err);
+    chatResponse.innerText = 'Ocurrió un error al hablar con ChatGPT.';
+  }
+});
   }
 
 });
