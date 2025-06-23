@@ -646,7 +646,7 @@ def get_candidates_by_account_opportunities(account_id):
                 c.candidate_id,
                 c.name,
                 c.stage,
-                c.opportunity_id,
+                o.opportunity_id,
                 o.opp_model,
                 c.employee_salary,
                 c.employee_fee,
@@ -655,15 +655,14 @@ def get_candidates_by_account_opportunities(account_id):
                 c.startingdate,
                 c.enddate,
                 c.status
-            FROM candidates c
-            JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
-            JOIN opportunity o ON oc.opportunity_id = o.opportunity_id
+            FROM opportunity o
+            LEFT JOIN candidates c ON o.candidato_contratado = c.candidate_id
             WHERE o.account_id = %s
         """, (account_id,))
         
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
-        data = [dict(zip(colnames, row)) for row in rows]
+        data = [dict(zip(colnames, row)) for row in rows if row[colnames.index("candidate_id")] is not None]
 
         cursor.close()
         conn.close()
