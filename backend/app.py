@@ -11,6 +11,7 @@ import httpx
 import traceback
 import logging
 from ai_basic import bp_ai
+import psycopg2
 
 
 
