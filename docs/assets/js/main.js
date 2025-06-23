@@ -150,6 +150,11 @@ helloBtn.addEventListener('click', async () => {
   }
 });
   }
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.stage-dropdown')) {
+    e.stopPropagation(); // 🚫 evita que el clic se propague al <tr> y dispare la redirección
+  }
+});
 
 });
 
