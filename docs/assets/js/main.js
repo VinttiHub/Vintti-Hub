@@ -128,13 +128,13 @@ document.addEventListener('change', async (e) => {
       console.log("🚀 Enviando solicitud a /ai/hello...");
 
       try {
-        const res = await fetch('https://vinttihub.vintti.com/ai/hello', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
+          const res = await fetch('https://vinttihub.vintti.com/ai/hello', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+          });
         const data = await res.json();
         console.log("📥 Respuesta recibida:", data);
 
