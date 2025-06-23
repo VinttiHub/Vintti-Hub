@@ -350,6 +350,29 @@ function updateHireField(field, value) {
 
 hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
 hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.value));
+const hash = window.location.hash;
+if (hash === '#hire') {
+  const hireTab = document.querySelector('.tab[data-tab="hire"]');
+  if (hireTab) hireTab.click();
+
+  // 🎉 Mostrar fuegos artificiales y mensaje SOLO si viene desde Close Win
+  if (localStorage.getItem('fromCloseWin') === 'true') {
+    localStorage.removeItem('fromCloseWin'); // Limpiamos el flag para que no se repita
+
+    // 🎆 Animación de fuegos artificiales
+    const particles = document.createElement('div');
+    particles.className = 'fireworks';
+    document.body.appendChild(particles);
+    setTimeout(() => particles.remove(), 2000);
+
+    // 💬 Mensaje sutil en estilo nube de polvo
+    const msg = document.createElement('div');
+    msg.className = 'floating-msg';
+    msg.textContent = 'Now complete the hire fields!';
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 2500);
+  }
+}
 
 });
 

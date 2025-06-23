@@ -473,6 +473,13 @@ function openSourcingPopup(opportunityId, dropdownElement) {
       console.error('❌ Error updating sourcing date/stage:', err);
       alert('Error updating sourcing info: ' + err.message);
     }
+    // Redirigir automáticamente a la pestaña Hire del candidato contratado
+    setTimeout(() => {
+      // Agregamos un flag en el localStorage para que candidate-details sepa que viene desde Close Win
+      localStorage.setItem('fromCloseWin', 'true');
+      window.location.href = `candidate-details.html?id=${candidateId}#hire`;
+    }, 300);
+
   };
 }
 
