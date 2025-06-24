@@ -13,14 +13,14 @@ def register_send_email_route(app):
     @app.route("/send_email", methods=["POST", "OPTIONS"])
     def send_email():
         if request.method == "OPTIONS":
+            print("🟡 [CORS] OPTIONS request recibida")
             response = make_response('', 204)
             response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
             response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Max-Age'] = '86400'
             return response
-
-        print("📥 [INICIO] POST recibido en /send_email")
 
         # ✅ Verificar resolución DNS (acceso a internet)
         try:
