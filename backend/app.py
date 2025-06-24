@@ -15,7 +15,7 @@ import psycopg2
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+from flask_cors import cross_origin
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1402,8 +1402,13 @@ def handle_candidate_hire_data(candidate_id):
     finally:
         cursor.close()
         conn.close()
-@app.route('/send_email', methods=['POST'])
+    
+@app.route('/send_email', methods=['POST', 'OPTIONS'])
+@cross_origin(origin="https://vinttihub.vintti.com", supports_credentials=True)
 def send_email():
+    if request.method == 'OPTIONS':
+        return '', 204
+
     try:
         data = request.get_json()
         subject = data.get('subject', '')
@@ -1433,6 +1438,14 @@ def send_email():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.after_request
+def apply_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS,PATCH,DELETE'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
