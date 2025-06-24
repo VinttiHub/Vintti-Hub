@@ -1406,85 +1406,6 @@ def handle_candidate_hire_data(candidate_id):
     finally:
         cursor.close()
         conn.close()
-    
-@app.route("/send_email", methods=["POST", "OPTIONS"])
-def send_email():
-    logging.info(f"🔍 Método recibido: {request.method}")
-    logging.info(f"🔍 Content-Type recibido: {request.content_type}")
-    logging.info("📨 Entrando a /send_email")
-
-    if request.method == "OPTIONS":
-        logging.info("🟡 OPTIONS request recibida para /send_email")
-        response = app.response_class(status=204)
-        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-        return response
-
-    try:
-        data = request.get_json()
-        logging.info(f"📥 JSON recibido: {data}")
-        print("📥 JSON recibido:", data)
-
-        to_emails = data.get("to", [])
-        cc_emails = data.get("cc", [])
-        subject = data.get("subject", "")
-        body = data.get("body", "")
-
-        logging.info(f"📧 Para: {to_emails}")
-        logging.info(f"📧 CC: {cc_emails}")
-        logging.info(f"📝 Asunto: {subject}")
-        logging.info(f"🧾 Cuerpo: {body[:100]}...")  # muestra solo los primeros 100 caracteres
-
-        if not to_emails:
-            logging.warning("⚠️ Campo 'to' requerido pero no fue enviado")
-            response = jsonify({"status": "error", "message": "Campo 'to' requerido"})
-            response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            return response, 400
-
-        try:
-            logging.info("📨 Preparando correo...")
-            message = Mail(
-                from_email="angie@vintti.com",
-                to_emails=[To(email) for email in to_emails],
-                subject=subject,
-                html_content=body
-            )
-
-            if cc_emails:
-                message.cc = [Cc(email) for email in cc_emails]
-
-            ping = requests.get("https://api.sendgrid.com")
-            logging.info(f"🌐 Prueba de red a SendGrid: {ping.status_code}")
-            sg = SendGridAPIClient(os.environ.get("SENDGRID_API_KEY"))
-            sendgrid_response = sg.send(message)
-
-            logging.info(f"✅ Correo enviado. Código de respuesta SendGrid: {sendgrid_response.status_code}")
-            logging.info(f"📬 Headers de respuesta: {sendgrid_response.headers}")
-            response = jsonify({"status": "success", "code": sendgrid_response.status_code})
-        
-        except Exception as mail_error:
-            logging.error("❌ Error al enviar correo con SendGrid")
-            logging.error(traceback.format_exc())
-            response = jsonify({'status': 'error', 'message': str(mail_error)})
-
-        # ✅ Siempre agrega headers CORS a la respuesta
-        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response
-
-
-    except Exception as general_error:
-        logging.error("❌ Error general en /send_email")
-        logging.error(traceback.format_exc())
-        print("❌ Error general:", general_error)
-        response = jsonify({'error': str(general_error)})
-        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response, 500
-
 
 
 @app.after_request
@@ -1494,6 +1415,9 @@ def apply_cors_headers(response):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
+
+from send_email_endpoint import register_send_email_route
+register_send_email_route(app)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
