@@ -1407,8 +1407,12 @@ def handle_candidate_hire_data(candidate_id):
 @cross_origin(origin="https://vinttihub.vintti.com", supports_credentials=True)
 def send_email():
     if request.method == 'OPTIONS':
-        return '', 204
-
+        response = app.response_class(status=204)
+        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
     try:
         data = request.get_json()
         subject = data.get('subject', '')
