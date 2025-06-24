@@ -6,6 +6,8 @@ import logging
 from flask import request, jsonify, make_response
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
+import requests
+import logging
 
 # ⚠️ IMPORTANTE: Quitar esto en producción, solo para pruebas de certificados locales
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -75,6 +77,14 @@ def register_send_email_route(app):
             # ENVÍO REAL (descomenta esta línea para pruebas reales)
             sg = SendGridAPIClient(api_key)
             logging.info("🚀 Enviando correo con SendGrid...")
+            try:
+                logging.info("🌐 Probing SendGrid API connectivity...")
+                r = requests.get("https://api.sendgrid.com/v3", timeout=10)
+                logging.info(f"🌐 SendGrid connectivity status: {r.status_code}")
+            except Exception as e:
+                logging.error("❌ Fallo al conectar a SendGrid directamente")
+                logging.exception(e)
+
             response = sg.send(message)
             logging.info("✅ Envío exitoso. Status: %s", response.status_code)
             logging.info("📨 Headers de SendGrid: %s", dict(response.headers))
