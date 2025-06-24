@@ -1404,7 +1404,7 @@ def handle_candidate_hire_data(candidate_id):
         conn.close()
     
 @app.route('/send_email', methods=['POST', 'OPTIONS'])
-@cross_origin(origin="https://vinttihub.vintti.com", supports_credentials=True)
+@cross_origin(origins="https://vinttihub.vintti.com", supports_credentials=True)
 def send_email():
     if request.method == 'OPTIONS':
         response = app.response_class(status=204)

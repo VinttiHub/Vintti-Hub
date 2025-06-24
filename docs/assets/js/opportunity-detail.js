@@ -561,15 +561,6 @@ async function loadOpportunityData() {
   try {
     const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
     const data = await res.json();
-          console.log("🔎 Client data:", {
-          name: data.account_name,
-          size: data.account_size,
-          state: data.account_state,
-          linkedin: data.account_linkedin,
-          website: data.account_website,
-          mail: data.account_mail,
-          about: data.account_about
-        });
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
     document.getElementById('opportunity-id-text').setAttribute('data-id', data.opportunity_id);
