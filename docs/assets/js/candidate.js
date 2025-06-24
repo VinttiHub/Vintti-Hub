@@ -14,25 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let rows = '';
       data.forEach(candidate => {
-        rows += `
-          <tr data-id="${candidate.candidate_id || ''}">
-            <td>${candidate.condition || 'Candidate'}</td>
-            <td>${candidate.Name || candidate.name || '—'}</td>
-            <td>${candidate.country || '—'}</td>
-            <td>
-              <button class="icon-button whatsapp" title="Enviar mensaje"
-                onclick="event.stopPropagation(); window.open('https://wa.me/${candidate.phone}', '_blank')">
-                <i class='fab fa-whatsapp'></i>
-              </button>
-            </td>
-            <td>
-              <button class="icon-button linkedin" title="Ver perfil LinkedIn"
-                onclick="event.stopPropagation(); window.open('${candidate.linkedin}', '_blank')">
-                <i class='fab fa-linkedin-in'></i>
-              </button>
-            </td>
-          </tr>
-        `;
+      rows += `
+        <tr data-id="${candidate.candidate_id || ''}">
+          <td>${candidate.condition || '—'}</td>
+          <td>${candidate.name || candidate.Name || '—'}</td>
+          <td>${candidate.country || '—'}</td>
+          <td>
+            <button class="icon-button whatsapp" title="Enviar mensaje"
+              onclick="event.stopPropagation(); window.open('https://wa.me/${candidate.phone}', '_blank')">
+              <i class='fab fa-whatsapp'></i>
+            </button>
+          </td>
+          <td>
+            <button class="icon-button linkedin" title="Ver perfil LinkedIn"
+              onclick="event.stopPropagation(); window.open('${candidate.linkedin}', '_blank')">
+              <i class='fab fa-linkedin-in'></i>
+            </button>
+          </td>
+        </tr>
+      `;
       });
 
       tbody.innerHTML = rows;
