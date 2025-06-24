@@ -43,11 +43,7 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 app.register_blueprint(bp_ai)
-CORS(app, origins=[
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "https://vinttihub.vintti.com"
-], supports_credentials=True)
+CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://vinttihub.vintti.com"}})
 
 
 
