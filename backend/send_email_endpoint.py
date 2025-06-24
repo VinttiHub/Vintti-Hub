@@ -1,22 +1,23 @@
 import os
 import ssl
 import socket
-import logging
 import traceback
+import logging
 from flask import request, jsonify, make_response
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
 
+# ⚠️ IMPORTANTE: Quitar esto en producción, solo para pruebas de certificados locales
 ssl._create_default_https_context = ssl._create_unverified_context
 
 def register_send_email_route(app):
     @app.route("/send_email", methods=["POST", "OPTIONS"])
     def send_email():
-        logging.info(f"🔍 Método recibido: {request.method}")
         logging.info("📨 Entrando a /send_email")
+        logging.info(f"🔍 Método recibido: {request.method}")
 
         if request.method == "OPTIONS":
-            print("🟡 [CORS] OPTIONS request recibida")
+            logging.info("🟡 OPTIONS request recibida")
             response = make_response('', 204)
             response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
@@ -25,42 +26,36 @@ def register_send_email_route(app):
             response.headers['Access-Control-Max-Age'] = '86400'
             return response
 
-        # 🌐 Verificar DNS
         try:
+            # Verificar DNS
             ip = socket.gethostbyname("sendgrid.com")
-            print(f"🌍 [DNS] sendgrid.com resuelve a {ip}")
-            logging.info(f"[DNS] sendgrid.com resolved to {ip}")
+            logging.info(f"🌍 DNS OK: sendgrid.com => {ip}")
         except Exception as dns_error:
-            print("🛑 [ERROR DNS] No se pudo resolver sendgrid.com")
-            logging.error("DNS resolution failed", exc_info=True)
+            logging.error("🛑 Error de DNS")
+            traceback.print_exc()
             return jsonify({"error": "DNS resolution failed", "detail": str(dns_error)}), 500
 
-        # 📥 Obtener datos del request
         try:
+            # Leer y validar JSON
             data = request.get_json(force=True)
-            print("📦 [DATA] JSON recibido:", data)
-            logging.info(f"[DATA] Payload: {data}")
+            logging.info("📦 JSON recibido: %s", data)
         except Exception as json_error:
-            print("❌ [ERROR JSON] Error al leer JSON")
-            logging.error("Invalid JSON payload", exc_info=True)
+            logging.error("❌ Error al leer JSON")
+            traceback.print_exc()
             return jsonify({"error": "Invalid JSON", "detail": str(json_error)}), 400
 
-        # ✅ Validar campos requeridos
+        # Validar campos obligatorios
         to_emails = data.get('to')
         cc_emails = data.get('cc', [])
         subject = data.get('subject')
         body = data.get('body')
 
         if not to_emails or not subject or not body:
-            print("⚠️ [VALIDACIÓN] Campos obligatorios faltantes")
-            logging.warning("Missing required fields in payload")
+            logging.warning("⚠️ Faltan campos requeridos")
             return jsonify({"error": "Missing required fields"}), 400
 
-        # 📤 Preparar envío
         try:
-            print("✉️ [EMAIL] Construyendo mensaje...")
-            logging.info("Construyendo correo...")
-
+            logging.info("✉️ Construyendo mensaje...")
             message = Mail(
                 from_email=Email('angie@vintti.com', name='Angie Vintti'),
                 to_emails=to_emails,
@@ -69,22 +64,20 @@ def register_send_email_route(app):
             )
             for email in cc_emails:
                 message.add_cc(email)
+            logging.info("📬 Mensaje construido correctamente")
 
             api_key = os.environ.get('SENDGRID_API_KEY')
             if not api_key:
-                print("🛑 [CONFIG] Faltante SENDGRID_API_KEY")
-                logging.critical("SENDGRID_API_KEY no está configurada")
+                logging.error("🛑 No se encontró SENDGRID_API_KEY en las variables de entorno")
                 return jsonify({"error": "SendGrid API Key not configured"}), 500
+            logging.info(f"🔐 API Key detectada (comienza con {api_key[:5]}...)")
 
-            print("🚀 [ENVÍO] Enviando correo...")
-            logging.info("Llamando a SendGrid API")
-
+            # ENVÍO REAL (descomenta esta línea para pruebas reales)
             sg = SendGridAPIClient(api_key)
+            logging.info("🚀 Enviando correo con SendGrid...")
             response = sg.send(message)
-
-            print("✅ [ENVÍO OK] Código:", response.status_code)
-            logging.info(f"[SendGrid] Código de respuesta: {response.status_code}")
-            logging.debug(f"[SendGrid] Headers: {response.headers}")
+            logging.info("✅ Envío exitoso. Status: %s", response.status_code)
+            logging.info("📨 Headers de SendGrid: %s", dict(response.headers))
 
             resp = jsonify({"status": "Email sent", "code": response.status_code})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
@@ -92,9 +85,8 @@ def register_send_email_route(app):
             return resp
 
         except Exception as e:
-            print("🧨 [ERROR ENVÍO] Falló el envío del correo")
+            logging.error("🧨 Excepción durante el envío")
             traceback.print_exc()
-            logging.error("Exception during email sending", exc_info=True)
             resp = jsonify({"error": "Email sending failed", "detail": str(e)})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
