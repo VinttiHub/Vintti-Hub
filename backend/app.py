@@ -12,7 +12,9 @@ import traceback
 import logging
 from ai_basic import bp_ai
 import psycopg2
-
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
 logging.basicConfig(
@@ -1404,6 +1406,37 @@ def handle_candidate_hire_data(candidate_id):
     finally:
         cursor.close()
         conn.close()
+@app.route('/send_email', methods=['POST'])
+def send_email():
+    try:
+        data = request.get_json()
+        subject = data.get('subject', '')
+        message = data.get('message', '')
+        to_emails = data.get('to', [])
+        cc_emails = data.get('cc', [])
+
+        sender_email = os.getenv("EMAIL_USER")
+        sender_password = os.getenv("EMAIL_PASSWORD")
+
+        if not (subject and message and to_emails):
+            return jsonify({"error": "Missing fields"}), 400
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = ", ".join(to_emails)
+        msg['Cc'] = ", ".join(cc_emails)
+        msg['Subject'] = subject
+
+        msg.attach(MIMEText(message, 'plain'))
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_emails + cc_emails, msg.as_string())
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
