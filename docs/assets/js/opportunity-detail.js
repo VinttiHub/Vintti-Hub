@@ -1,3 +1,5 @@
+let emailToChoices = null;
+let emailCcChoices = null;
 document.addEventListener('DOMContentLoaded', () => {
   // 🔹 Mostrar popup para elegir acción
 document.getElementById('createCandidateBtn').addEventListener('click', () => {
@@ -181,52 +183,56 @@ document.querySelector('.job-header-right .header-btn').addEventListener('click'
     ccSelect.appendChild(optionCc);
   });
 
-  new Choices(toSelect, { removeItemButton: true, placeholder: true });
-  new Choices(ccSelect, { removeItemButton: true, placeholder: true });
+  emailToChoices = new Choices(toSelect, { removeItemButton: true, placeholder: true });
+  emailCcChoices = new Choices(ccSelect, { removeItemButton: true, placeholder: true });
 });
 
 document.getElementById('closeEmailPopup').addEventListener('click', () => {
   document.getElementById('emailPopup').classList.add('hidden');
 });
 
+const overlay = document.getElementById('email-overlay');
+const overlayText = document.getElementById('email-overlay-message');
+
 document.getElementById('sendEmailBtn').addEventListener('click', async () => {
-  const overlay = document.getElementById('email-overlay');
   const btn = document.getElementById('sendEmailBtn');
-  const to = Array.from(document.getElementById('email-to').selectedOptions).map(o => o.value);
-  const cc = Array.from(document.getElementById('email-cc').selectedOptions).map(o => o.value);
+  const toChoices = emailToChoices.getValue().map(o => o.value);
+  const ccChoices = emailCcChoices.getValue().map(o => o.value);
   const subject = document.getElementById('email-subject').value;
   const message = document.getElementById('email-message').value;
 
-  if (!to.length || !subject || !message) {
+  if (!toChoices.length || !subject || !message) {
     alert("❌ Fill in all required fields (To, Subject, Message)");
     return;
   }
 
+
   btn.disabled = true;
-  overlay.style.display = 'flex';
+  overlayText.textContent = "Sending email...";
+  overlay.classList.remove('hidden');
 
   try {
     const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/send_email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, cc, subject, message })
+      body: JSON.stringify({ to: toChoices, cc: ccChoices, subject, message })
     });
 
     const result = await res.json();
     if (res.ok) {
-      overlay.querySelector('p').textContent = "✅ Email sent successfully";
+      overlayText.textContent = "✅ Email sent successfully";
       setTimeout(() => {
-        overlay.style.display = 'none';
+        overlay.classList.add('hidden');
         document.getElementById('emailPopup').classList.add('hidden');
         btn.disabled = false;
       }, 2000);
     } else {
-      overlay.style.display = 'none';
+      overlay.classList.add('hidden');
       alert("❌ Error sending email: " + (result.error || 'Unknown error'));
       btn.disabled = false;
     }
   } catch (err) {
-    overlay.style.display = 'none';
+    overlay.classList.add('hidden');
     console.error("❌ Error:", err);
     alert("❌ Failed to send email");
     btn.disabled = false;
