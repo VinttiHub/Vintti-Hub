@@ -16,6 +16,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask_cors import cross_origin
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Cc
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1403,47 +1405,38 @@ def handle_candidate_hire_data(candidate_id):
         cursor.close()
         conn.close()
     
-@app.route('/send_email', methods=['POST', 'OPTIONS'])
-@cross_origin(origins="https://vinttihub.vintti.com", supports_credentials=True)
+@app.route("/send_email", methods=["POST"])
 def send_email():
-    if request.method == 'OPTIONS':
-        response = app.response_class(status=204)
-        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response
     try:
         data = request.get_json()
-        subject = data.get('subject', '')
-        message = data.get('message', '')
-        to_emails = data.get('to', [])
-        cc_emails = data.get('cc', [])
+        to_emails = data.get("to", [])  # lista de correos
+        cc_emails = data.get("cc", [])  # lista de correos
+        subject = data.get("subject", "")
+        body = data.get("body", "")
 
-        sender_email = os.getenv("EMAIL_USER")
-        sender_password = os.getenv("EMAIL_PASSWORD")
+        if not to_emails:
+            return jsonify({"status": "error", "message": "Campo 'to' requerido"}), 400
 
-        if not (subject and message and to_emails):
-            return jsonify({"error": "Missing fields"}), 400
+        message = Mail(
+            from_email="angie@vintti.com",
+            to_emails=[To(email) for email in to_emails],
+            subject=subject,
+            html_content=body
+        )
 
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = ", ".join(to_emails)
-        msg['Cc'] = ", ".join(cc_emails)
-        msg['Subject'] = subject
+        if cc_emails:
+            message.cc = [Cc(email) for email in cc_emails]
 
-        msg.attach(MIMEText(message, 'plain'))
+        sg = SendGridAPIClient(os.environ.get("SENDGRID_API_KEY"))
+        response = sg.send(message)
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_emails + cc_emails, msg.as_string())
-
-        return jsonify({"success": True})
+        return jsonify({"status": "success", "code": response.status_code})
 
     except Exception as e:
         logging.error("❌ Error enviando correo: %s", e)
         logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
 
 
 @app.after_request
