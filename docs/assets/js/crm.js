@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 📦 Obtener datos desde Flask
-  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/data')
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data')
     .then(res => res.json())
     .then(data => {
       console.log("Datos recibidos desde el backend:", data);
@@ -91,7 +91,7 @@ form.addEventListener('submit', async (e) => {
   console.log("📤 Enviando datos al backend:", data);  // ✅ Ver qué datos se envían
 
   try {
-    const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts', {
+    const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

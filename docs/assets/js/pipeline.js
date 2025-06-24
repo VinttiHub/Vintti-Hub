@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const mappedStage = stageMap[newStage] || null;
             console.log(`➡️ Updating candidate ${candidateId} to stage ${mappedStage}`);
 
-            fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/stage`, {
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/stage`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json'
@@ -96,7 +96,7 @@ document.getElementById("createCandidateBtn").addEventListener("click", () => {
       return;
     }
 
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(query)}`);
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(query)}`);
     const data = await res.json();
 
     resultsList.innerHTML = "";
@@ -178,7 +178,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
 
   try {
     console.log("Payload:", payload);
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -229,7 +229,7 @@ function loadPipelineCandidates() {
   }
 
   // Hacer fetch al backend
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
     .then(response => response.json())
     .then(candidates => {
       console.log('🔵 Candidates:', candidates);

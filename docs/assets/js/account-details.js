@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const id = getIdFromURL();
   if (!id) return;
 
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${id}`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)
     .then(res => res.json())
     .then(data => {
       fillAccountDetails(data);
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function loadAssociatedOpportunities(accountId) {
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
     .then(res => res.json())
     .then(data => {
       console.log("Oportunidades asociadas:", data);
@@ -104,7 +104,7 @@ function fillOpportunitiesTable(opportunities) {
   });
 }
 function loadCandidates(accountId) {
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities/candidates`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities/candidates`)
     .then(res => res.json())
     .then(data => {
       console.log("Candidates asociados:", data);

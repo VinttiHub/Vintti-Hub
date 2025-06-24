@@ -55,7 +55,7 @@ document.getElementById('openExistingCandidatePopup').addEventListener('click', 
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
 
-  const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates');
+  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates');
   const candidates = await response.json();
 
   newInput.addEventListener('input', (e) => {
@@ -88,7 +88,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   if (!candidateId || !opportunityId) return alert('❌ Select a candidate first');
 
   // Crear en tabla intermedia
-  await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+  await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ candidate_id: candidateId })
@@ -170,7 +170,7 @@ document.querySelector('.job-header-right .header-btn').addEventListener('click'
   toSelect.innerHTML = '';
   ccSelect.innerHTML = '';
 
-  const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users');
+  const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
   const users = await res.json();
 
   users.forEach(user => {
@@ -212,7 +212,7 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
   overlay.classList.remove('hidden');
 
   try {
-    const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/send_email', {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ to: toChoices, cc: ccChoices, subject, body: message })
@@ -391,7 +391,7 @@ aiGo.addEventListener('click', async () => {
   aiGo.disabled = true;
 
   try {
-    const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/ai/generate_jd', {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/generate_jd', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ intro, deepDive, notes })
@@ -432,7 +432,7 @@ document.addEventListener("click", async (e) => {
 
     // Obtener candidatos de la oportunidad
     try {
-      const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
+      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
       const candidates = await res.json();
 
       // Limpiar resultados anteriores
@@ -472,7 +472,7 @@ document.addEventListener("click", async (e) => {
 
   try {
     // Llamar al backend para obtener los batch_id de la oportunidad
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const data = await res.json();
 
     // Buscar el batch con ese número
@@ -482,7 +482,7 @@ document.addEventListener("click", async (e) => {
       return;
     }
 
-    const patchRes = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/batch`, {
+    const patchRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.comcom/candidates/${candidateId}/batch`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -559,7 +559,7 @@ async function loadOpportunityData() {
   if (!opportunityId) return;
 
   try {
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
     const data = await res.json();
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
@@ -608,7 +608,7 @@ async function loadOpportunityData() {
       const hireSelect = document.getElementById('hire-select');
       const candidatoContratadoId = data.candidato_contratado;
 
-      const resCandidates = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates`);
+      const resCandidates = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates`);
       const candidates = await resCandidates.json();
 
       hireSelect.innerHTML = '<option value="">Select Hire...</option>';
@@ -634,7 +634,7 @@ async function loadOpportunityData() {
     }
       window.currentAccountId = data.account_id;
         try {
-          const resUsers = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/users`);
+          const resUsers = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users`);
           const users = await resUsers.json();
 
           const salesLeadSelect = document.getElementById('details-sales-lead');
@@ -706,7 +706,7 @@ async function updateOpportunityField(fieldName, fieldValue) {
   payload[fieldName] = fieldValue;
 
   try {
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json'
@@ -738,7 +738,7 @@ async function updateAccountField(fieldName, fieldValue) {
   payload[fieldName] = fieldValue;
 
   try {
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json'
@@ -768,8 +768,8 @@ document.querySelector('.btn-create').addEventListener('click', async () => {
 
   try {
     console.log("📌 Creating batch for opportunity ID:", opportunityId);
-    console.log("🚀 Calling URL:", `https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
-    const res = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`, {
+    console.log("🚀 Calling URL:", `https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`, {
       method: 'POST'
     });
 
@@ -798,8 +798,8 @@ document.querySelector('.btn-create').addEventListener('click', async () => {
 async function loadBatchesForOpportunity(opportunityId) {
   try {
     const [batchesRes, candidatesRes] = await Promise.all([
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
     ]);
 
     const batches = await batchesRes.json();
@@ -851,7 +851,7 @@ async function loadBatchesForOpportunity(opportunityId) {
             const candidateId = c.candidate_id;
 
             try {
-              const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunity_candidates/stage_batch`, {
+              const response = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunity_candidates/stage_batch`, {
                 method: 'PATCH',
                 headers: {
                   'Content-Type': 'application/json'
@@ -891,8 +891,8 @@ async function reloadBatchCandidates() {
 
   try {
     const [batchesRes, candidatesRes] = await Promise.all([
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
     ]);
 
     const batches = await batchesRes.json();
@@ -954,8 +954,8 @@ async function loadBatchesAndCandidates() {
 
   try {
     const [batchesRes, candidatesRes] = await Promise.all([
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
     ]);
 
     const batches = await batchesRes.json();

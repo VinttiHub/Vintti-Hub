@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities')
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities')
     .then(response => response.json())
     .then(data => {
       const tbody = document.getElementById('opportunityTableBody');
@@ -248,7 +248,7 @@ document.getElementById('login-form')?.addEventListener('submit', async function
   const password = document.getElementById('password').value;
   document.getElementById('click-sound').play();
   try {
-    const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/login', {
+    const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -307,7 +307,7 @@ if (createOpportunityForm && createButton) {
     };
 
     try {
-      const response = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities', {
+      const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -330,7 +330,7 @@ if (createOpportunityForm && createButton) {
   });
 }
 
-fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users')
+fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
   .then(response => response.json())
   .then(users => {
     const select = document.getElementById('sales_lead');
@@ -347,7 +347,7 @@ fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/users')
     console.error('Error loading users:', err);
   });
 
-fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/accounts')
+fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts')
   .then(response => response.json())
   .then(accounts => {
     const datalist = document.getElementById('accountList');
@@ -470,7 +470,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
     }
 
     try {
-      const updateResponse = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+      const updateResponse = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -520,7 +520,7 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
       return;
     }
 
-    await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -538,7 +538,7 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
 }
 
 function loadCandidatesForCloseWin() {
-  fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates')
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates')
     .then(response => response.json())
     .then(candidates => {
       const datalist = document.getElementById('closeWinCandidates');
@@ -559,7 +559,7 @@ function closeCloseWinPopup() {
 }
 async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
   try {
-    const response = await fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
+    const response = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ opp_stage: newStage })

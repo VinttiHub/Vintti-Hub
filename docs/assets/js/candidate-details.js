@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
 
   // === Fetch candidate info ===
-fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
+fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   .then(response => response.json())
   .then(data => {
     const overviewFields = {
@@ -49,7 +49,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
         el.contentEditable = true;
         el.addEventListener('blur', () => {
           const updatedValue = el.innerText.trim();
-          fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [fieldName]: updatedValue })
@@ -63,7 +63,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       const textarea = document.getElementById(id);
       textarea.addEventListener('blur', () => {
         const field = id === 'redFlags' ? 'red_flags' : 'comments';
-        fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ [field]: textarea.value.trim() })
@@ -112,7 +112,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   });
 
 
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/resumes/${candidateId}`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`)
     .then(res => res.json())
     .then(data => {
       aboutP.innerText = data.about || '';
@@ -213,7 +213,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     const video_link = document.getElementById('videoLinkInput').value.trim();
 
-    fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -231,7 +231,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     const aiLinkedIn = document.getElementById('ai-linkedin');
 
     // Mostrar LinkedIn automáticamente en popup
-    fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       .then(response => response.json())
       .then(data => {
         aiLinkedIn.value = data.linkedin || '';
@@ -249,7 +249,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
         formData.append('pdf', pdfFile);
 
         // 1️⃣ Primero subir a S3
-        fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/upload_pdf', {
+        fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/upload_pdf', {
           method: 'POST',
           body: formData,
         })
@@ -259,7 +259,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           alert('PDF uploaded successfully!');
 
           // 2️⃣ Después enviar a Affinda
-          return fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/extract_pdf_affinda', {
+          return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/extract_pdf_affinda', {
             method: 'POST',
             body: formData
           });
@@ -281,14 +281,14 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       console.log('PDF File:', pdfFile);
       console.log('Comments:', comments);
       // 3️⃣ Obtener extract_cv_pdf y cv_pdf_s3 del backend
-      fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/resumes/${candidateId}`)
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`)
         .then(res => res.json())
         .then(data => {
           const extractCvPdf = data.extract_cv_pdf || '';
           const cvPdfS3 = data.cv_pdf_s3 || '';
 
           // 4️⃣ Enviar todo a ChatGPT a través de tu nuevo endpoint
-          return fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/generate_resume_fields', {
+          return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -304,7 +304,7 @@ fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           console.log('✅ AI completed:', aiData);
 
           // 5️⃣ Guardar automáticamente la respuesta en la tabla resume
-          return fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
+          return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -341,7 +341,7 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
 }
 function updateHireField(field, value) {
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ [field]: value })
@@ -408,7 +408,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 window.loadOpportunitiesForCandidate = function () {
   const candidateId = new URLSearchParams(window.location.search).get('id');
   if (!candidateId) return;
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
     .then(res => res.json())
     .then(data => {
       const tbody = document.querySelector("#opportunitiesTable tbody");
@@ -430,7 +430,7 @@ function loadHireData() {
   const candidateId = new URLSearchParams(window.location.search).get('id');
   if (!candidateId) return;
 
-  fetch(`https://hkvmyif7s2.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
     .then(res => res.json())
     .then(data => {
       document.getElementById('hire-salary').value = data.employee_salary || '';
