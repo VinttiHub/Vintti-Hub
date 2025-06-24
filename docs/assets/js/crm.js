@@ -1,24 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // 🌗 Modo claro / oscuro
-  const setTheme = (theme) => {
-    if (theme === 'light') {
-      document.body.classList.add('light-mode');
-      localStorage.setItem('theme', 'light');
-    } else {
-      document.body.classList.remove('light-mode');
-      localStorage.setItem('theme', 'dark');
-    }
-  };
-
-  setTheme('light');
-
-  setTimeout(() => {
-    const lightButtons = document.querySelectorAll('.theme-light');
-    const darkButtons = document.querySelectorAll('.theme-dark');
-
-    lightButtons.forEach(btn => btn.addEventListener('click', () => setTheme('light')));
-    darkButtons.forEach(btn => btn.addEventListener('click', () => setTheme('dark')));
-  }, 0);
 
   // 🔍 Toggle filtros
   const toggleButton = document.getElementById('toggleFilters');
