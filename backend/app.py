@@ -1407,7 +1407,16 @@ def handle_candidate_hire_data(candidate_id):
     
 @app.route("/send_email", methods=["POST", "OPTIONS"])
 def send_email():
+    logging.info(f"🔍 Método recibido: {request.method}")
+    logging.info(f"🔍 Content-Type recibido: {request.content_type}")
     logging.info("📨 Entrando a /send_email")
+    if request.method == "OPTIONS":
+        response = app.response_class(status=204)
+        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+        return response
     try:
         data = request.get_json()
         to_emails = data.get("to", [])  # lista de correos
