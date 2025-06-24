@@ -1441,7 +1441,10 @@ def send_email():
         return jsonify({"success": True})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error("❌ Error enviando correo: %s", e)
+        logging.error(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 
 @app.after_request
 def apply_cors_headers(response):
