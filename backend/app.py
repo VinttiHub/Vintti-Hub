@@ -18,6 +18,8 @@ from email.mime.multipart import MIMEMultipart
 from flask_cors import cross_origin
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Cc
+import requests
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1443,6 +1445,7 @@ def send_email():
             return response, 400
 
         try:
+            logging.info("📨 Preparando correo...")
             message = Mail(
                 from_email="angie@vintti.com",
                 to_emails=[To(email) for email in to_emails],
@@ -1453,23 +1456,25 @@ def send_email():
             if cc_emails:
                 message.cc = [Cc(email) for email in cc_emails]
 
+            ping = requests.get("https://api.sendgrid.com")
+            logging.info(f"🌐 Prueba de red a SendGrid: {ping.status_code}")
             sg = SendGridAPIClient(os.environ.get("SENDGRID_API_KEY"))
             sendgrid_response = sg.send(message)
 
             logging.info(f"✅ Correo enviado. Código de respuesta SendGrid: {sendgrid_response.status_code}")
+            logging.info(f"📬 Headers de respuesta: {sendgrid_response.headers}")
             response = jsonify({"status": "success", "code": sendgrid_response.status_code})
-            response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            return response
-
+        
         except Exception as mail_error:
             logging.error("❌ Error al enviar correo con SendGrid")
             logging.error(traceback.format_exc())
-            print("❌ Error SendGrid:", mail_error)
-            response = jsonify({'error': str(mail_error)})
-            response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            return response, 500
+            response = jsonify({'status': 'error', 'message': str(mail_error)})
+
+        # ✅ Siempre agrega headers CORS a la respuesta
+        response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+
 
     except Exception as general_error:
         logging.error("❌ Error general en /send_email")
