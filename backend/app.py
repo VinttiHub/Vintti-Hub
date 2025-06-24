@@ -45,7 +45,7 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 app.register_blueprint(bp_ai)
-CORS(app, supports_credentials=True, resources={r"/*": {"origins": "https://vinttihub.vintti.com"}})
+CORS(app, supports_credentials=True, origins=["https://vinttihub.vintti.com"])
 
 
 
@@ -1405,8 +1405,9 @@ def handle_candidate_hire_data(candidate_id):
         cursor.close()
         conn.close()
     
-@app.route("/send_email", methods=["POST"])
+@app.route("/send_email", methods=["POST", "OPTIONS"])
 def send_email():
+    logging.info("📨 Entrando a /send_email")
     try:
         data = request.get_json()
         to_emails = data.get("to", [])  # lista de correos
@@ -1436,7 +1437,6 @@ def send_email():
         logging.error("❌ Error enviando correo: %s", e)
         logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
-
 
 
 @app.after_request
