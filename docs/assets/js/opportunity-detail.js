@@ -214,7 +214,7 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
   try {
     const res = await fetch('https://hkvmyif7s2.us-east-2.awsapprunner.com/send_email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ to: toChoices, cc: ccChoices, subject, body: message })
     });
 
