@@ -19,8 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>Candidate</td>
             <td>${candidate.Name || candidate.name || '—'}</td>
             <td>${candidate.country || '—'}</td>
-            <td><button class="whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${candidate.phone}', '_blank')">Contact</button></td>
-            <td><button class="linkedin" onclick="event.stopPropagation(); window.open('${candidate.linkedin}', '_blank')">LinkedIn</button></td>
+            <td><button class="icon-button whatsapp" title="Enviar mensaje" onclick="...">
+              <i class='fab fa-whatsapp'></i>
+            </button></td>
+            <td><button class="icon-button linkedin" title="Ver perfil LinkedIn" onclick="...">
+              <i class='fab fa-linkedin-in'></i>
+            </button></td>
           </tr>
         `;
       });
@@ -47,14 +51,23 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Hacer clic en fila -> ir a detalles
-      document.querySelectorAll('#candidatesTableBody tr').forEach(row => {
-        row.addEventListener('click', () => {
-          const id = row.getAttribute('data-id');
-          if (id) {
+    document.querySelectorAll('#candidatesTableBody tr').forEach(row => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-id');
+        if (id) {
+          const clickSound = document.getElementById('click-sound');
+          if (clickSound) {
+            clickSound.play();
+            setTimeout(() => {
+              window.location.href = `candidate-details.html?id=${id}`;
+            }, 200); // Espera 200 ms para dejar sonar el clic
+          } else {
             window.location.href = `candidate-details.html?id=${id}`;
           }
-        });
+        }
       });
+    });
+
 
       // Filtros tipo Excel (activar después de DataTables)
       document.querySelectorAll('.column-filter').forEach(icon => {

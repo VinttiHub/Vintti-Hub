@@ -192,3 +192,77 @@ body {
     margin: 0;
 }
 
+.icon-button {
+  background-color: #eaf0ff;
+  border: none;
+  border-radius: 50%;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.3s, box-shadow 0.3s;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.icon-button i {
+  color: #0044ff;
+}
+
+.icon-button.whatsapp i {
+  color: #25D366;
+}
+
+.icon-button.linkedin i {
+  color: #0077b5;
+}
+
+.icon-button:hover {
+  transform: scale(1.1);
+  background-color: #dce9ff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+#candidatesTable tbody tr:hover {
+  box-shadow: 0 4px 16px rgba(0, 68, 255, 0.12);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+@keyframes fadeInSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#candidatesTable tbody tr {
+  animation: fadeInSlide 0.4s ease-in-out;
+}
+#candidatesTable tbody tr::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(to bottom, #0044ff, #25d366);
+  opacity: 0;
+  transition: opacity 0.3s;
+  border-radius: 5px 0 0 5px;
+}
+
+#candidatesTable tbody tr:hover::before {
+  opacity: 1;
+}
+#candidatesTable tbody tr {
+  background-color: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+.icon-button:hover {
+  transform: scale(1.2) rotate(1deg);
+}
