@@ -106,9 +106,6 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   document.getElementById('candidatePopup').classList.add('hidden');
 });
 
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  setTheme(savedTheme);
-
   const tabs = document.querySelectorAll('.nav-item');
   const sections = document.querySelectorAll('.detail-section');
   const indicator = document.querySelector('.nav-indicator');
@@ -158,12 +155,21 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
 
   // ✅ Cargar datos reales de la oportunidad
   loadOpportunityData();
-document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
+  document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
   document.getElementById('emailPopup').classList.remove('hidden');
 
-  const jobDesc = document.getElementById('job-description-textarea').value;
-  document.getElementById('email-message').value = jobDesc;
-  document.getElementById('email-subject').value = 'Job Description for Opportunity';
+  const jobDesc = document.getElementById('job-description-textarea').value || '—';
+  const clientName = document.getElementById('client-name-input').value || '—';
+  const positionName = document.getElementById('details-opportunity-name').value || '—';
+
+  // 📩 Mensaje
+  const message = `Hi\n\nJob description ready, please review:\n\n${jobDesc}`;
+  document.getElementById('email-message').value = message;
+
+  // 📝 Asunto
+  const subject = `${clientName} - ${positionName} - Job Description`;
+  document.getElementById('email-subject').value = subject;
+
 
   const toSelect = document.getElementById('email-to');
   const ccSelect = document.getElementById('email-cc');
@@ -189,6 +195,12 @@ document.querySelector('.job-header-right .header-btn').addEventListener('click'
 
 document.getElementById('closeEmailPopup').addEventListener('click', () => {
   document.getElementById('emailPopup').classList.add('hidden');
+  
+  // Limpiar campos del formulario
+  if (emailToChoices) emailToChoices.clearStore();
+  if (emailCcChoices) emailCcChoices.clearStore();
+  document.getElementById('email-subject').value = '';
+  document.getElementById('email-message').value = '';
 });
 
 const overlay = document.getElementById('email-overlay');
@@ -224,6 +236,13 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
       setTimeout(() => {
         overlay.classList.add('hidden');
         document.getElementById('emailPopup').classList.add('hidden');
+        
+        // Limpiar campos del formulario
+        if (emailToChoices) emailToChoices.clearStore();
+        if (emailCcChoices) emailCcChoices.clearStore();
+        document.getElementById('email-subject').value = '';
+        document.getElementById('email-message').value = '';
+
         btn.disabled = false;
       }, 2000);
     } else {
@@ -542,16 +561,6 @@ document.addEventListener("click", async (e) => {
       await updateOpportunityField('candidato_contratado', selectedCandidateId);
     });
 });
-
-function setTheme(theme) {
-  if (theme === 'light') {
-    document.body.classList.add('light-mode');
-    localStorage.setItem('theme', 'light');
-  } else {
-    document.body.classList.remove('light-mode');
-    localStorage.setItem('theme', 'dark');
-  }
-}
 
 async function loadOpportunityData() {
   const params = new URLSearchParams(window.location.search);

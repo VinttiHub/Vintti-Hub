@@ -1409,11 +1409,17 @@ def handle_candidate_hire_data(candidate_id):
 
 @app.after_request
 def apply_cors_headers(response):
-    response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+    origin = request.headers.get('Origin')
+    allowed_origins = ['https://vinttihub.vintti.com', 'http://localhost:5500', 'http://127.0.0.1:5500']
+    
+    if origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS,PATCH,DELETE'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
+
 
 from send_email_endpoint import register_send_email_route
 register_send_email_route(app)

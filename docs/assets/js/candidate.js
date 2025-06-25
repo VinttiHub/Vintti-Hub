@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
       rows += `
         <tr data-id="${candidate.candidate_id || ''}">
           <td>${candidate.condition || '—'}</td>
-          <td>${candidate.name || candidate.Name || '—'}</td>
+          <td>${candidate.full_name || candidate.name || candidate.Name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
             <button class="icon-button whatsapp" title="Enviar mensaje"
