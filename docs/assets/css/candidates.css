@@ -96,8 +96,7 @@ body {
 /* TABLE */
 #candidatesTable {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 8px;
+  border-collapse: collapse;
   background-color: #fff;
   border-radius: 20px;
   padding: 20px 30px;
@@ -237,4 +236,11 @@ body {
   .main-content {
     padding: 20px;
   }
+}
+#candidatesTable tbody td:first-child {
+  padding-left: 20px; /* ajusta según se necesite */
+  position: relative;
+}
+#candidatesTable tbody tr::before {
+  left: 10px; /* para que no pise el contenido */
 }
