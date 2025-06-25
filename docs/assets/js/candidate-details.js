@@ -30,7 +30,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
-  hireStartDate.addEventListener('blur', () => updateHireField('start_date', hireStartDate.value));
+  if (hireStartDate) {
+    hireStartDate.addEventListener('blur', () => updateHireField('start_date', hireStartDate.value));
+  }
 
   // === Fetch candidate info ===
 fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
