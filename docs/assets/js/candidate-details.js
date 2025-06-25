@@ -26,9 +26,11 @@ document.addEventListener("DOMContentLoaded", () => {
   videoLinkInput.addEventListener('blur', () => saveResume());
   const hireWorkingSchedule = document.getElementById('hire-working-schedule');
   const hirePTO = document.getElementById('hire-pto');
+  const hireStartDate = document.getElementById('hire-start-date');
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
+  hireStartDate.addEventListener('blur', () => updateHireField('start_date', hireStartDate.value));
 
   // === Fetch candidate info ===
 fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
@@ -537,5 +539,6 @@ function loadHireData() {
       document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
       document.getElementById('hire-working-schedule').value = data.working_schedule || '';
       document.getElementById('hire-pto').value = data.pto || '';
+      document.getElementById('hire-start-date').value = data.start_date || '';
     });
 }
