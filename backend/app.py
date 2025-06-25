@@ -1022,7 +1022,7 @@ def generate_resume_fields():
         )
         print("🟢 OpenAI respondió:")
         print(completion)
-        response_text = completion['choices'][0]['message']['content']
+        response_text = completion.choices[0].message.content
         print("🟢 Respuesta de OpenAI:")
         print(response_text)
 
@@ -1454,12 +1454,11 @@ def create_salary_update(candidate_id):
 
         cur.execute("SELECT COALESCE(MAX(update_id), 0) FROM salary_updates")
         new_id = cur.fetchone()[0] + 1
-        now = datetime.now()
-
+        date = data.get('date') or datetime.now().strftime('%Y-%m-%d')
         cur.execute("""
             INSERT INTO salary_updates (update_id, candidate_id, salary, fee, date)
             VALUES (%s, %s, %s, %s, %s)
-        """, (new_id, candidate_id, salary, fee, now))
+        """, (new_id, candidate_id, salary, fee, date))
         conn.commit()
         cur.close(); conn.close()
         return jsonify({'success': True, 'update_id': new_id})

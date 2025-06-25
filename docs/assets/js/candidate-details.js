@@ -363,10 +363,32 @@ function updateHireField(field, value) {
 }
 
 [hireSalary, hireFee].forEach(input => {
-  input.addEventListener('blur', () => {
-    updateHireField(input.id === 'hire-salary' ? 'employee_salary' : 'employee_fee', Number(input.value));
+  input.addEventListener('blur', async () => {
+    const salary = Number(hireSalary.value);
+    const fee = Number(hireFee.value);
+    if (!salary || !fee) return;
+
+    // 1️⃣ Guardar valores en tabla candidates
+    const field = input.id === 'hire-salary' ? 'employee_salary' : 'employee_fee';
+    await updateHireField(field, Number(input.value));
+
+    // 2️⃣ Verifica si ambos están completos
+    if (!isNaN(salary) && !isNaN(fee) && salary > 0 && fee > 0) {
+      // 3️⃣ Obtener fecha actual de tabla candidates
+      const candidateRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`);
+      const candidateData = await candidateRes.json();
+      const date = candidateData.startingdate || new Date().toISOString().slice(0, 10);
+
+      // 4️⃣ Crear entrada en salary_updates
+      await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salary, fee, date })
+      }).then(() => loadSalaryUpdates());
+    }
   });
 });
+
 
 hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
 hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.value));
@@ -428,19 +450,22 @@ addSalaryUpdateBtn.addEventListener('click', () => {
 saveUpdateBtn.addEventListener('click', () => {
   const salary = parseFloat(salaryInput.value);
   const fee = parseFloat(feeInput.value);
-  if (!salary || !fee) return alert('Please fill both fields');
+  const date = document.getElementById('update-date').value;
+  if (!salary || !fee || !date) return alert('Please fill all fields');
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ salary, fee })
+    body: JSON.stringify({ salary, fee, date })
   }).then(() => {
     popup.classList.add('hidden');
     salaryInput.value = '';
     feeInput.value = '';
+    document.getElementById('update-date').value = '';
     loadSalaryUpdates();
   });
 });
+
 
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadSalaryUpdates();
