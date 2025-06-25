@@ -1008,7 +1008,10 @@ def generate_resume_fields():
     print(prompt[:1000])  # solo para evitar saturar logs
 
     try:
-        completion = openai.ChatCompletion.create(
+        print("🟡 Enviando prompt a OpenAI...")
+        print("Prompt preview:")
+        print(prompt[:500])
+        completion = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are an expert assistant specialized in resume generation."},
@@ -1017,7 +1020,8 @@ def generate_resume_fields():
             temperature=0.7,
             max_tokens=800
         )
-
+        print("🟢 OpenAI respondió:")
+        print(completion)
         response_text = completion['choices'][0]['message']['content']
         print("🟢 Respuesta de OpenAI:")
         print(response_text)
@@ -1030,12 +1034,15 @@ def generate_resume_fields():
             print(response_text)
             response_text_clean = response_text.strip('```json').strip('```').strip()
             ai_data = json.loads(response_text_clean)
-
+        print("🟢 JSON generado por OpenAI:")
+        print(ai_data)
 
         return jsonify(ai_data)
 
     except Exception as e:
         print("❌ Error in generate_resume_fields:", str(e))
+        print("❌ Error en generate_resume_fields:")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @app.route('/opportunities/<opportunity_id>/batches', methods=['POST'])
