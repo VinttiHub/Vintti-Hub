@@ -19,7 +19,7 @@ from flask_cors import cross_origin
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Cc
 import requests
-
+from datetime import datetime
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1423,6 +1423,61 @@ def apply_cors_headers(response):
 
 from send_email_endpoint import register_send_email_route
 register_send_email_route(app)
+
+@app.route('/candidates/<int:candidate_id>/salary_updates', methods=['GET'])
+def get_salary_updates(candidate_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT update_id, salary, fee, date
+            FROM salary_updates
+            WHERE candidate_id = %s
+            ORDER BY date DESC
+        """, (candidate_id,))
+        updates = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+        result = [dict(zip(colnames, row)) for row in updates]
+        cur.close(); conn.close()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/candidates/<int:candidate_id>/salary_updates', methods=['POST'])
+def create_salary_update(candidate_id):
+    data = request.get_json()
+    salary = data.get('salary')
+    fee = data.get('fee')
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("SELECT COALESCE(MAX(update_id), 0) FROM salary_updates")
+        new_id = cur.fetchone()[0] + 1
+        now = datetime.now()
+
+        cur.execute("""
+            INSERT INTO salary_updates (update_id, candidate_id, salary, fee, date)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (new_id, candidate_id, salary, fee, now))
+        conn.commit()
+        cur.close(); conn.close()
+        return jsonify({'success': True, 'update_id': new_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/salary_updates/<int:update_id>', methods=['DELETE'])
+def delete_salary_update(update_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM salary_updates WHERE update_id = %s", (update_id,))
+        conn.commit()
+        cur.close(); conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

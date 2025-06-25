@@ -230,6 +230,23 @@
       <label for="hire-extraperks">Extra Perks</label>
       <textarea id="hire-extraperks" placeholder="Extra perks..."></textarea>
     </div>
+    <section class="cv-section">
+  <h2 class="cv-heading">Salary Updates</h2>
+  <div id="salary-updates-box" class="cv-card">
+    <!-- Fetched salary updates will appear here -->
+  </div>
+  <button id="add-salary-update">➕ New Update</button>
+  </section>
+
+  <!-- SALARY UPDATE POPUP -->
+  <div id="salary-update-popup" class="popup hidden">
+    <h3>New Salary Update</h3>
+    <label>Salary ($)</label>
+    <input type="number" id="update-salary" placeholder="$" />
+    <label>Fee ($)</label>
+    <input type="number" id="update-fee" placeholder="$" />
+    <button id="save-salary-update">Save</button>
+  </div>
   </div>
 </div>
 

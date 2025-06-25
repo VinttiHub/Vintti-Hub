@@ -654,3 +654,95 @@ a {
     opacity: 0;
   }
 }
+/* Salary Updates Section */
+#salary-updates-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 1rem;
+  background: #fff7f0;
+  border: 1px solid #e0cfc0;
+  border-radius: 16px;
+  margin-bottom: 1rem;
+}
+
+.salary-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fef5eb;
+  border: 1px solid #ecd9c5;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  color: #4b3b2a;
+}
+
+.salary-entry button {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #d14b4b;
+}
+
+/* Add New Update Button */
+#add-salary-update {
+  background-color: #9ed6b5;
+  color: #1f4437;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+#add-salary-update:hover {
+  background-color: #81c7a1;
+}
+
+/* Salary Update Popup */
+#salary-update-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff9f6;
+  padding: 1.5rem;
+  border: 1px solid #dfcfc2;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 300px;
+}
+
+#salary-update-popup input {
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid #d8c4b4;
+  font-size: 0.95rem;
+}
+
+#salary-update-popup button {
+  background-color: #ffb88c;
+  color: #44260e;
+  border: none;
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+#salary-update-popup button:hover {
+  background-color: #ffa466;
+}
+
+/* Hidden Utility */
+.hidden {
+  display: none !important;
+}

@@ -373,6 +373,64 @@ if (hash === '#hire') {
     setTimeout(() => msg.remove(), 6000);
   }
 }
+// === SALARY UPDATES ===
+const salaryUpdatesBox = document.getElementById('salary-updates-box');
+const addSalaryUpdateBtn = document.getElementById('add-salary-update');
+const popup = document.getElementById('salary-update-popup');
+const saveUpdateBtn = document.getElementById('save-salary-update');
+const salaryInput = document.getElementById('update-salary');
+const feeInput = document.getElementById('update-fee');
+
+function loadSalaryUpdates() {
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`)
+    .then(res => res.json())
+    .then(data => {
+      salaryUpdatesBox.innerHTML = '';
+      data.forEach(update => {
+        const div = document.createElement('div');
+        div.className = 'salary-entry';
+        div.innerHTML = `
+          <span>💰 Salary updated to $${update.salary}, Fee to $${update.fee} on ${new Date(update.date).toLocaleDateString()}</span>
+          <button data-id="${update.update_id}" class="delete-salary-update">🗑️</button>
+        `;
+        salaryUpdatesBox.appendChild(div);
+      });
+
+      document.querySelectorAll('.delete-salary-update').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/salary_updates/${id}`, {
+            method: 'DELETE'
+          }).then(() => loadSalaryUpdates());
+        });
+      });
+    });
+}
+
+addSalaryUpdateBtn.addEventListener('click', () => {
+  popup.classList.remove('hidden');
+});
+
+saveUpdateBtn.addEventListener('click', () => {
+  const salary = parseFloat(salaryInput.value);
+  const fee = parseFloat(feeInput.value);
+  if (!salary || !fee) return alert('Please fill both fields');
+
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ salary, fee })
+  }).then(() => {
+    popup.classList.add('hidden');
+    salaryInput.value = '';
+    feeInput.value = '';
+    loadSalaryUpdates();
+  });
+});
+
+if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
+  loadSalaryUpdates();
+}
 
 });
 
