@@ -20,6 +20,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Cc
 import requests
 from datetime import datetime
+import json
 
 logging.basicConfig(
     level=logging.INFO,
@@ -931,78 +932,80 @@ def generate_resume_fields():
     cursor.close()
     conn.close()
     # Construir el prompt
+
     prompt = f"""
-You are an expert resume assistant. You will generate structured resume data in JSON format based on the following information:
+    You are an expert resume assistant. You will generate structured resume data in JSON format based on the following information:
 
-EXTRACTED_CV_PDF (Affinda or other CV extract): 
-{extract_cv_pdf}
+    EXTRACTED_CV_PDF (Affinda or other CV extract): 
+    {extract_cv_pdf}
 
-CV_PDF_S3 (Link to the original PDF):
-{cv_pdf_s3}
+    CV_PDF_S3 (Link to the original PDF):
+    {cv_pdf_s3}
 
-LINKEDIN_JSON (Extracted using Proxycurl):
-{linkedin_json}
+    LINKEDIN_JSON (Extracted using Proxycurl):
+    {linkedin_json}
 
-Additional user comments:
-{comments}
+    Additional user comments:
+    {comments}
 
-Please generate the following in ENGLISH:
-1. ABOUT: a professional summary paragraph.
-2. WORK_EXPERIENCE: a JSON array of objects with fields:
-   - title
-   - company
-   - start_date (YYYY-MM-DD or empty)
-   - end_date (YYYY-MM-DD or empty)
-   - current (true or false)
-   - description
+    Please generate the following in ENGLISH:
+    1. ABOUT: a professional summary paragraph.
+    2. WORK_EXPERIENCE: a JSON array of objects with fields:
+    - title
+    - company
+    - start_date (YYYY-MM-DD or empty)
+    - end_date (YYYY-MM-DD or empty)
+    - current (true or false)
+    - description
 
-3. EDUCATION: a JSON array of objects with fields:
-   - institution
-   - start_date (YYYY-MM-DD or empty)
-   - end_date (YYYY-MM-DD or empty)
-   - current (true or false)
-   - description
+    3. EDUCATION: a JSON array of objects with fields:
+    - institution
+    - start_date (YYYY-MM-DD or empty)
+    - end_date (YYYY-MM-DD or empty)
+    - current (true or false)
+    - description
 
-4. TOOLS: a JSON array of objects with fields:
-   - tool
-   - level (Basic, Intermediate, Advanced)
+    4. TOOLS: a JSON array of objects with fields:
+    - tool
+    - level (Basic, Intermediate, Advanced)
 
-Please respond in strict JSON format. Example:
+    Please respond in strict JSON format. Example:
 
-{
-  "about": "Experienced software engineer with a strong background in full-stack development and cloud technologies.",
-  "work_experience": [
-    {
-      "title": "Software Engineer",
-      "company": "Tech Corp",
-      "start_date": "2022-01-01",
-      "end_date": "",
-      "current": true,
-      "description": "Developed and maintained web applications using Python and React."
-    }
-  ],
-  "education": [
-    {
-      "institution": "University of Technology",
-      "start_date": "2018-09-01",
-      "end_date": "2022-06-01",
-      "current": false,
-      "description": "Bachelor's Degree in Computer Science."
-    }
-  ],
-  "tools": [
-    {
-      "tool": "Python",
-      "level": "Advanced"
-    },
-    {
-      "tool": "React",
-      "level": "Intermediate"
-    }
-  ]
-}
-
-"""
+    {{  
+    "about": "Experienced software engineer with a strong background in full-stack development and cloud technologies.",
+    "work_experience": [
+        {{
+        "title": "Software Engineer",
+        "company": "Tech Corp",
+        "start_date": "2022-01-01",
+        "end_date": "",
+        "current": true,
+        "description": "Developed and maintained web applications using Python and React."
+        }}
+    ],
+    "education": [
+        {{
+        "institution": "University of Technology",
+        "start_date": "2018-09-01",
+        "end_date": "2022-06-01",
+        "current": false,
+        "description": "Bachelor's Degree in Computer Science."
+        }}
+    ],
+    "tools": [
+        {{
+        "tool": "Python",
+        "level": "Advanced"
+        }},
+        {{
+        "tool": "React",
+        "level": "Intermediate"
+        }}
+    ]
+    }}
+    """
+    print("🧠 Prompt construido para resume:")
+    print(prompt[:1000])  # solo para evitar saturar logs
 
     try:
         completion = openai.ChatCompletion.create(
@@ -1016,14 +1019,18 @@ Please respond in strict JSON format. Example:
         )
 
         response_text = completion['choices'][0]['message']['content']
+        print("🟢 Respuesta de OpenAI:")
+        print(response_text)
 
         # intentar parsear como JSON
         try:
             ai_data = json.loads(response_text)
         except json.JSONDecodeError:
-            # fallback simple por si responde con ```json ... ```
+            print("❌ Error al parsear JSON:")
+            print(response_text)
             response_text_clean = response_text.strip('```json').strip('```').strip()
             ai_data = json.loads(response_text_clean)
+
 
         return jsonify(ai_data)
 
