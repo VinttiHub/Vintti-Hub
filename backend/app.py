@@ -785,77 +785,50 @@ def update_resume(candidate_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
-@app.route('/extract_linkedin', methods=['POST'])
-def extract_linkedin():
+@app.route('/extract_linkedin_proxycurl', methods=['POST'])
+def extract_linkedin_proxycurl():
+    data = request.json
+    linkedin_url = data.get("linkedin_url")
+    candidate_id = data.get("candidate_id")
+
+    if not linkedin_url or not candidate_id:
+        return jsonify({"error": "linkedin_url and candidate_id required"}), 400
+
     try:
-        data = request.json
-        resume_id = data.get('resume_id')  # el id de la fila en tu tabla resume
+        headers = {
+            "Authorization": f"Bearer {PROXYCURL_API_KEY}"
+        }
 
-        if not resume_id:
-            return jsonify({'error': 'resume_id is required'}), 400
-
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        # Obtener el candidate_id asociado al resume
-        cursor.execute("""
-            SELECT candidate_id FROM resume WHERE id = %s
-        """, (resume_id,))
-        result = cursor.fetchone()
-
-        if not result:
-            cursor.close()
-            conn.close()
-            return jsonify({'error': 'Resume not found'}), 404
-
-        candidate_id = result[0]
-
-        # Obtener el linkedin_url del candidate
-        cursor.execute("""
-            SELECT linkedin FROM candidates WHERE id = %s
-        """, (candidate_id,))
-        result = cursor.fetchone()
-
-        if not result or not result[0]:
-            cursor.close()
-            conn.close()
-            return jsonify({'error': 'LinkedIn URL not found for candidate'}), 404
-
-        linkedin_url = result[0]
-
-        # Llamar a Outscraper
-        api_key = 'TU_API_KEY'  # reemplaza por tu API key real
+        params = {
+            "url": linkedin_url,
+            "use_cache": "if-present"
+        }
 
         response = requests.get(
-            'https://api.app.outscraper.com/v1/linkedin-profiles',
-            params={
-                'queries': linkedin_url,
-                'api_key': api_key
-            }
+            "https://nubela.co/proxycurl/api/v2/linkedin",
+            headers=headers,
+            params=params
         )
 
         if response.status_code != 200:
-            cursor.close()
-            conn.close()
-            return jsonify({'error': 'Error calling Outscraper', 'status_code': response.status_code}), 500
+            return jsonify({"error": "Failed to extract from Proxycurl", "status_code": response.status_code}), 500
 
         linkedin_data = response.json()
 
-        # Guardar el JSON en extract_linkedin
+        conn = get_connection()
+        cursor = conn.cursor()
         cursor.execute("""
-            UPDATE resume
-            SET extract_linkedin = %s
-            WHERE id = %s
-        """, (json.dumps(linkedin_data), resume_id))
-
+            UPDATE resume SET extract_linkedin = %s WHERE candidate_id = %s
+        """, (json.dumps(linkedin_data), candidate_id))
         conn.commit()
         cursor.close()
         conn.close()
 
-        return jsonify({'success': True, 'linkedin_data': linkedin_data})
-
+        return jsonify({"success": True, "linkedin_data": linkedin_data})
+    
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
     
 @app.route('/upload_pdf', methods=['POST'])
 def upload_pdf():
@@ -947,7 +920,16 @@ def generate_resume_fields():
     extract_cv_pdf = data.get('extract_cv_pdf', '')
     cv_pdf_s3 = data.get('cv_pdf_s3', '')
     comments = data.get('comments', '')
-
+    # Obtener extract_linkedin desde la base de datos
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT extract_linkedin FROM resume WHERE candidate_id = %s
+    """, (candidate_id,))
+    linkedin_row = cursor.fetchone()
+    linkedin_json = linkedin_row[0] if linkedin_row else ''
+    cursor.close()
+    conn.close()
     # Construir el prompt
     prompt = f"""
 You are an expert resume assistant. You will generate structured resume data in JSON format based on the following information:
@@ -955,8 +937,11 @@ You are an expert resume assistant. You will generate structured resume data in 
 EXTRACTED_CV_PDF (Affinda or other CV extract): 
 {extract_cv_pdf}
 
-CV_PDF_S3 (LinkedIn or PDF extract):
+CV_PDF_S3 (Link to the original PDF):
 {cv_pdf_s3}
+
+LINKEDIN_JSON (Extracted using Proxycurl):
+{linkedin_json}
 
 Additional user comments:
 {comments}
