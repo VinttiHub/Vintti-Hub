@@ -106,6 +106,9 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   document.getElementById('candidatePopup').classList.add('hidden');
 });
 
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  setTheme(savedTheme);
+
   const tabs = document.querySelectorAll('.nav-item');
   const sections = document.querySelectorAll('.detail-section');
   const indicator = document.querySelector('.nav-indicator');
@@ -561,6 +564,16 @@ document.addEventListener("click", async (e) => {
       await updateOpportunityField('candidato_contratado', selectedCandidateId);
     });
 });
+
+function setTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('light-mode');
+    localStorage.setItem('theme', 'light');
+  } else {
+    document.body.classList.remove('light-mode');
+    localStorage.setItem('theme', 'dark');
+  }
+}
 
 async function loadOpportunityData() {
   const params = new URLSearchParams(window.location.search);
