@@ -368,6 +368,38 @@
   </div>
 </div>
 
+<!-- Sign Off Popup -->
+<div id="signOffPopup" class="popup hidden">
+  <div class="popup-content email-popup-content">
+    <span class="close-btn" id="closeSignOffPopup">&times;</span>
+    <h2>Send Rejection Email</h2>
+
+    <label>To</label>
+    <select id="signoff-to" multiple></select>
+
+    <label>Subject</label>
+    <input type="text" id="signoff-subject" value="Update on your application" />
+
+    <label>Message</label>
+    <textarea id="signoff-message" style="height: 200px;">Dear applicant,
+
+Thank you so much for being part of our process at Vintti. After careful consideration, we’ve decided to move forward with another candidate.
+
+We truly appreciate your time and interest!
+If you'd like to share your experience with the selection process, here’s a short anonymous survey (under 3 minutes):
+🔗 https://tally.so/r/w7K859
+
+Wishing you all the best in your journey! ✨
+Warmly,
+the Vintti team</textarea>
+
+    <div style="margin-top: 10px;">
+      <button id="toggleLangBtn">Cambiar a español</button>
+    </div>
+
+    <button id="sendSignOffBtn">Send</button>
+  </div>
+</div>
 
 <script src="./assets/js/opportunity-detail.js"></script>
 </body>

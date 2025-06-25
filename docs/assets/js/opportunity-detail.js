@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('createCandidateBtn').addEventListener('click', () => {
   document.getElementById('chooseCandidateActionPopup').classList.remove('hidden');
 });
+document.getElementById('closeSignOffPopup').addEventListener('click', () => {
+  document.getElementById('signOffPopup').classList.add('hidden');
+});
 
 // 🔹 Cerrar popup de elección
 document.getElementById('closeChoosePopup').addEventListener('click', () => {
@@ -563,6 +566,71 @@ document.addEventListener("click", async (e) => {
       const selectedCandidateId = e.target.value;
       await updateOpportunityField('candidato_contratado', selectedCandidateId);
     });
+    document.getElementById('signOffBtn').addEventListener('click', async () => {
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (!opportunityId) return;
+
+  document.getElementById('signOffPopup').classList.remove('hidden');
+
+  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
+  const candidates = await res.json();
+
+  const select = document.getElementById('signoff-to');
+  select.innerHTML = '';
+  candidates.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.email;
+    opt.textContent = c.name;
+    select.appendChild(opt);
+  });
+
+  if (window.signoffChoices) window.signoffChoices.destroy();
+  window.signoffChoices = new Choices(select, { removeItemButton: true });
+});
+let isSpanish = false;
+document.getElementById('toggleLangBtn').addEventListener('click', () => {
+  const subject = document.getElementById('signoff-subject');
+  const message = document.getElementById('signoff-message');
+
+  if (!isSpanish) {
+    subject.value = 'Actualización sobre tu aplicación';
+    message.value = `Querido candidato,\n\nGracias por haber participado en nuestro proceso en Vintti. Tras una cuidadosa evaluación, hemos decidido continuar con otro candidato.\n\n¡Apreciamos mucho tu tiempo e interés!\nSi deseas compartir tu experiencia con el proceso de selección, aquí hay una encuesta anónima muy corta (menos de 3 minutos):\n🔗 https://tally.so/r/w7K859\n\n¡Te deseamos lo mejor en tu camino! ✨\nCon cariño,\nel equipo de Vintti`;
+  } else {
+    subject.value = 'Update on your application';
+    message.value = `Dear applicant,\n\nThank you so much for being part of our process at Vintti. After careful consideration, we’ve decided to move forward with another candidate.\n\nWe truly appreciate your time and interest!\nIf you'd like to share your experience with the selection process, here’s a short anonymous survey (under 3 minutes):\n🔗 https://tally.so/r/w7K859\n\nWishing you all the best in your journey! ✨\nWarmly,\nthe Vintti team`;
+  }
+  isSpanish = !isSpanish;
+});
+document.getElementById('sendSignOffBtn').addEventListener('click', async () => {
+  const to = signoffChoices.getValue().map(o => o.value);
+  const subject = document.getElementById('signoff-subject').value;
+  const body = document.getElementById('signoff-message').value;
+
+  if (!to.length || !subject || !body) {
+    alert("❌ Fill in all fields");
+    return;
+  }
+
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body })
+    });
+
+    if (res.ok) {
+      alert("✅ Email sent successfully");
+      document.getElementById('signOffPopup').classList.add('hidden');
+    } else {
+      const err = await res.json();
+      alert("❌ Error: " + err.detail || err.error);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("❌ Failed to send email");
+  }
+});
+
 });
 
 function setTheme(theme) {
