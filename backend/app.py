@@ -878,40 +878,47 @@ def upload_pdf():
     
 @app.route('/extract_pdf_affinda', methods=['POST'])
 def extract_pdf_affinda():
-  candidate_id = request.form.get('candidate_id')
-  pdf_file = request.files.get('pdf')
-  if not candidate_id or not pdf_file:
-    return jsonify({"error": "candidate_id and pdf required"}), 400
+    candidate_id = request.form.get('candidate_id')
+    pdf_file = request.files.get('pdf')
 
-  try:
-    # 1. Cargar a Affinda
-    doc = affinda.create_document(
-      file=pdf_file,
-      workspace=WORKSPACE_ID,
-      document_type=DOC_TYPE_ID,
-      wait=True
-    )
-    data = doc.data  # JSON con campos extraídos
+    if not candidate_id or not pdf_file:
+        print("❌ candidate_id o PDF faltante")
+        return jsonify({"error": "candidate_id and pdf required"}), 400
 
-    # 2. Convertir JSON a string
-    data_str = json.dumps(data)
+    try:
+        print("📤 Subiendo PDF a Affinda...")
+        doc = affinda.create_document(
+            file=pdf_file,
+            workspace=WORKSPACE_ID,
+            document_type=DOC_TYPE_ID,
+            wait=True
+        )
+        data = doc.data
+        print("✅ Extracción exitosa:")
+        print(str(data)[:1000])  # limitar por si es muy largo
 
-    # 3. Guardar en base de datos
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-      UPDATE resume
-      SET extract_cv_pdf = %s
-      WHERE candidate_id = %s
-    """, (data_str, candidate_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
+        # Guardar en base de datos
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE resume
+            SET extract_cv_pdf = %s
+            WHERE candidate_id = %s
+        """, (json.dumps(data), candidate_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
 
-    return jsonify({"success": True, "extracted": data}), 200
+        return jsonify({"success": True, "extracted": data}), 200
 
-  except Exception as e:
-    return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        print("❌ ERROR en Affinda:")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+  
+
+
 @app.route('/generate_resume_fields', methods=['POST'])
 def generate_resume_fields():
     data = request.json
