@@ -351,6 +351,18 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   if (document.querySelector('.tab.active')?.dataset.tab === 'opportunities') {
     loadOpportunitiesForCandidate();
   }
+  // Verifica si el candidato está contratado y oculta la pestaña Hire si no lo está
+fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/is_hired`)
+  .then(res => res.json())
+  .then(data => {
+    if (!data.is_hired) {
+      const hireTab = document.querySelector('.tab[data-tab="hire"]');
+      const hireContent = document.getElementById('hire');
+      if (hireTab) hireTab.style.display = 'none';
+      if (hireContent) hireContent.style.display = 'none';
+    }
+  });
+
   const hireSalary = document.getElementById('hire-salary');
 const hireFee = document.getElementById('hire-fee');
 const hireRevenue = document.getElementById('hire-revenue');

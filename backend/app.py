@@ -1479,6 +1479,20 @@ def delete_salary_update(update_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/candidates/<int:candidate_id>/is_hired')
+def is_candidate_hired(candidate_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 1 FROM opportunity WHERE candidato_contratado = %s LIMIT 1
+        """, (candidate_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return jsonify({'is_hired': bool(result)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
