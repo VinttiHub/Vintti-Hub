@@ -110,8 +110,8 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     document.getElementById('redFlags').value = data.red_flags || '';
     document.getElementById('comments').value = data.comments || '';
-    document.getElementById("field-created-by").textContent = candidate.created_by || '—';
-    document.getElementById("field-created-at").textContent = candidate.created_at ? new Date(candidate.created_at).toLocaleString() : '—';
+    document.getElementById("field-created-by").textContent = data.created_by || '—';
+    document.getElementById("field-created-at").textContent = data.created_at ? new Date(data.created_at).toLocaleString() : '—';
   })
   .catch(err => {
     console.error('❌ Error fetching candidate:', err);
