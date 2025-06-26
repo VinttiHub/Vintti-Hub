@@ -10,7 +10,6 @@ import openai
 import httpx
 import traceback
 import logging
-from ai_basic import bp_ai
 import psycopg2
 import smtplib
 from email.mime.text import MIMEText
@@ -47,9 +46,6 @@ s3_client = boto3.client(
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
-app.register_blueprint(bp_ai)
-
-
 
 def get_connection():
     return psycopg2.connect(
@@ -1459,26 +1455,43 @@ def get_salary_updates(candidate_id):
 
 @app.route('/candidates/<int:candidate_id>/salary_updates', methods=['POST'])
 def create_salary_update(candidate_id):
-    data = request.get_json()
-    salary = data.get('salary')
-    fee = data.get('fee')
-
     try:
+        logging.info(f"📩 POST /candidates/{candidate_id}/salary_updates")
+
+        data = request.get_json()
+        logging.info(f"📥 Datos recibidos: {data}")
+
+        salary = data.get('salary')
+        fee = data.get('fee')
+        date = data.get('date') or datetime.now().strftime('%Y-%m-%d')
+
+        if salary is None or fee is None:
+            logging.error("❌ Faltan salary o fee en la solicitud")
+            return jsonify({'error': 'Missing salary or fee'}), 400
+
         conn = get_connection()
         cur = conn.cursor()
 
         cur.execute("SELECT COALESCE(MAX(update_id), 0) FROM salary_updates")
         new_id = cur.fetchone()[0] + 1
-        date = data.get('date') or datetime.now().strftime('%Y-%m-%d')
+
         cur.execute("""
             INSERT INTO salary_updates (update_id, candidate_id, salary, fee, date)
             VALUES (%s, %s, %s, %s, %s)
         """, (new_id, candidate_id, salary, fee, date))
+
         conn.commit()
-        cur.close(); conn.close()
+        cur.close()
+        conn.close()
+
+        logging.info(f"✅ Update creado: ID {new_id}, salary {salary}, fee {fee}, date {date}")
         return jsonify({'success': True, 'update_id': new_id})
+
     except Exception as e:
+        logging.error("❌ ERROR en POST /salary_updates:")
+        logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/salary_updates/<int:update_id>', methods=['DELETE'])
 def delete_salary_update(update_id):
