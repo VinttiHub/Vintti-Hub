@@ -110,6 +110,8 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     document.getElementById('redFlags').value = data.red_flags || '';
     document.getElementById('comments').value = data.comments || '';
+    document.getElementById("field-created-by").textContent = candidate.created_by || '—';
+    document.getElementById("field-created-at").textContent = candidate.created_at ? new Date(candidate.created_at).toLocaleString() : '—';
   })
   .catch(err => {
     console.error('❌ Error fetching candidate:', err);
@@ -543,4 +545,61 @@ function loadHireData() {
       document.getElementById('hire-pto').value = data.pto || '';
       document.getElementById('hire-start-date').value = data.start_date || '';
     });
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
+  .then(res => res.json())
+  .then(data => {
+    const model = data[0]?.opp_model;
+    if (model) {
+      document.getElementById('opp-model-pill').textContent = `Model: ${model}`;
+      adaptHireFieldsByModel(model);
+    }
+  });
+
+}
+function adaptHireFieldsByModel(model) {
+  const feeField = document.getElementById('hire-fee').closest('.field');
+  const revenueInput = document.getElementById('hire-revenue');
+
+  if (model.toLowerCase() === 'recruiting') {
+    // Oculta el campo fee
+    feeField.style.display = 'none';
+
+    // Hace revenue editable
+    revenueInput.disabled = false;
+
+    // Actualizar ambos con blur
+    ['hire-salary', 'hire-revenue'].forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('blur', () => {
+        const field = id === 'hire-salary' ? 'employee_salary' : 'employee_revenue';
+        updateHireField(field, el.value);
+      });
+    });
+
+  } else if (model.toLowerCase() === 'staffing') {
+    // Mostrar fee
+    feeField.style.display = 'block';
+
+    // Desactiva edición manual en revenue
+    revenueInput.disabled = true;
+
+    // Calcular revenue automáticamente
+    ['hire-salary', 'hire-fee'].forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('blur', async () => {
+        const salary = Number(document.getElementById('hire-salary').value);
+        const fee = Number(document.getElementById('hire-fee').value);
+        if (!salary || !fee) return;
+
+        // Actualiza campos individuales
+        const field = id === 'hire-salary' ? 'employee_salary' : 'employee_fee';
+        await updateHireField(field, el.value);
+
+        const revenue = salary + fee;
+        document.getElementById('hire-revenue').value = revenue;
+
+        await updateHireField('employee_revenue', revenue);
+      });
+    });
+  }
 }

@@ -498,7 +498,9 @@ def get_candidate_by_id(candidate_id):
                 english_level,
                 salary_range,
                 red_flags,
-                comments
+                comments,
+                created_by,
+                created_at
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))
@@ -1184,17 +1186,17 @@ def link_or_create_candidate(opportunity_id):
             new_candidate_id = max_id + 1
             created_by = data.get('created_by')
             # Insertar en tabla candidates SIN opportunity_id
+            created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("""
                 INSERT INTO candidates (
                     candidate_id, name, email, phone, linkedin,
-                    red_flags, comments, english_level, salary_range, country, stage, created_by
+                    red_flags, comments, english_level, salary_range, country, stage, created_by, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 new_candidate_id, name, email, phone, linkedin,
-                red_flags, comments, english_level, salary_range, country, stage, created_by
+                red_flags, comments, english_level, salary_range, country, stage, created_by, created_at
             ))
-
             # Insertar en tabla intermedia
             cursor.execute("""
                 INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
@@ -1380,7 +1382,7 @@ def handle_candidate_hire_data(candidate_id):
 
         if request.method == 'PATCH':
             data = request.get_json()
-            allowed_fields = ['employee_salary', 'employee_fee', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
+            allowed_fields = ['employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
             updates = []
             values = []
 

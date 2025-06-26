@@ -746,3 +746,13 @@ a {
 .hidden {
   display: none !important;
 }
+.pill {
+  background-color: #e0e0e0;
+  color: #333;
+  padding: 6px 12px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-block;
+  margin-bottom: 12px;
+}
