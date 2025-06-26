@@ -268,7 +268,8 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
         .then(response => response.json())
         .then(data => {
           console.log('✅ PDF uploaded:', data.pdf_url);
-          alert('PDF uploaded successfully!');
+          document.getElementById('ai-loader').classList.remove('hidden');
+
 
           // 2️⃣ Después enviar a Affinda
           return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/extract_pdf_affinda', {
@@ -341,14 +342,16 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
             })
           });
         })
-        .then(() => {
-          alert('Resume fields updated successfully!');
-          location.reload(); // refrescar para ver los nuevos datos
-        })
-        .catch(err => {
-          console.error('❌ Error in AI flow:', err);
-          alert('Error generating resume fields');
-        });
+      .then(() => {
+        document.getElementById('ai-loader').classList.add('hidden');
+        alert('Resume fields updated successfully!');
+        location.reload();
+      })
+      .catch(err => {
+        document.getElementById('ai-loader').classList.add('hidden');
+        console.error('❌ Error in AI flow:', err);
+        alert('Error generating resume fields');
+      });
 
       // Opcional: cerrar popup
       aiPopup.classList.add('hidden');
