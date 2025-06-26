@@ -1429,6 +1429,8 @@ register_send_email_route(app)
 @app.route('/candidates/<int:candidate_id>/salary_updates', methods=['GET'])
 def get_salary_updates(candidate_id):
     try:
+        print(f"🔎 GET /candidates/{candidate_id}/salary_updates")
+
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
@@ -1437,13 +1439,23 @@ def get_salary_updates(candidate_id):
             WHERE candidate_id = %s
             ORDER BY date DESC
         """, (candidate_id,))
+        
         updates = cur.fetchall()
         colnames = [desc[0] for desc in cur.description]
         result = [dict(zip(colnames, row)) for row in updates]
-        cur.close(); conn.close()
+
+        print(f"🟢 Salary updates found: {result}")
+
+        cur.close()
+        conn.close()
+
         return jsonify(result)
+
     except Exception as e:
+        print("❌ ERROR in GET /salary_updates")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/candidates/<int:candidate_id>/salary_updates', methods=['POST'])
 def create_salary_update(candidate_id):
