@@ -27,7 +27,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const hireWorkingSchedule = document.getElementById('hire-working-schedule');
   const hirePTO = document.getElementById('hire-pto');
   const hireStartDate = document.getElementById('hire-start-date');
-
+  function updateHireField(field, value) {
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [field]: value })
+  }).then(() => loadHireData());
+}
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
   if (hireStartDate) {
@@ -372,14 +378,6 @@ const hirePerks = document.getElementById('hire-extraperks');
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
 }
-function updateHireField(field, value) {
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ [field]: value })
-  }).then(() => loadHireData());
-}
-
 [hireSalary, hireFee].forEach(input => {
   input.addEventListener('blur', async () => {
     const salary = Number(hireSalary.value);
