@@ -904,7 +904,7 @@ def extract_pdf_affinda():
             UPDATE resume
             SET extract_cv_pdf = %s
             WHERE candidate_id = %s
-        """, (json.dumps(data), candidate_id))
+        """, (json.dumps(data.as_dict()), candidate_id))
         conn.commit()
         cursor.close()
         conn.close()
@@ -1432,9 +1432,11 @@ register_send_email_route(app)
 @app.route('/candidates/<int:candidate_id>/salary_updates', methods=['GET'])
 def get_salary_updates(candidate_id):
     try:
-        print(f"🔎 GET /candidates/{candidate_id}/salary_updates")
+        logging.info(f"📤 GET /candidates/{candidate_id}/salary_updates")
 
         conn = get_connection()
+        logging.info("✅ DB connected")
+
         cur = conn.cursor()
         cur.execute("""
             SELECT update_id, salary, fee, date
@@ -1442,12 +1444,12 @@ def get_salary_updates(candidate_id):
             WHERE candidate_id = %s
             ORDER BY date DESC
         """, (candidate_id,))
-        
+        logging.info("🟢 Query executed")
+
         updates = cur.fetchall()
         colnames = [desc[0] for desc in cur.description]
         result = [dict(zip(colnames, row)) for row in updates]
-
-        print(f"🟢 Salary updates found: {result}")
+        logging.info(f"📦 Data: {result}")
 
         cur.close()
         conn.close()
@@ -1455,9 +1457,10 @@ def get_salary_updates(candidate_id):
         return jsonify(result)
 
     except Exception as e:
-        print("❌ ERROR in GET /salary_updates")
-        print(traceback.format_exc())
+        logging.error("❌ ERROR en GET /salary_updates")
+        logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
 
 
 @app.route('/candidates/<int:candidate_id>/salary_updates', methods=['POST'])
