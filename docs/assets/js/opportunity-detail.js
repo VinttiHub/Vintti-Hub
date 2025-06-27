@@ -570,10 +570,10 @@ document.addEventListener("click", async (e) => {
         loadBatchesForOpportunity(opportunityId);
       }
     }
-    document.getElementById('hire-select').addEventListener('change', async (e) => {
-      const selectedCandidateId = e.target.value;
-      await updateOpportunityField('candidato_contratado', selectedCandidateId);
-    });
+// document.getElementById('hire-select').addEventListener('change', async (e) => {
+//   const selectedCandidateId = e.target.value;
+//   await updateOpportunityField('candidato_contratado', selectedCandidateId);
+// });
     document.getElementById('signOffBtn').addEventListener('click', async () => {
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   if (!opportunityId) return;
@@ -705,29 +705,25 @@ async function loadOpportunityData() {
     // Cargar el select de hire con los candidatos
     // Cargar el select de hire con los candidatos
     try {
-      const hireSelect = document.getElementById('hire-select');
+      const hireDisplay = document.getElementById('hire-display');
       const candidatoContratadoId = data.candidato_contratado;
 
-      const resCandidates = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates`);
-      const candidates = await resCandidates.json();
-
-      hireSelect.innerHTML = '<option value="">Select Hire...</option>';
-
-      candidates.forEach(candidate => {
-        const option = document.createElement('option');
-        option.value = candidate.candidate_id;
-        option.textContent = candidate.name;
-        if (candidate.candidate_id === candidatoContratadoId) {
-          option.selected = true;
+      if (candidatoContratadoId) {
+        try {
+          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidatoContratadoId}`);
+          if (res.ok) {
+            const candidato = await res.json();
+            hireDisplay.value = candidato.name || '—';
+          } else {
+            hireDisplay.value = '—';
+          }
+        } catch (err) {
+          console.error('Error fetching hire name:', err);
+          hireDisplay.value = '—';
         }
-        hireSelect.appendChild(option);
-      });
-
-      new Choices(hireSelect, {
-        searchEnabled: true,
-        itemSelectText: '',
-        shouldSort: false
-      });
+      } else {
+        hireDisplay.value = '';
+      }
 
     } catch (error) {
       console.error('Error loading hire candidates:', error);

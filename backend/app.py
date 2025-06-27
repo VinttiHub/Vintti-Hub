@@ -162,11 +162,38 @@ def get_candidates():
     search = request.args.get('search')
     if search:
         return search_candidates()
-    else:
-        result = fetch_data_from_table("candidates")
-        if "error" in result:
-            return jsonify(result), 500
-        return jsonify(result)
+    
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # Obtener todos los candidatos
+        cur.execute("SELECT * FROM candidates")
+        candidates_rows = cur.fetchall()
+        candidate_cols = [desc[0] for desc in cur.description]
+        candidates = [dict(zip(candidate_cols, row)) for row in candidates_rows]
+
+        # Para cada candidato, verificar si es empleado (si está en candidato_contratado)
+        for candidate in candidates:
+            candidate_id = candidate['candidate_id']
+
+            cur.execute("""
+                SELECT 1
+                FROM opportunity o
+                JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
+                WHERE oc.candidate_id = %s AND o.candidato_contratado = %s
+                LIMIT 1
+            """, (candidate_id, candidate_id))
+            result = cur.fetchone()
+            candidate['employee'] = '✔️' if result else '❌'
+
+        cur.close()
+        conn.close()
+        return jsonify(candidates)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 def search_candidates():
     q = request.args.get('search', '').strip()
     conn = get_connection()

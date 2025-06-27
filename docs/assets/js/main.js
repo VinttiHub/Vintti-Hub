@@ -420,7 +420,6 @@ function getStageDropdown(currentStage, opportunityId) {
     'Deep Dive'
   ];
 
-  // Mapeo de posibles variantes
   const stageMapping = {
     'Closed Win': 'Close Win',
     'Closed Lost': 'Closed Lost',
@@ -431,11 +430,10 @@ function getStageDropdown(currentStage, opportunityId) {
     'Deep Dive': 'Deep Dive'
   };
 
-  // Normalizamos el valor que viene de la base
   const normalizedStage = stageMapping[(currentStage || '').trim()] || '';
+  const isDisabled = normalizedStage === 'Close Win' ? 'disabled' : '';
 
-  // 👇 AQUI es donde agregamos el data-id
-  let dropdown = `<select class="stage-dropdown" data-id="${opportunityId}">`;
+  let dropdown = `<select class="stage-dropdown" data-id="${opportunityId}" ${isDisabled}>`;
 
   stages.forEach(stage => {
     const selected = (stage === normalizedStage) ? 'selected' : '';
