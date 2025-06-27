@@ -535,7 +535,8 @@ def update_opportunity_fields(opportunity_id):
         'opp_sales_lead',
         'opp_hr_lead',
         'hr_job_description',
-        'candidato_contratado'
+        'candidato_contratado',
+        'comments'
     ]
 
     updates = []
@@ -1316,19 +1317,37 @@ def generate_job_description():
         logging.info(f"   - Notes: {notes[:100] + '...' if notes else 'VACÍO'}")
 
         prompt = f"""
-You are a job posting assistant. Based on the following input, generate a complete and professional **Job Description** for LinkedIn that includes sections such as Role Summary, Key Responsibilities, Requirements, and Nice to Haves. Use clear and inclusive language.
+        You are a job posting assistant. Based on the following input, generate a complete and professional **Job Description** suitable for LinkedIn.
 
-INTRO CALL TRANSCRIPT:
-{intro}
+        Your response must include the following **structured sections**, using markdown-style formatting:
 
-DEEP DIVE NOTES:
-{deep_dive}
+        - **Job Title** (if applicable)
+        - **Role Summary** (1 short paragraph)
+        - **Key Responsibilities** (as a bulleted list)
+        - **Requirements** (as a bulleted list)
+        - **Nice to Haves** (as a bulleted list)
+        - **Additional Information** (optional – if relevant)
 
-EMAILS AND COMMENTS:
-{notes}
+        Use:
+        - Clear, inclusive, and engaging language.
+        - Only **bold** titles (no hashtags).
+        - Bullet points (`-`) for lists.
+        - A plain text markdown format (no HTML, no hashtags, no headings with `#`).
 
-Please respond with only the job description in markdown-style plain text.
-"""
+        SOURCE MATERIAL:
+        ---
+        **INTRO CALL TRANSCRIPT:**
+        {intro}
+
+        **DEEP DIVE NOTES:**
+        {deep_dive}
+
+        **EMAILS AND COMMENTS:**
+        {notes}
+        ---
+        Please output only the job description, fully formatted and ready to copy into LinkedIn.
+        """
+
         logging.info("🧠 Prompt construido correctamente, conectando con OpenAI...")
 
         chat = openai.chat.completions.create(

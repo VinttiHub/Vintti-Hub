@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${opp.opp_model || ''}</td>
         <td>${opp.opp_sales_lead || ''}</td>
         <td>${opp.opp_hr_lead || ''}</td>
-        <td>${opp.opp_comments || ''}</td>
+        <td>${opp.comments || ''}</td>
         <td>${daysAgo}</td>
       `;
 

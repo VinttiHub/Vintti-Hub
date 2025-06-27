@@ -265,6 +265,9 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
 });
 
 
+document.getElementById('comments-overview-textarea').addEventListener('blur', async (e) => {
+  await updateOpportunityField('comments', e.target.value);
+});
 
 document.getElementById('start-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
@@ -347,11 +350,16 @@ document.getElementById('details-sales-lead').addEventListener('change', async (
 });
 
 document.getElementById('details-hr-lead').addEventListener('change', async (e) => {
-  const emailValue = e.target.value; // el value es el email
+  const emailValue = e.target.value;
   console.log('🟡 HR Lead changed:', emailValue);
 
   await updateOpportunityField('opp_hr_lead', emailValue);
+
+  // ✅ Si se asigna, eliminar la alerta si existe
+  const alertBox = document.getElementById('hr-alert');
+  if (alertBox) alertBox.remove();
 });
+
 
 document.getElementById('details-model').addEventListener('change', async (e) => {
   await updateOpportunityField('opp_model', e.target.value);
@@ -656,6 +664,8 @@ async function loadOpportunityData() {
     document.getElementById('opportunity-id-text').setAttribute('data-id', data.opportunity_id);
     document.getElementById('start-date-input').value = formatDate(data.nda_signature_or_start_date);
     document.getElementById('close-date-input').value = formatDate(data.opp_close_date);
+    document.getElementById('comments-overview-textarea').value = data.comments || '';
+
     // Client section
     document.getElementById('client-name-input').value = data.account_name || '';
     document.getElementById('client-size-input').value = data.account_size || '';
@@ -751,6 +761,23 @@ async function loadOpportunityData() {
           if (data.opportunity_id) {
             reloadBatchCandidates();
           }
+          // 🚨 Mostrar alerta si no hay HR Lead asignado
+          if (!data.opp_hr_lead) {
+            const alertBox = document.createElement('div');
+            alertBox.textContent = "⚠️ This opportunity doesn't have an HR Lead assigned. Please assign one.";
+            alertBox.style.background = '#fff3cd';
+            alertBox.style.color = '#856404';
+            alertBox.style.border = '1px solid #ffeeba';
+            alertBox.style.padding = '12px';
+            alertBox.style.borderRadius = '10px';
+            alertBox.style.margin = '15px 0';
+            alertBox.style.fontWeight = '500';
+            alertBox.style.textAlign = 'center';
+
+            const container = document.querySelector('.detail-main');
+            container.insertBefore(alertBox, container.firstChild);
+          }
+
         } catch (err) {
           console.error('Error loading users for Sales/HR Lead:', err);
         }

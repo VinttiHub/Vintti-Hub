@@ -96,7 +96,8 @@ body {
 /* TABLE */
 #candidatesTable {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 6px;
   background-color: #fff;
   border-radius: 20px;
   padding: 20px 30px;
@@ -114,23 +115,35 @@ body {
 }
 #candidatesTable tbody tr {
   position: relative;
-  background-color: #fff;
+  background: linear-gradient(to right, #ffffff 0%, #ffffff 100%);
+  background-size: 200% 100%;
+  background-position: left center;
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
-  transition: box-shadow 0.3s, transform 0.3s;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.04);
+  transition: background-position 1s ease, transform 0.3s ease, box-shadow 0.3s ease;
   animation: fadeInSlide 0.4s ease-in-out;
 }
+
 #candidatesTable tbody tr:hover {
-  box-shadow: 0 4px 16px rgba(0, 68, 255, 0.12);
-  transform: translateY(-2px);
-  cursor: pointer;
+  background: linear-gradient(to right, #e6f0ff 0%, #ffffff 100%);
+  background-size: 200% 100%;
+  background-position: right center;
+  box-shadow: 0 0 20px rgba(0, 68, 255, 0.2), 0 0 40px rgba(0, 68, 255, 0.1);
+  transform: scale(1.01);
+  z-index: 2;
+  position: relative;
 }
+
 #candidatesTable tbody td {
-  padding: 12px 15px;
+  padding: 12px 30px;
   font-size: 14px;
   vertical-align: middle;
   border-bottom: 1px solid #f9f9f9;
+}
+#candidatesTable tbody td:nth-last-child(2),
+#candidatesTable tbody td:last-child {
+  padding: 12px 50px;
 }
 
 /* FILTER ICON + DROPDOWN */
@@ -221,11 +234,4 @@ body {
   .main-content {
     padding: 20px;
   }
-}
-#candidatesTable tbody td:first-child {
-  padding-left: 20px; /* ajusta según se necesite */
-  position: relative;
-}
-#candidatesTable tbody tr::before {
-  left: 10px; /* para que no pise el contenido */
 }

@@ -16,7 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
       data.forEach(candidate => {
       rows += `
         <tr data-id="${candidate.candidate_id || ''}">
-          <td>${candidate.condition || '—'}</td>
+        <td class="${!candidate.condition ? 'empty-cell' : ''}">
+          ${candidate.condition || '-'}
+        </td>
+
+
           <td>${candidate.full_name || candidate.name || candidate.Name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
