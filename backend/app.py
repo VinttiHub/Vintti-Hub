@@ -172,7 +172,6 @@ def get_opportunities():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/candidates', methods=['GET'])
 def get_candidates():
     search = request.args.get('search')
