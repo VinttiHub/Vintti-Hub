@@ -1323,3 +1323,14 @@ input::-webkit-contacts-auto-fill-button {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 6px;
+}
+.delete-icon {
+  font-size: 14px;
+  margin-left: auto;
+}
+

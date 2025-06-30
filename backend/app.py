@@ -1589,6 +1589,35 @@ def is_candidate_hired(candidate_id):
         return jsonify({'is_hired': bool(result)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>', methods=['DELETE'])
+def delete_candidate_from_pipeline(opportunity_id, candidate_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # ¿cuántas oportunidades tiene este candidato?
+        cur.execute("""
+            SELECT COUNT(*) FROM opportunity_candidates
+            WHERE candidate_id = %s
+        """, (candidate_id,))
+        count = cur.fetchone()[0]
+
+        if count == 1:
+            # Borrar completamente al candidato
+            cur.execute("DELETE FROM candidates WHERE candidate_id = %s", (candidate_id,))
+        else:
+            # Solo eliminar relación
+            cur.execute("""
+                DELETE FROM opportunity_candidates
+                WHERE opportunity_id = %s AND candidate_id = %s
+            """, (opportunity_id, candidate_id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -201,24 +201,6 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
 
 
   });
-  document.querySelectorAll(".candidate-card").forEach(card => {
-    const preview = card.querySelector(".preview");
-  
-    card.addEventListener("mouseenter", (e) => {
-      if (preview) {
-        const rect = card.getBoundingClientRect();
-        preview.style.top = `${rect.top + window.scrollY}px`;
-        preview.style.left = `${rect.right + 10}px`;
-        preview.style.display = "block";
-      }
-    });
-  
-    card.addEventListener("mouseleave", () => {
-      if (preview) {
-        preview.style.display = "none";
-      }
-    });
-  });
   // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline
 function loadPipelineCandidates() {
   // Leer el opportunity_id que ya está en la página
@@ -243,16 +225,39 @@ candidates.forEach(candidate => {
   const card = document.createElement('div');
   card.className = 'candidate-card';
   card.setAttribute('data-candidate-id', candidate.candidate_id); 
-  card.innerHTML = `
-    <strong>${candidate.name}</strong>
-    <div class="preview">
-      <img src="https://randomuser.me/api/portraits/lego/1.jpg" alt="${candidate.name}">
-      <div class="info">
-        <span class="name">${candidate.name}</span>
-        <span class="email">${candidate.email ?? ''}</span>
-      </div>
-    </div>
-  `;
+card.innerHTML = `
+  <div class="card-header">
+    <strong class="candidate-name">${candidate.name}</strong>
+    <span class="delete-icon" title="Delete" style="font-size: 14px; color: #c00; cursor: pointer; margin-left: auto;">🗑️</span>
+  </div>
+`;
+
+card.querySelector(".delete-icon").addEventListener("click", async (e) => {
+  e.stopPropagation(); // evitar que redireccione
+
+  const candidateId = card.getAttribute("data-candidate-id");
+  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+
+  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`);
+  const linkedOpportunities = await res.json();
+
+  let message = "Are you sure you want to delete this candidate from the pipeline?";
+  if (linkedOpportunities.length === 1 && linkedOpportunities[0].opportunity_id == opportunityId) {
+    message += "\n⚠️ This candidate is only linked to this opportunity. Deleting will remove them from the database.";
+  }
+
+  if (confirm(message)) {
+    const deleteRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}`, {
+      method: 'DELETE'
+    });
+    if (deleteRes.ok) {
+      loadPipelineCandidates();
+    } else {
+      alert("Error deleting candidate.");
+    }
+  }
+});
+
 
   enableDrag(card);
   card.addEventListener('click', () => {
