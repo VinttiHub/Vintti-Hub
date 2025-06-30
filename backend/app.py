@@ -152,10 +152,26 @@ def get_accounts():
 
 @app.route('/opportunities')
 def get_opportunities():
-    result = fetch_data_from_table("opportunity")
-    if "error" in result:
-        return jsonify(result), 500
-    return jsonify(result)
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT o.*, u.user_name AS sales_lead_name
+            FROM opportunity o
+            LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
+        """)
+        rows = cursor.fetchall()
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/candidates', methods=['GET'])
 def get_candidates():

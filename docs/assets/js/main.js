@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${opp.opp_position_name || ''}</td>
         <td>${opp.opp_type || ''}</td>
         <td>${opp.opp_model || ''}</td>
-        <td>${opp.opp_sales_lead || ''}</td>
+        <td>${opp.sales_lead_name || ''}</td>
         <td>${opp.opp_hr_lead || ''}</td>
         <td>${opp.comments || ''}</td>
         <td>${daysAgo}</td>
@@ -338,15 +338,19 @@ if (createOpportunityForm && createButton) {
 fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
   .then(response => response.json())
   .then(users => {
+    const allowedEmails = ['lara@vintti.com', 'bahia@vintti.com', 'agustin@vintti.com'];
     const select = document.getElementById('sales_lead');
     if (!select) return;
+
     select.innerHTML = '<option disabled selected>Select a user</option>';
-    users.forEach(user => {
-      const option = document.createElement('option');
-      option.value = user.email_vintti; // el VALUE será el email (como en la base de datos)
-      option.textContent = user.user_name; // el texto que ve el usuario será el nombre
-      select.appendChild(option);
-    });
+    users
+      .filter(user => allowedEmails.includes(user.email_vintti))
+      .forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.email_vintti;
+        option.textContent = user.user_name;
+        select.appendChild(option);
+      });
   })
   .catch(err => {
     console.error('Error loading users:', err);
