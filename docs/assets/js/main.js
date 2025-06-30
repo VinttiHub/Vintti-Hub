@@ -109,9 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
 document.addEventListener('change', async (e) => {
-  if (e.target && e.target.classList.contains('stage-dropdown')) {
-    const newStage = e.target.value;
-    const opportunityId = e.target.getAttribute('data-id');
+    if (e.target && e.target.classList.contains('stage-dropdown')) {
+      const newStage = e.target.value;
+      const opportunityId = e.target.getAttribute('data-id');
+
+      if (e.target.disabled) {
+        alert("This stage is final and cannot be changed.");
+        return;
+      }
 
     console.log('🟡 Stage dropdown changed! Opportunity ID:', opportunityId, 'New Stage:', newStage);
 
@@ -420,20 +425,10 @@ function getStageDropdown(currentStage, opportunityId) {
     'Deep Dive'
   ];
 
-  const stageMapping = {
-    'Closed Win': 'Close Win',
-    'Closed Lost': 'Closed Lost',
-    'Negotiating': 'Negotiating',
-    'Interviewing': 'Interviewing',
-    'Sourcing': 'Sourcing',
-    'NDA Sent': 'NDA Sent',
-    'Deep Dive': 'Deep Dive'
-  };
+  const normalizedStage = (currentStage || '').trim();
+  const isFinalStage = normalizedStage === 'Close Win' || normalizedStage === 'Closed Lost';
 
-  const normalizedStage = stageMapping[(currentStage || '').trim()] || '';
-  const isDisabled = normalizedStage === 'Close Win' ? 'disabled' : '';
-
-  let dropdown = `<select class="stage-dropdown" data-id="${opportunityId}" ${isDisabled}>`;
+  let dropdown = `<select class="stage-dropdown" data-id="${opportunityId}" ${isFinalStage ? 'disabled' : ''}>`;
 
   stages.forEach(stage => {
     const selected = (stage === normalizedStage) ? 'selected' : '';
@@ -444,6 +439,7 @@ function getStageDropdown(currentStage, opportunityId) {
 
   return dropdown;
 }
+
 
 function calculateDaysAgo(dateStr) {
   const date = new Date(dateStr);
@@ -567,6 +563,7 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
 
     if (response.ok) {
       console.log('✅ Stage updated successfully!');
+      window.location.reload();  // 🔄 Refresca para que se muestre el estado real desde la base
       dropdownElement.style.backgroundColor = '#d4edda';
       setTimeout(() => {
         dropdownElement.style.backgroundColor = '';
