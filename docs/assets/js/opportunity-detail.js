@@ -58,7 +58,15 @@ document.getElementById('openExistingCandidatePopup').addEventListener('click', 
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
 
-  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates');
+  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches', {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    candidate_id: candidateId,
+    batch_id: selectedBatch.batch_id
+  })
+});
+
   const candidates = await response.json();
 
   newInput.addEventListener('input', (e) => {
@@ -932,15 +940,17 @@ async function loadBatchesForOpportunity(opportunityId) {
           <div>
             <button class="btn-add">Add candidate</button>
             <button class="btn-send">Send for Approval</button>
+            <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
           </div>
         </div>
         <div class="batch-candidates"></div>
       `;
 
+
       const candidateContainer = box.querySelector(".batch-candidates");
 
       candidates
-        .filter(c => c.batch_id === batch.batch_id)
+        .filter(c => c.batch_id == batch.batch_id)  // asegúrate que el backend ahora lo incluya correctamente
         .forEach(c => {
           const template = document.getElementById("candidate-card-template");
           const cardFragment = template.content.cloneNode(true);
@@ -996,6 +1006,29 @@ async function loadBatchesForOpportunity(opportunityId) {
   } catch (err) {
     console.error('Error loading batches:', err);
   }
+  box.querySelector('.btn-delete').addEventListener('click', async (e) => {
+  const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
+  if (!confirmed) return;
+
+  const batchId = e.target.getAttribute('data-batch-id');
+
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      alert('✅ Batch deleted successfully');
+      await loadBatchesForOpportunity(opportunityId); // recargar
+    } else {
+      alert('❌ Error deleting batch');
+    }
+  } catch (err) {
+    console.error('Error deleting batch:', err);
+    alert('❌ Could not delete batch');
+  }
+});
+
 }
 
 async function reloadBatchCandidates() {
@@ -1025,10 +1058,12 @@ async function reloadBatchCandidates() {
           <div>
             <button class="btn-add">Add candidate</button>
             <button class="btn-send">Send for Approval</button>
+            <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
           </div>
         </div>
         <div class="batch-candidates"></div>
       `;
+
 
       const candidateContainer = box.querySelector(".batch-candidates");
 
@@ -1056,6 +1091,29 @@ async function reloadBatchCandidates() {
   } catch (err) {
     console.error("❌ Error reloading batch candidates:", err);
   }
+  box.querySelector('.btn-delete').addEventListener('click', async (e) => {
+  const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
+  if (!confirmed) return;
+
+  const batchId = e.target.getAttribute('data-batch-id');
+
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      alert('✅ Batch deleted successfully');
+      await loadBatchesForOpportunity(opportunityId); // recargar
+    } else {
+      alert('❌ Error deleting batch');
+    }
+  } catch (err) {
+    console.error('Error deleting batch:', err);
+    alert('❌ Could not delete batch');
+  }
+});
+
 }
 
 async function loadBatchesAndCandidates() {
@@ -1085,10 +1143,12 @@ async function loadBatchesAndCandidates() {
         <div>
           <button class="btn-add">Add candidate</button>
           <button class="btn-send">Send for Approval</button>
+          <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
         </div>
       </div>
       <div class="batch-candidates"></div>
     `;
+
       const candidateContainer = box.querySelector(".batch-candidates");
       candidates
         .filter(c => c.batch_id === batch.batch_id)

@@ -485,17 +485,18 @@ def get_candidates_by_opportunity(opportunity_id):
         cursor = conn.cursor()
         
         cursor.execute("""
-                SELECT 
-                    c.candidate_id,
-                    c.name,
-                    c.email,
-                    c.stage,
-                    c.employee_salary,
-                    c.batch_id,
-                    oc.stage_batch
-                FROM candidates c
-                INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
-                WHERE oc.opportunity_id = %s
+            SELECT 
+                c.candidate_id,
+                c.name,
+                c.email,
+                c.stage,
+                c.employee_salary,
+                cb.batch_id,
+                oc.stage_batch
+            FROM candidates c
+            INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
+            LEFT JOIN candidates_batches cb ON c.candidate_id = cb.candidate_id
+            WHERE oc.opportunity_id = %s
         """, (opportunity_id,))
 
         rows = cursor.fetchall()
@@ -1251,28 +1252,32 @@ def link_or_create_candidate(opportunity_id):
             return jsonify({"error": str(e)}), 500
 
 
-@app.route('/candidates/<int:candidate_id>/batch', methods=['PATCH'])
-def update_candidate_batch(candidate_id):
+@app.route('/candidates_batches', methods=['POST'])
+def link_candidate_to_batch():
     data = request.get_json()
+    candidate_id = data.get('candidate_id')
     batch_id = data.get('batch_id')
 
-    if batch_id is None:
-        return jsonify({'error': 'batch_id is required'}), 400
+    if not candidate_id or not batch_id:
+        return jsonify({'error': 'Missing candidate_id or batch_id'}), 400
 
     try:
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE candidates
-            SET batch_id = %s
-            WHERE candidate_id = %s
-        """, (batch_id, candidate_id))
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO candidates_batches (candidate_id, batch_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (candidate_id, batch_id))
+
         conn.commit()
-        cursor.close()
-        conn.close()
+        cur.close(); conn.close()
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+    
 @app.route('/candidates/<int:candidate_id>/opportunities')
 def get_opportunities_by_candidate(candidate_id):
     try:
@@ -1611,6 +1616,17 @@ def delete_candidate_from_pipeline(opportunity_id, candidate_id):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/batches/<int:batch_id>', methods=['DELETE'])
+def delete_batch(batch_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM batch WHERE batch_id = %s", (batch_id,))
+        conn.commit()
+        cur.close(); conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
