@@ -512,9 +512,11 @@ def get_candidates_by_opportunity(opportunity_id):
         print("❌ ERROR EN GET /opportunities/<id>/candidates")
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+    
 @app.route('/batches/<int:batch_id>/candidates')
 def get_candidates_by_batch(batch_id):
     try:
+        print(f"📥 GET /batches/{batch_id}/candidates")
         conn = get_connection()
         cursor = conn.cursor()
 
@@ -533,12 +535,17 @@ def get_candidates_by_batch(batch_id):
         colnames = [desc[0] for desc in cursor.description]
         data = [dict(zip(colnames, row)) for row in rows]
 
+        print(f"✅ Candidatos encontrados: {len(data)} para batch_id {batch_id}")
+
         cursor.close()
         conn.close()
         return jsonify(data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
+    except Exception as e:
+        import traceback
+        print("❌ ERROR EN /batches/<id>/candidates")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/candidates/<int:candidate_id>')
