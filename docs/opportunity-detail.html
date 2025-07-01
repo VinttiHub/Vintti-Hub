@@ -403,6 +403,26 @@ the Vintti team</textarea>
     <button id="sendSignOffBtn">Send</button>
   </div>
 </div>
+<div id="approvalEmailPopup" class="popup hidden">
+  <div class="popup-content email-popup-content">
+    <span class="close-btn" id="closeApprovalEmailPopup">&times;</span>
+    <h2>Send Candidates for Approval</h2>
+
+    <label>To</label>
+    <select id="approval-to" multiple></select>
+
+    <label>CC</label>
+    <select id="approval-cc" multiple></select>
+
+    <label>Subject</label>
+    <input type="text" id="approval-subject" placeholder="Subject..." />
+
+    <label>Message</label>
+    <textarea id="approval-message" style="height: 300px;"></textarea>
+
+    <button id="sendApprovalEmailBtn">Send</button>
+  </div>
+</div>
 
 <script src="./assets/js/opportunity-detail.js"></script>
 </body>

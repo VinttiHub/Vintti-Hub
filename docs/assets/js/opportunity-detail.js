@@ -646,6 +646,38 @@ document.getElementById('sendSignOffBtn').addEventListener('click', async () => 
     alert("❌ Failed to send email");
   }
 });
+document.getElementById('closeApprovalEmailPopup').addEventListener('click', () => {
+  document.getElementById('approvalEmailPopup').classList.add('hidden');
+});
+
+document.getElementById('sendApprovalEmailBtn').addEventListener('click', async () => {
+  const to = approvalToChoices.getValue().map(o => o.value);
+  const cc = approvalCcChoices.getValue().map(o => o.value);
+  const subject = document.getElementById('approval-subject').value;
+  const body = document.getElementById('approval-message').value;
+
+  if (!to.length || !subject || !body) {
+    alert('❌ Please fill all required fields');
+    return;
+  }
+
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, cc, subject, body })
+    });
+
+    if (res.ok) {
+      alert('✅ Email sent!');
+      document.getElementById('approvalEmailPopup').classList.add('hidden');
+    } else {
+      alert('❌ Error sending email');
+    }
+  } catch (err) {
+    alert('❌ Failed to send email');
+  }
+});
 
 });
 
@@ -936,6 +968,7 @@ async function loadBatchesForOpportunity(opportunityId) {
             <button class="btn-add">Add candidate</button>
             <button class="btn-send">Send for Approval</button>
             <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
+            box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
           </div>
         </div>
         <div class="batch-candidates"></div>
@@ -1014,6 +1047,7 @@ async function reloadBatchCandidates() {
             <button class="btn-add">Add candidate</button>
             <button class="btn-send">Send for Approval</button>
             <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
+            box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
           </div>
         </div>
         <div class="batch-candidates"></div>
@@ -1098,6 +1132,7 @@ for (const batch of batches) {
         <button class="btn-add">Add candidate</button>
         <button class="btn-send">Send for Approval</button>
         <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
+        box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
       </div>
     </div>
     <div class="batch-candidates"></div>
@@ -1128,4 +1163,77 @@ for (const batch of batches) {
   } catch (err) {
     console.error("Error loading batches and candidates:", err);
   }
+}
+async function openApprovalPopup(batchId) {
+  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+
+  const [usersRes, candidatesRes] = await Promise.all([
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users`),
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
+  ]);
+
+  const users = await usersRes.json();
+  const candidates = await candidatesRes.json();
+
+  const batchCandidates = candidates.filter(c => c.batch_id === batchId);
+
+  const toSelect = document.getElementById('approval-to');
+  const ccSelect = document.getElementById('approval-cc');
+  toSelect.innerHTML = '';
+  ccSelect.innerHTML = '';
+
+  users.forEach(user => {
+    const option = document.createElement('option');
+    option.value = user.email_vintti;
+    option.textContent = user.user_name;
+    toSelect.appendChild(option);
+
+    const optionCc = option.cloneNode(true);
+    ccSelect.appendChild(optionCc);
+  });
+
+  if (window.approvalToChoices) approvalToChoices.destroy();
+  if (window.approvalCcChoices) approvalCcChoices.destroy();
+
+  window.approvalToChoices = new Choices(toSelect, { removeItemButton: true });
+  window.approvalCcChoices = new Choices(ccSelect, { removeItemButton: true });
+
+  const yourName = localStorage.getItem('nickname') || 'The Vintti Team';
+
+  let candidateBlocks = '';
+  for (let c of batchCandidates) {
+    const resumeUrl = `https://vinttihub.vintti.com/candidate-details.html?id=${c.candidate_id}`;
+    const aboutRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${c.candidate_id}`);
+    const aboutData = await aboutRes.json();
+
+    candidateBlocks += `
+Name: ${c.name}  
+Monthly Cost: $${c.salary_range || '—'}  
+Resume: ${resumeUrl}  
+${aboutData.about?.trim() || '—'}  
+  
+`;
+  }
+
+  const body = `Hi XXX,
+
+Hope you're doing great!
+
+XXX has handpicked a shortlist of candidates who align with everything you outlined — from experience to budget. We’re confident you’ll find strong potential here.
+
+Please let us know your availability, and XXX will take care of scheduling the first round of interviews.
+
+Candidates:
+
+${candidateBlocks}
+
+Let us know what times work best and we’ll get things moving. Looking forward to your thoughts!
+
+Best,  
+${yourName}`;
+
+  document.getElementById('approval-subject').value = 'Candidate Shortlist for Review';
+  document.getElementById('approval-message').value = body;
+
+  document.getElementById('approvalEmailPopup').classList.remove('hidden');
 }
