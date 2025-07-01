@@ -31,32 +31,40 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const tr = document.createElement('tr');
 
-      tr.addEventListener('click', (e) => {
-        const clickedCellIndex = Array.from(e.currentTarget.children).indexOf(e.target.closest('td'));
-        if (clickedCellIndex > 0) {
-          openOpportunity(opp.opportunity_id);
-        }
-      });
+    tr.innerHTML = `
+      <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
+      <td>${opp.account_id || ''}</td>
+      <td>${opp.opp_position_name || ''}</td>
+      <td>${opp.opp_type || ''}</td>
+      <td>${opp.opp_model || ''}</td>
+      <td>${opp.sales_lead_name || ''}</td>
+      <td>
+        <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}" data-current="${opp.opp_hr_lead || ''}">
+          <option disabled ${opp.opp_hr_lead ? '' : 'selected'}>Assign HR Lead</option>
+        </select>
+      </td>
+      <td>
+        <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
+      </td>
+      <td>${daysAgo}</td>
+    `;
+    tr.querySelectorAll('td').forEach((cell, index) => {
+      // Guardar el índice como atributo para acceso rápido
+      cell.setAttribute('data-col-index', index);
+    });
 
-      tr.innerHTML = `
-          <tr>
-            <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
-            <td>${opp.account_id || ''}</td>
-            <td>${opp.opp_position_name || ''}</td>
-            <td>${opp.opp_type || ''}</td>
-            <td>${opp.opp_model || ''}</td>
-            <td>${opp.sales_lead_name || ''}</td>
-            <td>
-              <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}">
-                <option disabled selected>Loading...</option>
-              </select>
-            </td>
-            <td>
-              <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
-            </td>
-            <td>${daysAgo}</td>
-          </tr>
-      `;
+    tr.addEventListener('click', (e) => {
+      const td = e.target.closest('td');
+      if (!td) return;
+
+      const cellIndex = parseInt(td.getAttribute('data-col-index'), 10);
+
+      if ([0, 6, 7].includes(cellIndex)) {
+        return;
+      }
+
+      openOpportunity(opp.opportunity_id);
+    });
     fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
       .then(response => response.json())
       .then(users => {
@@ -216,15 +224,6 @@ helloBtn.addEventListener('click', async () => {
   }
 });
   }
-document.addEventListener('click', (e) => {
-  if (
-    e.target.closest('.stage-dropdown') ||
-    e.target.closest('.hr-lead-dropdown') ||
-    e.target.closest('.comment-input')
-  ) {
-    e.stopPropagation(); // 🚫 evitar redirección
-  }
-});
 
 });
 
