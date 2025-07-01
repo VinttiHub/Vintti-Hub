@@ -515,7 +515,7 @@ document.addEventListener("click", async (e) => {
       return;
     }
 
-    const patchRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.comcom/candidates/${candidateId}/batch`, {
+    const patchRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/batch`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"

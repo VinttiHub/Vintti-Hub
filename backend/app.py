@@ -1,5 +1,4 @@
 from flask import Flask, jsonify, request
-from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import boto3
@@ -7,16 +6,9 @@ import uuid
 from botocore.exceptions import NoCredentialsError
 from affinda import AffindaAPI, TokenCredential
 import openai
-import httpx
 import traceback
 import logging
 import psycopg2
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from flask_cors import cross_origin
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Cc
 import requests
 from datetime import datetime
 import json
@@ -983,7 +975,7 @@ def generate_resume_fields():
 
     prompt = f"""
     You are an expert resume assistant. You will generate structured resume data in JSON format based on the following information:
-
+    you cannot add info that is not explicity said in this inputs
     EXTRACTED_CV_PDF (Affinda or other CV extract): 
     {extract_cv_pdf}
 
@@ -1050,7 +1042,7 @@ def generate_resume_fields():
         "level": "Intermediate"
         }}
     ]
-    }}
+    }} 
     """
     print("🧠 Prompt construido para resume:")
     print(prompt[:1000])  # solo para evitar saturar logs
@@ -1361,18 +1353,18 @@ def generate_job_description():
         prompt = f"""
         You are a job posting assistant. Based on the following input, generate a complete and professional **Job Description** suitable for LinkedIn.
 
-        Your response must include the following **structured sections**, using markdown-style formatting:
+        Your response must include the following structured sections:
 
-        - **Job Title** (if applicable)
-        - **Role Summary** (1 short paragraph)
-        - **Key Responsibilities** (as a bulleted list)
-        - **Requirements** (as a bulleted list)
-        - **Nice to Haves** (as a bulleted list)
-        - **Additional Information** (optional – if relevant)
+        - Job Title (if applicable)
+        - Role Summary (1 short paragraph)
+        - Key Responsibilities (as a bulleted list)
+        - Requirements (as a bulleted list)
+        - Nice to Haves (as a bulleted list)
+        - Additional Information (optional – if relevant)
 
         Use:
         - Clear, inclusive, and engaging language.
-        - Only **bold** titles (no hashtags).
+        - titles (no hashtags, no **bold**).
         - Bullet points (`-`) for lists.
         - A plain text markdown format (no HTML, no hashtags, no headings with `#`).
 
@@ -1387,7 +1379,8 @@ def generate_job_description():
         **EMAILS AND COMMENTS:**
         {notes}
         ---
-        Please output only the job description, fully formatted and ready to copy into LinkedIn.
+        Please output only the job description, fully formatted and ready to copy into LinkedIn.you cannot add info
+        that is not explicity said in the source material
         """
 
         logging.info("🧠 Prompt construido correctamente, conectando con OpenAI...")

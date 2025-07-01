@@ -39,17 +39,46 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       tr.innerHTML = `
-        <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
-        <td>${opp.account_id || ''}</td>
-        <td>${opp.opp_position_name || ''}</td>
-        <td>${opp.opp_type || ''}</td>
-        <td>${opp.opp_model || ''}</td>
-        <td>${opp.sales_lead_name || ''}</td>
-        <td>${opp.opp_hr_lead || ''}</td>
-        <td>${opp.comments || ''}</td>
-        <td>${daysAgo}</td>
+          <tr>
+            <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
+            <td>${opp.account_id || ''}</td>
+            <td>${opp.opp_position_name || ''}</td>
+            <td>${opp.opp_type || ''}</td>
+            <td>${opp.opp_model || ''}</td>
+            <td>${opp.sales_lead_name || ''}</td>
+            <td>
+              <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}">
+                <option disabled selected>Loading...</option>
+              </select>
+            </td>
+            <td>
+              <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
+            </td>
+            <td>${daysAgo}</td>
+          </tr>
       `;
+    fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+      .then(response => response.json())
+      .then(users => {
+        const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina','Sol'];
 
+        document.querySelectorAll('.hr-lead-dropdown').forEach(select => {
+          const opportunityId = select.getAttribute('data-id');
+          const currentLead = select.getAttribute('data-current');
+          
+          select.innerHTML = '<option disabled>Select HR Lead</option>';
+
+          users
+            .filter(user => allowedSubstrings.some(name => user.user_name.includes(name)))
+            .forEach(user => {
+              const option = document.createElement('option');
+              option.value = user.email_vintti;
+              option.textContent = user.user_name;
+              if (currentLead === user.email_vintti) option.selected = true;
+              select.appendChild(option);
+            });
+        });
+      });
       tbody.appendChild(tr);
 
     });
@@ -133,6 +162,30 @@ document.addEventListener('change', async (e) => {
     await patchOpportunityStage(opportunityId, newStage, e.target);
   }
 });
+document.addEventListener('change', async e => {
+  if (e.target.classList.contains('hr-lead-dropdown')) {
+    const oppId = e.target.dataset.id;
+    const newLead = e.target.value;
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opp_hr_lead: newLead })
+    });
+  }
+});
+
+document.addEventListener('blur', async e => {
+  if (e.target.classList.contains('comment-input')) {
+    const oppId = e.target.dataset.id;
+    const newComment = e.target.value;
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comments: newComment })
+    });
+  }
+}, true);
+
   const helloBtn = document.getElementById('helloGPT');
   const chatResponse = document.getElementById('chatResponse');
 
@@ -164,8 +217,12 @@ helloBtn.addEventListener('click', async () => {
 });
   }
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.stage-dropdown')) {
-    e.stopPropagation(); // 🚫 evita que el clic se propague al <tr> y dispare la redirección
+  if (
+    e.target.closest('.stage-dropdown') ||
+    e.target.closest('.hr-lead-dropdown') ||
+    e.target.closest('.comment-input')
+  ) {
+    e.stopPropagation(); // 🚫 evitar redirección
   }
 });
 
