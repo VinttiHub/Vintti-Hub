@@ -918,21 +918,16 @@ document.querySelector('.btn-create').addEventListener('click', async () => {
 });
 async function loadBatchesForOpportunity(opportunityId) {
   try {
-    const [batchesRes, candidatesRes] = await Promise.all([
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
-    ]);
-
+    const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const batches = await batchesRes.json();
-    const candidates = await candidatesRes.json();
 
     const container = document.getElementById('batch-detail-container');
     container.innerHTML = '';
 
-    batches.forEach(batch => {
-      const box = document.createElement("div");
-      box.classList.add("batch-box");
-      box.setAttribute("data-batch-id", batch.batch_id); // ✅ para referencia directa
+    for (const batch of batches) {
+      const box = document.createElement('div');
+      box.classList.add('batch-box');
+      box.setAttribute('data-batch-id', batch.batch_id);
 
       box.innerHTML = `
         <div class="batch-actions">
@@ -946,108 +941,68 @@ async function loadBatchesForOpportunity(opportunityId) {
         <div class="batch-candidates"></div>
       `;
 
+      const candidateContainer = box.querySelector('.batch-candidates');
 
-      const candidateContainer = box.querySelector(".batch-candidates");
+      // Traer candidatos por batch desde tabla intermedia
+      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
+      const batchCandidates = await batchCandidatesRes.json();
 
-      candidates
-        .filter(c => c.batch_id == batch.batch_id)  // asegúrate que el backend ahora lo incluya correctamente
-        .forEach(c => {
-          const template = document.getElementById("candidate-card-template");
-          const cardFragment = template.content.cloneNode(true);
-          const cardElement = cardFragment.querySelector('.candidate-card');
+      batchCandidates.forEach(c => {
+        const template = document.getElementById('candidate-card-template');
+        const cardFragment = template.content.cloneNode(true);
+        const cardElement = cardFragment.querySelector('.candidate-card');
 
-          // Mostrar datos del candidato
-          cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-          cardElement.querySelector(".candidate-email").textContent = c.email || '';
-          cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+        cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
+        cardElement.querySelector('.candidate-email').textContent = c.email || '';
+        cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
 
-          // Actualizar valor actual del dropdown si existe stage_batch
-          const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-          if (dropdown && c.stage_batch) {
-            dropdown.value = c.stage_batch;
-          }
+        candidateContainer.appendChild(cardElement);
+      });
 
-          // Agregar listener para actualizar stage_batch en la base de datos
-          dropdown.addEventListener('change', async (e) => {
-            const stageBatch = e.target.value;
-            const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
-            const candidateId = c.candidate_id;
+      // Eliminar batch
+      box.querySelector('.btn-delete').addEventListener('click', async (e) => {
+        const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
+        if (!confirmed) return;
 
-            try {
-              const response = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunity_candidates/stage_batch`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  opportunity_id: opportunityId,
-                  candidate_id: candidateId,
-                  stage_batch: stageBatch
-                })
-              });
+        const batchId = e.target.getAttribute('data-batch-id');
 
-              if (!response.ok) {
-                const errorText = await response.text();
-                console.error("❌ Error updating stage_batch:", errorText);
-              } else {
-                console.log(`✅ stage_batch updated to "${stageBatch}" for candidate ${candidateId}`);
-              }
-            } catch (err) {
-              console.error("❌ Error updating stage_batch:", err);
-            }
+        try {
+          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
+            method: 'DELETE'
           });
 
-          candidateContainer.appendChild(cardElement);
-        });
-
+          if (res.ok) {
+            alert('✅ Batch deleted successfully');
+            await loadBatchesForOpportunity(opportunityId);
+          } else {
+            alert('❌ Error deleting batch');
+          }
+        } catch (err) {
+          console.error('Error deleting batch:', err);
+          alert('❌ Could not delete batch');
+        }
+      });
 
       container.appendChild(box);
-    });
+    }
   } catch (err) {
     console.error('Error loading batches:', err);
   }
-  box.querySelector('.btn-delete').addEventListener('click', async (e) => {
-  const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
-  if (!confirmed) return;
-
-  const batchId = e.target.getAttribute('data-batch-id');
-
-  try {
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
-      method: 'DELETE'
-    });
-
-    if (res.ok) {
-      alert('✅ Batch deleted successfully');
-      await loadBatchesForOpportunity(opportunityId); // recargar
-    } else {
-      alert('❌ Error deleting batch');
-    }
-  } catch (err) {
-    console.error('Error deleting batch:', err);
-    alert('❌ Could not delete batch');
-  }
-});
-
 }
+
 
 async function reloadBatchCandidates() {
   const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
   if (!opportunityId || opportunityId === '—') return;
 
   try {
-    const [batchesRes, candidatesRes] = await Promise.all([
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
-    ]);
-
+    const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const batches = await batchesRes.json();
-    const candidates = await candidatesRes.json();
 
     const container = document.getElementById("batch-detail-container");
     container.innerHTML = "";
 
-    batches.forEach(batch => {
+    for (const batch of batches) {
       const box = document.createElement("div");
       box.classList.add("batch-box");
       box.setAttribute("data-batch-id", batch.batch_id);
@@ -1064,57 +1019,56 @@ async function reloadBatchCandidates() {
         <div class="batch-candidates"></div>
       `;
 
-
       const candidateContainer = box.querySelector(".batch-candidates");
 
-      candidates
-        .filter(c => c.batch_id === batch.batch_id)
-        .forEach(c => {
-          const card = document.createElement("div");
-          card.classList.add("candidate-card");
-          card.innerHTML = `
-            <strong>${c.name}</strong>
-            <div class="preview">
-              <img src="https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg" />
-              <div class="info">
-                <span class="name">${c.name}</span>
-                <span class="email">${c.email || ''}</span>
-              </div>
-            </div>
-          `;
-          candidateContainer.appendChild(card);
-        });
+      // 🔁 Obtener candidatos desde nuevo endpoint
+      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
+      const batchCandidates = await batchCandidatesRes.json();
+
+      batchCandidates.forEach(c => {
+        const template = document.getElementById("candidate-card-template");
+        const cardFragment = template.content.cloneNode(true);
+        const cardElement = cardFragment.querySelector('.candidate-card');
+
+        cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+        cardElement.querySelector(".candidate-email").textContent = c.email || '';
+        cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+        candidateContainer.appendChild(cardElement);
+      });
+
+      // 🗑️ Agregar botón eliminar
+      box.querySelector('.btn-delete').addEventListener('click', async (e) => {
+        const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
+        if (!confirmed) return;
+
+        const batchId = e.target.getAttribute('data-batch-id');
+
+        try {
+          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
+            method: 'DELETE'
+          });
+
+          if (res.ok) {
+            alert('✅ Batch deleted successfully');
+            await reloadBatchCandidates();
+          } else {
+            alert('❌ Error deleting batch');
+          }
+        } catch (err) {
+          console.error('Error deleting batch:', err);
+          alert('❌ Could not delete batch');
+        }
+      });
 
       container.appendChild(box);
-    });
+    }
 
   } catch (err) {
     console.error("❌ Error reloading batch candidates:", err);
   }
-  box.querySelector('.btn-delete').addEventListener('click', async (e) => {
-  const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
-  if (!confirmed) return;
-
-  const batchId = e.target.getAttribute('data-batch-id');
-
-  try {
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
-      method: 'DELETE'
-    });
-
-    if (res.ok) {
-      alert('✅ Batch deleted successfully');
-      await loadBatchesForOpportunity(opportunityId); // recargar
-    } else {
-      alert('❌ Error deleting batch');
-    }
-  } catch (err) {
-    console.error('Error deleting batch:', err);
-    alert('❌ Could not delete batch');
-  }
-});
-
 }
+
 
 async function loadBatchesAndCandidates() {
   const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
@@ -1132,39 +1086,44 @@ async function loadBatchesAndCandidates() {
     const batches = await batchesRes.json();
     const candidates = await candidatesRes.json();
 
-    batches.forEach(batch => {
-    const box = document.createElement("div");
-    box.classList.add("batch-box");
-    box.setAttribute("data-batch-id", batch.batch_id); // ✅ Aquí se asigna el batch_id
+for (const batch of batches) {
+  const box = document.createElement("div");
+  box.classList.add("batch-box");
+  box.setAttribute("data-batch-id", batch.batch_id);
 
-    box.innerHTML = `
-      <div class="batch-actions">
-        <h3>Batch #${batch.batch_number}</h3>
-        <div>
-          <button class="btn-add">Add candidate</button>
-          <button class="btn-send">Send for Approval</button>
-          <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
-        </div>
+  box.innerHTML = `
+    <div class="batch-actions">
+      <h3>Batch #${batch.batch_number}</h3>
+      <div>
+        <button class="btn-add">Add candidate</button>
+        <button class="btn-send">Send for Approval</button>
+        <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
       </div>
-      <div class="batch-candidates"></div>
-    `;
+    </div>
+    <div class="batch-candidates"></div>
+  `;
 
-      const candidateContainer = box.querySelector(".batch-candidates");
-      candidates
-        .filter(c => c.batch_id === batch.batch_id)
-        .forEach(c => {
-          const template = document.getElementById("candidate-card-template");
-          const cardFragment = template.content.cloneNode(true);
-          const cardElement = cardFragment.querySelector('.candidate-card');
+  const candidateContainer = box.querySelector(".batch-candidates");
 
-          cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-          cardElement.querySelector(".candidate-email").textContent = c.email || '';
-          cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+  // ✅ Aquí sí puedes usar await
+  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
+  const batchCandidates = await res.json();
 
-          candidateContainer.appendChild(cardElement);
-        });
-      container.appendChild(box);
-    });
+  batchCandidates.forEach(c => {
+    const template = document.getElementById("candidate-card-template");
+    const cardFragment = template.content.cloneNode(true);
+    const cardElement = cardFragment.querySelector(".candidate-card");
+
+    cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+    cardElement.querySelector(".candidate-email").textContent = c.email || '';
+    cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+    candidateContainer.appendChild(cardElement);
+  });
+
+  container.appendChild(box);
+}
+
 
   } catch (err) {
     console.error("Error loading batches and candidates:", err);

@@ -478,6 +478,7 @@ def get_candidates_by_account(account_id):
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
 @app.route('/opportunities/<int:opportunity_id>/candidates')
 def get_candidates_by_opportunity(opportunity_id):
     try:
@@ -491,18 +492,13 @@ def get_candidates_by_opportunity(opportunity_id):
                 c.email,
                 c.stage,
                 c.employee_salary,
-                cb.batch_id,
                 oc.stage_batch
             FROM candidates c
             INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
-            LEFT JOIN candidates_batches cb ON c.candidate_id = cb.candidate_id
             WHERE oc.opportunity_id = %s
         """, (opportunity_id,))
 
         rows = cursor.fetchall()
-        if not rows:
-            return jsonify([])
-
         colnames = [desc[0] for desc in cursor.description]
         data = [dict(zip(colnames, row)) for row in rows]
 
@@ -512,7 +508,38 @@ def get_candidates_by_opportunity(opportunity_id):
         return jsonify(data)
 
     except Exception as e:
+        import traceback
+        print("❌ ERROR EN GET /opportunities/<id>/candidates")
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+@app.route('/batches/<int:batch_id>/candidates')
+def get_candidates_by_batch(batch_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 
+                c.candidate_id,
+                c.name,
+                c.email,
+                c.stage
+            FROM candidates c
+            INNER JOIN candidates_batches cb ON c.candidate_id = cb.candidate_id
+            WHERE cb.batch_id = %s
+        """, (batch_id,))
+        
+        rows = cursor.fetchall()
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 
 @app.route('/candidates/<int:candidate_id>')
 def get_candidate_by_id(candidate_id):
