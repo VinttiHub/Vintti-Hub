@@ -96,9 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
   dom: 'lrtip',
   lengthMenu: [[10, 20, 50], [10, 20, 50]],
   columnDefs: [
-    { targets: [0, 1, 2, 3, 4, 5, 6, 8], width: "10%" },
-    { targets: 7, width: "30%" }
+    { targets: [0], width: "8%" },         // Stage dropdown más angosto
+    { targets: [1, 2, 3, 4, 5, 6, 8], width: "10%" },
+    { targets: 7, width: "34%" }           // Comentarios más anchos
   ],
+
   columnDefs: [
     {
       targets: 0, // Columna Stage
