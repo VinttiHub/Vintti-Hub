@@ -50,10 +50,10 @@ body {
 }
 
 
-/* MAIN CONTENT */
 .main-content {
-    flex: 1;
-    padding: 30px;
+  flex: 1;
+  padding: 30px;
+  overflow-x: hidden; /* ❌ Previene scroll horizontal global */
 }
 
 .filters-top-bar {
@@ -436,13 +436,18 @@ body {
     background-color: #b6ea2a;
 }
 .table-card {
-    background-color: #fff;
-    border-radius: 20px;
-    padding: 20px 30px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    margin-bottom: 40px;
-    overflow-x: auto; /* por si la tabla es muy ancha en pantallas pequeñas */
+  background-color: #fff;
+  border-radius: 20px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  position: relative;
 }
+
 /* SPINNER OVERLAY */
 .spinner-overlay {
   position: absolute;
@@ -544,19 +549,42 @@ body {
 }
 .hr-lead-dropdown {
   padding: 6px 10px;
+  border-radius: 12px;
   border: 1px solid #ccc;
-  border-radius: 8px;
-  background-color: #fff;
-  font-family: 'Onest', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
+  width: 130px;
+  max-width: 100%;
+  background-color: #fefefe;
   color: #333;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  transition: border 0.2s, box-shadow 0.2s;
+  font-family: 'Onest', sans-serif;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   appearance: none;
 }
+
 
 .hr-lead-dropdown:focus {
   border-color: #888;
   box-shadow: 0 0 0 2px rgba(100, 100, 250, 0.2);
   outline: none;
+}
+.table-card::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-card::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.table-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-scroll-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+#opportunityTable {
+  min-width: 1400px; /* Fuerza overflow horizontal */
+  width: max-content;
 }

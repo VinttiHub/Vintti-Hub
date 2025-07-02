@@ -301,18 +301,18 @@ def get_opportunity_by_id(opportunity_id):
         cursor = conn.cursor()
         cursor.execute("""
             SELECT 
-    o.*, 
-    a.client_name AS account_name,
-    a.size AS account_size,
-    a.state AS account_state,
-    a.linkedin AS account_linkedin,
-    a.website AS account_website,
-    a.mail AS account_mail,
-    a.comments AS account_about,
-    a.timezone AS account_timezone
-FROM opportunity o
-LEFT JOIN account a ON o.account_id = a.account_id
-WHERE o.opportunity_id = %s
+                o.*, 
+                a.client_name AS account_name,
+                a.size AS account_size,
+                a.state AS account_state,
+                a.linkedin AS account_linkedin,
+                a.website AS account_website,
+                a.mail AS account_mail,
+                a.comments AS account_about,
+                a.timezone AS account_timezone
+            FROM opportunity o
+            LEFT JOIN account a ON o.account_id = a.account_id
+            WHERE o.opportunity_id = %s
             """, (opportunity_id,))
         row = cursor.fetchone()
         if not row:
@@ -1204,7 +1204,8 @@ def update_candidate_fields(candidate_id):
         'english_level',
         'salary_range',
         'red_flags',
-        'comments'
+        'comments',
+        'sign_off'
     ]
 
     updates = []

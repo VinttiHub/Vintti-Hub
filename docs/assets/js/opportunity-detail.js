@@ -111,7 +111,26 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   newCard.querySelectorAll('.candidate-name').forEach(el => el.textContent = name);
   newCard.querySelector('.candidate-email').textContent = ''; // puedes mejorar esto si tienes el email
   newCard.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${candidateId % 10}.jpg`;
+  // 🔘 Inicializar el interruptor de sign off
+  const checkbox = newCard.querySelector('.signoff-checkbox');
+  if (checkbox) {
+    checkbox.setAttribute('data-candidate-id', candidateId);
+    checkbox.checked = false;
 
+    checkbox.addEventListener('change', async () => {
+      const signOffValue = checkbox.checked ? 'yes' : null;
+      try {
+        await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sign_off: signOffValue })
+        });
+      } catch (err) {
+        alert('❌ Error updating sign off status');
+        console.error(err);
+      }
+    });
+  }
   document.querySelector('#contacted').appendChild(newCard); // agregar a columna inicial
 
   document.getElementById('candidatePopup').classList.add('hidden');
@@ -1083,6 +1102,26 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         const cardElement = cardFragment.querySelector('.candidate-card');
 
         cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+        const checkbox = cardElement.querySelector('.signoff-checkbox');
+        checkbox.setAttribute('data-candidate-id', c.candidate_id);
+        checkbox.checked = c.sign_off === 'yes';
+
+        checkbox.addEventListener('change', async () => {
+          const candidateId = checkbox.getAttribute('data-candidate-id');
+          const signOffValue = checkbox.checked ? 'yes' : null;
+
+          try {
+            await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sign_off: signOffValue })
+            });
+          } catch (err) {
+            alert('❌ Error updating sign off status');
+            console.error(err);
+          }
+        });
+
         cardElement.querySelector(".candidate-email").textContent = c.email || '';
         cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
 
@@ -1235,7 +1274,7 @@ console.log("🧪 batchCandidates:", batchCandidates);
 
 for (let c of batchCandidates) {
   try {
-    const resumeUrl = `https://vinttihub.vintti.com/candidate-details.html?id=${c.candidate_id}`;
+    const resumeUrl = `https://vinttihub.vintti.com/resume-readonly.html?id=${c.candidate_id}`;
     console.log(`📌 Procesando candidato: ${c.name}, ID: ${c.candidate_id}`);
 
     const aboutRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${c.candidate_id}`);

@@ -96,27 +96,18 @@ document.addEventListener('DOMContentLoaded', () => {
   dom: 'lrtip',
   lengthMenu: [[10, 20, 50], [10, 20, 50]],
   columnDefs: [
-    { targets: [0], width: "8%" },         // Stage dropdown más angosto
+    { targets: [0], width: "8%" },
     { targets: [1, 2, 3, 4, 5, 6, 8], width: "10%" },
-    { targets: 7, width: "34%" }           // Comentarios más anchos
-  ],
-
-  columnDefs: [
+    { targets: 7, width: "25%" },
     {
-      targets: 0, // Columna Stage
+      targets: 0, // Stage column rendering
       render: function (data, type, row, meta) {
         if (type === 'filter' || type === 'sort') {
-          // Aquí devolvemos solo el texto de la opción seleccionada
           const div = document.createElement('div');
           div.innerHTML = data;
           const select = div.querySelector('select');
-          if (select) {
-            return select.options[select.selectedIndex].textContent;
-          } else {
-            return data;
-          }
+          return select ? select.options[select.selectedIndex].textContent : data;
         }
-        // para 'display' devolvemos el HTML completo
         return data;
       }
     }
