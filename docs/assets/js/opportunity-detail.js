@@ -203,8 +203,26 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
     ccSelect.appendChild(optionCc);
   });
 
-  emailToChoices = new Choices(toSelect, { removeItemButton: true, placeholder: true });
-  emailCcChoices = new Choices(ccSelect, { removeItemButton: true, placeholder: true });
+if (emailToChoices) emailToChoices.destroy();
+if (emailCcChoices) emailCcChoices.destroy();
+
+emailToChoices = new Choices(toSelect, {
+  removeItemButton: true,
+  placeholder: true,
+  shouldSort: false
+});
+emailCcChoices = new Choices(ccSelect, {
+  removeItemButton: true,
+  placeholder: true,
+  shouldSort: false
+});
+
+// 🔹 Forzar clase visual compacta para que no colapse
+document.querySelectorAll('.choices').forEach(el => {
+  el.classList.add('compact-choices');
+});
+
+
 });
 
 document.getElementById('closeEmailPopup').addEventListener('click', () => {
@@ -1168,16 +1186,25 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
 }
 async function openApprovalPopup(batchId) {
   const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+// Obtener info completa de la oportunidad, incluyendo client_name
+const [opportunityInfoRes, batchListRes] = await Promise.all([
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`),
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`)
+]);
+const opportunityInfo = await opportunityInfoRes.json();
+const batchList = await batchListRes.json();
+const batchInfo = batchList.find(b => b.batch_id === batchId);
 
-  const [usersRes, candidatesRes] = await Promise.all([
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users`),
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
-  ]);
+const subject = `Batch#${batchInfo.batch_number} – ${opportunityInfo.opp_position_name} – ${opportunityInfo.account_name}`;
 
-  const users = await usersRes.json();
-  const candidates = await candidatesRes.json();
+const [usersRes, batchCandidatesRes] = await Promise.all([
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users`),
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}/candidates`)
+]);
 
-  const batchCandidates = candidates.filter(c => c.batch_id === batchId);
+const users = await usersRes.json();
+const batchCandidates = await batchCandidatesRes.json();
+
 
   const toSelect = document.getElementById('approval-to');
   const ccSelect = document.getElementById('approval-cc');
@@ -1248,7 +1275,7 @@ Let us know what times work best and we’ll get things moving. Looking forward 
 Best,  
 ${yourName}`;
 
-document.getElementById('approval-subject').value = 'Candidate Shortlist for Review';
+document.getElementById('approval-subject').value = subject;
 document.getElementById('approval-message').value = body;
 
 document.getElementById('approvalEmailPopup').classList.remove('hidden');
