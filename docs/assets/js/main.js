@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tr.innerHTML = `
       <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
-      <td>${opp.account_id || ''}</td>
+      <td>${opp.client_name || ''}</td>
       <td>${opp.opp_position_name || ''}</td>
       <td>${opp.opp_type || ''}</td>
       <td>${opp.opp_model || ''}</td>
@@ -74,8 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const opportunityId = select.getAttribute('data-id');
           const currentLead = select.getAttribute('data-current');
           
-          select.innerHTML = '<option disabled>Select HR Lead</option>';
-
+          select.innerHTML = '<option disabled ' + (!currentLead ? 'selected' : '') + '>Assign HR Lead</option>';
           users
             .filter(user => allowedSubstrings.some(name => user.user_name.includes(name)))
             .forEach(user => {
@@ -96,6 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
   pageLength: 10,
   dom: 'lrtip',
   lengthMenu: [[10, 20, 50], [10, 20, 50]],
+  columnDefs: [
+    { targets: [0, 1, 2, 3, 4, 5, 6, 8], width: "10%" },
+    { targets: 7, width: "30%" }
+  ],
   columnDefs: [
     {
       targets: 0, // Columna Stage

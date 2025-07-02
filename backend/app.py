@@ -147,12 +147,15 @@ def get_opportunities():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
-            SELECT o.*, u.user_name AS sales_lead_name
+            SELECT o.*, 
+                u.user_name AS sales_lead_name,
+                a.account_name AS client_name
             FROM opportunity o
             LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
+            LEFT JOIN account a ON o.account_id = a.account_id
         """)
+
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
         data = [dict(zip(colnames, row)) for row in rows]

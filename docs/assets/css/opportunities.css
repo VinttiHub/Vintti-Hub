@@ -536,3 +536,21 @@ body {
 .popup-content .close-btn:hover {
   color: #000;
 }
+.hr-lead-dropdown {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  color: #333;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: border 0.2s, box-shadow 0.2s;
+  appearance: none;
+}
+
+.hr-lead-dropdown:focus {
+  border-color: #888;
+  box-shadow: 0 0 0 2px rgba(100, 100, 250, 0.2);
+  outline: none;
+}
