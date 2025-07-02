@@ -616,3 +616,44 @@ function adaptHireFieldsByModel(model) {
     });
   }
 }
+document.querySelectorAll('.tab').forEach(button => {
+  button.addEventListener('click', () => {
+    const selectedTab = button.getAttribute('data-tab');
+
+    const aiButton = document.getElementById('ai-action-button');
+    const clientBtn = document.getElementById('client-version-btn');
+    const candidateId = new URLSearchParams(window.location.search).get('id');
+    
+    if (clientBtn && candidateId) {
+      clientBtn.href = `resume-readonly.html?id=${candidateId}`;
+    }
+
+    if (selectedTab === 'resume') {
+      aiButton.style.display = 'flex';
+      clientBtn.style.display = 'inline-block';
+    } else {
+      aiButton.style.display = 'none';
+      clientBtn.style.display = 'none';
+    }
+  });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const aiButton = document.getElementById('ai-action-button');
+  const clientBtn = document.getElementById('client-version-btn');
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+
+  if (clientBtn && candidateId) {
+    clientBtn.href = `resume-readonly.html?id=${candidateId}`;
+  }
+
+  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
+  if (activeTab === 'resume') {
+    if (aiButton) aiButton.style.display = 'flex';
+    if (clientBtn) clientBtn.style.display = 'inline-block';
+  } else {
+    if (aiButton) aiButton.style.display = 'none';
+    if (clientBtn) clientBtn.style.display = 'none';
+  }
+});
+

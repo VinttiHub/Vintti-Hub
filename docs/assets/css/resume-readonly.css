@@ -1,0 +1,109 @@
+body {
+  font-family: 'Nunito', 'Segoe UI', sans-serif;
+  background: #fafafa;
+  color: #2b2b2b;
+  padding: 40px;
+}
+
+.cv-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03);
+  padding: 48px;
+  border: 1px solid #eee;
+}
+
+.cv-title {
+  font-size: 38px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.cv-section {
+  margin-bottom: 40px;
+}
+
+.cv-heading {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+  border-left: 5px solid #4f93ff;
+  padding-left: 12px;
+}
+
+.cv-card {
+  background: #f6f8fc;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #e3e7ee;
+}
+
+.resume-entry {
+  margin-bottom: 24px;
+  line-height: 1.7;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #d9e1ea;
+}
+
+.resume-entry:last-child {
+  border-bottom: none;
+}
+
+.resume-entry strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.resume-entry span {
+  display: block;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.resume-entry p {
+  font-size: 15px;
+  color: #374151;
+  margin: 0;
+}
+
+.tool-pill {
+  display: inline-block;
+  background: #eaf3ff;
+  color: #084298;
+  padding: 12px 16px;
+  margin: 8px 8px 0 0;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  min-width: 120px;
+}
+
+.tool-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.tool-level {
+  font-weight: 500;
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+}
+
+#readonly-video-link a {
+  color: #0a66c2;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+#readonly-video-link a:hover {
+  text-decoration: underline;
+}
