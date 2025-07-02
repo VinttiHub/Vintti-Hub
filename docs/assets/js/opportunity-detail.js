@@ -979,7 +979,7 @@ async function loadBatchesForOpportunity(opportunityId) {
       // Traer candidatos por batch desde tabla intermedia
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
-
+      console.log("🔍 batchCandidates JSON:", batchCandidates);
       batchCandidates.forEach(c => {
         const template = document.getElementById('candidate-card-template');
         const cardFragment = template.content.cloneNode(true);
@@ -1058,7 +1058,7 @@ async function reloadBatchCandidates() {
       // 🔁 Obtener candidatos desde nuevo endpoint
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
-
+      console.log("🔍 batchCandidates JSON:", batchCandidates);
       batchCandidates.forEach(c => {
         const template = document.getElementById("candidate-card-template");
         const cardFragment = template.content.cloneNode(true);

@@ -1667,13 +1667,19 @@ def delete_batch(batch_id):
     
 @app.route('/candidates/<int:candidate_id>/batch', methods=['PATCH'])
 def assign_candidate_to_batch(candidate_id):
-    data = request.get_json()
-    batch_id = data.get('batch_id')
-
-    if not batch_id:
-        return jsonify({'error': 'Missing batch_id'}), 400
+    print(f"🔄 PATCH /candidates/{candidate_id}/batch")
 
     try:
+        data = request.get_json()
+        print(f"📥 Received data: {data}")
+
+        batch_id = data.get('batch_id')
+        if not batch_id:
+            print("❌ Missing batch_id in request")
+            return jsonify({'error': 'Missing batch_id'}), 400
+
+        print(f"✅ Assigning candidate {candidate_id} to batch {batch_id}")
+
         conn = get_connection()
         cursor = conn.cursor()
 
@@ -1684,13 +1690,17 @@ def assign_candidate_to_batch(candidate_id):
         """, (candidate_id, batch_id))
 
         conn.commit()
+        print(f"✅ Insert successful")
+
         cursor.close()
         conn.close()
 
         return jsonify({'success': True}), 200
 
     except Exception as e:
+        print(f"❌ Error assigning candidate to batch: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
