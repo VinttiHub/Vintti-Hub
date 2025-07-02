@@ -517,9 +517,16 @@ def get_candidates_by_opportunity(opportunity_id):
 def get_candidates_by_batch(batch_id):
     try:
         print(f"📥 GET /batches/{batch_id}/candidates")
+
         conn = get_connection()
         cursor = conn.cursor()
 
+        print(f"🔎 Verificando existencia de batch_id: {batch_id}")
+        cursor.execute("SELECT * FROM candidates_batches WHERE batch_id = %s", (batch_id,))
+        test_rows = cursor.fetchall()
+        print(f"🧾 Resultados en candidates_batches con batch_id={batch_id}: {test_rows}")
+
+        # Ejecutar la query principal
         cursor.execute("""
             SELECT 
                 c.candidate_id,
@@ -530,16 +537,19 @@ def get_candidates_by_batch(batch_id):
             INNER JOIN candidates_batches cb ON c.candidate_id = cb.candidate_id
             WHERE cb.batch_id = %s
         """, (batch_id,))
-        
+
         rows = cursor.fetchall()
+        print(f"📊 Candidatos encontrados: {rows}")
+
         colnames = [desc[0] for desc in cursor.description]
         data = [dict(zip(colnames, row)) for row in rows]
 
-        print(f"✅ Candidatos encontrados: {len(data)} para batch_id {batch_id}")
-
-        cursor.close()
-        conn.close()
         return jsonify(data)
+
+    except Exception as e:
+        print("❌ Error en /batches/<batch_id>/candidates:", e)
+        return jsonify({'error': str(e)}), 500
+
 
     except Exception as e:
         import traceback

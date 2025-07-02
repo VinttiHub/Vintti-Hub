@@ -1200,7 +1200,7 @@ async function openApprovalPopup(batchId) {
   window.approvalToChoices = new Choices(toSelect, { removeItemButton: true });
   window.approvalCcChoices = new Choices(ccSelect, { removeItemButton: true });
 
-  const yourName = localStorage.getItem('nickname') || 'The Vintti Hub';
+  const yourName = localStorage.getItem('nickname') || 'The Vintti Team';
 
 let candidateBlocks = '';
 
