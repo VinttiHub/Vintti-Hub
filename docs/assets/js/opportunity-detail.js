@@ -968,18 +968,18 @@ async function loadBatchesForOpportunity(opportunityId) {
             <button class="btn-add">Add candidate</button>
             <button class="btn-send">Send for Approval</button>
             <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
-            box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
           </div>
         </div>
         <div class="batch-candidates"></div>
       `;
+// 👉 Este es el botón de Send for Approval
+box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
 
       const candidateContainer = box.querySelector('.batch-candidates');
 
       // Traer candidatos por batch desde tabla intermedia
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
-      console.log("🔍 batchCandidates JSON:", batchCandidates);
       batchCandidates.forEach(c => {
         const template = document.getElementById('candidate-card-template');
         const cardFragment = template.content.cloneNode(true);
@@ -1047,18 +1047,18 @@ async function reloadBatchCandidates() {
             <button class="btn-add">Add candidate</button>
             <button class="btn-send">Send for Approval</button>
             <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
-            box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
           </div>
         </div>
         <div class="batch-candidates"></div>
       `;
+// 👉 Este es el botón de Send for Approval
+box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
 
       const candidateContainer = box.querySelector(".batch-candidates");
 
       // 🔁 Obtener candidatos desde nuevo endpoint
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
-      console.log("🔍 batchCandidates JSON:", batchCandidates);
       batchCandidates.forEach(c => {
         const template = document.getElementById("candidate-card-template");
         const cardFragment = template.content.cloneNode(true);
@@ -1132,11 +1132,13 @@ for (const batch of batches) {
         <button class="btn-add">Add candidate</button>
         <button class="btn-send">Send for Approval</button>
         <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
-        box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
       </div>
     </div>
     <div class="batch-candidates"></div>
   `;
+  // 👉 Este es el botón de Send for Approval
+box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
+
 
   const candidateContainer = box.querySelector(".batch-candidates");
 
@@ -1198,13 +1200,22 @@ async function openApprovalPopup(batchId) {
   window.approvalToChoices = new Choices(toSelect, { removeItemButton: true });
   window.approvalCcChoices = new Choices(ccSelect, { removeItemButton: true });
 
-  const yourName = localStorage.getItem('nickname') || 'The Vintti Team';
+  const yourName = localStorage.getItem('nickname') || 'The Vintti Hub';
 
-  let candidateBlocks = '';
-  for (let c of batchCandidates) {
+let candidateBlocks = '';
+
+console.log("🧪 batchCandidates:", batchCandidates);
+
+for (let c of batchCandidates) {
+  try {
     const resumeUrl = `https://vinttihub.vintti.com/candidate-details.html?id=${c.candidate_id}`;
+    console.log(`📌 Procesando candidato: ${c.name}, ID: ${c.candidate_id}`);
+
     const aboutRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${c.candidate_id}`);
+    console.log(`📡 Fetch about para ${c.candidate_id}:`, aboutRes.status);
+
     const aboutData = await aboutRes.json();
+    console.log(`📄 aboutData para ${c.candidate_id}:`, aboutData);
 
     candidateBlocks += `
 Name: ${c.name}  
@@ -1213,9 +1224,14 @@ Resume: ${resumeUrl}
 ${aboutData.about?.trim() || '—'}  
   
 `;
+  } catch (error) {
+    console.error(`❌ Error procesando candidato ID ${c.candidate_id}:`, error);
   }
+}
 
-  const body = `Hi XXX,
+console.log("📦 candidateBlocks final:", candidateBlocks);
+
+const body = `Hi XXX,
 
 Hope you're doing great!
 
@@ -1232,8 +1248,9 @@ Let us know what times work best and we’ll get things moving. Looking forward 
 Best,  
 ${yourName}`;
 
-  document.getElementById('approval-subject').value = 'Candidate Shortlist for Review';
-  document.getElementById('approval-message').value = body;
+document.getElementById('approval-subject').value = 'Candidate Shortlist for Review';
+document.getElementById('approval-message').value = body;
 
-  document.getElementById('approvalEmailPopup').classList.remove('hidden');
+document.getElementById('approvalEmailPopup').classList.remove('hidden');
+
 }
