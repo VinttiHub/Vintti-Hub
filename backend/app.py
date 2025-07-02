@@ -1607,6 +1607,7 @@ def delete_salary_update(update_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/candidates/<int:candidate_id>/is_hired')
 def is_candidate_hired(candidate_id):
     try:
@@ -1621,6 +1622,7 @@ def is_candidate_hired(candidate_id):
         return jsonify({'is_hired': bool(result)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>', methods=['DELETE'])
 def delete_candidate_from_pipeline(opportunity_id, candidate_id):
     try:
@@ -1650,6 +1652,7 @@ def delete_candidate_from_pipeline(opportunity_id, candidate_id):
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
 @app.route('/batches/<int:batch_id>', methods=['DELETE'])
 def delete_batch(batch_id):
     try:
@@ -1659,6 +1662,33 @@ def delete_batch(batch_id):
         conn.commit()
         cur.close(); conn.close()
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/candidates/<int:candidate_id>/batch', methods=['PATCH'])
+def assign_candidate_to_batch(candidate_id):
+    data = request.get_json()
+    batch_id = data.get('batch_id')
+
+    if not batch_id:
+        return jsonify({'error': 'Missing batch_id'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO candidates_batches (candidate_id, batch_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (candidate_id, batch_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
