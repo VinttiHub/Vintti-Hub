@@ -225,14 +225,40 @@ candidates.forEach(candidate => {
   const card = document.createElement('div');
   card.className = 'candidate-card';
   card.setAttribute('data-candidate-id', candidate.candidate_id); 
-card.innerHTML = `
-  <div class="card-header">
-    <strong class="candidate-name">${candidate.name}</strong>
-    <span class="delete-icon" title="Delete" style="font-size: 14px; color: #c00; cursor: pointer; margin-left: auto;">🗑️</span>
-  </div>
-`;
+  const signoffChecked = candidate.sign_off === 'yes' ? 'checked' : '';
+  card.innerHTML = `
+    <div class="card-header">
+      <strong class="candidate-name">${candidate.name}</strong>
+      <span class="delete-icon" title="Delete" style="font-size: 14px; color: #c00; cursor: pointer; margin-left: auto;">🗑️</span>
+      <div class="signoff-toggle">
+        <label class="switch">
+          <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
+          <span class="slider round"></span>
+        </label>
+      </div>
+    </div>
+  `;
+
 
 card.querySelector(".delete-icon").addEventListener("click", async (e) => {
+  card.querySelector(".signoff-checkbox").addEventListener("change", async (e) => {
+  e.stopPropagation();
+  const checkbox = e.target;
+  const candidateId = checkbox.getAttribute("data-candidate-id");
+  const signOffValue = checkbox.checked ? "yes" : null;
+
+  try {
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sign_off: signOffValue }),
+    });
+    console.log(`📝 Sign off status updated for candidate ${candidateId}`);
+  } catch (err) {
+    console.error("❌ Error updating sign_off:", err);
+  }
+});
+
   e.stopPropagation(); // evitar que redireccione
 
   const candidateId = card.getAttribute("data-candidate-id");
@@ -260,12 +286,16 @@ card.querySelector(".delete-icon").addEventListener("click", async (e) => {
 
 
   enableDrag(card);
-  card.addEventListener('click', () => {
+  card.addEventListener('click', (e) => {
+    // ✅ Si el clic fue en el interruptor, no redirigir
+    if (e.target.closest('.signoff-toggle')) return;
+
     const candidateId = card.getAttribute('data-candidate-id');
     if (candidateId) {
       window.location.href = `https://vinttihub.vintti.com/candidate-details.html?id=${candidateId}`;
     }
   });
+
 
   // Mapeo del stage → columna id
   let columnId = '';
