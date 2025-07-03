@@ -1194,6 +1194,7 @@ def get_batches(opportunity_id):
 @app.route('/candidates/<int:candidate_id>', methods=['PATCH'])
 def update_candidate_fields(candidate_id):
     data = request.get_json()
+    print("🟡 PATCH recibido:", data)
 
     allowed_fields = [
         'name',

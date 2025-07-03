@@ -240,12 +240,12 @@ candidates.forEach(candidate => {
   `;
 
 
-card.querySelector(".delete-icon").addEventListener("click", async (e) => {
+  card.querySelector(".delete-icon").addEventListener("click", async (e) => {
   card.querySelector(".signoff-checkbox").addEventListener("change", async (e) => {
   e.stopPropagation();
   const checkbox = e.target;
   const candidateId = checkbox.getAttribute("data-candidate-id");
-  const signOffValue = checkbox.checked ? "yes" : null;
+  const signOffValue = checkbox.checked ? "yes" : "no";
 
   try {
     await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
