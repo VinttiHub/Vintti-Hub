@@ -1535,3 +1535,41 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(16px);
 }
+.popup-content input,
+.popup-content select,
+.popup-content textarea {
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  margin-top: 6px;
+  margin-bottom: 12px;
+  background-color: #fdfdfd;
+  transition: border 0.2s ease;
+}
+
+.search-results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+  max-height: 180px;
+  overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.search-result-item {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.search-result-item:hover {
+  background-color: #f0f0f0;
+}
+
+.hidden {
+  display: none !important;
+}
