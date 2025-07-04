@@ -788,9 +788,17 @@ async function loadPresentationTable(opportunityId) {
       });
       tdDate.appendChild(inputDate);
 
-      // Time
+      // Time (días desde presentation_date hasta hoy)
       const tdTime = document.createElement("td");
-      tdTime.textContent = batch.time || '—';
+      if (batch.presentation_date) {
+        const today = new Date();
+        const presentation = new Date(batch.presentation_date);
+        const diffMs = today - presentation;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        tdTime.textContent = diffDays;
+      } else {
+        tdTime.textContent = '—';
+      }
 
       // View button
       const tdView = document.createElement("td");

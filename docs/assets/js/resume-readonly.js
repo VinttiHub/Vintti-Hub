@@ -44,19 +44,22 @@ try {
 } catch (e) {
   console.error("❌ Error parsing education:", e);
 }
-education.forEach((edu) => {
-  const entry = document.createElement("div");
-  entry.className = "resume-entry";
-  const startDate = formatDate(edu.start_date);
-const endDate = edu.current ? "Present" : formatDate(edu.end_date);
-
-  entry.innerHTML = `
-    <strong>${edu.institution || "—"}</strong><br/>
-    <span>${edu.level || "—"} (${startDate} – ${endDate})</span><br/>
-    <p>${edu.description || ""}</p>
-  `;
-  educationList.appendChild(entry);
-});
+if (education.length === 0) {
+  document.getElementById("educationSection").style.display = "none";
+} else {
+  education.forEach((edu) => {
+    const entry = document.createElement("div");
+    entry.className = "resume-entry";
+    const startDate = formatDate(edu.start_date);
+    const endDate = edu.current ? "Present" : formatDate(edu.end_date);
+    entry.innerHTML = `
+      <strong>${edu.institution || "—"}</strong><br/>
+      <span>${edu.level || "—"} (${startDate} – ${endDate})</span><br/>
+      <p>${edu.description || ""}</p>
+    `;
+    educationList.appendChild(entry);
+  });
+}
 
 // 💼 Work Experience
 const workExperienceList = document.getElementById("workExperienceList");
@@ -87,22 +90,25 @@ try {
 } catch (e) {
   console.error("❌ Error parsing tools:", e);
 }
-tools.forEach((tool) => {
-  const wrapper = document.createElement("div");
-  wrapper.className = "tool-pill";
-  const name = typeof tool === "object" ? tool.tool : tool;
-  const level = typeof tool === "object" && tool.level ? tool.level : "";
-  wrapper.innerHTML = `
-    <div class="tool-name">${name}</div>
-    <div class="tool-level">${level}</div>
-  `;
-  toolsList.appendChild(wrapper);
-});
-
+if (tools.length === 0) {
+  document.getElementById("toolsSection").style.display = "none";
+} else {
+  tools.forEach((tool) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "tool-pill";
+    const name = typeof tool === "object" ? tool.tool : tool;
+    const level = typeof tool === "object" && tool.level ? tool.level : "";
+    wrapper.innerHTML = `
+      <div class="tool-name">${name}</div>
+      <div class="tool-level">${level}</div>
+    `;
+    toolsList.appendChild(wrapper);
+  });
+}
 
     // 📹 Video Link
     const videoDiv = document.getElementById("readonly-video-link");
-    if (data.video_link && data.video_link !== "[]") {
+    if (data.video_link && data.video_link.trim() !== "") {
       const link = document.createElement("a");
       link.href = data.video_link;
       link.target = "_blank";
@@ -110,9 +116,8 @@ tools.forEach((tool) => {
       videoDiv.innerHTML = "";
       videoDiv.appendChild(link);
     } else {
-      videoDiv.textContent = "—";
+      videoDiv.closest(".cv-section").style.display = "none";
     }
-
   } catch (error) {
     console.error("❌ Error loading resume data:", error);
   }
