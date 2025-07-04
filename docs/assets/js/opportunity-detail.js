@@ -475,6 +475,7 @@ if (tabName === 'Candidates') {
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   if (opportunityId && opportunityId !== '—') {
     loadBatchesForOpportunity(opportunityId);
+    loadPresentationTable(opportunityId);
   } else {
     console.error('Opportunity ID is invalid:', opportunityId);
   }
@@ -754,6 +755,62 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
     alert('❌ Failed to send email');
   }
 });
+async function loadPresentationTable(opportunityId) {
+  const tableBody = document.getElementById("presentation-batch-table-body");
+  tableBody.innerHTML = '';
+
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const batches = await res.json();
+
+    batches.forEach(batch => {
+      // Solo mostrar si hay presentation_date
+      if (!batch.presentation_date) return;
+
+      const tr = document.createElement("tr");
+
+      // Batch #
+      const tdBatch = document.createElement("td");
+      tdBatch.textContent = `#${batch.batch_number}`;
+
+      // Presentation Date
+      const tdDate = document.createElement("td");
+      const inputDate = document.createElement("input");
+      inputDate.type = "date";
+      inputDate.value = formatDate(batch.presentation_date);
+      inputDate.addEventListener("blur", async () => {
+        const updated = { presentation_date: inputDate.value };
+        await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated)
+        });
+      });
+      tdDate.appendChild(inputDate);
+
+      // Time
+      const tdTime = document.createElement("td");
+      tdTime.textContent = batch.time || '—';
+
+      // View button
+      const tdView = document.createElement("td");
+      const viewBtn = document.createElement("button");
+      viewBtn.textContent = "View";
+      viewBtn.classList.add("view-btn");
+      // Agrega acción si necesitas
+      tdView.appendChild(viewBtn);
+
+      tr.appendChild(tdBatch);
+      tr.appendChild(tdDate);
+      tr.appendChild(tdTime);
+      tr.appendChild(tdView);
+      tableBody.appendChild(tr);
+    });
+
+  } catch (err) {
+    console.error("❌ Error loading batches for presentation table:", err);
+  }
+}
 
 });
 
