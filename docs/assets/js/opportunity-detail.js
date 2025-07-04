@@ -16,7 +16,6 @@ document.getElementById('closeChoosePopup').addEventListener('click', () => {
 
 document.getElementById('openNewCandidatePopup').addEventListener('click', () => {
   document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
-  document.getElementById('candidatePopup').classList.remove('hidden');
 
   // Mostrar campos
   document.getElementById('extra-fields').style.display = 'block';
@@ -35,7 +34,67 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', () =>
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
 });
+document.getElementById('openNewCandidatePopup').addEventListener('click', async () => {
+  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
+  document.getElementById('preCreateCheckPopup').classList.remove('hidden');
 
+  const input = document.getElementById('precreate-search');
+  const results = document.getElementById('precreate-results');
+  const foundMsg = document.getElementById('precreate-found-msg');
+  const noMatch = document.getElementById('precreate-no-match');
+
+  input.value = '';
+  results.innerHTML = '';
+  foundMsg.style.display = 'none';
+  noMatch.style.display = 'none';
+
+  const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates');
+  const candidates = await res.json();
+
+  input.addEventListener('input', () => {
+    const term = input.value.toLowerCase().trim().split(' ');
+    results.innerHTML = '';
+    foundMsg.style.display = 'none';
+    noMatch.style.display = 'none';
+
+    const matches = candidates.filter(c => {
+      const nameTokens = c.name.toLowerCase().split(' ');
+      return term.every(t =>
+        nameTokens.some(n => n.includes(t)) ||
+        t.includes(nameTokens.join(' '))
+      );
+    });
+
+    if (matches.length === 0 && term.join('').length > 3) {
+      noMatch.style.display = 'block';
+    } else if (matches.length > 0) {
+      foundMsg.style.display = 'block';
+      matches.forEach(c => {
+        const li = document.createElement('li');
+        li.textContent = c.name;
+        li.classList.add('search-result-item');
+        results.appendChild(li);
+      });
+    }
+  });
+});
+
+document.getElementById('goToCreateCandidateBtn').addEventListener('click', () => {
+  document.getElementById('preCreateCheckPopup').classList.add('hidden');
+  document.getElementById('candidatePopup').classList.remove('hidden');
+
+  document.getElementById('extra-fields').style.display = 'block';
+  document.getElementById('popupcreateCandidateBtn').style.display = 'block';
+  document.getElementById('popupAddExistingBtn').style.display = 'none';
+
+  const input = document.getElementById('candidate-name');
+  input.value = '';
+  input.placeholder = 'Full name';
+  input.removeAttribute('data-candidate-id');
+});
+document.getElementById('closePreCreatePopup').addEventListener('click', () => {
+  document.getElementById('preCreateCheckPopup').classList.add('hidden');
+});
 
 document.getElementById('openExistingCandidatePopup').addEventListener('click', async () => {
   document.getElementById('chooseCandidateActionPopup').classList.add('hidden');

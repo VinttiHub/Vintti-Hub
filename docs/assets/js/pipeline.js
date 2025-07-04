@@ -68,68 +68,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
     });
-// Mostrar popup al hacer clic en “+ Add Candidate”
-// Mostrar popup al hacer clic en “+ Add Candidate”
-document.getElementById("createCandidateBtn").addEventListener("click", () => {
-  const nameInput = document.getElementById("candidate-name");
-  const resultsList = document.getElementById("candidateSearchResults");
-  const warning = document.getElementById("name-warning");
-  const createBtn = document.getElementById("popupcreateCandidateBtn");
-  const addExistingBtn = document.getElementById("popupAddExistingBtn");
-  const extraFields = document.getElementById("extra-fields");
-
-  let selectedExisting = null;
-
-  // mostrar siempre warning y ambos botones
-  warning.style.display = "block";
-  createBtn.style.display = "";
-  addExistingBtn.style.display = "";
-
-  nameInput.value = "";
-  resultsList.innerHTML = "";
-  extraFields.style.display = "";
-
-  nameInput.addEventListener("input", async () => {
-    const query = nameInput.value.trim();
-    if (query.length < 2) {
-      resultsList.innerHTML = "";
-      return;
-    }
-
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(query)}`);
-    const data = await res.json();
-
-    resultsList.innerHTML = "";
-    data.forEach(c => {
-      const li = document.createElement("li");
-      li.textContent = c.name;
-      li.dataset.id = c.candidate_id;
-      li.style.cursor = "pointer";
-      li.addEventListener("click", () => {
-        selectedExisting = c;
-        nameInput.value = c.name;
-        resultsList.innerHTML = "";
-        extraFields.style.display = "none";
-        createBtn.style.display = "none";
-        addExistingBtn.style.display = "";
-      });
-      resultsList.appendChild(li);
-    });
-  });
-
-  nameInput.addEventListener("change", () => {
-    if (!selectedExisting || nameInput.value !== selectedExisting.name) {
-      selectedExisting = null;
-      warning.style.display = "block";
-      extraFields.style.display = "";
-      createBtn.style.display = "";
-      addExistingBtn.style.display = "none";
-      resultsList.innerHTML = "";
-    }
-  });
-
-  document.getElementById("candidatePopup").classList.remove("hidden");
-});
 
 document.getElementById("closePopup").addEventListener("click", () => {
   document.getElementById("candidatePopup").classList.add("hidden");
