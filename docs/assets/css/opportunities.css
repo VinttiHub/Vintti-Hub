@@ -593,10 +593,3 @@ body {
   color: #c00 !important;
   font-weight: bold;
 }
-
-.batch-alert-row::before {
-  content: "⚠️";
-  position: absolute;
-  left: -20px;
-  font-size: 12px;
-}
