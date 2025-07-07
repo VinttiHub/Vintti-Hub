@@ -589,7 +589,7 @@ body {
   width: max-content;
 }
 .red-cell {
-  background-color: #ffe5e5 !important;
-  color: #c00 !important;
+  background-color: #f9e5e5 !important;
+  color: rgb(204, 78, 78) !important;
   font-weight: bold;
 }
