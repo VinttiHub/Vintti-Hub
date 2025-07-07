@@ -154,7 +154,7 @@
       </div>
   
       <div class="job-card">
-        <textarea id="job-description-textarea" style="width: 100%; height: 400px; padding: 10px; font-size: 1rem;"></textarea>
+        <textarea id="job-description-textarea" class="styled-textarea" style="width: 100%; max-width: 98%; height: 400px; padding: 10px; font-size: 1rem; border-radius: 8px;"></textarea> 
       </div>
     </section>
     
@@ -239,6 +239,7 @@
   <!-- AI Assistant Popup -->
   <div id="ai-assistant-popup" class="ai-popup hidden">
     <div class="ai-popup-content">
+      <span class="ai-close-x" onclick="closeAiPopup()">×</span>
       <h2>AI Assistant</h2>
       <label>Intro Call</label>
       <textarea placeholder="00:00 Speaker: Text here..."></textarea>
@@ -250,13 +251,13 @@
       <textarea placeholder="Your notes here..."></textarea>
 
       <label>Files</label>
-      <div class="file-upload">
-        <input type="file" />
-        <div class="upload-icon">☁️⬆️</div>
+      <div class="file-upload" onclick="document.getElementById('ai-file-input').click()">
+        <input type="file" id="ai-file-input" />
+        <div class="upload-icon">📁</div>
       </div>
-
-      <button id="ai-assistant-go">Let's Go 🚀</button>
-      <button id="ai-assistant-close">Close</button>
+      <div class="button-group">
+        <button id="ai-assistant-go">Let's Go 🚀</button>
+      </div>
     </div>
   </div>
     <!-- ADD Candidate Popup -->

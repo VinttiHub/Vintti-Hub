@@ -1390,3 +1390,6 @@ document.getElementById('approval-message').value = body;
 document.getElementById('approvalEmailPopup').classList.remove('hidden');
 
 }
+function closeAiPopup() {
+  document.getElementById('ai-assistant-popup').classList.add('hidden');
+}
