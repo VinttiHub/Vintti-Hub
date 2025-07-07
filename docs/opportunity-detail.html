@@ -239,7 +239,7 @@
   <!-- AI Assistant Popup -->
   <div id="ai-assistant-popup" class="ai-popup hidden">
     <div class="ai-popup-content">
-      <span class="ai-close-x" onclick="closeAiPopup()">×</span>
+      <span id="ai-assistant-close" class="ai-close-x">×</span>
       <h2>AI Assistant</h2>
       <label>Intro Call</label>
       <textarea placeholder="00:00 Speaker: Text here..."></textarea>
@@ -266,6 +266,7 @@
         <span class="close-btn" id="closePopup">&times;</span>
         <h2>Add Candidate</h2>
         <input type="text" id="candidate-name" placeholder="Full name" autocomplete="off"/>
+        <p id="name-warning" style="display: none;">Please select a candidate from the list</p>
         <ul id="pipelineCandidateSearchResults" class="search-results-list"></ul>
         <div id="extra-fields">
         <input type="text" id="candidate-email" placeholder="Email" />
@@ -301,7 +302,7 @@
   <div class="candidate-card">
     <div class="candidate-card-header">
       <strong class="candidate-name">Name</strong>
-      <select class="candidate-status-dropdown">
+      <select class="candidate-status-dropdown pipeline-only-hide">
         <option disabled selected>Status</option>
         <option value="Client rejected CV">Client rejected CV</option>
         <option value="Client interviewing/testing">Client interviewing/testing</option>

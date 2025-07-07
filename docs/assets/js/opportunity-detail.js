@@ -21,6 +21,10 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', () =>
   document.getElementById('extra-fields').style.display = 'block';
   document.getElementById('popupcreateCandidateBtn').style.display = 'block';
   document.getElementById('popupAddExistingBtn').style.display = 'none';
+  const nameWarning = document.getElementById('name-warning');
+  if (nameWarning) {
+    nameWarning.style.display = 'none'; // o 'block' si es el otro caso
+  }
   document.getElementById('name-warning').style.display = 'none';
   document.getElementById('pipelineCandidateSearchResults').innerHTML = '';
 
@@ -99,12 +103,13 @@ document.getElementById('closePreCreatePopup').addEventListener('click', () => {
 document.getElementById('openExistingCandidatePopup').addEventListener('click', async () => {
   document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
 
-  // Mostrar solo buscador y botón azul
   document.getElementById('candidatePopup').classList.remove('hidden');
   document.getElementById('popupAddExistingBtn').style.display = 'block';
   document.getElementById('popupcreateCandidateBtn').style.display = 'none';
   document.getElementById('extra-fields').style.display = 'none';
-  document.getElementById('name-warning').style.display = 'block';
+
+  const warning = document.getElementById('name-warning');
+  if (warning) warning.style.display = 'block';
 
   const input = document.getElementById('candidate-name');
   const list = document.getElementById('pipelineCandidateSearchResults');
@@ -113,33 +118,28 @@ document.getElementById('openExistingCandidatePopup').addEventListener('click', 
   input.placeholder = 'Full name or search...';
   input.removeAttribute('data-candidate-id');
 
-  // ⚠️ Limpiar buscador viejo si existe
+  // Limpiar input anterior (por si tenía eventos)
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
 
-  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches', {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    candidate_id: candidateId,
-    batch_id: selectedBatch.batch_id
-  })
-});
-
+  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates');
   const candidates = await response.json();
 
   newInput.addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase().trim().split(' ');
     list.innerHTML = '';
+
     candidates.forEach(c => {
       const nameTokens = c.name.toLowerCase().split(' ');
       const match = term.every(t => nameTokens.some(n => n.includes(t)));
+
       if (match) {
         const li = document.createElement('li');
         li.textContent = c.name;
         li.classList.add('search-result-item');
         li.setAttribute('data-candidate-id', c.candidate_id);
         list.appendChild(li);
+
         li.addEventListener('click', () => {
           newInput.value = c.name;
           newInput.setAttribute('data-candidate-id', c.candidate_id);
@@ -148,6 +148,7 @@ document.getElementById('openExistingCandidatePopup').addEventListener('click', 
     });
   });
 });
+
 
 // 🔹 Agregar candidato existente al pipeline
 document.getElementById('popupAddExistingBtn').addEventListener('click', async () => {
@@ -170,6 +171,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   newCard.querySelectorAll('.candidate-name').forEach(el => el.textContent = name);
   newCard.querySelector('.candidate-email').textContent = ''; // puedes mejorar esto si tienes el email
   newCard.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${candidateId % 10}.jpg`;
+  newCard.querySelector('.candidate-status-dropdown')?.remove();
   document.querySelector('#contacted').appendChild(newCard); // agregar a columna inicial
 
   document.getElementById('candidatePopup').classList.add('hidden');
@@ -541,6 +543,7 @@ aiGo.addEventListener('click', async () => {
 // Popup para agregar candidato al batch
 document.addEventListener("click", async (e) => {
   if (e.target.classList.contains("btn-add")) {
+    console.log("✅ Click en Add Candidate detectado");
     const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
     if (!opportunityId || opportunityId === '—') return;
 

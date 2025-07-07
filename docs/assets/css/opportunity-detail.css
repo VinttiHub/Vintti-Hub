@@ -410,9 +410,37 @@ body {
   align-items: flex-start;
   flex-direction: row-reverse;
 }
-/* ==== JOB DESCRIPTION SECTION ==== */
+#batchCandidatePopup {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.7);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
 
-/* ==== JOB SECTION ==== */
+.popup:not(.hidden) {
+  display: flex;
+}
+#batchCandidatePopup:not(.hidden) {
+  display: flex;
+}
+
+#batchCandidatePopup .popup-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 90%;
+  margin: auto;
+  position: relative;
+}
+
 
 #job .job-header {
   display: flex;
@@ -613,7 +641,7 @@ body {
   margin-bottom: 0.5rem;
   padding-left: 0.3rem;
   text-transform: uppercase;
-  color: #5d3dbd; /* Lila oscuro */
+  color: #1b1b1b; /* Lila oscuro */
   letter-spacing: 0.3px;
   font-weight: 600;
 }
@@ -650,10 +678,6 @@ body {
     font-size: 0.7rem;
     margin-top: 0.3rem;
     color: #777;
-  }
-  
-  .pipeline-section {
-    cursor: url('https://cdn.custom-cursor.com/db/8721/32/premium-breeze-cursor.png'), auto;
   }
   .candidate-card {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -886,9 +910,11 @@ body {
 }
 
 .candidate-name {
-  font-weight: 600;
-  flex: 1;
+  font-size: 1.2rem;
+  font-weight: 400;
+  color: #0a1f44;
 }
+
 
 .budget {
   padding: 0.3rem 0.6rem;
@@ -918,9 +944,13 @@ body {
 }
 
 .btn-add {
-  background-color: var(--accent);
-  color: white;
+  position: relative;
+  z-index: 9999;
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
 }
+
 
 .btn-send {
   background-color: #e0e0e0;
@@ -1198,15 +1228,23 @@ body {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
-  background-color: #fff8fc; /* lila pálido */
+  background-color: #fff8fc;  /* ✅ Asegura que los elementos se apilen verticalmente */
+  align-items: stretch;       /* ✅ Que ocupen todo el ancho */
+  gap: 1rem;                  /* Espacio entre batches */
+  width: 97%;
+  height: auto;
+  overflow: visible;  
 }
+
 .popup {
+  display: none;
   position: fixed;
   top: 0; left: 0;
   width: 100vw; height: 100vh;
   background-color: rgba(0, 0, 0, 0.7);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
 }
 
 #candidateSearchInput {
@@ -1323,14 +1361,6 @@ input::-webkit-contacts-auto-fill-button {
   position: absolute;
   right: 0;
 }
-.popup {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex; justify-content: center; align-items: center;
-  z-index: 999;
-}
 .popup-content {
   background: white;
   padding: 20px;
@@ -1360,7 +1390,9 @@ input::-webkit-contacts-auto-fill-button {
   background-color: var(--card-bg, #fff);
   box-shadow: 0 0 4px rgba(0,0,0,0.05);
   margin-bottom: 1rem;
+  min-height: 50px;
 }
+
 
 .candidate-card-header {
   display: flex;
@@ -1420,6 +1452,20 @@ select {
   background: var(--card-bg, #fff);
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
   text-align: center;
+}
+.candidate-status-dropdown {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  background: white;
+  z-index: 9999;
+  max-height: 40px;        /* Limita altura máxima */
+  overflow-y: auto;         /* Permite hacer scroll si se desborda */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 #chooseCandidateActionPopup h2 {
@@ -1753,7 +1799,7 @@ input:checked + .slider:before {
 }
 
 .hidden {
-  display: none !important;
+  display: none;
 }
 #precreate-no-match p {
   margin-bottom: 6px;
