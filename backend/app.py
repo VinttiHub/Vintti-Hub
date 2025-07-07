@@ -363,14 +363,16 @@ def create_opportunity():
             return jsonify({'error': f'No account found for client_name: {client_name}'}), 400
 
         account_id = account_row[0]
-        query = """
+        # 🔍 Obtener el siguiente opportunity_id
+        cursor.execute("SELECT COALESCE(MAX(opportunity_id), 0) + 1 FROM opportunity")
+        new_opportunity_id = cursor.fetchone()[0]
+
+        # 🔽 Insertar con ID manual
+        cursor.execute("""
             INSERT INTO opportunity (
-                account_id, opp_model, opp_position_name, opp_sales_lead, opp_type, opp_stage
-            ) VALUES (%s, %s, %s, %s, %s, %s)
-            """
-        cursor.execute(query, (account_id, opp_model, position_name, sales_lead, opp_type, 'Deep Dive'))
-
-
+                opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead, opp_type, opp_stage
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (new_opportunity_id, account_id, opp_model, position_name, sales_lead, opp_type, 'Deep Dive'))
         conn.commit()
 
         cursor.close()
