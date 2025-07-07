@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Opportunity Details</title>
@@ -29,20 +30,17 @@
   <main class="detail-main">
     <section id="overview" class="detail-section">
       <div class="section-header">
-        <h2>Overview</h2>
+        <h2 class="overview-title">Overview</h2>
         <p class="section-subtext"> </p>
       </div>
 
-<div class="overview-card">
+<div class="overview-card pastel-card" style="padding-top: 2rem;">
   <div class="stage-top">
-    <div>
-      <label class="section-label">Opportunity ID</label>
-      <div class="stage-id">
-        <span id="opportunity-id-text" data-id="">—</span>
-      </div>
+    <div class="opportunity-id-card">
+      <span class="label">Opportunity ID</span>
+      <span id="opportunity-id-text" data-id="">1</span>
     </div>
   </div>
-
   <div class="overview-grid">
     <div class="input-group">
       <label>Start Date</label>
@@ -61,7 +59,7 @@
       <input id="hire-display" type="text" readonly placeholder="No hire assigned yet" />
     </div>
   </div>
-  <div class="input-group full">
+  <div class="input-group comments-group">
   <label>Comments</label>
   <textarea id="comments-overview-textarea" placeholder="Write internal comments here..."></textarea>
 </div>
