@@ -15,15 +15,15 @@
     <div class="header-left">
       <h1 class="detail-title">Opportunity Detail</h1>
     </div>
-    <nav class="detail-nav">
-      <ul>
-        <li class="nav-item active">Overview</li>
-        <li class="nav-item">Job Description</li>
-        <li class="nav-item">Pipeline</li>
-        <li class="nav-item">Candidates</li>
-        <div class="nav-indicator"></div>
-      </ul>
-    </nav>
+      <nav class="detail-nav">
+        <ul>
+          <li class="nav-item active">Overview</li>
+          <li class="nav-item">Job Description</li>
+          <li class="nav-item">Pipeline</li>
+          <li class="nav-item">Candidates</li>
+          <div class="nav-indicator"></div>
+        </ul>
+      </nav>
   </header>
 
   <main class="detail-main">
@@ -78,16 +78,10 @@
   <div class="card-content">
     <div class="overview-grid">
       <div class="input-group"><label>Name</label><input id="client-name-input" value="" readonly/></div>
-      <div class="input-group"><label>Size</label>
-          <select id="client-size-input" disabled>
-            <option value="">Select Size...</option>
-            <option value="1-10">1-10</option>
-            <option value="11-50">11-50</option>
-            <option value="51-200">51-200</option>
-            <option value="201-500">201-500</option>
-            <option value="+500">+500</option>
-          </select>
-          </div>
+      <div class="input-group">
+        <label>Size</label>
+        <input type="text" id="client-size-input" value="" readonly />
+      </div>
       <div class="input-group"><label>State</label><input id="client-state-input" value="" ></div>
       <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value="" ></div>
       <div class="input-group"><label>Website</label><input id="client-website-input" value="" ></div>

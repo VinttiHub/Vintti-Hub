@@ -1,6 +1,5 @@
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.body.classList.add('light-mode');
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
 
