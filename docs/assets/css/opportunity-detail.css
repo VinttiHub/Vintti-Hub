@@ -1390,7 +1390,7 @@ input::-webkit-contacts-auto-fill-button {
   background-color: var(--card-bg, #fff);
   box-shadow: 0 0 4px rgba(0,0,0,0.05);
   margin-bottom: 1rem;
-  min-height: 50px;
+  min-height: 40px;
 }
 
 
