@@ -30,6 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
         daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
       }
       const tr = document.createElement('tr');
+      let daysSinceBatch = '-';
+      if (opp.since_sourcing || opp.nda_signature_or_start_date) {
+        const refDate = opp.since_sourcing || opp.nda_signature_or_start_date;
+        const diff = calculateDaysAgo(refDate);
+        daysSinceBatch = diff;
+
+        // ⚠️ Si son 7 días o más, agregamos clase de alerta
+        if (diff >= 7) {
+          tr.classList.add('batch-alert-row');
+        }
+      }
 
     tr.innerHTML = `
       <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
@@ -47,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
       </td>
       <td>${daysAgo}</td>
+      <td class="${daysSinceBatch >= 7 ? 'red-cell' : ''}">${daysSinceBatch}</td>
     `;
     tr.querySelectorAll('td').forEach((cell, index) => {
       // Guardar el índice como atributo para acceso rápido
@@ -524,7 +536,8 @@ function openSourcingPopup(opportunityId, dropdownElement) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nda_signature_or_start_date: date
+          nda_signature_or_start_date: date,
+          since_sourcing: new Date().toISOString().slice(0, 10)
         })
       });
 

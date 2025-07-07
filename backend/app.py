@@ -605,6 +605,7 @@ def update_opportunity_fields(opportunity_id):
 
     allowed_fields = [
         'nda_signature_or_start_date',
+        'since_sourcing',
         'opp_position_name',
         'opp_model',
         'min_budget',
