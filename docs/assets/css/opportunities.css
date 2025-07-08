@@ -593,3 +593,76 @@ body {
   color: rgb(204, 78, 78) !important;
   font-weight: bold;
 }
+/* 1. Estilo de tarjeta para cada fila */
+#opportunityTable tbody tr {
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: background 0.3s ease;
+}
+
+#opportunityTable tbody tr:hover {
+  background: linear-gradient(to right, #e3f2fd, #f0f8ff);
+}
+
+/* 2. Centrar columna Days + más espacio Days Since Batch */
+#opportunityTable tbody td:nth-child(9) {
+  text-align: center;
+}
+
+#opportunityTable thead th:nth-child(10),
+#opportunityTable tbody td:nth-child(10) {
+  min-width: 140px;
+}
+
+/* 3. Sombra rosa en campo comments */
+.comment-input:focus {
+  outline: none;
+  border-color: #ffb3e6;
+  box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
+}
+
+/* 4. Colores pastel para stage */
+.stage-dropdown option[value="Negotiating"] {
+  background-color: #fce3ec;
+}
+.stage-dropdown option[value="Interviewing"] {
+  background-color: #edf5ff;
+}
+.stage-dropdown option[value="Sourcing"] {
+  background-color: #e6fff5;
+}
+.stage-dropdown option[value="NDA Sent"] {
+  background-color: #fff4e6;
+}
+.stage-dropdown option[value="Deep Dive"] {
+  background-color: #f3e6ff;
+}
+.stage-dropdown option[value="Close Win"] {
+  background-color: #e1ffe1;
+}
+.stage-dropdown option[value="Closed Lost"] {
+  background-color: #ffe6e6;
+}
+
+/* 5. Colores pastel para HR Lead */
+.hr-lead-dropdown option[value*="Pilar"] {
+  background-color: #fce4ff;
+}
+.hr-lead-dropdown option[value*="Jazmin"] {
+  background-color: #e6faff;
+}
+.hr-lead-dropdown option[value*="Agostina"] {
+  background-color: #fff5e6;
+}
+.hr-lead-dropdown option[value*="Sol"] {
+  background-color: #f0fff4;
+}
+
+/* 6. Sombra rosita al enfocar dropdowns */
+.stage-dropdown:focus,
+.hr-lead-dropdown:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
+  border-color: #ffb3e6;
+}

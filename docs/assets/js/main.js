@@ -23,127 +23,115 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      data.forEach(opp => {
-        let daysAgo = '';
-        if (opp.nda_signature_or_start_date) {
-          daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
-        }
+    // 👇 Orden de etapas personalizado
+    const stageOrder = [
+      'Negotiating',
+      'Interviewing',
+      'Sourcing',
+      'NDA Sent',
+      'Deep Dive',
+      'Close Win',
+      'Closed Lost'
+    ];
 
-        const tr = document.createElement('tr');
-        let daysSinceBatch = '-';
-
-        async function fetchDaysSinceBatch(opp) {
-          const oppId = opp.opportunity_id;
-          console.log(`🔎 Buscando días desde batch para opp_id=${oppId}`);
-          let referenceDate = null;
-
-          try {
-            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
-            const result = await res.json();
-            console.log(`📦 Resultado de /latest_sourcing_date para opp ${oppId}:`, result);
-
-            if (result.latest_sourcing_date) {
-              referenceDate = new Date(result.latest_sourcing_date);
-              console.log(`✅ Fecha más reciente en sourcing: ${referenceDate}`);
-            } else if (opp.nda_signature_or_start_date) {
-              referenceDate = new Date(opp.nda_signature_or_start_date);
-              console.log(`📁 Usando nda_signature_or_start_date: ${referenceDate}`);
-            } else {
-              console.log(`⚠️ No hay fecha en sourcing ni en nda_signature_or_start_date para opp ${oppId}`);
-            }
-
-            if (referenceDate) {
-              const today = new Date();
-              const diffTime = today - referenceDate;
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              console.log(`📆 Días calculados: ${diffDays}`);
-              return diffDays;
-            }
-
-            return '';
-          } catch (err) {
-            console.error(`❌ Error fetching sourcing date para opp ${oppId}:`, err);
-            return '';
-          }
-        }
-
-        fetchDaysSinceBatch(opp).then(result => {
-          const cell = tr.querySelector('td:last-child');
-          console.log(`💬 Resultado final de daysSinceBatch para opp ${opp.opportunity_id}:`, result);
-          if (cell) {
-            cell.textContent = result || '';
-            if (!isNaN(result) && parseInt(result) >= 7) {
-              cell.classList.add('red-cell');
-              cell.innerHTML += ' ⚠️';
-            }
-          }
-        });
-
-
-    tr.innerHTML = `
-      <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
-      <td>${opp.client_name || ''}</td>
-      <td>${opp.opp_position_name || ''}</td>
-      <td>${opp.opp_type || ''}</td>
-      <td>${opp.opp_model || ''}</td>
-      <td>${opp.sales_lead_name || ''}</td>
-      <td>
-        <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}" data-current="${opp.opp_hr_lead || ''}">
-          <option disabled ${opp.opp_hr_lead ? '' : 'selected'}>Assign HR Lead</option>
-        </select>
-      </td>
-      <td>
-        <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
-      </td>
-      <td>${daysAgo}</td>
-      <td class="${daysSinceBatch >= 7 ? 'red-cell' : ''}">${daysSinceBatch}</td>
-    `;
-    tr.querySelectorAll('td').forEach((cell, index) => {
-      // Guardar el índice como atributo para acceso rápido
-      cell.setAttribute('data-col-index', index);
+    // 👇 Agrupar oportunidades por stage
+    const grouped = {};
+    data.forEach(opp => {
+      const stage = opp.opp_stage || '—';
+      if (!grouped[stage]) grouped[stage] = [];
+      grouped[stage].push(opp);
     });
 
-    tr.addEventListener('click', (e) => {
-      const td = e.target.closest('td');
-      if (!td) return;
+    // 👇 Vaciar tbody
+    tbody.innerHTML = '';
 
-      const cellIndex = parseInt(td.getAttribute('data-col-index'), 10);
+    // 👇 Insertar oportunidades en orden
+    stageOrder.forEach(stage => {
+      if (grouped[stage]) {
+        grouped[stage].forEach(opp => {
+          let daysAgo = '';
+          if (opp.nda_signature_or_start_date) {
+            daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
+          }
 
-      if ([0, 6, 7].includes(cellIndex)) {
-        return;
+          const tr = document.createElement('tr');
+          let daysSinceBatch = '-';
+
+          async function fetchDaysSinceBatch(opp, tr) {
+            const oppId = opp.opportunity_id;
+            let referenceDate = null;
+
+            try {
+              const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
+              const result = await res.json();
+
+              if (result.latest_sourcing_date) {
+                referenceDate = new Date(result.latest_sourcing_date);
+              } else if (opp.nda_signature_or_start_date) {
+                referenceDate = new Date(opp.nda_signature_or_start_date);
+              }
+
+              if (referenceDate) {
+                const today = new Date();
+                const diffTime = today - referenceDate;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const cell = tr.querySelector('td:last-child');
+                if (cell) {
+                  cell.textContent = diffDays;
+                  if (diffDays >= 7) {
+                    cell.classList.add('red-cell');
+                    cell.innerHTML += ' ⚠️';
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`Error fetching sourcing date para opp ${oppId}:`, err);
+            }
+          }
+
+          tr.innerHTML = `
+            <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
+            <td>${opp.client_name || ''}</td>
+            <td>${opp.opp_position_name || ''}</td>
+            <td>${opp.opp_type || ''}</td>
+            <td>${opp.opp_model || ''}</td>
+            <td>${opp.sales_lead_name || ''}</td>
+            <td>
+              <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}" data-current="${opp.opp_hr_lead || ''}">
+                <option disabled ${opp.opp_hr_lead ? '' : 'selected'}>Assign HR Lead</option>
+              </select>
+            </td>
+            <td>
+              <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
+            </td>
+            <td>${daysAgo}</td>
+            <td>${daysSinceBatch}</td>
+          `;
+
+          tr.querySelectorAll('td').forEach((cell, index) => {
+            cell.setAttribute('data-col-index', index);
+          });
+
+          tr.addEventListener('click', (e) => {
+            const td = e.target.closest('td');
+            if (!td) return;
+            const cellIndex = parseInt(td.getAttribute('data-col-index'), 10);
+            if ([0, 6, 7].includes(cellIndex)) return;
+            openOpportunity(opp.opportunity_id);
+          });
+
+          tbody.appendChild(tr);
+          fetchDaysSinceBatch(opp, tr);
+        });
       }
-
-      openOpportunity(opp.opportunity_id);
-    });
-    fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
-      .then(response => response.json())
-      .then(users => {
-        const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina','Sol'];
-
-        document.querySelectorAll('.hr-lead-dropdown').forEach(select => {
-          const opportunityId = select.getAttribute('data-id');
-          const currentLead = select.getAttribute('data-current');
-          
-          select.innerHTML = '<option disabled ' + (!currentLead ? 'selected' : '') + '>Assign HR Lead</option>';
-          users
-            .filter(user => allowedSubstrings.some(name => user.user_name.includes(name)))
-            .forEach(user => {
-              const option = document.createElement('option');
-              option.value = user.email_vintti;
-              option.textContent = user.user_name;
-              if (currentLead === user.email_vintti) option.selected = true;
-              select.appendChild(option);
-            });
-        });
-      });
-      tbody.appendChild(tr);
-
     });
 
-      const table = $('#opportunityTable').DataTable({
+
+  const table = $('#opportunityTable').DataTable({
   responsive: true,
   pageLength: 10,
   dom: 'lrtip',
+  ordering: false,
   lengthMenu: [[10, 20, 50], [10, 20, 50]],
   columnDefs: [
     { targets: [0], width: "8%" },
@@ -273,6 +261,28 @@ helloBtn.addEventListener('click', async () => {
   }
 });
   }
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('stage-dropdown') || e.target.classList.contains('hr-lead-dropdown')) {
+    const select = e.target;
+    const value = select.value;
+
+    let pastel = '';
+    if (value === 'Negotiating') pastel = '#fce3ec';
+    else if (value === 'Interviewing') pastel = '#edf5ff';
+    else if (value === 'Sourcing') pastel = '#e6fff5';
+    else if (value === 'NDA Sent') pastel = '#fff4e6';
+    else if (value === 'Deep Dive') pastel = '#f3e6ff';
+    else if (value === 'Close Win') pastel = '#e1ffe1';
+    else if (value === 'Closed Lost') pastel = '#ffe6e6';
+    else if (value.includes('Pilar')) pastel = '#fce4ff';
+    else if (value.includes('Jazmin')) pastel = '#e6faff';
+    else if (value.includes('Agostina')) pastel = '#fff5e6';
+    else if (value.includes('Sol')) pastel = '#f0fff4';
+    else pastel = '#fefefe';
+
+    select.style.backgroundColor = pastel;
+  }
+});
 
 });
 
