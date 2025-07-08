@@ -1719,7 +1719,8 @@ def assign_candidate_to_batch(candidate_id):
     except Exception as e:
         print(f"❌ Error assigning candidate to batch: {str(e)}")
         return jsonify({'error': str(e)}), 500
-@app.route('/sourcing', methods=['POST'])
+    
+@app.route('/sourcing', methods=['GET', 'POST'])
 def create_sourcing_entry():
     data = request.get_json()
     opportunity_id = data.get('opportunity_id')
