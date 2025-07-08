@@ -761,3 +761,37 @@ body {
     transform: translateX(-20px);
   }
 }
+/* Dropdown STAGE - fondo pastel */
+.stage-dropdown {
+  background-color: #fdf1fc; /* rosa pastel */
+}
+
+/* Cambia según valor */
+.stage-dropdown option[value="Negotiating"] {
+  background-color: #fce3ec;
+}
+.stage-dropdown option[value="Interviewing"] {
+  background-color: #edf5ff;
+}
+.stage-dropdown option[value="Sourcing"] {
+  background-color: #e6fff5;
+}
+.stage-dropdown option[value="NDA Sent"] {
+  background-color: #fff4e6;
+}
+.stage-dropdown option[value="Deep Dive"] {
+  background-color: #f3e6ff;
+}
+.stage-dropdown option[value="Close Win"] {
+  background-color: #e1ffe1;
+}
+.stage-dropdown option[value="Closed Lost"] {
+  background-color: #ffe6e6;
+}
+
+/* Dropdown HR Lead - fondo pastel */
+.hr-lead-dropdown {
+  background-color: #e6fff5; /* lila pastel */
+}
+
+/* También puedes hacer variantes por contenido si quieres algo más dinámico */
