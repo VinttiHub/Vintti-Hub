@@ -692,3 +692,72 @@ body {
   border-color: #ffb3e6;
   box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
 }
+#opportunityTable tbody tr {
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+
+#opportunityTable tbody tr:hover {
+  transform: scale(1.015);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
+}
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+#stage-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #fdf4ee;
+  color: #b9608b;
+  padding: 12px 20px;
+  border-radius: 18px;
+  font-weight: 500;
+  font-size: 15px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  z-index: 99999;
+  display: none;
+  animation: sparkleFade 2.8s ease forwards;
+}
+
+@keyframes sparkleFade {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(-10px);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+}
+.sparkle-show {
+  animation: sparkleFade 2.8s ease forwards;
+}
+
+.table-card.exit-left {
+  animation: fadeSlideLeft 0.4s ease forwards;
+}
+
+@keyframes fadeSlideLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}

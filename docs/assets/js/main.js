@@ -120,7 +120,13 @@ document.addEventListener('DOMContentLoaded', () => {
             openOpportunity(opp.opportunity_id);
           });
 
+          tr.style.opacity = 0;
           tbody.appendChild(tr);
+
+          setTimeout(() => {
+            tr.style.animation = 'fadeInUp 0.4s ease forwards';
+          }, 100 * tbody.children.length); // delay progresivo
+
           fetchDaysSinceBatch(opp, tr);
         });
       }
@@ -261,6 +267,14 @@ helloBtn.addEventListener('click', async () => {
   }
 });
   }
+window.addEventListener('pageshow', () => {
+  const tableCard = document.querySelector('.table-card');
+  if (tableCard.classList.contains('exit-left')) {
+    tableCard.classList.remove('exit-left');
+    tableCard.style.opacity = '1';
+    tableCard.style.transform = 'translateX(0)';
+  }
+});
 
 });
 
@@ -273,9 +287,14 @@ function closePopup() {
 }
 
 function openOpportunity(id) {
-  window.location.href = `opportunity-detail.html?id=${id}`;
-  console.log("🔵 openOpportunity - sending id:", id);
+  const tableCard = document.querySelector('.table-card');
+  tableCard.classList.add('exit-left');
+
+  setTimeout(() => {
+    window.location.href = `opportunity-detail.html?id=${id}`;
+  }, 400);
 }
+
 
 function navigateTo(section) {
   alert(`Navigation to "${section}" would happen here.`);
@@ -672,11 +691,16 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
     const result = await response.json();
 
     if (response.ok) {
-      console.log('✅ Stage updated successfully!');
-      dropdownElement.style.backgroundColor = '#d4edda';
+      const toast = document.getElementById('stage-toast');
+      toast.textContent = '✨ Stage updated!';
+      toast.style.display = 'inline-block';
+      toast.classList.remove('sparkle-show'); // para reiniciar si se repite
+      void toast.offsetWidth; // forzar reflow
+      toast.classList.add('sparkle-show');
+
       setTimeout(() => {
-        dropdownElement.style.backgroundColor = '';
-      }, 1000);
+        toast.style.display = 'none';
+      }, 3000);
     } else {
       console.error('❌ Error updating stage:', result.error || result);
       alert('Error updating stage: ' + (result.error || 'Unexpected error'));
