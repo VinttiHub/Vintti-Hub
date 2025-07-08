@@ -517,50 +517,61 @@ function calculateDaysAgo(dateStr) {
 }
 
 
-// Popup Sourcing
 function openSourcingPopup(opportunityId, dropdownElement) {
-  const popup = document.getElementById('sourcingPopup');
-  popup.style.display = 'flex';
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`)
+    .then(res => res.json())
+    .then(opportunity => {
+      const hasStartDate = opportunity.nda_signature_or_start_date;
 
-  const saveBtn = document.getElementById('saveSourcingDate');
-  saveBtn.onclick = async () => {
-    const date = document.getElementById('sourcingDate').value;
-    if (!date) {
-      alert('Please select a date.');
-      return;
-    }
+      if (!hasStartDate) {
+        // 🟢 Primera vez: abrir popup antigua
+        const popup = document.getElementById('sourcingPopup');
+        popup.style.display = 'flex';
 
-    try {
-      const updateResponse = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nda_signature_or_start_date: date,
-          since_sourcing: new Date().toISOString().slice(0, 10)
-        })
-      });
+        const saveBtn = document.getElementById('saveSourcingDate');
+        saveBtn.onclick = async () => {
+          const date = document.getElementById('sourcingDate').value;
+          if (!date) return alert('Please select a date.');
 
-      if (!updateResponse.ok) {
-        const errData = await updateResponse.json();
-        throw new Error(`Error updating sourcing date: ${errData.error || 'Unknown error'}`);
+          await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nda_signature_or_start_date: date })
+          });
+
+          await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+          closeSourcingPopup();
+          location.reload();
+        };
+      } else {
+        // 🔁 Ya tiene start_date: abrir nueva popup
+        const popup = document.getElementById('newSourcingPopup');
+        popup.style.display = 'flex';
+
+        const saveNewBtn = document.getElementById('saveNewSourcing');
+        saveNewBtn.onclick = async () => {
+          const date = document.getElementById('newSourcingDate').value;
+          if (!date) return alert('Please select a date.');
+
+          const hr_lead = opportunity.opp_hr_lead;
+          if (!hr_lead) return alert('HR Lead is missing.');
+
+          await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/sourcing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              opportunity_id: opportunityId,
+              user_id: hr_lead,
+              since_sourcing: date
+            })
+          });
+
+          await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+          closeNewSourcingPopup();
+          location.reload();
+        };
       }
-
-      await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
-
-      closeSourcingPopup();
-      location.reload();
-    } catch (err) {
-      console.error('❌ Error updating sourcing date/stage:', err);
-      alert('Error updating sourcing info: ' + err.message);
-    }
-    // Redirigir automáticamente a la pestaña Hire del candidato contratado
-    setTimeout(() => {
-      // Agregamos un flag en el localStorage para que candidate-details sepa que viene desde Close Win
-      localStorage.setItem('fromCloseWin', 'true');
-      window.location.href = `candidate-details.html?id=${candidateId}#hire`;
-    }, 300);
-
-  };
+    });
 }
 
 
@@ -614,6 +625,9 @@ function loadCandidatesForCloseWin() {
 }
 function closeSourcingPopup() {
   document.getElementById('sourcingPopup').style.display = 'none';
+}
+function closeNewSourcingPopup() {
+  document.getElementById('newSourcingPopup').style.display = 'none';
 }
 
 function closeCloseWinPopup() {

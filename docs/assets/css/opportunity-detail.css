@@ -666,6 +666,8 @@ body {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     max-width: 100%;
     position: relative;
+    border: 1px solid rgba(255, 182, 193, 0.5); /* borde rosado claro */
+
   }
   
   .candidate-card:hover {
@@ -1228,9 +1230,9 @@ body {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
-  background-color: #fff8fc;  /* ✅ Asegura que los elementos se apilen verticalmente */
-  align-items: stretch;       /* ✅ Que ocupen todo el ancho */
-  gap: 1rem;                  /* Espacio entre batches */
+  background-color: #ffffff; 
+  align-items: stretch;      
+  gap: 1rem;                  
   width: 97%;
   height: auto;
   overflow: visible;  

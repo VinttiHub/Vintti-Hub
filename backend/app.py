@@ -1718,6 +1718,35 @@ def assign_candidate_to_batch(candidate_id):
     except Exception as e:
         print(f"❌ Error assigning candidate to batch: {str(e)}")
         return jsonify({'error': str(e)}), 500
+@app.route('/sourcing', methods=['POST'])
+def create_sourcing_entry():
+    data = request.get_json()
+    opportunity_id = data.get('opportunity_id')
+    user_id = data.get('user_id')
+    since_sourcing = data.get('since_sourcing')
+
+    if not all([opportunity_id, user_id, since_sourcing]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COALESCE(MAX(sourcing_id), 0) FROM sourcing")
+        new_id = cursor.fetchone()[0] + 1
+
+        cursor.execute("""
+            INSERT INTO sourcing (sourcing_id, opportunity_id, user_id, since_sourcing)
+            VALUES (%s, %s, %s, %s)
+        """, (new_id, opportunity_id, user_id, since_sourcing))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True, 'sourcing_id': new_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
