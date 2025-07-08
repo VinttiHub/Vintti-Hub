@@ -1720,17 +1720,19 @@ def assign_candidate_to_batch(candidate_id):
         print(f"❌ Error assigning candidate to batch: {str(e)}")
         return jsonify({'error': str(e)}), 500
     
-@app.route('/sourcing', methods=['GET', 'POST'])
+@app.route('/sourcing', methods=['POST'])
 def create_sourcing_entry():
-    data = request.get_json()
-    opportunity_id = data.get('opportunity_id')
-    user_id = data.get('user_id')
-    since_sourcing = data.get('since_sourcing')
-
-    if not all([opportunity_id, user_id, since_sourcing]):
-        return jsonify({'error': 'Missing required fields'}), 400
-
     try:
+        data = request.get_json()
+        print("🟡 Recibido en /sourcing:", data)
+
+        opportunity_id = data.get('opportunity_id')
+        user_id = data.get('user_id')
+        since_sourcing = data.get('since_sourcing')
+
+        if not all([opportunity_id, user_id, since_sourcing]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
         conn = get_connection()
         cursor = conn.cursor()
 
@@ -1746,8 +1748,11 @@ def create_sourcing_entry():
         cursor.close()
         conn.close()
 
+        print("🟢 Sourcing insertado con ID:", new_id)
         return jsonify({'success': True, 'sourcing_id': new_id})
+
     except Exception as e:
+        print("❌ ERROR en /sourcing:", str(e))
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
