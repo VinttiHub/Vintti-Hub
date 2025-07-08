@@ -179,23 +179,6 @@ candidates.forEach(candidate => {
 
 
   card.querySelector(".delete-icon").addEventListener("click", async (e) => {
-  card.querySelector(".signoff-checkbox").addEventListener("change", async (e) => {
-  e.stopPropagation();
-  const checkbox = e.target;
-  const candidateId = checkbox.getAttribute("data-candidate-id");
-  const signOffValue = checkbox.checked ? "yes" : "no";
-
-  try {
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sign_off: signOffValue }),
-    });
-    console.log(`📝 Sign off status updated for candidate ${candidateId}`);
-  } catch (err) {
-    console.error("❌ Error updating sign_off:", err);
-  }
-});
 
   e.stopPropagation(); // evitar que redireccione
 
@@ -221,7 +204,24 @@ candidates.forEach(candidate => {
     }
   }
 });
+  card.querySelector(".signoff-checkbox").addEventListener("change", async (e) => {
+  e.stopPropagation();
+  const checkbox = e.target;
+  const candidateId = checkbox.getAttribute("data-candidate-id");
+  const signOffValue = checkbox.checked ? "yes" : "no";
 
+  try {
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sign_off: signOffValue }),
+    });
+    console.log(`📝 Sign off status updated for candidate ${candidateId}`);
+    checkbox.checked = signOffValue === 'yes';
+  } catch (err) {
+    console.error("❌ Error updating sign_off:", err);
+  }
+});
 
   enableDrag(card);
   card.addEventListener('click', (e) => {

@@ -23,40 +23,61 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-    data.forEach(opp => {
-      let daysAgo = '';
-      if (opp.nda_signature_or_start_date) {
-        daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
-      }
-      const tr = document.createElement('tr');
-      let daysSinceBatch = '-';
-
-      async function fetchDaysSinceBatch(opp) {
-        const oppId = opp.opportunity_id;
-        let referenceDate = null;
-
-        try {
-          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
-          const result = await res.json();
-
-          if (result.latest_sourcing_date) {
-            referenceDate = new Date(result.latest_sourcing_date);
-          } else if (opp.nda_signature_or_start_date) {
-            referenceDate = new Date(opp.nda_signature_or_start_date);
-          }
-
-          if (referenceDate) {
-            const today = new Date();
-            const diffTime = today - referenceDate;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays;
-          }
-          return '';  // espacio en blanco si no hay fechas
-        } catch (err) {
-          console.error(`❌ Error fetching sourcing date for opp ${oppId}:`, err);
-          return '';
+      data.forEach(opp => {
+        let daysAgo = '';
+        if (opp.nda_signature_or_start_date) {
+          daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
         }
-      }
+
+        const tr = document.createElement('tr');
+        let daysSinceBatch = '-';
+
+        async function fetchDaysSinceBatch(opp) {
+          const oppId = opp.opportunity_id;
+          console.log(`🔎 Buscando días desde batch para opp_id=${oppId}`);
+          let referenceDate = null;
+
+          try {
+            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
+            const result = await res.json();
+            console.log(`📦 Resultado de /latest_sourcing_date para opp ${oppId}:`, result);
+
+            if (result.latest_sourcing_date) {
+              referenceDate = new Date(result.latest_sourcing_date);
+              console.log(`✅ Fecha más reciente en sourcing: ${referenceDate}`);
+            } else if (opp.nda_signature_or_start_date) {
+              referenceDate = new Date(opp.nda_signature_or_start_date);
+              console.log(`📁 Usando nda_signature_or_start_date: ${referenceDate}`);
+            } else {
+              console.log(`⚠️ No hay fecha en sourcing ni en nda_signature_or_start_date para opp ${oppId}`);
+            }
+
+            if (referenceDate) {
+              const today = new Date();
+              const diffTime = today - referenceDate;
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              console.log(`📆 Días calculados: ${diffDays}`);
+              return diffDays;
+            }
+
+            return '';
+          } catch (err) {
+            console.error(`❌ Error fetching sourcing date para opp ${oppId}:`, err);
+            return '';
+          }
+        }
+
+        fetchDaysSinceBatch(opp).then(result => {
+          const cell = tr.querySelector('td:last-child');
+          console.log(`💬 Resultado final de daysSinceBatch para opp ${opp.opportunity_id}:`, result);
+          if (cell) {
+            cell.textContent = result || '';
+            if (!isNaN(result) && parseInt(result) >= 7) {
+              cell.classList.add('red-cell');
+              cell.innerHTML += ' ⚠️';
+            }
+          }
+        });
 
 
     tr.innerHTML = `
