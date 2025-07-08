@@ -1754,6 +1754,25 @@ def create_sourcing_entry():
     except Exception as e:
         print("❌ ERROR en /sourcing:", str(e))
         return jsonify({'error': str(e)}), 500
+@app.route('/opportunities/<int:opportunity_id>/latest_sourcing_date')
+def get_latest_sourcing_date(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT MAX(since_sourcing)
+            FROM sourcing
+            WHERE opportunity_id = %s
+        """, (opportunity_id,))
+        result = cursor.fetchone()[0]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({'latest_sourcing_date': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

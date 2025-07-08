@@ -30,16 +30,34 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const tr = document.createElement('tr');
       let daysSinceBatch = '-';
-      if (opp.since_sourcing || opp.nda_signature_or_start_date) {
-        const refDate = opp.since_sourcing || opp.nda_signature_or_start_date;
-        const diff = calculateDaysAgo(refDate);
-        daysSinceBatch = diff;
 
-        // ⚠️ Si son 7 días o más, agregamos clase de alerta
-        if (diff >= 7) {
-          tr.classList.add('batch-alert-row');
+      async function fetchDaysSinceBatch(opp) {
+        const oppId = opp.opportunity_id;
+        let referenceDate = null;
+
+        try {
+          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
+          const result = await res.json();
+
+          if (result.latest_sourcing_date) {
+            referenceDate = new Date(result.latest_sourcing_date);
+          } else if (opp.nda_signature_or_start_date) {
+            referenceDate = new Date(opp.nda_signature_or_start_date);
+          }
+
+          if (referenceDate) {
+            const today = new Date();
+            const diffTime = today - referenceDate;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+          }
+          return '';  // espacio en blanco si no hay fechas
+        } catch (err) {
+          console.error(`❌ Error fetching sourcing date for opp ${oppId}:`, err);
+          return '';
         }
       }
+
 
     tr.innerHTML = `
       <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
