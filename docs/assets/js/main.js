@@ -544,7 +544,6 @@ function openSourcingPopup(opportunityId, dropdownElement) {
 
           await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
           closeSourcingPopup();
-          location.reload();
         };
       } else {
         // 🔁 Ya tiene start_date: abrir nueva popup
@@ -571,7 +570,6 @@ function openSourcingPopup(opportunityId, dropdownElement) {
 
           await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
           closeNewSourcingPopup();
-          location.reload();
         };
       }
     });
