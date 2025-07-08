@@ -909,16 +909,21 @@ async function loadOpportunityData() {
           salesLeadSelect.innerHTML = `<option value="">Select Sales Lead...</option>`;
           hrLeadSelect.innerHTML = `<option value="">Select HR Lead...</option>`;
 
+          const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
+
           users.forEach(user => {
             const option1 = document.createElement('option');
             option1.value = user.email_vintti;
             option1.textContent = user.user_name;
             salesLeadSelect.appendChild(option1);
 
-            const option2 = document.createElement('option');
-            option2.value = user.email_vintti;
-            option2.textContent = user.user_name;
-            hrLeadSelect.appendChild(option2);
+            // Solo agregar al dropdown de HR Lead si coincide con los nombres permitidos
+            if (allowedSubstrings.some(name => user.user_name.includes(name))) {
+              const option2 = document.createElement('option');
+              option2.value = user.email_vintti;
+              option2.textContent = user.user_name;
+              hrLeadSelect.appendChild(option2);
+            }
           });
 
           // Ahora cruzas: en data.opp_sales_lead y opp_hr_lead tienes el EMAIL → debes setear el value del <select> con ese email:
