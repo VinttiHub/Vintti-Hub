@@ -648,7 +648,6 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
 
     if (response.ok) {
       console.log('✅ Stage updated successfully!');
-      window.location.reload();  // 🔄 Refresca para que se muestre el estado real desde la base
       dropdownElement.style.backgroundColor = '#d4edda';
       setTimeout(() => {
         dropdownElement.style.backgroundColor = '';
