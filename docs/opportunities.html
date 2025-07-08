@@ -124,6 +124,27 @@
     <button id="saveNewSourcing">Save</button>
   </div>
 </div>
+<!-- Popup Closed Lost -->
+<div id="closeLostPopup" class="popup-overlay" style="display: none;">
+  <div class="popup-content">
+    <span class="close-btn" onclick="closeCloseLostPopup()">&times;</span>
+    <h2>Closed Lost Details</h2>
+    
+    <label>Close Date:</label>
+    <input type="date" id="closeLostDate" />
+
+    <label>Reason:</label>
+    <select id="closeLostReason">
+      <option value="">Select reason</option>
+      <option value="Ghosting">Ghosting</option>
+      <option value="Pricing">Pricing</option>
+      <option value="Shopping">Shopping</option>
+      <option value="Competencia">Competencia</option>
+    </select>
+
+    <button id="saveCloseLost">Save</button>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
 <script src="./assets/js/main.js"></script>

@@ -173,7 +173,10 @@ document.addEventListener('change', async (e) => {
       openCloseWinPopup(opportunityId, e.target);
       return;
     }
-
+    if (newStage === 'Closed Lost') {
+      openCloseLostPopup(opportunityId, e.target);
+      return;
+    }
     await patchOpportunityStage(opportunityId, newStage, e.target);
   }
 });
@@ -658,4 +661,36 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
     console.error('❌ Network error updating stage:', err);
     alert('Network error. Please try again.');
   }
+}
+function openCloseLostPopup(opportunityId, dropdownElement) {
+  const popup = document.getElementById('closeLostPopup');
+  popup.style.display = 'flex';
+
+  const saveBtn = document.getElementById('saveCloseLost');
+  saveBtn.onclick = async () => {
+    const closeDate = document.getElementById('closeLostDate').value;
+    const motive = document.getElementById('closeLostReason').value;
+
+    if (!closeDate || !motive) {
+      alert("Please fill in both date and reason.");
+      return;
+    }
+
+    // Guardar en DB
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        opp_close_date: closeDate,
+        motive_close_lost: motive
+      })
+    });
+
+    await patchOpportunityStage(opportunityId, 'Closed Lost', dropdownElement);
+    closeCloseLostPopup();
+  };
+}
+
+function closeCloseLostPopup() {
+  document.getElementById('closeLostPopup').style.display = 'none';
 }

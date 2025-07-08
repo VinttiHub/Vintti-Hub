@@ -621,7 +621,8 @@ def update_opportunity_fields(opportunity_id):
         'opp_hr_lead',
         'hr_job_description',
         'candidato_contratado',
-        'comments'
+        'comments',
+        'motive_close_lost'
     ]
 
     updates = []
