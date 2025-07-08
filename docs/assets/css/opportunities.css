@@ -666,3 +666,29 @@ body {
   box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
   border-color: #ffb3e6;
 }
+/* Centrar texto en la columna "Days Since Batch" (10ma columna = índice 9) */
+#opportunityTable tbody td:nth-child(10),
+#opportunityTable thead th:nth-child(10) {
+  text-align: center;
+}
+.dataTables_length select {
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 999px; /* más redondeado */
+  padding: 8px 14px;
+  font-size: 14px;
+  font-family: 'Onest', sans-serif;
+  text-align: center;              /* centrado horizontal */
+  text-align-last: center;         /* centrado en el valor seleccionado */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: box-shadow 0.3s ease;
+  width: 80px;                     /* ancho fijo más compacto */
+}
+
+.dataTables_length select:focus {
+  outline: none;
+  border-color: #ffb3e6;
+  box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
+}

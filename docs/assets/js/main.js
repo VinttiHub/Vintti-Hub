@@ -261,28 +261,6 @@ helloBtn.addEventListener('click', async () => {
   }
 });
   }
-document.addEventListener('change', (e) => {
-  if (e.target.classList.contains('stage-dropdown') || e.target.classList.contains('hr-lead-dropdown')) {
-    const select = e.target;
-    const value = select.value;
-
-    let pastel = '';
-    if (value === 'Negotiating') pastel = '#fce3ec';
-    else if (value === 'Interviewing') pastel = '#edf5ff';
-    else if (value === 'Sourcing') pastel = '#e6fff5';
-    else if (value === 'NDA Sent') pastel = '#fff4e6';
-    else if (value === 'Deep Dive') pastel = '#f3e6ff';
-    else if (value === 'Close Win') pastel = '#e1ffe1';
-    else if (value === 'Closed Lost') pastel = '#ffe6e6';
-    else if (value.includes('Pilar')) pastel = '#fce4ff';
-    else if (value.includes('Jazmin')) pastel = '#e6faff';
-    else if (value.includes('Agostina')) pastel = '#fff5e6';
-    else if (value.includes('Sol')) pastel = '#f0fff4';
-    else pastel = '#fefefe';
-
-    select.style.backgroundColor = pastel;
-  }
-});
 
 });
 
