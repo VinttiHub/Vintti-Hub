@@ -161,7 +161,7 @@ function loadPipelineCandidates() {
 
 candidates.forEach(candidate => {
   const card = document.createElement('div');
-  card.className = 'candidate-card';
+  card.className = 'candidate-card pipeline-card';
   card.setAttribute('data-candidate-id', candidate.candidate_id); 
   const signoffChecked = candidate.sign_off === 'yes' ? 'checked' : '';
   card.innerHTML = `

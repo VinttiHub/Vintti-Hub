@@ -645,9 +645,6 @@ body {
   letter-spacing: 0.3px;
   font-weight: 600;
 }
-  .column:hover {
-    transform: scale(1.01);
-  }
   
   .card-container {
     min-height: 200px;
@@ -1881,4 +1878,57 @@ input:checked + .slider {
 /* Mover el ícono a la derecha */
 input:checked + .slider::before {
   transform: translateX(20px);
+}
+/* 🌿 Estilo aún más minimalista y pastel para pipeline */
+.pipeline-card {
+  padding: 0.6rem 0.8rem 1.4rem;
+  font-size: 0.75rem;
+  border-radius: 14px;
+  background-color: #effdf4; /* verdecito pastel */
+  border: 1px solid #c4f0d2;
+  box-shadow: 0 2px 8px rgba(180, 240, 200, 0.25);
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+/* 👤 Nombre más pequeño */
+.pipeline-card .candidate-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2d5a3a;
+}
+
+/* 🗑️ Caneca en esquina inferior derecha */
+.pipeline-card .delete-icon {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 14px;
+  color: #d94c4c;
+  transition: transform 0.2s ease;
+}
+
+.pipeline-card .delete-icon:hover {
+  transform: scale(1.2);
+}
+
+/* 🪄 Sombra suave al hacer hover */
+.pipeline-card:hover {
+  transform: scale(1.035); /* más notorio */
+  box-shadow: 0 6px 16px rgba(163, 255, 204, 0.4); /* más visible */
+}
+/* 🪄 Animación de entrada para tarjetas */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pipeline-card {
+  animation: fadeSlideUp 0.4s ease forwards;
 }
