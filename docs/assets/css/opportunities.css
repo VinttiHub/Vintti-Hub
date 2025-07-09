@@ -793,5 +793,10 @@ body {
 .hr-lead-dropdown {
   background-color: #e6fff5; /* lila pastel */
 }
-
-/* También puedes hacer variantes por contenido si quieres algo más dinámico */
+.stage-dropdown,
+.hr-lead-dropdown {
+  border: none !important;
+  box-shadow: none !important;
+  padding: 8px 12px;
+  border-radius: 12px;
+}

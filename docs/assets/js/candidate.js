@@ -12,10 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      let rows = '';
+      let delay = 0;
       data.forEach(candidate => {
-      rows += `
-        <tr data-id="${candidate.candidate_id || ''}">
+        const tr = document.createElement('tr');
+        tr.dataset.id = candidate.candidate_id || '';
+        tr.innerHTML = `
           <td class="${!candidate.condition ? 'empty-cell' : ''}">
             ${candidate.condition || '-'}
           </td>
@@ -34,11 +35,13 @@ document.addEventListener('DOMContentLoaded', () => {
             </button>
           </td>
           <td>${candidate.employee || '—'}</td>
-        </tr>
-      `;
+        `;
+        tr.style.animation = `fadeInRow 0.4s ease both`;
+        tr.style.animationDelay = `${delay}s`;
+        delay += 0.07;
+        tbody.appendChild(tr);
       });
 
-      tbody.innerHTML = rows;
 
       const table = $('#candidatesTable').DataTable({
         responsive: true,

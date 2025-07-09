@@ -122,8 +122,9 @@ body {
   overflow: hidden;
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.04);
   transition: background-position 1s ease, transform 0.3s ease, box-shadow 0.3s ease;
-  animation: fadeInSlide 0.4s ease-in-out;
+  will-change: transform;
 }
+
 
 #candidatesTable tbody tr:hover {
   background: linear-gradient(to right, #e6f0ff 0%, #ffffff 100%);
@@ -235,3 +236,58 @@ body {
     padding: 20px;
   }
 }
+#candidatesTable thead th,
+#candidatesTable tbody td {
+  padding-left: 24px;
+  padding-right: 24px;
+  white-space: nowrap;
+}
+
+#candidatesTable {
+  table-layout: auto;
+}
+@keyframes fadeInRow {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+#candidatesTable tbody td:nth-child(3),  /* Country */
+#candidatesTable tbody td:nth-child(4) { /* WhatsApp */
+  text-align: center;
+}
+#candidatesTable thead th:nth-child(3),  /* Country */
+#candidatesTable thead th:nth-child(4) { /* WhatsApp */
+  text-align: center;
+}
+.dataTables_length select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 6px 12px;
+  width: 80px;
+  font-size: 14px;
+  font-family: 'Onest', sans-serif;
+  font-weight: 500;
+  text-align-last: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M1 1L5 5L9 1' stroke='%230044FF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+}
+
+.dataTables_length select:hover {
+  box-shadow: 0 0 4px rgba(0, 68, 255, 0.15);
+}
+
