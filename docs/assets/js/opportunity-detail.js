@@ -551,7 +551,10 @@ document.addEventListener("click", async (e) => {
     try {
       const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
       const candidates = await res.json();
-
+        if (!res.ok && data.error) {
+            showFriendlyPopup(`🌸 ${data.error}`);
+            return;
+          }
       // Limpiar resultados anteriores
       const resultsList = document.getElementById("candidateSearchResults");
       resultsList.innerHTML = "";
@@ -1400,4 +1403,28 @@ document.getElementById('approvalEmailPopup').classList.remove('hidden');
 }
 function closeAiPopup() {
   document.getElementById('ai-assistant-popup').classList.add('hidden');
+}
+function showFriendlyPopup(message) {
+  const popup = document.createElement('div');
+  popup.textContent = message;
+  popup.style.position = 'fixed';
+  popup.style.top = '20px';
+  popup.style.right = '20px';
+  popup.style.backgroundColor = '#ffe4ec';
+  popup.style.color = '#b3005f';
+  popup.style.padding = '14px 20px';
+  popup.style.borderRadius = '20px';
+  popup.style.fontWeight = '600';
+  popup.style.boxShadow = '0 4px 10px rgba(0,0,0,0.1)';
+  popup.style.zIndex = '9999';
+  popup.style.transition = 'opacity 0.3s ease';
+  popup.style.opacity = '1';
+  popup.style.fontFamily = 'Quicksand, sans-serif';
+
+  document.body.appendChild(popup);
+
+  setTimeout(() => {
+    popup.style.opacity = '0';
+    setTimeout(() => popup.remove(), 300);
+  }, 3000);
 }

@@ -1252,10 +1252,26 @@ def link_or_create_candidate(opportunity_id):
     if candidate_id:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("INSERT INTO opportunity_candidates (opportunity_id, candidate_id) VALUES (%s, %s)", (opportunity_id, candidate_id))
+
+        # Verificar si ya está relacionado
+        cur.execute("""
+            SELECT 1 FROM opportunity_candidates
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (opportunity_id, candidate_id))
+
+        if cur.fetchone():
+            cur.close(); conn.close()
+            return jsonify({"error": "This candidate is already linked to this opportunity."}), 400
+
+        # Si no existe la relación, insertarla
+        cur.execute("""
+            INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
+            VALUES (%s, %s)
+        """, (opportunity_id, candidate_id))
         conn.commit()
         cur.close(); conn.close()
         return jsonify({"message": "Linked existing candidate"}), 200
+
     else:
         data = request.get_json()
         name = data.get('name')
