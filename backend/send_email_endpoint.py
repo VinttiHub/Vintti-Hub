@@ -59,7 +59,7 @@ def register_send_email_route(app):
         try:
             logging.info("✉️ Construyendo mensaje...")
             message = Mail(
-                from_email=Email('info@vintti.com', name='Vintti Hub'),
+                from_email=Email('angie@vintti.com', name='Vintti Hub'),
                 to_emails=to_emails,
                 subject=subject,
                 html_content=body
