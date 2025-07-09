@@ -22,16 +22,23 @@
     <div class="title-container">
       <h1 class="page-title">Candidates</h1>
     </div>
-
+    <div class="table-controls-wrapper">
+      <div class="left-controls">
+        <div id="datatable-wrapper"></div>
+      </div>
+      <div class="right-controls">
+        <input type="text" id="searchByName" placeholder="Search by name..." class="name-search-input" />
+      </div>
+    </div>
     <!-- TABLA DE CANDIDATOS -->
     <table id="candidatesTable">
       <thead>
         <tr>
           <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Condition</th>
           <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Full Name</th>
-          <th><span class="column-filter" data-column="2"><i class="fa-solid fa-filter"></i></span> Country</th>
-          <th><span class="column-filter" data-column="3"><i class="fa-solid fa-filter"></i></span> Whatsapp</th>
-          <th><span class="column-filter" data-column="4"><i class="fa-solid fa-filter"></i></span> LinkedIn</th>
+          <th>Country</th>
+          <th>Whatsapp</th>
+          <th>LinkedIn</th>
           <th><span class="column-filter" data-column="5"><i class="fa-solid fa-filter"></i></span> Employee</th>
         </tr>
       </thead>

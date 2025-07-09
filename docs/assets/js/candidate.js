@@ -61,10 +61,17 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       });
-
+      // Mover el control de "Mostrar X registros" al wrapper
+      const lengthControl = document.querySelector('.dataTables_length');
+      const wrapper = document.getElementById('datatable-wrapper');
+      if (lengthControl && wrapper) {
+        wrapper.appendChild(lengthControl);
+      }
       // Hacer clic en fila -> ir a detalles
-    document.querySelectorAll('#candidatesTableBody tr').forEach(row => {
-      row.addEventListener('click', () => {
+      document.getElementById('candidatesTableBody').addEventListener('click', function (e) {
+        const row = e.target.closest('tr');
+        if (!row) return;
+
         const id = row.getAttribute('data-id');
         if (id) {
           const clickSound = document.getElementById('click-sound');
@@ -72,23 +79,25 @@ document.addEventListener('DOMContentLoaded', () => {
             clickSound.play();
             setTimeout(() => {
               window.location.href = `candidate-details.html?id=${id}`;
-            }, 200); // Espera 200 ms para dejar sonar el clic
+            }, 200);
           } else {
             window.location.href = `candidate-details.html?id=${id}`;
           }
         }
       });
-    });
-
 
       // Filtros tipo Excel (activar después de DataTables)
       document.querySelectorAll('.column-filter').forEach(icon => {
+        const columnIndex = parseInt(icon.getAttribute('data-column'), 10);
+        if ([2, 3, 4].includes(columnIndex)) return; // omitimos Country, Whatsapp, LinkedIn
         icon.addEventListener('click', (e) => {
           e.stopPropagation();
-          const columnIndex = parseInt(icon.getAttribute('data-column'), 10);
           createColumnFilter(columnIndex, table);
         });
       });
+      document.getElementById('searchByName').addEventListener('input', function () {
+      table.column(1).search(this.value).draw(); // columna 1 = full_name
+    });
     })
     .catch(err => {
       console.error('❌ Error al obtener candidatos:', err);
