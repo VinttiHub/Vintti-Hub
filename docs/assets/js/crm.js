@@ -44,6 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
           </tr>
         `;
         tableBody.innerHTML += htmlRow;
+        setTimeout(() => {
+          const rows = document.querySelectorAll('#accountTableBody tr');
+          rows.forEach((row, index) => {
+            row.style.opacity = '0';
+            row.style.animation = `fadeInUp 0.4s ease forwards`;
+            row.style.animationDelay = `${index * 0.05}s`;
+          });
+        }, 100); // delay para esperar al render
       });
 
       document.querySelectorAll('#accountTableBody tr').forEach(row => {
