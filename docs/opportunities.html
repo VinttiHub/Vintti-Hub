@@ -22,6 +22,39 @@
       <h1 class="page-title">Opportunities</h1>
       <button class="new-btn" onclick="openPopup()">New</button>
     </div>
+    <div class="filters-top-bar">
+      <div class="dataTables-length-wrapper" id="dataTablesLengthTarget"></div>
+
+      <div class="multi-filter" id="filterStageContainer">
+        <div class="filter-header">
+          <label>Stage</label>
+          <button class="filter-toggle" data-target="filterStage"><i class="fa-solid fa-angle-down"></i></button>
+        </div>
+        <div class="multi-select hidden" id="filterStage"></div>
+      </div>
+
+<div class="multi-filter" id="filterSalesLeadContainer">
+  <div class="filter-header">
+    <label>Sales Lead</label>
+    <button class="filter-toggle" data-target="filterSalesLead">
+      <i class="fa-solid fa-angle-down"></i>
+    </button>
+  </div>
+  <div class="multi-select hidden" id="filterSalesLead"></div>
+</div>
+
+<div class="multi-filter" id="filterHRLeadContainer">
+  <div class="filter-header">
+    <label>HR Lead</label>
+    <button class="filter-toggle" data-target="filterHRLead">
+      <i class="fa-solid fa-angle-down"></i>
+    </button>
+  </div>
+  <div class="multi-select hidden" id="filterHRLead"></div>
+</div>
+
+    </div>
+
   <div class="table-card">
     <div class="table-scroll-wrapper">
   <table id="opportunityTable" style="min-width: 1400px; width: max-content;">

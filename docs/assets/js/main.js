@@ -1,7 +1,15 @@
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.filter-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetId = btn.getAttribute('data-target');
+    const target = document.getElementById(targetId);
+    target.classList.toggle('hidden');
+  });
+});
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
+
   var allowedHRUsers = [];
 
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
@@ -195,7 +203,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return data;
       }
+    },
+    {
+  targets: 6, // HR Lead column rendering
+  render: function (data, type, row, meta) {
+    if (type === 'filter' || type === 'sort') {
+      const div = document.createElement('div');
+      div.innerHTML = data;
+      const select = div.querySelector('select');
+      return select ? select.options[select.selectedIndex].textContent : data;
     }
+    return data;
+  }
+}
+
   ],
   language: {
     search: "🔍 Buscar:",
@@ -210,6 +231,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+const dtLength = document.querySelector('#opportunityTable_length');
+const dtTarget = document.getElementById('dataTablesLengthTarget');
+if (dtLength && dtTarget) dtTarget.appendChild(dtLength);
+
+function buildMultiFilter(containerId, options, columnIndex) {
+  const container = document.getElementById(containerId);
+  const column = table.column(columnIndex);
+
+  const selectToggle = document.createElement('button');
+  selectToggle.className = 'select-toggle';
+  selectToggle.textContent = 'Deselect All';
+
+  container.appendChild(selectToggle);
+
+  const checkboxWrapper = document.createElement('div');
+  checkboxWrapper.classList.add('checkbox-list');
+  container.appendChild(checkboxWrapper);
+
+  options.forEach(val => {
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = val;
+    checkbox.checked = true;
+
+    label.appendChild(checkbox);
+    label.append(' ' + val);
+    checkboxWrapper.appendChild(label);
+  });
+
+  function applyFilter() {
+    const checkboxes = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
+    const selected = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+    column.search(selected.length ? selected.join('|') : '', true, false).draw();
+  }
+
+  checkboxWrapper.addEventListener('change', applyFilter);
+
+  selectToggle.addEventListener('click', () => {
+    const all = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
+    const isDeselecting = selectToggle.textContent === 'Deselect All';
+
+    all.forEach(cb => cb.checked = !isDeselecting);
+    selectToggle.textContent = isDeselecting ? 'Select All' : 'Deselect All';
+    applyFilter();
+  });
+}
+
       document.getElementById('opportunityTable').addEventListener('click', function(e) {
         const target = e.target.closest('.column-filter');
         if (target) {
@@ -219,6 +288,22 @@ document.addEventListener('DOMContentLoaded', () => {
           createColumnFilter(columnIndex, table);
         }
       });
+      const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))];
+      const uniqueSalesLeads = [...new Set(data.map(d => d.sales_lead_name).filter(Boolean))];
+      const emailToNameMap = {};
+allowedHRUsers.forEach(user => {
+  emailToNameMap[user.email_vintti] = user.user_name;
+});
+const uniqueHRLeads = [...new Set(
+  data.map(d => emailToNameMap[d.opp_hr_lead] || '').filter(Boolean)
+)];
+
+
+      buildMultiFilter('filterStage', uniqueStages, 0);
+      buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5);
+      buildMultiFilter('filterHRLead', uniqueHRLeads, 6);
+
+
     })
     .catch(err => {
       console.error('Error fetching opportunities:', err);
@@ -316,7 +401,6 @@ window.addEventListener('pageshow', () => {
     tableCard.style.transform = 'translateX(0)';
   }
 });
-
 });
 
 function openPopup() {
@@ -502,6 +586,27 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts')
   .catch(err => {
     console.error('Error loading accounts:', err);
   });
+fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+  .then(response => response.json())
+  .then(users => {
+    const salesDropdown = document.getElementById('sales_lead');
+    if (!salesDropdown) return;
+
+    const allowedPrefixes = ['Agustin', 'Lara', 'Bahia'];
+    const filtered = users.filter(user =>
+      allowedPrefixes.some(prefix => user.user_name.startsWith(prefix))
+    );
+
+    filtered.forEach(user => {
+      const option = document.createElement('option');
+      option.value = user.email_vintti;
+      option.textContent = user.user_name;
+      salesDropdown.appendChild(option);
+    });
+  })
+  .catch(err => console.error('Error loading sales leads:', err));
+
+
   function getStagePill(stage) {
   switch (stage) {
     case 'Close Win':
