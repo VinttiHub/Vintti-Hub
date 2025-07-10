@@ -2,7 +2,25 @@
 document.addEventListener('DOMContentLoaded', () => {
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
+  var allowedHRUsers = [];
 
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+    .then(response => response.json())
+    .then(users => {
+      const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
+      allowedHRUsers = users.filter(user =>
+        allowedSubstrings.some(name => user.user_name.includes(name))
+      );
+    })
+    .catch(err => console.error('Error loading HR Leads:', err));
+    function generateHROptions(currentValue) {
+    let html = `<option disabled ${currentValue ? '' : 'selected'}>Assign HR Lead</option>`;
+    allowedHRUsers.forEach(user => {
+      const selected = user.email_vintti === currentValue ? 'selected' : '';
+      html += `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
+    });
+    return html;
+  }
   if (toggleButton && filtersCard) {
     toggleButton.addEventListener('click', () => {
       const isExpanded = filtersCard.classList.contains('expanded');
@@ -97,8 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>${opp.opp_model || ''}</td>
             <td>${opp.sales_lead_name || ''}</td>
             <td>
-              <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}" data-current="${opp.opp_hr_lead || ''}">
-                <option disabled ${opp.opp_hr_lead ? '' : 'selected'}>Assign HR Lead</option>
+              <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}">
+                ${generateHROptions(opp.opp_hr_lead)}
               </select>
             </td>
             <td>
@@ -131,7 +149,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     });
+    fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+      .then(response => response.json())
+      .then(users => {
+        const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
+        const dropdowns = document.querySelectorAll('.hr-lead-dropdown');
 
+        dropdowns.forEach(select => {
+          const currentValue = select.dataset.current;
+
+          // Filtrar usuarios permitidos
+          const filtered = users.filter(user =>
+            allowedSubstrings.some(name => user.user_name.includes(name))
+          );
+
+          // Agregar opciones al dropdown
+          select.innerHTML += filtered.map(user => {
+            const selected = user.email_vintti === currentValue ? 'selected' : '';
+            return `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
+          }).join('');
+        });
+      })
+      .catch(err => {
+        console.error('Error loading HR Leads:', err);
+      });
 
   const table = $('#opportunityTable').DataTable({
   responsive: true,
@@ -177,31 +218,6 @@ document.addEventListener('DOMContentLoaded', () => {
           const columnIndex = parseInt(target.getAttribute('data-column'), 10);
           createColumnFilter(columnIndex, table);
         }
-      });
-    // 🔁 Luego de insertar todas las filas, poblar los HR Lead dropdowns filtrando
-    fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
-      .then(response => response.json())
-      .then(users => {
-        const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
-        const dropdowns = document.querySelectorAll('.hr-lead-dropdown');
-
-        dropdowns.forEach(select => {
-          const currentValue = select.dataset.current;
-
-          // Filtrar usuarios permitidos
-          const filtered = users.filter(user =>
-            allowedSubstrings.some(name => user.user_name.includes(name))
-          );
-
-          // Agregar opciones al dropdown
-          select.innerHTML += filtered.map(user => {
-            const selected = user.email_vintti === currentValue ? 'selected' : '';
-            return `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
-          }).join('');
-        });
-      })
-      .catch(err => {
-        console.error('Error loading HR Leads:', err);
       });
     })
     .catch(err => {
@@ -472,27 +488,6 @@ if (createOpportunityForm && createButton) {
   });
 }
 
-fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
-  .then(response => response.json())
-  .then(users => {
-    const allowedEmails = ['lara@vintti.com', 'bahia@vintti.com', 'agustin@vintti.com'];
-    const select = document.getElementById('sales_lead');
-    if (!select) return;
-
-    select.innerHTML = '<option disabled selected>Select a user</option>';
-    users
-      .filter(user => allowedEmails.includes(user.email_vintti))
-      .forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.email_vintti;
-        option.textContent = user.user_name;
-        select.appendChild(option);
-      });
-  })
-  .catch(err => {
-    console.error('Error loading users:', err);
-  });
-
 fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts')
   .then(response => response.json())
   .then(accounts => {
@@ -580,7 +575,6 @@ function getStageDropdown(currentStage, opportunityId) {
 
   return dropdown;
 }
-
 
 function calculateDaysAgo(dateStr) {
   const date = new Date(dateStr);
