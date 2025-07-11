@@ -1790,6 +1790,31 @@ def get_latest_sourcing_date(opportunity_id):
         return jsonify({'latest_sourcing_date': result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/candidates_batches/status', methods=['PATCH'])
+def update_candidate_batch_status():
+    data = request.get_json()
+    candidate_id = data.get('candidate_id')
+    batch_id = data.get('batch_id')
+    status = data.get('status')
+
+    if not all([candidate_id, batch_id, status]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE candidates_batches
+            SET status = %s
+            WHERE candidate_id = %s AND batch_id = %s
+        """, (status, candidate_id, batch_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -1318,10 +1318,63 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
     const template = document.getElementById("candidate-card-template");
     const cardFragment = template.content.cloneNode(true);
     const cardElement = cardFragment.querySelector(".candidate-card");
+    const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+      if (c.status) {
+        dropdown.value = c.status;
+      }
 
     cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
     cardElement.querySelector(".candidate-email").textContent = c.email || '';
     cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+    const statusDropdown = cardElement.querySelector(".candidate-status-dropdown");
+
+batchCandidates.forEach(c => {
+  const template = document.getElementById("candidate-card-template");
+  const cardFragment = template.content.cloneNode(true);
+  const cardElement = cardFragment.querySelector(".candidate-card");
+
+  // Setear valores
+  cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+  cardElement.querySelector(".candidate-email").textContent = c.email || '';
+  cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+  // Si ya tiene status, seleccionarlo
+  const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  if (c.status) {
+    dropdown.value = c.status;
+  }
+
+  // ✅ Aquí agregas el event listener correctamente
+  dropdown.addEventListener("change", async (e) => {
+    const newStatus = e.target.value;
+    const candidateId = c.candidate_id;
+    const batchId = batch.batch_id;
+
+    try {
+      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          batch_id: batchId,
+          status: newStatus
+        })
+      });
+
+      if (res.ok) {
+        showFriendlyPopup("✅ Status updated");
+      } else {
+        showFriendlyPopup("❌ Error updating status");
+      }
+    } catch (err) {
+      console.error("❌ Exception updating status:", err);
+    }
+  });
+
+  candidateContainer.appendChild(cardElement);
+});
 
     candidateContainer.appendChild(cardElement);
   });
