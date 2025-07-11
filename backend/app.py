@@ -880,10 +880,11 @@ def extract_linkedin_proxycurl():
 
     if not linkedin_url or not candidate_id:
         return jsonify({"error": "linkedin_url and candidate_id required"}), 400
-
+    proxycurl_key = os.environ.get("PROXYCURL_API_KEY")
+    print("🔐 Proxycurl Key loaded:", proxycurl_key)
     try:
         headers = {
-            "Authorization": f"Bearer {PROXYCURL_API_KEY}"
+            "Authorization": f"Bearer {proxycurl_key}"
         }
 
         params = {
