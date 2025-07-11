@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("🔹 candidateId:", candidateId)
             console.log("🔹 opportunityId:", opportunityId)
             console.log("🔹 newStage:", mappedStage)
+            const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
 
             fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/stage`, {
               method: 'PATCH',
