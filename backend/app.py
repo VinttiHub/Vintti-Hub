@@ -1791,7 +1791,7 @@ def get_latest_sourcing_date(opportunity_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/candidates_batches/status', methods=['PATCH'])
+@app.route('/candidates_batches/status', methods=['GET','PATCH'])
 def update_candidate_batch_status():
     data = request.get_json()
     candidate_id = data.get('candidate_id')

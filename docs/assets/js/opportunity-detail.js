@@ -1346,6 +1346,7 @@ batchCandidates.forEach(c => {
 
   // ✅ Aquí agregas el event listener correctamente
   dropdown.addEventListener("change", async (e) => {
+    console.log("📥 Cambio detectado en dropdown de status");
     const newStatus = e.target.value;
     const candidateId = c.candidate_id;
     const batchId = batch.batch_id;
