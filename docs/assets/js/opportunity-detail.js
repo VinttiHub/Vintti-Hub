@@ -1156,6 +1156,45 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
         cardElement.querySelector('.candidate-email').textContent = c.email || '';
         cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+        const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+        if (c.status) {
+          dropdown.value = c.status;
+        }
+
+        dropdown.addEventListener("change", async (e) => {
+          const newStatus = e.target.value;
+          const candidateId = c.candidate_id;
+          const batchId = batch.batch_id;
+
+          console.log("📥 Cambio en status");
+          console.log("📌 candidateId:", candidateId);
+          console.log("📌 batchId:", batchId);
+          console.log("📌 newStatus:", newStatus);
+
+          try {
+            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                candidate_id: candidateId,
+                batch_id: batchId,
+                status: newStatus
+              })
+            });
+
+            const result = await res.json();
+            console.log("📤 Respuesta backend:", result);
+
+            if (res.ok) {
+              dropdown.value = newStatus;
+              showFriendlyPopup("✅ Status updated");
+            } else {
+              showFriendlyPopup("❌ Error updating status");
+            }
+          } catch (err) {
+            console.error("❌ Error enviando status:", err);
+          }
+        });
 
         candidateContainer.appendChild(cardElement);
       });
@@ -1227,17 +1266,62 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
       // 🔁 Obtener candidatos desde nuevo endpoint
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
-      batchCandidates.forEach(c => {
-        const template = document.getElementById("candidate-card-template");
-        const cardFragment = template.content.cloneNode(true);
-        const cardElement = cardFragment.querySelector('.candidate-card');
+batchCandidates.forEach(c => {
+  const template = document.getElementById("candidate-card-template");
+  const cardFragment = template.content.cloneNode(true);
+  const cardElement = cardFragment.querySelector(".candidate-card");
 
-        cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-        cardElement.querySelector(".candidate-email").textContent = c.email || '';
-        cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+  // Setear nombre, email, imagen
+  cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+  cardElement.querySelector(".candidate-email").textContent = c.email || '';
+  cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
 
-        candidateContainer.appendChild(cardElement);
+  // Status dropdown
+  const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  if (c.status) {
+    dropdown.value = c.status;
+  }
+
+  // ✅ Listener funcional
+  dropdown.addEventListener("change", async (e) => {
+    const newStatus = e.target.value;
+    const candidateId = c.candidate_id;
+    const batchId = batch.batch_id;
+
+    console.log("📥 Cambio en status");
+    console.log("📌 candidateId:", candidateId);
+    console.log("📌 batchId:", batchId);
+    console.log("📌 newStatus:", newStatus);
+
+    try {
+      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          batch_id: batchId,
+          status: newStatus
+        })
       });
+
+      console.log("📤 Enviado al backend. Status HTTP:", res.status);
+      const result = await res.json();
+      console.log("📥 Respuesta del backend:", result);
+
+      if (res.ok) {
+        dropdown.value = newStatus;
+        showFriendlyPopup("✅ Status updated");
+      } else {
+        showFriendlyPopup("❌ Error updating status");
+      }
+    } catch (err) {
+      console.error("❌ Exception updating status:", err);
+    }
+  });
+
+  candidateContainer.appendChild(cardElement);
+});
+
 
       // 🗑️ Agregar botón eliminar
       box.querySelector('.btn-delete').addEventListener('click', async (e) => {
@@ -1333,39 +1417,42 @@ batchCandidates.forEach(c => {
   const cardFragment = template.content.cloneNode(true);
   const cardElement = cardFragment.querySelector(".candidate-card");
 
-  // Setear valores
+  // Setear nombre, email, imagen
   cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
   cardElement.querySelector(".candidate-email").textContent = c.email || '';
   cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-
-  // Si ya tiene status, seleccionarlo
+  
+  // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
   if (c.status) {
     dropdown.value = c.status;
   }
 
-  // ✅ Aquí agregas el event listener correctamente
+  // ✅ Listener funcional
   dropdown.addEventListener("change", async (e) => {
-    console.log("📥 Cambio detectado en dropdown de status");
     const newStatus = e.target.value;
     const candidateId = c.candidate_id;
     const batchId = batch.batch_id;
-    console.log("🔄 Cambiando status...");
+
+    console.log("📥 Cambio en status");
     console.log("📌 candidateId:", candidateId);
     console.log("📌 batchId:", batchId);
     console.log("📌 newStatus:", newStatus);
+
     try {
       const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           candidate_id: candidateId,
           batch_id: batchId,
           status: newStatus
         })
       });
+
+      console.log("📤 Enviado al backend. Status HTTP:", res.status);
+      const result = await res.json();
+      console.log("📥 Respuesta del backend:", result);
 
       if (res.ok) {
         showFriendlyPopup("✅ Status updated");
