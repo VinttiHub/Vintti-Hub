@@ -1349,7 +1349,10 @@ batchCandidates.forEach(c => {
     const newStatus = e.target.value;
     const candidateId = c.candidate_id;
     const batchId = batch.batch_id;
-
+    console.log("🔄 Cambiando status...");
+    console.log("📌 candidateId:", candidateId);
+    console.log("📌 batchId:", batchId);
+    console.log("📌 newStatus:", newStatus);
     try {
       const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
         method: "PATCH",

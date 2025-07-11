@@ -1790,6 +1790,7 @@ def get_latest_sourcing_date(opportunity_id):
         return jsonify({'latest_sourcing_date': result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 @app.route('/candidates_batches/status', methods=['PATCH'])
 def update_candidate_batch_status():
     data = request.get_json()
@@ -1797,7 +1798,13 @@ def update_candidate_batch_status():
     batch_id = data.get('batch_id')
     status = data.get('status')
 
+    print("📥 PATCH /candidates_batches/status")
+    print("📌 candidate_id:", candidate_id)
+    print("📌 batch_id:", batch_id)
+    print("📌 status:", status)
+
     if not all([candidate_id, batch_id, status]):
+        print("❌ Missing required fields")
         return jsonify({'error': 'Missing required fields'}), 400
 
     try:
@@ -1812,8 +1819,10 @@ def update_candidate_batch_status():
         cursor.close()
         conn.close()
 
+        print("✅ Status updated successfully")
         return jsonify({'success': True}), 200
     except Exception as e:
+        print("❌ Exception:", str(e))
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
