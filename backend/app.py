@@ -12,6 +12,7 @@ import psycopg2
 import requests
 from datetime import datetime
 import json
+from ai_routes import register_ai_routes
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +39,8 @@ s3_client = boto3.client(
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
+
+register_ai_routes(app)
 
 def get_connection():
     return psycopg2.connect(
