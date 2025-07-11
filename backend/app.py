@@ -993,7 +993,7 @@ def extract_pdf_affinda():
             UPDATE resume
             SET extract_cv_pdf = %s
             WHERE candidate_id = %s
-        """, (json.dumps(data.as_dict()), candidate_id))
+        """, (json.dumps(data), candidate_id))
         conn.commit()
         cursor.close()
         conn.close()
