@@ -11,6 +11,8 @@
 </head>
 <script src="./assets/js/pipeline.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script type="module" src="https://unpkg.com/emoji-picker-element?module"></script>
+
 <body>
   <header class="detail-header">
     <div class="header-left">
@@ -84,7 +86,7 @@
       <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value="" ></div>
       <div class="input-group"><label>Website</label><input id="client-website-input" value="" ></div>
       <div class="input-group full"><label>Mail</label><input id="client-mail-input" value="" ></div>
-      <div class="input-group full"><label>About</label><textarea id="client-about-textarea" ></textarea></div>
+      <div class="input-group full"><label>About</label><textarea id="client-about-textarea" placeholder="Client background, culture, values..." class="taller-textarea"></textarea></div>
     </div>
   </div>
 </div>
@@ -134,7 +136,7 @@
     <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
     <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
     <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
-    <div class="input-group full"><label>First Meeting Comments</label><textarea id="comments-firstmeeting-textarea"></textarea></div>
+    <div class="input-group full"><label>First Meeting Comments</label><textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea></div>
     <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
     </div>
   </div>
@@ -152,9 +154,17 @@
           <button class="header-btn">Send</button>
         </div>
       </div>
-  
+      <div class="toolbar" id="job-toolbar">
+        <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
+        <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
+        <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
+        <div style="position: relative; display: inline-block;">
+          <button id="emoji-trigger">😊</button>
+          <emoji-picker id="emoji-picker" style="position: absolute; top: 100%; left: 0; display: none;"></emoji-picker>
+        </div>
+      </div>
       <div class="job-card">
-        <textarea id="job-description-textarea" class="styled-textarea" style="width: 100%; max-width: 98%; height: 400px; padding: 10px; font-size: 1rem; border-radius: 8px;"></textarea> 
+        <div id="job-description-textarea" contenteditable="true" class="job-description-editor" placeholder="Write your message here..."></div>  
       </div>
     </section>
     
@@ -335,7 +345,7 @@
     <input type="text" id="email-subject" placeholder="Subject..." />
 
     <label>Message</label>
-    <textarea id="email-message" style="height: 200px;"></textarea>
+    <div id="email-message" class="rich-editor" contenteditable="true" style="height: 200px; border: 1px solid #ccc; padding: 10px; border-radius: 8px;"></div>
 
     <button id="sendEmailBtn">Send</button>
   </div>

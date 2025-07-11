@@ -1,5 +1,9 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+function toggleActiveButton(command, button) {
+  document.execCommand(command, false, '');
+  button.classList.toggle('active');
+}
 document.addEventListener('DOMContentLoaded', () => {
   // 🔹 Mostrar popup para elegir acción
 document.getElementById('createCandidateBtn').addEventListener('click', () => {
@@ -228,13 +232,13 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
   document.getElementById('emailPopup').classList.remove('hidden');
 
-  const jobDesc = document.getElementById('job-description-textarea').value || '—';
+  const jobDesc = document.getElementById('job-description-textarea').innerText || '—';
   const clientName = document.getElementById('client-name-input').value || '—';
   const positionName = document.getElementById('details-opportunity-name').value || '—';
 
   // 📩 Mensaje
-  const message = `Hi\n\nJob description ready, please review:\n\n${jobDesc}`;
-  document.getElementById('email-message').value = message;
+  const message = `Hi<br><br>Job description ready, please review:<br><br>${jobDesc}`;
+  document.getElementById('email-message').innerHTML = message;
 
   // 📝 Asunto
   const subject = `${clientName} - ${positionName} - Job Description`;
@@ -299,7 +303,7 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
   const toChoices = emailToChoices.getValue().map(o => o.value);
   const ccChoices = emailCcChoices.getValue().map(o => o.value);
   const subject = document.getElementById('email-subject').value;
-  const message = document.getElementById('email-message').value;
+  const message = document.getElementById('email-message').innerHTML;
 
   if (!toChoices.length || !subject || !message) {
     alert("❌ Fill in all required fields (To, Subject, Message)");
@@ -355,7 +359,7 @@ document.getElementById('start-date-input').addEventListener('blur', async (e) =
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
 });
 document.getElementById('job-description-textarea').addEventListener('blur', e =>
-  updateOpportunityField('hr_job_description', e.target.value));
+  updateOpportunityField('hr_job_description', e.target.innerHTML));
 
 document.getElementById('close-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('opp_close_date', e.target.value);
@@ -822,6 +826,32 @@ async function loadPresentationTable(opportunityId) {
   }
 }
 
+// Marcar activo si el estilo está aplicado al soltar selección
+document.getElementById('job-description-textarea').addEventListener('mouseup', () => {
+  document.querySelectorAll('.toolbar button').forEach(btn => {
+    const command = btn.getAttribute('data-command');
+    if (!command) return;
+
+    const isActive = document.queryCommandState(command);
+    btn.classList.toggle('active', isActive);
+  });
+});
+
+const picker = document.getElementById('emoji-picker');
+const trigger = document.getElementById('emoji-trigger');
+const editor = document.getElementById('job-description-textarea');
+
+trigger.addEventListener('click', () => {
+  picker.style.display = picker.style.display === 'block' ? 'none' : 'block';
+});
+
+picker.addEventListener('emoji-click', event => {
+  const emoji = event.detail.unicode; // emoji unicode, p.ej. "😊"
+  editor.focus();
+  document.execCommand('insertText', false, emoji);
+  picker.style.display = 'none';
+});
+
 });
 
 async function loadOpportunityData() {
@@ -854,7 +884,7 @@ async function loadOpportunityData() {
     document.getElementById('details-model').value = data.opp_model || '';
     
     // JOB DESCRIPTION
-    document.getElementById('job-description-textarea').value = data.hr_job_description || '';
+    document.getElementById('job-description-textarea').innerHTML = data.hr_job_description || '';
 
     // FIRST MEETING INFO
     document.getElementById('min-budget-input').value = data.min_budget || '';
@@ -1427,4 +1457,9 @@ function showFriendlyPopup(message) {
     popup.style.opacity = '0';
     setTimeout(() => popup.remove(), 300);
   }, 3000);
+}
+function insertEmoji(emoji) {
+  const editor = document.getElementById('job-description-textarea');
+  editor.focus();
+  document.execCommand('insertText', false, emoji);
 }
