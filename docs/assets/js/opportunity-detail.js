@@ -1157,9 +1157,23 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         cardElement.querySelector('.candidate-email').textContent = c.email || '';
         cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
         const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+        console.log("🎯 Seteando status:", c.status);
+        console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
         if (c.status) {
-          dropdown.value = c.status;
+          const options = dropdown.options;
+          let found = false;
+          for (let i = 0; i < options.length; i++) {
+            if (options[i].value.trim() === c.status.trim()) {
+              options[i].selected = true;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            console.warn("⚠️ Status no encontrado en opciones:", c.status);
+          }
         }
+
 
         dropdown.addEventListener("change", async (e) => {
           const newStatus = e.target.value;
@@ -1278,9 +1292,23 @@ batchCandidates.forEach(c => {
 
   // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  console.log("🎯 Seteando status:", c.status);
+  console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
   if (c.status) {
-    dropdown.value = c.status;
+    const options = dropdown.options;
+    let found = false;
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].value.trim() === c.status.trim()) {
+        options[i].selected = true;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      console.warn("⚠️ Status no encontrado en opciones:", c.status);
+    }
   }
+
 
   // ✅ Listener funcional
   dropdown.addEventListener("change", async (e) => {
@@ -1403,9 +1431,23 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
     const cardFragment = template.content.cloneNode(true);
     const cardElement = cardFragment.querySelector(".candidate-card");
     const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-      if (c.status) {
-        dropdown.value = c.status;
+    console.log("🎯 Seteando status:", c.status);
+    console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
+    if (c.status) {
+      const options = dropdown.options;
+      let found = false;
+      for (let i = 0; i < options.length; i++) {
+        if (options[i].value.trim() === c.status.trim()) {
+          options[i].selected = true;
+          found = true;
+          break;
+        }
       }
+      if (!found) {
+        console.warn("⚠️ Status no encontrado en opciones:", c.status);
+      }
+    }
+
 
     cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
     cardElement.querySelector(".candidate-email").textContent = c.email || '';
@@ -1424,8 +1466,21 @@ batchCandidates.forEach(c => {
   
   // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  console.log("🎯 Seteando status:", c.status);
+  console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
   if (c.status) {
-    dropdown.value = c.status;
+    const options = dropdown.options;
+    let found = false;
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].value.trim() === c.status.trim()) {
+        options[i].selected = true;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      console.warn("⚠️ Status no encontrado en opciones:", c.status);
+    }
   }
 
   // ✅ Listener funcional
