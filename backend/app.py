@@ -13,7 +13,7 @@ import requests
 from datetime import datetime
 import json
 from ai_routes import register_ai_routes
-
+from db import get_connection 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
@@ -41,15 +41,6 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 app = Flask(__name__)
 
 register_ai_routes(app)
-
-def get_connection():
-    return psycopg2.connect(
-        host="vintti-hub-db.ctia0ga4u82m.us-east-2.rds.amazonaws.com",
-        port="5432",
-        database="postgres",
-        user="adminuser",
-        password="Elementum54!"
-    )
 
 def fetch_data_from_table(table_name):
     try:

@@ -21,7 +21,7 @@ import logging
 import traceback
 import openai
 import json
-from app import get_connection
+from db import get_connection 
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
