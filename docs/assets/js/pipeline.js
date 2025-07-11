@@ -42,13 +42,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const mappedStage = stageMap[newStage] || null;
             console.log(`➡️ Updating candidate ${candidateId} to stage ${mappedStage}`);
 
-            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/stage`, {
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/stage`, {
               method: 'PATCH',
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ stage: mappedStage })
+              body: JSON.stringify({ stage_pipeline: mappedStage })
             })
+
             .then(response => {
               if (!response.ok) {
                 throw new Error('Error updating candidate stage');
@@ -211,7 +212,7 @@ candidates.forEach(candidate => {
   const signOffValue = checkbox.checked ? "yes" : "no";
 
   try {
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/signoff`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sign_off: signOffValue }),

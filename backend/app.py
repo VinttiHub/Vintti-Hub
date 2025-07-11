@@ -492,7 +492,8 @@ def get_candidates_by_opportunity(opportunity_id):
                 c.stage,
                 c.employee_salary,
                 oc.stage_batch,
-                c.sign_off
+                oc.stage_pipeline AS stage,
+                oc.sign_off
             FROM candidates c
             INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
             WHERE oc.opportunity_id = %s
@@ -684,33 +685,49 @@ def update_account_fields(account_id):
     except Exception as e:
         print("Error updating account fields:", e)
         return jsonify({'error': str(e)}), 500
-@app.route('/candidates/<int:candidate_id>/stage', methods=['PATCH'])
-def update_candidate_stage(candidate_id):
-    data = request.get_json()
-    new_stage = data.get('stage')
 
-    if new_stage is None:
-        return jsonify({'error': 'stage is required'}), 400
+@app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/stage', methods=['PATCH'])
+def update_stage_pipeline(opportunity_id, candidate_id):
+    data = request.get_json()
+    stage_pipeline = data.get('stage_pipeline')
+
+    if stage_pipeline is None:
+        return jsonify({'error': 'stage_pipeline is required'}), 400
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
-            UPDATE candidates
-            SET stage = %s
-            WHERE candidate_id = %s
-        """, (new_stage, candidate_id))
-
+            UPDATE opportunity_candidates
+            SET stage_pipeline = %s
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (stage_pipeline, opportunity_id, candidate_id))
         conn.commit()
         cursor.close()
         conn.close()
-
         return jsonify({'success': True}), 200
-
     except Exception as e:
-        print("Error updating candidate stage:", e)
         return jsonify({'error': str(e)}), 500
+@app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/signoff', methods=['PATCH'])
+def update_signoff_status(opportunity_id, candidate_id):
+    data = request.get_json()
+    sign_off = data.get('sign_off')
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE opportunity_candidates
+            SET sign_off = %s
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (sign_off, opportunity_id, candidate_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
     
 @app.route('/accounts/<account_id>/opportunities/candidates')
 def get_candidates_by_account_opportunities(account_id):

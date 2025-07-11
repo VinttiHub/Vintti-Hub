@@ -132,6 +132,12 @@ def register_ai_routes(app):
             SELECT extract_linkedin FROM resume WHERE candidate_id = %s
         """, (candidate_id,))
         linkedin_row = cursor.fetchone()
+        if linkedin_row is None or linkedin_row[0] is None:
+            linkedin_json = ''
+        else:
+            linkedin_json = linkedin_row[0]
+
+        linkedin_row = cursor.fetchone()
         linkedin_json = linkedin_row[0] if linkedin_row else ''
         cursor.close()
         conn.close()
