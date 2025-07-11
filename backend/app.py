@@ -689,9 +689,15 @@ def update_account_fields(account_id):
 @app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/stage', methods=['PATCH'])
 def update_stage_pipeline(opportunity_id, candidate_id):
     data = request.get_json()
+    print("📥 PATCH /stage recibido")
+    print("🟡 opportunity_id:", opportunity_id)
+    print("🟡 candidate_id:", candidate_id)
+    print("🟡 payload:", data)
+
     stage_pipeline = data.get('stage_pipeline')
 
     if stage_pipeline is None:
+        print("❌ stage_pipeline no recibido")
         return jsonify({'error': 'stage_pipeline is required'}), 400
 
     try:
@@ -705,9 +711,12 @@ def update_stage_pipeline(opportunity_id, candidate_id):
         conn.commit()
         cursor.close()
         conn.close()
+        print("✅ stage_pipeline actualizado")
         return jsonify({'success': True}), 200
     except Exception as e:
+        print("❌ ERROR DB:", e)
         return jsonify({'error': str(e)}), 500
+
 @app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/signoff', methods=['PATCH'])
 def update_signoff_status(opportunity_id, candidate_id):
     data = request.get_json()

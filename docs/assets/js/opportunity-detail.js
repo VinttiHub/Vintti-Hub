@@ -1157,8 +1157,6 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         cardElement.querySelector('.candidate-email').textContent = c.email || '';
         cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
         const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-        console.log("🎯 Seteando status:", c.status);
-        console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
         if (c.status) {
           const options = dropdown.options;
           let found = false;

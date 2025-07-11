@@ -41,6 +41,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const newStage = container.parentElement.getAttribute('data-status');
             const mappedStage = stageMap[newStage] || null;
             console.log(`➡️ Updating candidate ${candidateId} to stage ${mappedStage}`);
+            console.log("📤 PATCH stage_pipeline")
+            console.log("🔹 candidateId:", candidateId)
+            console.log("🔹 opportunityId:", opportunityId)
+            console.log("🔹 newStage:", mappedStage)
 
             fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/stage`, {
               method: 'PATCH',
