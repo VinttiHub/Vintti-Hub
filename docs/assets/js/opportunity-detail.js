@@ -1290,8 +1290,7 @@ batchCandidates.forEach(c => {
 
   // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-  console.log("🎯 Seteando status:", c.status);
-  console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
+
   if (c.status) {
     const options = dropdown.options;
     let found = false;
