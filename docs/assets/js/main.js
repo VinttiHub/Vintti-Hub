@@ -94,6 +94,16 @@ document.querySelectorAll('.filter-toggle').forEach(header => {
             let referenceDate = null;
 
             try {
+              const pauseRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/pause_days_since_batch`);
+              const pauseData = await pauseRes.json();
+              const shouldPause = pauseData.pause;
+
+              if (shouldPause) {
+                cell.textContent = '⏸️';
+                cell.title = 'Paused due to recent presentation';
+                return;
+              }
+
               const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
               const result = await res.json();
 
