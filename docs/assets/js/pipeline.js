@@ -88,7 +88,9 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   const name = document.getElementById("candidate-name").value;
   const email = document.getElementById("candidate-email").value;
-  const phone = document.getElementById("candidate-phone").value;
+  const phoneCode = document.getElementById("phone-country-code").value;
+  const rawPhone = document.getElementById("candidate-phone").value.replace(/\s+/g, '');
+  const phone = phoneCode + rawPhone;
   const linkedin = document.getElementById("candidate-linkedin").value;
   const red_flags = document.getElementById("candidate-redflags").value;
   const comments = document.getElementById("candidate-comments").value;
@@ -102,7 +104,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     return;
   }
 
-  if (!name || !email || !phone || !linkedin || !country || !salary_range || !english_level ) {
+  if (!name || !email || !phone || !linkedin || !country) {
     alert("Please fill in all fields before creating the candidate.");
     return;
   }

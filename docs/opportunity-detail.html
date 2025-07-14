@@ -8,6 +8,9 @@
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
+
 </head>
 <script src="./assets/js/pipeline.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
@@ -275,14 +278,38 @@
       <div class="popup-content">
         <span class="close-btn" id="closePopup">&times;</span>
         <h2>Add Candidate</h2>
-        <input type="text" id="candidate-name" placeholder="Full name" autocomplete="off"/>
+        <input type="text" id="candidate-name" placeholder="Full name *" autocomplete="off"/>
         <p id="name-warning" style="display: none;">Please select a candidate from the list</p>
         <ul id="pipelineCandidateSearchResults" class="search-results-list"></ul>
         <div id="extra-fields">
-        <input type="text" id="candidate-email" placeholder="Email" />
-        <input type="text" id="candidate-country" placeholder="Country" />
-        <input type="text" id="candidate-phone" placeholder="Phone number" />
-        <input type="text" id="candidate-linkedin" placeholder="LinkedIn URL" />
+        <input type="text" id="candidate-email" placeholder="Email *" />
+        <input type="text" id="candidate-country" placeholder="Country *" />
+        <div style="display: flex; gap: 8px;">
+          <select id="phone-country-code" style="width: 30%;">
+            <option value="54" selected>🇦🇷 +54    Argentina</option>
+            <option value="591">🇧🇴 +591    Bolivia</option>
+            <option value="55">🇧🇷 +55    Brasil</option>
+            <option value="56">🇨🇱 +56    Chile</option>
+            <option value="57">🇨🇴 +57    Colombia</option>
+            <option value="506">🇨🇷 +506    Costa Rica</option>
+            <option value="53">🇨🇺 +53    Cuba</option>
+            <option value="593">🇪🇨 +593    Ecuador</option>
+            <option value="503">🇸🇻 +503    El Salvador</option>
+            <option value="502">🇬🇹 +502    Guatemala</option>
+            <option value="504">🇭🇳 +504    Honduras</option>
+            <option value="52">🇲🇽 +52    México</option>
+            <option value="505">🇳🇮 +505    Nicaragua</option>
+            <option value="507">🇵🇦 +507    Panamá</option>
+            <option value="595">🇵🇾 +595    Paraguay</option>
+            <option value="51">🇵🇪 +51    Perú</option>
+            <option value="1">🇵🇷 +1    Puerto Rico</option>
+            <option value="1">🇩🇴 +1    República Dominicana</option>
+            <option value="598">🇺🇾 +598    Uruguay</option>
+            <option value="58">🇻🇪 +58    Venezuela</option>
+          </select>
+          <input type="text" id="candidate-phone" placeholder="Phone number" style="width: 70%;" />
+        </div>
+        <input type="text" id="candidate-linkedin" placeholder="LinkedIn URL *" />
         <input type="text" id="candidate-redflags" placeholder="Red Flags" />
         <input type="text" id="candidate-comments" placeholder="Comments" />
         <select id="candidate-english" placeholder="English Level">
