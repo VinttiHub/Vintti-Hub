@@ -118,6 +118,8 @@ def register_ai_routes(app):
     
     @app.route('/generate_resume_fields', methods=['POST','GET'])
     def generate_resume_fields():
+        print("🔍 Headers recibidos:", dict(request.headers))
+        print("🔍 Content-Type:", request.content_type)
         data = request.json
         candidate_id = data.get('candidate_id')
         extract_cv_pdf = data.get('extract_cv_pdf', '')
@@ -264,10 +266,16 @@ def register_ai_routes(app):
             print(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
         
-    @app.route('/extract_linkedin_proxycurl', methods=['POST','GET'])
+    @app.route('/extract_linkedin_proxycurl', methods=['POST'])
     def extract_linkedin_proxycurl():
         try:
             print("📥 Recibiendo request en /extract_linkedin_proxycurl")
+
+            # Validación de tipo de contenido
+            if not request.is_json:
+                print("❌ Content-Type inválido:", request.content_type)
+                return jsonify({"error": "Request must be JSON"}), 400
+
             data = request.get_json()
             print("📄 Body recibido:", data)
 
@@ -277,11 +285,15 @@ def register_ai_routes(app):
                 return jsonify({"error": "Missing LinkedIn URL"}), 400
             
             if "/in/" not in linkedin_url:
-                print("❌ Error: URL de LinkedIn malformada:", linkedin_url)
+                print("❌ URL malformada:", linkedin_url)
                 return jsonify({"error": "Malformed LinkedIn URL"}), 400
 
             # Configuración del request a Proxycurl
             proxycurl_api_key = os.getenv("PROXYCURL_API_KEY")
+            if not proxycurl_api_key:
+                print("❌ PROXYCURL_API_KEY no está configurado")
+                return jsonify({"error": "API key not set"}), 500
+
             headers = {
                 "Authorization": f"Bearer {proxycurl_api_key}"
             }
@@ -296,25 +308,32 @@ def register_ai_routes(app):
             response = requests.get(
                 "https://nubela.co/proxycurl/api/v2/linkedin",
                 headers=headers,
-                params=params
+                params=params,
+                timeout=30  # ⏱️ Evita que se quede colgado si Proxycurl no responde
             )
 
             print("📡 Proxycurl status code:", response.status_code)
+
             if response.status_code != 200:
                 print("❌ Error al llamar Proxycurl:", response.text)
-                return jsonify({"error": response.text}), response.status_code
+                return jsonify({"error": "Proxycurl request failed", "details": response.text}), response.status_code
 
             linkedin_data = response.json()
-            print("✅ LinkedIn JSON recibido (preview):", json.dumps(linkedin_data, indent=2)[:1000])
+            print("✅ LinkedIn JSON recibido (preview):", json.dumps(linkedin_data, indent=2)[:800])
 
             return jsonify(linkedin_data)
 
+        except requests.exceptions.Timeout:
+            print("⏱️ Timeout al llamar Proxycurl")
+            return jsonify({"error": "Request to Proxycurl timed out"}), 504
+
         except Exception as e:
+            import traceback
             print("❌ Excepción en /extract_linkedin_proxycurl:", str(e))
             print(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
-    import time
 
+import time
 def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
     for attempt in range(retries):
         try:
