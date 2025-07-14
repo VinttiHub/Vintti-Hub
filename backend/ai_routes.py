@@ -228,7 +228,7 @@ def register_ai_routes(app):
                 print("❌ JSONDecodeError:", str(e))
                 print("Contenido bruto:")
                 print(response_text)
-                response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip())
+                response_text_clean = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', response_text.strip())
 
                 try:
                     ai_data = json.loads(response_text_clean)

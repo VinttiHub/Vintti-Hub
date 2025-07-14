@@ -891,4 +891,31 @@ body {
 .filter-header i.rotate-up {
   transform: rotate(180deg) !important;
 }
+/* 🎯 Botón de toggle visible siempre */
+.sidebar-toggle-icon {
+  position: fixed;
+  top: 12px;
+  left: 220px; /* alineado al borde derecho del sidebar */
+  cursor: pointer;
+  z-index: 9999;
+  font-size: 18px;
+  background: #fff;
+  border-radius: 50%;
+  padding: 5px;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
+  transition: left 0.3s ease;
+}
+
+.custom-sidebar-hidden + .sidebar-toggle-icon {
+  left: 12px; /* cuando el sidebar está oculto */
+}
+
+.custom-sidebar-hidden {
+  display: none !important;
+}
+
+.custom-main-expanded {
+  width: 100% !important;
+}
+
 

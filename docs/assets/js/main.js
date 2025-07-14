@@ -1,17 +1,38 @@
 
 document.addEventListener('DOMContentLoaded', () => {
-document.querySelectorAll('.filter-toggle').forEach(header => {
-  header.addEventListener('click', () => {
-    const targetId = header.getAttribute('data-target');
-    const target = document.getElementById(targetId);
-    const icon = header.querySelector('i');
+const toggleSidebarButton = document.getElementById("sidebarToggleUnique");
+const sidebar = document.querySelector(".sidebar");
+const mainContent = document.querySelector(".main-content");
 
-    target.classList.toggle('hidden');
+if (toggleSidebarButton && sidebar && mainContent) {
+  toggleSidebarButton.addEventListener("click", () => {
+    const isHidden = sidebar.classList.toggle("custom-sidebar-hidden");
+    mainContent.classList.toggle("custom-main-expanded", isHidden);
+
+    const icon = toggleSidebarButton.querySelector("i");
     if (icon) {
-      icon.classList.toggle('rotate-up');
+      icon.classList.toggle("fa-chevron-left", !isHidden);
+      icon.classList.toggle("fa-chevron-right", isHidden);
     }
+
+    // Mueve el botón dependiendo del estado del sidebar
+    toggleSidebarButton.style.left = isHidden ? '12px' : '220px';
   });
-});
+}
+
+
+  document.querySelectorAll('.filter-toggle').forEach(header => {
+    header.addEventListener('click', () => {
+      const targetId = header.getAttribute('data-target');
+      const target = document.getElementById(targetId);
+      const icon = header.querySelector('i');
+
+      target.classList.toggle('hidden');
+      if (icon) {
+        icon.classList.toggle('rotate-up');
+      }
+    });
+  });
 
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
