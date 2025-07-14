@@ -1561,6 +1561,9 @@ def update_candidate_batch_status():
     except Exception as e:
         print("❌ Exception:", str(e))
         return jsonify({'error': str(e)}), 500
+@app.route('/debug/routes')
+def debug_routes():
+    return jsonify([str(rule) for rule in app.url_map.iter_rules()])
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -1157,6 +1157,7 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         cardElement.querySelector('.candidate-email').textContent = c.email || '';
         cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
         const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+        dropdown.value = "Client interviewing/testing";
         if (c.status) {
           const options = dropdown.options;
           let found = false;
@@ -1290,6 +1291,8 @@ batchCandidates.forEach(c => {
 
   // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  dropdown.value = "Client interviewing/testing";
+
 
   if (c.status) {
     const options = dropdown.options;
@@ -1428,6 +1431,8 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
     const cardFragment = template.content.cloneNode(true);
     const cardElement = cardFragment.querySelector(".candidate-card");
     const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+    dropdown.value = "Client interviewing/testing";
+
     console.log("🎯 Seteando status:", c.status);
     console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
     if (c.status) {
@@ -1463,6 +1468,8 @@ batchCandidates.forEach(c => {
   
   // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  dropdown.value = "Client interviewing/testing";
+
   console.log("🎯 Seteando status:", c.status);
   console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
   if (c.status) {
