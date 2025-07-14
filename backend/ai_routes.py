@@ -224,12 +224,21 @@ def register_ai_routes(app):
 
             # intentar parsear como JSON
             try:
+                print("🟢 Intentando hacer json.loads sobre:")
+                print(response_text[:1000])  # solo por seguridad
                 ai_data = json.loads(response_text)
-            except json.JSONDecodeError:
-                print("❌ Error al parsear JSON:")
+            except json.JSONDecodeError as e:
+                print("❌ JSONDecodeError:", str(e))
+                print("Contenido bruto:")
                 print(response_text)
                 response_text_clean = response_text.strip('```json').strip('```').strip()
-                ai_data = json.loads(response_text_clean)
+                try:
+                    ai_data = json.loads(response_text_clean)
+                except Exception as inner:
+                    print("❌ Falla también al limpiar el prompt:", str(inner))
+                    print(traceback.format_exc())
+                    return jsonify({"error": f"Invalid JSON response: {inner}"}), 500
+
             print("🟢 JSON generado por OpenAI:")
             print(ai_data)
 
