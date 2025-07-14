@@ -10,6 +10,7 @@ import json
 import time
 from flask import Flask, jsonify, request
 import requests
+import re
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -227,7 +228,8 @@ def register_ai_routes(app):
                 print("❌ JSONDecodeError:", str(e))
                 print("Contenido bruto:")
                 print(response_text)
-                response_text_clean = response_text.strip('```json').strip('```').strip()
+                response_text_clean = re.sub(r'^```json\s*|\s*```$', '', response_text.strip())
+
                 try:
                     ai_data = json.loads(response_text_clean)
                 except Exception as inner:

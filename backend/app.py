@@ -14,6 +14,7 @@ from datetime import datetime
 import json
 from ai_routes import register_ai_routes
 from db import get_connection 
+import re
 
 logging.basicConfig(
     level=logging.INFO,
