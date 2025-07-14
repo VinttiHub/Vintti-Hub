@@ -1,16 +1,11 @@
 from flask import Flask, jsonify, request
 import os
 from dotenv import load_dotenv
-import boto3
-import uuid
 from botocore.exceptions import NoCredentialsError
 from affinda import AffindaAPI, TokenCredential
 import openai
 import traceback
 import logging
-import psycopg2
-import requests
-from datetime import datetime
 import json
 
 openai.api_key = os.getenv("OPENAI_API_KEY")

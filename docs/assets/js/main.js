@@ -153,7 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.style.animation = 'fadeInUp 0.4s ease forwards';
           }, 100 * tbody.children.length); // delay progresivo
 
-          fetchDaysSinceBatch(opp, tr);
+          if (opp.opp_stage === 'Sourcing') {
+            fetchDaysSinceBatch(opp, tr);
+          }
         });
       }
     });
