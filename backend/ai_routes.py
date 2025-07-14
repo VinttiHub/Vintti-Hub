@@ -159,7 +159,6 @@ def register_ai_routes(app):
             linkedin_json = ''
         else:
             linkedin_json = linkedin_row[0]
-        linkedin_json = linkedin_row[0] if linkedin_row else ''
         linkedin_resumido = resumir_fuente("LinkedIn", linkedin_json)
         extract_resumido = resumir_fuente("Extracted CV PDF", extract_cv_pdf)
 
@@ -288,7 +287,7 @@ def register_ai_routes(app):
 
             print(f"🔗 Llamando a Proxycurl con URL: {linkedin_url}")
             response = requests.get(
-                "https://nubela.co/proxycurl/api/v2/linkedin",
+                "https://nubela.co/proxycurl/api/v2/linkedin/profile",
                 headers=headers,
                 params=params,
                 timeout=30  # ⏱️ Evita que se quede colgado si Proxycurl no responde

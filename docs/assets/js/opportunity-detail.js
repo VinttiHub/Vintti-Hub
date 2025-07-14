@@ -81,7 +81,32 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', async
         const li = document.createElement('li');
         li.textContent = c.name;
         li.classList.add('search-result-item');
+        li.setAttribute('data-candidate-id', c.candidate_id);
         results.appendChild(li);
+
+        li.addEventListener('click', async () => {
+          const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+          if (!opportunityId || !c.candidate_id) return alert('❌ Invalid candidate or opportunity');
+
+          // 🔁 Insertar en tabla intermedia
+          await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ candidate_id: c.candidate_id })
+          });
+
+          // 🔁 Mostrar tarjeta en columna "Contactado"
+          const cardTemplate = document.getElementById('candidate-card-template');
+          const newCard = cardTemplate.content.cloneNode(true);
+          newCard.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
+          newCard.querySelector('.candidate-email').textContent = c.email || '';
+          newCard.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+          newCard.querySelector('.candidate-status-dropdown')?.remove();
+          document.querySelector('#contacted').appendChild(newCard);
+
+          document.getElementById('preCreateCheckPopup').classList.add('hidden');
+          showFriendlyPopup(`✅ ${c.name} added to pipeline`);
+        });
       });
     }
   });
