@@ -1561,9 +1561,44 @@ def update_candidate_batch_status():
     except Exception as e:
         print("❌ Exception:", str(e))
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/debug/routes')
 def debug_routes():
     return jsonify([str(rule) for rule in app.url_map.iter_rules()])
+
+@app.route('/opportunities/<int:opp_id>/pause_days_since_batch', methods=['GET'])
+def should_pause_days_since_batch(opp_id):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT MAX(since_sourcing)
+            FROM sourcing
+            WHERE opportunity_id = %s
+        """, (opp_id,))
+        sourcing_date = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT presentation_date
+            FROM batch
+            WHERE opportunity_id = %s
+        """, (opp_id,))
+        presentation_dates = [row[0] for row in cur.fetchall() if row[0]]
+
+        if not sourcing_date:
+            return jsonify({"pause": False})
+
+        pause = any(p > sourcing_date for p in presentation_dates)
+        return jsonify({"pause": pause})
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": "Internal server error"}), 500
+
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
