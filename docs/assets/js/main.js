@@ -1,12 +1,18 @@
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.filter-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const targetId = btn.getAttribute('data-target');
+document.querySelectorAll('.filter-toggle').forEach(header => {
+  header.addEventListener('click', () => {
+    const targetId = header.getAttribute('data-target');
     const target = document.getElementById(targetId);
+    const icon = header.querySelector('i');
+
     target.classList.toggle('hidden');
+    if (icon) {
+      icon.classList.toggle('rotate-up');
+    }
   });
 });
+
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
 
@@ -256,7 +262,7 @@ function buildMultiFilter(containerId, options, columnIndex) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = val;
-    checkbox.checked = true;
+    checkbox.checked = !(val === 'Close Win' || val === 'Closed Lost');
 
     label.appendChild(checkbox);
     label.append(' ' + val);

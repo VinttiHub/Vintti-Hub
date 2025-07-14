@@ -877,3 +877,17 @@ body {
   height: 100%;
 }
 
+.filter-header {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-header i {
+  transition: transform 0.3s ease;
+}
+
+.filter-header i.rotate-up {
+  transform: rotate(180deg);
+}
