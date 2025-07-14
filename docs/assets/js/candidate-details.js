@@ -335,7 +335,6 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       })
 
         })
-        .then(res => res.json())
         .then(aiData => {
           console.log('✅ AI completed:', aiData);
 
