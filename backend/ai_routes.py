@@ -166,7 +166,6 @@ def register_ai_routes(app):
         #conn.close()
         print("🧾 extract_cv_pdf:", repr(extract_cv_pdf[:200]))
         print("🧾 cv_pdf_s3:", repr(cv_pdf_s3))
-        print("🧾 linkedin_json:", repr(linkedin_json[:200]))
         print("🧾 comments:", repr(comments[:200]))
 
 
@@ -202,7 +201,7 @@ def register_ai_routes(app):
             print(prompt[:500])
             max_chars = 10000
             extract_cv_pdf = extract_cv_pdf[:max_chars]
-            linkedin_json = linkedin_json[:max_chars]
+            #linkedin_json = linkedin_json[:max_chars]
             comments = comments[:max_chars]
             completion = openai.chat.completions.create(
                 model="gpt-4o",

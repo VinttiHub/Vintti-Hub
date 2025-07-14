@@ -315,24 +315,24 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       //  console.error('❌ Error extracting LinkedIn data:', err);
      // });
           // 4️⃣ Enviar todo a ChatGPT a través de tu nuevo endpoint
-return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    candidate_id: candidateId,
-    extract_cv_pdf: extractCvPdf,
-    cv_pdf_s3: cvPdfS3,
-    comments: comments
-  })
-})
-.then(async res => {
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error("❌ Error 500 body:", errorText);
-    throw new Error(`Server error: ${res.status}`);
-  }
-  return res.json();
-})
+      return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          extract_cv_pdf: extractCvPdf,
+          cv_pdf_s3: cvPdfS3,
+          comments: comments
+        })
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("❌ Error 500 body:", errorText);
+          throw new Error(`Server error: ${res.status}`);
+        }
+        return res.json();
+      })
 
         })
         .then(res => res.json())
