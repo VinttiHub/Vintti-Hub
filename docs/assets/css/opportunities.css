@@ -918,4 +918,54 @@ body {
   width: 100% !important;
 }
 
+/* Oculto (lo mandamos a la izquierda) */
+.sidebar.custom-sidebar-hidden {
+  left: -220px;
+}
+
+/* Main content expandido */
+.custom-main-expanded {
+  margin-left: 0 !important;
+  width: calc(100% - 12px);
+  transition: all 0.3s ease;
+}
+
+/* Botón burbuja */
+.sidebar-wow-toggle {
+  position: fixed;
+  top: 20px;
+  left: 220px;
+  width: 36px;
+  height: 36px;
+  background-color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Botón cuando el sidebar está oculto */
+.sidebar-hidden .sidebar-wow-toggle {
+  left: 12px !important;
+}
+
+.sidebar-wow-toggle:hover {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+
+.sidebar-wow-toggle i {
+  transition: transform 0.3s ease;
+  font-size: 16px;
+}
+
+/* Flecha rotada */
+.rotated-icon {
+  transform: rotate(180deg);
+}
+
 
