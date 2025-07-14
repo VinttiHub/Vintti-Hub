@@ -820,64 +820,68 @@ def get_resume(candidate_id):
 
 @app.route('/resumes/<int:candidate_id>', methods=['POST', 'PATCH'])
 def update_resume(candidate_id):
-    data = request.get_json()
-
-    allowed_fields = [
-        'about',
-        'work_experience',
-        'education',
-        'tools',
-        'video_link'
-    ]
-
-    updates = []
-    values = []
-
-    for field in allowed_fields:
-        if field in data:
-            updates.append(f"{field} = %s")
-            values.append(data[field])
-
-    if not updates:
-        return jsonify({'error': 'No valid fields provided'}), 400
-
-    values.append(candidate_id)
-
     try:
+        print("📥 PATCH recibido para candidate_id:", candidate_id)
+        data = request.get_json()
+        print("📦 JSON recibido:", data)
+
+        allowed_fields = [
+            'about',
+            'work_experience',
+            'education',
+            'tools',
+            'video_link'
+        ]
+
+        updates = []
+        values = []
+
+        for field in allowed_fields:
+            if field in data:
+                updates.append(f"{field} = %s")
+                values.append(data[field])
+
+        if not updates:
+            print("❌ No valid fields in data:", data)
+            return jsonify({'error': 'No valid fields provided'}), 400
+
+        values.append(candidate_id)
+
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Si el resume no existe aún → INSERT
-        cursor.execute("""
-            SELECT 1 FROM resume WHERE candidate_id = %s
-        """, (candidate_id,))
+        cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
         exists = cursor.fetchone()
+        print("🔎 Resume exists?", exists)
 
         if exists:
-            # UPDATE
+            print("🛠 Ejecutando UPDATE")
             cursor.execute(f"""
                 UPDATE resume
                 SET {', '.join(updates)}
                 WHERE candidate_id = %s
             """, values)
         else:
-            # INSERT
+            print("➕ Ejecutando INSERT")
             insert_fields = ", ".join(["candidate_id"] + [f for f in allowed_fields if f in data])
             insert_values = ", ".join(["%s"] * (1 + len(updates)))
             cursor.execute(f"""
                 INSERT INTO resume ({insert_fields})
                 VALUES ({insert_values})
-            """, [candidate_id] + values[:-1])  # values[:-1] → no repetimos candidate_id al final
+            """, [candidate_id] + values[:-1])
 
         conn.commit()
         cursor.close()
         conn.close()
 
+        print("✅ Resume actualizado correctamente")
         return jsonify({'success': True}), 200
 
     except Exception as e:
+        import traceback
+        print("❌ Error en PATCH /resumes:")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
-
 
     
 @app.route('/upload_pdf', methods=['POST'])
