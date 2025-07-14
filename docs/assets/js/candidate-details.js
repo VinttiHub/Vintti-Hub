@@ -299,21 +299,21 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
         .then(data => {
           const extractCvPdf = data.extract_cv_pdf || '';
           const cvPdfS3 = data.cv_pdf_s3 || '';
-      fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/extract_linkedin_proxycurl', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          linkedin_url: aiLinkedIn.value,
-          candidate_id: candidateId
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        console.log('✅ LinkedIn data:', data.linkedin_data);
-      })
-      .catch(err => {
-        console.error('❌ Error extracting LinkedIn data:', err);
-      });
+      //fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/extract_linkedin_proxycurl', {
+      //  method: 'POST',
+      //  headers: { 'Content-Type': 'application/json' },
+       // body: JSON.stringify({
+       //   linkedin_url: aiLinkedIn.value,
+       //   candidate_id: candidateId
+       // })
+      //})
+      //.then(res => res.json())
+      //.then(data => {
+       // console.log('✅ LinkedIn data:', data.linkedin_data);
+     // })
+      //.catch(err => {
+      //  console.error('❌ Error extracting LinkedIn data:', err);
+     // });
           // 4️⃣ Enviar todo a ChatGPT a través de tu nuevo endpoint
           return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
             method: 'POST',

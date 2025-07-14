@@ -149,21 +149,21 @@ def register_ai_routes(app):
         cv_pdf_s3 = data.get('cv_pdf_s3', '')
         comments = data.get('comments', '')
         # Obtener extract_linkedin desde la base de datos
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT extract_linkedin FROM resume WHERE candidate_id = %s
-        """, (candidate_id,))
-        linkedin_row = cursor.fetchone()
-        if linkedin_row is None or linkedin_row[0] is None:
-            linkedin_json = ''
-        else:
-            linkedin_json = linkedin_row[0]
-        linkedin_resumido = resumir_fuente("LinkedIn", linkedin_json)
-        extract_resumido = resumir_fuente("Extracted CV PDF", extract_cv_pdf)
+        #conn = get_connection()
+        #cursor = conn.cursor()
+        #cursor.execute("""
+        #    SELECT extract_linkedin FROM resume WHERE candidate_id = %s
+        #""", (candidate_id,))
+        #linkedin_row = cursor.fetchone()
+        #if linkedin_row is None or linkedin_row[0] is None:
+        #    linkedin_json = ''
+        #else:
+        #    linkedin_json = linkedin_row[0]
+        linkedin_resumido = ""
+        #extract_resumido = resumir_fuente("Extracted CV PDF", extract_cv_pdf)
 
-        cursor.close()
-        conn.close()
+        #cursor.close()
+        #conn.close()
         print("🧾 extract_cv_pdf:", repr(extract_cv_pdf[:200]))
         print("🧾 cv_pdf_s3:", repr(cv_pdf_s3))
         print("🧾 linkedin_json:", repr(linkedin_json[:200]))
@@ -179,7 +179,7 @@ def register_ai_routes(app):
         {extract_resumido}
 
         LINKEDIN_SUMMARY:
-        {linkedin_resumido}
+        (Not available)
 
         COMMENTS:
         {html.escape(comments)}
