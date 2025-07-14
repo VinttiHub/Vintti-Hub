@@ -116,7 +116,7 @@ def register_ai_routes(app):
             response.headers['Access-Control-Allow-Credentials'] = 'true'
             return response, 500
     
-    @app.route('/generate_resume_fields', methods=['POST'])
+    @app.route('/generate_resume_fields', methods=['POST','GET'])
     def generate_resume_fields():
         data = request.json
         candidate_id = data.get('candidate_id')
