@@ -159,8 +159,6 @@ def register_ai_routes(app):
             linkedin_json = ''
         else:
             linkedin_json = linkedin_row[0]
-
-        linkedin_row = cursor.fetchone()
         linkedin_json = linkedin_row[0] if linkedin_row else ''
         linkedin_resumido = resumir_fuente("LinkedIn", linkedin_json)
         extract_resumido = resumir_fuente("Extracted CV PDF", extract_cv_pdf)
