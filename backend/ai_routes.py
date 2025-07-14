@@ -116,7 +116,6 @@ def register_ai_routes(app):
             response.headers['Access-Control-Allow-Credentials'] = 'true'
             return response, 500
     
-    @app.route('/generate_resume_fields', methods=['POST','GET'])
     def resumir_fuente(nombre, contenido):
         prompt = f"""
         Resume solo la información profesional más útil para armar un CV a partir de este bloque de texto JSON o plano.
@@ -139,7 +138,8 @@ def register_ai_routes(app):
             max_tokens=700
         )
         return respuesta.choices[0].message.content.strip()
-
+    
+    @app.route('/generate_resume_fields', methods=['POST','GET'])
     def generate_resume_fields():
         print("🔍 Headers recibidos:", dict(request.headers))
         print("🔍 Content-Type:", request.content_type)
