@@ -7,6 +7,9 @@ import openai
 import traceback
 import logging
 import json
+import time
+from flask import Flask, jsonify, request
+import requests
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -86,7 +89,7 @@ def register_ai_routes(app):
 
             logging.info("🧠 Prompt construido correctamente, conectando con OpenAI...")
 
-            chat = openai.chat.completions.create(
+            chat = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert recruiter and job description writer."},
@@ -310,3 +313,25 @@ def register_ai_routes(app):
             print("❌ Excepción en /extract_linkedin_proxycurl:", str(e))
             print(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
+    import time
+
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
+    for attempt in range(retries):
+        try:
+            response = openai.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            return response
+        except openai.RateLimitError as e:
+            logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")
+            if hasattr(e, 'response') and e.response is not None:
+                logging.warning("🔎 Response headers: %s", e.response.headers)
+            time.sleep(10)
+        except Exception as e:
+            logging.error("❌ Error en llamada a OpenAI: " + str(e))
+            raise e
+    raise Exception("Exceeded maximum retries due to rate limit")
+
