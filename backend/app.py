@@ -878,48 +878,54 @@ def update_resume(candidate_id):
     
 @app.route('/extract_linkedin_proxycurl', methods=['POST'])
 def extract_linkedin_proxycurl():
-    data = request.json
-    linkedin_url = data.get("linkedin_url")
-    candidate_id = data.get("candidate_id")
-
-    if not linkedin_url or not candidate_id:
-        return jsonify({"error": "linkedin_url and candidate_id required"}), 400
-    proxycurl_key = os.environ.get("PROXYCURL_API_KEY")
-    print("🔐 Proxycurl Key loaded:", proxycurl_key)
     try:
-        headers = {
-            "Authorization": f"Bearer {proxycurl_key}"
-        }
+        print("📥 Recibiendo request en /extract_linkedin_proxycurl")
+        data = request.get_json()
+        print("📄 Body recibido:", data)
 
+        linkedin_url = data.get("linkedin_url", "").strip()
+        if not linkedin_url:
+            print("❌ Error: No se proporcionó URL de LinkedIn")
+            return jsonify({"error": "Missing LinkedIn URL"}), 400
+        
+        if "/in/" not in linkedin_url:
+            print("❌ Error: URL de LinkedIn malformada:", linkedin_url)
+            return jsonify({"error": "Malformed LinkedIn URL"}), 400
+
+        # Configuración del request a Proxycurl
+        proxycurl_api_key = os.getenv("PROXYCURL_API_KEY")
+        headers = {
+            "Authorization": f"Bearer {proxycurl_api_key}"
+        }
         params = {
             "url": linkedin_url,
-            "use_cache": "if-present"
+            "use_cache": "if-present",
+            "skills": "include",
+            "inferred_salary": "include"
         }
 
+        print(f"🔗 Llamando a Proxycurl con URL: {linkedin_url}")
         response = requests.get(
             "https://nubela.co/proxycurl/api/v2/linkedin",
             headers=headers,
             params=params
         )
 
+        print("📡 Proxycurl status code:", response.status_code)
         if response.status_code != 200:
-            return jsonify({"error": "Failed to extract from Proxycurl", "status_code": response.status_code}), 500
+            print("❌ Error al llamar Proxycurl:", response.text)
+            return jsonify({"error": response.text}), response.status_code
 
         linkedin_data = response.json()
+        print("✅ LinkedIn JSON recibido (preview):", json.dumps(linkedin_data, indent=2)[:1000])
 
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE resume SET extract_linkedin = %s WHERE candidate_id = %s
-        """, (json.dumps(linkedin_data), candidate_id))
-        conn.commit()
-        cursor.close()
-        conn.close()
+        return jsonify(linkedin_data)
 
-        return jsonify({"success": True, "linkedin_data": linkedin_data})
-    
     except Exception as e:
+        print("❌ Excepción en /extract_linkedin_proxycurl:", str(e))
+        print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+
 
     
 @app.route('/upload_pdf', methods=['POST'])

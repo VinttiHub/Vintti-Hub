@@ -228,6 +228,10 @@ def register_ai_routes(app):
             print("🟡 Enviando prompt a OpenAI...")
             print("Prompt preview:")
             print(prompt[:500])
+            max_chars = 13000
+            extract_cv_pdf = extract_cv_pdf[:max_chars]
+            linkedin_json = linkedin_json[:max_chars]
+            comments = comments[:max_chars]
             completion = openai.chat.completions.create(
                 model="gpt-4o",
                 messages=[
