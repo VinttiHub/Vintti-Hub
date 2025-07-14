@@ -117,6 +117,29 @@ def register_ai_routes(app):
             return response, 500
     
     @app.route('/generate_resume_fields', methods=['POST','GET'])
+    def resumir_fuente(nombre, contenido):
+        prompt = f"""
+        Resume solo la información profesional más útil para armar un CV a partir de este bloque de texto JSON o plano.
+        Elimina cosas irrelevantes o duplicadas.
+        
+        Fuente: {nombre.upper()}
+        ---
+        {contenido[:8000]}  # recortamos para evitar token overflow
+        ---
+        Devuelve solo texto limpio y resumido, en inglés.
+        """
+        print(f"✂️ Resumiendo fuente: {nombre}")
+        respuesta = call_openai_with_retry(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert resume cleaner."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=700
+        )
+        return respuesta.choices[0].message.content.strip()
+
     def generate_resume_fields():
         print("🔍 Headers recibidos:", dict(request.headers))
         print("🔍 Content-Type:", request.content_type)
@@ -139,6 +162,9 @@ def register_ai_routes(app):
 
         linkedin_row = cursor.fetchone()
         linkedin_json = linkedin_row[0] if linkedin_row else ''
+        linkedin_resumido = resumir_fuente("LinkedIn", linkedin_json)
+        extract_resumido = resumir_fuente("Extracted CV PDF", extract_cv_pdf)
+
         cursor.close()
         conn.close()
         print("🧾 extract_cv_pdf:", repr(extract_cv_pdf[:200]))
@@ -150,77 +176,26 @@ def register_ai_routes(app):
         import html
 
         prompt = f"""
-        You are an expert resume assistant. You will generate structured resume data in JSON format based on the following information:
-        you cannot add info that is not explicity said in this inputs
+        Extract resume fields in JSON format using only the provided data.
 
-        EXTRACTED_CV_PDF (Affinda or other CV extract): 
-        {html.escape(extract_cv_pdf)}
+        CV_EXTRACT_SUMMARY:
+        {extract_resumido}
 
-        CV_PDF_S3 (Link to the original PDF):
-        {html.escape(cv_pdf_s3)}
+        LINKEDIN_SUMMARY:
+        {linkedin_resumido}
 
-        LINKEDIN_JSON (Extracted using Proxycurl):
-        {html.escape(linkedin_json)}
-
-        Additional user comments:
+        COMMENTS:
         {html.escape(comments)}
 
-        Please generate the following in ENGLISH:
-        1. ABOUT: a professional summary paragraph.
-        2. WORK_EXPERIENCE: a JSON array of objects with fields:
-        - title
-        - company
-        - start_date (YYYY-MM-DD or empty)
-        - end_date (YYYY-MM-DD or empty)
-        - current (true or false)
-        - description
+        Respond in valid ENGLISH JSON with:
+        - about
+        - work_experience (title, company, start_date, end_date, current, description)
+        - education (institution, start_date, end_date, current, description)
+        - tools (tool, level)
 
-        3. EDUCATION: a JSON array of objects with fields:
-        - institution
-        - start_date (YYYY-MM-DD or empty)
-        - end_date (YYYY-MM-DD or empty)
-        - current (true or false)
-        - description
-
-        4. TOOLS: a JSON array of objects with fields:
-        - tool
-        - level (Basic, Intermediate, Advanced)
-
-        Please respond in strict JSON format. Example:
-
-        {{  
-        "about": "Experienced software engineer with a strong background in full-stack development and cloud technologies.",
-        "work_experience": [
-            {{
-            "title": "Software Engineer",
-            "company": "Tech Corp",
-            "start_date": "2022-01-01",
-            "end_date": "",
-            "current": true,
-            "description": "Developed and maintained web applications using Python and React."
-            }}
-        ],
-        "education": [
-            {{
-            "institution": "University of Technology",
-            "start_date": "2018-09-01",
-            "end_date": "2022-06-01",
-            "current": false,
-            "description": "Bachelor's Degree in Computer Science."
-            }}
-        ],
-        "tools": [
-            {{
-            "tool": "Python",
-            "level": "Advanced"
-            }},
-            {{
-            "tool": "React",
-            "level": "Intermediate"
-            }}
-        ]
-        }} 
+        Do NOT invent data.
         """
+
         print("🧠 Prompt construido para resume:")
         print(prompt[:1000])  # solo para evitar saturar logs
 
