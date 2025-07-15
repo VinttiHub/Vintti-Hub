@@ -110,7 +110,6 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     email,
     phone,
     linkedin,
-    salary_range,
     country,
     stage,
     created_by: localStorage.getItem('user_email') // ✅ esto lo agrega
