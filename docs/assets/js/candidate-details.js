@@ -412,36 +412,47 @@ document.getElementById('ai-submit').addEventListener('click', async () => {
   const candidateId = new URLSearchParams(window.location.search).get('id');
   if (!linkedin_scrapper && !cv_pdf_scrapper) return;
 
-  document.getElementById('ai-loader').classList.remove('hidden');
+  // 👉 Mostrar mensaje de carga
+  const loader = document.getElementById('ai-loader');
+  loader.classList.remove('hidden');
 
-  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ candidate_id: candidateId, linkedin_scrapper, cv_pdf_scrapper })
-  });
+  try {
+    const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, linkedin_scrapper, cv_pdf_scrapper })
+    });
 
-  const result = await response.json();
-  document.getElementById('ai-loader').classList.add('hidden');
+    const result = await response.json();
 
-  if (result.about) document.getElementById('aboutField').innerText = result.about;
+    if (result.about) document.getElementById('aboutField').innerText = result.about;
 
-  if (result.education) {
-    document.getElementById('educationList').innerHTML = '';
-    JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+    if (result.education) {
+      document.getElementById('educationList').innerHTML = '';
+      JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+    }
+
+    if (result.work_experience) {
+      document.getElementById('workExperienceList').innerHTML = '';
+      JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+    }
+
+    if (result.tools) {
+      document.getElementById('toolsList').innerHTML = '';
+      JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
+    }
+
+    // ✅ Cerrar popup
+    document.getElementById('ai-popup').classList.add('hidden');
+  } catch (err) {
+    console.error('❌ Error generating resume:', err);
+    alert("Something went wrong while generating the resume. Please try again.");
+  } finally {
+    // ✅ Ocultar loader sin importar si funcionó o falló
+    loader.classList.add('hidden');
   }
-
-  if (result.work_experience) {
-    document.getElementById('workExperienceList').innerHTML = '';
-    JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
-  }
-
-  if (result.tools) {
-    document.getElementById('toolsList').innerHTML = '';
-    JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
-  }
-
-  document.getElementById('ai-popup').classList.add('hidden');
 });
+
 
 });
 
@@ -589,24 +600,5 @@ document.querySelectorAll('.tab').forEach(button => {
       clientBtn.style.display = 'none';
     }
   });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-  const aiButton = document.getElementById('ai-action-button');
-  const clientBtn = document.getElementById('client-version-btn');
-  const candidateId = new URLSearchParams(window.location.search).get('id');
-
-  if (clientBtn && candidateId) {
-    clientBtn.href = `resume-readonly.html?id=${candidateId}`;
-  }
-
-  const activeTab = document.querySelector('.tab.active')?.dataset.tab;
-  if (activeTab === 'resume') {
-    if (aiButton) aiButton.style.display = 'flex';
-    if (clientBtn) clientBtn.style.display = 'inline-block';
-  } else {
-    if (aiButton) aiButton.style.display = 'none';
-    if (clientBtn) clientBtn.style.display = 'none';
-  }
 });
 

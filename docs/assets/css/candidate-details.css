@@ -1101,3 +1101,47 @@ select:focus {
 .ai-fullscreen button#ai-submit:hover {
   background: #333;
 }
+#ai-loader {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #e6f0fa; /* azul muy suave */
+  padding: 12px 24px;
+  border-radius: 30px;
+  border: 2px solid #a3c7f5; /* borde azul pastel */
+  font-weight: 600;
+  font-family: 'Onest', sans-serif;
+  color: #1a4d8f; /* azul más oscuro para texto */
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 9999;
+  box-shadow: 0 0 12px rgba(26, 77, 143, 0.15);
+}
+
+#ai-loader.hidden {
+  display: none;
+}
+
+#ai-loader .dot {
+  animation: blink 1.2s infinite;
+  color: #1a4d8f;
+}
+
+#ai-loader .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+#ai-loader .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+#ai-loader .dot:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}

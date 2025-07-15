@@ -11,6 +11,7 @@ import time
 from flask import Flask, jsonify, request
 import requests
 import re
+import datetime
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -179,6 +180,58 @@ def register_ai_routes(app):
 
             try:
                 json_data = json.loads(content)
+                today = datetime.date.today()
+
+                # Preprocesar fechas en work_experience
+                for entry in json_data.get("work_experience", []):
+                    # Formatear fechas incompletas
+                    start = entry.get("start_date", "")
+                    end = entry.get("end_date", "")
+
+                    if start and len(start) == 4:
+                        entry["start_date"] = f"{start}-01-01"
+                    elif start and len(start) == 7:
+                        entry["start_date"] = f"{start}-01"
+
+                    if end and len(end) == 4:
+                        entry["end_date"] = f"{end}-01-01"
+                    elif end and len(end) == 7:
+                        entry["end_date"] = f"{end}-01"
+
+                    # Evaluar si es actual
+                    if not entry.get("end_date"):
+                        entry["current"] = True
+                    else:
+                        try:
+                            end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
+                            entry["current"] = end_date_obj > today
+                        except:
+                            entry["current"] = False
+
+                # Preprocesar fechas en education
+                for entry in json_data.get("education", []):
+                    start = entry.get("start_date", "")
+                    end = entry.get("end_date", "")
+
+                    if start and len(start) == 4:
+                        entry["start_date"] = f"{start}-01-01"
+                    elif start and len(start) == 7:
+                        entry["start_date"] = f"{start}-01"
+
+                    if end and len(end) == 4:
+                        entry["end_date"] = f"{end}-01-01"
+                    elif end and len(end) == 7:
+                        entry["end_date"] = f"{end}-01"
+
+                    if not entry.get("end_date"):
+                        entry["current"] = True
+                    else:
+                        try:
+                            end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
+                            entry["current"] = end_date_obj > today
+                        except:
+                            entry["current"] = False
+
             except:
                 json_data = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip()))
 
