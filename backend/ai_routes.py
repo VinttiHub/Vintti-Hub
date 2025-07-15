@@ -140,178 +140,77 @@ def register_ai_routes(app):
         )
         return respuesta.choices[0].message.content.strip()
     
-    @app.route('/generate_resume_fields', methods=['POST','GET'])
+    @app.route('/generate_resume_fields', methods=['POST'])
     def generate_resume_fields():
-        print("🔍 Headers recibidos:", dict(request.headers))
-        print("🔍 Content-Type:", request.content_type)
-        data = request.json
-        candidate_id = data.get('candidate_id')
-        extract_cv_pdf = data.get('extract_cv_pdf', '')
-        cv_pdf_s3 = data.get('cv_pdf_s3', '')
-        comments = data.get('comments', '')
-        # Obtener extract_linkedin desde la base de datos
-        #conn = get_connection()
-        #cursor = conn.cursor()
-        #cursor.execute("""
-        #    SELECT extract_linkedin FROM resume WHERE candidate_id = %s
-        #""", (candidate_id,))
-        #linkedin_row = cursor.fetchone()
-        #if linkedin_row is None or linkedin_row[0] is None:
-        #    linkedin_json = ''
-        #else:
-        #    linkedin_json = linkedin_row[0]
-        linkedin_resumido = ""
-        extract_resumido = resumir_fuente("Extracted CV PDF", extract_cv_pdf)
-
-        #cursor.close()
-        #conn.close()
-        print("🧾 extract_cv_pdf:", repr(extract_cv_pdf[:200]))
-        print("🧾 cv_pdf_s3:", repr(cv_pdf_s3))
-        print("🧾 comments:", repr(comments[:200]))
-
-
-        import html
-
-        prompt = f"""
-        Extract resume fields in JSON format using only the provided data.
-
-        CV_EXTRACT_SUMMARY:
-        {extract_resumido}
-
-        LINKEDIN_SUMMARY:
-        (Not available)
-
-        COMMENTS:
-        {html.escape(comments)}
-
-        Respond in valid ENGLISH JSON with:
-        - about
-        - work_experience (title, company, start_date, end_date, current, description)
-        - education (institution, start_date, end_date, current, description)
-        - tools (tool, level)
-
-        Do NOT invent data.
-        """
-
-        print("🧠 Prompt construido para resume:")
-        print(prompt[:1000])  # solo para evitar saturar logs
-
         try:
-            print("🟡 Enviando prompt a OpenAI...")
-            print("Prompt preview:")
-            print(prompt[:500])
-            max_chars = 10000
-            extract_cv_pdf = extract_cv_pdf[:max_chars]
-            #linkedin_json = linkedin_json[:max_chars]
-            comments = comments[:max_chars]
-            completion = openai.chat.completions.create(
+            data = request.json
+            candidate_id = data.get('candidate_id')
+            linkedin_scrapper = data.get('linkedin_scrapper', '')[:8000]
+            cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
+
+            prompt = f"""
+            Based only on the information below, generate a clean resume in valid JSON format. Do not invent any data.
+
+            LINKEDIN SCRAPER:
+            {linkedin_scrapper}
+
+            CV PDF SCRAPER:
+            {cv_pdf_scrapper}
+
+            Return JSON with:
+            - about
+            - work_experience (title, company, start_date, end_date, current, description)
+            - education (institution, start_date, end_date, current, description)
+            - tools (tool, level)
+            """
+
+            completion = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are an expert assistant specialized in resume generation."},
+                    {"role": "system", "content": "You are a resume generation assistant."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=800
+                max_tokens=1000
             )
-            print("🟢 OpenAI respondió:")
-            print(completion)
-            response_text = completion.choices[0].message.content
-            print("🟢 Respuesta de OpenAI:")
-            print(response_text)
 
-            # intentar parsear como JSON
+            content = completion.choices[0].message.content
+            print("📥 Resume JSON:", content)
+
             try:
-                print("🟢 Intentando hacer json.loads sobre:")
-                print(response_text[:1000])  # solo por seguridad
-                ai_data = json.loads(response_text)
-            except json.JSONDecodeError as e:
-                print("❌ JSONDecodeError:", str(e))
-                print("Contenido bruto:")
-                print(response_text)
-                response_text_clean = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', response_text.strip())
+                json_data = json.loads(content)
+            except:
+                json_data = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip()))
 
-                try:
-                    ai_data = json.loads(response_text_clean)
-                except Exception as inner:
-                    print("❌ Falla también al limpiar el prompt:", str(inner))
-                    print(traceback.format_exc())
-                    return jsonify({"error": f"Invalid JSON response: {inner}"}), 500
+            about = json_data.get('about', '')
+            education = json.dumps(json_data.get('education', []))
+            work_experience = json.dumps(json_data.get('work_experience', []))
+            tools = json.dumps(json_data.get('tools', []))
 
-            print("🟢 JSON generado por OpenAI:")
-            print(ai_data)
+            conn = get_connection()
+            cursor = conn.cursor()
 
-            return jsonify(ai_data)
+            cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
+            exists = cursor.fetchone()
 
-        except Exception as e:
-            print("❌ Error in generate_resume_fields:", str(e))
-            print("❌ Error en generate_resume_fields:")
-            print(traceback.format_exc())
-            return jsonify({"error": str(e)}), 500
-        
-    @app.route('/extract_linkedin_proxycurl', methods=['POST'])
-    def extract_linkedin_proxycurl():
-        try:
-            print("📥 Recibiendo request en /extract_linkedin_proxycurl")
+            if exists:
+                cursor.execute("""
+                    UPDATE resume SET about=%s, education=%s, work_experience=%s, tools=%s
+                    WHERE candidate_id=%s
+                """, (about, education, work_experience, tools, candidate_id))
+            else:
+                cursor.execute("""
+                    INSERT INTO resume (candidate_id, about, education, work_experience, tools)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (candidate_id, about, education, work_experience, tools))
 
-            # Validación de tipo de contenido
-            if not request.is_json:
-                print("❌ Content-Type inválido:", request.content_type)
-                return jsonify({"error": "Request must be JSON"}), 400
+            conn.commit()
+            cursor.close()
+            conn.close()
 
-            data = request.get_json()
-            print("📄 Body recibido:", data)
-
-            linkedin_url = data.get("linkedin_url", "").strip()
-            if not linkedin_url:
-                print("❌ Error: No se proporcionó URL de LinkedIn")
-                return jsonify({"error": "Missing LinkedIn URL"}), 400
-            
-            if "/in/" not in linkedin_url:
-                print("❌ URL malformada:", linkedin_url)
-                return jsonify({"error": "Malformed LinkedIn URL"}), 400
-
-            # Configuración del request a Proxycurl
-            proxycurl_api_key = os.getenv("PROXYCURL_API_KEY")
-            if not proxycurl_api_key:
-                print("❌ PROXYCURL_API_KEY no está configurado")
-                return jsonify({"error": "API key not set"}), 500
-
-            headers = {
-                "Authorization": f"Bearer {proxycurl_api_key}"
-            }
-            params = {
-                "url": linkedin_url,
-                "use_cache": "if-present",
-                "skills": "include",
-                "inferred_salary": "include"
-            }
-
-            print(f"🔗 Llamando a Proxycurl con URL: {linkedin_url}")
-            response = requests.get(
-                "https://nubela.co/proxycurl/api/v2/linkedin/profile",
-                headers=headers,
-                params=params,
-                timeout=30  # ⏱️ Evita que se quede colgado si Proxycurl no responde
-            )
-
-            print("📡 Proxycurl status code:", response.status_code)
-
-            if response.status_code != 200:
-                print("❌ Error al llamar Proxycurl:", response.text)
-                return jsonify({"error": "Proxycurl request failed", "details": response.text}), response.status_code
-
-            linkedin_data = response.json()
-            print("✅ LinkedIn JSON recibido (preview):", json.dumps(linkedin_data, indent=2)[:800])
-
-            return jsonify(linkedin_data)
-
-        except requests.exceptions.Timeout:
-            print("⏱️ Timeout al llamar Proxycurl")
-            return jsonify({"error": "Request to Proxycurl timed out"}), 504
+            return jsonify({"success": True, "about": about, "education": education, "work_experience": work_experience, "tools": tools})
 
         except Exception as e:
-            import traceback
-            print("❌ Excepción en /extract_linkedin_proxycurl:", str(e))
             print(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
 
