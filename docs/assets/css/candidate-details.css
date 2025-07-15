@@ -359,61 +359,75 @@ a {
   border-color: #7f5af0;
   color: #7f5af0;
 }
+#ai-popup label {
+  text-transform: none;
+  letter-spacing: 0;
+}
+#ai-popup input[type="text"]:focus,
+#ai-popup textarea:focus {
+  border: 2px solid #fbbbd3;
+  outline: none;
+  box-shadow: 0 0 0 2px #ffe0ec88;
+}
+#ai-popup button#ai-submit {
+  background: linear-gradient(to right, #c084fc, #f472b6);
+  color: white;
+  font-weight: 600;
+}
 
-/* AI Popup */
 #ai-popup {
   position: fixed;
-  top: 70px;
-  right: 10px;
-  background: #fffafa;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  padding: 20px;
-  width: 320px;
-  z-index: 999;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fdfcfc;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  padding: 30px 40px;
+  width: 90%;
+  max-width: 600px;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  border: 2px solid #ffb6c1;
-  font-family: 'Poppins', sans-serif;
+  gap: 16px;
+  border: 2px solid #fde4e8;
+  font-family: 'Onest', sans-serif;
+  animation: fadeIn 0.2s ease-out;
 }
 
 #ai-popup.hidden {
   display: none;
 }
 
-#ai-popup h3 {
+#ai-popup h2 {
   margin: 0 0 10px 0;
-  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
-  color: #7f5af0;
+  font-family: 'Onest', sans-serif;
+  color: #24222b;
+  font-size: 24px;
   text-align: center;
-  font-size: 20px;
-  text-transform: none !important;
 }
 
 #ai-popup label {
   font-size: 14px;
   color: #4a4e69;
   margin-bottom: 4px;
-  font-family: 'Poppins', sans-serif;
-  text-transform: none !important;
+  font-family: 'Onest', sans-serif;
 }
 
 #ai-popup input[type="text"],
 #ai-popup input[type="file"],
 #ai-popup textarea {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #ddd;
   border-radius: 12px;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Onest', sans-serif;
   font-size: 14px;
   box-sizing: border-box;
-  text-transform: none !important;
 }
 
 #ai-popup textarea {
-  min-height: 80px;
+  min-height: 100px;
   resize: vertical;
 }
 
@@ -425,15 +439,38 @@ a {
   border-radius: 999px;
   cursor: pointer;
   font-weight: bold;
-  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
+  font-family: 'Onest', sans-serif;
   font-size: 16px;
   transition: background-color 0.3s ease;
-  text-transform: none !important;
 }
 
 #ai-popup button#ai-submit:hover {
   background-color: #5a35c8;
 }
+
+/* Botón de cierre ❌ */
+#ai-popup .close-btn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+  font-weight: bold;
+  background: none;
+  border: none;
+}
+
+#ai-popup .close-btn:hover {
+  color: #333;
+}
+
+/* Animación suave */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -55%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
 
 /* 🍏 Estilo Apple-style Notification */
 .apple-hire-notice {
@@ -1011,4 +1048,56 @@ select:focus {
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 16px 16px;
+}
+.ai-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: white;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.ai-fullscreen h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.ai-fullscreen label {
+  font-weight: 600;
+  margin-top: 20px;
+  align-self: flex-start;
+}
+
+.ai-fullscreen textarea {
+  width: 90%;
+  max-width: 1000px;
+  min-height: 120px;
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.ai-fullscreen button#ai-submit {
+  margin-top: 30px;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 10px;
+  background: black;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ai-fullscreen button#ai-submit:hover {
+  background: #333;
 }

@@ -236,132 +236,43 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     });
   }
   // === AI Popup Logic ===
-    const aiButton = document.getElementById('ai-action-button');
-    const aiPopup = document.getElementById('ai-popup');
-    const aiLinkedIn = document.getElementById('ai-linkedin');
+  const aiButton = document.getElementById('ai-action-button');
+  const aiPopup = document.getElementById('ai-popup');
+  const aiLinkedInScrap = document.getElementById('ai-linkedin-scrap');
+  const aiCvScrap = document.getElementById('ai-cv-scrap');
 
-    // Mostrar LinkedIn automáticamente en popup
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
-      .then(response => response.json())
-      .then(data => {
-        aiLinkedIn.value = data.linkedin || '';
-      });
+  aiButton.addEventListener('click', () => {
+    aiPopup.classList.toggle('hidden');
+  });
 
-    aiButton.addEventListener('click', () => {
-      aiPopup.classList.toggle('hidden');
+  // Obtener los datos del backend
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
+    .then(res => res.json())
+    .then(data => {
+      aiLinkedInScrap.value = data.linkedin_scrapper || '';
+      aiCvScrap.value = data.cv_pdf_scrapper || '';
     });
 
-    document.getElementById('ai-submit').addEventListener('click', () => {
-      const pdfFile = document.getElementById('ai-pdf').files[0];
-      if (pdfFile) {
-        const formData = new FormData();
-        formData.append('candidate_id', candidateId);
-        formData.append('pdf', pdfFile);
-
-        // 1️⃣ Primero subir a S3
-        fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/upload_pdf', {
-          method: 'POST',
-          body: formData,
-        })
-        .then(response => response.json())
-        .then(data => {
-          console.log('✅ PDF uploaded:', data.pdf_url);
-          document.getElementById('ai-loader').classList.remove('hidden');
-
-
-          // 2️⃣ Después enviar a Affinda
-          return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/extract_pdf_affinda', {
-            method: 'POST',
-            body: formData
-          });
-        })
-        .then(res => res.json())
-        .then(data => {
-          console.log('✅ Extracción completa', data.extracted);
-        })
-        .catch(error => {
-          console.error('❌ Error en el flujo de carga y extracción:', error);
-          alert('Error uploading or extracting PDF');
-        });
-      }
-
-      const comments = document.getElementById('ai-comments').value.trim();
-
-      console.log('🚀 AI Action Triggered');
-      console.log('LinkedIn:', aiLinkedIn.value);
-      console.log('PDF File:', pdfFile);
-      console.log('Comments:', comments);
-      // 3️⃣ Obtener extract_cv_pdf y cv_pdf_s3 del backend
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`)
-        .then(res => res.json())
-        .then(data => {
-          const extractCvPdf = data.extract_cv_pdf || '';
-          const cvPdfS3 = data.cv_pdf_s3 || '';
-      //fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/extract_linkedin_proxycurl', {
-      //  method: 'POST',
-      //  headers: { 'Content-Type': 'application/json' },
-       // body: JSON.stringify({
-       //   linkedin_url: aiLinkedIn.value,
-       //   candidate_id: candidateId
-       // })
-      //})
-      //.then(res => res.json())
-      //.then(data => {
-       // console.log('✅ LinkedIn data:', data.linkedin_data);
-     // })
-      //.catch(err => {
-      //  console.error('❌ Error extracting LinkedIn data:', err);
-     // });
-          // 4️⃣ Enviar todo a ChatGPT a través de tu nuevo endpoint
-      return fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          candidate_id: candidateId,
-          extract_cv_pdf: extractCvPdf,
-          cv_pdf_s3: cvPdfS3,
-          comments: comments
-        })
-      })
-      .then(async res => {
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("❌ Error 500 body:", errorText);
-          throw new Error(`Server error: ${res.status}`);
-        }
-        return res.json();
-      })
-
-        })
-        .then(aiData => {
-          console.log('✅ AI completed:', aiData);
-
-          // 5️⃣ Guardar automáticamente la respuesta en la tabla resume
-          return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              about: aiData.about,
-              work_experience: JSON.stringify(aiData.work_experience),
-              education: JSON.stringify(aiData.education),
-              tools: JSON.stringify(aiData.tools),
-            })
-          });
-        })
-      .then(() => {
-        document.getElementById('ai-loader').classList.add('hidden');
-        alert('Resume fields updated successfully!');
-        location.reload();
-      })
-      .catch(err => {
-        document.getElementById('ai-loader').classList.add('hidden');
-        console.error('❌ Error in AI flow:', err);
-        alert('Error generating resume fields');
-      });
-
-      // Opcional: cerrar popup
-      aiPopup.classList.add('hidden');
+  // Guardar en blur
+  aiLinkedInScrap.addEventListener('blur', () => {
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ linkedin_scrapper: aiLinkedInScrap.value.trim() })
     });
+  });
+
+  aiCvScrap.addEventListener('blur', () => {
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cv_pdf_scrapper: aiCvScrap.value.trim() })
+    });
+  });
+  document.getElementById('ai-close').addEventListener('click', () => {
+  document.getElementById('ai-popup').classList.add('hidden');
+});
+
   // 👇 AGREGAR ESTO AL FINAL DEL DOMContentLoaded
   if (document.querySelector('.tab.active')?.dataset.tab === 'opportunities') {
     loadOpportunitiesForCandidate();

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Candidate Details</title>
   <link rel="stylesheet" href="./assets/css/candidate-details.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+
 </head>
 <body>
   <div class="main-content">
@@ -14,21 +16,24 @@
       <span>AI Assistant</span>
     </div>
 
-    <!-- AI Popup -->
-    <div id="ai-popup" class="hidden">
-      <h3>✨ AI Assistant</h3>
-      
-      <label>LinkedIn</label>
-      <input type="text" id="ai-linkedin">
-      
-      <label>Upload PDF</label>
-      <input type="file" id="ai-pdf">
-      
-      <label>Do you want me to take something into account?</label>
-      <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
-      
-      <button id="ai-submit">✨ Let's Go!</button>
-    </div>
+
+  <!-- AI Popup Fullscreen -->
+  <div id="ai-popup" class="hidden">
+    <button class="close-btn" id="ai-close">✖</button>
+    <h2>✨ AI Assistant</h2>
+    
+    <label>LinkedIn Data</label>
+    <textarea id="ai-linkedin-scrap" placeholder="LinkedIn summary..."></textarea>
+
+    <label>PDF Extract</label>
+    <textarea id="ai-cv-scrap" placeholder="PDF raw content..."></textarea>
+
+    <label>Do you want me to take something into account?</label>
+    <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
+
+    <button id="ai-submit">✨ Let's Go!</button>
+  </div>
+
     <div class="tabs">
       <button class="tab active" data-tab="overview">Overview</button>
       <button class="tab" data-tab="resume">Resume</button>

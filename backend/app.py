@@ -562,7 +562,9 @@ def get_candidate_by_id(candidate_id):
                 red_flags,
                 comments,
                 created_by,
-                created_at
+                created_at,
+                linkedin_scrapper,
+                cv_pdf_scrapper
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))
@@ -1045,7 +1047,9 @@ def update_candidate_fields(candidate_id):
         'salary_range',
         'red_flags',
         'comments',
-        'sign_off'
+        'sign_off',
+        'linkedin_scrapper',
+        'cv_pdf_scrapper'
     ]
 
     updates = []
