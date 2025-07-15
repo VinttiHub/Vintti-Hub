@@ -157,7 +157,10 @@
 
         <!-- About -->
         <section class="cv-section">
+          <div class="cv-heading-wrapper">
           <h2 class="cv-heading">About</h2>
+          <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+          </div>
           <div class="cv-card">
             <p id="aboutField">Click here to edit your About section.</p>
           </div>
@@ -165,21 +168,30 @@
 
         <!-- Education -->
         <section class="cv-section" id="educationSection">
+          <div class="cv-heading-wrapper">
           <h2 class="cv-heading">Education</h2>
+          <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+          </div>
           <div class="cv-card" id="educationList"></div>
           <button id="addEducationBtn">Add Education</button>
         </section>
 
         <!-- Work Experience -->
         <section class="cv-section" id="workExperienceSection">
+          <div class="cv-heading-wrapper">
           <h2 class="cv-heading">Work Experience</h2>
+          <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+          </div>
           <div class="cv-card" id="workExperienceList"></div>
           <button id="addWorkExperienceBtn">Add Work Experience</button>
         </section>
 
         <!-- Tools -->
         <section class="cv-section" id="toolsSection">
+          <div class="cv-heading-wrapper">
           <h2 class="cv-heading">Tools</h2>
+          <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+          </div>
           <div class="cv-card" id="toolsList"></div>
           <button id="addToolBtn">Add Tool</button>
         </section>
@@ -274,6 +286,34 @@
   <span class="dot">.</span>
   <span class="dot">.</span>
   <span class="dot">.</span>
+</div>
+
+<div id="popup-about" class="star-popup hidden">
+  <button class="close-star-popup">✖</button>
+  <h3>About Prompt</h3>
+  <textarea placeholder="Add your prompt here..."></textarea>
+  <button class="generate-btn">Generate</button>
+</div>
+
+<div id="popup-education" class="star-popup hidden">
+  <button class="close-star-popup">✖</button>
+  <h3>Education Prompt</h3>
+  <textarea placeholder="Add your prompt here..."></textarea>
+  <button class="generate-btn">Generate</button>
+</div>
+
+<div id="popup-work" class="star-popup hidden">
+  <button class="close-star-popup">✖</button>
+  <h3>Work Experience Prompt</h3>
+  <textarea placeholder="Add your prompt here..."></textarea>
+  <button class="generate-btn">Generate</button>
+</div>
+
+<div id="popup-tools" class="star-popup hidden">
+  <button class="close-star-popup">✖</button>
+  <h3>Tools Prompt</h3>
+  <textarea placeholder="Add your prompt here..."></textarea>
+  <button class="generate-btn">Generate</button>
 </div>
 
 

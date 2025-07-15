@@ -452,6 +452,33 @@ document.getElementById('ai-submit').addEventListener('click', async () => {
     loader.classList.add('hidden');
   }
 });
+document.querySelectorAll('.star-button').forEach(button => {
+  button.addEventListener('click', () => {
+    const popupId = button.getAttribute('data-target');
+    document.querySelectorAll('.star-popup').forEach(p => p.classList.add('hidden'));
+    document.getElementById(popupId).classList.remove('hidden');
+  });
+});
+
+document.querySelectorAll('.star-popup .generate-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const popup = btn.closest('.star-popup');
+    const textarea = popup.querySelector('textarea');
+    console.log('💬 Generate comment for:', popup.id, 'Text:', textarea.value);
+    popup.classList.add('hidden');
+  });
+});
+
+window.addEventListener('click', (e) => {
+  if (e.target.classList.contains('star-popup')) {
+    e.target.classList.add('hidden');
+  }
+});
+document.querySelectorAll('.close-star-popup').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.closest('.star-popup').classList.add('hidden');
+  });
+});
 
 
 });

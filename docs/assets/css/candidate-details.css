@@ -333,12 +333,12 @@ a {
 }
 /* AI Action Button - friendly style */
 #ai-action-button {
-  display: none; /* por defecto oculto */
+  display: none; /* se muestra solo en Resume con JS */
   position: fixed;
   top: 10px;
   right: 10px;
-  background: #ffffff;
-  border: 3px solid #4a4e69;
+  background: #fff0f5; /* rosa claro */
+  border: 2px solid #ffc0cb; /* borde rosa */
   border-radius: 999px;
   color: #4a4e69;
   font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
@@ -351,8 +351,8 @@ a {
   z-index: 999;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   transition: all 0.3s ease;
-  text-transform: none !important;
 }
+
 
 #ai-action-button:hover {
   transform: scale(1.05);
@@ -1144,4 +1144,94 @@ select:focus {
   0% { opacity: 0; }
   50% { opacity: 1; }
   100% { opacity: 0; }
+}
+
+.star-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #f0f7ff; /* azul muy suave */
+  border-radius: 16px;
+  border: 2px solid #a3c7f5;
+  padding: 24px;
+  z-index: 9999;
+  width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  font-family: 'Onest', sans-serif;
+}
+
+.star-popup textarea {
+  width: 80%;
+  margin: 12px auto;
+  height: 100px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  font-family: 'Onest', sans-serif;
+  display: block;
+}
+
+.star-popup .generate-btn {
+  background-color: #90caf9; /* azul pastel */
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease;
+  display: block;
+  margin: 12px auto 0;
+  text-align: center;
+}
+
+.star-popup .generate-btn:hover {
+  background-color: #ff8fa3;
+}
+
+.star-popup.hidden {
+  display: none;
+}
+.star-popup .close-star-popup {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #2c2c2c;
+}
+.cv-heading-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-right: 0;
+}
+
+.cv-heading {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  border-left: 4px solid #3b82f6;
+  padding-left: 12px;
+  letter-spacing: 0.5px;
+}
+
+.star-button {
+  font-size: 16px;
+  border: 2px solid #ffc0cb;
+  border-radius: 12px;
+  padding: 6px 10px;
+  background-color: #fffafa;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.star-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }

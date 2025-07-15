@@ -633,13 +633,7 @@ document.addEventListener("click", async (e) => {
         const li = document.createElement('li');
         li.classList.add('search-result-item');
         li.setAttribute('data-candidate-id', c.candidate_id);
-
-        const matchBy = term.map(t => {
-          if ((c.name || '').toLowerCase().includes(t)) return 'Name';
-          if ((c.linkedin || '').toLowerCase().includes(t)) return 'LinkedIn';
-          if ((c.phone || '').toLowerCase().includes(t)) return 'Phone';
-          return null;
-        }).filter(Boolean)[0] || 'Name';
+        const matchBy = 'Name'; // No hay búsqueda activa, así que no se necesita mostrar "match by"
 
         li.innerHTML = `
           <div style="font-weight: 600;">${c.name}</div>
