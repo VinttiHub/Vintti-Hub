@@ -66,12 +66,17 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', async
     noMatch.style.display = 'none';
 
     const matches = candidates.filter(c => {
-      const nameTokens = c.name.toLowerCase().split(' ');
+      const name = c.name?.toLowerCase() || '';
+      const linkedin = c.linkedin?.toLowerCase() || '';
+      const phone = c.phone?.toLowerCase() || '';
+
       return term.every(t =>
-        nameTokens.some(n => n.includes(t)) ||
-        t.includes(nameTokens.join(' '))
+        name.includes(t) ||
+        linkedin.includes(t) ||
+        phone.includes(t)
       );
     });
+
 
     if (matches.length === 0 && term.join('').length > 3) {
       noMatch.style.display = 'block';
@@ -79,7 +84,21 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', async
       foundMsg.style.display = 'block';
       matches.forEach(c => {
         const li = document.createElement('li');
-        li.textContent = c.name;
+        li.classList.add('search-result-item');
+        li.setAttribute('data-candidate-id', c.candidate_id);
+
+        const matchBy = term.map(t => {
+          if ((c.name || '').toLowerCase().includes(t)) return 'Name';
+          if ((c.linkedin || '').toLowerCase().includes(t)) return 'LinkedIn';
+          if ((c.phone || '').toLowerCase().includes(t)) return 'Phone';
+          return null;
+        }).filter(Boolean)[0] || 'Name';
+
+        li.innerHTML = `
+          <div style="font-weight: 600;">${c.name}</div>
+          <div style="font-size: 12px; color: #666;">🔍 Match by ${matchBy}</div>
+        `;
+
         li.classList.add('search-result-item');
         li.setAttribute('data-candidate-id', c.candidate_id);
         results.appendChild(li);
@@ -160,11 +179,33 @@ document.getElementById('openExistingCandidatePopup').addEventListener('click', 
 
     candidates.forEach(c => {
       const nameTokens = c.name.toLowerCase().split(' ');
-      const match = term.every(t => nameTokens.some(n => n.includes(t)));
+      const name = c.name?.toLowerCase() || '';
+      const linkedin = c.linkedin?.toLowerCase() || '';
+      const phone = c.phone?.toLowerCase() || '';
+
+      const match = term.every(t =>
+        name.includes(t) ||
+        linkedin.includes(t) ||
+        phone.includes(t)
+      );
 
       if (match) {
         const li = document.createElement('li');
-        li.textContent = c.name;
+        li.classList.add('search-result-item');
+        li.setAttribute('data-candidate-id', c.candidate_id);
+
+        const matchBy = term.map(t => {
+          if ((c.name || '').toLowerCase().includes(t)) return 'Name';
+          if ((c.linkedin || '').toLowerCase().includes(t)) return 'LinkedIn';
+          if ((c.phone || '').toLowerCase().includes(t)) return 'Phone';
+          return null;
+        }).filter(Boolean)[0] || 'Name';
+
+        li.innerHTML = `
+          <div style="font-weight: 600;">${c.name}</div>
+          <div style="font-size: 12px; color: #666;">🔍 Match by ${matchBy}</div>
+        `;
+
         li.classList.add('search-result-item');
         li.setAttribute('data-candidate-id', c.candidate_id);
         list.appendChild(li);
@@ -589,8 +630,22 @@ document.addEventListener("click", async (e) => {
       resultsList.innerHTML = "";
 
       candidates.forEach(c => {
-        const li = document.createElement("li");
-        li.textContent = c.name;
+        const li = document.createElement('li');
+        li.classList.add('search-result-item');
+        li.setAttribute('data-candidate-id', c.candidate_id);
+
+        const matchBy = term.map(t => {
+          if ((c.name || '').toLowerCase().includes(t)) return 'Name';
+          if ((c.linkedin || '').toLowerCase().includes(t)) return 'LinkedIn';
+          if ((c.phone || '').toLowerCase().includes(t)) return 'Phone';
+          return null;
+        }).filter(Boolean)[0] || 'Name';
+
+        li.innerHTML = `
+          <div style="font-weight: 600;">${c.name}</div>
+          <div style="font-size: 12px; color: #666;">🔍 Match by ${matchBy}</div>
+        `;
+
         li.classList.add("search-result-item");
         li.setAttribute("data-candidate-id", c.candidate_id);
         resultsList.appendChild(li);

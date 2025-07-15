@@ -50,6 +50,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       'field-phone': 'phone',
       'field-email': 'email',
       'field-english-level': 'english_level',
+      'field-linkedin': 'linkedin',
       'field-salary-range': 'salary_range',
     };
 
@@ -100,10 +101,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           div.textContent = data.email || '—';
           break;
         case 'linkedin':
-          const linkedinLink = document.getElementById('linkedin');
-          if (linkedinLink) {
-            linkedinLink.href = data.linkedin || '#';
-          }
+          div.textContent = data.linkedin || '—';
           break;
         case 'english level':
           div.textContent = data.english_level || '—';

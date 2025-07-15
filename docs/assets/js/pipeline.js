@@ -79,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
 document.getElementById("closePopup").addEventListener("click", () => {
   document.getElementById("candidatePopup").classList.add("hidden");
 
-  ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary", "candidate-country"]
+  ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-country"]
     .forEach(id => document.getElementById(id).value = '');
 });
 
@@ -92,10 +92,6 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
   const rawPhone = document.getElementById("candidate-phone").value.replace(/\s+/g, '');
   const phone = phoneCode + rawPhone;
   const linkedin = document.getElementById("candidate-linkedin").value;
-  const red_flags = document.getElementById("candidate-redflags").value;
-  const comments = document.getElementById("candidate-comments").value;
-  const english_level = document.getElementById("candidate-english").value;
-  const salary_range = document.getElementById("candidate-salary").value;
   const country = document.getElementById("candidate-country").value;
   const stage = "Contactado";
 
@@ -114,9 +110,6 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     email,
     phone,
     linkedin,
-    red_flags,
-    comments,
-    english_level,
     salary_range,
     country,
     stage,
@@ -136,7 +129,7 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     document.getElementById("candidatePopup").classList.add("hidden");
 
     // Limpiar campos
-    ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-redflags", "candidate-comments", "candidate-english", "candidate-salary", "candidate-country"]
+    ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-country"]
       .forEach(id => document.getElementById(id).value = '');
 
     loadPipelineCandidates();
