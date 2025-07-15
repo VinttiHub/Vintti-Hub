@@ -406,6 +406,42 @@ saveUpdateBtn.addEventListener('click', () => {
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadSalaryUpdates();
 }
+document.getElementById('ai-submit').addEventListener('click', async () => {
+  const linkedin_scrapper = document.getElementById('ai-linkedin-scrap').value.trim();
+  const cv_pdf_scrapper = document.getElementById('ai-cv-scrap').value.trim();
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  if (!linkedin_scrapper && !cv_pdf_scrapper) return;
+
+  document.getElementById('ai-loader').classList.remove('hidden');
+
+  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ candidate_id: candidateId, linkedin_scrapper, cv_pdf_scrapper })
+  });
+
+  const result = await response.json();
+  document.getElementById('ai-loader').classList.add('hidden');
+
+  if (result.about) document.getElementById('aboutField').innerText = result.about;
+
+  if (result.education) {
+    document.getElementById('educationList').innerHTML = '';
+    JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+  }
+
+  if (result.work_experience) {
+    document.getElementById('workExperienceList').innerHTML = '';
+    JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+  }
+
+  if (result.tools) {
+    document.getElementById('toolsList').innerHTML = '';
+    JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
+  }
+
+  document.getElementById('ai-popup').classList.add('hidden');
+});
 
 });
 
