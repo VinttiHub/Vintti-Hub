@@ -94,8 +94,10 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     document.querySelectorAll('#overview .field').forEach(field => {
       const label = field.querySelector('label');
-      const div = field.querySelector('div');
+      const div = field.querySelector('div, select, input, span');
       const id = label ? label.textContent.trim().toLowerCase() : '';
+
+      if (!div) return; // Evita errores si no hay ningún div/select/input/span
 
       switch (id) {
         case 'name':
