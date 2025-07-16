@@ -336,12 +336,13 @@ allowedHRUsers.forEach(user => {
 const uniqueHRLeads = [...new Set(
   data.map(d => emailToNameMap[d.opp_hr_lead] || '').filter(Boolean)
 )];
+const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))];
 
 
       buildMultiFilter('filterStage', uniqueStages, 0);
       buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5);
       buildMultiFilter('filterHRLead', uniqueHRLeads, 6);
-
+      buildMultiFilter('filterAccount', uniqueAccounts, 1); // Columna 1 = Account
 
     })
     .catch(err => {
