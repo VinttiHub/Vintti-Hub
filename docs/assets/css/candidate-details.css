@@ -1235,3 +1235,34 @@ select:focus {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
+.ai-loader {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f0f0ff;
+  border: 1px solid #d4d4f8;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-family: 'Onest', sans-serif;
+  color: #7f5af0;
+  font-size: 16px;
+  z-index: 9999;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.ai-loader .dot {
+  animation: blink 1s infinite;
+}
+
+.ai-loader .dot:nth-child(2) { animation-delay: 0.2s; }
+.ai-loader .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+.hidden {
+  display: none;
+}

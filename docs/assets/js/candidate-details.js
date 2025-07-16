@@ -483,8 +483,11 @@ document.querySelector('#popup-about .generate-btn').addEventListener('click', a
   const candidateId = new URLSearchParams(window.location.search).get('id');
   const textarea = document.querySelector('#popup-about textarea');
   const userPrompt = textarea.value.trim();
+  const loader = document.getElementById('about-loader');
 
   if (!userPrompt) return alert("Please add a comment before generating.");
+
+  loader.classList.remove('hidden');
 
   try {
     const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/improve_about', {
@@ -502,6 +505,8 @@ document.querySelector('#popup-about .generate-btn').addEventListener('click', a
   } catch (err) {
     console.error("❌ Error updating about:", err);
     alert("Error improving About section. Try again.");
+  } finally {
+    loader.classList.add('hidden');
   }
 });
 
