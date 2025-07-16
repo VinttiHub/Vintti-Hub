@@ -1993,3 +1993,11 @@ input:checked + .slider::before {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
+#candidate-country {
+  font-family: inherit;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  width: 100%;
+  font-size: 15px;
+}

@@ -55,8 +55,17 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     };
 
     Object.entries(overviewFields).forEach(([elementId, fieldName]) => {
-      const el = document.getElementById(elementId);
-      if (el) {
+    const el = document.getElementById(elementId);
+    if (el) {
+      if (fieldName === 'country') {
+        el.addEventListener('change', () => {
+          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ country: el.value })
+          });
+        });
+      } else {
         el.contentEditable = true;
         el.addEventListener('blur', () => {
           const updatedValue = el.innerText.trim();
@@ -67,6 +76,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           });
         });
       }
+    }
     });
 
     // === Guardar cambios de comentarios y red flags ===
@@ -92,7 +102,11 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           div.textContent = data.name || '—';
           break;
         case 'country':
-          div.textContent = data.country || '—';
+          if (div.tagName === 'SELECT') {
+            div.value = data.country || '';
+          } else {
+            div.textContent = data.country || '—';
+          }
           break;
         case 'phone number':
           div.textContent = data.phone || '—';
