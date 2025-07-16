@@ -479,6 +479,31 @@ document.querySelectorAll('.close-star-popup').forEach(btn => {
     btn.closest('.star-popup').classList.add('hidden');
   });
 });
+document.querySelector('#popup-about .generate-btn').addEventListener('click', async () => {
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  const textarea = document.querySelector('#popup-about textarea');
+  const userPrompt = textarea.value.trim();
+
+  if (!userPrompt) return alert("Please add a comment before generating.");
+
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/improve_about', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, user_prompt: userPrompt })
+    });
+
+    const data = await res.json();
+    if (data.about) {
+      document.getElementById('aboutField').innerText = data.about;
+    }
+
+    document.getElementById('popup-about').classList.add('hidden');
+  } catch (err) {
+    console.error("❌ Error updating about:", err);
+    alert("Error improving About section. Try again.");
+  }
+});
 
 
 });

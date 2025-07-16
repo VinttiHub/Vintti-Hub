@@ -26,6 +26,62 @@ from db import get_connection
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def register_ai_routes(app):
+    @app.route('/ai/improve_about', methods=['POST'])
+    def improve_about_section():
+        try:
+            data = request.json
+            candidate_id = data['candidate_id']
+            user_prompt = data.get('user_prompt', '').strip()
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # Obtener datos de DB
+            cursor.execute("SELECT about FROM resume WHERE candidate_id = %s", (candidate_id,))
+            about = cursor.fetchone()[0] or ""
+
+            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
+            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+
+            prompt = f"""
+    You are an expert resume editor. Here's the current "About" section for a candidate:
+
+    --- CURRENT ABOUT ---
+    {about}
+
+    --- SCRAPED LINKEDIN ---
+    {linkedin_scrapper[:2000]}
+
+    --- SCRAPED PDF ---
+    {cv_pdf_scrapper[:2000]}
+
+    --- USER COMMENTS ---
+    {user_prompt}
+
+    Based on all this, improve the "About" section. It should be short (2-4 lines), professional, and accurate. Only include real info. Return only the improved version, no intro, no comments.
+    """
+
+            completion = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=300
+            )
+
+            new_about = completion.choices[0].message.content.strip()
+
+            cursor.execute("UPDATE resume SET about = %s WHERE candidate_id = %s", (new_about, candidate_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return jsonify({"about": new_about})
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return jsonify({"error": str(e)}), 500
+
+
+
     @app.route('/ai/generate_jd', methods=['POST', 'OPTIONS'])
     def generate_job_description():
         logging.info("🔁 Entrando a /ai/generate_jd")
