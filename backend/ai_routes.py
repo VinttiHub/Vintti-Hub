@@ -26,6 +26,68 @@ from db import get_connection
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def register_ai_routes(app):
+    @app.route('/ai/improve_tools', methods=['POST'])
+    def improve_tools_section():
+        try:
+            data = request.json
+            candidate_id = data['candidate_id']
+            user_prompt = data.get('user_prompt', '').strip()
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # Obtener tools actuales
+            cursor.execute("SELECT tools FROM resume WHERE candidate_id = %s", (candidate_id,))
+            tools = cursor.fetchone()[0] or "[]"
+
+            # Obtener scraps
+            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
+            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+
+            prompt = f"""
+    You are a resume tools editor.
+
+    --- CURRENT TOOLS ---
+    {tools}
+
+    --- LINKEDIN SCRAP ---
+    {linkedin_scrapper[:2000]}
+
+    --- PDF SCRAP ---
+    {cv_pdf_scrapper[:2000]}
+
+    --- USER COMMENTS ---
+    {user_prompt}
+
+    Improve the tools section using this info. Output must be a JSON array of this format:
+    [{{"tool":"Excel","level":"Advanced"}},{{"tool":"QuickBooks","level":"Intermediate"}},{{"tool":"SAP","level":"Intermediate"}}]
+
+    - Infer the level (Basic, Intermediate, Advanced) based on context.
+    - Do NOT invent tools.
+    - If no level is specified, infer from experience.
+    Return only the JSON array.
+    """
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.5,
+                max_tokens=800
+            )
+
+            content = chat.choices[0].message.content.strip()
+            tools_json = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content))
+
+            cursor.execute("UPDATE resume SET tools = %s WHERE candidate_id = %s", (json.dumps(tools_json), candidate_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return jsonify({"tools": json.dumps(tools_json)})
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return jsonify({"error": str(e)}), 500
+
     @app.route('/ai/improve_work_experience', methods=['POST'])
     def improve_work_experience_section():
         try:

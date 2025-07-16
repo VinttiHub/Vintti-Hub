@@ -251,7 +251,27 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     .then(data => {
       aiLinkedInScrap.value = data.linkedin_scrapper || '';
       aiCvScrap.value = data.cv_pdf_scrapper || '';
+      const bothEmpty = !data.linkedin_scrapper && !data.cv_pdf_scrapper;
+
+      document.querySelectorAll('.star-button').forEach(btn => {
+        if (bothEmpty) {
+          btn.classList.add('disabled-star');
+
+          // Tooltip + bloquear acción
+          btn.addEventListener('click', e => {
+            e.preventDefault();
+            e.stopPropagation();
+          });
+
+          btn.addEventListener('mouseenter', () => {
+            showStarTooltip(btn);
+          });
+
+          btn.addEventListener('mouseleave', hideStarTooltip);
+        }
+      });
     });
+    
 
   // Guardar en blur
   aiLinkedInScrap.addEventListener('blur', () => {
@@ -453,8 +473,15 @@ document.getElementById('ai-submit').addEventListener('click', async () => {
   }
 });
 document.querySelectorAll('.star-button').forEach(button => {
-  button.addEventListener('click', () => {
-    const popupId = button.getAttribute('data-target');
+  const popupId = button.getAttribute('data-target');
+
+  button.addEventListener('click', e => {
+    if (button.classList.contains('disabled-star')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     document.querySelectorAll('.star-popup').forEach(p => p.classList.add('hidden'));
     document.getElementById(popupId).classList.remove('hidden');
   });
@@ -572,6 +599,48 @@ document.querySelector('#popup-work .generate-btn').addEventListener('click', as
     loader.classList.add('hidden');
   }
 });
+document.querySelector('#popup-tools .generate-btn').addEventListener('click', async () => {
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  const textarea = document.querySelector('#popup-tools textarea');
+  const userPrompt = textarea.value.trim();
+  const loader = document.getElementById('tools-loader');
+
+  if (!userPrompt) return alert("Please add a comment before generating.");
+
+  loader.classList.remove('hidden');
+
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/improve_tools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, user_prompt: userPrompt })
+    });
+
+    const data = await res.json();
+    if (data.tools) {
+      document.getElementById('toolsList').innerHTML = '';
+      JSON.parse(data.tools).forEach(entry => addToolEntry(entry));
+    }
+
+    document.getElementById('popup-tools').classList.add('hidden');
+  } catch (err) {
+    console.error("❌ Error improving tools:", err);
+    alert("Error improving Tools section. Try again.");
+  } finally {
+    loader.classList.add('hidden');
+  }
+});
+function showStarTooltip(button) {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'star-tooltip';
+  tooltip.textContent = 'Please use the AI Assistant button first.';
+  button.appendChild(tooltip);
+}
+
+function hideStarTooltip() {
+  document.querySelectorAll('.star-tooltip').forEach(el => el.remove());
+}
+
 
 
 
