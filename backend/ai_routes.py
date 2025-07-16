@@ -26,6 +26,92 @@ from db import get_connection
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def register_ai_routes(app):
+    @app.route('/ai/improve_education', methods=['POST'])
+    def improve_education_section():
+        try:
+            data = request.json
+            candidate_id = data['candidate_id']
+            user_prompt = data.get('user_prompt', '').strip()
+
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            # Obtener education actual
+            cursor.execute("SELECT education FROM resume WHERE candidate_id = %s", (candidate_id,))
+            education = cursor.fetchone()[0] or "[]"
+
+            # Obtener scraps
+            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
+            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+
+            prompt = f"""
+    You are a resume education editor.
+
+    --- CURRENT EDUCATION SECTION ---
+    {education}
+
+    --- LINKEDIN SCRAP ---
+    {linkedin_scrapper[:2000]}
+
+    --- PDF SCRAP ---
+    {cv_pdf_scrapper[:2000]}
+
+    --- USER COMMENTS ---
+    {user_prompt}
+
+    Improve the education section using this info. Output must be a JSON array with objects of this format:
+    [{{"institution":"...", "start_date":"YYYY-MM-DD", "end_date":"YYYY-MM-DD", "current":true/false, "description":"..."}}]
+
+    - If month or day is missing, complete with 01
+    - If end_date is missing or says "present", set current = true
+    - Else set current = false
+    Return only the JSON array.
+    """
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.6,
+                max_tokens=700
+            )
+
+            content = chat.choices[0].message.content.strip()
+            education_json = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content))
+
+            today = datetime.date.today()
+            for entry in education_json:
+                if entry.get("start_date", "").count("-") == 0:
+                    entry["start_date"] += "-01-01"
+                elif entry.get("start_date", "").count("-") == 1:
+                    entry["start_date"] += "-01"
+
+                if entry.get("end_date", "") in ["", None, "present", "Present"]:
+                    entry["end_date"] = ""
+                    entry["current"] = True
+                else:
+                    if entry["end_date"].count("-") == 0:
+                        entry["end_date"] += "-01-01"
+                    elif entry["end_date"].count("-") == 1:
+                        entry["end_date"] += "-01"
+                    try:
+                        end = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
+                        entry["current"] = end > today
+                    except:
+                        entry["current"] = False
+
+            cursor.execute("UPDATE resume SET education = %s WHERE candidate_id = %s", (json.dumps(education_json), candidate_id))
+            conn.commit()
+            cursor.close()
+            conn.close()
+
+            return jsonify({"education": json.dumps(education_json)})
+
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return jsonify({"error": str(e)}), 500
+
+
+
     @app.route('/ai/improve_about', methods=['POST'])
     def improve_about_section():
         try:

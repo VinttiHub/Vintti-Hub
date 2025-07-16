@@ -509,6 +509,43 @@ document.querySelector('#popup-about .generate-btn').addEventListener('click', a
     loader.classList.add('hidden');
   }
 });
+document.querySelector('#popup-education .generate-btn').addEventListener('click', async () => {
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  const textarea = document.querySelector('#popup-education textarea');
+  const userPrompt = textarea.value.trim();
+  const loader = document.getElementById('about-loader'); // reutilizamos este loader
+
+  if (!userPrompt) return alert("Please add a comment before generating.");
+
+  loader.querySelector('span').innerText = "Improving Education section...";
+  loader.classList.remove('hidden');
+
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/improve_education', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, user_prompt: userPrompt })
+    });
+
+    const data = await res.json();
+    if (data.education) {
+      document.getElementById('educationList').innerHTML = '';
+      JSON.parse(data.education).forEach(entry => addEducationEntry(entry));
+    }
+
+    document.getElementById('popup-education').classList.add('hidden');
+  } catch (err) {
+    console.error("❌ Error updating education:", err);
+    alert("Error improving Education section. Try again.");
+  } finally {
+    loader.classList.add('hidden');
+  }
+});
+
+
+
+
+
 
 
 });
