@@ -541,6 +541,37 @@ document.querySelector('#popup-education .generate-btn').addEventListener('click
     loader.classList.add('hidden');
   }
 });
+document.querySelector('#popup-work .generate-btn').addEventListener('click', async () => {
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  const textarea = document.querySelector('#popup-work textarea');
+  const userPrompt = textarea.value.trim();
+  const loader = document.getElementById('work-loader');
+
+  if (!userPrompt) return alert("Please add a comment before generating.");
+
+  loader.classList.remove('hidden');
+
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/improve_work_experience', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, user_prompt: userPrompt })
+    });
+
+    const data = await res.json();
+    if (data.work_experience) {
+      document.getElementById('workExperienceList').innerHTML = '';
+      JSON.parse(data.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+    }
+
+    document.getElementById('popup-work').classList.add('hidden');
+  } catch (err) {
+    console.error("❌ Error improving work experience:", err);
+    alert("Error improving Work Experience section. Try again.");
+  } finally {
+    loader.classList.add('hidden');
+  }
+});
 
 
 
