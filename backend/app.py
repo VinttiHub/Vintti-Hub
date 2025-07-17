@@ -1240,7 +1240,7 @@ def handle_candidate_hire_data(candidate_id):
     try:
         if request.method == 'GET':
             cursor.execute("""
-                SELECT references, employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date
+                SELECT "references", employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date
                 FROM candidates
                 WHERE candidate_id = %s
             """, (candidate_id,))

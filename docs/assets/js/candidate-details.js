@@ -340,7 +340,9 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
 }
 
 hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
-hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.value));
+hirePerks.addEventListener('blur', () => {
+  updateHireField('extraperks', hirePerks.innerHTML.trim());
+});
 const hash = window.location.hash;
 if (hash === '#hire') {
   const hireTab = document.querySelector('.tab[data-tab="hire"]');
@@ -673,9 +675,16 @@ referencesDiv.addEventListener('blur', () => {
 document.querySelectorAll('.rich-toolbar button').forEach(button => {
   button.addEventListener('click', () => {
     const command = button.getAttribute('data-command');
-    document.execCommand(command, false, null);
+    const targetId = button.getAttribute('data-target');
+    const target = targetId ? document.getElementById(targetId) : document.getSelection().focusNode?.parentElement;
+
+    if (target && target.isContentEditable) {
+      target.focus();
+      document.execCommand(command, false, null);
+    }
   });
 });
+
 
 
 
@@ -749,7 +758,7 @@ function loadHireData() {
   salaryInput.value = data.employee_salary || '';
   feeInput.value = data.employee_fee || '';
   document.getElementById('hire-computer').value = data.computer || '';
-  document.getElementById('hire-extraperks').value = data.extraperks || '';
+  document.getElementById('hire-extraperks').innerHTML = data.extraperks || '';
   document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
