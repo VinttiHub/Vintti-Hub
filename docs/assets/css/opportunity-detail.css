@@ -2001,3 +2001,20 @@ input:checked + .slider::before {
   width: 100%;
   font-size: 15px;
 }
+#approval-message {
+  min-height: 300px;
+  padding: 14px 16px;
+  border: 1.5px solid #ccc;
+  border-radius: 12px;
+  font-family: 'Quicksand', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  background-color: #fffdfd;
+  resize: vertical;
+  overflow-y: auto;
+}
+#approval-message:focus {
+  border-color: #f48fb1;
+  box-shadow: 0 0 0 2px rgba(244, 143, 177, 0.2);
+}

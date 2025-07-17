@@ -811,7 +811,7 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
   const to = approvalToChoices.getValue().map(o => o.value);
   const cc = approvalCcChoices.getValue().map(o => o.value);
   const subject = document.getElementById('approval-subject').value;
-  const body = document.getElementById('approval-message').value;
+  const body = document.getElementById('approval-message').innerHTML;
 
   if (!to.length || !subject || !body) {
     alert('❌ Please fill all required fields');
@@ -1658,52 +1658,44 @@ const batchCandidates = await batchCandidatesRes.json();
 
 let candidateBlocks = '';
 
-console.log("🧪 batchCandidates:", batchCandidates);
-
 for (let c of batchCandidates) {
   try {
     const resumeUrl = `https://vinttihub.vintti.com/resume-readonly.html?id=${c.candidate_id}`;
-    console.log(`📌 Procesando candidato: ${c.name}, ID: ${c.candidate_id}`);
-
     const aboutRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${c.candidate_id}`);
-    console.log(`📡 Fetch about para ${c.candidate_id}:`, aboutRes.status);
-
     const aboutData = await aboutRes.json();
-    console.log(`📄 aboutData para ${c.candidate_id}:`, aboutData);
 
     candidateBlocks += `
-Name: ${c.name}  
-Monthly Cost: $${c.salary_range || '—'}  
-Resume: ${resumeUrl}  
-${aboutData.about?.trim() || '—'}  
-  
-`;
+      <li style="margin-bottom: 10px;">
+        <strong>Name:</strong> ${c.name}<br>
+        <strong>Monthly Cost:</strong> $${c.salary_range || '—'}<br>
+        <strong>Resume:</strong> <em><a href="${resumeUrl}" target="_blank">${resumeUrl}</a></em><br>
+      </li>
+    `;
   } catch (error) {
     console.error(`❌ Error procesando candidato ID ${c.candidate_id}:`, error);
   }
 }
 
-console.log("📦 candidateBlocks final:", candidateBlocks);
+const body = `
+  <p>Hi XXX,</p>
+  <p>Hope you're doing great!</p>
+  <p>
+    XXX has handpicked a shortlist of candidates who align with everything you outlined — from experience to budget. 
+    We’re confident you’ll find strong potential here.
+  </p>
+  <p>Please let us know your availability, and XXX will take care of scheduling the first round of interviews.</p>
+  <p><strong>Candidates:</strong></p>
+  <ul>${candidateBlocks}</ul>
+  <p>
+    Let us know what times work best and we’ll get things moving. Looking forward to your thoughts!
+  </p>
+  <p>Best,<br>${yourName}</p>
+`;
 
-const body = `Hi XXX,
+document.getElementById('approval-message').innerHTML = body;
 
-Hope you're doing great!
-
-XXX has handpicked a shortlist of candidates who align with everything you outlined — from experience to budget. We’re confident you’ll find strong potential here.
-
-Please let us know your availability, and XXX will take care of scheduling the first round of interviews.
-
-Candidates:
-
-${candidateBlocks}
-
-Let us know what times work best and we’ll get things moving. Looking forward to your thoughts!
-
-Best,  
-${yourName}`;
 
 document.getElementById('approval-subject').value = subject;
-document.getElementById('approval-message').value = body;
 
 document.getElementById('approvalEmailPopup').classList.remove('hidden');
 
