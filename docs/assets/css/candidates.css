@@ -131,7 +131,6 @@ body {
   background-size: 200% 100%;
   background-position: right center;
   box-shadow: 0 0 20px rgba(0, 68, 255, 0.2), 0 0 40px rgba(0, 68, 255, 0.1);
-  transform: scale(1.01);
   z-index: 2;
   position: relative;
 }
@@ -366,3 +365,46 @@ body {
 }
 
 
+#accountTable tbody tr:hover,
+#candidatesTable tbody tr:hover,
+#opportunityTable tbody tr:hover {
+  cursor: pointer;
+}
+.sidebar-wow-toggle {
+  position: fixed;
+  top: 20px;
+  left: 220px;
+  width: 36px;
+  height: 36px;
+  background-color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.custom-sidebar-hidden + .sidebar-wow-toggle {
+  left: 12px;
+}
+.custom-sidebar-hidden {
+  display: none !important;
+}
+.custom-main-expanded {
+  margin-left: 0 !important;
+  width: calc(100% - 12px);
+  transition: all 0.3s ease;
+}
+.sidebar-wow-toggle:hover {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+.sidebar-wow-toggle i {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+.rotated-icon {
+  transform: rotate(180deg);
+}

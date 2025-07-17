@@ -690,11 +690,6 @@ body {
 #opportunityTable tbody tr {
   transition: transform 0.2s ease, box-shadow 0.3s ease;
 }
-
-#opportunityTable tbody tr:hover {
-  transform: scale(1.015);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
-}
 @keyframes fadeInUp {
   0% {
     opacity: 0;
@@ -969,3 +964,8 @@ body {
 }
 
 
+#accountTable tbody tr:hover,
+#candidatesTable tbody tr:hover,
+#opportunityTable tbody tr:hover {
+  cursor: pointer;
+}

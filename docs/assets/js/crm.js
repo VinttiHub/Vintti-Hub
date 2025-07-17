@@ -65,9 +65,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       $('#accountTable').DataTable({
         responsive: true,
-        pageLength: 10,
+        pageLength: 50,
         dom: 'lrtip',
-        lengthMenu: [ [10, 20, 50], [10, 20, 50] ],
+        lengthMenu: [[50, 100, 150], [50, 100, 150]],
         language: {
           search: "🔍 Buscar:",
           lengthMenu: "Mostrar _MENU_ registros por página",
@@ -125,6 +125,45 @@ form.addEventListener('submit', async (e) => {
   }
 });
   }
+// 🟣 SIDEBAR TOGGLE CON MEMORIA (único y sin colisión)
+const sidebarToggleBtn = document.getElementById('sidebarToggle');
+const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+const sidebarEl = document.querySelector('.sidebar');
+const mainContentEl = document.querySelector('.main-content');
+
+// Leer estado anterior desde localStorage
+const isSidebarHidden = localStorage.getItem('sidebarHidden') === 'true';
+
+if (isSidebarHidden) {
+  sidebarEl.classList.add('custom-sidebar-hidden');
+  mainContentEl.classList.add('custom-main-expanded');
+  sidebarToggleIcon.classList.remove('fa-chevron-left');
+  sidebarToggleIcon.classList.add('fa-chevron-right');
+  sidebarToggleBtn.style.left = '12px';
+} else {
+  sidebarToggleBtn.style.left = '220px';
+}
+
+sidebarToggleBtn.addEventListener('click', () => {
+  const hidden = sidebarEl.classList.toggle('custom-sidebar-hidden');
+  mainContentEl.classList.toggle('custom-main-expanded', hidden);
+
+  sidebarToggleIcon.classList.toggle('fa-chevron-left', !hidden);
+  sidebarToggleIcon.classList.toggle('fa-chevron-right', hidden);
+  sidebarToggleBtn.style.left = hidden ? '12px' : '220px';
+
+  localStorage.setItem('sidebarHidden', hidden); // 🧠 guardar estado
+});
+
+
+
+
+
+
+
+
+
+  
 });
 
 // 🪟 Funciones popup

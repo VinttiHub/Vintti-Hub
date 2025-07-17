@@ -45,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const table = $('#candidatesTable').DataTable({
         responsive: true,
-        pageLength: 10,
+        pageLength: 50,
         dom: 'lrtip',
-        lengthMenu: [[10, 20, 50], [10, 20, 50]],
+        lengthMenu: [[50, 100, 150], [50, 100, 150]],
         language: {
           search: "🔍 Buscar:",
           lengthMenu: "Mostrar _MENU_ registros por página",
@@ -102,6 +102,41 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(err => {
       console.error('❌ Error al obtener candidatos:', err);
     });
+// 🟣 SIDEBAR TOGGLE CON MEMORIA
+const sidebar = document.querySelector('.sidebar');
+const mainContent = document.querySelector('.main-content');
+const toggleButton = document.getElementById('sidebarToggle');
+const toggleIcon = document.getElementById('sidebarToggleIcon');
+
+// Leer estado anterior
+const savedState = localStorage.getItem('sidebarHidden') === 'true';
+if (savedState) {
+  sidebar.classList.add('custom-sidebar-hidden');
+  mainContent.classList.add('custom-main-expanded');
+  toggleIcon.classList.remove('fa-chevron-left');
+  toggleIcon.classList.add('fa-chevron-right');
+  toggleButton.style.left = '12px';
+} else {
+  toggleButton.style.left = '220px';
+}
+
+toggleButton.addEventListener('click', () => {
+  const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
+  mainContent.classList.toggle('custom-main-expanded', isHidden);
+  toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
+  toggleIcon.classList.toggle('fa-chevron-right', isHidden);
+  toggleButton.style.left = isHidden ? '12px' : '220px';
+  localStorage.setItem('sidebarHidden', isHidden); // 🧠 guardar estado
+});
+
+
+
+
+
+
+
+
+
 });
 
 // Filtros tipo Excel

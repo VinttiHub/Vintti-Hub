@@ -223,10 +223,10 @@ if (toggleSidebarButton && sidebar && mainContent) {
 
   const table = $('#opportunityTable').DataTable({
   responsive: true,
-  pageLength: 10,
+  pageLength: 50,
   dom: 'lrtip',
   ordering: false,
-  lengthMenu: [[10, 20, 50], [10, 20, 50]],
+  lengthMenu: [[50, 100, 150], [50, 100, 150]],
   columnDefs: [
     { targets: [0], width: "8%" },
     { targets: [1, 2, 3, 4, 5, 6, 8], width: "10%" },
