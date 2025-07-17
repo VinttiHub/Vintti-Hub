@@ -65,7 +65,7 @@ if (toggleSidebarButton && sidebar && mainContent) {
     });
   }
 
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities')
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light')
     .then(response => response.json())
     .then(data => {
       const tbody = document.getElementById('opportunityTableBody');

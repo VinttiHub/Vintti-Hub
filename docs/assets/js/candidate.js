@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.body.classList.add('light-mode');
 
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates')
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/light')
     .then(response => response.json())
     .then(data => {
       const tbody = document.getElementById('candidatesTableBody');

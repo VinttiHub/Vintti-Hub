@@ -61,6 +61,85 @@ def fetch_data_from_table(table_name):
 @app.route('/')
 def home():
     return 'API running 🎉'
+@app.route('/candidates/light', methods=['GET'])
+def get_candidates_light():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                candidate_id,
+                full_name,
+                country,
+                phone,
+                linkedin,
+                condition
+            FROM candidates
+        """)
+        rows = cursor.fetchall()
+        candidates = [dict(zip(
+            ['candidate_id', 'full_name', 'country', 'phone', 'linkedin', 'condition'],
+            row
+        )) for row in rows]
+
+        cursor.close()
+        conn.close()
+        return jsonify(candidates)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/opportunities/light')
+def get_opportunities_light():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                o.opportunity_id,
+                o.opp_stage,
+                o.opp_position_name,
+                o.opp_type,
+                o.opp_model,
+                o.opp_hr_lead,
+                o.comments,
+                o.nda_signature_or_start_date,
+                u.user_name AS sales_lead_name,
+                a.client_name AS client_name
+            FROM opportunity o
+            LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
+            LEFT JOIN account a ON o.account_id = a.account_id
+        """)
+        rows = cursor.fetchall()
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/data/light')
+def get_accounts_light():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                a.account_id,
+                a.client_name,
+                a.account_manager,
+                a.contract
+            FROM account a
+        """)
+        rows = cursor.fetchall()
+        accounts = [dict(zip(['account_id', 'client_name', 'account_manager', 'contract'], row)) for row in rows]
+        cursor.close()
+        conn.close()
+        return jsonify(accounts)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/data')
 def get_accounts():

@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 📦 Obtener datos desde Flask
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data')
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
     .then(res => res.json())
     .then(data => {
       console.log("Datos recibidos desde el backend:", data);
