@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.getElementById("closePopup").addEventListener("click", () => {
   document.getElementById("candidatePopup").classList.add("hidden");
-  window.location.reload();
+  loadPipelineCandidates();
 
   ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-country"]
     .forEach(id => document.getElementById(id).value = '');

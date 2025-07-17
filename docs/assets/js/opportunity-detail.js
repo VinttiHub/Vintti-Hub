@@ -125,7 +125,7 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', async
 
           document.getElementById('preCreateCheckPopup').classList.add('hidden');
           showFriendlyPopup(`✅ ${c.name} added to pipeline`);
-          window.location.reload();
+          loadPipelineCandidates();
         });
       });
     }
