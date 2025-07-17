@@ -69,7 +69,7 @@ def get_candidates_light():
         cursor.execute("""
             SELECT
                 candidate_id,
-                full_name,
+                name,
                 country,
                 phone,
                 linkedin,
