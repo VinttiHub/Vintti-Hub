@@ -1,4 +1,15 @@
+
 document.addEventListener("DOMContentLoaded", () => {
+  window.updateHireField = function(field, value) {
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  if (!candidateId) return;
+
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [field]: value })
+  }).then(() => loadHireData());
+};
   const savedTheme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
 
@@ -27,13 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const hireWorkingSchedule = document.getElementById('hire-working-schedule');
   const hirePTO = document.getElementById('hire-pto');
   const hireStartDate = document.getElementById('hire-start-date');
-  function updateHireField(field, value) {
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ [field]: value })
-  }).then(() => loadHireData());
-}
+
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
   if (hireStartDate) {
@@ -327,40 +332,12 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/i
 
   const hireSalary = document.getElementById('hire-salary');
 const hireFee = document.getElementById('hire-fee');
-const hireRevenue = document.getElementById('hire-revenue');
 const hireComputer = document.getElementById('hire-computer');
 const hirePerks = document.getElementById('hire-extraperks');
 
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
 }
-[hireSalary, hireFee].forEach(input => {
-  input.addEventListener('blur', async () => {
-    const salary = Number(hireSalary.value);
-    const fee = Number(hireFee.value);
-    if (!salary || !fee) return;
-
-    // 1️⃣ Guardar valores en tabla candidates
-    const field = input.id === 'hire-salary' ? 'employee_salary' : 'employee_fee';
-    await updateHireField(field, Number(input.value));
-
-    // 2️⃣ Verifica si ambos están completos
-    if (!isNaN(salary) && !isNaN(fee) && salary > 0 && fee > 0) {
-      // 3️⃣ Obtener fecha actual de tabla candidates
-      const candidateRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`);
-      const candidateData = await candidateRes.json();
-      const date = candidateData.startingdate || new Date().toISOString().slice(0, 10);
-
-      // 4️⃣ Crear entrada en salary_updates
-      await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ salary, fee, date })
-      }).then(() => loadSalaryUpdates());
-    }
-  });
-});
-
 
 hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
 hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.value));
@@ -414,6 +391,35 @@ function loadSalaryUpdates() {
       });
     });
 }
+hireSalary.addEventListener('blur', async () => {
+  const salary = parseFloat(hireSalary.value);
+  if (!salary || isNaN(salary)) return;
+
+  await updateHireField('employee_salary', salary);
+
+  const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
+  const fee = parseFloat(hireFee.value);
+  if (model?.includes('staffing') && !isNaN(fee)) {
+    const revenue = salary + fee;
+    document.getElementById('hire-revenue').value = revenue;
+    await updateHireField('employee_revenue', revenue);
+  }
+});
+
+hireFee.addEventListener('blur', async () => {
+  const fee = parseFloat(hireFee.value);
+  if (!fee || isNaN(fee)) return;
+
+  await updateHireField('employee_fee', fee);
+
+  const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
+  const salary = parseFloat(hireSalary.value);
+  if (model?.includes('staffing') && !isNaN(salary)) {
+    const revenue = salary + fee;
+    document.getElementById('hire-revenue').value = revenue;
+    await updateHireField('employee_revenue', revenue);
+  }
+});
 
 addSalaryUpdateBtn.addEventListener('click', () => {
   popup.classList.remove('hidden');
@@ -722,16 +728,28 @@ function loadHireData() {
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
     .then(res => res.json())
-    .then(data => {
-      document.getElementById('hire-salary').value = data.employee_salary || '';
-      document.getElementById('hire-fee').value = data.employee_fee || '';
-      document.getElementById('hire-computer').value = data.computer || '';
-      document.getElementById('hire-extraperks').value = data.extraperks || '';
-      document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
-      document.getElementById('hire-working-schedule').value = data.working_schedule || '';
-      document.getElementById('hire-pto').value = data.pto || '';
-      document.getElementById('hire-start-date').value = data.start_date || '';
-    });
+.then(data => {
+  const salaryInput = document.getElementById('hire-salary');
+  const feeInput = document.getElementById('hire-fee');
+
+  salaryInput.value = data.employee_salary || '';
+  feeInput.value = data.employee_fee || '';
+  document.getElementById('hire-computer').value = data.computer || '';
+  document.getElementById('hire-extraperks').value = data.extraperks || '';
+  document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
+  document.getElementById('hire-working-schedule').value = data.working_schedule || '';
+  document.getElementById('hire-pto').value = data.pto || '';
+  document.getElementById('hire-start-date').value = data.start_date || '';
+
+  // Deshabilitar salary y fee si ya tienen valores
+  if (data.employee_salary && parseFloat(data.employee_salary) > 0) {
+    salaryInput.disabled = true;
+  }
+  if (data.employee_fee && parseFloat(data.employee_fee) > 0) {
+    feeInput.disabled = true;
+  }
+});
+
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
   .then(res => res.json())
   .then(data => {
@@ -741,6 +759,48 @@ function loadHireData() {
       adaptHireFieldsByModel(model);
     }
   });
+const salaryInput = document.getElementById('hire-salary');
+const feeInput = document.getElementById('hire-fee');
+const tipMessage = "To update salary or fee, please use the 'Salary Updates' section below.";
+[salaryInput, feeInput].forEach(input => {
+  input.addEventListener('mouseenter', () => {
+    if (input.disabled) showTooltip(input, tipMessage);
+  });
+
+  input.addEventListener('mouseleave', hideTooltip);
+  input.addEventListener('click', () => {
+    if (input.disabled) showTooltip(input, tipMessage);
+  });
+});
+
+
+
+function showTooltip(input, message) {
+  if (document.querySelector('.input-tooltip')) return;
+  const tooltip = document.createElement('div');
+  tooltip.className = 'input-tooltip';
+  tooltip.textContent = message;
+
+  const rect = input.getBoundingClientRect();
+  tooltip.style.position = 'absolute';
+  tooltip.style.left = `${rect.left + window.scrollX}px`;
+  tooltip.style.top = `${rect.bottom + 5 + window.scrollY}px`;
+  tooltip.style.backgroundColor = '#333';
+  tooltip.style.color = '#fff';
+  tooltip.style.padding = '6px 10px';
+  tooltip.style.borderRadius = '6px';
+  tooltip.style.fontSize = '13px';
+  tooltip.style.zIndex = 1000;
+  tooltip.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+  tooltip.style.pointerEvents = 'none';
+
+  document.body.appendChild(tooltip);
+}
+
+function hideTooltip() {
+  const tooltip = document.querySelector('.input-tooltip');
+  if (tooltip) tooltip.remove();
+}
 
 }
 function adaptHireFieldsByModel(model) {
