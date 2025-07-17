@@ -662,6 +662,20 @@ function showStarTooltip(button) {
 function hideStarTooltip() {
   document.querySelectorAll('.star-tooltip').forEach(el => el.remove());
 }
+const referencesDiv = document.getElementById('hire-references');
+
+// Guardar en blur
+referencesDiv.addEventListener('blur', () => {
+  updateHireField('references', referencesDiv.innerHTML.trim());
+});
+
+// Toolbar logic
+document.querySelectorAll('.rich-toolbar button').forEach(button => {
+  button.addEventListener('click', () => {
+    const command = button.getAttribute('data-command');
+    document.execCommand(command, false, null);
+  });
+});
 
 
 
@@ -740,6 +754,8 @@ function loadHireData() {
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
   document.getElementById('hire-start-date').value = data.start_date || '';
+  document.getElementById('hire-references').innerHTML = data.references || '';
+
 
   // Deshabilitar salary y fee si ya tienen valores
   if (data.employee_salary && parseFloat(data.employee_salary) > 0) {
