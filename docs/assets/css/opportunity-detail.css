@@ -12,6 +12,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: end;
+  padding: 3.5rem 2rem 1rem;
   border-bottom: 1px solid #f1eaf2;
   position: sticky;
   top: 0;
@@ -649,9 +650,15 @@ body {
   .card-container {
     min-height: 200px;
     align-items: center;
+    min-height: 1000px; /* o más, según el tamaño que necesites */
+    padding: 20px 10px; /* aumenta el padding para facilitar el drop */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
-  
+
   .candidate-card {
+    width: 260px;
     background-color: #ffffff;
     color: #0a1f44;
     padding: 0.6rem 0.8rem;
@@ -671,6 +678,7 @@ body {
     transform: scale(1.02);
     box-shadow: 0 3px 10px rgba(0,0,0,0.15);
     z-index: 10; 
+    width: 270px;
   }
   
   .candidate-card .status {
@@ -2017,4 +2025,51 @@ input:checked + .slider::before {
 #approval-message:focus {
   border-color: #f48fb1;
   box-shadow: 0 0 0 2px rgba(244, 143, 177, 0.2);
+}
+#fixedBackContainer {
+  position: fixed;
+  top: 20px;
+  left: 30px;
+  z-index: 99999;
+}
+
+.go-back-button {
+  background-color: #f3e8ff;
+  color: #7c3aed;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(200, 160, 255, 0.25);
+  transition: all 0.3s ease;
+}
+
+.go-back-button:hover {
+  background-color: #e9d5ff;
+  transform: scale(1.05);
+}
+.candidate-card .card-body {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.candidate-card .card-body span {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.candidate-card .card-body .candidate-country {
+  font-weight: 500;
+}
+
+.candidate-card .card-body .candidate-salary {
+  font-weight: 400;
+  color: #666;
 }

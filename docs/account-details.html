@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet" />
 </head>
 <body>
+<button id="goBackButton" class="go-back-button" title="Go Back">⟵ Go Back</button>
 
   <div class="main-content">
     <h1 class="page-title">Account Details</h1>
@@ -26,8 +27,20 @@
             <p><strong>Size:</strong> <span id="account-size">—</span></p>
             <p><strong>Timezone:</strong> —</p>
             <p><strong>State:</strong> —</p>
-            <p><strong>LinkedIn:</strong> <a href="#">—</a></p>
-            <p><strong>Website:</strong> <a href="#">—</a></p>
+            <p>
+              <strong>LinkedIn:</strong>
+              <a id="linkedin-link" href="#" target="_blank">
+                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/linkedin.svg" alt="LinkedIn" style="width: 20px; vertical-align: middle; margin-right: 8px;">
+              </a>
+              <button class="edit-btn" onclick="editField('linkedin')">✎ Edit</button>
+            </p>
+            <p>
+              <strong>Website:</strong>
+              <a id="website-link" href="#" target="_blank">
+                <img src="https://cdn-icons-png.flaticon.com/512/841/841364.png" alt="Website" style="width: 20px; vertical-align: middle; margin-right: 8px;">
+              </a>
+              <button class="edit-btn" onclick="editField('website')">✎ Edit</button>
+            </p>
             <p><strong>Contract:</strong> —</p>
             <p><strong>Total Staffing Fee:</strong> —</p>
             <p><strong>Total Staffing Revenue:</strong> —</p>

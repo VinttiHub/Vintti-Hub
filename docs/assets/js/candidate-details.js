@@ -684,6 +684,18 @@ document.querySelectorAll('.rich-toolbar button').forEach(button => {
     }
   });
 });
+// Botón de Go Back
+
+const goBackButton = document.getElementById('goBackButton');
+if (goBackButton) {
+  goBackButton.addEventListener('click', () => {
+    if (document.referrer) {
+      window.history.back();
+    } else {
+      window.location.href = '/'; // Cambia por la home si quieres
+    }
+  });
+}
 
 
 

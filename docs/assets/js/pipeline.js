@@ -138,6 +138,19 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     alert("Failed to create candidate");
   }
 });
+const goBackButton = document.getElementById('goBackButton');
+const previousPage = localStorage.getItem('previousPage');
+
+if (previousPage && goBackButton) {
+  goBackButton.style.display = 'block';
+  goBackButton.addEventListener('click', () => {
+    window.location.href = previousPage;
+    localStorage.removeItem('previousPage');
+  });
+}
+
+
+
 
 
   });
@@ -166,10 +179,18 @@ candidates.forEach(candidate => {
   card.className = 'candidate-card pipeline-card';
   card.setAttribute('data-candidate-id', candidate.candidate_id); 
   const signoffChecked = candidate.sign_off === 'yes' ? 'checked' : '';
+  console.log("🌍 Country:", candidate.country);
+  console.log("💰 Salary:", candidate.employee_salary);
   card.innerHTML = `
     <div class="card-header">
-      <strong class="candidate-name">${candidate.name}</strong>
-      <span class="delete-icon" title="Delete" style="font-size: 14px; color: #c00; cursor: pointer; margin-left: auto;">🗑️</span>
+      <div class="candidate-info">
+        <strong class="candidate-name">${candidate.name}</strong>
+        <div class="candidate-meta">
+          <span class="country">${getFlagEmoji(candidate.country || '')}</span>
+          <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
+        </div>
+      </div>
+      <span class="delete-icon" title="Delete">🗑️</span>
       <div class="signoff-toggle">
         <label class="switch">
           <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
@@ -227,14 +248,20 @@ candidates.forEach(candidate => {
 
   enableDrag(card);
   card.addEventListener('click', (e) => {
-    // ✅ Si el clic fue en el interruptor, no redirigir
-    if (e.target.closest('.signoff-toggle')) return;
-
     const candidateId = card.getAttribute('data-candidate-id');
-    if (candidateId) {
-      window.location.href = `https://vinttihub.vintti.com/candidate-details.html?id=${candidateId}`;
-    }
+    if (!candidateId) return;
+
+    const isSafe = !e.target.closest('.signoff-toggle') &&
+                  !e.target.closest('.delete-icon') &&
+                  !e.target.closest('input') &&
+                  !e.target.closest('select');
+
+    if (!isSafe) return;
+
+    localStorage.setItem('previousPage', window.location.href);
+    window.location.href = `https://vinttihub.vintti.com/candidate-details.html?id=${candidateId}`;
   });
+
 
 
   // Mapeo del stage → columna id
@@ -286,3 +313,13 @@ function enableDrag(card) {
         }, 0);
       });
     }
+function getFlagEmoji(country) {
+  const flags = {
+    "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
+    "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Ecuador": "🇪🇨",
+    "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "Mexico": "🇲🇽",
+    "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
+    "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
+  };
+  return flags[country] || "";
+}

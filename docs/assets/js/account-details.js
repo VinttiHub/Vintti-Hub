@@ -1,8 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Tema claro/oscuro
-  const savedTheme = localStorage.getItem('theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  document.body.classList.add((savedTheme === 'dark' || (!savedTheme && prefersDark)) ? 'dark-mode' : 'light-mode');
+document.body.style.backgroundColor = 'var(--bg)';
 
   // Tabs
   const tabs = document.querySelectorAll('.tab-btn');
@@ -56,8 +53,54 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(err => {
       console.error('Error fetching accounts details:', err);
     });
-});
+// Botón de Go Back
+const goBackButton = document.getElementById('goBackButton');
+if (goBackButton) {
+  goBackButton.addEventListener('click', () => {
+    if (document.referrer) {
+      window.history.back();
+    } else {
+      window.location.href = '/'; // Cambia por la home si quieres
+    }
+  });
+}
 
+
+
+
+
+
+
+});
+function editField(field) {
+  const currentLink = document.getElementById(`${field}-link`).href;
+  const newLink = prompt(`Enter new ${field} URL:`, currentLink);
+
+  if (!newLink) return;
+
+  // Actualiza el link visualmente
+  document.getElementById(`${field}-link`).href = newLink;
+
+  // Obtener el account ID desde la URL
+  const accountId = new URLSearchParams(window.location.search).get('id');
+  if (!accountId) return;
+
+  const body = { [field]: newLink };
+
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Failed to update');
+    console.log(`${field} updated successfully`);
+  })
+  .catch(err => {
+    alert('There was an error updating the link. Please try again.');
+    console.error(err);
+  });
+}
 function loadAssociatedOpportunities(accountId) {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
     .then(res => res.json())
@@ -70,18 +113,22 @@ function loadAssociatedOpportunities(accountId) {
     });
 }
 function fillAccountDetails(data) {
-  const container = document.querySelector('.grid-two-cols');
-  container.innerHTML = `
-    <p><strong>Name:</strong> ${data.client_name || '—'}</p>
-    <p><strong>Size:</strong> ${data.size || '—'}</p>
-    <p><strong>Timezone:</strong> ${data.timezone || '—'}</p>
-    <p><strong>State:</strong> ${data.state || '—'}</p>
-    <p><strong>LinkedIn:</strong> <a href="${data.linkedin}" target="_blank">${data.linkedin || '—'}</a></p>
-    <p><strong>Website:</strong> <a href="${data.website}" target="_blank">${data.website || '—'}</a></p>
-    <p><strong>Contract:</strong> ${data.contract || '—'}</p>
-    <p><strong>Total Staffing Fee:</strong> —</p>
-    <p><strong>Total Staffing Revenue:</strong> —</p>
-  `;
+  document.getElementById('account-size').textContent = data.size || '—';
+  document.querySelector('p strong:contains("Timezone")')?.nextSibling.textContent = data.timezone || '—';
+  document.querySelector('p strong:contains("State")')?.nextSibling.textContent = data.state || '—';
+  document.querySelector('p strong:contains("Contract")')?.nextSibling.textContent = data.contract || '—';
+  console.log('LINKEDIN:', data.linkedin);
+  console.log('WEBSITE:', data.website);
+
+  const linkedinLink = document.getElementById('linkedin-link');
+  if (linkedinLink) {
+    linkedinLink.href = data.linkedin || '#';
+  }
+
+  const websiteLink = document.getElementById('website-link');
+  if (websiteLink) {
+    websiteLink.href = data.website || '#';
+  }
 }
 
 function fillOpportunitiesTable(opportunities) {

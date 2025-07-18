@@ -571,7 +571,9 @@ def get_candidates_by_opportunity(opportunity_id):
                 c.name,
                 c.email,
                 c.stage,
+                c.country,
                 c.employee_salary,
+                c.salary_range,
                 oc.stage_batch,
                 oc.stage_pipeline AS stage,
                 oc.sign_off
