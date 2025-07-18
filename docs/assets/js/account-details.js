@@ -113,10 +113,17 @@ function loadAssociatedOpportunities(accountId) {
     });
 }
 function fillAccountDetails(data) {
-  document.getElementById('account-size').textContent = data.size || '—';
-  document.querySelector('p strong:contains("Timezone")')?.nextSibling.textContent = data.timezone || '—';
-  document.querySelector('p strong:contains("State")')?.nextSibling.textContent = data.state || '—';
-  document.querySelector('p strong:contains("Contract")')?.nextSibling.textContent = data.contract || '—';
+  document.querySelectorAll('#overview .accordion-content p').forEach(p => {
+    if (p.textContent.includes('Timezone:')) {
+      p.innerHTML = `<strong>Timezone:</strong> ${data.timezone || '—'}`;
+    } else if (p.textContent.includes('State:')) {
+      p.innerHTML = `<strong>State:</strong> ${data.state || '—'}`;
+    } else if (p.textContent.includes('Contract:')) {
+      p.innerHTML = `<strong>Contract:</strong> ${data.contract || '—'}`;
+    }
+  });
+
+  
   console.log('LINKEDIN:', data.linkedin);
   console.log('WEBSITE:', data.website);
 
@@ -180,7 +187,6 @@ function fillCandidatesCards(candidates) {
         <div><strong>Revenue:</strong> $${candidate.employee_revenue || '—'}</div>
         <div><strong>Fee:</strong> $${candidate.employee_fee || '—'}</div>
         <div><strong>Salary:</strong> $${candidate.employee_salary || '—'}</div>
-        <div><strong>Type:</strong> ${candidate.employee_type || '—'}</div>
       </div>
     `;
 
