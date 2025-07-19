@@ -334,6 +334,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/i
 const hireFee = document.getElementById('hire-fee');
 const hireComputer = document.getElementById('hire-computer');
 const hirePerks = document.getElementById('hire-extraperks');
+console.log(document.getElementById('hire-extraperks').innerHTML)
 
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
@@ -341,7 +342,7 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
 
 hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
 hirePerks.addEventListener('blur', () => {
-  updateHireField('extraperks', hirePerks.innerHTML.trim());
+  updateHireField('extraperks', hirePerks.innerHTML);
 });
 const hash = window.location.hash;
 if (hash === '#hire') {
@@ -668,7 +669,7 @@ const referencesDiv = document.getElementById('hire-references');
 
 // Guardar en blur
 referencesDiv.addEventListener('blur', () => {
-  updateHireField('references', referencesDiv.innerHTML.trim());
+  updateHireField('references', referencesDiv.innerHTML);
 });
 
 // Toolbar logic
@@ -771,6 +772,7 @@ function loadHireData() {
   feeInput.value = data.employee_fee || '';
   document.getElementById('hire-computer').value = data.computer || '';
   document.getElementById('hire-extraperks').innerHTML = data.extraperks || '';
+  console.log(document.getElementById('hire-extraperks').innerHTML)
   document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
