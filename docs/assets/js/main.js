@@ -137,7 +137,7 @@ if (toggleSidebarButton && sidebar && mainContent) {
               if (referenceDate) {
                 const today = new Date();
                 const diffTime = today - referenceDate;
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
                 const cell = tr.querySelector('td:last-child');
                 if (cell) {
                   cell.textContent = diffDays;
@@ -725,7 +725,7 @@ function calculateDaysAgo(dateStr) {
   const date = new Date(dateStr);
   const now = new Date();
   const diffTime = Math.abs(now - date);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
   return diffDays;
 }
 
