@@ -839,7 +839,7 @@ def get_candidates_by_account_opportunities(account_id):
                 c.employee_salary,
                 c.employee_fee,
                 c.employee_revenue,
-                c.startingdate,
+                c.start_date,
                 c.enddate,
                 c.status
             FROM opportunity o
