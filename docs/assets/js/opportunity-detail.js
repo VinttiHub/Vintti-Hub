@@ -664,10 +664,7 @@ document.addEventListener("click", async (e) => {
         loadBatchesForOpportunity(opportunityId);
       }
     }
-// document.getElementById('hire-select').addEventListener('change', async (e) => {
-//   const selectedCandidateId = e.target.value;
-//   await updateOpportunityField('candidato_contratado', selectedCandidateId);
-// });
+
     document.getElementById('signOffBtn').addEventListener('click', async () => {
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   if (!opportunityId) return;
@@ -1172,6 +1169,8 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         const template = document.getElementById('candidate-card-template');
         const cardFragment = template.content.cloneNode(true);
         const cardElement = cardFragment.querySelector('.candidate-card');
+        cardElement.setAttribute('data-candidate-id', c.candidate_id);
+
 
         cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
         cardElement.querySelector('.candidate-email').textContent = c.email || '';
@@ -1328,6 +1327,18 @@ batchCandidates.forEach(c => {
       console.warn("⚠️ Status no encontrado en opciones:", c.status);
     }
   }
+document.addEventListener('click', (e) => {
+  const dropdownClicked = e.target.classList.contains('candidate-status-dropdown');
+  const card = e.target.closest('.candidate-card');
+
+  if (card && !dropdownClicked) {
+    const candidateId = card.getAttribute('data-candidate-id');
+    if (candidateId) {
+      window.location.href = `/docs/candidate-details.html?id=${candidateId}`;
+    }
+  }
+});
+
 
 
   // ✅ Listener funcional

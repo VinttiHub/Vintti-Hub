@@ -1341,7 +1341,7 @@ def handle_candidate_hire_data(candidate_id):
 
         if request.method == 'PATCH':
             data = request.get_json()
-            allowed_fields = ['employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
+            allowed_fields = ['references', 'employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
             updates = []
             values = []
 

@@ -658,7 +658,6 @@ body {
   }
 
   .candidate-card {
-    width: 260px;
     background-color: #ffffff;
     color: #0a1f44;
     padding: 0.6rem 0.8rem;
@@ -678,7 +677,6 @@ body {
     transform: scale(1.02);
     box-shadow: 0 3px 10px rgba(0,0,0,0.15);
     z-index: 10; 
-    width: 270px;
   }
   
   .candidate-card .status {
@@ -1891,12 +1889,17 @@ input:checked + .slider::before {
 .pipeline-card {
   padding: 0.6rem 0.8rem 1.4rem;
   font-size: 0.75rem;
+  width: 260px !important;
   border-radius: 14px;
   background-color: #effdf4; /* verdecito pastel */
   border: 1px solid #c4f0d2;
   box-shadow: 0 2px 8px rgba(180, 240, 200, 0.25);
   position: relative;
   transition: transform 0.2s ease;
+}
+.candidate-card:not(.pipeline-card) .candidate-name {
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 /* 👤 Nombre más pequeño */
