@@ -136,7 +136,11 @@ function loadAssociatedOpportunities(accountId) {
 }
 function fillAccountDetails(data) {
   document.querySelectorAll('#overview .accordion-content p').forEach(p => {
-    if (p.textContent.includes('Timezone:')) {
+    if (p.textContent.includes('Name:')) {
+      p.innerHTML = `<strong>Name:</strong> ${data.client_name || '—'}`;
+    } else if (p.textContent.includes('Size:')) {
+      p.innerHTML = `<strong>Size:</strong> ${data.size || '—'}`;
+    } else if (p.textContent.includes('Timezone:')) {
       p.innerHTML = `<strong>Timezone:</strong> ${data.timezone || '—'}`;
     } else if (p.textContent.includes('State:')) {
       p.innerHTML = `<strong>State:</strong> ${data.state || '—'}`;
@@ -145,20 +149,13 @@ function fillAccountDetails(data) {
     }
   });
 
-  
-  console.log('LINKEDIN:', data.linkedin);
-  console.log('WEBSITE:', data.website);
-
   const linkedinLink = document.getElementById('linkedin-link');
-  if (linkedinLink) {
-    linkedinLink.href = data.linkedin || '#';
-  }
+  if (linkedinLink) linkedinLink.href = data.linkedin || '#';
 
   const websiteLink = document.getElementById('website-link');
-  if (websiteLink) {
-    websiteLink.href = data.website || '#';
-  }
+  if (websiteLink) websiteLink.href = data.website || '#';
 }
+
 
 function fillOpportunitiesTable(opportunities) {
   const tbody = document.querySelector('#overview .accordion-section:nth-of-type(2) tbody');
