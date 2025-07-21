@@ -8,7 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet" />
 </head>
 <body>
-<button id="goBackButton" class="go-back-button" title="Go Back">⟵ Go Back</button>
+<button id="goBackButton" class="go-back-button" title="Go Back">
+  ← Go Back
+</button>
 
   <div class="main-content">
     <h1 class="page-title">Account Details</h1>
@@ -23,10 +25,10 @@
         <div class="accordion-header">Account Info</div>
         <div class="accordion-content">
           <div class="grid-two-cols">
-            <p><strong>Name:</strong> —</p>
-            <p><strong>Size:</strong> <span id="account-size">—</span></p>
-            <p><strong>Timezone:</strong> —</p>
-            <p><strong>State:</strong> —</p>
+            <p><strong>Name:</strong> <span class="placeholder">Not available</span></p>
+            <p><strong>Size:</strong> <span id="account-size" class="placeholder">Not available</span></p>
+            <p><strong>Timezone:</strong> <span id="account-timezone" class="placeholder">Not available</span></p>
+            <p><strong>State:</strong> <span id="account-state" class="placeholder">Not available</span></p>
             <p>
               <strong>LinkedIn:</strong>
               <a id="linkedin-link" href="#" target="_blank">
@@ -41,9 +43,9 @@
               </a>
               <button class="edit-btn" onclick="editField('website')">✎</button>
             </p>
-            <p><strong>Contract:</strong> —</p>
-            <p><strong>Total Staffing Fee:</strong> —</p>
-            <p><strong>Total Staffing Revenue:</strong> —</p>
+              <p><strong>Contract:</strong> <span class="placeholder">Not available</span></p>
+              <p><strong>Total Staffing Fee:</strong> <span class="placeholder">Not available</span></p>
+              <p><strong>Total Staffing Revenue:</strong> <span class="placeholder">Not available</span></p>
           </div>
           <div class="comment-box">
             <label for="comments"><strong>Comments:</strong></label>

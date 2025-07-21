@@ -148,15 +148,20 @@ function fillOpportunitiesTable(opportunities) {
   }
 
   opportunities.forEach(opp => {
+    const hireContent = opp.candidate_name
+      ? opp.candidate_name
+      : `<span class="no-hire">Not hired yet</span>`;
+
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${opp.opp_position_name || '—'}</td>
       <td>${opp.opp_stage || '—'}</td>
-      <td>${opp.candidate_name || '—'}</td>
+      <td>${hireContent}</td>
     `;
     tbody.appendChild(row);
   });
 }
+
 function loadCandidates(accountId) {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities/candidates`)
     .then(res => res.json())
@@ -181,14 +186,21 @@ function fillCandidatesCards(candidates) {
   candidates.forEach(candidate => {
     const card = document.createElement('div');
     card.classList.add('info-card', 'square');
+    const formatValue = (val) => {
+      return val
+        ? `$${val}`
+        : `<span class="to-be-filled">Unfilled</span>`;
+    };
+
     card.innerHTML = `
       <div class="info-title">👤 ${candidate.name || '—'}</div>
       <div class="info-details">
-        <div><strong>Revenue:</strong> $${candidate.employee_revenue || '—'}</div>
-        <div><strong>Fee:</strong> $${candidate.employee_fee || '—'}</div>
-        <div><strong>Salary:</strong> $${candidate.employee_salary || '—'}</div>
+        <div><strong>Revenue:</strong> ${formatValue(candidate.employee_revenue)}</div>
+        <div><strong>Fee:</strong> ${formatValue(candidate.employee_fee)}</div>
+        <div><strong>Salary:</strong> ${formatValue(candidate.employee_salary)}</div>
       </div>
     `;
+
 
     // Según peoplemodel lo metemos en el contenedor correcto:
     if (candidate.opp_model === 'Staffing') {
