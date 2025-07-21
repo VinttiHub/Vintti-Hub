@@ -669,7 +669,7 @@ const referencesDiv = document.getElementById('hire-references');
 
 // Guardar en blur
 referencesDiv.addEventListener('blur', () => {
-  updateHireField('references', referencesDiv.innerHTML);
+  updateHireField('references_notes', referencesDiv.innerHTML);
 });
 
 // Toolbar logic

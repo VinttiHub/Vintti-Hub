@@ -1321,7 +1321,7 @@ def handle_candidate_hire_data(candidate_id):
     try:
         if request.method == 'GET':
             cursor.execute("""
-                SELECT "references", employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date
+                SELECT references_notes, employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date
                 FROM candidates
                 WHERE candidate_id = %s
             """, (candidate_id,))
@@ -1329,7 +1329,7 @@ def handle_candidate_hire_data(candidate_id):
             if not row:
                 return jsonify({'error': 'Candidate not found'}), 404
             return jsonify({
-                'references': row[0],
+                'references_notes': row[0],
                 'employee_salary': row[1],
                 'employee_fee': row[2],
                 'computer': row[3],
@@ -1342,7 +1342,7 @@ def handle_candidate_hire_data(candidate_id):
 
         if request.method == 'PATCH':
             data = request.get_json()
-            allowed_fields = ['references', 'employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
+            allowed_fields = ['references_notes', 'employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
             updates = []
             values = []
 
