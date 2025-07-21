@@ -270,6 +270,14 @@ if (toggleSidebarButton && sidebar && mainContent) {
     }
   }
 });
+const accountSearchInput = document.getElementById('accountSearchInput');
+if (accountSearchInput) {
+  accountSearchInput.addEventListener('input', () => {
+    const value = accountSearchInput.value;
+    table.column(1).search(value, true, false).draw(); // columna 1 = Account
+  });
+}
+
 const dtLength = document.querySelector('#opportunityTable_length');
 const dtTarget = document.getElementById('dataTablesLengthTarget');
 if (dtLength && dtTarget) dtTarget.appendChild(dtLength);
@@ -342,7 +350,6 @@ const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))
       buildMultiFilter('filterStage', uniqueStages, 0);
       buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5);
       buildMultiFilter('filterHRLead', uniqueHRLeads, 6);
-      buildMultiFilter('filterAccount', uniqueAccounts, 1); // Columna 1 = Account
 
     })
     .catch(err => {

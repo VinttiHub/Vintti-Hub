@@ -969,3 +969,17 @@ body {
 #opportunityTable tbody tr:hover {
   cursor: pointer;
 }
+.text-filter {
+  display: flex;
+  flex-direction: column;
+  margin-right: 20px;
+}
+
+.text-filter input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  background-color: white;
+}
