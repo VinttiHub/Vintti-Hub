@@ -1327,18 +1327,6 @@ batchCandidates.forEach(c => {
       console.warn("⚠️ Status no encontrado en opciones:", c.status);
     }
   }
-document.addEventListener('click', (e) => {
-  const dropdownClicked = e.target.classList.contains('candidate-status-dropdown');
-  const card = e.target.closest('.candidate-card');
-
-  if (card && !dropdownClicked) {
-    const candidateId = card.getAttribute('data-candidate-id');
-    if (candidateId) {
-      window.location.href = `/docs/candidate-details.html?id=${candidateId}`;
-    }
-  }
-});
-
 
 
   // ✅ Listener funcional
