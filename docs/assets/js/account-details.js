@@ -64,6 +64,28 @@ if (goBackButton) {
     }
   });
 }
+  // Guardar Pain Points al hacer blur
+  const painPointsTextarea = document.getElementById('pain-points');
+  if (painPointsTextarea) {
+    painPointsTextarea.addEventListener('blur', () => {
+      const value = painPointsTextarea.value.trim();
+      const accountId = getIdFromURL();
+      if (!accountId) return;
+
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pain_points: value })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Error updating pain points');
+        console.log('Pain Points updated');
+      })
+      .catch(err => {
+        console.error('Failed to update Pain Points:', err);
+      });
+    });
+  }
 
 
 
