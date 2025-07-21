@@ -777,7 +777,7 @@ function loadHireData() {
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
   document.getElementById('hire-start-date').value = data.start_date || '';
-  document.getElementById('hire-references').innerHTML = data.references || '';
+  document.getElementById('hire-references').innerHTML = data.references_notes || '';
 
 
   // Deshabilitar salary y fee si ya tienen valores
