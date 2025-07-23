@@ -9,11 +9,15 @@
 
 </head>
 <body>
-  <button id="goBackButton" class="go-back-button" title="Go Back">⟵</button>
+  <button id="goBackButton" class="go-back-button">
+    <span class="arrow">←</span>
+    <span class="text">Go Back</span>
+  </button>
+
 
   <div class="main-content">
     <!-- AI Action Button -->
-    <div id="ai-action-button">
+    <div id="ai-action-button" class="pill hidden" >
       <span style="font-size: 20px; margin-right: 8px;">✨</span>
       <span>AI Assistant</span>
     </div>
@@ -113,7 +117,12 @@
 <!-- LINKEDIN -->
 <div class="field">
   <label>LinkedIn</label>
-  <div id="field-linkedin" contenteditable="true">—</div>
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <div id="field-linkedin" contenteditable="true" style="flex: 1;">—</div>
+    <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank">
+      🔗
+    </a>
+  </div>
 </div>
 
 
@@ -222,7 +231,7 @@
         </section>
       </div>
     </div>
-    <a id="client-version-btn" class="pill" target="_blank"
+    <a id="client-version-btn" class="pill hidden" target="_blank"
       href="resume-readonly.html?id=123">📄 Client Version</a>
     <div id="opportunities" class="tab-content">
       <table id="opportunitiesTable">
@@ -233,6 +242,8 @@
             <th>Position</th>
             <th>Sales Lead</th>
             <th>Stage</th>
+            <th>Account</th>
+            <th>HR Lead</th>
           </tr>
         </thead>
         <tbody></tbody>

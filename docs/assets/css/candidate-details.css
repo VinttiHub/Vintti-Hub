@@ -8,16 +8,6 @@
   --shadow: rgba(0, 0, 0, 0.1);
 }
 
-[data-theme="dark"] {
-  --bg: #1f2937;
-  --card: #1e293b;  /* azul marino oscuro elegante */
-  --tab-bg: #4b5563;
-  --tab-active: #2563eb;
-  --shadow: rgba(255, 255, 255, 0.05);
-  --text: #f9fafb;
-  --label: #cbd5e1;
-}
-
 body {
   margin: 0;
   font-family: 'Segoe UI', sans-serif;
@@ -43,6 +33,7 @@ body {
 .tabs {
   display: flex;
   gap: 10px;
+  margin-top: 30px;
   margin-bottom: 20px;
 }
 
@@ -139,16 +130,6 @@ label {
   box-shadow: 0 0 0 2px var(--tab-active);
 }
 
-[data-theme="dark"] .field.textarea textarea {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-}
-
-[data-theme="dark"] .field.textarea textarea:focus {
-  background-color: #1e293b;
-  box-shadow: 0 0 0 2px var(--tab-active);
-}
-
 .field.textarea:hover {
   background-color: transparent;
 }
@@ -191,13 +172,7 @@ a {
 .field:hover {
   background-color: rgba(0, 0, 0, 0.035);
 }
-[data-theme="dark"] .field {
-  background-color: rgba(255, 255, 255, 0.03);
-}
 
-[data-theme="dark"] .field:hover {
-  background-color: rgba(255, 255, 255, 0.06);
-}
 .icon {
   width: 16px;
   height: 16px;
@@ -226,111 +201,7 @@ a {
   background: rgba(59, 130, 246, 0.1);
   cursor: pointer;
 }
-.linkedin-icon img {
-  transition: transform 0.2s ease, opacity 0.2s ease;
-  opacity: 0.9;
-}
 
-.linkedin-icon:hover img {
-  transform: scale(1.1);
-  opacity: 1;
-  cursor: pointer;
-}
-/* TEXTAREAS con fondo adaptado a modo oscuro */
-[data-theme="dark"] .field.textarea textarea#redFlags {
-  background-color: rgba(239, 68, 68, 0.15); /* rojo más opaco */
-  color: #fef2f2;
-}
-
-[data-theme="dark"] .field.textarea textarea#comments {
-  background-color: rgba(59, 130, 246, 0.12); /* azul más opaco */
-  color: #e0f2fe;
-}
-
-/* LinkedIn PNG ícono en dark: baja brillo si es imagen */
-[data-theme="dark"] .linkedin-icon img {
-  filter: brightness(0.85);
-}
-
-/* Mejora general para cajas en dark: sombra o contorno */
-[data-theme="dark"] .field {
-  background-color: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-}
-
-/* Evita fondos oscuros heredados por error */
-[data-theme="dark"] .field.textarea {
-  background-color: transparent;
-  box-shadow: none !important;
-}
-/* Mejoras para el pipeline */
-
-.pipeline-columns {
-  display: flex;
-  gap: 20px;
-  padding: 20px;
-}
-
-.column {
-  flex: 1;
-  background-color: var(--card);
-  border-radius: 12px;
-  box-shadow: 0 6px 12px var(--shadow);
-  display: flex;
-  flex-direction: column;
-  padding: 12px;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.column h3 {
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--label);
-  letter-spacing: 0.5px;
-}
-
-.card-container {
-  flex: 1;
-  min-height: 200px; /* IMPORTANTE para permitir drop */
-  padding: 10px;
-  border: 2px dashed rgba(0, 0, 0, 0.1); /* borde para indicar zona de drop */
-  border-radius: 8px;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.column.drag-over .card-container {
-  background-color: rgba(59, 130, 246, 0.1); /* azul suave al hacer hover con tarjeta */
-  border-color: var(--tab-active);
-}
-
-.candidate-card {
-  background-color: var(--card);
-  padding: 12px 16px;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  margin-bottom: 10px;
-  cursor: grab;
-  transition: box-shadow 0.2s ease, transform 0.1s ease;
-}
-
-.candidate-card:active {
-  cursor: grabbing;
-  transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Dark mode */
-[data-theme="dark"] .card-container {
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .column.drag-over .card-container {
-  background-color: rgba(37, 99, 235, 0.15);
-  border-color: var(--tab-active);
-}
 /* AI Action Button - friendly style */
 #ai-action-button {
   display: none; /* se muestra solo en Resume con JS */
@@ -1355,4 +1226,63 @@ select:focus {
 .go-back-button:hover {
   transform: scale(1.1);
   background-color: #e0e0e0;
+}
+#opportunitiesTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  font-size: 14px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+#opportunitiesTable thead {
+  background-color: #f3f4f6;
+  color: #374151;
+  text-align: left;
+}
+
+#opportunitiesTable th, #opportunitiesTable td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#opportunitiesTable tbody tr:hover {
+  background-color: #f9fafb;
+  cursor: pointer;
+}
+
+#opportunitiesTable td {
+  color: #111827;
+}
+.linkedin-link {
+  display: none; /* Por defecto oculto */
+  font-size: 18px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.linkedin-link:hover {
+  transform: scale(1.2);
+}
+.go-back-button {
+  position: absolute;
+  top: 16px;
+  left: 25px;
+  width: 100px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #e6f3ff;
+  color: #0077cc;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s, transform 0.2s;
+  z-index: 1000;
+}
+.go-back-button:hover {
+  background-color: #d0eaff;
+  transform: scale(1.05);
 }

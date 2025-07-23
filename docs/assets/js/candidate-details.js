@@ -10,9 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     body: JSON.stringify({ [field]: value })
   }).then(() => loadHireData());
 };
-  const savedTheme = localStorage.getItem('theme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-
+  document.documentElement.setAttribute('data-theme', 'light');
   const urlParams = new URLSearchParams(window.location.search);
   const candidateId = urlParams.get('id');
   if (!candidateId) return;
@@ -83,6 +81,14 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       }
     }
     });
+    const openBtn = document.getElementById('linkedin-open-btn');
+    if (data.linkedin && data.linkedin.startsWith('http')) {
+      openBtn.href = data.linkedin;
+      openBtn.style.display = 'inline-flex';
+    } else {
+      openBtn.style.display = 'none';
+    }
+
 
     // === Guardar cambios de comentarios y red flags ===
     ['redFlags', 'comments'].forEach(id => {
@@ -258,6 +264,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   }
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
+  aiButton.classList.add('hidden');
   const aiPopup = document.getElementById('ai-popup');
   const aiLinkedInScrap = document.getElementById('ai-linkedin-scrap');
   const aiCvScrap = document.getElementById('ai-cv-scrap');
@@ -721,13 +728,16 @@ document.querySelectorAll('.tab').forEach(tab => {
     // Mostrar / ocultar el botón de AI Assistant solo en Resume
     const aiButton = document.getElementById('ai-action-button');
     const aiPopup = document.getElementById('ai-popup');
-    
+    const clientBtn = document.getElementById('client-version-btn');
+
     if (tabId === 'resume') {
-      aiButton.style.display = 'flex';
+      aiButton.classList.remove('hidden');
+      clientBtn.classList.remove('hidden');
     } else {
-      aiButton.style.display = 'none';
-      aiPopup.classList.add('hidden'); // Cierra popup si cambian de pestaña
+      aiButton.classList.add('hidden');
+      clientBtn.classList.add('hidden');
     }
+
     if (tabId === 'opportunities') {
       loadOpportunitiesForCandidate();
     }
@@ -753,6 +763,8 @@ window.loadOpportunitiesForCandidate = function () {
           <td>${opp.opp_position_name || ''}</td>
           <td>${opp.opp_sales_lead || ''}</td>
           <td>${opp.opp_stage || ''}</td>
+          <td>${opp.client_name || ''}</td>
+          <td>${opp.opp_hr_lead || ''}</td>
         `;
         tbody.appendChild(row);
       });
@@ -895,6 +907,7 @@ document.querySelectorAll('.tab').forEach(button => {
 
     const aiButton = document.getElementById('ai-action-button');
     const clientBtn = document.getElementById('client-version-btn');
+    clientBtn.classList.add('hidden');
     const candidateId = new URLSearchParams(window.location.search).get('id');
     
     if (clientBtn && candidateId) {

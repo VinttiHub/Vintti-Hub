@@ -519,7 +519,7 @@ aiGo.addEventListener('click', async () => {
       const jd = data.job_description;
 
       // Mostrar y guardar en textarea
-      document.getElementById('job-description-textarea').value = jd;
+      document.getElementById('job-description-textarea').innerHTML = jd;
 
       // Guardar en la base de datos
       await updateOpportunityField('hr_job_description', jd);
