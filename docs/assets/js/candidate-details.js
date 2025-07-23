@@ -84,10 +84,20 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     const openBtn = document.getElementById('linkedin-open-btn');
     if (data.linkedin && data.linkedin.startsWith('http')) {
       openBtn.href = data.linkedin;
-      openBtn.style.display = 'inline-flex';
+      openBtn.style.display = 'inline-flex';  // ✅ Esto asegura que se vea
     } else {
       openBtn.style.display = 'none';
     }
+    const flagEmoji = getFlagEmoji(data.country || '');
+    const countrySelect = document.getElementById('field-country');
+    const flagContainer = document.createElement('span');
+    flagContainer.className = 'country-flag';
+    flagContainer.textContent = flagEmoji || '';
+    countrySelect.parentNode.appendChild(flagContainer);
+
+    countrySelect.addEventListener('change', () => {
+      flagContainer.textContent = getFlagEmoji(countrySelect.value);
+    });
 
 
     // === Guardar cambios de comentarios y red flags ===
@@ -733,9 +743,10 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tabId === 'resume') {
       aiButton.classList.remove('hidden');
       clientBtn.classList.remove('hidden');
+      clientBtn.style.display = 'inline-block';
     } else {
       aiButton.classList.add('hidden');
-      clientBtn.classList.add('hidden');
+      clientBtn.style.display = 'none';
     }
 
     if (tabId === 'opportunities') {
@@ -769,6 +780,14 @@ window.loadOpportunitiesForCandidate = function () {
         tbody.appendChild(row);
       });
     });
+    tbody.querySelectorAll('tr').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+      const opportunityId = row.children[0].innerText;
+      window.location.href = `opportunity-details.html?id=${opportunityId}`;
+    });
+  });
+
 };
 function loadHireData() {
   const candidateId = new URLSearchParams(window.location.search).get('id');
@@ -924,3 +943,13 @@ document.querySelectorAll('.tab').forEach(button => {
   });
 });
 
+function getFlagEmoji(countryName) {
+  const flags = {
+    "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
+    "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Dominican Republic": "🇩🇴",
+    "Ecuador": "🇪🇨", "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳",
+    "Mexico": "🇲🇽", "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾",
+    "Peru": "🇵🇪", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
+  };
+  return flags[countryName] || '';
+}

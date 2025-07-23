@@ -15,21 +15,6 @@ body {
   color: var(--text);
   padding: 40px;
 }
-
-.theme-toggle {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-}
-
-#toggle-theme {
-  background: transparent;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--text);
-}
-
 .tabs {
   display: flex;
   gap: 10px;
@@ -45,6 +30,11 @@ body {
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+}
+#linkedin-open-btn {
+  font-size: 20px;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .tab:hover {
@@ -111,7 +101,7 @@ label {
 
 .field.textarea textarea {
   resize: vertical;
-  width: 100%;
+  width: 95%;
   font-size: 14px;
   font-family: inherit;
   padding: 12px 14px;
@@ -1256,13 +1246,7 @@ select:focus {
 #opportunitiesTable td {
   color: #111827;
 }
-.linkedin-link {
-  display: none; /* Por defecto oculto */
-  font-size: 18px;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
+
 .linkedin-link:hover {
   transform: scale(1.2);
 }
@@ -1285,4 +1269,27 @@ select:focus {
 .go-back-button:hover {
   background-color: #d0eaff;
   transform: scale(1.05);
+}
+.country-flag {
+  margin-left: 8px;
+  font-size: 20px;
+  vertical-align: middle;
+}
+#overview .field {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+  transition: transform 0.2s;
+}
+
+#overview .field:hover {
+  transform: translateY(-2px);
+}
+/* Bandera dentro del dropdown */
+#field-country {
+  padding-right: 40px; /* espacio para la bandera */
+  border: 1px solid #d1d5db; /* bordes más claros */
+  background-color: #ffffff;
 }

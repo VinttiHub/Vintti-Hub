@@ -1273,19 +1273,33 @@ def get_opportunities_by_candidate(candidate_id):
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT o.*
+            SELECT 
+                o.opportunity_id,
+                o.opp_model,
+                o.opp_position_name,
+                o.opp_sales_lead,
+                o.opp_stage,
+                o.opp_hr_lead,
+                a.client_name
             FROM opportunity o
             JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
+            LEFT JOIN account a ON o.account_id = a.account_id
             WHERE oc.candidate_id = %s
         """, (candidate_id,))
+        
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
         data = [dict(zip(colnames, row)) for row in rows]
-        cursor.close()
-        conn.close()
+
         return jsonify(data)
+    
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+    finally:
+        cursor.close()
+        conn.close()
+
 @app.route('/opportunity_candidates/stage_batch', methods=['PATCH'])
 def update_stage_batch():
     data = request.get_json()
