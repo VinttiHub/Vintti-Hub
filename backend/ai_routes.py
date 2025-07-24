@@ -457,7 +457,7 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # Must be detailed and in bullet point format
+                    "description": "- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n- Bullet 4\\n..."  // Use all available details. Each description must include at least 5-8 bullet points, written in professional tone. Bullets must cover responsibilities, methods, tools, skills applied, outcomes (if mentioned), and relevant context. Do not add or assume anything that is not clearly present in the input."
                 }}
             ]
             - work_experience: [
@@ -467,7 +467,7 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # Must be detailed and in bullet point format
+                    "description": "- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n- Bullet 4\\n..."  // Use all available details. Each description must include at least 5-8 bullet points, written in professional tone. Bullets must cover responsibilities, methods, tools, skills applied, outcomes (if mentioned), and relevant context. Do not add or assume anything that is not clearly present in the input."
                 }}
             ]
             - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
