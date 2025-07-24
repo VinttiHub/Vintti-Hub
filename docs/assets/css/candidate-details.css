@@ -175,9 +175,23 @@ a {
 
 .field label {
   display: flex;
+  flex-direction: row; /* ✅ Horizontal */
+  align-items: center; /* ✅ Centrado vertical */
+  gap: 6px;
+  font-weight: 500;
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: var(--label);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+#overview .field label {
+  display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 6px;
 }
+
 
 .linkedin-link {
   display: inline-flex;
@@ -1284,12 +1298,15 @@ select:focus {
   transition: transform 0.2s;
 }
 
-#overview .field:hover {
-  transform: translateY(-2px);
-}
-/* Bandera dentro del dropdown */
 #field-country {
-  padding-right: 40px; /* espacio para la bandera */
-  border: 1px solid #d1d5db; /* bordes más claros */
+  margin-top: 6px;
+  border: 1px solid #d1d5db;
   background-color: #ffffff;
+}
+#linkedin-open-btn {
+  display: inline-block !important;
+  visibility: visible;
+  opacity: 1;
+  margin-left: 6px;
+  font-size: 18px;
 }

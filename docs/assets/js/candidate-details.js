@@ -53,52 +53,70 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       'field-phone': 'phone',
       'field-email': 'email',
       'field-english-level': 'english_level',
-      'field-linkedin': 'linkedin',
       'field-salary-range': 'salary_range',
     };
 
     Object.entries(overviewFields).forEach(([elementId, fieldName]) => {
-    const el = document.getElementById(elementId);
-    if (el) {
-      if (fieldName === 'country') {
-        el.addEventListener('change', () => {
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ country: el.value })
+      const el = document.getElementById(elementId);
+      if (el) {
+        if (fieldName === 'country') {
+          el.addEventListener('change', () => {
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ country: el.value })
+            });
           });
-        });
-      } else {
-        el.contentEditable = true;
-        el.addEventListener('blur', () => {
-          const updatedValue = el.innerText.trim();
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ [fieldName]: updatedValue })
+        } else {
+          // Asigna el valor directamente desde la base
+          const value = data[fieldName];
+          if (value) el.innerText = value;
+
+          el.contentEditable = true;
+          el.addEventListener('blur', () => {
+            const updatedValue = el.innerText.trim();
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ [fieldName]: updatedValue })
+            });
           });
-        });
+        }
       }
-    }
     });
+
     const openBtn = document.getElementById('linkedin-open-btn');
-    if (data.linkedin && data.linkedin.startsWith('http')) {
-      openBtn.href = data.linkedin;
-      openBtn.style.display = 'inline-flex';  // ✅ Esto asegura que se vea
+    let linkedinUrl = (data.linkedin || '').trim();
+    linkedinUrl = linkedinUrl.replace(/^[-–—\s]+/, ''); // elimina guiones largos y espacios del inicio
+
+    console.log("🔗 Clean LinkedIn:", linkedinUrl);
+
+    if (linkedinUrl.startsWith('http')) {
+      openBtn.href = linkedinUrl;
+      openBtn.style.display = 'inline-flex';
+      openBtn.style.visibility = 'visible';
+      openBtn.style.opacity = 1;
+      openBtn.addEventListener('click', (e) => {
+        e.preventDefault(); // evita conflictos si el href no es válido
+        if (linkedinUrl && linkedinUrl.startsWith('http')) {
+          window.open(linkedinUrl, '_blank');
+        } else {
+          console.warn("❌ Invalid LinkedIn URL:", linkedinUrl);
+        }
+      });
     } else {
       openBtn.style.display = 'none';
     }
+    console.log("🎯 Valor desde DB:", data.country);
+
     const flagEmoji = getFlagEmoji(data.country || '');
+    const countryFlagSpan = document.getElementById('country-flag');
+    countryFlagSpan.textContent = flagEmoji;
     const countrySelect = document.getElementById('field-country');
-    const flagContainer = document.createElement('span');
-    flagContainer.className = 'country-flag';
-    flagContainer.textContent = flagEmoji || '';
-    countrySelect.parentNode.appendChild(flagContainer);
 
     countrySelect.addEventListener('change', () => {
-      flagContainer.textContent = getFlagEmoji(countrySelect.value);
+      countryFlagSpan.textContent = getFlagEmoji(countrySelect.value);
     });
-
 
     // === Guardar cambios de comentarios y red flags ===
     ['redFlags', 'comments'].forEach(id => {
@@ -116,7 +134,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     document.querySelectorAll('#overview .field').forEach(field => {
       const label = field.querySelector('label');
       const div = field.querySelector('div, select, input, span');
-      const id = label ? label.textContent.trim().toLowerCase() : '';
+      const id = label ? label.textContent.replace(/[^\w\s]/gi, '').trim().toLowerCase() : '';
 
       if (!div) return; // Evita errores si no hay ningún div/select/input/span
 
@@ -125,10 +143,11 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           div.textContent = data.name || '—';
           break;
         case 'country':
-          if (div.tagName === 'SELECT') {
-            div.value = data.country || '';
-          } else {
-            div.textContent = data.country || '—';
+          const select = document.getElementById('field-country');
+          if (select && data.country) {
+            select.value = data.country;
+            const flagSpan = document.getElementById('country-flag');
+            if (flagSpan) flagSpan.textContent = getFlagEmoji(data.country);
           }
           break;
         case 'phone number':
@@ -138,7 +157,8 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           div.textContent = data.email || '—';
           break;
         case 'linkedin':
-          div.textContent = data.linkedin || '—';
+          const linkedinField = document.getElementById('field-linkedin');
+          if (linkedinField) linkedinField.textContent = data.linkedin || '—';
           break;
         case 'english level':
           div.textContent = data.english_level || '—';
@@ -330,6 +350,11 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   document.getElementById('ai-close').addEventListener('click', () => {
   document.getElementById('ai-popup').classList.add('hidden');
 });
+if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
+  aiButton.classList.remove('hidden');
+  clientBtn.classList.remove('hidden');
+  clientBtn.style.display = 'inline-block';
+}
 
   // 👇 AGREGAR ESTO AL FINAL DEL DOMContentLoaded
   if (document.querySelector('.tab.active')?.dataset.tab === 'opportunities') {
@@ -777,17 +802,12 @@ window.loadOpportunitiesForCandidate = function () {
           <td>${opp.client_name || ''}</td>
           <td>${opp.opp_hr_lead || ''}</td>
         `;
+        row.addEventListener('click', () => {
+          window.location.href = `./opportunity-detail.html?id=${opp.opportunity_id}`;
+        });
         tbody.appendChild(row);
       });
     });
-    tbody.querySelectorAll('tr').forEach(row => {
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', () => {
-      const opportunityId = row.children[0].innerText;
-      window.location.href = `opportunity-details.html?id=${opportunityId}`;
-    });
-  });
-
 };
 function loadHireData() {
   const candidateId = new URLSearchParams(window.location.search).get('id');
@@ -936,6 +956,8 @@ document.querySelectorAll('.tab').forEach(button => {
     if (selectedTab === 'resume') {
       aiButton.style.display = 'flex';
       clientBtn.style.display = 'inline-block';
+      clientBtn.classList.remove('hidden');
+
     } else {
       aiButton.style.display = 'none';
       clientBtn.style.display = 'none';

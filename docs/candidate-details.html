@@ -61,11 +61,13 @@
   <div id="field-name" contenteditable="true">—</div>
 </div>
 
+
 <!-- COUNTRY -->
 <div class="field">
-  <label>
+  <label style="display: flex; align-items: center; gap: 8px;">
     <svg class="icon" ...></svg>
-    Country
+    <span>Country</span>
+    <span id="country-flag" class="country-flag"></span>
   </label>
   <select id="field-country">
     <option value="">—</option>
@@ -116,13 +118,11 @@
 
 <!-- LINKEDIN -->
 <div class="field">
-  <label>LinkedIn</label>
-  <div style="display: flex; align-items: center; gap: 8px;">
-    <div id="field-linkedin" contenteditable="true" style="flex: 1;">—</div>
-    <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank">
-      🔗
-    </a>
-  </div>
+  <label style="display: flex; align-items: center; justify-content: space-between;">
+    <span>LinkedIn</span>
+    <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank">🔗</a>
+  </label>
+  <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
 </div>
 
 

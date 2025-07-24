@@ -419,6 +419,8 @@ document.getElementById('comments-firstmeeting-textarea').addEventListener('blur
 
 document.getElementById('recording-input').addEventListener('blur', e =>
   updateOpportunityField('first_meeting_recording', e.target.value));
+document.getElementById('deepdive-recording-input').addEventListener('blur', e =>
+  updateOpportunityField('deepdive_recording', e.target.value));
 
 document.getElementById('timezone-input').addEventListener('blur', e =>
   updateAccountField('timezone', e.target.value));
@@ -914,6 +916,7 @@ async function loadOpportunityData() {
     document.getElementById('timezone-input').value = data.account_timezone || '';
     document.getElementById('comments-firstmeeting-textarea').value = data.opp_comments || '';
     document.getElementById('recording-input').value = data.first_meeting_recording || '';
+    document.getElementById('deepdive-recording-input').value = data.deepdive_recording || '';
 
     // Signed: si tienes un campo de fecha de firma, calcula días
     if (data.nda_signature_or_start_date) {

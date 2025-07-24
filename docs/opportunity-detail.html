@@ -27,6 +27,7 @@
       <nav class="detail-nav">
         <ul>
           <li class="nav-item active">Overview</li>
+          <li class="nav-item">Information</li>
           <li class="nav-item">Job Description</li>
           <li class="nav-item">Pipeline</li>
           <li class="nav-item">Candidates</li>
@@ -120,35 +121,35 @@
   </div>
 </div>
 
-
-<!-- First Meeting -->
-<div class="overview-card">
-  <button class="card-toggle">
-    <h3>First Meeting Information</h3>
-    <span class="toggle-icon">▾</span>
-  </button>
-  <div class="card-content">
-    <div class="overview-grid">
-    <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
-    <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
-    <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
-    <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
-    <div class="input-group"><label>Model</label>
-      <select id="model-select">
-        <option value="Staffing">Staffing</option>
-        <option value="Recruiting">Recruiting</option>
-      </select>
-    </div>
-    <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
-    <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
-    <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
-    <div class="input-group full"><label>First Meeting Comments</label><textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea></div>
-    <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
-    </div>
-  </div>
-</div>
     </section>
-    
+          <section id="information" class="detail-section hidden">
+        <div class="section-header">
+          <p class="section-subtext"></p>
+        </div>
+        <div class="overview-card">
+          <div class="overview-grid">
+            <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
+            <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
+            <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
+            <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
+            <div class="input-group"><label>Model</label>
+              <select id="model-select">
+                <option value="Staffing">Staffing</option>
+                <option value="Recruiting">Recruiting</option>
+              </select>
+            </div>
+            <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
+            <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
+            <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
+            <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
+            <div class="input-group full">
+              <label>Deep Dive Recording</label>
+              <input id="deepdive-recording-input" placeholder="Deep dive recording..." />
+            </div>
+            <div class="input-group full"><label>First Meeting Comments</label><textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea></div>
+          </div>
+        </div>
+      </section>
 
     <section id="job" class="detail-section hidden">
       <div class="job-header">
