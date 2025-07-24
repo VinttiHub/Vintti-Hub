@@ -212,8 +212,12 @@ function addEducationEntry(entry = { institution: '', title: '', start_date: '',
         </div>
       </div>
     </div>
-
-    <textarea class="edu-desc" placeholder="Description" style="min-height: 240px;">${entry.description}</textarea>
+    <div class="rich-toolbar">
+      <button type="button" data-command="bold"><b>B</b></button>
+      <button type="button" data-command="italic"><i>I</i></button>
+      <button type="button" data-command="insertUnorderedList">• List</button>
+    </div>
+    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description}</div>
     <button class="remove-entry">🗑️</button>
   `;
 
@@ -250,8 +254,12 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
         </div>
       </div>
     </div>
-
-    <textarea class="work-desc" placeholder="Description" style="min-height: 240px;">${entry.description}</textarea>
+    <div class="rich-toolbar">
+      <button type="button" data-command="bold"><b>B</b></button>
+      <button type="button" data-command="italic"><i>I</i></button>
+      <button type="button" data-command="insertUnorderedList">• List</button>
+    </div>
+    <div class="work-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description}</div>
     <button class="remove-entry">🗑️</button>
   `;
 
@@ -297,7 +305,7 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
         start_date: div.querySelector('.edu-start').value,
         end_date: div.querySelector('.edu-end').value,
         current: div.querySelector('.edu-current').checked,
-        description: div.querySelector('.edu-desc').value.trim(),
+        description: div.querySelector('.edu-desc').innerHTML.trim(),
       }));
 
 
@@ -307,7 +315,7 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       start_date: div.querySelector('.work-start').value,
       end_date: div.querySelector('.work-end').value,
       current: div.querySelector('.work-current').checked,
-      description: div.querySelector('.work-desc').value.trim(),
+      description: div.querySelector('.work-desc').innerHTML.trim(),
     }));
 
     const tools = Array.from(document.querySelectorAll('#toolsList .cv-card-entry')).map(div => ({

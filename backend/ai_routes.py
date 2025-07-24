@@ -439,7 +439,7 @@ def register_ai_routes(app):
             cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
 
             prompt = f"""
-            Based only on the information below, generate a clean resume in valid JSON format. Do not invent any data.
+            You are a resume generation assistant. Based only on the information below, generate a clean resume in valid JSON format. Do not invent any data that is not explicitly mentioned.
 
             LINKEDIN SCRAPER:
             {linkedin_scrapper}
@@ -447,12 +447,26 @@ def register_ai_routes(app):
             CV PDF SCRAPER:
             {cv_pdf_scrapper}
 
-            Return JSON with:
-            - about
-            - work_experience (title, company, start_date, end_date, current, description)
-            - education (institution, start_date, end_date, current, description)
-            - tools (tool, level)
-            """
+            Your response must be a valid JSON with the following fields:
+
+            1. **about**: A detailed, professional summary written in third person using only the real information found in the sources. Do not invent or generalize. It should be at least 4 lines long and reflect actual experience, education or tools. Never say “X professional” or “X years” unless it's in the input.
+
+            2. **education**: A list of objects with the following keys:
+            - `institution`
+            - `title`: This is the actual degree obtained (e.g., Bachelor of Science in Engineering). Move it here from the description if needed.
+            - `start_date` and `end_date` in `YYYY-MM-DD` format. If month or day is missing, complete it with 01.
+            - `current`: true if still ongoing, false otherwise.
+            - `description`: Write an extensive description of the education experience in bullet points (`-`). Use all available information. Never include the title here.
+
+            3. **work_experience**: A list of objects with the following keys:
+            - `title`, `company`, `start_date`, `end_date`, `current`, `description`
+            - Dates must be in `YYYY-MM-DD`. If a field is missing, try your best to deduce it. Never leave it blank unless truly unavailable. If “present” is found, mark `current: true`.
+            - `description`: Use all information available to write a detailed list of bullet points (`-`). Be specific and never invent.
+
+            4. **tools**: A list of tools with inferred level of proficiency:
+            ```json
+            [{"tool": "Excel", "level": "Advanced"}]"""
+
 
             completion = call_openai_with_retry(
                 model="gpt-4o",
