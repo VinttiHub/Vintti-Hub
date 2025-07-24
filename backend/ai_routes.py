@@ -439,7 +439,7 @@ def register_ai_routes(app):
             cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
 
             prompt = f"""
-            Based only on the information below, generate a resume in valid JSON format. Do not invent any data.
+            You are a resume generation assistant. Based only on the following data, generate a resume in valid JSON format. Do NOT invent or assume any information.
 
             LINKEDIN SCRAPER:
             {linkedin_scrapper}
@@ -447,17 +447,17 @@ def register_ai_routes(app):
             CV PDF SCRAPER:
             {cv_pdf_scrapper}
 
-            Output JSON with these fields:
+            Your response must be a single JSON with these fields:
 
-            - about: Written in third person, professional, and extended. Use only the given information.
+            - about: A detailed third-person professional summary using only the data provided.
             - education: [
                 {{
                     "institution": "...",
-                    "title": "...",            # degree or program
+                    "title": "...",
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # must be descriptive and detailed
+                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # Must be detailed and in bullet point format
                 }}
             ]
             - work_experience: [
@@ -467,18 +467,19 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # extensive, based on input
+                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # Must be detailed and in bullet point format
                 }}
             ]
             - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
 
             Rules:
-            - Do not create or assume anything that is not clearly stated.
-            - Fill missing month/day as 01 if necessary, but NEVER make up a year.
-            - Use all data from both sources and summarize accurately.
-            - If end_date is "present", set current=true.
-            Return only the JSON. No explanations, no markdown.
+            - Use all available information, summarizing accurately.
+            - Do not add anything that is not present.
+            - Descriptions **must be long and detailed** using bullet points (`- ...\\n`).
+            - If a date is missing a month or day, complete it with `01`, but never invent a missing year.
+            Return only valid JSON. No markdown, no comments.
             """
+
 
 
             completion = call_openai_with_retry(
@@ -496,6 +497,19 @@ def register_ai_routes(app):
 
             try:
                 json_data = json.loads(content)
+                def format_description(description):
+                    if not description:
+                        return ""
+                    lines = re.split(r'\n|•|–|-', description)
+                    bullets = ['- ' + line.strip() for line in lines if line.strip()]
+                    return '\n'.join(bullets)
+
+                for entry in json_data.get("education", []):
+                    entry["description"] = format_description(entry.get("description", ""))
+
+                for entry in json_data.get("work_experience", []):
+                    entry["description"] = format_description(entry.get("description", ""))
+
                 today = datetime.date.today()
 
                 # Preprocesar fechas en work_experience
