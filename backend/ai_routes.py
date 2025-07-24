@@ -430,145 +430,167 @@ def register_ai_routes(app):
         )
         return respuesta.choices[0].message.content.strip()
     
-    @app.route('/generate_resume_fields', methods=['POST'])
-    def generate_resume_fields():
+@app.route('/generate_resume_fields', methods=['POST', 'GET'])
+def generate_resume_fields():
+    try:
+        print("⚙️ Entrando a /generate_resume_fields")
+
+        data = request.json
+        print("📦 JSON recibido:", data)
+
+        if not data:
+            raise ValueError("No JSON payload received")
+
+        candidate_id = data.get('candidate_id')
+        if not candidate_id:
+            raise ValueError("Missing candidate_id")
+
+        linkedin_scrapper = data.get('linkedin_scrapper', '')[:8000]
+        cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
+
+        prompt = f"""
+        You are a resume generation assistant. Based only on the information below, generate a clean resume in valid JSON format. Do not invent any data that is not explicitly mentioned.
+
+        LINKEDIN SCRAPER:
+        {linkedin_scrapper}
+
+        CV PDF SCRAPER:
+        {cv_pdf_scrapper}
+
+        Your response must be a valid JSON with the following fields:
+
+        1. **about**: A detailed, professional summary written in third person using only the real information found in the sources. Do not invent or generalize. It should be at least 4 lines long and reflect actual experience, education or tools. Never say “X professional” or “X years” unless it's in the input.
+
+        2. **education**: A list of objects with the following keys:
+        - `institution`
+        - `title`
+        - `start_date`, `end_date` in `YYYY-MM-DD` format (complete with 01 if missing)
+        - `current` (true/false)
+        - `description` in bullet points (`-`) using all available info. Never include the title here.
+
+        3. **work_experience**: A list of:
+        - `title`, `company`, `start_date`, `end_date`, `current`, `description`
+        - Dates must be formatted and `current` inferred properly.
+        - `description`: detailed bullet points. Never invent.
+
+        4. **tools**: Example:
+        ```json
+        [{{"tool":"Excel","level":"Advanced"}},{{"tool":"Python","level":"Intermediate"}}]
+        ```
+        """
+
+        completion = call_openai_with_retry(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a resume generation assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1200
+        )
+
+        content = completion.choices[0].message.content
+        print("🧠 Respuesta de OpenAI:", content)
+
+        # Intentar parsear el JSON directo o limpiarlo si viene en bloque ```json
         try:
-            data = request.json
-            candidate_id = data.get('candidate_id')
-            linkedin_scrapper = data.get('linkedin_scrapper', '')[:8000]
-            cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
+            json_data = json.loads(content)
+        except json.JSONDecodeError:
+            print("🔴 Fallo json.loads directo, limpiando con regex...")
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip())
+            json_data = json.loads(cleaned)
 
-            prompt = f"""
-            You are a resume generation assistant. Based only on the information below, generate a clean resume in valid JSON format. Do not invent any data that is not explicitly mentioned.
+        today = datetime.date.today()
 
-            LINKEDIN SCRAPER:
-            {linkedin_scrapper}
+        # Normalizar fechas en work_experience
+        for entry in json_data.get("work_experience", []):
+            start = entry.get("start_date", "")
+            end = entry.get("end_date", "")
 
-            CV PDF SCRAPER:
-            {cv_pdf_scrapper}
+            if start and len(start) == 4:
+                entry["start_date"] = f"{start}-01-01"
+            elif start and len(start) == 7:
+                entry["start_date"] = f"{start}-01"
 
-            Your response must be a valid JSON with the following fields:
+            if end and len(end) == 4:
+                entry["end_date"] = f"{end}-01-01"
+            elif end and len(end) == 7:
+                entry["end_date"] = f"{end}-01"
 
-            1. **about**: A detailed, professional summary written in third person using only the real information found in the sources. Do not invent or generalize. It should be at least 4 lines long and reflect actual experience, education or tools. Never say “X professional” or “X years” unless it's in the input.
-
-            2. **education**: A list of objects with the following keys:
-            - `institution`
-            - `title`: This is the actual degree obtained (e.g., Bachelor of Science in Engineering). Move it here from the description if needed.
-            - `start_date` and `end_date` in `YYYY-MM-DD` format. If month or day is missing, complete it with 01.
-            - `current`: true if still ongoing, false otherwise.
-            - `description`: Write an extensive description of the education experience in bullet points (`-`). Use all available information. Never include the title here.
-
-            3. **work_experience**: A list of objects with the following keys:
-            - `title`, `company`, `start_date`, `end_date`, `current`, `description`
-            - Dates must be in `YYYY-MM-DD`. If a field is missing, try your best to deduce it. Never leave it blank unless truly unavailable. If “present” is found, mark `current: true`.
-            - `description`: Use all information available to write a detailed list of bullet points (`-`). Be specific and never invent.
-
-            4. **tools**: A list of tools with inferred level of proficiency:
-            ```json
-            [{"tool": "Excel", "level": "Advanced"}]"""
-
-
-            completion = call_openai_with_retry(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are a resume generation assistant."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=1000
-            )
-
-            content = completion.choices[0].message.content
-            print("📥 Resume JSON:", content)
-
-            try:
-                json_data = json.loads(content)
-                today = datetime.date.today()
-
-                # Preprocesar fechas en work_experience
-                for entry in json_data.get("work_experience", []):
-                    # Formatear fechas incompletas
-                    start = entry.get("start_date", "")
-                    end = entry.get("end_date", "")
-
-                    if start and len(start) == 4:
-                        entry["start_date"] = f"{start}-01-01"
-                    elif start and len(start) == 7:
-                        entry["start_date"] = f"{start}-01"
-
-                    if end and len(end) == 4:
-                        entry["end_date"] = f"{end}-01-01"
-                    elif end and len(end) == 7:
-                        entry["end_date"] = f"{end}-01"
-
-                    # Evaluar si es actual
-                    if not entry.get("end_date"):
-                        entry["current"] = True
-                    else:
-                        try:
-                            end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
-                            entry["current"] = end_date_obj > today
-                        except:
-                            entry["current"] = False
-
-                # Preprocesar fechas en education
-                for entry in json_data.get("education", []):
-                    start = entry.get("start_date", "")
-                    end = entry.get("end_date", "")
-
-                    if start and len(start) == 4:
-                        entry["start_date"] = f"{start}-01-01"
-                    elif start and len(start) == 7:
-                        entry["start_date"] = f"{start}-01"
-
-                    if end and len(end) == 4:
-                        entry["end_date"] = f"{end}-01-01"
-                    elif end and len(end) == 7:
-                        entry["end_date"] = f"{end}-01"
-
-                    if not entry.get("end_date"):
-                        entry["current"] = True
-                    else:
-                        try:
-                            end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
-                            entry["current"] = end_date_obj > today
-                        except:
-                            entry["current"] = False
-
-            except:
-                json_data = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip()))
-
-            about = json_data.get('about', '')
-            education = json.dumps(json_data.get('education', []))
-            work_experience = json.dumps(json_data.get('work_experience', []))
-            tools = json.dumps(json_data.get('tools', []))
-
-            conn = get_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
-            exists = cursor.fetchone()
-
-            if exists:
-                cursor.execute("""
-                    UPDATE resume SET about=%s, education=%s, work_experience=%s, tools=%s
-                    WHERE candidate_id=%s
-                """, (about, education, work_experience, tools, candidate_id))
+            if not entry.get("end_date"):
+                entry["current"] = True
             else:
-                cursor.execute("""
-                    INSERT INTO resume (candidate_id, about, education, work_experience, tools)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (candidate_id, about, education, work_experience, tools))
+                try:
+                    end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
+                    entry["current"] = end_date_obj > today
+                except:
+                    entry["current"] = False
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+        # Normalizar fechas en education
+        for entry in json_data.get("education", []):
+            start = entry.get("start_date", "")
+            end = entry.get("end_date", "")
 
-            return jsonify({"success": True, "about": about, "education": education, "work_experience": work_experience, "tools": tools})
+            if start and len(start) == 4:
+                entry["start_date"] = f"{start}-01-01"
+            elif start and len(start) == 7:
+                entry["start_date"] = f"{start}-01"
 
-        except Exception as e:
-            print(traceback.format_exc())
-            return jsonify({"error": str(e)}), 500
+            if end and len(end) == 4:
+                entry["end_date"] = f"{end}-01-01"
+            elif end and len(end) == 7:
+                entry["end_date"] = f"{end}-01"
+
+            if not entry.get("end_date"):
+                entry["current"] = True
+            else:
+                try:
+                    end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
+                    entry["current"] = end_date_obj > today
+                except:
+                    entry["current"] = False
+
+        about = json_data.get('about', '')
+        education = json.dumps(json_data.get('education', []))
+        work_experience = json.dumps(json_data.get('work_experience', []))
+        tools = json.dumps(json_data.get('tools', []))
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
+        exists = cursor.fetchone()
+
+        if exists:
+            cursor.execute("""
+                UPDATE resume
+                SET about = %s, education = %s, work_experience = %s, tools = %s
+                WHERE candidate_id = %s
+            """, (about, education, work_experience, tools, candidate_id))
+        else:
+            cursor.execute("""
+                INSERT INTO resume (candidate_id, about, education, work_experience, tools)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (candidate_id, about, education, work_experience, tools))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        print("✅ Resume generado y guardado exitosamente")
+        return jsonify({
+            "success": True,
+            "about": about,
+            "education": education,
+            "work_experience": work_experience,
+            "tools": tools
+        })
+
+    except Exception as e:
+        print("❌ Error interno:")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 
 import time
 def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):

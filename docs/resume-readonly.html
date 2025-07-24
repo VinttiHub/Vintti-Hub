@@ -7,11 +7,18 @@
   <link rel="stylesheet" href="./assets/css/resume-readonly.css" />
 </head>
 <body>
+<header class="cv-header">
+  <div class="header-left">
+    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="vintti-logo" />
+    <div class="cv-subtitle">Top Candidate Profile</div>
+  </div>
+</header>
+
   <div class="cv-container">
     <h1 id="candidateNameTitle" class="cv-title">Candidate Name</h1>
     <!-- About -->
     <section class="cv-section">
-      <h2 class="cv-heading">About</h2>
+      <h2 class="cv-heading" data-icon="🧠">About</h2>
       <div class="cv-card">
         <p id="aboutField">Click here to edit your About section.</p>
       </div>
@@ -19,25 +26,25 @@
 
     <!-- Education -->
     <section class="cv-section" id="educationSection">
-      <h2 class="cv-heading">Education</h2>
+      <h2 class="cv-heading" data-icon="🎓">Education</h2>
       <div class="cv-card" id="educationList"></div>
     </section>
 
     <!-- Work Experience -->
     <section class="cv-section" id="workExperienceSection">
-      <h2 class="cv-heading">Work Experience</h2>
+      <h2 class="cv-heading" data-icon="💼">Work Experience</h2>
       <div class="cv-card" id="workExperienceList"></div>
     </section>
 
     <!-- Tools -->
     <section class="cv-section" id="toolsSection">
-      <h2 class="cv-heading">Tools</h2>
+      <h2 class="cv-heading" data-icon="🛠️">Tools</h2>
       <div class="cv-card" id="toolsList"></div>
     </section>
 
     <!-- Video Link -->
     <section class="cv-section">
-      <h2 class="cv-heading">Video Link</h2>
+      <h2 class="cv-heading" data-icon="📹">Video Link</h2>
       <div class="cv-card">
         <div id="readonly-video-link">—</div>
       </div>
@@ -46,5 +53,8 @@
   </div>
 
   <script src="./assets/js/resume-readonly.js"></script>
+  <footer class="cv-footer">
+    Powered by <strong>Vintti</strong> · <a href="https://www.vintti.com" target="_blank">vintti.com</a>
+  </footer>
 </body>
 </html>

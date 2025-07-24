@@ -1,10 +1,3 @@
-body {
-  font-family: 'Nunito', 'Segoe UI', sans-serif;
-  background: #fafafa;
-  color: #2b2b2b;
-  padding: 40px;
-}
-
 .cv-container {
   max-width: 900px;
   margin: 0 auto;
@@ -106,4 +99,82 @@ body {
 
 #readonly-video-link a:hover {
   text-decoration: underline;
+}
+/* Logo y header */
+.cv-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0 30px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vintti-logo {
+  height: 50px;
+  margin-bottom: 8px;
+}
+
+.cv-subtitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1b59f8;
+  font-family: 'Nunito', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+/* Footer */
+.cv-footer {
+  text-align: center;
+  margin-top: 60px;
+  color: #6b7280;
+  font-size: 13px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cv-footer a {
+  color: #1b59f8;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Estética refinada */
+body {
+  background: linear-gradient(to bottom, #fafafa, #f0f4f8);
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.cv-container {
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+}
+
+.cv-heading::before {
+  content: attr(data-icon);
+  margin-right: 8px;
+}
+
+/* Animaciones */
+.fade-in {
+  animation: fadeInUp 0.6s ease-out both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
