@@ -504,9 +504,10 @@ def register_ai_routes(app):
                 def format_description(description):
                     if not description:
                         return ""
-                    lines = re.split(r'\n|•|–|-', description)
-                    bullets = ['- ' + line.strip() for line in lines if line.strip()]
-                    return '\n'.join(bullets)
+                    lines = re.split(r'\n|- ', description.strip())
+                    bullets = [f"<li>{line.strip()}</li>" for line in lines if line.strip()]
+                    return f"<ul>{''.join(bullets)}</ul>"
+
 
                 for entry in json_data.get("education", []):
                     entry["description"] = format_description(entry.get("description", ""))
