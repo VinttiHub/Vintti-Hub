@@ -198,7 +198,7 @@
           <h2 class="cv-heading">Education</h2>
           <button class="star-button" data-target="popup-education" title="Add comment">✨</button>
           </div>
-          <div class="cv-card" id="educationList"></div>
+          <div id="educationList"></div>
           <button id="addEducationBtn">Add Education</button>
         </section>
 
@@ -208,7 +208,7 @@
           <h2 class="cv-heading">Work Experience</h2>
           <button class="star-button" data-target="popup-work" title="Add comment">✨</button>
           </div>
-          <div class="cv-card" id="workExperienceList"></div>
+          <div id="workExperienceList"></div>
           <button id="addWorkExperienceBtn">Add Work Experience</button>
         </section>
 
@@ -226,7 +226,13 @@
         <section class="cv-section">
           <h2 class="cv-heading">Video Link</h2>
           <div class="cv-card">
-            <input type="text" id="videoLinkInput" placeholder="Paste video link here" style="width: 100%; padding: 8px;">
+          <div class="rich-toolbar" id="video-toolbar">
+            <button type="button" data-target="videoLinkInput" data-command="bold"><b>B</b></button>
+            <button type="button" data-target="videoLinkInput" data-command="italic"><i>I</i></button>
+            <button type="button" data-target="videoLinkInput" data-command="insertUnorderedList">• List</button>
+          </div>
+          <div id="videoLinkInput" class="rich-input" contenteditable="true" placeholder="Paste video link or notes..."></div>
+
           </div>
         </section>
       </div>

@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const hireWorkingSchedule = document.getElementById('hire-working-schedule');
   const hirePTO = document.getElementById('hire-pto');
   const hireStartDate = document.getElementById('hire-start-date');
+  const video_link = videoLinkInput.innerHTML.trim();
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
@@ -189,48 +190,82 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       videoLinkInput.value = data.video_link || '';
     });
 
-  function addEducationEntry(entry = { institution: '', start_date: '', end_date: '', current: false, description: '' }) {
-    const div = document.createElement('div');
-    div.className = 'cv-card-entry pulse';
-    div.innerHTML = `
-      <input type="text" class="edu-title" value="${entry.institution}" placeholder="Institution"/>
-      <label>Start Date: <input type="date" class="edu-start" value="${entry.start_date}"></label>
-      <label>End Date: <input type="date" class="edu-end" value="${entry.end_date}" ${entry.current ? 'disabled' : ''}></label>
-      <label><input type="checkbox" class="edu-current" ${entry.current ? 'checked' : ''}/> Current</label>
-      <textarea class="edu-desc" placeholder="Description">${entry.description}</textarea>
-      <button class="remove-entry">🗑️</button>
-    `;
-    setTimeout(() => div.classList.remove('pulse'), 500);
-    div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-    div.querySelector('.edu-current').onchange = e => {
-      div.querySelector('.edu-end').disabled = e.target.checked;
-      saveResume();
-    };
-    div.querySelectorAll('input, textarea').forEach(el => el.addEventListener('blur', saveResume));
-    educationList.appendChild(div);
-  }
+function addEducationEntry(entry = { institution: '', title: '', start_date: '', end_date: '', current: false, description: '' }) {
+  const div = document.createElement('div');
+  div.className = 'cv-card-entry pulse';
+  div.innerHTML = `
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 2.5; min-width: 320px;">
+        <input type="text" class="edu-title" value="${entry.institution}" placeholder="Institution" />
+        <input type="text" class="edu-degree" value="${entry.title || ''}" placeholder="Title/Degree" style="margin-top: 6px;" />
+      </div>
 
-  function addWorkExperienceEntry(entry = { title: '', company: '', start_date: '', end_date: '', current: false, description: '' }) {
-    const div = document.createElement('div');
-    div.className = 'cv-card-entry pulse';
-    div.innerHTML = `
-      <input type="text" class="work-title" value="${entry.title}" placeholder="Title"/>
-      <input type="text" class="work-company" value="${entry.company}" placeholder="Company"/>
-      <label>Start Date: <input type="date" class="work-start" value="${entry.start_date}"></label>
-      <label>End Date: <input type="date" class="work-end" value="${entry.end_date}" ${entry.current ? 'disabled' : ''}></label>
-      <label><input type="checkbox" class="work-current" ${entry.current ? 'checked' : ''}/> Current</label>
-      <textarea class="work-desc" placeholder="Description">${entry.description}</textarea>
-      <button class="remove-entry">🗑️</button>
-    `;
-    setTimeout(() => div.classList.remove('pulse'), 500);
-    div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-    div.querySelector('.work-current').onchange = e => {
-      div.querySelector('.work-end').disabled = e.target.checked;
-      saveResume();
-    };
-    div.querySelectorAll('input, textarea').forEach(el => el.addEventListener('blur', saveResume));
-    workExperienceList.appendChild(div);
-  }
+      <div style="flex: 1.5; min-width: 300px;">
+        <div style="display: flex; gap: 10px;">
+          <label style="flex: 1;">Start<br/><input type="date" class="edu-start" value="${entry.start_date}" /></label>
+          <label style="flex: 1;">End<br/><input type="date" class="edu-end" value="${entry.end_date}" ${entry.current ? 'disabled' : ''} /></label>
+        </div>
+        <div style="display: flex; justify-content: flex-end; padding-right: 62px; padding-top: -52px">
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; text-transform: none;">
+            <input type="checkbox" class="edu-current" ${entry.current ? 'checked' : ''}/> Current
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <textarea class="edu-desc" placeholder="Description" style="min-height: 240px;">${entry.description}</textarea>
+    <button class="remove-entry">🗑️</button>
+  `;
+
+  setTimeout(() => div.classList.remove('pulse'), 500);
+  div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
+  div.querySelector('.edu-current').onchange = e => {
+    div.querySelector('.edu-end').disabled = e.target.checked;
+    saveResume();
+  };
+  div.querySelectorAll('input, textarea').forEach(el => el.addEventListener('blur', saveResume));
+  educationList.appendChild(div);
+}
+
+
+function addWorkExperienceEntry(entry = { title: '', company: '', start_date: '', end_date: '', current: false, description: '' }) {
+  const div = document.createElement('div');
+  div.className = 'cv-card-entry pulse';
+  div.innerHTML = `
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 2.5; min-width: 320px;">
+        <input type="text" class="work-title" value="${entry.title}" placeholder="Title" />
+        <input type="text" class="work-company" value="${entry.company}" placeholder="Company" style="margin-top: 6px;" />
+      </div>
+
+      <div style="flex: 1.5; min-width: 300px;">
+        <div style="display: flex; gap: 10px;">
+          <label style="flex: 1;">Start<br/><input type="date" class="work-start" value="${entry.start_date}" /></label>
+          <label style="flex: 1;">End<br/><input type="date" class="work-end" value="${entry.end_date}" ${entry.current ? 'disabled' : ''} /></label>
+        </div>
+        <div style="display: flex; justify-content: flex-end; padding-top: -52px; padding-right: 62px;">
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap;">
+            <input type="checkbox" class="work-current" ${entry.current ? 'checked' : ''}/> Current
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <textarea class="work-desc" placeholder="Description" style="min-height: 240px;">${entry.description}</textarea>
+    <button class="remove-entry">🗑️</button>
+  `;
+
+
+  setTimeout(() => div.classList.remove('pulse'), 500);
+  div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
+  div.querySelector('.work-current').onchange = e => {
+    div.querySelector('.work-end').disabled = e.target.checked;
+    saveResume();
+  };
+  div.querySelectorAll('input, textarea').forEach(el => el.addEventListener('blur', saveResume));
+  workExperienceList.appendChild(div);
+}
+
 
   function addToolEntry(entry = { tool: '', level: 'Basic' }) {
     const div = document.createElement('div');
@@ -256,13 +291,15 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
   function saveResume() {
     const about = document.getElementById('aboutField').innerText.trim();
 
-    const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => ({
-      institution: div.querySelector('.edu-title').value.trim(),
-      start_date: div.querySelector('.edu-start').value,
-      end_date: div.querySelector('.edu-end').value,
-      current: div.querySelector('.edu-current').checked,
-      description: div.querySelector('.edu-desc').value.trim(),
-    }));
+      const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => ({
+        institution: div.querySelector('.edu-title').value.trim(),
+        title: div.querySelector('.edu-degree').value.trim(),
+        start_date: div.querySelector('.edu-start').value,
+        end_date: div.querySelector('.edu-end').value,
+        current: div.querySelector('.edu-current').checked,
+        description: div.querySelector('.edu-desc').value.trim(),
+      }));
+
 
     const work_experience = Array.from(document.querySelectorAll('#workExperienceList .cv-card-entry')).map(div => ({
       title: div.querySelector('.work-title').value.trim(),
@@ -725,6 +762,8 @@ document.querySelectorAll('.rich-toolbar button').forEach(button => {
       target.focus();
       document.execCommand(command, false, null);
     }
+    const isActive = document.queryCommandState(command);
+    button.classList.toggle('active', isActive);
   });
 });
 // Botón de Go Back
