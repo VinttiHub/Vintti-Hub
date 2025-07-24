@@ -439,7 +439,7 @@ def register_ai_routes(app):
             cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
 
             prompt = f"""
-            You are a resume generation assistant. Based strictly and only on the following information, generate a detailed and professional resume in valid JSON format.
+            You are a resume generation assistant. Based only on the following data, generate a resume in valid JSON format. Do NOT invent or assume any information.
 
             LINKEDIN SCRAPER:
             {linkedin_scrapper}
@@ -447,9 +447,9 @@ def register_ai_routes(app):
             CV PDF SCRAPER:
             {cv_pdf_scrapper}
 
-            Your response must be a single valid JSON object with the following structure:
+            Your response must be a single JSON with these fields:
 
-            - about: A third-person summary written in a professional tone using only the data provided. It should be comprehensive, not generic.
+            - about: A detailed third-person professional summary using only the data provided.
             - education: [
                 {{
                     "institution": "...",
@@ -457,7 +457,7 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n..."  // Must be long, detailed and specific to the institution or program
+                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # Must be detailed and in bullet point format
                 }}
             ]
             - work_experience: [
@@ -467,19 +467,17 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n..."  // Must be detailed with accomplishments, tools used, responsibilities, methods, etc.
+                    "description": "- Bullet 1\\n- Bullet 2\\n..."  # Must be detailed and in bullet point format
                 }}
             ]
             - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
 
-            Important rules:
+            Rules:
             - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
             - Use all possible details found in the source to make the descriptions **long, rich and specific**.
             - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
-            - If there is too little info, still write one or two bullets using the available data — but do not fabricate anything.
+            - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
             - Expand acronyms and explain concepts if mentioned.
-
-            Return only valid JSON. Do not wrap in markdown, do not add any explanation or comments.
             """
 
             completion = call_openai_with_retry(
