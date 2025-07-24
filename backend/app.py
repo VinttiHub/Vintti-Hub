@@ -922,7 +922,12 @@ def update_resume(candidate_id):
         for field in allowed_fields:
             if field in data:
                 updates.append(f"{field} = %s")
-                values.append(data[field])
+                value = data[field]
+                if isinstance(value, (dict, list)):
+                    values.append(json.dumps(value))
+                else:
+                    values.append(value)
+
 
         if not updates:
             print("❌ No valid fields in data:", data)
