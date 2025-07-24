@@ -476,15 +476,11 @@ def register_ai_routes(app):
             - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
             - Use all possible details found in the source to make the descriptions **long, rich and specific**.
             - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
-            - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
+            - If there is too little info, still write one or two bullets using the available data — but do not fabricate anything.
             - Expand acronyms and explain concepts if mentioned.
-            - Avoid generic phrases like "responsible for" — prefer clear actions and tools used.
 
             Return only valid JSON. Do not wrap in markdown, do not add any explanation or comments.
             """
-
-
-
 
             completion = call_openai_with_retry(
                 model="gpt-4o",
@@ -504,10 +500,9 @@ def register_ai_routes(app):
                 def format_description(description):
                     if not description:
                         return ""
-                    lines = re.split(r'\n|- ', description.strip())
-                    bullets = [f"<li>{line.strip()}</li>" for line in lines if line.strip()]
-                    return f"<ul>{''.join(bullets)}</ul>"
-
+                    lines = re.split(r'\n|•|–|-', description)
+                    bullets = ['- ' + line.strip() for line in lines if line.strip()]
+                    return '\n'.join(bullets)
 
                 for entry in json_data.get("education", []):
                     entry["description"] = format_description(entry.get("description", ""))
