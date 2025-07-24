@@ -220,6 +220,20 @@ function addEducationEntry(entry = { institution: '', title: '', start_date: '',
     <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description}</div>
     <button class="remove-entry">🗑️</button>
   `;
+  div.querySelectorAll('.rich-toolbar button').forEach(button => {
+    button.addEventListener('click', () => {
+      const command = button.getAttribute('data-command');
+      const targetId = button.getAttribute('data-target');
+      const target = targetId ? document.getElementById(targetId) : document.getSelection().focusNode?.parentElement;
+
+      if (target && target.isContentEditable) {
+        target.focus();
+        document.execCommand(command, false, null);
+      }
+      const isActive = document.queryCommandState(command);
+      button.classList.toggle('active', isActive);
+    });
+  });
 
   setTimeout(() => div.classList.remove('pulse'), 500);
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
@@ -263,6 +277,20 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
     <button class="remove-entry">🗑️</button>
   `;
 
+  div.querySelectorAll('.rich-toolbar button').forEach(button => {
+    button.addEventListener('click', () => {
+      const command = button.getAttribute('data-command');
+      const targetId = button.getAttribute('data-target');
+      const target = targetId ? document.getElementById(targetId) : document.getSelection().focusNode?.parentElement;
+
+      if (target && target.isContentEditable) {
+        target.focus();
+        document.execCommand(command, false, null);
+      }
+      const isActive = document.queryCommandState(command);
+      button.classList.toggle('active', isActive);
+    });
+  });
 
   setTimeout(() => div.classList.remove('pulse'), 500);
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
