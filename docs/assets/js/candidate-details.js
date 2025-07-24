@@ -227,7 +227,7 @@ function addEducationEntry(entry = { institution: '', title: '', start_date: '',
     div.querySelector('.edu-end').disabled = e.target.checked;
     saveResume();
   };
-  div.querySelectorAll('input, textarea').forEach(el => el.addEventListener('blur', saveResume));
+  div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
   educationList.appendChild(div);
 }
 
@@ -270,7 +270,7 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
     div.querySelector('.work-end').disabled = e.target.checked;
     saveResume();
   };
-  div.querySelectorAll('input, textarea').forEach(el => el.addEventListener('blur', saveResume));
+  div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
   workExperienceList.appendChild(div);
 }
 
@@ -323,19 +323,28 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       level: div.querySelector('.tool-level').value,
     }));
 
-    const video_link = document.getElementById('videoLinkInput').value.trim();
+    const videoLinkDiv = document.getElementById('videoLinkInput');
+    const video_link = videoLinkDiv?.innerText?.trim() || null;
+    console.log("📝 Saving resume with:", {
+      about,
+      education,
+      work_experience,
+      tools,
+      video_link,
+    });
 
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         about,
-        education: JSON.stringify(education),
-        work_experience: JSON.stringify(work_experience),
-        tools: JSON.stringify(tools),
+        education,  // sin JSON.stringify
+        work_experience,
+        tools,
         video_link,
       }),
     });
+
   }
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
