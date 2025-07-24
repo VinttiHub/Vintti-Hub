@@ -178,3 +178,27 @@ body {
     transform: translateY(0);
   }
 }
+.resume-description {
+  font-size: 15px;
+  color: #374151;
+  line-height: 1.7;
+}
+
+.resume-description ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.resume-description li {
+  margin-bottom: 4px;
+}
+
+.resume-description b,
+.resume-description strong {
+  font-weight: 700;
+}
+
+.resume-description i,
+.resume-description em {
+  font-style: italic;
+}

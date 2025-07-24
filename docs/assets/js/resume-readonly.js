@@ -52,11 +52,13 @@ if (education.length === 0) {
     entry.className = "resume-entry";
     const startDate = formatDate(edu.start_date);
     const endDate = edu.current ? "Present" : formatDate(edu.end_date);
+    // 🎓 Education
     entry.innerHTML = `
       <strong>${edu.institution || "—"}</strong><br/>
       <span>${edu.level || "—"} (${startDate} – ${endDate})</span><br/>
-      <p>${edu.description || ""}</p>
+      <div class="resume-description">${edu.description || ""}</div>
     `;
+
     educationList.appendChild(entry);
   });
 }
@@ -74,11 +76,13 @@ workExperience.forEach((exp) => {
   const startDate = formatDate(exp.start_date);
   const endDate = exp.current ? "Present" : formatDate(exp.end_date);
   entry.className = "resume-entry";
+  // 💼 Work Experience
   entry.innerHTML = `
     <strong>${exp.company || "—"}</strong><br/>
     <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
-    <p>${exp.description || ""}</p>
+    <div class="resume-description">${exp.description || ""}</div>
   `;
+
   workExperienceList.appendChild(entry);
 });
 
