@@ -2076,3 +2076,7 @@ input:checked + .slider::before {
   font-weight: 400;
   color: #666;
 }
+#summaryTable td:not(:first-child) {
+  cursor: pointer !important;
+}
+

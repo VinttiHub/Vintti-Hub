@@ -111,5 +111,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     cell.appendChild(breakdown);
   });
 });
+// ✅ Añadir cursor manito solo a celdas con número
+setTimeout(() => {
+  document.querySelectorAll("#summaryTable tbody tr").forEach(row => {
+    const cells = row.querySelectorAll("td:not(:first-child)");
+    cells.forEach(cell => {
+      if (!isNaN(parseInt(cell.textContent))) {
+        cell.style.cursor = "pointer";
+      }
+    });
+  });
+}, 300);
 
 });
