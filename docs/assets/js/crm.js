@@ -30,32 +30,35 @@ document.addEventListener('DOMContentLoaded', () => {
         tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
         return;
       }
-
+      const currentUserEmail = localStorage.getItem('user_email');
+      const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+      const showPriorityColumn = allowedEmails.includes(currentUserEmail);
       data.forEach(item => {
-        const htmlRow = `
-          <tr data-id="${item.account_id}">
-            <td>${item.client_name || '—'}</td>
-            <td>${item.calculated_status || '—'}</td>
-            <td>${item.account_manager || '—'}</td>
-            <td>${item.contract || '—'}</td>
-            <td>$${item.trr ?? '—'}</td>
-            <td>$${item.tsf ?? '—'}</td>
-            <td>$${item.tsr ?? '—'}</td>
-          </tr>
+      let htmlRow = `
+        <tr data-id="${item.account_id}">
+          <td>${item.client_name || '—'}</td>
+          <td>${item.calculated_status || '—'}</td>
+          <td>${item.account_manager || '—'}</td>
+          <td>${item.contract || '—'}</td>
+          <td>$${item.trr ?? '—'}</td>
+          <td>$${item.tsf ?? '—'}</td>
+          <td>$${item.tsr ?? '—'}</td>
+      `;
+      if (showPriorityColumn) {
+        htmlRow += `
+          <td>
+            <select class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : ''}" data-id="${item.account_id}">
+              <option value="">—</option>
+              <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
+              <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
+              <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
+            </select>
+          </td>
         `;
-        if (showPriorityColumn) {
-          htmlRow += `
-            <td>
-              <select class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : ''}" data-id="${item.account_id}">
-                <option value="">—</option>
-                <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
-                <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
-                <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
-              </select>
-            </td>
-          `;
-        }
-        tableBody.innerHTML += htmlRow;
+      }
+      htmlRow += `</tr>`;
+      tableBody.innerHTML += htmlRow;
+
         setTimeout(() => {
           const rows = document.querySelectorAll('#accountTableBody tr');
           rows.forEach((row, index) => {
@@ -65,9 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }, 100); // delay para esperar al render
       });
-      const currentUserEmail = localStorage.getItem('user_email');
-      const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
-      const showPriorityColumn = allowedEmails.includes(currentUserEmail);
 
       // 👇 Inserta el nuevo <th> si aplica
       if (showPriorityColumn) {

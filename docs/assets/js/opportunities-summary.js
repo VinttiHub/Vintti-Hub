@@ -61,4 +61,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   lastUpdatedDiv.textContent = `Last updated: ${formattedDate} at ${formattedTime} — refresh the page to get the latest numbers.`;
+
+  document.querySelectorAll("#summaryTable td").forEach(cell => {
+  cell.addEventListener("click", async () => {
+    // Evitar duplicación
+    if (cell.querySelector(".priority-breakdown")) {
+      cell.querySelector(".priority-breakdown").remove();
+      return;
+    }
+
+    const stage = stages[cell.cellIndex - 1];
+    const row = cell.closest("tr");
+    const hrEmail = row.getAttribute("data-email");
+
+    // 🧩 Cargar oportunidades y cuentas si no están en caché
+    const [oppsRes, accountsRes] = await Promise.all([
+      fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light"),
+      fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light")
+    ]);
+    const opps = await oppsRes.json();
+    const accounts = await accountsRes.json();
+    const priorityMap = {};
+    accounts.forEach(acc => {
+      if (acc.account_id) {
+        priorityMap[acc.account_id] = acc.priority || "N/A";
+      }
+    });
+
+    // 📊 Filtrar oportunidades por HR Lead + Stage
+    const filteredOpps = opps.filter(o =>
+      o.opp_hr_lead?.toLowerCase() === hrEmail &&
+      o.opp_stage === stage
+    );
+
+    const counts = { A: 0, B: 0, C: 0, "N/A": 0 };
+    filteredOpps.forEach(opp => {
+      const prio = priorityMap[opp.account_id] || "N/A";
+      counts[prio]++;
+    });
+
+    // 🎨 Mostrar desglose debajo del número
+    const breakdown = document.createElement("div");
+    breakdown.className = "priority-breakdown";
+    breakdown.innerHTML = `
+      <div class="priority A">A: ${counts.A}</div>
+      <div class="priority B">B: ${counts.B}</div>
+      <div class="priority C">C: ${counts.C}</div>
+    `;
+    cell.appendChild(breakdown);
+  });
+});
+
 });

@@ -135,7 +135,7 @@ def get_accounts_light():
             FROM account a
         """)
         rows = cursor.fetchall()
-        accounts = [dict(zip(['account_id', 'client_name', 'account_manager', 'contract'], row)) for row in rows]
+        accounts = [dict(zip(['account_id', 'client_name', 'account_manager', 'contract', 'priority'], row)) for row in rows]
         cursor.close()
         conn.close()
         return jsonify(accounts)
