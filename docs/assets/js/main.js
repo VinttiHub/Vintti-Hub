@@ -448,6 +448,19 @@ window.addEventListener('pageshow', () => {
     tableCard.style.transform = 'translateX(0)';
   }
 });
+const summaryLink = document.getElementById('summaryLink');
+const currentUserEmail = localStorage.getItem('user_email');
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+
+if (summaryLink && allowedEmails.includes(currentUserEmail)) {
+  summaryLink.style.display = 'block';
+}
+
+
+
+
+
+
 });
 
 function openPopup() {

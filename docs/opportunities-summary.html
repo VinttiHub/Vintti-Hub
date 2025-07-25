@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Opportunities Summary</title>
+  <link rel="stylesheet" href="./assets/css/opportunities-summary.css" />
+</head>
+<body>
+  <button class="go-back-button" onclick="window.history.back()">
+  ← Go Back
+</button>
+
+  <div class="summary-container">
+    <header class="summary-header">
+      <h1>Opportunities Summary</h1>
+      <p>This dashboard shows the current distribution of opportunities by HR lead and stage</p>
+    </header>
+
+    <div class="opportunity-summary-table">
+      <table id="summaryTable">
+        <thead>
+          <tr>
+            <th>HR Lead</th>
+            <th>Negotiating</th>
+            <th>Interviewing</th>
+            <th>Sourcing</th>
+            <th>Deep Dive</th>
+            <th>NDA Sent</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-email="pilar@vintti.com"><td>Pilar</td></tr>
+          <tr data-email="agostina@vintti.com"><td>Agostina</td></tr>
+          <tr data-email="jazmin@vintti.com"><td>Jazmín</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<div id="lastUpdated" class="last-updated"></div>
+  <script src="./assets/js/opportunities-summary.js"></script>
+</body>
+</html>

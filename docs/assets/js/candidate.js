@@ -128,7 +128,13 @@ toggleButton.addEventListener('click', () => {
   toggleButton.style.left = isHidden ? '12px' : '220px';
   localStorage.setItem('sidebarHidden', isHidden); // 🧠 guardar estado
 });
+const summaryLink = document.getElementById('summaryLink');
+const currentUserEmail = localStorage.getItem('user_email');
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
 
+if (summaryLink && allowedEmails.includes(currentUserEmail)) {
+  summaryLink.style.display = 'block';
+}
 
 
 

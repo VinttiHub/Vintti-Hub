@@ -1,0 +1,145 @@
+/* opportunities-summary.css */
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background-color: #f9f9f9;
+  color: #333;
+}
+
+.summary-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+.summary-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  padding: 0 1rem;
+}
+
+.summary-header h1 {
+  font-size: 2.8rem;
+  font-weight: 700;
+  background: linear-gradient(to right, #4f46e5, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.6rem;
+}
+
+.summary-header p {
+  font-size: 1.15rem;
+  color: #444;
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.opportunity-summary-table {
+  overflow-x: auto;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  padding: 2rem;
+}
+
+#summaryTable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+  table-layout: fixed;
+}
+
+#summaryTable thead {
+  background-color: #fafafa;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+#summaryTable th, #summaryTable td {
+  padding: 16px;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+#summaryTable th {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background-color: #f1f3f5;
+}
+
+#summaryTable td {
+  border-bottom: 1px solid #eee;
+}
+
+#summaryTable tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 768px) {
+  .summary-header h1 {
+    font-size: 2rem;
+  }
+
+  .summary-header p {
+    font-size: 1rem;
+  }
+
+  #summaryTable th, #summaryTable td {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+}
+.opportunity-summary-table {
+  animation: fadeSlideIn 0.7s ease forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes fadeSlideIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.last-updated {
+  text-align: center;
+  margin-top: 2rem;
+  color: #777;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+.go-back-button {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  color: #4f46e5;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+
+.go-back-button:hover {
+  background-color: rgba(79, 70, 229, 0.08);
+  transform: translateX(-2px);
+}
+
+#summaryTable {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+#summaryTable th:first-child {
+  border-top-left-radius: 12px;
+}
+
+#summaryTable th:last-child {
+  border-top-right-radius: 12px;
+}

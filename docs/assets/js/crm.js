@@ -43,6 +43,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>$${item.tsr ?? '—'}</td>
           </tr>
         `;
+        if (showPriorityColumn) {
+          htmlRow += `
+            <td>
+              <select class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : ''}" data-id="${item.account_id}">
+                <option value="">—</option>
+                <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
+                <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
+                <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
+              </select>
+            </td>
+          `;
+        }
         tableBody.innerHTML += htmlRow;
         setTimeout(() => {
           const rows = document.querySelectorAll('#accountTableBody tr');
@@ -53,6 +65,16 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }, 100); // delay para esperar al render
       });
+      const currentUserEmail = localStorage.getItem('user_email');
+      const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+      const showPriorityColumn = allowedEmails.includes(currentUserEmail);
+
+      // 👇 Inserta el nuevo <th> si aplica
+      if (showPriorityColumn) {
+        const priorityHeader = document.createElement('th');
+        priorityHeader.textContent = 'Priority';
+        document.querySelector('#accountTable thead tr').appendChild(priorityHeader);
+      }
 
       document.querySelectorAll('#accountTableBody tr').forEach(row => {
         row.addEventListener('click', () => {
@@ -81,6 +103,33 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       });
+document.querySelectorAll('.priority-select').forEach(select => {
+  select.addEventListener('change', async () => {
+    const accountId = select.getAttribute('data-id');
+    const newPriority = select.value;
+
+    // Quitar clases anteriores
+    select.classList.remove('priority-a', 'priority-b', 'priority-c');
+
+    // Agregar clase correspondiente
+    if (newPriority === 'A') select.classList.add('priority-a');
+    if (newPriority === 'B') select.classList.add('priority-b');
+    if (newPriority === 'C') select.classList.add('priority-c');
+
+    try {
+      await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority: newPriority })
+      });
+      console.log(`✅ Priority updated for account ${accountId}`);
+    } catch (error) {
+      console.error('❌ Error updating priority:', error);
+    }
+  });
+});
+
+
     })
     .catch(err => {
       console.error('Error fetching account data:', err);
@@ -154,7 +203,13 @@ sidebarToggleBtn.addEventListener('click', () => {
 
   localStorage.setItem('sidebarHidden', hidden); // 🧠 guardar estado
 });
+const summaryLink = document.getElementById('summaryLink');
+const currentUserEmail = localStorage.getItem('user_email');
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
 
+if (summaryLink && allowedEmails.includes(currentUserEmail)) {
+  summaryLink.style.display = 'block';
+}
 
 
 

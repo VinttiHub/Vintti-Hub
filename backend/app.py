@@ -130,7 +130,8 @@ def get_accounts_light():
                 a.account_id,
                 a.client_name,
                 a.account_manager,
-                a.contract
+                a.contract,
+                a.priority
             FROM account a
         """)
         rows = cursor.fetchall()
@@ -736,7 +737,8 @@ def update_account_fields(account_id):
         'mail',
         'comments',
         'timezone',
-        'pain_points'
+        'pain_points',
+        'priority'
     ]
 
     updates = []
