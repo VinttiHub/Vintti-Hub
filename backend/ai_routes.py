@@ -592,12 +592,12 @@ def register_ai_routes(app):
 
             if exists:
                 cursor.execute("""
-                    UPDATE resume SET about=%s, education=%s, work_experience=%s, tools=%s
+                    UPDATE resume SET education=%s, work_experience=%s, tools=%s
                     WHERE candidate_id=%s
                 """, (education, work_experience, tools, candidate_id))
             else:
                 cursor.execute("""
-                    INSERT INTO resume (candidate_id, about, education, work_experience, tools)
+                    INSERT INTO resume (candidate_id, education, work_experience, tools)
                     VALUES (%s, %s, %s, %s, %s)
                 """, (candidate_id, education, work_experience, tools))
 
