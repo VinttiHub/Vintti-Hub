@@ -37,6 +37,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     const aboutP = document.getElementById("aboutField");
     aboutP.textContent = data.about || "—";
 
+// 💼 Work Experience
+const workExperienceList = document.getElementById("workExperienceList");
+let workExperience = [];
+try {
+  workExperience = JSON.parse(data.work_experience || "[]");
+} catch (e) {
+  console.error("❌ Error parsing work_experience:", e);
+}
+workExperience.forEach((exp) => {
+  const entry = document.createElement("div");
+  const startDate = formatDate(exp.start_date);
+  const endDate = exp.current ? "Present" : formatDate(exp.end_date);
+  entry.className = "resume-entry";
+  // 💼 Work Experience
+  entry.innerHTML = `
+    <strong>${exp.company || "—"}</strong><br/>
+    <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
+    <div class="resume-description">${exp.description || ""}</div>
+  `;
+
+  workExperienceList.appendChild(entry);
+});
+
 // 🎓 Education
 const educationList = document.getElementById("educationList");
 let education = [];
@@ -63,29 +86,6 @@ if (education.length === 0) {
     educationList.appendChild(entry);
   });
 }
-
-// 💼 Work Experience
-const workExperienceList = document.getElementById("workExperienceList");
-let workExperience = [];
-try {
-  workExperience = JSON.parse(data.work_experience || "[]");
-} catch (e) {
-  console.error("❌ Error parsing work_experience:", e);
-}
-workExperience.forEach((exp) => {
-  const entry = document.createElement("div");
-  const startDate = formatDate(exp.start_date);
-  const endDate = exp.current ? "Present" : formatDate(exp.end_date);
-  entry.className = "resume-entry";
-  // 💼 Work Experience
-  entry.innerHTML = `
-    <strong>${exp.company || "—"}</strong><br/>
-    <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
-    <div class="resume-description">${exp.description || ""}</div>
-  `;
-
-  workExperienceList.appendChild(entry);
-});
 
 // 🛠️ Tools
 const toolsList = document.getElementById("toolsList");

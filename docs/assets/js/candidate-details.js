@@ -184,8 +184,8 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     .then(res => res.json())
     .then(data => {
       aboutP.innerText = data.about || '';
-      JSON.parse(data.education || '[]').forEach(entry => addEducationEntry(entry));
       JSON.parse(data.work_experience || '[]').forEach(entry => addWorkExperienceEntry(entry));
+      JSON.parse(data.education || '[]').forEach(entry => addEducationEntry(entry));
       JSON.parse(data.tools || '[]').forEach(entry => addToolEntry(entry));
       videoLinkInput.value = data.video_link || '';
     });

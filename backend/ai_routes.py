@@ -132,7 +132,7 @@ def register_ai_routes(app):
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.6,
-                max_tokens=1000
+                max_tokens=7000
             )
 
             content = chat.choices[0].message.content.strip()
@@ -449,7 +449,7 @@ def register_ai_routes(app):
             CV PDF SCRAPER:
             {cv_pdf_scrapper}
 
-            Your response must be a single JSON with these fields:
+            You must always return all 4 fields, even if any of them are empty. Return a complete valid JSON.
 
             - about: A detailed third-person professional summary using only the data provided.
             - education: [
@@ -480,6 +480,8 @@ def register_ai_routes(app):
             - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
             - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
             - Expand acronyms and explain concepts if mentioned.
+            Return only the full JSON object. Do not return only partial content or text outside of the JSON.
+
             """
 
             completion = call_openai_with_retry(
@@ -489,7 +491,7 @@ def register_ai_routes(app):
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=7000
             )
 
             if not completion.choices or not hasattr(completion.choices[0], "message"):
