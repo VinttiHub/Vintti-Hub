@@ -269,39 +269,39 @@ def register_ai_routes(app):
             conn = get_connection()
             cursor = conn.cursor()
 
-            # Obtener datos de DB
-            cursor.execute("SELECT about FROM resume WHERE candidate_id = %s", (candidate_id,))
-            about = cursor.fetchone()[0] or ""
-
-            cursor.execute("SELECT linkedin_scrapper, cv_pdf_scrapper FROM candidates WHERE candidate_id = %s", (candidate_id,))
-            linkedin_scrapper, cv_pdf_scrapper = cursor.fetchone()
+            # Extraer información de la base
+            cursor.execute("SELECT about, education, work_experience, tools FROM resume WHERE candidate_id = %s", (candidate_id,))
+            result = cursor.fetchone()
+            about, education, work_experience, tools = result if result else ("", "[]", "[]", "[]")
 
             prompt = f"""
-    You are an expert resume editor. Here's the current "About" section for a candidate:
+    You are a professional resume editor.
 
-    --- CURRENT ABOUT ---
-    {about}
+    Your task is to write an "About" section (also called Summary or Profile) for a candidate, based on their resume data and user comments. Use only the provided data — do not invent or assume anything.
 
-    --- SCRAPED LINKEDIN ---
-    {linkedin_scrapper[:2000]}
+    --- EDUCATION ---
+    {education}
 
-    --- SCRAPED PDF ---
-    {cv_pdf_scrapper[:2000]}
+    --- WORK EXPERIENCE ---
+    {work_experience}
 
-    --- USER COMMENTS ---
+    --- TOOLS ---
+    {tools}
+
+    --- USER COMMENT ---
     {user_prompt}
 
-    Based on all this, improve the "About" section. It should be short (2-4 lines), professional, and accurate. Only include real info. Return only the improved version, no intro, no comments.
-    """
+    Write a third-person, professional "About" section (5-7 lines), highlighting key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
+            """
 
-            completion = call_openai_with_retry(
+            chat = call_openai_with_retry(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.6,
                 max_tokens=300
             )
 
-            new_about = completion.choices[0].message.content.strip()
+            new_about = chat.choices[0].message.content.strip()
 
             cursor.execute("UPDATE resume SET about = %s WHERE candidate_id = %s", (new_about, candidate_id))
             conn.commit()
@@ -309,9 +309,11 @@ def register_ai_routes(app):
             conn.close()
 
             return jsonify({"about": new_about})
+
         except Exception as e:
             logging.error(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
+
 
 
 
@@ -575,7 +577,6 @@ def register_ai_routes(app):
                 except Exception as e2:
                     raise Exception(f"❌ Error parsing JSON. First attempt: {str(e1)} | Second attempt: {str(e2)} | Content: {content[:300]}")
 
-            about = json_data.get('about', '')
             education = json.dumps(json_data.get('education', []))
             work_experience = json.dumps(json_data.get('work_experience', []))
             tools = json.dumps(json_data.get('tools', []))
@@ -590,18 +591,18 @@ def register_ai_routes(app):
                 cursor.execute("""
                     UPDATE resume SET about=%s, education=%s, work_experience=%s, tools=%s
                     WHERE candidate_id=%s
-                """, (about, education, work_experience, tools, candidate_id))
+                """, (education, work_experience, tools, candidate_id))
             else:
                 cursor.execute("""
                     INSERT INTO resume (candidate_id, about, education, work_experience, tools)
                     VALUES (%s, %s, %s, %s, %s)
-                """, (candidate_id, about, education, work_experience, tools))
+                """, (candidate_id, education, work_experience, tools))
 
             conn.commit()
             cursor.close()
             conn.close()
 
-            return jsonify({"success": True, "about": about, "education": education, "work_experience": work_experience, "tools": tools})
+            return jsonify({"success": True, "education": education, "work_experience": work_experience, "tools": tools})
 
         except Exception as e:
             logging.error("❌ Error en /generate_resume_fields:")
