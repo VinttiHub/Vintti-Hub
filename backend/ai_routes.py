@@ -449,9 +449,8 @@ def register_ai_routes(app):
             CV PDF SCRAPER:
             {cv_pdf_scrapper}
 
-            You must always return all 4 fields, even if any of them are empty. Return a complete valid JSON.
+            You must always return all 3 fields, even if any of them are empty. Return a complete valid JSON.
 
-            - about: A detailed third-person professional summary using only the data provided.
             - education: [
                 {{
                     "institution": "...",
@@ -587,7 +586,9 @@ def register_ai_routes(app):
             cursor = conn.cursor()
 
             cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
-            exists = cursor.fetchone()
+            result = cursor.fetchone()
+            exists = result is not None
+
 
             if exists:
                 cursor.execute("""
