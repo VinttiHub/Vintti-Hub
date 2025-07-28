@@ -556,7 +556,10 @@ saveUpdateBtn.addEventListener('click', () => {
   const salary = parseFloat(salaryInput.value);
   const fee = parseFloat(feeInput.value);
   const date = document.getElementById('update-date').value;
-  if (!salary || !fee || !date) return alert('Please fill all fields');
+  if (salaryInput.value === '' || feeInput.value === '' || !date) {
+      return alert('Please fill all fields');
+    }
+
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
     method: 'POST',
