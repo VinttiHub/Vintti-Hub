@@ -467,7 +467,7 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n- Bullet 4\\n..."  // Use all available details. Each description must include at least 5-8 bullet points, written in professional tone. Bullets must cover responsibilities, methods, tools, skills applied, outcomes (if mentioned), and relevant context. Do not add or assume anything that is not clearly present in the input."
+                    "description": "In this role I did (short summary)...\\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n..."  // Start with a simple summary sentence, then detailed bullet points using all available data. No extra info.
                 }}
             ]
             - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
@@ -495,18 +495,21 @@ def register_ai_routes(app):
 
             try:
                 json_data = json.loads(content)
-                def format_description(description):
+                def format_description_to_html(description):
                     if not description:
                         return ""
                     lines = re.split(r'\n|•|–|-', description)
-                    bullets = ['- ' + line.strip() for line in lines if line.strip()]
-                    return '\n'.join(bullets)
+                    bullets = [line.strip() for line in lines if line.strip()]
+                    if not bullets:
+                        return ""
+                    return "<ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>"
+
 
                 for entry in json_data.get("education", []):
-                    entry["description"] = format_description(entry.get("description", ""))
+                    entry["description"] = format_description_to_html(entry.get("description", ""))
 
                 for entry in json_data.get("work_experience", []):
-                    entry["description"] = format_description(entry.get("description", ""))
+                    entry["description"] = format_description_to_html(entry.get("description", ""))
 
                 today = datetime.date.today()
 
