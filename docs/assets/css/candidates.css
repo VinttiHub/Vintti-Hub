@@ -245,16 +245,7 @@ body {
 #candidatesTable {
   table-layout: auto;
 }
-@keyframes fadeInRow {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+
 #candidatesTable tbody td:nth-child(3),  /* Country */
 #candidatesTable tbody td:nth-child(4) { /* WhatsApp */
   text-align: center;

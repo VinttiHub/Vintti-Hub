@@ -32,10 +32,24 @@ document.addEventListener('DOMContentLoaded', () => {
           </td>
           <td>${candidate.employee || '—'}</td>
         `;
-        tr.style.animation = `fadeInRow 0.4s ease both`;
-        tr.style.animationDelay = `${delay}s`;
-        delay += 0.07;
         tbody.appendChild(tr);
+        document.getElementById('candidatesTableBody').addEventListener('click', function (e) {
+          const row = e.target.closest('tr');
+          if (!row) return;
+
+          const id = row.getAttribute('data-id');
+          if (id) {
+            const clickSound = document.getElementById('click-sound');
+            if (clickSound) {
+              clickSound.play();
+              setTimeout(() => {
+                window.location.href = `candidate-details.html?id=${id}`;
+              }, 200);
+            } else {
+              window.location.href = `candidate-details.html?id=${id}`;
+            }
+          }
+        });
       });
 
       const table = $('#candidatesTable').DataTable({
