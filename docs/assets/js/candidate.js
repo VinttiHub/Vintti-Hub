@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tbody.innerHTML = '';
 
       if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5">No data available</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6">No data available</td></tr>`;
         return;
       }
 
@@ -17,20 +17,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const tr = document.createElement('tr');
         tr.dataset.id = candidate.candidate_id || '';
         tr.innerHTML = `
-          <td class="${!candidate.condition ? 'empty-cell' : ''}">
-            ${candidate.condition || '-'}
-          </td>
-          <td>${candidate.full_name || candidate.name || candidate.Name || '—'}</td>
+          <td>${candidate.condition || '-'}</td>
+          <td>${candidate.name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
-            <button class="icon-button whatsapp" title="Enviar mensaje"
-              onclick="event.stopPropagation(); window.open('https://wa.me/${candidate.phone}', '_blank')">
+            <button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${candidate.phone}', '_blank')">
               <i class='fab fa-whatsapp'></i>
             </button>
           </td>
           <td>
-            <button class="icon-button linkedin" title="Ver perfil LinkedIn"
-              onclick="event.stopPropagation(); window.open('${candidate.linkedin}', '_blank')">
+            <button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${candidate.linkedin}', '_blank')">
               <i class='fab fa-linkedin-in'></i>
             </button>
           </td>
@@ -41,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
         delay += 0.07;
         tbody.appendChild(tr);
       });
-
 
       const table = $('#candidatesTable').DataTable({
         responsive: true,
@@ -61,47 +56,15 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       });
-      // Mover el control de "Mostrar X registros" al wrapper
-      const lengthControl = document.querySelector('.dataTables_length');
-      const wrapper = document.getElementById('datatable-wrapper');
-      if (lengthControl && wrapper) {
-        wrapper.appendChild(lengthControl);
-      }
-      // Hacer clic en fila -> ir a detalles
-      document.getElementById('candidatesTableBody').addEventListener('click', function (e) {
-        const row = e.target.closest('tr');
-        if (!row) return;
 
-        const id = row.getAttribute('data-id');
-        if (id) {
-          const clickSound = document.getElementById('click-sound');
-          if (clickSound) {
-            clickSound.play();
-            setTimeout(() => {
-              window.location.href = `candidate-details.html?id=${id}`;
-            }, 200);
-          } else {
-            window.location.href = `candidate-details.html?id=${id}`;
-          }
-        }
-      });
-
-      // Filtros tipo Excel (activar después de DataTables)
-      document.querySelectorAll('.column-filter').forEach(icon => {
-        const columnIndex = parseInt(icon.getAttribute('data-column'), 10);
-        if ([2, 3, 4].includes(columnIndex)) return; // omitimos Country, Whatsapp, LinkedIn
-        icon.addEventListener('click', (e) => {
-          e.stopPropagation();
-          createColumnFilter(columnIndex, table);
-        });
-      });
       document.getElementById('searchByName').addEventListener('input', function () {
-      table.column(1).search(this.value).draw(); // columna 1 = full_name
-    });
+        table.column(1).search(this.value).draw();
+      });
     })
     .catch(err => {
       console.error('❌ Error al obtener candidatos:', err);
     });
+
 // 🟣 SIDEBAR TOGGLE CON MEMORIA
 const sidebar = document.querySelector('.sidebar');
 const mainContent = document.querySelector('.main-content');

@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const nameRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`);
     const nameData = await nameRes.json();
     document.getElementById("candidateNameTitle").textContent = nameData.name || "Unnamed Candidate";
+    document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     // 🧠 About
     const aboutP = document.getElementById("aboutField");

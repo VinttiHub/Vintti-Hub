@@ -61,32 +61,36 @@ def fetch_data_from_table(table_name):
 @app.route('/')
 def home():
     return 'API running 🎉'
-@app.route('/candidates/light', methods=['GET'])
+
+@app.route('/candidates/light')
 def get_candidates_light():
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
-            SELECT
-                candidate_id,
-                name,
-                country,
-                phone,
-                linkedin,
-                condition
-            FROM candidates
+            SELECT 
+                c.candidate_id,
+                c.name,
+                c.country,
+                c.phone,
+                c.linkedin,
+                CASE WHEN o.candidato_contratado IS NOT NULL THEN '✔️' ELSE NULL END AS employee
+            FROM candidates c
+            LEFT JOIN opportunity o ON o.candidato_contratado = c.candidate_id
         """)
+
         rows = cursor.fetchall()
-        candidates = [dict(zip(
-            ['candidate_id', 'full_name', 'country', 'phone', 'linkedin', 'condition'],
-            row
-        )) for row in rows]
+        colnames = [desc[0] for desc in cursor.description]
+        candidates = [dict(zip(colnames, row)) for row in rows]
 
         cursor.close()
         conn.close()
         return jsonify(candidates)
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/opportunities/light')
 def get_opportunities_light():

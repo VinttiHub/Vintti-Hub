@@ -202,3 +202,14 @@ body {
 .resume-description em {
   font-style: italic;
 }
+.cv-card p,
+.cv-card .resume-description {
+  text-align: justify;
+}
+.cv-country {
+  font-size: 1.1rem;
+  color: #666;
+  margin-top: -10px;
+  margin-bottom: 20px;
+  text-align: center;
+}
