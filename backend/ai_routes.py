@@ -490,8 +490,12 @@ def register_ai_routes(app):
                 max_tokens=1000
             )
 
+            if not completion.choices or not hasattr(completion.choices[0], "message"):
+                raise Exception("❌ OpenAI response missing 'choices[0].message'")
+
             content = completion.choices[0].message.content
-            print("📥 Resume JSON:", content)
+            print("📥 Resume raw response content:", content)
+
 
             try:
                 json_data = json.loads(content)
@@ -563,8 +567,12 @@ def register_ai_routes(app):
                         except:
                             entry["current"] = False
 
-            except:
-                json_data = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip()))
+            except Exception as e1:
+                try:
+                    cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip())
+                    json_data = json.loads(cleaned)
+                except Exception as e2:
+                    raise Exception(f"❌ Error parsing JSON. First attempt: {str(e1)} | Second attempt: {str(e2)} | Content: {content[:300]}")
 
             about = json_data.get('about', '')
             education = json.dumps(json_data.get('education', []))
