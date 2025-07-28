@@ -498,6 +498,7 @@ def register_ai_routes(app):
 
 
             try:
+                print("🔍 Raw OpenAI response content:", repr(content[:500]))
                 json_data = json.loads(content)
                 def format_description_to_html(description):
                     if not description:
@@ -603,8 +604,10 @@ def register_ai_routes(app):
             return jsonify({"success": True, "about": about, "education": education, "work_experience": work_experience, "tools": tools})
 
         except Exception as e:
-            print(traceback.format_exc())
-            return jsonify({"error": str(e)}), 500
+            logging.error("❌ Error en /generate_resume_fields:")
+            logging.error(traceback.format_exc())
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 
 import time
 def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
