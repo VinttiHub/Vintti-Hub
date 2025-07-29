@@ -392,6 +392,27 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       aiLinkedInScrap.value = data.linkedin_scrapper || '';
       aiCvScrap.value = data.cv_pdf_scrapper || '';
       const bothEmpty = !data.linkedin_scrapper && !data.cv_pdf_scrapper;
+      // ⭐ Habilitar solo botón de About si existe entry en tabla resume
+      const aboutStarBtn = document.querySelector('#about-star-button');
+      if (aboutStarBtn) {
+        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`)
+          .then(res => {
+            if (!res.ok) throw new Error("No resume found");
+            return res.json();
+          })
+          .then(() => {
+            aboutStarBtn.classList.remove('disabled-star');
+          })
+          .catch(() => {
+            aboutStarBtn.classList.add('disabled-star');
+            aboutStarBtn.addEventListener('click', e => {
+              e.preventDefault();
+              e.stopPropagation();
+            });
+            aboutStarBtn.addEventListener('mouseenter', () => showStarTooltip(aboutStarBtn, 'Please complete resume first.'));
+            aboutStarBtn.addEventListener('mouseleave', hideStarTooltip);
+          });
+      }
 
       document.querySelectorAll('.star-button').forEach(btn => {
         if (bothEmpty) {
