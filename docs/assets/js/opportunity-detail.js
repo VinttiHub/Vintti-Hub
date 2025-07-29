@@ -1232,6 +1232,47 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         });
 
         candidateContainer.appendChild(cardElement);
+                const trash = document.createElement("button");
+      trash.innerHTML = "🗑️";
+      trash.classList.add("delete-candidate-btn");
+      trash.title = "Remove from batch";
+      trash.style.marginLeft = "auto";
+      trash.style.background = "none";
+      trash.style.border = "none";
+      trash.style.cursor = "pointer";
+      trash.style.fontSize = "18px";
+
+      trash.addEventListener("click", async () => {
+        const confirmed = confirm(`⚠️ Remove ${c.name} from this batch?`);
+        if (!confirmed) return;
+
+        try {
+          const res = await fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              candidate_id: c.candidate_id,
+              batch_id: batch.batch_id
+            })
+          });
+
+          if (res.ok) {
+            showFriendlyPopup("✅ Candidate removed from batch");
+            await reloadBatchCandidates();
+          } else {
+            alert("❌ Failed to remove candidate");
+          }
+        } catch (err) {
+          console.error("❌ Error removing candidate:", err);
+          alert("❌ Could not remove candidate");
+        }
+      });
+
+      const header = cardElement.querySelector(".candidate-card-header");
+      dropdown.style.marginRight = "10px";
+      header.appendChild(trash);
+
+
       });
 
       // Eliminar batch
@@ -1309,6 +1350,11 @@ batchCandidates.forEach(c => {
   // Setear nombre, email, imagen
   cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
   cardElement.querySelector(".candidate-email").textContent = c.email || '';
+  const salaryEl = document.createElement("span");
+  salaryEl.classList.add("candidate-salary");
+  salaryEl.textContent = c.salary_range ? `$${c.salary_range}` : '—';
+  cardElement.querySelector(".info").appendChild(salaryEl);
+
   cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
 
   // Status dropdown
@@ -1370,6 +1416,47 @@ batchCandidates.forEach(c => {
   });
 
   candidateContainer.appendChild(cardElement);
+          const trash = document.createElement("button");
+      trash.innerHTML = "🗑️";
+      trash.classList.add("delete-candidate-btn");
+      trash.title = "Remove from batch";
+      trash.style.marginLeft = "auto";
+      trash.style.background = "none";
+      trash.style.border = "none";
+      trash.style.cursor = "pointer";
+      trash.style.fontSize = "18px";
+
+      trash.addEventListener("click", async () => {
+        const confirmed = confirm(`⚠️ Remove ${c.name} from this batch?`);
+        if (!confirmed) return;
+
+        try {
+          const res = await fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              candidate_id: c.candidate_id,
+              batch_id: batch.batch_id
+            })
+          });
+
+          if (res.ok) {
+            showFriendlyPopup("✅ Candidate removed from batch");
+            await reloadBatchCandidates();
+          } else {
+            alert("❌ Failed to remove candidate");
+          }
+        } catch (err) {
+          console.error("❌ Error removing candidate:", err);
+          alert("❌ Could not remove candidate");
+        }
+      });
+
+      const header = cardElement.querySelector(".candidate-card-header");
+      dropdown.style.marginRight = "10px";
+      header.appendChild(trash);
+
+
 });
 
 
@@ -1475,6 +1562,11 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
 
     cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
     cardElement.querySelector(".candidate-email").textContent = c.email || '';
+    const salaryEl = document.createElement("span");
+    salaryEl.classList.add("candidate-salary");
+    salaryEl.textContent = c.salary_range ? `$${c.salary_range}` : '—';
+    cardElement.querySelector(".info").appendChild(salaryEl);
+
     cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
     const statusDropdown = cardElement.querySelector(".candidate-status-dropdown");
 
@@ -1486,6 +1578,10 @@ batchCandidates.forEach(c => {
   // Setear nombre, email, imagen
   cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
   cardElement.querySelector(".candidate-email").textContent = c.email || '';
+  const salaryEl = document.createElement("span");
+  salaryEl.classList.add("candidate-salary");
+  salaryEl.textContent = c.salary_range ? `$${c.salary_range}` : '—';
+  cardElement.querySelector(".info").appendChild(salaryEl);
   cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
   
   // Status dropdown

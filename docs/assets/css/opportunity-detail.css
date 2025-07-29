@@ -764,9 +764,6 @@ body {
     color: #999;
   }
   
-  .candidate-card:hover .preview {
-    display: block;
-  }
   .column:not(:last-child)::after {
     content: "";
     position: absolute;
@@ -780,14 +777,17 @@ body {
   .pipeline-columns::-webkit-scrollbar {
     height: 6px;
   }
-  
+  .candidate-salary {
+  font-weight: 500;
+  font-size: 13px;
+  color: #333;
+  display: block;
+  margin-top: 4px;
+}
+
   .pipeline-columns::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 10px;
-  }
-  .candidate-card:hover .preview {
-    display: block;
-    animation: fadeInUp 0.3s ease-out forwards;
   }
   
   @keyframes fadeInUp {

@@ -1715,6 +1715,29 @@ def should_pause_days_since_batch(opp_id):
     finally:
         cur.close()
         conn.close()
+@app.route('/candidates_batches', methods=['DELETE'])
+def delete_candidate_from_batch():
+    data = request.get_json()
+    candidate_id = data.get('candidate_id')
+    batch_id = data.get('batch_id')
+
+    if not candidate_id or not batch_id:
+        return jsonify({'error': 'Missing candidate_id or batch_id'}), 400
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM candidates_batches
+            WHERE candidate_id = %s AND batch_id = %s
+        """, (candidate_id, batch_id))
+
+        conn.commit()
+        cur.close(); conn.close()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
