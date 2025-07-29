@@ -79,9 +79,11 @@ if (education.length === 0) {
     // 🎓 Education
     entry.innerHTML = `
       <strong>${edu.institution || "—"}</strong><br/>
-      <span>${edu.level || "—"} (${startDate} – ${endDate})</span><br/>
+      <span style="font-weight: 500;">${edu.title || "—"}</span><br/>
+      <span>${startDate} – ${endDate}</span><br/>
       <div class="resume-description">${edu.description || ""}</div>
     `;
+
 
     educationList.appendChild(entry);
   });
