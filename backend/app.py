@@ -100,6 +100,7 @@ def get_opportunities_light():
         cursor.execute("""
             SELECT
                 o.opportunity_id,
+                o.account_id,
                 o.opp_stage,
                 o.opp_position_name,
                 o.opp_type,
