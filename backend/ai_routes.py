@@ -480,7 +480,7 @@ def register_ai_routes(app):
             - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
             - Expand acronyms and explain concepts if mentioned.
             Return only the full JSON object. Do not return only partial content or text outside of the JSON.
-
+            DO NOT merge bullet points into paragraphs. Keep each bullet on a separate line starting with "- ".
             """
 
             completion = call_openai_with_retry(
@@ -592,6 +592,34 @@ def register_ai_routes(app):
                 try:
                     cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip())
                     json_data = json.loads(cleaned)
+                    # 🔄 Convertir bullets a HTML incluso en el segundo intento
+                    def format_description_to_html(description):
+                        if not description:
+                            return ""
+                        lines = description.strip().split("\n")
+                        first_sentence = ""
+                        bullet_lines = []
+                        for line in lines:
+                            stripped = line.strip()
+                            if not stripped:
+                                continue
+                            if stripped.startswith("-") or stripped.startswith("•") or stripped.startswith("–"):
+                                bullet_lines.append(stripped.lstrip("-•–").strip())
+                            elif not first_sentence:
+                                first_sentence = stripped
+                        html = ""
+                        if first_sentence:
+                            html += f"<p>{first_sentence}</p>"
+                        if bullet_lines:
+                            html += "<ul>" + "".join(f"<li>{b}</li>" for b in bullet_lines) + "</ul>"
+                        return html
+
+                    for entry in json_data.get("education", []):
+                        entry["description"] = format_description_to_html(entry.get("description", ""))
+
+                    for entry in json_data.get("work_experience", []):
+                        entry["description"] = format_description_to_html(entry.get("description", ""))
+
                 except Exception as e2:
                     raise Exception(f"❌ Error parsing JSON. First attempt: {str(e1)} | Second attempt: {str(e2)} | Content: {content[:300]}")
 
