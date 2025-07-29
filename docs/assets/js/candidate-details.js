@@ -826,10 +826,13 @@ if (goBackButton) {
   });
 }
 const phrases = [
-  "Las chicas lindas saben esperar",
-  "Gracias por tu paciencia, eres la mejor Vinttituta",
-  "Generando algo genial para que le mandes a tu clientito",
-  "No me molestes, estoy trabajando para vos, dame un segundito"
+  "Las chicas lindas saben esperar 💅✨",
+  "Gracias por tu paciencia, sos la mejor Vinttituta 💖👑",
+  "Keep calm and deja que Vinttihub te lo solucione 😌🛠️",
+  "Tranquila reina, tu CV está en buenas manos 📄👑",
+  "Si esto fuera un casting de modelos, ya estarías contratada 😍 Solo falta tu resume 👑",
+  "Las Vinttitutas no se apuran, se hacen desear 💁‍♀️💫",
+  "Generando algo genial para que le mandes a tu clientito ✨📤💌"
 ];
 
 let currentPhraseIndex = 0;
@@ -853,7 +856,7 @@ function updatePhrase() {
     currentPhraseIndex = (currentPhraseIndex + 1) % phrases.length;
   }, 400);
 
-  setTimeout(updatePhrase, 5000); // Cambia cada 5 segundos (2.5s de lectura x2)
+  setTimeout(updatePhrase, 3000); // Cambia cada 5 segundos (2.5s de lectura x2)
 }
 
 
