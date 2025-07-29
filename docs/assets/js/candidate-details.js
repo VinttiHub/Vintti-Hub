@@ -684,8 +684,6 @@ document.querySelector('#popup-about .generate-btn').addEventListener('click', a
   const userPrompt = textarea.value.trim();
   const loader = document.getElementById('about-loader');
 
-  if (!userPrompt) return alert("Please add a comment before generating.");
-
   loader.classList.remove('hidden');
 
   try {
