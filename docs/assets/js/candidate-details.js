@@ -585,7 +585,7 @@ document.getElementById('ai-submit').addEventListener('click', async () => {
   if (!linkedin_scrapper && !cv_pdf_scrapper) return;
 
   // 👉 Mostrar mensaje de carga
-  startResumeLoader();floader.classList.add('hidden');
+  startResumeLoader();
 
   try {
     const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
