@@ -585,8 +585,7 @@ document.getElementById('ai-submit').addEventListener('click', async () => {
   if (!linkedin_scrapper && !cv_pdf_scrapper) return;
 
   // 👉 Mostrar mensaje de carga
-  const loader = document.getElementById('ai-loader');
-  loader.classList.remove('hidden');
+  startResumeLoader();floader.classList.add('hidden');
 
   try {
     const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
@@ -621,7 +620,7 @@ document.getElementById('ai-submit').addEventListener('click', async () => {
     alert("Something went wrong while generating the resume. Please try again.");
   } finally {
     // ✅ Ocultar loader sin importar si funcionó o falló
-    loader.classList.add('hidden');
+    stopResumeLoader();
   }
 });
 document.querySelectorAll('.star-button').forEach(button => {
@@ -825,6 +824,36 @@ if (goBackButton) {
       window.location.href = '/'; // Cambia por la home si quieres
     }
   });
+}
+const phrases = [
+  "Las chicas lindas saben esperar",
+  "Gracias por tu paciencia, eres la mejor Vinttituta",
+  "Generando algo genial para que le mandes a tu clientito",
+  "No me molestes, estoy trabajando para vos, dame un segundito"
+];
+
+let currentPhraseIndex = 0;
+const phraseEl = document.getElementById('resume-loader-phrase');
+
+function startResumeLoader() {
+  document.getElementById('resume-loader').classList.remove('hidden');
+  updatePhrase();
+}
+
+function stopResumeLoader() {
+  document.getElementById('resume-loader').classList.add('hidden');
+  currentPhraseIndex = 0;
+}
+
+function updatePhrase() {
+  phraseEl.style.opacity = 0;
+  setTimeout(() => {
+    phraseEl.innerText = phrases[currentPhraseIndex];
+    phraseEl.style.opacity = 1;
+    currentPhraseIndex = (currentPhraseIndex + 1) % phrases.length;
+  }, 400);
+
+  setTimeout(updatePhrase, 5000); // Cambia cada 5 segundos (2.5s de lectura x2)
 }
 
 
