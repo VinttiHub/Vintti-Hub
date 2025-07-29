@@ -468,7 +468,7 @@ def register_ai_routes(app):
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "In this role I did (short summary)...\\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n..."  // Start with a simple summary sentence, then detailed bullet points using all available data. No extra info.
+                    "description": "In this role I did (short summary). \\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n..."  // Start with a simple summary sentence finished with dot, then detailed bullet points using all available data. No extra info.
                 }}
             ]
             - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
@@ -506,11 +506,27 @@ def register_ai_routes(app):
                 def format_description_to_html(description):
                     if not description:
                         return ""
-                    lines = re.split(r'\n|•|–|-', description)
-                    bullets = [line.strip() for line in lines if line.strip()]
-                    if not bullets:
-                        return ""
-                    return "<ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>"
+
+                    # Detectar primer punto (final de la oración inicial)
+                    first_sentence_match = re.match(r'^(.*?\.)\s*', description)
+                    if first_sentence_match:
+                        first_sentence = first_sentence_match.group(1).strip()
+                        rest = description[len(first_sentence):].strip()
+                    else:
+                        first_sentence = ""
+                        rest = description.strip()
+
+                    # Detectar bullets como - texto o • texto o – texto
+                    bullet_lines = re.findall(r'(?:\-|•|–)\s*(.+?)(?=(?:\-|•|–)|$)', rest, re.DOTALL)
+
+                    html = ""
+                    if first_sentence:
+                        html += f"<p>{first_sentence}</p>"
+
+                    if bullet_lines:
+                        html += "<ul>" + "".join(f"<li>{b.strip()}</li>" for b in bullet_lines) + "</ul>"
+
+                    return html
 
 
                 for entry in json_data.get("education", []):
