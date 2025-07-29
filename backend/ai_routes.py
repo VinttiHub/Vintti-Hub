@@ -643,7 +643,7 @@ def register_ai_routes(app):
             else:
                 cursor.execute("""
                     INSERT INTO resume (candidate_id, education, work_experience, tools)
-                    VALUES (%s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s)
                 """, (candidate_id, education, work_experience, tools))
 
             conn.commit()
