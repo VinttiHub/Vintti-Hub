@@ -507,27 +507,28 @@ def register_ai_routes(app):
                     if not description:
                         return ""
 
-                    # Detectar primer punto (final de la oración inicial)
-                    first_sentence_match = re.match(r'^(.*?\.)\s*', description)
-                    if first_sentence_match:
-                        first_sentence = first_sentence_match.group(1).strip()
-                        rest = description[len(first_sentence):].strip()
-                    else:
-                        first_sentence = ""
-                        rest = description.strip()
+                    # Separar por líneas
+                    lines = description.strip().split("\n")
+                    first_sentence = ""
+                    bullet_lines = []
 
-                    # Detectar bullets como - texto o • texto o – texto
-                    bullet_lines = re.findall(r'(?:\-|•|–)\s*(.+?)(?=(?:\-|•|–)|$)', rest, re.DOTALL)
+                    for line in lines:
+                        stripped = line.strip()
+                        if not stripped:
+                            continue
+                        if stripped.startswith("-") or stripped.startswith("•") or stripped.startswith("–"):
+                            bullet_lines.append(stripped.lstrip("-•–").strip())
+                        elif not first_sentence:
+                            first_sentence = stripped
 
                     html = ""
                     if first_sentence:
                         html += f"<p>{first_sentence}</p>"
 
                     if bullet_lines:
-                        html += "<ul>" + "".join(f"<li>{b.strip()}</li>" for b in bullet_lines) + "</ul>"
+                        html += "<ul>" + "".join(f"<li>{b}</li>" for b in bullet_lines) + "</ul>"
 
                     return html
-
 
                 for entry in json_data.get("education", []):
                     entry["description"] = format_description_to_html(entry.get("description", ""))
