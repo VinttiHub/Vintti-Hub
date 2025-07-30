@@ -1251,6 +1251,33 @@ def link_or_create_candidate(opportunity_id):
 
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+        
+@app.route('/opportunities/<int:opportunity_id>/candidates', methods=['GET'])
+def get_candidates_for_opportunity(opportunity_id):
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute("""
+            SELECT 
+                c.candidate_id,
+                c.name,
+                c.linkedin,
+                c.salary_range,
+                c.country,
+                oc.stage_pipeline
+            FROM opportunity_candidates oc
+            JOIN candidates c ON c.candidate_id = oc.candidate_id
+            WHERE oc.opportunity_id = %s
+        """, (opportunity_id,))
+
+        results = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify(results)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/candidates_batches', methods=['POST'])

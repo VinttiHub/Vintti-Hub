@@ -196,30 +196,6 @@ if (toggleSidebarButton && sidebar && mainContent) {
         });
       }
     });
-    fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
-      .then(response => response.json())
-      .then(users => {
-        const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
-        const dropdowns = document.querySelectorAll('.hr-lead-dropdown');
-
-        dropdowns.forEach(select => {
-          const currentValue = select.dataset.current;
-
-          // Filtrar usuarios permitidos
-          const filtered = users.filter(user =>
-            allowedSubstrings.some(name => user.user_name.includes(name))
-          );
-
-          // Agregar opciones al dropdown
-          select.innerHTML += filtered.map(user => {
-            const selected = user.email_vintti === currentValue ? 'selected' : '';
-            return `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
-          }).join('');
-        });
-      })
-      .catch(err => {
-        console.error('Error loading HR Leads:', err);
-      });
 
   const table = $('#opportunityTable').DataTable({
   responsive: true,

@@ -552,10 +552,14 @@ document.addEventListener("click", async (e) => {
     try {
       const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
       const candidates = await res.json();
-        if (!res.ok && data.error) {
-            showFriendlyPopup(`🌸 ${data.error}`);
-            return;
-          }
+      console.log("🧠 Todos los candidatos de la oportunidad:", candidates);
+
+      if (!res.ok && filtered.error) {
+        showFriendlyPopup(`🌸 ${filtered.error}`);
+        return;
+      }
+      const filtered = candidates.filter(c => c.stage_pipeline === "En proceso con Cliente");
+      console.log("🧪 Candidatos con 'En proceso con Cliente':", filtered);
       // Limpiar resultados anteriores
       const resultsList = document.getElementById("candidateSearchResults");
       resultsList.innerHTML = "";
@@ -1194,6 +1198,17 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
             console.warn("⚠️ Status no encontrado en opciones:", c.status);
           }
         }
+      // Evita que clicks en el dropdown o trash icon activen la redirección
+      cardElement.addEventListener('click', (e) => {
+        const isDropdown = e.target.classList.contains('candidate-status-dropdown');
+        const isTrash = e.target.classList.contains('delete-candidate-btn');
+        if (isDropdown || isTrash) return;
+
+        const candidateId = cardElement.getAttribute('data-candidate-id');
+        if (candidateId) {
+          window.location.href = `/docs/candidate-details.html?id=${candidateId}`;
+        }
+      });
 
 
         dropdown.addEventListener("change", async (e) => {
@@ -1270,7 +1285,7 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
 
       const header = cardElement.querySelector(".candidate-card-header");
       dropdown.style.marginRight = "10px";
-      header.appendChild(trash);
+      dropdown.insertAdjacentElement('afterend', trash);
 
 
       });
@@ -1360,6 +1375,17 @@ batchCandidates.forEach(c => {
   // Status dropdown
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
   dropdown.value = "Client interviewing/testing";
+// Evita que clicks en el dropdown o trash icon activen la redirección
+  cardElement.addEventListener('click', (e) => {
+    const isDropdown = e.target.classList.contains('candidate-status-dropdown');
+    const isTrash = e.target.classList.contains('delete-candidate-btn');
+    if (isDropdown || isTrash) return;
+
+    const candidateId = cardElement.getAttribute('data-candidate-id');
+    if (candidateId) {
+      window.location.href = `/docs/candidate-details.html?id=${candidateId}`;
+    }
+  });
 
 
   if (c.status) {
@@ -1454,7 +1480,7 @@ batchCandidates.forEach(c => {
 
       const header = cardElement.querySelector(".candidate-card-header");
       dropdown.style.marginRight = "10px";
-      header.appendChild(trash);
+      dropdown.insertAdjacentElement('afterend', trash);
 
 
 });
@@ -1775,4 +1801,14 @@ function insertEmoji(emoji) {
   const editor = document.getElementById('job-description-textarea');
   editor.focus();
   document.execCommand('insertText', false, emoji);
+}
+function getFlagEmoji(country) {
+  const flags = {
+    "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
+    "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Ecuador": "🇪🇨",
+    "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "Mexico": "🇲🇽",
+    "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
+    "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
+  };
+  return flags[country] || "";
 }

@@ -514,21 +514,38 @@ const saveUpdateBtn = document.getElementById('save-salary-update');
 const salaryInput = document.getElementById('update-salary');
 const feeInput = document.getElementById('update-fee');
 
-function loadSalaryUpdates() {
+window.loadSalaryUpdates = function () {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`)
     .then(res => res.json())
     .then(data => {
       salaryUpdatesBox.innerHTML = '';
+
+      // Cabecera de tabla
+      const header = document.createElement('div');
+      header.className = 'salary-entry';
+      header.style.fontWeight = 'bold';
+      header.innerHTML = `
+        <span>Salary</span>
+        <span>Fee</span>
+        <span>Date</span>
+        <span></span>
+      `;
+      salaryUpdatesBox.appendChild(header);
+
+      // Filas con datos
       data.forEach(update => {
         const div = document.createElement('div');
         div.className = 'salary-entry';
         div.innerHTML = `
-          <span>💰 Salary updated to $${update.salary}, Fee to $${update.fee} on ${new Date(update.date).toLocaleDateString()}</span>
+          <span>$${update.salary}</span>
+          <span>$${update.fee}</span>
+          <span>${new Date(update.date).toLocaleDateString()}</span>
           <button data-id="${update.update_id}" class="delete-salary-update">🗑️</button>
         `;
         salaryUpdatesBox.appendChild(div);
       });
 
+      // Eliminar
       document.querySelectorAll('.delete-salary-update').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
@@ -539,6 +556,7 @@ function loadSalaryUpdates() {
       });
     });
 }
+
 hireSalary.addEventListener('blur', async () => {
   const salary = parseFloat(hireSalary.value);
   if (!salary || isNaN(salary)) return;
@@ -571,21 +589,47 @@ hireFee.addEventListener('blur', async () => {
 
 addSalaryUpdateBtn.addEventListener('click', () => {
   popup.classList.remove('hidden');
+
+  // Oculta fee si modelo es Recruiting
+  const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
+  const feeLabel = popup.querySelector('label[for="update-fee"]') || popup.querySelectorAll('label')[1];
+  const feeInput = document.getElementById('update-fee');
+
+  if (modelText?.includes('recruiting')) {
+    feeLabel.style.display = 'none';
+    feeInput.style.display = 'none';
+  } else {
+    feeLabel.style.display = '';
+    feeInput.style.display = '';
+  }
+
 });
 
 saveUpdateBtn.addEventListener('click', () => {
   const salary = parseFloat(salaryInput.value);
   const fee = parseFloat(feeInput.value);
   const date = document.getElementById('update-date').value;
-  if (salaryInput.value === '' || feeInput.value === '' || !date) {
-      return alert('Please fill all fields');
-    }
 
+  const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
+  const isRecruiting = modelText?.includes('recruiting');
+
+  if (salaryInput.value === '' || !date || (!isRecruiting && feeInput.value === '')) {
+    return alert('Please fill all required fields');
+  }
+
+  const body = {
+    salary,
+    date
+  };
+
+  if (!isRecruiting) {
+    body.fee = fee;
+  }
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ salary, fee, date })
+    body: JSON.stringify(body)
   }).then(() => {
     popup.classList.add('hidden');
     salaryInput.value = '';
@@ -594,6 +638,7 @@ saveUpdateBtn.addEventListener('click', () => {
     loadSalaryUpdates();
   });
 });
+
 
 
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
@@ -976,6 +1021,7 @@ function loadHireData() {
   if (data.employee_fee && parseFloat(data.employee_fee) > 0) {
     feeInput.disabled = true;
   }
+  loadSalaryUpdates();
 });
 
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
@@ -990,6 +1036,18 @@ function loadHireData() {
 const salaryInput = document.getElementById('hire-salary');
 const feeInput = document.getElementById('hire-fee');
 const tipMessage = "To update salary or fee, please use the 'Salary Updates' section below.";
+const revenueInput = document.getElementById('hire-revenue');
+const revenueMessage = "You can't edit revenue manually. It's auto-calculated.";
+
+revenueInput.addEventListener('mouseenter', () => {
+  if (revenueInput.disabled) showTooltip(revenueInput, revenueMessage);
+});
+
+revenueInput.addEventListener('mouseleave', hideTooltip);
+revenueInput.addEventListener('click', () => {
+  if (revenueInput.disabled) showTooltip(revenueInput, revenueMessage);
+});
+
 [salaryInput, feeInput].forEach(input => {
   input.addEventListener('mouseenter', () => {
     if (input.disabled) showTooltip(input, tipMessage);
