@@ -210,6 +210,14 @@ const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.c
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
 }
+// 🔍 Buscador por Client Name
+const clientSearchInput = document.getElementById('searchClientInput');
+if (clientSearchInput) {
+  clientSearchInput.addEventListener('input', function () {
+    const table = $('#accountTable').DataTable();
+    table.column(0).search(this.value, true, false).draw();
+  });
+}
 
 
 
