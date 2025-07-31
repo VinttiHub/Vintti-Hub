@@ -561,13 +561,13 @@ document.addEventListener("click", async (e) => {
         showFriendlyPopup(`🌸 ${filtered.error}`);
         return;
       }
-      const filtered = candidates.filter(c => c.stage_pipeline === "En proceso con Cliente");
+      const filtered = candidates.filter(c => c.stage === "En proceso con Cliente");
       console.log("🧪 Candidatos con 'En proceso con Cliente':", filtered);
       // Limpiar resultados anteriores
       const resultsList = document.getElementById("candidateSearchResults");
       resultsList.innerHTML = "";
 
-      candidates.forEach(c => {
+      filtered.forEach(c => {
         const li = document.createElement('li');
         li.classList.add('search-result-item');
         li.setAttribute('data-candidate-id', c.candidate_id);
