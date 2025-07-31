@@ -87,6 +87,27 @@ if (goBackButton) {
     });
   }
 
+const clientNameInput = document.getElementById('account-client-name');
+if (clientNameInput) {
+  clientNameInput.addEventListener('blur', () => {
+    const newName = clientNameInput.value.trim();
+    const accountId = getIdFromURL();
+    if (!accountId || !newName) return;
+
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_name: newName })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Error updating client name');
+      console.log('Client name updated');
+    })
+    .catch(err => {
+      console.error('Failed to update client name:', err);
+    });
+  });
+}
 
 
 
@@ -137,7 +158,8 @@ function loadAssociatedOpportunities(accountId) {
 function fillAccountDetails(data) {
   document.querySelectorAll('#overview .accordion-content p').forEach(p => {
     if (p.textContent.includes('Name:')) {
-      p.innerHTML = `<strong>Name:</strong> ${data.client_name || '—'}`;
+      const inputHTML = `<strong>Name:</strong> <input id="account-client-name" class="editable-input" type="text" value="${data.client_name || ''}" placeholder="Not available" />`;
+      p.innerHTML = inputHTML;
     } else if (p.textContent.includes('Size:')) {
       p.innerHTML = `<strong>Size:</strong> ${data.size || '—'}`;
     } else if (p.textContent.includes('Timezone:')) {

@@ -1,11 +1,13 @@
 :root {
-  --bg: #ffffff; /* fondo blanco */
-  --card: #ffffff;
-  --text: #1b2f2b;
-  --accent: #d8f8e1; /* verde menta pastel */
-  --accent-strong: #bff0d4; /* verde menta más fuerte */
-  --border: #d0eadd;
+  --bg: #ffffff;
+  --card: #f9f9f9;
+  --text: #1a1a1a;
+  --accent: #ececec;
+  --accent-strong: #e0e0e0;
+  --border: #dcdcdc;
   --shadow: rgba(0, 0, 0, 0.05);
+  --highlight: #f5f5f5;
+  --primary: #6c63ff; /* lila sutil para detalles interactivos */
 }
 
 
@@ -13,9 +15,12 @@
 body {
   margin: 0;
   padding: 30px;
-  font-family: 'Onest', sans-serif;
+  font-family: 'Inter', sans-serif;
   background-color: var(--bg); /* blanco ahora */
   color: var(--text);
+}
+*, *::before, *::after {
+  transition: all 0.2s ease-in-out;
 }
 
 
@@ -26,29 +31,31 @@ h1, h2 {
 
 /* ===== TABS ===== */
 .tab-btn {
-  background: none;
+  background-color: var(--accent);
+  border-radius: 12px;
   border: none;
-  padding: 10px 20px;
-  font-size: 16px;
-  margin-right: 10px;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
   color: var(--text);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.tab-btn.active {
+  background-color: var(--primary);
+  color: white;
+}
+.tab-btn:hover {
+  background-color: var(--accent-strong);
 }
 
-.tab-btn.active {
-  border-color: var(--accent-strong);
-  font-weight: bold;
-}
 
 /* ===== INFO CARDS ===== */
 .info-card, .info-card.square {
-  background-color: var(--card);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 4px 12px var(--shadow);
-  transition: background 0.3s;
+  box-shadow: 0 2px 10px var(--shadow);
 }
+
 
 .info-title {
   font-weight: 600;
@@ -69,7 +76,8 @@ h1, h2 {
   background-color: var(--card);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 0 15px rgba(186, 255, 213, 0.6); /* sombra verde menta suave */
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
+  margin-top: 40px;
 }
 
 
@@ -81,9 +89,18 @@ h1, h2 {
   cursor: pointer;
   border-bottom: 1px solid var(--border);
 }
-
+@keyframes fadeAccordion {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .accordion-section.open .accordion-header {
-  background-color: #e0f9eb; /* verde pastel más fuerte */
+  background-color: #f5f5f7;
 }
 
 .accordion-content {
@@ -99,27 +116,26 @@ h1, h2 {
   border-spacing: 0;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 0 18px rgba(186, 255, 213, 0.35); /* sombra verde pastel suave */
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
   font-family: 'Onest', sans-serif;
 }
 
 /* CABECERA */
 .styled-table thead {
-  position: sticky;
-  top: 0;
-  background-color: #f2f9f5; /* verde muy claro */
-  color: #1a1a1a;
+  background-color: var(--highlight);
+  font-size: 14px;
   font-weight: 600;
-  font-size: 14.5px;
-  text-transform: capitalize;
-  letter-spacing: 0.3px;
-  z-index: 10;
-  border-bottom: 1px solid #e0eee8;
 }
-
-.styled-table th {
-  text-align: left;
-  padding: 18px 24px;
+.styled-table td, .styled-table th {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.styled-table tbody tr:hover {
+  background-color: var(--accent);
+}
+.styled-table td.hire-name {
+  color: var(--primary);
+  background-color: #f4f3ff;
 }
 
 /* FILAS Y CELDAS */
@@ -177,27 +193,24 @@ h1, h2 {
 
 /* ===== BOTÓN GO BACK ===== */
 .go-back-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  background: #f1fef0;
-  color: #1b2f2b;
-  border: 1px solid #d0eadd;
-  border-radius: 14px;
-  font-size: 14px;
+  background-color: #f5f5f7;
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: #1a1a1a;
   font-weight: 500;
-  font-family: 'Onest', sans-serif;
-  cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.04);
-  transition: all 0.2s ease;
+  font-size: 14px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .go-back-button:hover {
-  background: #f5fbf8;
-  transform: translateX(-2px);
-  box-shadow: 0 6px 12px rgba(0,0,0,0.06);
+  background-color: #eaeaea;
+  transform: translateX(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  cursor: pointer;
 }
+
 
 
 /* ===== COMENTARIOS ===== */
@@ -229,13 +242,13 @@ h1, h2 {
   color: #1b2f2b;
   resize: vertical;
   min-height: 120px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
   transition: all 0.25s ease;
 }
 
 .comment-box textarea:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #bff0d4, 0 10px 20px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
   transform: scale(1.01);
   background: rgba(255, 255, 255, 0.7);
 }
@@ -286,10 +299,7 @@ h1, h2 {
 .tab-content.active {
   display: block;
 }
-.tab-btn.active {
-  border-color: var(--accent-strong);
-  font-weight: bold;
-}
+
 .accordion-content {
   display: none;
 }
@@ -327,9 +337,9 @@ a, .accordion-header, .edit-btn {
   justify-content: space-between;
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.04);
   animation: fadeInZoom 0.4s ease forwards;
-  box-shadow: inset 0 0 0.3px rgba(0, 0, 0, 0.04), 0 8px 14px rgba(0, 0, 0, 0.035);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
+
 }
 
 /* Animación entrada */
@@ -379,7 +389,7 @@ a, .accordion-header, .edit-btn {
 /* Efecto hover sutil */
 .grid-two-cols p:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
 }
 
 .no-hire {
@@ -393,4 +403,20 @@ a, .accordion-header, .edit-btn {
   font-style: italic;
   font-weight: 400;
   opacity: 0.75;
+}
+.editable-input {
+  border: none;
+  border-bottom: 1px solid #ccc;
+  background-color: transparent;
+  font-size: 1rem;
+  font-family: inherit;
+  width: 100%;
+  padding: 4px 20px;
+}
+
+.editable-input:focus {
+  outline: none;
+  border-bottom: 2px solid #6c63ff; /* color lila o el que prefieras */
+  background-color: #f5f5f5;
+  transition: border 0.3s ease;
 }

@@ -67,9 +67,24 @@ if (toggleSidebarButton && sidebar && mainContent) {
 
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light')
     .then(response => response.json())
-    .then(data => {
+    .then(async data => {
+      
       const tbody = document.getElementById('opportunityTableBody');
       tbody.innerHTML = '';
+      // 🔄 Enriquecer con latest_sourcing_date solo para oportunidades en 'Sourcing'
+      await Promise.all(data.map(async opp => {
+        if (opp.opp_stage === 'Sourcing') {
+          try {
+            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opp.opportunity_id}/latest_sourcing_date`);
+            const result = await res.json();
+            if (result.latest_sourcing_date) {
+              opp.latest_sourcing_date = result.latest_sourcing_date;
+            }
+          } catch (err) {
+            console.error(`Error fetching sourcing date for opp ${opp.opportunity_id}`, err);
+          }
+        }
+      }));
 
       if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9">No data available</td></tr>';
@@ -91,12 +106,37 @@ if (toggleSidebarButton && sidebar && mainContent) {
     const grouped = {};
     data.forEach(opp => {
       const stage = opp.opp_stage || '—';
+
+      // Para Sourcing: usar exclusivamente nda_signature_or_start_date
+      if (stage === 'Sourcing') {
+        opp._sort_date = opp.nda_signature_or_start_date || null;
+      }
+
+      // Para Close Win / Closed Lost: usar opp_close_date
+      else if (stage === 'Close Win' || stage === 'Closed Lost') {
+        opp._sort_date = opp.opp_close_date || null;
+      }
+
+      // Otros stages: usar nda_signature_or_start_date como respaldo
+      else {
+        opp._sort_date = opp.nda_signature_or_start_date || null;
+      }
+
       if (!grouped[stage]) grouped[stage] = [];
       grouped[stage].push(opp);
     });
 
+
     // 👇 Vaciar tbody
     tbody.innerHTML = '';
+    // Ordenar internamente cada grupo por la fecha relevante
+    Object.keys(grouped).forEach(stage => {
+      grouped[stage].sort((a, b) => {
+        const dateA = a._sort_date ? new Date(a._sort_date) : new Date(0);
+        const dateB = b._sort_date ? new Date(b._sort_date) : new Date(0);
+        return dateB - dateA; // orden descendente
+      });
+    });
 
     // 👇 Insertar oportunidades en orden
     stageOrder.forEach(stage => {
