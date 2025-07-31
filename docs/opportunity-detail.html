@@ -147,6 +147,16 @@
               <input id="deepdive-recording-input" placeholder="Deep dive recording..." />
             </div>
             <div class="input-group full"><label>First Meeting Comments</label><textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea></div>
+            <div class="input-group full">
+              <label>Client Interviewing Process</label>
+              <div class="toolbar small-toolbar" id="interviewing-toolbar">
+                <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
+                <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
+                <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
+              </div>
+              <div id="interviewing-process-editor" contenteditable="true" class="job-description-editor" placeholder="Describe the client interview steps..."></div>
+            </div>
+
           </div>
         </div>
       </section>

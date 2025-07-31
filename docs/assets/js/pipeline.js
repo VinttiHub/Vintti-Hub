@@ -148,6 +148,41 @@ if (previousPage && goBackButton) {
     localStorage.removeItem('previousPage');
   });
 }
+new Choices('#candidate-country', {
+  searchEnabled: true,
+  itemSelectText: '',
+  shouldSort: false,
+});
+const countryToCodeMap = {
+  "Argentina": "54",
+  "Bolivia": "591",
+  "Brazil": "55",
+  "Chile": "56",
+  "Colombia": "57",
+  "Costa Rica": "506",
+  "Cuba": "53",
+  "Ecuador": "593",
+  "El Salvador": "503",
+  "Guatemala": "502",
+  "Honduras": "504",
+  "Mexico": "52",
+  "Nicaragua": "505",
+  "Panama": "507",
+  "Paraguay": "595",
+  "Peru": "51",
+  "Puerto Rico": "1",
+  "Dominican Republic": "1",
+  "Uruguay": "598",
+  "Venezuela": "58"
+};
+
+document.getElementById('candidate-country').addEventListener('change', (e) => {
+  const selectedCountry = e.target.value;
+  const code = countryToCodeMap[selectedCountry];
+  if (code) {
+    document.getElementById('phone-country-code').value = code;
+  }
+});
 
 
 

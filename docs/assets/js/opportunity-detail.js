@@ -349,6 +349,9 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
 document.getElementById('comments-overview-textarea').addEventListener('blur', async (e) => {
   await updateOpportunityField('comments', e.target.value);
 });
+document.getElementById('interviewing-process-editor').addEventListener('blur', e => {
+  updateOpportunityField('client_interviewing_process', e.target.innerHTML);
+});
 
 document.getElementById('start-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
@@ -921,6 +924,7 @@ async function loadOpportunityData() {
     document.getElementById('comments-firstmeeting-textarea').value = data.opp_comments || '';
     document.getElementById('recording-input').value = data.first_meeting_recording || '';
     document.getElementById('deepdive-recording-input').value = data.deepdive_recording || '';
+    document.getElementById('interviewing-process-editor').innerHTML = data.client_interviewing_process || '';
 
     // Signed: si tienes un campo de fecha de firma, calcula días
     if (data.nda_signature_or_start_date) {
@@ -1821,4 +1825,8 @@ function getFlagEmoji(country) {
     "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
   };
   return flags[country] || "";
+}
+function toggleActiveButton(command, button) {
+  document.execCommand(command, false, '');
+  button.classList.toggle('active');
 }

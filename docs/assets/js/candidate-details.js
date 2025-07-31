@@ -91,7 +91,9 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     linkedinUrl = linkedinUrl.replace(/^[-–—\s]+/, ''); // elimina guiones largos y espacios del inicio
 
     console.log("🔗 Clean LinkedIn:", linkedinUrl);
-
+    if (linkedinUrl.startsWith('www')) {
+      linkedinUrl = 'https://' + linkedinUrl;
+    }
     if (linkedinUrl.startsWith('http')) {
       openBtn.href = linkedinUrl;
       openBtn.style.display = 'inline-flex';

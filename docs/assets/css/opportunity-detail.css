@@ -2016,14 +2016,60 @@ input:checked + .slider::before {
   white-space: pre-wrap;
   word-wrap: break-word;
 }
-#candidate-country {
-  font-family: inherit;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  width: 100%;
-  font-size: 15px;
+/* Contenedor del campo con Choices */
+#candidate-country.choices__input,
+#candidate-country.choices__inner,
+.choices[data-type*="select-one"] {
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  background: transparent !important;
 }
+
+/* Estilo personalizado para country específico */
+#candidate-country + .choices {
+  max-width: 360px;
+  width: 100% !important;
+  margin: 0 auto 12px !important;
+  padding: 0 !important;
+  border: 1px solid #ccc !important;
+  border-radius: 10px !important;
+  background-color: #fff !important;
+  box-shadow: none !important;
+  height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+
+/* Elimina borde doble interno */
+#candidate-country + .choices .choices__inner {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: auto !important;
+  display: flex !important;
+  align-items: center !important;
+}
+/* Asegura que el input se vea centrado verticalmente */
+#candidate-country + .choices .choices__list--single {
+  padding-left: 14px !important;
+  font-size: 15px !important;
+  color: #4a5568;
+}
+
+/* Evita espacio fantasma inferior */
+#candidate-country + .choices .choices__list--dropdown {
+  margin-top: 4px !important;
+}
+/* Alinea con el resto de inputs */
+#candidate-country + .choices .choices__placeholder {
+  color: #a0aec0;
+  font-weight: 500;
+}
+
 #approval-message {
   min-height: 300px;
   padding: 14px 16px;
@@ -2092,3 +2138,33 @@ input:checked + .slider::before {
   cursor: pointer !important;
 }
 
+#interviewing-process-editor {
+  min-height: 180px;
+  max-height: 320px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  overflow-y: auto;
+  resize: vertical;
+  background: white;
+}
+
+#interviewing-toolbar {
+  margin-bottom: 8px;
+}
+
+#interviewing-toolbar button {
+  background: #f2f2f2;
+  border: none;
+  padding: 6px 10px;
+  margin-right: 4px;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#interviewing-toolbar button.active {
+  background: #e0d0ff;
+}
