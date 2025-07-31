@@ -295,7 +295,7 @@ def register_ai_routes(app):
     --- USER COMMENT ---
     {user_prompt}
 
-    Write a third-person, professional "About" section (5-7 lines), deduce the gender and use pronouns (her, she, his, he) (do NOT use 'they/them'). highlighting key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
+    Write a third-person, professional "About" section (5-7 lines), deduce the gender and use pronouns (her, she, his, he) (DO NOT use 'they/them'). highlighting key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
     - translate everything to english
             """
 
