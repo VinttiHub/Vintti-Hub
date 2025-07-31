@@ -1216,7 +1216,7 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
 
         const candidateId = cardElement.getAttribute('data-candidate-id');
         if (candidateId) {
-          window.location.href = `/docs/candidate-details.html?id=${candidateId}`;
+          window.location.href = `/candidate-details.html?id=${candidateId}`;
         }
       });
 
@@ -1393,7 +1393,7 @@ batchCandidates.forEach(c => {
 
     const candidateId = cardElement.getAttribute('data-candidate-id');
     if (candidateId) {
-      window.location.href = `/docs/candidate-details.html?id=${candidateId}`;
+      window.location.href = `/candidate-details.html?id=${candidateId}`;
     }
   });
 
