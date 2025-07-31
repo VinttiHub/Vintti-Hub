@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       const currentUserEmail = localStorage.getItem('user_email');
-      const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+      const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
       const showPriorityColumn = allowedEmails.includes(currentUserEmail);
       data.forEach(item => {
       let htmlRow = `
