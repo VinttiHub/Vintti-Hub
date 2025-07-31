@@ -983,3 +983,34 @@ body {
   font-size: 14px;
   background-color: white;
 }
+.stage-color-close-win {
+  background-color: #8bfc9c !important; /* verde pastel suave (éxito) */
+}
+
+.stage-color-closed-lost {
+  background-color: #f9c2c2 !important; /* rojo pastel claro (error/pérdida) */
+}
+
+.stage-color-negotiating {
+  background-color: #fff3cc !important; /* amarillo pastel (precaución/negociación) */
+}
+
+.stage-color-interviewing {
+  background-color: #e0f0ff !important; /* azul pastel (proceso activo) */
+}
+
+.stage-color-sourcing {
+  background-color: #e4fbe6 !important; /* verde menta pastel (búsqueda/fresco) */
+}
+
+.stage-color-nda-sent {
+  background-color: #fcdb94 !important; /* durazno pastel (documentos enviados) */
+}
+
+.stage-color-deep-dive {
+  background-color: #f3e8fd !important; /* lila suave (investigación profunda) */
+}
+
+.filter-header i.rotate-up {
+  transform: rotate(180deg);
+}

@@ -21,19 +21,25 @@ if (toggleSidebarButton && sidebar && mainContent) {
 }
 
 
-  document.querySelectorAll('.filter-toggle').forEach(header => {
-    header.addEventListener('click', () => {
-      const targetId = header.getAttribute('data-target');
-      const target = document.getElementById(targetId);
-      const icon = header.querySelector('i');
+document.querySelectorAll('.filter-header').forEach(header => {
+  header.addEventListener('click', () => {
+    const targetId = header.getAttribute('data-target');
+    const target = document.getElementById(targetId);
+    const icon = header.querySelector('i');
 
-      target.classList.toggle('hidden');
-      if (icon) {
-        icon.classList.toggle('rotate-up');
-      }
-    });
+    const isHidden = target.classList.toggle('hidden');
+    if (icon) {
+      icon.classList.toggle('rotate-up', !isHidden);
+    }
   });
+});
 
+document.querySelectorAll('.filter-header button').forEach(button => {
+  button.addEventListener('click', (e) => {
+    e.stopPropagation(); // evita que se dispare doble
+    button.parentElement.click();
+  });
+});
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
 
@@ -400,6 +406,18 @@ document.addEventListener('change', async (e) => {
       return;
     }
     await patchOpportunityStage(opportunityId, newStage, e.target);
+    const select = e.target;
+if (select.classList.contains('stage-dropdown')) {
+  // Elimina clases anteriores
+  select.classList.forEach(cls => {
+    if (cls.startsWith('stage-color-')) select.classList.remove(cls);
+  });
+
+  // Agrega la nueva clase
+  const newClass = 'stage-color-' + newStage.toLowerCase().replace(/\s/g, '-');
+  select.classList.add(newClass);
+}
+
   }
 });
 document.addEventListener('change', async e => {
@@ -742,13 +760,13 @@ function getStageDropdown(currentStage, opportunityId) {
     'Deep Dive'
   ];
 
-  const normalizedStage = (currentStage || '').trim();
-  const isFinalStage = normalizedStage === 'Close Win' || normalizedStage === 'Closed Lost';
+  const normalized = currentStage?.toLowerCase().replace(/\s/g, '-') || '';
+  const isFinalStage = currentStage === 'Close Win' || currentStage === 'Closed Lost';
 
-  let dropdown = `<select class="stage-dropdown" data-id="${opportunityId}" ${isFinalStage ? 'disabled' : ''}>`;
+  let dropdown = `<select class="stage-dropdown stage-color-${normalized}" data-id="${opportunityId}" ${isFinalStage ? 'disabled' : ''}>`;
 
   stages.forEach(stage => {
-    const selected = (stage === normalizedStage) ? 'selected' : '';
+    const selected = stage === currentStage ? 'selected' : '';
     dropdown += `<option value="${stage}" ${selected}>${stage}</option>`;
   });
 

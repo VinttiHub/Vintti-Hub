@@ -1408,12 +1408,12 @@ input::-webkit-contacts-auto-fill-button {
   min-height: 40px;
 }
 
-
 .candidate-card-header {
   display: flex;
   align-items: center;
-  gap: 8px; /* Espacio entre dropdown y basurita */
+  gap: 10px;
 }
+
 
 .delete-candidate-btn {
   background: none;
@@ -2167,4 +2167,41 @@ input:checked + .slider::before {
 
 #interviewing-toolbar button.active {
   background: #e0d0ff;
+}
+.opportunity-stage-card {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-weight: 500;
+  font-size: 14px;
+  color: #000;
+  margin-left: 10px;
+  font-family: 'Quicksand', sans-serif;
+}
+
+/* Colores personalizados por stage */
+.stage-color-close-win {
+  background-color: #8bfc9c !important;
+}
+.stage-color-closed-lost {
+  background-color: #f9c2c2 !important;
+}
+.stage-color-negotiating {
+  background-color: #fff3cc !important;
+}
+.stage-color-interviewing {
+  background-color: #e0f0ff !important;
+}
+.stage-color-sourcing {
+  background-color: #e4fbe6 !important;
+}
+.stage-color-nda-sent {
+  background-color: #fcdb94 !important;
+}
+.stage-color-deep-dive {
+  background-color: #f3e8fd !important;
+}
+#hire-display {
+  cursor: pointer;
+  background-color: #f9f9f9;
 }

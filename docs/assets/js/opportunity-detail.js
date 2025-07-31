@@ -871,6 +871,12 @@ if (goBackButton) {
     }
   });
 }
+document.getElementById('hire-display').addEventListener('click', () => {
+  const candidateId = document.getElementById('hire-display').getAttribute('data-candidate-id');
+  if (candidateId) {
+    window.location.href = `/candidate-details.html?id=${candidateId}`;
+  }
+});
 
 
 
@@ -945,6 +951,7 @@ async function loadOpportunityData() {
           if (res.ok) {
             const candidato = await res.json();
             hireDisplay.value = candidato.name || '—';
+            hireDisplay.setAttribute('data-candidate-id', candidato.candidate_id);
           } else {
             hireDisplay.value = '—';
           }
@@ -1018,6 +1025,30 @@ async function loadOpportunityData() {
         } catch (err) {
           console.error("Error loading opportunity:", err);
         }
+        try {
+  const lightRes = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light');
+  const lightData = await lightRes.json();
+  const currentId = opportunityId;
+  const opp = lightData.find(o => o.opportunity_id == currentId); // usa comparación flexible con ==
+
+  if (opp && opp.opp_stage) {
+    const stageText = opp.opp_stage;
+    const stageTag = document.getElementById('stage-tag');
+    const stageSpan = document.getElementById('stage-text');
+
+    stageSpan.textContent = stageText;
+
+    // Limpiar clases anteriores por si hay recarga
+    stageTag.className = 'opportunity-stage-card';
+
+    // Generar clase CSS dinámicamente
+    const cssClass = `stage-color-${stageText.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '')}`;
+    stageTag.classList.add(cssClass);
+  }
+} catch (err) {
+  console.error("❌ Error loading stage from opportunities/light:", err);
+}
+
       }
       function formatDate(dateStr) {
         if (!dateStr) return '';
@@ -1297,9 +1328,9 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
         }
       });
 
-      const header = cardElement.querySelector(".candidate-card-header");
-      dropdown.style.marginRight = "10px";
-      dropdown.insertAdjacentElement('afterend', trash);
+    const header = cardElement.querySelector(".candidate-card-header");
+    header.insertBefore(trash, header.firstChild);
+
 
 
       });
@@ -1493,8 +1524,8 @@ batchCandidates.forEach(c => {
       });
 
       const header = cardElement.querySelector(".candidate-card-header");
-      dropdown.style.marginRight = "10px";
-      dropdown.insertAdjacentElement('afterend', trash);
+      header.insertBefore(trash, header.firstChild);
+
 
 
 });
