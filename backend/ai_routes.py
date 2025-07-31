@@ -66,6 +66,7 @@ def register_ai_routes(app):
     - Do NOT invent tools.
     - If no level is specified, infer from experience.
     Return only the JSON array.
+    - translate everything to english
     """
 
             chat = call_openai_with_retry(
@@ -126,6 +127,7 @@ def register_ai_routes(app):
     - If end_date is missing or says "present", set current = true
     - Else set current = false
     Return only the JSON array.
+    - translate everything to english
     """
 
             chat = call_openai_with_retry(
@@ -213,6 +215,7 @@ def register_ai_routes(app):
     - If end_date is missing or says "present", set current = true
     - Else set current = false
     Return only the JSON array.
+    - translate everything to english
     """
 
             chat = call_openai_with_retry(
@@ -292,6 +295,7 @@ def register_ai_routes(app):
     {user_prompt}
 
     Write a third-person, professional "About" section (5-7 lines), highlighting key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
+    - translate everything to english
             """
 
             chat = call_openai_with_retry(
@@ -378,6 +382,7 @@ def register_ai_routes(app):
             ---
             Please output only the job description, fully formatted and ready to copy into LinkedIn.you cannot add info
             that is not explicity said in the source material
+            - translate everything to english
             """
 
             logging.info("🧠 Prompt construido correctamente, conectando con OpenAI...")
@@ -479,8 +484,10 @@ def register_ai_routes(app):
             - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
             - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
             - Expand acronyms and explain concepts if mentioned.
+            - translate everything to english
             Return only the full JSON object. Do not return only partial content or text outside of the JSON.
             DO NOT merge bullet points into paragraphs. Keep each bullet on a separate line starting with "- ".
+
             """
 
             completion = call_openai_with_retry(
