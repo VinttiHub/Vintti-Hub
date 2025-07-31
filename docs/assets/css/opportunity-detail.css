@@ -938,15 +938,30 @@ body {
   cursor: pointer;
 }
 
-.btn-add, .btn-send, .btn-create {
+.btn-add,
+.btn-send,
+.btn-create {
   padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-weight: 500;
+  border-radius: 10px;
+  font-weight: 600;
   cursor: pointer;
   border: none;
-  background-color: #e0b0ff;
+  background-color: #9333ea; /* morado fuerte */
   color: white;
+  font-size: 0.95rem;
+  transition: all 0.25s ease-in-out;
+  transform: scale(1);
+  box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
 }
+
+.btn-add:hover,
+.btn-send:hover,
+.btn-create:hover {
+  background-color: #7e22ce; /* un poco más oscuro en hover */
+  transform: scale(1.07); /* agranda */
+  box-shadow: 0 6px 16px rgba(126, 34, 206, 0.4);
+}
+
 
 .btn-add {
   position: relative;
@@ -956,13 +971,8 @@ body {
   visibility: visible;
 }
 
-
-.btn-send {
-  background-color: #e0e0e0;
-}
-
 .btn-create {
-  background-color: #e0b0ff;
+  background-color: #61079e;
   color: white;
   margin-top: 2rem;
 }

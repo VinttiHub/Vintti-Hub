@@ -1078,6 +1078,10 @@ def create_batch(opportunity_id):
         conn = get_connection()
         cursor = conn.cursor()
 
+        # Leer fecha desde el JSON recibido
+        data = request.get_json()
+        presentation_date = data.get('presentation_date')  # formato YYYY-MM-DD
+
         # Obtener el batch_id más alto actual
         cursor.execute("SELECT COALESCE(MAX(batch_id), 0) FROM batch")
         current_max_batch_id = cursor.fetchone()[0]
@@ -1088,13 +1092,13 @@ def create_batch(opportunity_id):
         batch_count = cursor.fetchone()[0]
         batch_number = batch_count + 1
 
-        # Insertar el nuevo batch
+        # Insertar el nuevo batch con fecha
         cursor.execute("""
-            INSERT INTO batch (batch_id, batch_number, opportunity_id)
-            VALUES (%s, %s, %s)
-        """, (new_batch_id, batch_number, opportunity_id))
+            INSERT INTO batch (batch_id, batch_number, opportunity_id, presentation_date)
+            VALUES (%s, %s, %s, %s)
+        """, (new_batch_id, batch_number, opportunity_id, presentation_date))
+        
         conn.commit()
-
         cursor.close()
         conn.close()
 
@@ -1107,6 +1111,7 @@ def create_batch(opportunity_id):
     except Exception as e:
         print("Error creating batch:", e)
         return jsonify({"error": str(e)}), 500
+
     
 @app.route('/opportunities/<opportunity_id>/batches', methods=['GET'])
 def get_batches(opportunity_id):

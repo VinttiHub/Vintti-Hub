@@ -1103,19 +1103,26 @@ async function updateAccountField(fieldName, fieldValue) {
 function getAccountId() {
   return window.currentAccountId || null;
 }
+document.querySelector('.btn-create').addEventListener('click', () => {
+  document.getElementById('presentationDateInput').value = ''; // limpia fecha previa
+  document.getElementById('createBatchPopup').classList.remove('hidden');
+});
 
-document.querySelector('.btn-create').addEventListener('click', async () => {
+document.getElementById('closeCreateBatchPopup').addEventListener('click', () => {
+  document.getElementById('createBatchPopup').classList.add('hidden');
+});
+
+document.getElementById('confirmCreateBatchBtn').addEventListener('click', async () => {
+  const presentationDate = document.getElementById('presentationDateInput').value;
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
-  if (!opportunityId || opportunityId === '—') {
-    alert('Opportunity ID not found');
-    return;
-  }
+
+  if (!presentationDate) return alert('❌ Please select a presentation date');
 
   try {
-    console.log("📌 Creating batch for opportunity ID:", opportunityId);
-    console.log("🚀 Calling URL:", `https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ presentation_date: presentationDate })  // ← ahora se envía la fecha
     });
 
     const data = await res.json();
@@ -1133,11 +1140,14 @@ document.querySelector('.btn-create').addEventListener('click', async () => {
         </div>
       `;
       document.getElementById('batch-detail-container').appendChild(batchContainer);
+      document.getElementById('createBatchPopup').classList.add('hidden');
+      showFriendlyPopup("✅ Batch created successfully");
     } else {
-      alert('Failed to create batch');
+      alert('❌ Failed to create batch');
     }
   } catch (err) {
     console.error('Error creating batch:', err);
+    alert('❌ Could not create batch');
   }
 });
 async function loadBatchesForOpportunity(opportunityId) {
