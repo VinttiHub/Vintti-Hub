@@ -15,6 +15,11 @@ import json
 from ai_routes import register_ai_routes
 from db import get_connection 
 import re
+import psycopg2.extras
+from psycopg2.extras import RealDictCursor
+
+
+
 
 logging.basicConfig(
     level=logging.INFO,
