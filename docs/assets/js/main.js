@@ -426,7 +426,7 @@ window.addEventListener('pageshow', () => {
 });
 const summaryLink = document.getElementById('summaryLink');
 const currentUserEmail = localStorage.getItem('user_email');
-const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
