@@ -264,6 +264,32 @@ def register_ai_routes(app):
 
     @app.route('/ai/improve_about', methods=['POST'])
     def improve_about_section():
+        # Obtener el nombre del candidato
+        cursor.execute("SELECT name FROM candidates WHERE candidate_id = %s", (candidate_id,))
+        name_row = cursor.fetchone()
+        candidate_name = name_row[0] if name_row else ""
+
+        # Preguntar a ChatGPT el género probable y pronombres preferidos
+        gender_prompt = f"""
+        Given the name: "{candidate_name}", determine the most likely gender (male or female), and return appropriate third-person pronouns for resume writing. Return your response in the following JSON format:
+        {{"gender": "...", "pronouns": {{"subject": "...", "object": "...", "possessive": "..."}}}}
+
+        Examples:
+        For "Laura Pérez" → {{"gender": "female", "pronouns": {{"subject": "she", "object": "her", "possessive": "her"}}}}
+        For "Juan Rodríguez" → {{"gender": "male", "pronouns": {{"subject": "he", "object": "him", "possessive": "his"}}}}
+        """
+
+        gender_response = call_openai_with_retry(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": gender_prompt}],
+            temperature=0.2,
+            max_tokens=100
+        )
+
+        # Parsear la respuesta
+        gender_data = json.loads(re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', gender_response.choices[0].message.content.strip()))
+        pronouns = gender_data.get("pronouns", {"subject": "they", "object": "them", "possessive": "their"})
+
         try:
             data = request.json
             candidate_id = data['candidate_id']
@@ -278,25 +304,34 @@ def register_ai_routes(app):
             about, education, work_experience, tools = result if result else ("", "[]", "[]", "[]")
 
             prompt = f"""
-    You are a professional resume editor.
+            You are a professional resume editor.
 
-    Your task is to write an "About" section (also called Summary or Profile) for a candidate, based on their resume data and user comments. Use only the provided data — do not invent or assume anything.
+            Your task is to write an "About" section (also called Summary or Profile) for a candidate, based on their resume data and user comments. Use only the provided data — do not invent or assume anything.
 
-    --- EDUCATION ---
-    {education}
+            --- CANDIDATE NAME ---
+            {candidate_name}
 
-    --- WORK EXPERIENCE ---
-    {work_experience}
+            --- PREFERRED PRONOUNS ---
+            Subject: {pronouns['subject']}
+            Object: {pronouns['object']}
+            Possessive: {pronouns['possessive']}
 
-    --- TOOLS ---
-    {tools}
+            --- EDUCATION ---
+            {education}
 
-    --- USER COMMENT ---
-    {user_prompt}
+            --- WORK EXPERIENCE ---
+            {work_experience}
 
-    Write a third-person, professional "About" section (5-7 lines), highlighting key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
-    - translate everything to english
+            --- TOOLS ---
+            {tools}
+
+            --- USER COMMENT ---
+            {user_prompt}
+
+            Write a third-person, professional "About" section (5-7 lines), using the provided pronouns (do NOT use 'they/them'). Highlight key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
+            - translate everything to english
             """
+
 
             chat = call_openai_with_retry(
                 model="gpt-4o",
