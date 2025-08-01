@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
 
 </head>
@@ -200,27 +201,27 @@
       <div class="pipeline-columns">
         <!-- Column 1 -->
         <div class="column" data-status="contacted">
-          <h3>Contactado</h3>
+          <h3 style="background-color: #fef2f2;" class="column-title"><span class="column-name">Contactado</span> <span class="column-count" id="count-contacted">0</span></h3>
           <div class="card-container" id="contacted">
           </div>
         </div>
         <!-- Column: No avanza primera -->
         <div class="column" data-status="no-advance">
-          <h3>No avanza primera</h3>
+          <h3 style="background-color: #effaf0;" class="column-title"><span class="column-name">No avanza primera</span> <span class="column-count" id="count-no-advance">0</span></h3>
           <div class="card-container" id="no-advance">
             <!-- puedes dejarlo vacío por ahora -->
           </div>
         </div>
         <!-- Column 2 -->
         <div class="column" data-status="first-interview">
-          <h3>Primera entrevista</h3>
+          <h3 style="background-color: #edf4ff;" class="column-title"><span class="column-name">Primera entrevista</span> <span class="column-count" id="count-first-interview">0</span></h3>
           <div class="card-container" id="first-interview">
           </div>
         </div>
     
         <!-- Column 3 -->
         <div class="column" data-status="client-process">
-          <h3>En proceso con Cliente</h3>
+          <h3 style="background-color: #fef3fb;" class="column-title"><span class="column-name">En proceso con Cliente</span> <span class="column-count" id="count-client-process">0</span></h3>
           <div class="card-container" id="client-process">
           </div>
         </div>

@@ -587,7 +587,8 @@ def get_candidates_by_opportunity(opportunity_id):
                 c.salary_range,
                 oc.stage_batch,
                 oc.stage_pipeline AS stage,
-                oc.sign_off
+                oc.sign_off,
+                oc.star
             FROM candidates c
             INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
             WHERE oc.opportunity_id = %s
@@ -835,6 +836,29 @@ def update_signoff_status(opportunity_id, candidate_id):
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/star', methods=['PATCH'])
+def update_candidate_star(opportunity_id, candidate_id):
+    try:
+        data = request.get_json()
+        star_value = data.get('star')
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE opportunity_candidates
+            SET star = %s
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (star_value, opportunity_id, candidate_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "Star updated successfully"})
+    except Exception as e:
+        print(f"Error updating star: {e}")
+        return jsonify({"error": str(e)}), 500
 
     
 @app.route('/accounts/<account_id>/opportunities/candidates')

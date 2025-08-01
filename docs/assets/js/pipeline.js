@@ -203,7 +203,12 @@ function loadPipelineCandidates() {
     .then(response => response.json())
     .then(candidates => {
       console.log('🔵 Candidates:', candidates);
-      
+              const counters = {
+        'contacted': 0,
+        'no-advance': 0,
+        'first-interview': 0,
+        'client-process': 0
+      };
       // Limpiar todas las columnas antes
       document.querySelectorAll('.card-container').forEach(container => {
         container.innerHTML = '';
@@ -214,26 +219,31 @@ candidates.forEach(candidate => {
   card.className = 'candidate-card pipeline-card';
   card.setAttribute('data-candidate-id', candidate.candidate_id); 
   const signoffChecked = candidate.sign_off === 'yes' ? 'checked' : '';
-  console.log("🌍 Country:", candidate.country);
-  console.log("💰 Salary:", candidate.employee_salary);
-  card.innerHTML = `
-    <div class="card-header">
-      <div class="candidate-info">
-        <strong class="candidate-name">${candidate.name}</strong>
-        <div class="candidate-meta">
-          <span class="country">${getFlagEmoji(candidate.country || '')}</span>
-          <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
-        </div>
+  const isStarred = candidate.star === 'yes';
+  const starClass = isStarred ? 'starred' : '';
+
+card.innerHTML = `
+  <div class="card-header">
+    <div class="candidate-info">
+      <strong class="candidate-name">${candidate.name}</strong>
+      <div class="candidate-meta">
+        <span class="country">${getFlagEmoji(candidate.country || '')}</span>
+        <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
       </div>
-      <span class="delete-icon" title="Delete">🗑️</span>
-      <div class="signoff-toggle">
-        <label class="switch">
-          <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
-          <span class="slider round"></span>
-        </label>
+      <div class="star-wrapper">
+        <i class="fas fa-star star-icon ${starClass}"></i>
       </div>
     </div>
-  `;
+    <span class="delete-icon" title="Delete">🗑️</span>
+    <div class="signoff-toggle">
+      <label class="switch">
+        <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
+        <span class="slider round"></span>
+      </label>
+    </div>
+  </div>
+`;
+
 
 
   card.querySelector(".delete-icon").addEventListener("click", async (e) => {
@@ -242,6 +252,10 @@ candidates.forEach(candidate => {
 
   const candidateId = card.getAttribute("data-candidate-id");
   const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  if (columnId) {
+    container.appendChild(card);
+    counters[columnId]++;
+  }
 
   const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`);
   const linkedOpportunities = await res.json();
@@ -262,6 +276,25 @@ candidates.forEach(candidate => {
     }
   }
 });
+card.querySelector(".star-icon").addEventListener("click", async (e) => {
+  e.stopPropagation();
+  const starIcon = e.target;
+  const candidateId = card.getAttribute("data-candidate-id");
+  const newStarValue = starIcon.classList.contains('starred') ? 'no' : 'yes';
+
+  try {
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}/star`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ star: newStarValue })
+    });
+    console.log(`⭐ Star status updated for candidate ${candidateId} to ${newStarValue}`);
+    starIcon.classList.toggle('starred', newStarValue === 'yes');
+  } catch (err) {
+    console.error("❌ Error updating star:", err);
+  }
+});
+
   card.querySelector(".signoff-checkbox").addEventListener("change", async (e) => {
   e.stopPropagation();
   const checkbox = e.target;
@@ -322,8 +355,21 @@ candidates.forEach(candidate => {
   const container = document.getElementById(columnId);
   if (container) {
     container.appendChild(card);
+    counters[columnId]++; // ✅ Sumar al contador después de agregar
   }
+        for (const column in counters) {
+        const countElement = document.getElementById(`count-${column}`);
+        if (countElement) {
+          countElement.textContent = counters[column];
+        }
+      }
 });
+for (const column in counters) {
+  const countElement = document.getElementById(`count-${column}`);
+  if (countElement) {
+    countElement.textContent = counters[column];
+  }
+}
 
     })
     .catch(error => {

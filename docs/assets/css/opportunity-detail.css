@@ -625,13 +625,11 @@ body {
   .column {
     flex: 0 0 auto; /* 👈 NO crecer, NO encoger */
     width: 220px;
-    min-width: 220px;
-    max-width: 220px;
+    min-width: 250px;
     padding: 0 0.5rem;
     border-right: 1px solid #e4d4f5;
     position: static;
   }
-  
   
   .column:last-child {
     border-right: none;
@@ -1901,22 +1899,43 @@ input:checked + .slider::before {
 .pipeline-card {
   padding: 0.6rem 0.8rem 1.4rem;
   font-size: 0.75rem;
-  width: 260px !important;
+  width: 250px !important;
   border-radius: 14px;
-  background-color: #effdf4; /* verdecito pastel */
-  border: 1px solid #c4f0d2;
-  box-shadow: 0 2px 8px rgba(180, 240, 200, 0.25);
+  background-color: #ffffff; 
+  border: 1px solid #d4d9d6;
   position: relative;
   transition: transform 0.2s ease;
+  margin-right: 12px;
+
 }
 .candidate-card:not(.pipeline-card) .candidate-name {
   font-size: 0.85rem;
   font-weight: 500;
 }
+.candidate-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.star-wrapper {
+  margin-top: 4px;
+}
+
+.star-icon {
+  cursor: pointer;
+  font-size: 10px;
+  color: #ccc;
+}
+
+.star-icon.starred {
+  color: gold;
+}
+
 
 /* 👤 Nombre más pequeño */
 .pipeline-card .candidate-name {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: #2d5a3a;
 }
@@ -2204,4 +2223,22 @@ input:checked + .slider::before {
 #hire-display {
   cursor: pointer;
   background-color: #f9f9f9;
+}
+.column-title {
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.column-count {
+  background: white;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 0.8rem;
+  color: #555;
 }
