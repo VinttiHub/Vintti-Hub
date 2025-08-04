@@ -1040,10 +1040,10 @@ function loadHireData() {
   loadSalaryUpdates();
 });
 
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
-  .then(res => res.json())
-  .then(data => {
-    const model = data[0]?.opp_model;
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire_opportunity`)
+    .then(res => res.json())
+    .then(data => {
+      const model = data.opp_model;
     if (model) {
       document.getElementById('opp-model-pill').textContent = `Model: ${model}`;
       adaptHireFieldsByModel(model);

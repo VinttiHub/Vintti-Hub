@@ -897,6 +897,27 @@ def get_candidates_by_account_opportunities(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/candidates/<int:candidate_id>/hire_opportunity', methods=['GET'])
+def get_hire_opportunity(candidate_id):
+    from flask import jsonify
+    from db import connection  # Asegúrate que esta conexión apunta a tu DB
+
+    query = """
+        SELECT o.opportunity_id, o.opp_model, o.opp_stage, a.client_name
+        FROM opportunity o
+        JOIN account a ON o.account_id = a.account_id
+        WHERE o.candidato_contratado = %s
+        LIMIT 1;
+    """
+
+    with connection.cursor(dictionary=True) as cursor:
+        cursor.execute(query, (candidate_id,))
+        result = cursor.fetchone()
+
+    if result:
+        return jsonify(result)
+    else:
+        return jsonify({}), 404
 
 @app.route('/resumes/<int:candidate_id>', methods=['GET'])
 def get_resume(candidate_id):
