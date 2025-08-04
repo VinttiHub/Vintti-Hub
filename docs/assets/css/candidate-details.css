@@ -1534,3 +1534,11 @@ select:focus {
   grid-column: 1 / -1;
   width: 96%;
 }
+.cv-card-entry input[type="month"] {
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 6px !important;
+  padding: 10px 12px !important;
+}

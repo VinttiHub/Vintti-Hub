@@ -204,8 +204,13 @@ function addEducationEntry(entry = { institution: '', title: '', start_date: '',
 
       <div style="flex: 1.5; min-width: 300px;">
         <div style="display: flex; gap: 10px;">
-          <label style="flex: 1;">Start<br/><input type="date" class="edu-start" value="${entry.start_date}" /></label>
-          <label style="flex: 1;">End<br/><input type="date" class="edu-end" value="${entry.end_date}" ${entry.current ? 'disabled' : ''} /></label>
+          <label style="flex: 1;">Start<br/><input type="month" class="edu-start" value="${entry.start_date?.slice(0,7)}" placeholder="yyyy-mm"/></label>
+          <label style="flex: 1;">End<br/>
+            ${entry.current 
+              ? `<input type="text" class="edu-end" value="Present" disabled />`
+              : `<input type="date" class="edu-end" value="${entry.end_date}" />`
+            }
+          </label>
         </div>
         <div style="display: flex; justify-content: flex-end; padding-right: 62px; padding-top: -52px">
           <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; text-transform: none;">
@@ -260,8 +265,13 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
 
       <div style="flex: 1.5; min-width: 300px;">
         <div style="display: flex; gap: 10px;">
-          <label style="flex: 1;">Start<br/><input type="date" class="work-start" value="${entry.start_date}" /></label>
-          <label style="flex: 1;">End<br/><input type="date" class="work-end" value="${entry.end_date}" ${entry.current ? 'disabled' : ''} /></label>
+          <label style="flex: 1;">Start<br/><input type="month" class="work-start" value="${entry.start_date?.slice(0,7)}" /></label>
+          <label style="flex: 1;">End<br/>
+            ${entry.current 
+              ? `<input type="text" class="work-end" value="Present" disabled />`
+              : `<input type="date" class="work-end" value="${entry.end_date}" />`
+            }
+          </label>
         </div>
         <div style="display: flex; justify-content: flex-end; padding-top: -52px; padding-right: 62px;">
           <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap;">
@@ -329,24 +339,28 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
   function saveResume() {
     const about = document.getElementById('aboutField').innerText.trim();
 
-      const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => ({
-        institution: div.querySelector('.edu-title').value.trim(),
-        title: div.querySelector('.edu-degree').value.trim(),
-        start_date: div.querySelector('.edu-start').value,
-        end_date: div.querySelector('.edu-end').value,
-        current: div.querySelector('.edu-current').checked,
-        description: div.querySelector('.edu-desc').innerHTML.trim(),
-      }));
-
+    const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => ({
+      institution: div.querySelector('.edu-title').value.trim(),
+      title: div.querySelector('.edu-degree').value.trim(),
+      start_date: div.querySelector('.edu-start').value ? `${div.querySelector('.edu-start').value}-01` : '',
+      end_date: div.querySelector('.edu-end').value === 'Present' 
+        ? '' 
+        : `${div.querySelector('.edu-end').value}-01`,
+      current: div.querySelector('.edu-current').checked,
+      description: div.querySelector('.edu-desc').innerHTML.trim(),
+    }));
 
     const work_experience = Array.from(document.querySelectorAll('#workExperienceList .cv-card-entry')).map(div => ({
       title: div.querySelector('.work-title').value.trim(),
       company: div.querySelector('.work-company').value.trim(),
-      start_date: div.querySelector('.work-start').value,
-      end_date: div.querySelector('.work-end').value,
+      start_date: div.querySelector('.work-start').value ? `${div.querySelector('.work-start').value}-01` : '',
+      end_date: div.querySelector('.work-end').value === 'Present' 
+        ? '' 
+        : `${div.querySelector('.work-end').value}-01`,
       current: div.querySelector('.work-current').checked,
       description: div.querySelector('.work-desc').innerHTML.trim(),
     }));
+
 
     const tools = Array.from(document.querySelectorAll('#toolsList .cv-card-entry')).map(div => ({
       tool: div.querySelector('.tool-name').value.trim(),
