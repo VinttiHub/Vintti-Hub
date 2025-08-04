@@ -547,6 +547,17 @@ aiGo.addEventListener('click', async () => {
 // Popup para agregar candidato al batch
 document.addEventListener("click", async (e) => {
   if (e.target.classList.contains("btn-add")) {
+        const batchBox = e.target.closest(".batch-box");
+    const batchId = batchBox ? batchBox.getAttribute("data-batch-id") : null;
+
+    if (!batchId) {
+      console.error("Batch ID not found");
+      return;
+    }
+    const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}/candidates`);
+    const batchCandidates = await batchCandidatesRes.json();
+    const assignedCandidateIds = batchCandidates.map(c => c.candidate_id);
+
     console.log("✅ Click en Add Candidate detectado");
     const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
     if (!opportunityId || opportunityId === '—') return;
@@ -562,12 +573,13 @@ document.addEventListener("click", async (e) => {
         return;
       }
       const filtered = candidates.filter(c => c.stage === "En proceso con Cliente");
+      const availableCandidates = candidates.filter(c => !assignedCandidateIds.includes(c.candidate_id));
       console.log("🧪 Candidatos con 'En proceso con Cliente':", filtered);
       // Limpiar resultados anteriores
       const resultsList = document.getElementById("candidateSearchResults");
       resultsList.innerHTML = "";
 
-      filtered.forEach(c => {
+      availableCandidates.forEach(c => {
         const li = document.createElement('li');
         li.classList.add('search-result-item');
         li.setAttribute('data-candidate-id', c.candidate_id);
