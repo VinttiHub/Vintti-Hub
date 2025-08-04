@@ -952,6 +952,7 @@ async function loadOpportunityData() {
             const candidato = await res.json();
             hireDisplay.value = candidato.name || '—';
             hireDisplay.setAttribute('data-candidate-id', candidato.candidate_id);
+            console.log(candidato)
           } else {
             hireDisplay.value = '—';
           }

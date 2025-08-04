@@ -1177,7 +1177,8 @@ def update_candidate_fields(candidate_id):
         'comments',
         'sign_off',
         'linkedin_scrapper',
-        'cv_pdf_scrapper'
+        'cv_pdf_scrapper',
+        'candidate_id'
     ]
 
     updates = []

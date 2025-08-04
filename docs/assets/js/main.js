@@ -229,12 +229,9 @@ document.querySelectorAll('.filter-header button').forEach(button => {
             openOpportunity(opp.opportunity_id);
           });
 
-          tr.style.opacity = 0;
           tbody.appendChild(tr);
-
-          setTimeout(() => {
-            tr.style.animation = 'fadeInUp 0.4s ease forwards';
-          }, 100 * tbody.children.length); // delay progresivo
+          tr.style.opacity = 1;
+          tr.style.animation = 'none';
 
           if (opp.opp_stage === 'Sourcing') {
             fetchDaysSinceBatch(opp, tr);
