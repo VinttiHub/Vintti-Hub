@@ -1226,6 +1226,10 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
 
 
         cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
+        const flag = getFlagEmoji(c.country);
+        cardElement.querySelector('.candidate-country').textContent = c.country ? `${flag} ${c.country}` : '—';
+        cardElement.querySelector('.candidate-salary').textContent = c.salary_range ? `$${c.salary_range}` : '—';
+
         cardElement.querySelector('.candidate-email').textContent = c.email || '';
         cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
         const dropdown = cardElement.querySelector('.candidate-status-dropdown');
@@ -1410,11 +1414,11 @@ batchCandidates.forEach(c => {
 
   // Setear nombre, email, imagen
   cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-  cardElement.querySelector(".candidate-email").textContent = c.email || '';
-  const salaryEl = document.createElement("span");
-  salaryEl.classList.add("candidate-salary");
-  salaryEl.textContent = c.salary_range ? `$${c.salary_range}` : '—';
-  cardElement.querySelector(".info").appendChild(salaryEl);
+
+  // Country con flag emoji
+  const countryEl = cardElement.querySelector(".candidate-country");
+  const flag = getFlagEmoji(c.country);
+  countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
 
   cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
 
@@ -1562,6 +1566,13 @@ batchCandidates.forEach(c => {
   } catch (err) {
     console.error("❌ Error reloading batch candidates:", err);
   }
+  // Salary Range
+const nameEl = cardElement.querySelector('.candidate-name');
+nameEl.textContent = c.name;
+
+const countryEl = cardElement.querySelector('.candidate-country');
+const flag = getFlagEmoji(c.country);
+countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
 }
 
 
@@ -1633,10 +1644,11 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
 
 
     cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-    cardElement.querySelector(".candidate-email").textContent = c.email || '';
-    const salaryEl = document.createElement("span");
-    salaryEl.classList.add("candidate-salary");
-    salaryEl.textContent = c.salary_range ? `$${c.salary_range}` : '—';
+
+    // Country con flag emoji
+    const countryEl = cardElement.querySelector(".candidate-country");
+    const flag = getFlagEmoji(c.country);
+    countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
     cardElement.querySelector(".info").appendChild(salaryEl);
 
     cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
@@ -1648,11 +1660,17 @@ batchCandidates.forEach(c => {
   const cardElement = cardFragment.querySelector(".candidate-card");
 
   // Setear nombre, email, imagen
+  // Nombre
   cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
+
+  // Country con flag emoji
+  const countryEl = cardElement.querySelector(".candidate-country");
+  const flag = getFlagEmoji(c.country);
+  countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
+
   cardElement.querySelector(".candidate-email").textContent = c.email || '';
   const salaryEl = document.createElement("span");
   salaryEl.classList.add("candidate-salary");
-  salaryEl.textContent = c.salary_range ? `$${c.salary_range}` : '—';
   cardElement.querySelector(".info").appendChild(salaryEl);
   cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
   
