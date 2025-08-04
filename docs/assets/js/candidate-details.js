@@ -345,7 +345,9 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       start_date: div.querySelector('.edu-start').value ? `${div.querySelector('.edu-start').value}-01` : '',
       end_date: div.querySelector('.edu-end').value === 'Present' 
         ? '' 
-        : `${div.querySelector('.edu-end').value}-01`,
+        : div.querySelector('.edu-end').value.length === 7  // Si es yyyy-mm
+          ? `${div.querySelector('.edu-end').value}-01`
+          : div.querySelector('.edu-end').value,
       current: div.querySelector('.edu-current').checked,
       description: div.querySelector('.edu-desc').innerHTML.trim(),
     }));
@@ -356,10 +358,13 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       start_date: div.querySelector('.work-start').value ? `${div.querySelector('.work-start').value}-01` : '',
       end_date: div.querySelector('.work-end').value === 'Present' 
         ? '' 
-        : `${div.querySelector('.work-end').value}-01`,
+        : div.querySelector('.work-end').value.length === 7
+          ? `${div.querySelector('.work-end').value}-01`
+          : div.querySelector('.work-end').value,
       current: div.querySelector('.work-current').checked,
       description: div.querySelector('.work-desc').innerHTML.trim(),
     }));
+
 
 
     const tools = Array.from(document.querySelectorAll('#toolsList .cv-card-entry')).map(div => ({
