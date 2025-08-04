@@ -899,25 +899,37 @@ def get_candidates_by_account_opportunities(account_id):
 
 @app.route('/candidates/<int:candidate_id>/hire_opportunity', methods=['GET'])
 def get_hire_opportunity(candidate_id):
-    from flask import jsonify
-    from db import connection  # Asegúrate que esta conexión apunta a tu DB
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    query = """
-        SELECT o.opportunity_id, o.opp_model, o.opp_stage, a.client_name
-        FROM opportunity o
-        JOIN account a ON o.account_id = a.account_id
-        WHERE o.candidato_contratado = %s
-        LIMIT 1;
-    """
+        cursor.execute("""
+            SELECT o.opportunity_id, o.opp_model
+            FROM opportunity o
+            WHERE o.candidato_contratado = %s
+            LIMIT 1;
+        """, (candidate_id,))
 
-    with connection.cursor(dictionary=True) as cursor:
-        cursor.execute(query, (candidate_id,))
-        result = cursor.fetchone()
+        row = cursor.fetchone()
 
-    if result:
-        return jsonify(result)
-    else:
-        return jsonify({}), 404
+        if not row:
+            cursor.close()
+            conn.close()
+            return jsonify({}), 404
+
+        colnames = [desc[0] for desc in cursor.description]
+        opportunity = dict(zip(colnames, row))
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(opportunity)
+    except Exception as e:
+        import traceback
+        print("❌ Error en GET /candidates/<candidate_id>/hire_opportunity:")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/resumes/<int:candidate_id>', methods=['GET'])
 def get_resume(candidate_id):
