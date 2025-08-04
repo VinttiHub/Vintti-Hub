@@ -1542,3 +1542,22 @@ select:focus {
   border-radius: 6px !important;
   padding: 10px 12px !important;
 }
+.disabled-hover {
+  position: relative;
+  pointer-events: auto; /* Necesario para permitir el hover en disabled */
+}
+
+.disabled-hover:hover::after {
+  content: "You can't edit revenue manually. It's auto-calculated.";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 240px;
+  background: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}

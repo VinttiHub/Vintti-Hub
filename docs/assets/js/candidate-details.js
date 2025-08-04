@@ -1023,7 +1023,7 @@ function loadHireData() {
   document.getElementById('hire-computer').value = data.computer || '';
   document.getElementById('hire-extraperks').innerHTML = data.extraperks || '';
   console.log(document.getElementById('hire-extraperks').innerHTML)
-  document.getElementById('hire-revenue').value = (data.employee_revenue || 0);
+  document.getElementById('hire-revenue').value = data.employee_revenue_recruiting || data.employee_revenue || '';
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
   document.getElementById('hire-start-date').value = data.start_date || '';
@@ -1054,15 +1054,6 @@ const feeInput = document.getElementById('hire-fee');
 const tipMessage = "To update salary or fee, please use the 'Salary Updates' section below.";
 const revenueInput = document.getElementById('hire-revenue');
 const revenueMessage = "You can't edit revenue manually. It's auto-calculated.";
-
-revenueInput.addEventListener('mouseenter', () => {
-  if (revenueInput.disabled) showTooltip(revenueInput, revenueMessage);
-});
-
-revenueInput.addEventListener('mouseleave', hideTooltip);
-revenueInput.addEventListener('click', () => {
-  if (revenueInput.disabled) showTooltip(revenueInput, revenueMessage);
-});
 
 [salaryInput, feeInput].forEach(input => {
   input.addEventListener('mouseenter', () => {
@@ -1110,29 +1101,25 @@ function adaptHireFieldsByModel(model) {
   const revenueInput = document.getElementById('hire-revenue');
 
   if (model.toLowerCase() === 'recruiting') {
-    // Oculta el campo fee
     feeField.style.display = 'none';
-
-    // Hace revenue editable
     revenueInput.disabled = false;
 
-    // Actualizar ambos con blur
-    ['hire-salary', 'hire-revenue'].forEach(id => {
-      const el = document.getElementById(id);
-      el.addEventListener('blur', () => {
-        const field = id === 'hire-salary' ? 'employee_salary' : 'employee_revenue';
-        updateHireField(field, el.value);
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
+      .then(res => res.json())
+      .then(data => {
+        revenueInput.value = data.employee_revenue_recruiting || '';
       });
+
+    revenueInput.addEventListener('blur', () => {
+      updateHireField('employee_revenue_recruiting', revenueInput.value);
     });
 
+    revenueInput.classList.remove('disabled-hover');
   } else if (model.toLowerCase() === 'staffing') {
-    // Mostrar fee
     feeField.style.display = 'block';
-
-    // Desactiva edición manual en revenue
     revenueInput.disabled = true;
+    revenueInput.classList.add('disabled-hover');
 
-    // Calcular revenue automáticamente
     ['hire-salary', 'hire-fee'].forEach(id => {
       const el = document.getElementById(id);
       el.addEventListener('blur', async () => {
@@ -1140,18 +1127,17 @@ function adaptHireFieldsByModel(model) {
         const fee = Number(document.getElementById('hire-fee').value);
         if (!salary || !fee) return;
 
-        // Actualiza campos individuales
         const field = id === 'hire-salary' ? 'employee_salary' : 'employee_fee';
         await updateHireField(field, el.value);
 
         const revenue = salary + fee;
-        document.getElementById('hire-revenue').value = revenue;
-
+        revenueInput.value = revenue;
         await updateHireField('employee_revenue', revenue);
       });
     });
   }
 }
+
 document.querySelectorAll('.tab').forEach(button => {
   button.addEventListener('click', () => {
     const selectedTab = button.getAttribute('data-tab');

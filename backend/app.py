@@ -1444,7 +1444,7 @@ def handle_candidate_hire_data(candidate_id):
     try:
         if request.method == 'GET':
             cursor.execute("""
-                SELECT references_notes, employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date
+                SELECT references_notes, employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date, employee_revenue_recruiting
                 FROM candidates
                 WHERE candidate_id = %s
             """, (candidate_id,))
@@ -1460,12 +1460,13 @@ def handle_candidate_hire_data(candidate_id):
                 'working_schedule': row[5],
                 'pto': row[6],
                 'employee_revenue': (row[1] or 0) + (row[2] or 0),
+                'employee_revenue_recruiting': row[8],
                 'start_date': row[7]
             })
 
         if request.method == 'PATCH':
             data = request.get_json()
-            allowed_fields = ['references_notes', 'employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date']
+            allowed_fields = ['references_notes', 'employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date','employee_revenue_recruiting']
             updates = []
             values = []
 
