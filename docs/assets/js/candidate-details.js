@@ -585,14 +585,16 @@ hireSalary.addEventListener('blur', async () => {
   await updateHireField('employee_salary', salary);
 
   const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-  const fee = parseFloat(hireFee.value);
-  if (model?.includes('staffing') && !isNaN(fee)) {
-    const revenue = salary + fee;
-    document.getElementById('hire-revenue').value = revenue;
-    await updateHireField('employee_revenue', revenue);
+  if (model?.includes('staffing')) {
+    const fee = parseFloat(hireFee.value);
+    if (!isNaN(fee)) {
+      const revenue = salary + fee;
+      document.getElementById('hire-revenue').value = revenue;
+      await updateHireField('employee_revenue', revenue);
+    }
   }
+  // ➜ No recalcular revenue si es Recruiting
 });
-
 hireFee.addEventListener('blur', async () => {
   const fee = parseFloat(hireFee.value);
   if (!fee || isNaN(fee)) return;
@@ -600,12 +602,15 @@ hireFee.addEventListener('blur', async () => {
   await updateHireField('employee_fee', fee);
 
   const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-  const salary = parseFloat(hireSalary.value);
-  if (model?.includes('staffing') && !isNaN(salary)) {
-    const revenue = salary + fee;
-    document.getElementById('hire-revenue').value = revenue;
-    await updateHireField('employee_revenue', revenue);
+  if (model?.includes('staffing')) {
+    const salary = parseFloat(hireSalary.value);
+    if (!isNaN(salary)) {
+      const revenue = salary + fee;
+      document.getElementById('hire-revenue').value = revenue;
+      await updateHireField('employee_revenue', revenue);
+    }
   }
+  // ➜ No recalcular revenue si es Recruiting
 });
 
 addSalaryUpdateBtn.addEventListener('click', () => {
@@ -1028,12 +1033,38 @@ function loadHireData() {
   document.getElementById('hire-computer').value = data.computer || '';
   document.getElementById('hire-extraperks').innerHTML = data.extraperks || '';
   console.log(document.getElementById('hire-extraperks').innerHTML)
-  document.getElementById('hire-revenue').value = data.employee_revenue_recruiting || data.employee_revenue || '';
+  const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
+  if (model?.includes('recruiting')) {
+    document.getElementById('hire-revenue').value = data.employee_revenue_recruiting || '';
+  } else {
+    document.getElementById('hire-revenue').value = data.employee_revenue || '';
+  }
+  if (model?.toLowerCase() === 'recruiting') {
+  document.getElementById('hire-working-schedule').closest('.field').style.display = 'none';
+  document.getElementById('hire-pto').closest('.field').style.display = 'none';
+  document.getElementById('hire-computer').closest('.field').style.display = 'none';
+  document.getElementById('hire-extraperks').closest('.field').style.display = 'none';
+}
+
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
   document.getElementById('hire-start-date').value = data.start_date || '';
   document.getElementById('hire-references').innerHTML = data.references_notes || '';
 
+if (data.employee_salary && parseFloat(data.employee_salary) > 0) {
+  salaryInput.disabled = true;
+  salaryInput.addEventListener('mouseenter', () => showTooltip(salaryInput, "To update salary or revenue, please use the update salary section below"));
+  salaryInput.addEventListener('mouseleave', hideTooltip);
+  salaryInput.addEventListener('click', () => showTooltip(salaryInput, "To update salary or revenue, please use the update salary section below"));
+}
+
+if ((data.employee_revenue_recruiting && parseFloat(data.employee_revenue_recruiting) > 0) || 
+    (data.employee_revenue && parseFloat(data.employee_revenue) > 0)) {
+  revenueInput.disabled = true;
+  revenueInput.addEventListener('mouseenter', () => showTooltip(revenueInput, "To update salary or revenue, please use the update salary section below"));
+  revenueInput.addEventListener('mouseleave', hideTooltip);
+  revenueInput.addEventListener('click', () => showTooltip(revenueInput, "To update salary or revenue, please use the update salary section below"));
+}
 
   // Deshabilitar salary y fee si ya tienen valores
   if (data.employee_salary && parseFloat(data.employee_salary) > 0) {
@@ -1118,7 +1149,10 @@ function adaptHireFieldsByModel(model) {
     revenueInput.addEventListener('blur', () => {
       updateHireField('employee_revenue_recruiting', revenueInput.value);
     });
-
+  document.getElementById('hire-working-schedule').closest('.field').style.display = 'none';
+  document.getElementById('hire-pto').closest('.field').style.display = 'none';
+  document.getElementById('hire-computer').closest('.field').style.display = 'none';
+  document.getElementById('hire-extraperks').closest('.field').style.display = 'none';
     revenueInput.classList.remove('disabled-hover');
   } else if (model.toLowerCase() === 'staffing') {
     feeField.style.display = 'block';
@@ -1196,3 +1230,4 @@ document.querySelectorAll('[contenteditable="true"]').forEach(el => {
     });
   });
 });
+const candidateId = new URLSearchParams(window.location.search).get('id');
