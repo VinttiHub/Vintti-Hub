@@ -129,3 +129,20 @@ if (tools.length === 0) {
     console.error("❌ Error loading resume data:", error);
   }
 });
+document.addEventListener('paste', function (e) {
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.isContentEditable || activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand("insertText", false, text);
+  }
+});
+function cleanInlineStyles(element) {
+  element.querySelectorAll('*').forEach(el => {
+    el.removeAttribute('style');
+    el.style.fontFamily = 'Onest, sans-serif';
+  });
+}
+const aboutP = document.getElementById("aboutField");
+aboutP.innerHTML = data.about || "—";
+cleanInlineStyles(aboutP);

@@ -1178,3 +1178,21 @@ function getFlagEmoji(countryName) {
   };
   return flags[countryName] || '';
 }
+document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+  el.addEventListener('paste', function(e) {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    document.execCommand('insertText', false, text);
+  });
+});
+document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+  el.addEventListener('input', function() {
+    this.querySelectorAll('*').forEach(child => {
+      child.removeAttribute('style');
+      child.style.fontFamily = 'Onest';
+      child.style.fontSize = '14px';
+      child.style.color = '#333';
+      child.style.fontWeight = '400';
+    });
+  });
+});
