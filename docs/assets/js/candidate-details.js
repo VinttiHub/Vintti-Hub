@@ -250,6 +250,7 @@ function addEducationEntry(entry = { institution: '', title: '', start_date: '',
   };
   div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
   educationList.appendChild(div);
+  sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
 }
 
 
@@ -312,6 +313,7 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
   };
   div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
   workExperienceList.appendChild(div);
+  sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
 }
 
 
@@ -382,17 +384,21 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       video_link,
     });
 
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        about,
-        education,  // sin JSON.stringify
-        work_experience,
-        tools,
-        video_link,
-      }),
-    });
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      about,
+      education,
+      work_experience,
+      tools,
+      video_link,
+    }),
+  }).then(() => {
+    // Reordenar después de guardar
+    sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
+    sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
+  });
 
   }
   // === AI Popup Logic ===
@@ -1231,3 +1237,22 @@ document.querySelectorAll('[contenteditable="true"]').forEach(el => {
   });
 });
 const candidateId = new URLSearchParams(window.location.search).get('id');
+function sortEntriesByEndDate(containerId, cardSelector, endDateSelector, currentCheckboxSelector) {
+  const container = document.getElementById(containerId);
+  const cards = Array.from(container.querySelectorAll(cardSelector));
+
+  cards.sort((a, b) => {
+    const endA = a.querySelector(endDateSelector).value;
+    const currentA = a.querySelector(currentCheckboxSelector)?.checked;
+    const endB = b.querySelector(endDateSelector).value;
+    const currentB = b.querySelector(currentCheckboxSelector)?.checked;
+
+    const dateA = currentA || endA === 'Present' || endA === '' ? new Date(2100, 0, 1) : new Date(endA);
+    const dateB = currentB || endB === 'Present' || endB === '' ? new Date(2100, 0, 1) : new Date(endB);
+
+    return dateB - dateA; // Sort descending
+  });
+
+  // Re-append sorted cards
+  cards.forEach(card => container.appendChild(card));
+}
