@@ -213,21 +213,3 @@ body {
   margin-bottom: 20px;
   text-align: center;
 }
-* {
-  font-family: 'Onest', sans-serif !important;
-  font-size: inherit !important;
-  font-weight: inherit !important;
-  color: inherit !important;
-}
-
-html, body {
-  font-size: 16px; /* o el tamaño base que tú uses */
-}
-
-input, textarea, [contenteditable="true"] {
-  all: unset;
-  font-family: 'Onest', sans-serif !important;
-  font-size: 16px !important;
-  color: #333 !important;
-}
-
