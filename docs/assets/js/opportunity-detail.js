@@ -1190,6 +1190,7 @@ document.getElementById('confirmCreateBatchBtn').addEventListener('click', async
       document.getElementById('batch-detail-container').appendChild(batchContainer);
       document.getElementById('createBatchPopup').classList.add('hidden');
       showFriendlyPopup("✅ Batch created successfully");
+      setTimeout(() => location.reload(), 1000);
     } else {
       alert('❌ Failed to create batch');
     }
@@ -1207,173 +1208,15 @@ async function loadBatchesForOpportunity(opportunityId) {
     container.innerHTML = '';
 
     for (const batch of batches) {
-      const box = document.createElement('div');
-      box.classList.add('batch-box');
-      box.setAttribute('data-batch-id', batch.batch_id);
-
-      box.innerHTML = `
-        <div class="batch-actions">
-          <h3>Batch #${batch.batch_number}</h3>
-          <div>
-            <button class="btn-add">Add candidate</button>
-            <button class="btn-send">Send for Approval</button>
-            <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
-          </div>
-        </div>
-        <div class="batch-candidates"></div>
-      `;
-// 👉 Este es el botón de Send for Approval
-box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
-
+      const box = createBatchBox(batch);
       const candidateContainer = box.querySelector('.batch-candidates');
 
-      // Traer candidatos por batch desde tabla intermedia
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
+
       batchCandidates.forEach(c => {
-        const template = document.getElementById('candidate-card-template');
-        const cardFragment = template.content.cloneNode(true);
-        const cardElement = cardFragment.querySelector('.candidate-card');
-        cardElement.setAttribute('data-candidate-id', c.candidate_id);
-
-
-        cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
-        const flag = getFlagEmoji(c.country);
-        cardElement.querySelector('.candidate-country').textContent = c.country ? `${flag} ${c.country}` : '—';
-        cardElement.querySelector('.candidate-salary').textContent = c.salary_range ? `$${c.salary_range}` : '—';
-
-        cardElement.querySelector('.candidate-email').textContent = c.email || '';
-        cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-        const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-        dropdown.value = "Client interviewing/testing";
-        if (c.status) {
-          const options = dropdown.options;
-          let found = false;
-          for (let i = 0; i < options.length; i++) {
-            if (options[i].value.trim() === c.status.trim()) {
-              options[i].selected = true;
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            console.warn("⚠️ Status no encontrado en opciones:", c.status);
-          }
-        }
-      // Evita que clicks en el dropdown o trash icon activen la redirección
-      cardElement.addEventListener('click', (e) => {
-        const isDropdown = e.target.classList.contains('candidate-status-dropdown');
-        const isTrash = e.target.classList.contains('delete-candidate-btn');
-        if (isDropdown || isTrash) return;
-
-        const candidateId = cardElement.getAttribute('data-candidate-id');
-        if (candidateId) {
-          window.location.href = `/candidate-details.html?id=${candidateId}`;
-        }
-      });
-
-
-        dropdown.addEventListener("change", async (e) => {
-          const newStatus = e.target.value;
-          const candidateId = c.candidate_id;
-          const batchId = batch.batch_id;
-
-          console.log("📥 Cambio en status");
-          console.log("📌 candidateId:", candidateId);
-          console.log("📌 batchId:", batchId);
-          console.log("📌 newStatus:", newStatus);
-
-          try {
-            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                candidate_id: candidateId,
-                batch_id: batchId,
-                status: newStatus
-              })
-            });
-
-            const result = await res.json();
-            console.log("📤 Respuesta backend:", result);
-
-            if (res.ok) {
-              dropdown.value = newStatus;
-              showFriendlyPopup("✅ Status updated");
-            } else {
-              showFriendlyPopup("❌ Error updating status");
-            }
-          } catch (err) {
-            console.error("❌ Error enviando status:", err);
-          }
-        });
-
+        const cardElement = createCandidateCard(c, batch.batch_id);
         candidateContainer.appendChild(cardElement);
-                const trash = document.createElement("button");
-      trash.innerHTML = "🗑️";
-      trash.classList.add("delete-candidate-btn");
-      trash.title = "Remove from batch";
-      trash.style.marginLeft = "auto";
-      trash.style.background = "none";
-      trash.style.border = "none";
-      trash.style.cursor = "pointer";
-      trash.style.fontSize = "18px";
-
-      trash.addEventListener("click", async () => {
-        const confirmed = confirm(`⚠️ Remove ${c.name} from this batch?`);
-        if (!confirmed) return;
-
-        try {
-          const res = await fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              candidate_id: c.candidate_id,
-              batch_id: batch.batch_id
-            })
-          });
-
-          if (res.ok) {
-            showFriendlyPopup("✅ Candidate removed from batch");
-            await reloadBatchCandidates();
-          } else {
-            alert("❌ Failed to remove candidate");
-          }
-        } catch (err) {
-          console.error("❌ Error removing candidate:", err);
-          alert("❌ Could not remove candidate");
-        }
-      });
-
-    const header = cardElement.querySelector(".candidate-card-header");
-    header.insertBefore(trash, header.firstChild);
-
-
-
-      });
-
-      // Eliminar batch
-      box.querySelector('.btn-delete').addEventListener('click', async (e) => {
-        const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
-        if (!confirmed) return;
-
-        const batchId = e.target.getAttribute('data-batch-id');
-
-        try {
-          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
-            method: 'DELETE'
-          });
-
-          if (res.ok) {
-            alert('✅ Batch deleted successfully');
-            await loadBatchesForOpportunity(opportunityId);
-          } else {
-            alert('❌ Error deleting batch');
-          }
-        } catch (err) {
-          console.error('Error deleting batch:', err);
-          alert('❌ Could not delete batch');
-        }
       });
 
       container.appendChild(box);
@@ -1383,231 +1226,17 @@ box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup
   }
 }
 
-
 async function reloadBatchCandidates() {
-  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
-  if (!opportunityId || opportunityId === '—') return;
-
-  try {
-    const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
-    const batches = await batchesRes.json();
-
-    const container = document.getElementById("batch-detail-container");
-    container.innerHTML = "";
-
-    for (const batch of batches) {
-      const box = document.createElement("div");
-      box.classList.add("batch-box");
-      box.setAttribute("data-batch-id", batch.batch_id);
-
-      box.innerHTML = `
-        <div class="batch-actions">
-          <h3>Batch #${batch.batch_number}</h3>
-          <div>
-            <button class="btn-add">Add candidate</button>
-            <button class="btn-send">Send for Approval</button>
-            <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
-          </div>
-        </div>
-        <div class="batch-candidates"></div>
-      `;
-// 👉 Este es el botón de Send for Approval
-box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
-
-      const candidateContainer = box.querySelector(".batch-candidates");
-
-      // 🔁 Obtener candidatos desde nuevo endpoint
-      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
-      const batchCandidates = await batchCandidatesRes.json();
-batchCandidates.forEach(c => {
-  const template = document.getElementById("candidate-card-template");
-  const cardFragment = template.content.cloneNode(true);
-  const cardElement = cardFragment.querySelector(".candidate-card");
-
-  // Setear nombre, email, imagen
-  cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-
-  // Country con flag emoji
-  const countryEl = cardElement.querySelector(".candidate-country");
-  const flag = getFlagEmoji(c.country);
-  countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
-
-  cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-
-  // Status dropdown
-  const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-  dropdown.value = "Client interviewing/testing";
-// Evita que clicks en el dropdown o trash icon activen la redirección
-  cardElement.addEventListener('click', (e) => {
-    const isDropdown = e.target.classList.contains('candidate-status-dropdown');
-    const isTrash = e.target.classList.contains('delete-candidate-btn');
-    if (isDropdown || isTrash) return;
-
-    const candidateId = cardElement.getAttribute('data-candidate-id');
-    if (candidateId) {
-      window.location.href = `/candidate-details.html?id=${candidateId}`;
-    }
-  });
-
-
-  if (c.status) {
-    const options = dropdown.options;
-    let found = false;
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].value.trim() === c.status.trim()) {
-        options[i].selected = true;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      console.warn("⚠️ Status no encontrado en opciones:", c.status);
-    }
+  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (opportunityId && opportunityId !== '—') {
+    await loadBatchesForOpportunity(opportunityId);
   }
-
-
-  // ✅ Listener funcional
-  dropdown.addEventListener("change", async (e) => {
-    const newStatus = e.target.value;
-    const candidateId = c.candidate_id;
-    const batchId = batch.batch_id;
-
-    console.log("📥 Cambio en status");
-    console.log("📌 candidateId:", candidateId);
-    console.log("📌 batchId:", batchId);
-    console.log("📌 newStatus:", newStatus);
-
-    try {
-      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          candidate_id: candidateId,
-          batch_id: batchId,
-          status: newStatus
-        })
-      });
-
-      console.log("📤 Enviado al backend. Status HTTP:", res.status);
-      const result = await res.json();
-      console.log("📥 Respuesta del backend:", result);
-
-      if (res.ok) {
-        dropdown.value = newStatus;
-        showFriendlyPopup("✅ Status updated");
-      } else {
-        showFriendlyPopup("❌ Error updating status");
-      }
-    } catch (err) {
-      console.error("❌ Exception updating status:", err);
-    }
-  });
-
-  candidateContainer.appendChild(cardElement);
-          const trash = document.createElement("button");
-      trash.innerHTML = "🗑️";
-      trash.classList.add("delete-candidate-btn");
-      trash.title = "Remove from batch";
-      trash.style.marginLeft = "auto";
-      trash.style.background = "none";
-      trash.style.border = "none";
-      trash.style.cursor = "pointer";
-      trash.style.fontSize = "18px";
-
-      trash.addEventListener("click", async () => {
-        const confirmed = confirm(`⚠️ Remove ${c.name} from this batch?`);
-        if (!confirmed) return;
-
-        try {
-          const res = await fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              candidate_id: c.candidate_id,
-              batch_id: batch.batch_id
-            })
-          });
-
-          if (res.ok) {
-            showFriendlyPopup("✅ Candidate removed from batch");
-            await reloadBatchCandidates();
-          } else {
-            alert("❌ Failed to remove candidate");
-          }
-        } catch (err) {
-          console.error("❌ Error removing candidate:", err);
-          alert("❌ Could not remove candidate");
-        }
-      });
-
-      const header = cardElement.querySelector(".candidate-card-header");
-      header.insertBefore(trash, header.firstChild);
-
-
-
-});
-
-
-      // 🗑️ Agregar botón eliminar
-      box.querySelector('.btn-delete').addEventListener('click', async (e) => {
-        const confirmed = confirm("⚠️ Are you sure you want to delete this batch?");
-        if (!confirmed) return;
-
-        const batchId = e.target.getAttribute('data-batch-id');
-
-        try {
-          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, {
-            method: 'DELETE'
-          });
-
-          if (res.ok) {
-            alert('✅ Batch deleted successfully');
-            await reloadBatchCandidates();
-          } else {
-            alert('❌ Error deleting batch');
-          }
-        } catch (err) {
-          console.error('Error deleting batch:', err);
-          alert('❌ Could not delete batch');
-        }
-      });
-
-      container.appendChild(box);
-    }
-
-  } catch (err) {
-    console.error("❌ Error reloading batch candidates:", err);
-  }
-  // Salary Range
-const nameEl = cardElement.querySelector('.candidate-name');
-nameEl.textContent = c.name;
-
-const countryEl = cardElement.querySelector('.candidate-country');
-const flag = getFlagEmoji(c.country);
-countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
 }
 
-
-async function loadBatchesAndCandidates() {
-  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
-  if (!opportunityId || opportunityId === '—') return;
-
-  const container = document.getElementById("batch-detail-container");
-  container.innerHTML = "";
-
-  try {
-    const [batchesRes, candidatesRes] = await Promise.all([
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`),
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`)
-    ]);
-
-    const batches = await batchesRes.json();
-    const candidates = await candidatesRes.json();
-
-for (const batch of batches) {
-  const box = document.createElement("div");
-  box.classList.add("batch-box");
-  box.setAttribute("data-batch-id", batch.batch_id);
+function createBatchBox(batch) {
+  const box = document.createElement('div');
+  box.classList.add('batch-box');
+  box.setAttribute('data-batch-id', batch.batch_id);
 
   box.innerHTML = `
     <div class="batch-actions">
@@ -1620,143 +1249,149 @@ for (const batch of batches) {
     </div>
     <div class="batch-candidates"></div>
   `;
-  // 👉 Este es el botón de Send for Approval
-box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
 
+  box.querySelector('.btn-add').addEventListener('click', async (e) => {
+  // Lógica para abrir la popup de agregar candidato
+  console.log("🟢 Add Candidate clicked for batch:", batch.batch_id);
+  const batchBox = e.target.closest(".batch-box");
+  if (!batchBox) return;
 
-  const candidateContainer = box.querySelector(".batch-candidates");
+  const batchId = batchBox.getAttribute("data-batch-id");
+  if (!batchId) return;
 
-  // ✅ Aquí sí puedes usar await
-  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
-  const batchCandidates = await res.json();
+  // Muestra la popup de agregar candidato (batchCandidatePopup)
+  document.getElementById("batchCandidatePopup").classList.remove("hidden");
 
-  batchCandidates.forEach(c => {
-    const template = document.getElementById("candidate-card-template");
-    const cardFragment = template.content.cloneNode(true);
-    const cardElement = cardFragment.querySelector(".candidate-card");
-    const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-    dropdown.value = "Client interviewing/testing";
-
-    console.log("🎯 Seteando status:", c.status);
-    console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
-    if (c.status) {
-      const options = dropdown.options;
-      let found = false;
-      for (let i = 0; i < options.length; i++) {
-        if (options[i].value.trim() === c.status.trim()) {
-          options[i].selected = true;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        console.warn("⚠️ Status no encontrado en opciones:", c.status);
-      }
-    }
-
-
-    cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-
-    // Country con flag emoji
-    const countryEl = cardElement.querySelector(".candidate-country");
-    const flag = getFlagEmoji(c.country);
-    countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
-    cardElement.querySelector(".info").appendChild(salaryEl);
-
-    cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-    const statusDropdown = cardElement.querySelector(".candidate-status-dropdown");
-
-batchCandidates.forEach(c => {
-  const template = document.getElementById("candidate-card-template");
-  const cardFragment = template.content.cloneNode(true);
-  const cardElement = cardFragment.querySelector(".candidate-card");
-
-  // Setear nombre, email, imagen
-  // Nombre
-  cardElement.querySelectorAll(".candidate-name").forEach(el => el.textContent = c.name);
-
-  // Country con flag emoji
-  const countryEl = cardElement.querySelector(".candidate-country");
-  const flag = getFlagEmoji(c.country);
-  countryEl.textContent = c.country ? `${flag} ${c.country}` : '—';
-
-  cardElement.querySelector(".candidate-email").textContent = c.email || '';
-  const salaryEl = document.createElement("span");
-  salaryEl.classList.add("candidate-salary");
-  cardElement.querySelector(".info").appendChild(salaryEl);
-  cardElement.querySelector(".candidate-img").src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-  
-  // Status dropdown
-  const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-  dropdown.value = "Client interviewing/testing";
-
-  console.log("🎯 Seteando status:", c.status);
-  console.log("🧩 Opciones en dropdown:", [...dropdown.options].map(opt => opt.value));
-  if (c.status) {
-    const options = dropdown.options;
-    let found = false;
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].value.trim() === c.status.trim()) {
-        options[i].selected = true;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      console.warn("⚠️ Status no encontrado en opciones:", c.status);
-    }
-  }
-
-  // ✅ Listener funcional
-  dropdown.addEventListener("change", async (e) => {
-    const newStatus = e.target.value;
-    const candidateId = c.candidate_id;
-    const batchId = batch.batch_id;
-
-    console.log("📥 Cambio en status");
-    console.log("📌 candidateId:", candidateId);
-    console.log("📌 batchId:", batchId);
-    console.log("📌 newStatus:", newStatus);
-
-    try {
-      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          candidate_id: candidateId,
-          batch_id: batchId,
-          status: newStatus
-        })
-      });
-
-      console.log("📤 Enviado al backend. Status HTTP:", res.status);
-      const result = await res.json();
-      console.log("📥 Respuesta del backend:", result);
-
-      if (res.ok) {
-        showFriendlyPopup("✅ Status updated");
-      } else {
-        showFriendlyPopup("❌ Error updating status");
-      }
-    } catch (err) {
-      console.error("❌ Exception updating status:", err);
-    }
-  });
-
-  candidateContainer.appendChild(cardElement);
+  // Llama a la función para cargar los candidatos disponibles a asignar a ese batch
+  await loadAvailableCandidatesForBatch(batchId);
 });
 
-    candidateContainer.appendChild(cardElement);
+
+  box.querySelector('.btn-send').addEventListener('click', () => openApprovalPopup(batch.batch_id));
+  box.querySelector('.btn-delete').addEventListener('click', async (e) => {
+    const confirmed = confirm('⚠️ Are you sure you want to delete this batch?');
+    if (!confirmed) return;
+    await deleteBatch(e.target.getAttribute('data-batch-id'));
   });
 
-  container.appendChild(box);
+  return box;
 }
 
+function createCandidateCard(c, batchId) {
+  const template = document.getElementById('candidate-card-template');
+  const cardFragment = template.content.cloneNode(true);
+  const cardElement = cardFragment.querySelector('.candidate-card');
+  cardElement.setAttribute('data-candidate-id', c.candidate_id);
 
-  } catch (err) {
-    console.error("Error loading batches and candidates:", err);
+  cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
+  const flag = getFlagEmoji(c.country);
+  cardElement.querySelector('.candidate-country').textContent = c.country ? `${flag} ${c.country}` : '—';
+  cardElement.querySelector('.candidate-salary').textContent = c.salary_range ? `$${c.salary_range}` : '—';
+  cardElement.querySelector('.candidate-email').textContent = c.email || '';
+  cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+  const dropdown = cardElement.querySelector('.candidate-status-dropdown');
+  dropdown.value = c.status || "Client interviewing/testing";
+  setDropdownValue(dropdown, c.status);
+
+  dropdown.addEventListener('change', () => updateCandidateStatus(c.candidate_id, batchId, dropdown.value));
+
+  cardElement.addEventListener('click', (e) => {
+    if (e.target.classList.contains('candidate-status-dropdown') || e.target.classList.contains('delete-candidate-btn')) return;
+    window.location.href = `/candidate-details.html?id=${c.candidate_id}`;
+  });
+
+  const trash = document.createElement('button');
+  trash.innerHTML = '🗑️';
+  trash.classList.add('delete-candidate-btn');
+  trash.title = 'Remove from batch';
+  trash.style.marginLeft = 'auto';
+  trash.style.background = 'none';
+  trash.style.border = 'none';
+  trash.style.cursor = 'pointer';
+  trash.style.fontSize = '18px';
+  trash.addEventListener('click', async () => {
+    const confirmed = confirm(`⚠️ Remove ${c.name} from this batch?`);
+    if (!confirmed) return;
+    await removeCandidateFromBatch(c.candidate_id, batchId);
+  });
+
+  const header = cardElement.querySelector('.candidate-card-header');
+  header.insertBefore(trash, header.firstChild);
+
+  return cardElement;
+}
+
+function setDropdownValue(dropdown, status) {
+  if (!status) return;
+  const options = dropdown.options;
+  let found = false;
+  for (let i = 0; i < options.length; i++) {
+    if (options[i].value.trim() === status.trim()) {
+      options[i].selected = true;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    console.warn('⚠️ Status not found in options:', status);
   }
 }
+
+async function updateCandidateStatus(candidateId, batchId, newStatus) {
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, batch_id: batchId, status: newStatus })
+    });
+
+    const result = await res.json();
+    if (res.ok) {
+      showFriendlyPopup('✅ Status updated');
+    } else {
+      showFriendlyPopup('❌ Error updating status');
+    }
+  } catch (err) {
+    console.error('❌ Error updating status:', err);
+  }
+}
+
+async function deleteBatch(batchId) {
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}`, { method: 'DELETE' });
+    if (res.ok) {
+      alert('✅ Batch deleted successfully');
+      await reloadBatchCandidates();
+    } else {
+      alert('❌ Error deleting batch');
+    }
+  } catch (err) {
+    console.error('Error deleting batch:', err);
+    alert('❌ Could not delete batch');
+  }
+}
+
+async function removeCandidateFromBatch(candidateId, batchId) {
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates_batches', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId, batch_id: batchId })
+    });
+
+    if (res.ok) {
+      showFriendlyPopup('✅ Candidate removed from batch');
+      await reloadBatchCandidates();
+    } else {
+      alert('❌ Failed to remove candidate');
+    }
+  } catch (err) {
+    console.error('❌ Error removing candidate:', err);
+    alert('❌ Could not remove candidate');
+  }
+}
+
 async function openApprovalPopup(batchId) {
   const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
 // Obtener info completa de la oportunidad, incluyendo client_name
@@ -1891,4 +1526,84 @@ function getFlagEmoji(country) {
 function toggleActiveButton(command, button) {
   document.execCommand(command, false, '');
   button.classList.toggle('active');
+}
+async function loadAvailableCandidatesForBatch(batchId) {
+  try {
+    const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
+
+    // Obtener candidatos de la oportunidad
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
+    const candidates = await res.json();
+
+    // Obtener todos los batches de la oportunidad
+    const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
+    const batches = await batchesRes.json();
+
+    // Obtener IDs de candidatos que ya están en cualquier batch de esta oportunidad
+    let assignedCandidateIds = [];
+    for (const batch of batches) {
+      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
+      const batchCandidates = await batchCandidatesRes.json();
+      assignedCandidateIds = assignedCandidateIds.concat(batchCandidates.map(c => c.candidate_id));
+    }
+
+    // Filtrar candidatos disponibles: stage correcto y no asignados a ningún batch de esta oportunidad
+    const availableCandidates = candidates.filter(c =>
+      c.stage === "En proceso con Cliente" &&
+      !assignedCandidateIds.includes(c.candidate_id)
+    );
+
+    const resultsList = document.getElementById("candidateSearchResults");
+    resultsList.innerHTML = "";
+
+    if (availableCandidates.length === 0) {
+      resultsList.innerHTML = "<li>No candidates available</li>";
+      return;
+    }
+
+    availableCandidates.forEach(c => {
+      const li = document.createElement('li');
+      li.classList.add('search-result-item');
+      li.setAttribute('data-candidate-id', c.candidate_id);
+
+      li.innerHTML = `
+        <div style="font-weight: 600;">${c.name}</div>
+        <div style="font-size: 12px; color: #666;">🔍 Match by Name</div>
+      `;
+
+      li.addEventListener("click", async () => {
+        const confirmed = confirm(`Add ${c.name} to this batch?`);
+        if (!confirmed) return;
+
+        const patchRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${c.candidate_id}/batch`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batch_id: batchId })
+        });
+
+        if (patchRes.ok) {
+          showFriendlyPopup(`✅ ${c.name} added to batch`);
+          document.getElementById("batchCandidatePopup").classList.add("hidden");
+          await reloadBatchCandidates();
+        } else {
+          alert(`❌ Error adding ${c.name} to batch`);
+        }
+      });
+
+      resultsList.appendChild(li);
+    });
+
+    // Reset search input
+    const searchInput = document.getElementById("candidateSearchInput");
+    searchInput.value = '';
+    searchInput.addEventListener("input", () => {
+      const term = searchInput.value.toLowerCase();
+      document.querySelectorAll(".search-result-item").forEach(item => {
+        item.style.display = item.textContent.toLowerCase().includes(term) ? "block" : "none";
+      });
+    });
+
+  } catch (err) {
+    console.error('Error loading available candidates for batch:', err);
+  }
 }
