@@ -503,14 +503,9 @@ function closePopup() {
 }
 
 function openOpportunity(id) {
-  const tableCard = document.querySelector('.table-card');
-  tableCard.classList.add('exit-left');
-
-  setTimeout(() => {
-    window.location.href = `opportunity-detail.html?id=${id}`;
-  }, 400);
+  const url = `opportunity-detail.html?id=${id}`;
+  window.open(url, '_blank'); // 👉 abre en nueva pestaña
 }
-
 
 function navigateTo(section) {
   alert(`Navigation to "${section}" would happen here.`);

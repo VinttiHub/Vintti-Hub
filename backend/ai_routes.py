@@ -279,25 +279,38 @@ def register_ai_routes(app):
             about, education, work_experience, tools = result if result else ("", "[]", "[]", "[]")
 
             prompt = f"""
-    You are a professional resume editor.
+            You are a professional resume editor.
 
-    Your task is to write an "About" section (also called Summary or Profile) for a candidate, based on their resume data and user comments. Use only the provided data — do not invent or assume anything.
+            Your task is to rewrite the candidate's "About" section (also known as Summary or Profile) using only the following information.
 
-    --- EDUCATION ---
-    {education}
+            --- CANDIDATE NAME ---
+            {data.get("candidate_name", "")}
 
-    --- WORK EXPERIENCE ---
-    {work_experience}
+            --- EDUCATION ---
+            {education}
 
-    --- TOOLS ---
-    {tools}
+            --- WORK EXPERIENCE ---
+            {work_experience}
 
-    --- USER COMMENT ---
-    {user_prompt}
+            --- TOOLS ---
+            {tools}
 
-    Write a third-person, professional "About" section (5-7 lines), deduce the gender and use pronouns (her, she, his, he) (DO NOT use 'they/them'). highlighting key skills, tools, industries, years of experience, and professional strengths. Do not include redundant or vague phrases. Only return the final text, no markdown, no intro, no formatting.
-    - translate everything to english
+            --- USER COMMENT ---
+            {user_prompt}
+
+            Instructions:
+            - Write a **concise and professional summary (5–7 lines)** in the **third person**.
+            - Deduce the candidate’s gender based on the name and context. If unclear, use **gender-neutral language without inventing names or making assumptions**.
+            - If the user comment asks to focus on a particular skill, role, industry, or experience, **do not just repeat the comment**. Instead:
+                - **Identify a relevant experience or education entry** that supports that focus.
+                - **Reorganize and highlight that experience** naturally within the summary.
+                - Do not start the summary with the explicit comment the user wrote.
+            - Emphasize skills, tools, industries, strengths, and years of experience according to the user comment.
+            - Do **not** invent any information. Use only what is available.
+            - Return only the final text, no formatting, no explanation, no markdown.
+            - Translate everything into English.
             """
+
 
             chat = call_openai_with_retry(
                 model="gpt-4o",
