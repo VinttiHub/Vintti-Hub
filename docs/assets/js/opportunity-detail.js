@@ -141,7 +141,9 @@ document.getElementById('goToCreateCandidateBtn').addEventListener('click', () =
   document.getElementById('popupAddExistingBtn').style.display = 'none';
 
   const input = document.getElementById('candidate-name');
-  input.value = '';
+  const precreateValue = document.getElementById('precreate-search').value;
+
+  input.value = precreateValue || ''; // copiar el valor buscado si existe
   input.placeholder = 'Full name';
   input.removeAttribute('data-candidate-id');
 });
