@@ -943,6 +943,7 @@ def get_resume(candidate_id):
                 work_experience, 
                 education, 
                 tools, 
+                languages,
                 video_link,
                 extract_cv_pdf,
                 cv_pdf_s3
@@ -958,6 +959,7 @@ def get_resume(candidate_id):
                     "work_experience": "[]",
                     "education": "[]",
                     "tools": "[]",
+                    "languages": "[]",
                     "video_link": "[]",
                     "extract_cv_pdf": "",
                     "cv_pdf_s3": ""
@@ -985,6 +987,7 @@ def update_resume(candidate_id):
             'work_experience',
             'education',
             'tools',
+            'languages',
             'video_link'
         ]
 

@@ -69,19 +69,31 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
             });
           });
         } else {
-          // Asigna el valor directamente desde la base
           const value = data[fieldName];
-          if (value) el.innerText = value;
+          
+          if (el.tagName === 'SELECT') {
+            if (value) el.value = value;
 
-          el.contentEditable = true;
-          el.addEventListener('blur', () => {
-            const updatedValue = el.innerText.trim();
-            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ [fieldName]: updatedValue })
+            el.addEventListener('change', () => {
+              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [fieldName]: el.value })
+              });
             });
-          });
+          } else {
+            if (value) el.innerText = value;
+
+            el.contentEditable = true;
+            el.addEventListener('blur', () => {
+              const updatedValue = el.innerText.trim();
+              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [fieldName]: updatedValue })
+              });
+            });
+          }
         }
       }
     });
@@ -164,7 +176,10 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
           if (linkedinField) linkedinField.textContent = data.linkedin || '—';
           break;
         case 'english level':
-          div.textContent = data.english_level || '—';
+          const englishSelect = document.getElementById('field-english-level');
+          if (englishSelect && data.english_level) {
+            englishSelect.value = data.english_level;
+          }
           break;
         case 'min salary':
           div.textContent = data.salary_range || '—';
@@ -189,6 +204,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       JSON.parse(data.work_experience || '[]').forEach(entry => addWorkExperienceEntry(entry));
       JSON.parse(data.education || '[]').forEach(entry => addEducationEntry(entry));
       JSON.parse(data.tools || '[]').forEach(entry => addToolEntry(entry));
+      JSON.parse(data.languages || '[]').forEach(entry => addLanguageEntry(entry));
       videoLinkInput.value = data.video_link || '';
     });
 
@@ -337,6 +353,34 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
     });
     toolsList.appendChild(div);
   }
+function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
+  const div = document.createElement('div');
+  div.className = 'cv-card-entry pulse';
+  div.innerHTML = `
+    <select class="language-name">
+      <option value="">Select Language</option>
+      <option value="English" ${entry.language === 'English' ? 'selected' : ''}>English</option>
+      <option value="Spanish" ${entry.language === 'Spanish' ? 'selected' : ''}>Spanish</option>
+      <option value="Portuguese" ${entry.language === 'Portuguese' ? 'selected' : ''}>Portuguese</option>
+      <option value="French" ${entry.language === 'French' ? 'selected' : ''}>French</option>
+      <option value="German" ${entry.language === 'German' ? 'selected' : ''}>German</option>
+    </select>
+    <select class="language-level">
+      <option value="Basic" ${entry.level === 'Basic' ? 'selected' : ''}>Basic</option>
+      <option value="Regular" ${entry.level === 'Regular' ? 'selected' : ''}>Regular</option>
+      <option value="Fluent" ${entry.level === 'Fluent' ? 'selected' : ''}>Fluent</option>
+      <option value="Native" ${entry.level === 'Native' ? 'selected' : ''}>Native</option>
+    </select>
+    <button class="remove-entry">🗑️</button>
+  `;
+  setTimeout(() => div.classList.remove('pulse'), 500);
+  div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
+  div.querySelectorAll('select').forEach(el => {
+    el.addEventListener('blur', saveResume);
+    el.addEventListener('change', saveResume);
+  });
+  document.getElementById('languagesList').appendChild(div);
+}
 
   function saveResume() {
     const about = document.getElementById('aboutField').innerText.trim();
@@ -373,6 +417,10 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       tool: div.querySelector('.tool-name').value.trim(),
       level: div.querySelector('.tool-level').value,
     }));
+    const languages = Array.from(document.querySelectorAll('#languagesList .cv-card-entry')).map(div => ({
+      language: div.querySelector('.language-name').value.trim(),
+      level: div.querySelector('.language-level').value
+    }));
 
     const videoLinkDiv = document.getElementById('videoLinkInput');
     const video_link = videoLinkDiv?.innerText?.trim() || null;
@@ -381,6 +429,7 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       education,
       work_experience,
       tools,
+      languages,
       video_link,
     });
 
@@ -392,6 +441,7 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       education,
       work_experience,
       tools,
+      languages,
       video_link,
     }),
   }).then(() => {
@@ -954,6 +1004,8 @@ function updatePhrase() {
 
   setTimeout(updatePhrase, 3000); // Cambia cada 5 segundos (2.5s de lectura x2)
 }
+const addLanguageBtn = document.getElementById('addLanguageBtn');
+addLanguageBtn.addEventListener('click', () => addLanguageEntry());
 
 
 

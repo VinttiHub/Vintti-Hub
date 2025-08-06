@@ -116,6 +116,28 @@ if (tools.length === 0) {
     toolsList.appendChild(wrapper);
   });
 }
+// 🌐 Languages
+const languagesList = document.getElementById("languagesList");
+let languages = [];
+try {
+  languages = JSON.parse(data.languages || "[]");
+} catch (e) {
+  console.error("❌ Error parsing languages:", e);
+}
+
+if (languages.length === 0) {
+  document.getElementById("languagesSection").style.display = "none";
+} else {
+  languages.forEach((lang) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "tool-pill";
+    wrapper.innerHTML = `
+      <div class="tool-name">${lang.language || '—'}</div>
+      <div class="tool-level">${lang.level || ''}</div>
+    `;
+    languagesList.appendChild(wrapper);
+  });
+}
 
     // 📹 Video Link
     const videoDiv = document.getElementById("readonly-video-link");

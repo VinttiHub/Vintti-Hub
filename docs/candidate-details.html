@@ -127,6 +127,7 @@
 
 
 <!-- ENGLISH LEVEL -->
+<!-- ENGLISH LEVEL (Dropdown) -->
 <div class="field">
   <label>
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -136,7 +137,14 @@
     </svg>
     English Level
   </label>
-  <div id="field-english-level" contenteditable="true">—</div>
+  <select id="field-english-level">
+    <option value="">—</option>
+    <option value="Poor">Poor</option>
+    <option value="Regular">Regular</option>
+    <option value="Good">Good</option>
+    <option value="Very Good">Very Good</option>
+    <option value="Excellent">Excellent</option>
+  </select>
 </div>
 
 <!-- MIN SALARY -->
@@ -220,6 +228,15 @@
           </div>
           <div class="cv-card" id="toolsList"></div>
           <button id="addToolBtn">Add Tool</button>
+        </section>
+        <!-- Languages -->
+        <section class="cv-section" id="languagesSection">
+          <div class="cv-heading-wrapper">
+            <h2 class="cv-heading">Languages</h2>
+            <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+          </div>
+          <div class="cv-card" id="languagesList"></div>
+          <button id="addLanguageBtn">Add Language</button>
         </section>
 
         <!-- Video Link -->
