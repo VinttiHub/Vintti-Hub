@@ -2,13 +2,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const candidateId = urlParams.get("id");
     function formatDate(dateStr) {
-    if (!dateStr) return "?";
-    const date = new Date(dateStr);
-    if (isNaN(date)) return "?";
-    return date.toLocaleDateString("en-US", {
+      if (!dateStr) return "?";
+      const [year, month] = dateStr.split("-"); // Ignora el día
+      const date = new Date(`${year}-${month}-01T12:00:00Z`); // Forzamos día seguro en UTC para evitar desbordes
+      return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
-    });
+      });
     }
 
   if (!candidateId) {
@@ -77,12 +77,16 @@ if (education.length === 0) {
     const startDate = formatDate(edu.start_date);
     const endDate = edu.current ? "Present" : formatDate(edu.end_date);
     // 🎓 Education
-    entry.innerHTML = `
-      <strong>${edu.institution || "—"}</strong><br/>
-      <span style="font-weight: 500;">${edu.title || "—"}</span><br/>
-      <span>${startDate} – ${endDate}</span><br/>
-      <div class="resume-description">${edu.description || ""}</div>
-    `;
+entry.innerHTML = `
+  <div class="edu-header">
+    <strong>${edu.institution || "—"}</strong>
+  </div>
+  <div class="edu-subheader">
+    <span class="edu-title">${edu.title || "—"}</span>
+    <span class="edu-dates">${startDate} – ${endDate}</span>
+  </div>
+  ${edu.description ? `<div class="resume-description">${edu.description}</div>` : ""}
+`;
 
 
     educationList.appendChild(entry);
