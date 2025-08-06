@@ -101,11 +101,6 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
     return;
   }
 
-  if (!name || !email || !phone || !linkedin || !country) {
-    alert("Please fill in all fields before creating the candidate.");
-    return;
-  }
-
   const payload = {
     name,
     email,
