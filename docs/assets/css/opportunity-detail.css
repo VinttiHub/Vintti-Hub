@@ -2257,3 +2257,7 @@ input:checked + .slider::before {
   font-size: 12px;
   color: #888;
 }
+#batchesSection #createCandidateBtn {
+  position: static !important;
+  margin: 12px 0 20px 0;
+}
