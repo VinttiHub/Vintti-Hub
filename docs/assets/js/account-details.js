@@ -226,10 +226,18 @@ function fillAccountDetails(data) {
 
   const websiteLink = document.getElementById('website-link');
   if (websiteLink) websiteLink.href = data.website || '#';
-  if (data.pdf_s3) {
+if (data.pdf_s3) {
   const previewContainer = document.getElementById("pdfPreviewContainer");
-  previewContainer.innerHTML = `<a href="${data.pdf_s3}" target="_blank">📄 View uploaded PDF</a>`;
+  previewContainer.innerHTML = `
+    <a href="${data.pdf_s3}" target="_blank">📄 View PDF</a>
+    <button id="deletePdfBtn" title="Delete PDF">🗑️</button>
+  `;
+  const deleteBtn = document.getElementById("deletePdfBtn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", deletePDF);
+  }
 }
+
 
 }
 

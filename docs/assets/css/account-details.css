@@ -591,3 +591,42 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 #pdfPreviewContainer a:hover {
   background-color: var(--accent-strong);
 }
+.pdf-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#pdfPreviewContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+#pdfPreviewContainer a {
+  padding: 6px 10px;
+  background-color: var(--accent);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+#pdfPreviewContainer a:hover {
+  background-color: var(--accent-strong);
+}
+
+#deletePdfBtn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #ff4d4d;
+  transition: transform 0.2s ease;
+}
+
+#deletePdfBtn:hover {
+  transform: scale(1.2);
+}
