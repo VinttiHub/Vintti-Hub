@@ -183,19 +183,35 @@ function cleanHTML(html) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = html;
 
-  // Elimina estilos inline
+  // 🔥 Elimina todos los span pero conserva su contenido interno
+  wrapper.querySelectorAll('span').forEach(span => {
+    const parent = span.parentNode;
+    while (span.firstChild) parent.insertBefore(span.firstChild, span);
+    parent.removeChild(span);
+  });
+
+  // 🔧 Elimina clases raras y estilos inline
   wrapper.querySelectorAll('*').forEach(el => {
     el.removeAttribute('style');
+    el.removeAttribute('data-start');
+    el.removeAttribute('data-end');
+    el.removeAttribute('class');
     el.style.fontFamily = 'Onest, sans-serif';
     el.style.fontSize = '14px';
     el.style.color = '#333';
     el.style.fontWeight = '400';
   });
 
-  // Reemplaza Apple-converted-space
-  wrapper.querySelectorAll('.Apple-converted-space').forEach(el => {
-    el.replaceWith(' ');
+  // 🧼 Limpia los <br> dentro de <li>
+  wrapper.querySelectorAll('li').forEach(li => {
+    li.innerHTML = li.innerHTML
+      .replace(/<br\s*\/?>/gi, '') // remueve todos los br
+      .trim();
   });
 
-  return wrapper.innerHTML;
+  // 🔨 Elimina <br> generales fuera de listas
+  wrapper.querySelectorAll('br').forEach(br => br.remove());
+
+  return wrapper.innerHTML.trim();
 }
+
