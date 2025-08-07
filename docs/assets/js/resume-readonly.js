@@ -45,7 +45,7 @@ try {
 } catch (e) {
   console.error("❌ Error parsing work_experience:", e);
 }
-workExperience.forEach((exp) => {
+sortByEndDateDescending(workExperience).forEach((exp) => {
   const entry = document.createElement("div");
   const startDate = formatDate(exp.start_date);
   const endDate = exp.current ? "Present" : formatDate(exp.end_date);
@@ -54,7 +54,7 @@ workExperience.forEach((exp) => {
   entry.innerHTML = `
     <strong>${exp.company || "—"}</strong><br/>
     <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
-    <div class="resume-description">${exp.description || ""}</div>
+    <div class="resume-description">${cleanHTML(exp.description || "")}</div>
   `;
 
   workExperienceList.appendChild(entry);
@@ -71,7 +71,7 @@ try {
 if (education.length === 0) {
   document.getElementById("educationSection").style.display = "none";
 } else {
-  education.forEach((edu) => {
+  sortByEndDateDescending(education).forEach((edu) => {
     const entry = document.createElement("div");
     entry.className = "resume-entry";
     const startDate = formatDate(edu.start_date);
@@ -172,3 +172,30 @@ function cleanInlineStyles(element) {
 const aboutP = document.getElementById("aboutField");
 aboutP.innerHTML = data.about || "—";
 cleanInlineStyles(aboutP);
+function sortByEndDateDescending(entries) {
+  return entries.sort((a, b) => {
+    const dateA = a.current || !a.end_date ? new Date(2100, 0, 1) : new Date(a.end_date);
+    const dateB = b.current || !b.end_date ? new Date(2100, 0, 1) : new Date(b.end_date);
+    return dateB - dateA; // más reciente primero
+  });
+}
+function cleanHTML(html) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
+
+  // Elimina estilos inline
+  wrapper.querySelectorAll('*').forEach(el => {
+    el.removeAttribute('style');
+    el.style.fontFamily = 'Onest, sans-serif';
+    el.style.fontSize = '14px';
+    el.style.color = '#333';
+    el.style.fontWeight = '400';
+  });
+
+  // Reemplaza Apple-converted-space
+  wrapper.querySelectorAll('.Apple-converted-space').forEach(el => {
+    el.replaceWith(' ');
+  });
+
+  return wrapper.innerHTML;
+}
