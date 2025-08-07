@@ -392,7 +392,11 @@ uploadBtn.addEventListener("click", () => {
     .then(res => res.json())
     .then(data => {
       if (data.pdf_url) {
-        previewContainer.innerHTML = `<a href="${data.pdf_url}" target="_blank">📄 View uploaded PDF</a>`;
+        previewContainer.innerHTML = `
+          <a href="${data.pdf_url}" target="_blank">📄 View uploaded PDF</a>
+          <button id="deletePdfBtn" class="delete-pdf-btn">🗑️</button>
+        `;
+        document.getElementById("deletePdfBtn").addEventListener("click", deletePDF);
       } else {
         alert("Error uploading PDF.");
       }
@@ -418,4 +422,23 @@ function updateCandidateField(candidateId, field, value) {
     })
     .catch(err => console.error('❌ Failed to save field:', err));
   }
+}
+function deletePDF() {
+  const accountId = getIdFromURL();
+  if (!accountId) return;
+
+  if (!confirm("Are you sure you want to delete this PDF?")) return;
+
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/delete_pdf`, {
+    method: "DELETE"
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Failed to delete PDF");
+    previewContainer.innerHTML = "";
+    alert("PDF deleted successfully");
+  })
+  .catch(err => {
+    console.error("Error deleting PDF:", err);
+    alert("Failed to delete PDF");
+  });
 }

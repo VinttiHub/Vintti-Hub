@@ -578,14 +578,16 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 }
 
 #pdfPreviewContainer a {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background-color: var(--accent);
+  border-radius: 8px;
+  font-size: 0.9rem;
   text-decoration: none;
-  color: var(--primary);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
+  color: var(--text);
+  transition: background-color 0.2s;
 }
-
-#pdfPreviewContainer a::before {
-  content: "📄";
-  margin-right: 6px;
+#pdfPreviewContainer a:hover {
+  background-color: var(--accent-strong);
 }

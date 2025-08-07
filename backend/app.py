@@ -1872,6 +1872,34 @@ def upload_account_pdf(account_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/accounts/<account_id>/delete_pdf', methods=['DELETE'])
+def delete_account_pdf(account_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT pdf_s3 FROM account WHERE account_id = %s", (account_id,))
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            return jsonify({"error": "No PDF found"}), 404
+
+        pdf_url = row[0]
+        match = re.search(r"accounts%2F(.+?)\.pdf", pdf_url) or re.search(r"accounts/(.+?\.pdf)", pdf_url)
+        if not match:
+            return jsonify({"error": "Invalid S3 key"}), 400
+
+        s3_key = f"accounts/{match.group(1)}"
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=s3_key)
+
+        cursor.execute("UPDATE account SET pdf_s3 = NULL WHERE account_id = %s", (account_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "PDF deleted"}), 200
+
+    except Exception as e:
+        print("❌ Error deleting PDF:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
