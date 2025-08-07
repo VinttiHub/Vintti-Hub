@@ -226,6 +226,11 @@ function fillAccountDetails(data) {
 
   const websiteLink = document.getElementById('website-link');
   if (websiteLink) websiteLink.href = data.website || '#';
+  if (data.pdf_s3) {
+  const previewContainer = document.getElementById("pdfPreviewContainer");
+  previewContainer.innerHTML = `<a href="${data.pdf_s3}" target="_blank">📄 View uploaded PDF</a>`;
+}
+
 }
 
 
@@ -362,3 +367,32 @@ function saveDiscountDolar(candidateId, value) {
   })
   .catch(err => console.error('❌ Failed to save discount:', err));
 }
+const uploadBtn = document.getElementById("uploadPdfBtn");
+const pdfInput = document.getElementById("pdfUpload");
+const previewContainer = document.getElementById("pdfPreviewContainer");
+
+uploadBtn.addEventListener("click", () => {
+  const file = pdfInput.files[0];
+  if (!file) return alert("Please select a PDF file.");
+
+  const formData = new FormData();
+  formData.append("pdf", file);
+
+  const accountId = getIdFromURL();
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/upload_pdf`, {
+    method: "POST",
+    body: formData,
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.pdf_url) {
+        previewContainer.innerHTML = `<a href="${data.pdf_url}" target="_blank">📄 View uploaded PDF</a>`;
+      } else {
+        alert("Error uploading PDF.");
+      }
+    })
+    .catch(err => {
+      console.error("Error uploading PDF:", err);
+      alert("Upload failed");
+    });
+});

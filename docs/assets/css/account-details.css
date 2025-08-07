@@ -531,3 +531,61 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 .month-range-picker::placeholder {
   color: #aaa;
 }
+.pdf-upload-section {
+  background-color: var(--card);
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px var(--shadow);
+  margin-top: 20px;
+  transition: all 0.3s ease;
+}
+
+.pdf-upload-section label {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 8px;
+}
+
+#pdfUpload {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: #fff;
+  font-family: inherit;
+}
+
+#uploadPdfBtn {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+#uploadPdfBtn:hover {
+  background-color: #574fd6;
+}
+
+#pdfPreviewContainer {
+  margin-top: 12px;
+  font-weight: 500;
+}
+
+#pdfPreviewContainer a {
+  text-decoration: none;
+  color: var(--primary);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+#pdfPreviewContainer a::before {
+  content: "📄";
+  margin-right: 6px;
+}

@@ -1841,6 +1841,37 @@ def delete_candidate_from_batch():
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/accounts/<account_id>/upload_pdf', methods=['POST'])
+def upload_account_pdf(account_id):
+    pdf_file = request.files.get('pdf')
+    if not pdf_file:
+        return jsonify({"error": "Missing PDF file"}), 400
+
+    try:
+        filename = f"accounts/{account_id}_{uuid.uuid4()}.pdf"
+        s3_client.upload_fileobj(
+            pdf_file,
+            S3_BUCKET,
+            filename,
+            ExtraArgs={'ContentType': 'application/pdf'}
+        )
+        signed_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': filename},
+            ExpiresIn=604800  # 7 días
+        )
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE account SET pdf_s3 = %s WHERE account_id = %s", (signed_url, account_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "PDF uploaded", "pdf_url": signed_url}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
