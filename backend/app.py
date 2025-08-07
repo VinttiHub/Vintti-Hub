@@ -659,7 +659,7 @@ def get_candidate_by_id(candidate_id):
                 created_at,
                 linkedin_scrapper,
                 cv_pdf_scrapper,
-                candidate_id
+                candidate_id, 'discount_dolar', 'discount_daterange'
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))

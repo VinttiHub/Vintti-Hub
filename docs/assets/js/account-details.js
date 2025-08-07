@@ -24,17 +24,6 @@ document.body.style.backgroundColor = 'var(--bg)';
     });
   });
 
-  // Expandable rows
-  document.querySelectorAll('.expand-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      const table = button.closest('table');
-      const isOpen = button.classList.toggle('opened');
-      const toggleCells = table.querySelectorAll('.hidden-column');
-      toggleCells.forEach(cell => {
-        cell.style.display = isOpen ? 'table-cell' : 'none';
-      });
-    });
-  });
   // Cargar datos
   const id = getIdFromURL();
   if (!id) return;
@@ -104,6 +93,47 @@ if (clientNameInput) {
     });
   });
 }
+setTimeout(() => {
+  document.querySelectorAll('.month-range-picker').forEach(input => {
+    new Litepicker({
+      element: input,
+      format: 'MMM YYYY',
+      numberOfMonths: 2,
+      numberOfColumns: 2,
+      singleMode: false,
+      allowRepick: true,
+      dropdowns: {
+        minYear: 2020,
+        maxYear: 2030,
+        months: true,
+        years: true
+      },
+      setup: (picker) => {
+        picker.on('selected', (date1, date2) => {
+          const candidateId = input.dataset.candidateId;
+          if (!candidateId) return;
+
+          const start = date1.format('YYYY-MM-DD');
+          const end = date2.format('YYYY-MM-DD');
+
+          // Guardar en la base de datos
+          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ discount_daterange: `[${start},${end}]` }) // formato de daterange
+          }).then(res => {
+            if (!res.ok) throw new Error("Error al guardar discount_daterange");
+            console.log('🟢 Discount date range actualizado');
+          }).catch(err => {
+            console.error('❌ Error:', err);
+          });
+        });
+      }
+    });
+  });
+}, 100);
+
+
 
 
 
@@ -229,48 +259,11 @@ function loadCandidates(accountId) {
     .then(res => res.json())
     .then(data => {
       console.log("Candidates asociados:", data);
-      fillCandidatesCards(data);
       fillEmployeesTables(data);
     })
     .catch(err => {
       console.error("Error cargando candidates asociados:", err);
     });
-}
-function fillCandidatesCards(candidates) {
-  const staffingContainer = document.querySelector('#overview .accordion-section:nth-of-type(3) .card-grid');
-  const recruitingContainer = document.querySelector('#overview .accordion-section:nth-of-type(4) .card-grid');
-
-  staffingContainer.innerHTML = '';   // Limpiar
-  recruitingContainer.innerHTML = '';
-
-  if (!candidates.length) return;
-
-  candidates.forEach(candidate => {
-    const card = document.createElement('div');
-    card.classList.add('info-card', 'square');
-    const formatValue = (val) => {
-      return val
-        ? `$${val}`
-        : `<span class="to-be-filled">Unfilled</span>`;
-    };
-
-    card.innerHTML = `
-      <div class="info-title">👤 ${candidate.name || '—'}</div>
-      <div class="info-details">
-        <div><strong>Revenue:</strong> ${formatValue(candidate.employee_revenue)}</div>
-        <div><strong>Fee:</strong> ${formatValue(candidate.employee_fee)}</div>
-        <div><strong>Salary:</strong> ${formatValue(candidate.employee_salary)}</div>
-      </div>
-    `;
-
-
-    // Según peoplemodel lo metemos en el contenedor correcto:
-    if (candidate.opp_model === 'Staffing') {
-      staffingContainer.appendChild(card);
-    } else if (candidate.opp_model === 'Recruiting') {
-      recruitingContainer.appendChild(card);
-    }
-  });
 }
 
 function fillEmployeesTables(candidates) {
@@ -279,6 +272,9 @@ function fillEmployeesTables(candidates) {
 
   staffingTableBody.innerHTML = '';   // Limpiar
   recruitingTableBody.innerHTML = '';
+
+  let hasStaffing = false;
+  let hasRecruiting = false;
 
   if (!candidates.length) return;
 
@@ -294,17 +290,38 @@ function fillEmployeesTables(candidates) {
       <td>$${candidate.employee_fee ?? '—'}</td>
       <td>$${candidate.employee_salary ?? '—'}</td>
       <td>$${candidate.employee_revenue ?? '—'}</td>
-      <td class="toggle-col-btn"><button class="expand-btn">＋</button></td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
-      <td class="hidden-column">—</td>
+      <td>
+        <input 
+          type="number"
+          class="discount-input"
+          placeholder="$"
+          value="${candidate.discount_dolar || ''}"
+          onchange="updateCandidateField(${candidate.candidate_id}, 'discount_dolar', this.value)"
+        />
+      </td>
+      <td>
+      <input 
+        type="text" 
+        class="month-range-picker" 
+        placeholder="Select range"
+        readonly 
+        data-candidate-id="${candidate.candidate_id}"
+        value="${candidate.discount_daterange || ''}"
+      />
+      </td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
     `;
+    if (candidate.opp_model === 'Staffing') {
+      staffingTableBody.appendChild(row);
+      hasStaffing = true;
+    } else if (candidate.opp_model === 'Recruiting') {
+      recruitingTableBody.appendChild(row);
+      hasRecruiting = true;
+    }
 
     // Según peoplemodel lo metemos en la tabla correcta:
     if (candidate.opp_model === 'Staffing') {
@@ -314,20 +331,34 @@ function fillEmployeesTables(candidates) {
     }
   });
 
-  // Re-asignar eventos a los botones expand-btn:
-  document.querySelectorAll('.expand-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      const table = button.closest('table');
-      const isOpen = button.classList.toggle('opened');
-      
-      const toggleCells = table.querySelectorAll('.hidden-column');
-      toggleCells.forEach(cell => {
-        cell.style.display = isOpen ? 'table-cell' : 'none';
-      });
-    });
-  });
+  if (!hasStaffing) {
+  staffingTableBody.innerHTML = `<tr><td colspan="100%">No employees in Staffing</td></tr>`;
+}
+if (!hasRecruiting) {
+  recruitingTableBody.innerHTML = `<tr><td colspan="100%">No employees in Recruiting</td></tr>`;
+}
+
 }
   function getIdFromURL() {
     const params = new URLSearchParams(window.location.search);
     return params.get('id');
   }
+  function formatDollarInput(input) {
+  const val = input.value.replace(/\$/g, '').replace(/[^\d.]/g, '');
+  input.value = val ? `$${val}` : '';
+}
+function saveDiscountDolar(candidateId, value) {
+  const numericValue = parseFloat(value.replace(/[^\d.]/g, ''));
+  if (isNaN(numericValue)) return;
+
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ discount_dolar: numericValue })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Error saving discount');
+    console.log('💾 Discount $ saved');
+  })
+  .catch(err => console.error('❌ Failed to save discount:', err));
+}
