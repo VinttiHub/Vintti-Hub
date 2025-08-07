@@ -205,12 +205,17 @@ function cleanHTML(html) {
   // 🧼 Limpia los <br> dentro de <li>
   wrapper.querySelectorAll('li').forEach(li => {
     li.innerHTML = li.innerHTML
-      .replace(/<br\s*\/?>/gi, '') // remueve todos los br
+      .replace(/<br\s*\/?>/gi, '')   // elimina <br>
+      .replace(/&nbsp;/gi, ' ')     // reemplaza nbsp por espacio normal
+      .replace(/\s+/g, ' ')         // colapsa espacios múltiples
       .trim();
   });
 
   // 🔨 Elimina <br> generales fuera de listas
   wrapper.querySelectorAll('br').forEach(br => br.remove());
+
+  // ✨ Colapsa espacios innecesarios entre etiquetas HTML
+  wrapper.innerHTML = wrapper.innerHTML.replace(/>\s+</g, '><');
 
   return wrapper.innerHTML.trim();
 }
