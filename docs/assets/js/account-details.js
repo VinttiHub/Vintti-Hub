@@ -301,7 +301,7 @@ function fillEmployeesTables(candidates) {
           class="discount-input"
           placeholder="$"
           value="${candidate.discount_dolar || ''}"
-          onchange="updateCandidateField(${candidate.candidate_id}, 'discount_dolar', this.value)"
+          data-candidate-id="${candidate.candidate_id}"
         />
       </td>
       <td>
@@ -320,6 +320,12 @@ function fillEmployeesTables(candidates) {
       <td>—</td>
       <td>—</td>
     `;
+    const discountInput = row.querySelector('.discount-input');
+    discountInput.addEventListener('blur', () => {
+      const candidateId = discountInput.dataset.candidateId;
+      const value = discountInput.value;
+      updateCandidateField(candidateId, 'discount_dolar', value);
+    });
     if (candidate.opp_model === 'Staffing') {
       staffingTableBody.appendChild(row);
       hasStaffing = true;
@@ -396,3 +402,20 @@ uploadBtn.addEventListener("click", () => {
       alert("Upload failed");
     });
 });
+function updateCandidateField(candidateId, field, value) {
+  if (field === 'discount_dolar') {
+    const numericValue = parseFloat(value.replace(/[^\d.]/g, ''));
+    if (isNaN(numericValue)) return;
+
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: numericValue })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Error saving discount');
+      console.log(`💾 ${field} saved for candidate ${candidateId}`);
+    })
+    .catch(err => console.error('❌ Failed to save field:', err));
+  }
+}
