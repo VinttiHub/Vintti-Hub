@@ -93,45 +93,6 @@ if (clientNameInput) {
     });
   });
 }
-setTimeout(() => {
-  document.querySelectorAll('.month-range-picker').forEach(input => {
-    new Litepicker({
-      element: input,
-      format: 'MMM YYYY',
-      numberOfMonths: 2,
-      numberOfColumns: 2,
-      singleMode: false,
-      allowRepick: true,
-      dropdowns: {
-        minYear: 2020,
-        maxYear: 2030,
-        months: true,
-        years: true
-      },
-      setup: (picker) => {
-        picker.on('selected', (date1, date2) => {
-          const candidateId = input.dataset.candidateId;
-          if (!candidateId) return;
-
-          const start = date1.format('YYYY-MM-DD');
-          const end = date2.format('YYYY-MM-DD');
-
-          // Guardar en la base de datos
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ discount_daterange: `[${start},${end}]` }) // formato de daterange
-          }).then(res => {
-            if (!res.ok) throw new Error("Error al guardar discount_daterange");
-            console.log('🟢 Discount date range actualizado');
-          }).catch(err => {
-            console.error('❌ Error:', err);
-          });
-        });
-      }
-    });
-  });
-}, 100);
 
 
 
@@ -328,6 +289,46 @@ function fillEmployeesTables(candidates) {
       <td>—</td>
       <td>—</td>
     `;
+    // Inicializar Litepicker en el input recién creado
+const monthPickerInput = row.querySelector('.month-range-picker');
+if (monthPickerInput) {
+  new Litepicker({
+    element: monthPickerInput,
+    format: 'MMM YYYY',
+    numberOfMonths: 2,
+    numberOfColumns: 2,
+    singleMode: false,
+    allowRepick: true,
+    dropdowns: {
+      minYear: 2020,
+      maxYear: 2030,
+      months: true,
+      years: true
+    },
+    setup: (picker) => {
+      picker.on('selected', (date1, date2) => {
+        const candidateId = monthPickerInput.dataset.candidateId;
+        if (!candidateId) return;
+
+        const start = date1.format('YYYY-MM-DD');
+        const end = date2.format('YYYY-MM-DD');
+
+        // Guardar en la base de datos
+        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discount_daterange: `[${start},${end}]` })
+        }).then(res => {
+          if (!res.ok) throw new Error("Error al guardar discount_daterange");
+          console.log('🟢 Discount date range actualizado');
+        }).catch(err => {
+          console.error('❌ Error:', err);
+        });
+      });
+    }
+  });
+}
+
     const discountInput = row.querySelector('.discount-input');
     discountInput.addEventListener('blur', () => {
       const candidateId = discountInput.dataset.candidateId;
