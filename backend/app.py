@@ -145,7 +145,41 @@ def get_accounts_light():
         return jsonify(accounts)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/opportunities/light')
+def get_opportunities_light():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                o.opportunity_id,
+                o.account_id,
+                o.opp_stage,
+                o.opp_position_name,
+                o.opp_type,
+                o.opp_model,
+                o.opp_hr_lead,
+                o.comments,
+                o.nda_signature_or_start_date,
+                o.opp_close_date,  -- <== agrega esta línea
+                u.user_name AS sales_lead_name,
+                a.client_name AS client_name
+            FROM opportunity o
+            LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
+            LEFT JOIN account a ON o.account_id = a.account_id
+        """)
+        rows = cursor.fetchall()
+        colnames = [desc[0] for desc in cursor.description]
+        data = [dict(zip(colnames, row)) for row in rows]
 
+        cursor.close()
+        conn.close()
+
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 @app.route('/data')
 def get_accounts():
     try:
