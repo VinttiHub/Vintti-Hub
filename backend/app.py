@@ -145,9 +145,9 @@ def get_accounts_light():
                 a.contract,
                 a.priority,
                 -- SUMAS agrupadas por cuenta
-                COALESCE(SUM(CASE WHEN c.peoplemodel = 'Recruiting' THEN c.employee_revenue_recruiting ELSE 0 END), 0) AS trr,
-                COALESCE(SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN c.employee_fee ELSE 0 END), 0) AS tsf,
-                COALESCE(SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN c.employee_salary ELSE 0 END), 0) AS tsr
+                SUM(CASE WHEN c.peoplemodel = 'Recruiting' THEN COALESCE(c.employee_revenue_recruiting, 0) ELSE 0 END) AS trr,
+                SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN COALESCE(c.employee_fee, 0) ELSE 0 END) AS tsf,
+                SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN COALESCE(c.employee_salary, 0) ELSE 0 END) AS tsr
             FROM account a
             LEFT JOIN candidates c ON c.account_id = a.account_id
             GROUP BY a.account_id, a.client_name, a.account_manager, a.contract, a.priority
