@@ -670,4 +670,19 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 .discount-alert li span {
   font-weight: 500;
 }
+.close-alert-btn {
+  background: transparent;
+  border: none;
+  font-size: 10px;
+  color: #696969; /* gris suave */
+  float: right;
+  cursor: pointer;
+  margin-left: 10px;
+  padding: 0;
+  line-height: 1;
+}
+.close-alert-btn:hover {
+  color: #3a3a3a;
+  transform: scale(1.1);
+}
 

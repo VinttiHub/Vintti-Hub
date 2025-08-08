@@ -93,6 +93,12 @@ if (clientNameInput) {
     });
   });
 }
+const closeBtn = document.getElementById("close-discount-alert");
+if (closeBtn) {
+  closeBtn.addEventListener("click", () => {
+    document.getElementById("discount-alert").classList.add("hidden");
+  });
+}
 
 
 
@@ -284,7 +290,7 @@ function fillEmployeesTables(candidates) {
         placeholder="Select range"
         readonly 
         data-candidate-id="${candidate.candidate_id}"
-        value="${candidate.discount_daterange || ''}"
+        value="${candidate.discount_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
       />
       </td>
       <td>—</td>
@@ -295,8 +301,23 @@ function fillEmployeesTables(candidates) {
     `;
     // Inicializar Litepicker en el input recién creado
 const monthPickerInput = row.querySelector('.month-range-picker');
+
 if (monthPickerInput) {
-  new Litepicker({
+  // ⬇️ Este bloque va afuera del objeto, antes del new Litepicker
+const daterange = candidate.discount_daterange;
+let startDate = null;
+let endDate = null;
+
+if (daterange && daterange.includes(',')) {
+  const dates = daterange.replace('[', '').replace(']', '').split(',');
+  if (dates.length === 2) {
+    startDate = new Date(dates[0].trim().slice(0, 7) + '-15');
+    endDate = new Date(dates[1].trim().slice(0, 7) + '-15');
+  }
+}
+
+  // ⬇️ Creamos el objeto de opciones para Litepicker
+  const litepickerOptions = {
     element: monthPickerInput,
     format: 'MMM YYYY',
     numberOfMonths: 2,
@@ -317,7 +338,6 @@ if (monthPickerInput) {
         const start = date1.format('YYYY-MM-DD');
         const end = date2.format('YYYY-MM-DD');
 
-        // Guardar en la base de datos
         fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -330,7 +350,16 @@ if (monthPickerInput) {
         });
       });
     }
-  });
+  };
+
+  // ⬇️ Solo si hay valores previos, se agregan
+  if (startDate && endDate) {
+    litepickerOptions.startDate = startDate;
+    litepickerOptions.endDate = endDate;
+  }
+
+  // ⬇️ Finalmente, inicializamos el picker
+  new Litepicker(litepickerOptions);
 }
 
     const discountInput = row.querySelector('.discount-input');
@@ -378,20 +407,21 @@ discountCandidates.sort((a, b) => {
   return new Date(endA) - new Date(endB);
 });
 
-  discountCandidates.forEach(c => {
-    const name = c.name || 'Unnamed';
-    const endDate = c.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+discountCandidates.forEach(c => {
+  const endDate = c.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
 
-    if (endDate) {
-      const formattedEnd = new Date(endDate).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'short'
-      });
+  if (endDate) {
+    const formattedEnd = new Date(endDate).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short'
+    });
 
-      const li = document.createElement('li');
-      li.innerHTML = `🗓️ <span>${name}</span> → until <strong>${formattedEnd}</strong>`;
-      discountListEl.appendChild(li);
-    }
-  });
+    const li = document.createElement('li');
+    const discountDollar = c.discount_dolar ? `$${c.discount_dolar}` : '';
+    li.innerHTML = `💵 ${discountDollar} until <strong>${formattedEnd}</strong>`;
+
+    discountListEl.appendChild(li);
+  }
+});
 
   alertDiv.classList.remove("hidden");
 } else {
