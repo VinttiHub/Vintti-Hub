@@ -1109,19 +1109,24 @@ function loadHireData() {
   document.getElementById('hire-start-date').value = data.start_date || '';
   document.getElementById('hire-references').innerHTML = data.references_notes || '';
 
-if (data.employee_salary && parseFloat(data.employee_salary) > 0) {
-  salaryInput.disabled = true;
-  salaryInput.addEventListener('mouseenter', () => showTooltip(salaryInput, "To update salary or revenue, please use the update salary section below"));
-  salaryInput.addEventListener('mouseleave', hideTooltip);
-  salaryInput.addEventListener('click', () => showTooltip(salaryInput, "To update salary or revenue, please use the update salary section below"));
-}
+const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
+const isRecruiting = modelText?.includes('recruiting');
 
-if ((data.employee_revenue_recruiting && parseFloat(data.employee_revenue_recruiting) > 0) || 
-    (data.employee_revenue && parseFloat(data.employee_revenue) > 0)) {
-  revenueInput.disabled = true;
-  revenueInput.addEventListener('mouseenter', () => showTooltip(revenueInput, "To update salary or revenue, please use the update salary section below"));
-  revenueInput.addEventListener('mouseleave', hideTooltip);
-  revenueInput.addEventListener('click', () => showTooltip(revenueInput, "To update salary or revenue, please use the update salary section below"));
+// Solo aplica esta lógica si es Recruiting
+if (isRecruiting) {
+  if (data.employee_salary && parseFloat(data.employee_salary) > 0) {
+    salaryInput.disabled = true;
+    salaryInput.addEventListener('mouseenter', () => showTooltip(salaryInput, "To update salary, please use the 'Salary Updates' section below"));
+    salaryInput.addEventListener('mouseleave', hideTooltip);
+    salaryInput.addEventListener('click', () => showTooltip(salaryInput, "To update salary, please use the 'Salary Updates' section below"));
+  }
+
+  if (data.employee_revenue_recruiting && parseFloat(data.employee_revenue_recruiting) > 0) {
+    revenueInput.disabled = true;
+    revenueInput.addEventListener('mouseenter', () => showTooltip(revenueInput, "To update revenue, please use the 'Salary Updates' section below"));
+    revenueInput.addEventListener('mouseleave', hideTooltip);
+    revenueInput.addEventListener('click', () => showTooltip(revenueInput, "To update revenue, please use the 'Salary Updates' section below"));
+  }
 }
 
   // Deshabilitar salary y fee si ya tienen valores
