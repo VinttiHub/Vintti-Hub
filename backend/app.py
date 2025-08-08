@@ -158,75 +158,65 @@ def get_accounts():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        # Traer todas las accounts
+
+        # Traer todas las cuentas
         cursor.execute("SELECT * FROM account")
         accounts_rows = cursor.fetchall()
         accounts_columns = [desc[0] for desc in cursor.description]
-
         accounts = [dict(zip(accounts_columns, row)) for row in accounts_rows]
 
         for account in accounts:
             account_id = account['account_id']
 
-            # Calcular TRR, TSF, TSR
-            cursor.execute("""
-                SELECT
-                    COALESCE(SUM(CASE WHEN peoplemodel = 'Recruiting' THEN employee_revenue ELSE 0 END), 0) AS trr,
-                    COALESCE(SUM(CASE WHEN peoplemodel = 'Staffing' THEN employee_fee ELSE 0 END), 0) AS tsf,
-                    COALESCE(SUM(CASE WHEN peoplemodel = 'Staffing' THEN employee_revenue ELSE 0 END), 0) AS tsr
-                FROM candidates
-                WHERE account_id = %s
-            """, (account_id,))
-            
-            sums_row = cursor.fetchone()
-            account['trr'] = sums_row[0]
-            account['tsf'] = sums_row[1]
-            account['tsr'] = sums_row[2]
-
-            ### Calcular Status:
-            # 1️⃣ Traer opportunities
-            cursor.execute("""
-                SELECT opportunity_id, opp_stage
-                FROM opportunity
-                WHERE account_id = %s
-            """, (account_id,))
+            # Obtener opportunity_id de esta cuenta
+            cursor.execute("SELECT opportunity_id, opp_model FROM opportunity WHERE account_id = %s", (account_id,))
             opp_rows = cursor.fetchall()
             if not opp_rows:
-                # Si no hay opportunities, entonces Pending
-                account['calculated_status'] = 'Pending'
                 continue
 
-            opp_ids = [row[0] for row in opp_rows]
-            opp_stages = [row[1] for row in opp_rows]
+            opp_ids = [r[0] for r in opp_rows]
+            opp_model_map = {r[0]: r[1] for r in opp_rows}
 
-            # 2️⃣ Traer candidates de esas opportunities
+            # Obtener candidatos vinculados a esas oportunidades
             cursor.execute("""
-                SELECT condition
-                FROM candidates
-                WHERE opportunity_id = ANY(%s)
-                """, ([*opp_ids],))  # o simplemente (opp_ids,) si ya es una lista
-            candidate_rows = cursor.fetchall()
-            candidate_stages = [row[0] for row in candidate_rows]
+                SELECT oc.opportunity_id, c.employee_salary, c.employee_fee, c.employee_revenue, c.employee_revenue_recruiting
+                FROM opportunity_candidates oc
+                JOIN candidates c ON oc.candidate_id = c.candidate_id
+                WHERE oc.opportunity_id = ANY(%s)
+            """, (opp_ids,))
 
-            # 3️⃣ Aplicar reglas:
-            status = 'Pending'
+            trr = tsf = tsr = 0
+            for row in cursor.fetchall():
+                opp_id, salary, fee, revenue, revenue_recruiting = row
+                model = opp_model_map.get(opp_id)
 
-            # Priority order:
-            if any((s or '').lower() == 'active' for s in candidate_stages):
-                status = 'Active'
-            elif any((s or '').lower() == 'inactive' for s in candidate_stages):
-                status = 'Inactive'
-            elif any((stage or '').lower() in ['interviewing', 'sourcing', 'nda sent', 'negotiating'] for stage in opp_stages):
-                status = 'In Process'
+                if model == 'Recruiting':
+                    trr += revenue_recruiting or 0
+                elif model == 'Staffing':
+                    tsf += fee or 0
+                    tsr += salary or 0
 
-            account['calculated_status'] = status
+            # Guardar los valores en la tabla account
+            cursor.execute("""
+                UPDATE account
+                SET trr = %s, tsf = %s, tsr = %s
+                WHERE account_id = %s
+            """, (trr, tsf, tsr, account_id))
 
+            account['trr'] = trr
+            account['tsf'] = tsf
+            account['tsr'] = tsr
+
+        conn.commit()
         cursor.close()
         conn.close()
 
         return jsonify(accounts)
+
     except Exception as e:
+        print("Error en /data:", e)
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/opportunities')

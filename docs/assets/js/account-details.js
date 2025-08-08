@@ -204,6 +204,9 @@ if (data.pdf_s3) {
     deleteBtn.addEventListener("click", deletePDF);
   }
 }
+document.getElementById('account-tsf').textContent = `$${data.tsf ?? 0}`;
+document.getElementById('account-tsr').textContent = `$${data.tsr ?? 0}`;
+document.getElementById('account-trr').textContent = `$${data.trr ?? 0}`;
 
 
 }
