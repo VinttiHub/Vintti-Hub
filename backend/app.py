@@ -113,11 +113,11 @@ def get_accounts_light():
                 CASE
                 WHEN MAX(CASE WHEN o.opp_model = 'Staffing'   THEN 1 ELSE 0 END) = 1
                 AND MAX(CASE WHEN o.opp_model = 'Recruiting' THEN 1 ELSE 0 END) = 1
-                    THEN 'Contract mix'
+                    THEN 'Mix'
                 WHEN MAX(CASE WHEN o.opp_model = 'Staffing'   THEN 1 ELSE 0 END) = 1
-                    THEN 'Contract staffing'
+                    THEN 'Staffing'
                 WHEN MAX(CASE WHEN o.opp_model = 'Recruiting' THEN 1 ELSE 0 END) = 1
-                    THEN 'Contract recruiting'
+                    THEN 'Recruiting'
                 ELSE NULL
                 END AS contract,
 
