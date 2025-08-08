@@ -321,7 +321,7 @@ if (monthPickerInput) {
         fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ discount_daterange: `[${start},${end}]` })
+          body: JSON.stringify({ discount_daterange: `${start},${end}` })
         }).then(res => {
           if (!res.ok) throw new Error("Error al guardar discount_daterange");
           console.log('🟢 Discount date range actualizado');
