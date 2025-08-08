@@ -97,39 +97,57 @@ def get_candidates_light():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/opportunities/light')
-def get_opportunities_light():
+@app.route('/data/light')
+def get_accounts_light():
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
+        # ✅ Calculado en runtime a partir de opportunities + candidato_contratado
         cursor.execute("""
             SELECT
-                o.opportunity_id,
-                o.account_id,
-                o.opp_stage,
-                o.opp_position_name,
-                o.opp_type,
-                o.opp_model,
-                o.opp_hr_lead,
-                o.comments,
-                o.nda_signature_or_start_date,
-                o.opp_close_date,  -- <== agrega esta línea
-                u.user_name AS sales_lead_name,
-                a.client_name AS client_name
-            FROM opportunity o
-            LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
-            LEFT JOIN account a ON o.account_id = a.account_id
+                a.account_id,
+                a.client_name,
+                COALESCE(u.user_name, a.account_manager) AS account_manager_name,
+                a.priority,
+
+                -- "contract": cantidad de hires en esta cuenta
+                COALESCE(COUNT(o.candidato_contratado) FILTER (WHERE o.candidato_contratado IS NOT NULL), 0) AS contract,
+
+                -- TRR: suma de employee_revenue_recruiting para hires en oportunidades Recruiting
+                COALESCE(SUM(
+                    CASE WHEN o.opp_model = 'Recruiting' THEN c.employee_revenue_recruiting ELSE 0 END
+                ), 0) AS trr,
+
+                -- TSF: suma de employee_fee para hires en oportunidades Staffing
+                COALESCE(SUM(
+                    CASE WHEN o.opp_model = 'Staffing' THEN c.employee_fee ELSE 0 END
+                ), 0) AS tsf,
+
+                -- TSR: suma de employee_salary para hires en oportunidades Staffing
+                COALESCE(SUM(
+                    CASE WHEN o.opp_model = 'Staffing' THEN c.employee_salary ELSE 0 END
+                ), 0) AS tsr
+
+            FROM account a
+            LEFT JOIN users u ON a.account_manager = u.email_vintti
+            LEFT JOIN opportunity o ON o.account_id = a.account_id
+            LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+            GROUP BY
+                a.account_id, a.client_name, u.user_name, a.account_manager, a.priority
+            ORDER BY a.client_name ASC
         """)
+
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
-        data = [dict(zip(colnames, row)) for row in rows]
+        accounts = [dict(zip(colnames, row)) for row in rows]
 
         cursor.close()
         conn.close()
-
-        return jsonify(data)
+        return jsonify(accounts)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/data/light')
 def get_accounts_light():

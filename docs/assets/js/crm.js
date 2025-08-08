@@ -34,31 +34,38 @@ document.addEventListener('DOMContentLoaded', () => {
       const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
       const showPriorityColumn = allowedEmails.includes(currentUserEmail);
       data.forEach(item => {
-      let htmlRow = `
-        <tr data-id="${item.account_id}">
-          <td>${item.client_name || '—'}</td>
-          <td>${item.calculated_status || '—'}</td>
-          <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">No sales lead assigned</span>'}</td>
-          <td class="muted-cell">${item.contract ? item.contract : '<span class="placeholder">No hires yet</span>'}</td>
-          <td>$${item.trr ?? '—'}</td>
-          <td>$${item.tsf ?? '—'}</td>
-          <td>$${item.tsr ?? '—'}</td>
-      `;
-      if (showPriorityColumn) {
-        htmlRow += `
-          <td>
-            <select class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : ''}" data-id="${item.account_id}">
-              <option value="">—</option>
-              <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
-              <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
-              <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
-            </select>
-          </td>
+        const contractTxt = fmtContract(item.contract) || '<span class="placeholder">No hires yet</span>';
+        const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">No available</span>';
+        const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">No available</span>';
+        const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">No available</span>';
+
+        let htmlRow = `
+          <tr data-id="${item.account_id}">
+            <td>${item.client_name || '—'}</td>
+            <td>${item.calculated_status || '—'}</td>
+            <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">No sales lead assigned</span>'}</td>
+            <td class="muted-cell">${contractTxt}</td>
+            <td>${trrTxt}</td>
+            <td>${tsfTxt}</td>
+            <td>${tsrTxt}</td>
         `;
-      }
-      htmlRow += `</tr>`;
-      tableBody.innerHTML += htmlRow;
+
+        if (showPriorityColumn) {
+          htmlRow += `
+            <td>
+              <select class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : ''}" data-id="${item.account_id}">
+                <option value="">—</option>
+                <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
+                <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
+                <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
+              </select>
+            </td>
+          `;
+        }
+        htmlRow += `</tr>`;
+        tableBody.innerHTML += htmlRow;
       });
+
 
       // 👇 Inserta el nuevo <th> si aplica
       if (showPriorityColumn) {
@@ -242,3 +249,15 @@ function closePopup() {
   }, 300);  // Esperas a que termine la animación de fade-out
 }
 
+// 👉 Helpers de formateo
+function fmtMoney(v) {
+  if (v === null || v === undefined) return null;
+  const num = Number(v) || 0;
+  if (num === 0) return null; // para mostrar "No available"
+  return `$${num.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+function fmtContract(n) {
+  const qty = Number(n) || 0;
+  if (qty <= 0) return null; // para "No hires yet"
+  return qty === 1 ? '1 hire' : `${qty} hires`;
+}
