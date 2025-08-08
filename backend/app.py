@@ -146,37 +146,6 @@ def get_accounts_light():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-
-@app.route('/data/light')
-def get_accounts_light():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            SELECT
-                a.account_id,
-                a.client_name,
-                COALESCE(u.user_name, a.account_manager) AS account_manager_name,
-                a.contract,
-                a.priority,
-                a.trr,
-                a.tsf,
-                a.tsr
-            FROM account a
-            LEFT JOIN users u ON a.account_manager = u.email_vintti
-        """)
-        rows = cursor.fetchall()
-        colnames = [desc[0] for desc in cursor.description]
-        accounts = [dict(zip(colnames, row)) for row in rows]
-
-        cursor.close()
-        conn.close()
-        return jsonify(accounts)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route('/data')
 def get_accounts():
     try:
