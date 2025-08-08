@@ -258,7 +258,7 @@ function fillEmployeesTables(candidates) {
     row.innerHTML = `
       <td>${candidate.status || '—'}</td>
       <td>
-        <a href="/candidate_details.html?id=${candidate.candidate_id}" class="employee-link">
+        <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
           ${candidate.name || '—'}
         </a>
       </td>
