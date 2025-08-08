@@ -496,6 +496,37 @@ discountCandidates.forEach(c => {
 } else {
   alertDiv.classList.add("hidden");
 }
+// 🔁 Determinar tipo de contrato
+let contractType = '—';
+if (hasStaffing && !hasRecruiting) {
+  contractType = 'Staffing';
+} else if (!hasStaffing && hasRecruiting) {
+  contractType = 'Recruiting';
+} else if (hasStaffing && hasRecruiting) {
+  contractType = 'Mix';
+}
+
+// 📝 Mostrar el contract visualmente en el overview
+const contractField = Array.from(document.querySelectorAll('#overview .accordion-content p'))
+  .find(p => p.textContent.includes('Contract:'));
+if (contractField) {
+  contractField.innerHTML = `<strong>Contract:</strong> ${contractType}`;
+}
+
+// 💾 Guardar en la base de datos si es distinto
+const accountId = getIdFromURL();
+if (accountId && contractType !== '—') {
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contract: contractType })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Error updating contract');
+    console.log('✅ Contract updated to:', contractType);
+  })
+  .catch(err => console.error('❌ Error updating contract:', err));
+}
 
 }
   function getIdFromURL() {

@@ -753,7 +753,8 @@ def update_account_fields(account_id):
         'comments',
         'timezone',
         'pain_points',
-        'priority'
+        'priority',
+        'contract'
     ]
 
     updates = []
