@@ -30,7 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <i class='fab fa-linkedin-in'></i>
             </button>
           </td>
-          <td>${candidate.employee || '—'}</td>
+          <td class="employee-cell">
+            ${candidate.employee ? candidate.employee : "<i class='fa-solid fa-xmark gray-x'></i>"}
+          </td>
         `;
         tbody.appendChild(tr);
         document.getElementById('candidatesTableBody').addEventListener('click', function (e) {
@@ -69,7 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
             previous: "Anterior"
           }
         }
-      });
+      });// Mover el selector de registros al contenedor izquierdo
+      const dataTableLength = document.querySelector('.dataTables_length');
+      const wrapper = document.getElementById('datatable-wrapper');
+      if (dataTableLength && wrapper) {
+        wrapper.appendChild(dataTableLength);
+      }
 
       document.getElementById('searchByName').addEventListener('input', function () {
         table.column(1).search(this.value).draw();

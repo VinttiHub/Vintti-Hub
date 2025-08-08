@@ -566,3 +566,24 @@ body {
   font-family: 'Inter', sans-serif;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
+.crm-controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+#datatable-length-container {
+  display: flex;
+  align-items: center;
+}
+
+/* Estilo redondo al buscador */
+.crm-search-input {
+  border-radius: 20px;
+  border: 1px solid #ccc;
+  padding: 8px 14px;
+  outline: none;
+  font-size: 14px;
+}

@@ -94,6 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       });
+      // Mover selector de "mostrar X registros por página" al contenedor deseado
+const lengthMenu = document.querySelector('#accountTable_length');
+const customLengthContainer = document.getElementById('datatable-length-container');
+if (lengthMenu && customLengthContainer) {
+  customLengthContainer.appendChild(lengthMenu);
+}
+
 document.querySelectorAll('.priority-select').forEach(select => {
   select.addEventListener('change', async () => {
     const accountId = select.getAttribute('data-id');
