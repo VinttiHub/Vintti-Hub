@@ -144,12 +144,25 @@ def get_accounts_light():
                 a.account_manager,
                 a.contract,
                 a.priority,
-                -- SUMAS agrupadas por cuenta
-                SUM(CASE WHEN c.peoplemodel = 'Recruiting' THEN COALESCE(c.employee_revenue_recruiting, 0) ELSE 0 END) AS trr,
-                SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN COALESCE(c.employee_fee, 0) ELSE 0 END) AS tsf,
-                SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN COALESCE(c.employee_salary, 0) ELSE 0 END) AS tsr
+                -- TRR: recruiting revenue
+                COALESCE(SUM(CASE 
+                    WHEN o.opp_model = 'Recruiting' THEN c.employee_revenue_recruiting 
+                    ELSE 0 END), 0) AS trr,
+
+                -- TSF: staffing fee
+                COALESCE(SUM(CASE 
+                    WHEN o.opp_model = 'Staffing' THEN c.employee_fee 
+                    ELSE 0 END), 0) AS tsf,
+
+                -- TSR: staffing salary
+                COALESCE(SUM(CASE 
+                    WHEN o.opp_model = 'Staffing' THEN c.employee_salary 
+                    ELSE 0 END), 0) AS tsr
+
             FROM account a
-            LEFT JOIN candidates c ON c.account_id = a.account_id
+            LEFT JOIN opportunity o ON o.account_id = a.account_id
+            LEFT JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
+            LEFT JOIN candidates c ON c.candidate_id = oc.candidate_id
             GROUP BY a.account_id, a.client_name, a.account_manager, a.contract, a.priority
         """)
 
