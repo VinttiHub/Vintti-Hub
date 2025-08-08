@@ -361,6 +361,42 @@ if (monthPickerInput) {
 if (!hasRecruiting) {
   recruitingTableBody.innerHTML = `<tr><td colspan="100%">No employees in Recruiting</td></tr>`;
 }
+const alertDiv = document.getElementById("discount-alert");
+const discountCountEl = document.getElementById("discount-count");
+const discountListEl = document.getElementById("discount-list");
+
+const discountCandidates = candidates.filter(c => 
+  c.discount_dolar && c.discount_daterange && c.discount_daterange.includes(',')
+);
+
+if (discountCandidates.length > 0) {
+  discountCountEl.innerText = discountCandidates.length;
+  discountListEl.innerHTML = '';
+discountCandidates.sort((a, b) => {
+  const endA = a.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+  const endB = b.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+  return new Date(endA) - new Date(endB);
+});
+
+  discountCandidates.forEach(c => {
+    const name = c.name || 'Unnamed';
+    const endDate = c.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+
+    if (endDate) {
+      const formattedEnd = new Date(endDate).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short'
+      });
+
+      const li = document.createElement('li');
+      li.innerHTML = `🗓️ <span>${name}</span> → until <strong>${formattedEnd}</strong>`;
+      discountListEl.appendChild(li);
+    }
+  });
+
+  alertDiv.classList.remove("hidden");
+} else {
+  alertDiv.classList.add("hidden");
+}
 
 }
   function getIdFromURL() {

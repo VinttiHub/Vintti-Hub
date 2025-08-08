@@ -640,3 +640,34 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
   text-decoration: underline;
   color: var(--primary);
 }
+.discount-alert {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background-color: #f9f9f9;
+  border-left: 4px solid #007aff;
+  padding: 14px 18px;
+  font-size: 14px;
+  font-family: 'Onest', sans-serif;
+  color: #1a1a1a;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  z-index: 1000;
+  width: 260px;
+}
+.discount-alert.hidden {
+  display: none;
+}
+.discount-alert ul {
+  margin: 8px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+.discount-alert li {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.discount-alert li span {
+  font-weight: 500;
+}
+
