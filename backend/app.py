@@ -103,7 +103,6 @@ def get_accounts_light():
         conn = get_connection()
         cursor = conn.cursor()
 
-        # ✅ Calculado en runtime a partir de opportunities + candidato_contratado
         cursor.execute("""
             SELECT
                 a.account_id,
@@ -111,30 +110,29 @@ def get_accounts_light():
                 COALESCE(u.user_name, a.account_manager) AS account_manager_name,
                 a.priority,
 
-                -- "contract": cantidad de hires en esta cuenta
-                COALESCE(COUNT(o.candidato_contratado) FILTER (WHERE o.candidato_contratado IS NOT NULL), 0) AS contract,
+                -- contract = cantidad de hires (o.candidato_contratado no nulo)
+                COALESCE(SUM(CASE WHEN o.candidato_contratado IS NOT NULL THEN 1 ELSE 0 END), 0) AS contract,
 
-                -- TRR: suma de employee_revenue_recruiting para hires en oportunidades Recruiting
+                -- TRR (Recruiting): suma employee_revenue_recruiting del candidato contratado
                 COALESCE(SUM(
-                    CASE WHEN o.opp_model = 'Recruiting' THEN c.employee_revenue_recruiting ELSE 0 END
+                    CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(c.employee_revenue_recruiting, 0) ELSE 0 END
                 ), 0) AS trr,
 
-                -- TSF: suma de employee_fee para hires en oportunidades Staffing
+                -- TSF (Staffing): suma employee_fee del candidato contratado
                 COALESCE(SUM(
-                    CASE WHEN o.opp_model = 'Staffing' THEN c.employee_fee ELSE 0 END
+                    CASE WHEN o.opp_model = 'Staffing' THEN COALESCE(c.employee_fee, 0) ELSE 0 END
                 ), 0) AS tsf,
 
-                -- TSR: suma de employee_salary para hires en oportunidades Staffing
+                -- TSR (Staffing): suma employee_salary del candidato contratado
                 COALESCE(SUM(
-                    CASE WHEN o.opp_model = 'Staffing' THEN c.employee_salary ELSE 0 END
+                    CASE WHEN o.opp_model = 'Staffing' THEN COALESCE(c.employee_salary, 0) ELSE 0 END
                 ), 0) AS tsr
 
             FROM account a
             LEFT JOIN users u ON a.account_manager = u.email_vintti
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
-            GROUP BY
-                a.account_id, a.client_name, u.user_name, a.account_manager, a.priority
+            GROUP BY a.account_id, a.client_name, u.user_name, a.account_manager, a.priority
             ORDER BY a.client_name ASC
         """)
 
@@ -147,6 +145,7 @@ def get_accounts_light():
         return jsonify(accounts)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/data/light')
