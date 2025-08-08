@@ -1216,7 +1216,8 @@ def update_candidate_fields(candidate_id):
         'sign_off',
         'linkedin_scrapper',
         'cv_pdf_scrapper',
-        'candidate_id', 'discount_dolar', 'discount_daterange'
+        'discount_dolar', 
+        'discount_daterange'
     ]
 
     updates = []
