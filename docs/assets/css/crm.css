@@ -105,14 +105,6 @@ body {
     border-bottom: 1px solid #f9f9f9;
 }
 
-/* ICON FILTER */
-.column-filter {
-    cursor: pointer;
-    margin-left: 8px;
-    color: #0044ff;
-    font-size: 14px;
-}
-
 /* FILTER DROPDOWN */
 .filter-dropdown {
     position: absolute;

@@ -136,22 +136,33 @@ def get_accounts_light():
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
         cursor.execute("""
             SELECT
                 a.account_id,
                 a.client_name,
                 a.account_manager,
                 a.contract,
-                a.priority
+                a.priority,
+                -- SUMAS agrupadas por cuenta
+                COALESCE(SUM(CASE WHEN c.peoplemodel = 'Recruiting' THEN c.employee_revenue_recruiting ELSE 0 END), 0) AS trr,
+                COALESCE(SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN c.employee_fee ELSE 0 END), 0) AS tsf,
+                COALESCE(SUM(CASE WHEN c.peoplemodel = 'Staffing' THEN c.employee_salary ELSE 0 END), 0) AS tsr
             FROM account a
+            LEFT JOIN candidates c ON c.account_id = a.account_id
+            GROUP BY a.account_id, a.client_name, a.account_manager, a.contract, a.priority
         """)
+
         rows = cursor.fetchall()
-        accounts = [dict(zip(['account_id', 'client_name', 'account_manager', 'contract', 'priority'], row)) for row in rows]
+        colnames = [desc[0] for desc in cursor.description]
+        accounts = [dict(zip(colnames, row)) for row in rows]
+
         cursor.close()
         conn.close()
         return jsonify(accounts)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/data')
 def get_accounts():
