@@ -38,8 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <tr data-id="${item.account_id}">
           <td>${item.client_name || '—'}</td>
           <td>${item.calculated_status || '—'}</td>
-          <td>${item.account_manager || '—'}</td>
-          <td>${item.contract || '—'}</td>
+          <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">No sales lead assigned</span>'}</td>
+          <td class="muted-cell">${item.contract ? item.contract : '<span class="placeholder">No hires yet</span>'}</td>
           <td>$${item.trr ?? '—'}</td>
           <td>$${item.tsf ?? '—'}</td>
           <td>$${item.tsr ?? '—'}</td>

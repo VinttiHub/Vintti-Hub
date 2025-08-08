@@ -579,3 +579,11 @@ body {
   outline: none;
   font-size: 14px;
 }
+.placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.muted-cell {
+  font-weight: 400;
+}
