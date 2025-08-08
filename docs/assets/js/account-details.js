@@ -299,6 +299,66 @@ function fillEmployeesTables(candidates) {
       <td>—</td>
       <td>—</td>
     `;
+    // 👉 Agregar cálculo de Discount Months y ver si está expirado
+// 🎯 Ubicamos celdas necesarias
+const monthsCell = row.children[10]; // Discount Months
+const dateRangeCell = row.children[9]; // Date Range
+const dollarCell = row.children[8]; // Discount $
+
+if (candidate.discount_daterange && candidate.discount_daterange.includes(',')) {
+  const [startStr, endStr] = candidate.discount_daterange.replace('[','').replace(']','').split(',').map(d => d.trim());
+
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+
+  if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+    // 🧮 Calcular meses
+    const months =
+      (end.getFullYear() - start.getFullYear()) * 12 +
+      (end.getMonth() - start.getMonth()) + 1;
+
+    monthsCell.textContent = months;
+
+    // ⏳ Verificar si expiró
+    const now = new Date();
+    const current = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+
+    const isExpired = endMonth < current;
+
+    // 💬 Badge visual
+    const badge = document.createElement('span');
+    badge.textContent = isExpired ? 'expired' : 'active';
+    badge.style.backgroundColor = isExpired ? '#ffe6e6' : '#e6f5e6';
+    badge.style.color = isExpired ? '#b30000' : '#006600';
+    badge.style.padding = '2px 8px';
+    badge.style.borderRadius = '12px';
+    badge.style.fontSize = '11px';
+    badge.style.marginLeft = '8px';
+    badge.style.fontWeight = '600';
+    badge.style.display = 'inline-block';
+
+    const dateInput = dateRangeCell.querySelector('.month-range-picker');
+    if (dateInput && dateInput.parentElement) {
+      dateInput.parentElement.appendChild(badge);
+    }
+
+    if (isExpired) {
+      [monthsCell, dateRangeCell, dollarCell].forEach(cell => {
+        cell.style.backgroundColor = '#fff0f0'; // rojo pastel más suave
+        cell.style.color = '#b30000';
+        cell.style.fontWeight = '500';
+      });
+    } else {
+      [monthsCell, dateRangeCell, dollarCell].forEach(cell => {
+        cell.style.backgroundColor = '#f2fff2'; // verde pastel suave
+        cell.style.color = '#006600';
+      });
+    }
+  }
+}
+
+
     // Inicializar Litepicker en el input recién creado
 const monthPickerInput = row.querySelector('.month-range-picker');
 
@@ -394,9 +454,18 @@ const alertDiv = document.getElementById("discount-alert");
 const discountCountEl = document.getElementById("discount-count");
 const discountListEl = document.getElementById("discount-list");
 
-const discountCandidates = candidates.filter(c => 
-  c.discount_dolar && c.discount_daterange && c.discount_daterange.includes(',')
-);
+const discountCandidates = candidates.filter(c => {
+  if (!c.discount_dolar || !c.discount_daterange || !c.discount_daterange.includes(',')) return false;
+
+  const [ , endStr ] = c.discount_daterange.replace('[', '').replace(']', '').split(',').map(s => s.trim());
+  const endDate = new Date(endStr);
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endMonthStart = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+  return endMonthStart >= currentMonthStart; // ✅ Solo incluir si no está expirado
+});
+
 
 if (discountCandidates.length > 0) {
   discountCountEl.innerText = discountCandidates.length;
