@@ -262,8 +262,8 @@ function fillEmployeesTables(candidates) {
           ${candidate.name || '—'}
         </a>
       </td>
-      <td>${candidate.startingdate || '—'}</td>
-      <td>${candidate.enddate || '—'}</td>
+      <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
+      <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
       <td>${candidate.opp_position_name || '—'}</td>
       <td>$${candidate.employee_fee ?? '—'}</td>
       <td>$${candidate.employee_salary ?? '—'}</td>
