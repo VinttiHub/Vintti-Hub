@@ -34,10 +34,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
       const showPriorityColumn = allowedEmails.includes(currentUserEmail);
       data.forEach(item => {
-        const contractTxt = fmtContract(item.contract) || '<span class="placeholder">No hires yet</span>';
-        const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">No available</span>';
-        const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">No available</span>';
-        const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">No available</span>';
+        const contractTxt = item.contract || '<span class="placeholder">No hires yet</span>';
+        const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">$0</span>';
+        const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">$0</span>';
+        const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">$0</span>';
 
         let htmlRow = `
           <tr data-id="${item.account_id}">
@@ -256,8 +256,4 @@ function fmtMoney(v) {
   if (num === 0) return null; // para mostrar "No available"
   return `$${num.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
-function fmtContract(n) {
-  const qty = Number(n) || 0;
-  if (qty <= 0) return null; // para "No hires yet"
-  return qty === 1 ? '1 hire' : `${qty} hires`;
-}
+

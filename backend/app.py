@@ -102,7 +102,6 @@ def get_accounts_light():
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
             SELECT
                 a.account_id,
@@ -110,8 +109,17 @@ def get_accounts_light():
                 COALESCE(u.user_name, a.account_manager) AS account_manager_name,
                 a.priority,
 
-                -- contract = cantidad de hires (o.candidato_contratado no nulo)
-                COALESCE(SUM(CASE WHEN o.candidato_contratado IS NOT NULL THEN 1 ELSE 0 END), 0) AS contract,
+                -- 🔵 contract (sin contar hires): basado SOLO en modelos de oportunidades
+                CASE
+                WHEN MAX(CASE WHEN o.opp_model = 'Staffing'   THEN 1 ELSE 0 END) = 1
+                AND MAX(CASE WHEN o.opp_model = 'Recruiting' THEN 1 ELSE 0 END) = 1
+                    THEN 'Contract mix'
+                WHEN MAX(CASE WHEN o.opp_model = 'Staffing'   THEN 1 ELSE 0 END) = 1
+                    THEN 'Contract staffing'
+                WHEN MAX(CASE WHEN o.opp_model = 'Recruiting' THEN 1 ELSE 0 END) = 1
+                    THEN 'Contract recruiting'
+                ELSE NULL
+                END AS contract,
 
                 -- TRR (Recruiting): suma employee_revenue_recruiting del candidato contratado
                 COALESCE(SUM(
@@ -135,6 +143,7 @@ def get_accounts_light():
             GROUP BY a.account_id, a.client_name, u.user_name, a.account_manager, a.priority
             ORDER BY a.client_name ASC
         """)
+
 
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
