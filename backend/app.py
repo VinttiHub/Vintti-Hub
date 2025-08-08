@@ -883,7 +883,9 @@ def get_candidates_by_account_opportunities(account_id):
                 c.employee_revenue,
                 c.start_date,
                 c.enddate,
-                c.status
+                c.status,
+                c.discount_dolar,
+                c.discount_daterange
             FROM opportunity o
             LEFT JOIN candidates c ON o.candidato_contratado = c.candidate_id
             WHERE o.account_id = %s
