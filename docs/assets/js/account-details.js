@@ -257,10 +257,14 @@ function fillEmployeesTables(candidates) {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${candidate.status || '—'}</td>
-      <td>${candidate.name || '—'}</td>
+      <td>
+        <a href="/candidate_details.html?id=${candidate.candidate_id}" class="employee-link">
+          ${candidate.name || '—'}
+        </a>
+      </td>
       <td>${candidate.startingdate || '—'}</td>
       <td>${candidate.enddate || '—'}</td>
-      <td>${candidate.opportunity_id || '—'}</td>
+      <td>${candidate.opp_position_name || '—'}</td>
       <td>$${candidate.employee_fee ?? '—'}</td>
       <td>$${candidate.employee_salary ?? '—'}</td>
       <td>$${candidate.employee_revenue ?? '—'}</td>

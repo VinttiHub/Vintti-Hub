@@ -630,3 +630,13 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 #deletePdfBtn:hover {
   transform: scale(1.2);
 }
+.employee-link {
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.employee-link:hover {
+  text-decoration: underline;
+  color: var(--primary);
+}

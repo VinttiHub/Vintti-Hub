@@ -877,6 +877,7 @@ def get_candidates_by_account_opportunities(account_id):
                 c.stage,
                 o.opportunity_id,
                 o.opp_model,
+                o.opp_position_name,
                 c.employee_salary,
                 c.employee_fee,
                 c.employee_revenue,
