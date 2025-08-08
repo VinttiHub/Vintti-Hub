@@ -336,9 +336,36 @@ def get_account_by_id(account_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
+        # 1) Calcular TRR/TSF/TSR para ESTA cuenta (solo hires), en una sola query
+        cursor.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN c.employee_revenue_recruiting ELSE 0 END), 0) AS trr,
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN c.employee_fee                 ELSE 0 END), 0) AS tsf,
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN c.employee_salary              ELSE 0 END), 0) AS tsr
+            FROM opportunity o
+            LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+            WHERE o.account_id = %s
+        """, (account_id,))
+        sums = cursor.fetchone()
+        trr = sums[0] or 0
+        tsf = sums[1] or 0
+        tsr = sums[2] or 0
+
+        # 2) Persistir en la tabla account
+        cursor.execute("""
+            UPDATE account
+            SET trr = %s, tsf = %s, tsr = %s
+            WHERE account_id = %s
+        """, (trr, tsf, tsr, account_id))
+        conn.commit()
+
+        # 3) Devolver la cuenta (ya con los valores actualizados)
         cursor.execute("SELECT * FROM account WHERE account_id = %s", (account_id,))
         row = cursor.fetchone()
         if not row:
+            cursor.close()
+            conn.close()
             return jsonify({"error": "Account not found"}), 404
 
         colnames = [desc[0] for desc in cursor.description]
