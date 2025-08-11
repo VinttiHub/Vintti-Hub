@@ -790,13 +790,16 @@ def update_opportunity_fields(opportunity_id):
         if candidate_hired_id:
             # 2.1) Asegurar fila en hire_opportunity (no duplica si ya existe)
             cursor.execute("""
-                INSERT INTO hire_opportunity (candidate_id, opportunity_id)
-                SELECT %s, %s
-                WHERE NOT EXISTS (
+                INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
+                SELECT %s, %s, o.account_id
+                FROM opportunity o
+                WHERE o.opportunity_id = %s
+                AND NOT EXISTS (
                     SELECT 1 FROM hire_opportunity
                     WHERE candidate_id = %s AND opportunity_id = %s
                 )
-            """, (candidate_hired_id, opportunity_id, candidate_hired_id, opportunity_id))
+            """, (candidate_hired_id, opportunity_id, opportunity_id, candidate_hired_id, opportunity_id))
+
 
             # 2.2) Actualizar status en candidates_batches a "Client hired"
             #     (limitado a los batches que pertenezcan a esta opportunity)
