@@ -1560,7 +1560,7 @@ def handle_candidate_hire_data(candidate_id):
             # 2) Traer datos desde hire_opportunity (nuevo origen)
             cursor.execute("""
                 SELECT
-                    references,      -- referencias (texto rico)
+                    references_notes,      -- referencias (texto rico)
                     salary,          -- salario
                     fee,             -- fee
                     computer,        -- yes/no
@@ -1592,12 +1592,12 @@ def handle_candidate_hire_data(candidate_id):
                     'end_date': None
                 })
 
-            (references, salary, fee, computer, extra_perks, working_schedule,
+            (references_notes, salary, fee, computer, extra_perks, working_schedule,
              pto, start_date, end_date, revenue) = row
 
             # Mantener las mismas claves que espera tu JS
             return jsonify({
-                'references_notes': references,
+                'references_notes': references_notes,
                 'employee_salary': salary,
                 'employee_fee': fee,
                 'computer': computer,
@@ -1617,7 +1617,7 @@ def handle_candidate_hire_data(candidate_id):
 
             # Mapeo de claves (frontend) -> columnas (hire_opportunity)
             mapping = {
-                'references_notes': 'references',
+                'references_notes': 'references_notes',
                 'employee_salary': 'salary',
                 'employee_fee': 'fee',
                 'computer': 'computer',
