@@ -1664,6 +1664,12 @@ def handle_candidate_hire_data(candidate_id):
                     WHERE candidate_id = %s AND opportunity_id = %s
                 """, set_vals)
                 updated = True
+            # 2.5) Marcar al candidato como "Client hired" en candidates_batches
+            cursor.execute("""
+                UPDATE candidates_batches
+                SET status = %s
+                WHERE candidate_id = %s AND opportunity_id = %s
+            """, ('Client hired', candidate_id, opportunity_id))
 
             conn.commit()
             return jsonify({'success': True, 'created': created, 'updated': updated})
