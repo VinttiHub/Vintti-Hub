@@ -770,17 +770,55 @@ def update_opportunity_fields(opportunity_id):
     if not updates:
         return jsonify({'error': 'No valid fields provided'}), 400
 
+    # Necesitamos saber si vino candidato_contratado para disparar los efectos de Close Win
+    candidate_hired_id = data.get('candidato_contratado')
+
     values.append(opportunity_id)
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
+        # 1) Actualizar campos de opportunity
         cursor.execute(f"""
             UPDATE opportunity
             SET {', '.join(updates)}
             WHERE opportunity_id = %s
         """, values)
+
+        # 2) Si se asignó candidato_contratado, crear hire_opportunity y actualizar candidates_batches
+        if candidate_hired_id:
+            # 2.1) Asegurar fila en hire_opportunity (no duplica si ya existe)
+            cursor.execute("""
+                INSERT INTO hire_opportunity (candidate_id, opportunity_id)
+                SELECT %s, %s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM hire_opportunity
+                    WHERE candidate_id = %s AND opportunity_id = %s
+                )
+            """, (candidate_hired_id, opportunity_id, candidate_hired_id, opportunity_id))
+
+            # 2.2) Actualizar status en candidates_batches a "Client hired"
+            #     (limitado a los batches que pertenezcan a esta opportunity)
+            cursor.execute("""
+                UPDATE candidates_batches cb
+                SET status = %s
+                WHERE cb.candidate_id = %s
+                  AND EXISTS (
+                    SELECT 1
+                    FROM batch b
+                    WHERE b.batch_id = cb.batch_id
+                      AND b.opportunity_id = %s
+                  )
+            """, ('Client hired', candidate_hired_id, opportunity_id))
+
+            # Fallback: si no había batches ligados a esta opportunity, actualiza cualquier batch del candidato
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    UPDATE candidates_batches
+                    SET status = %s
+                    WHERE candidate_id = %s
+                """, ('Client hired', candidate_hired_id))
 
         conn.commit()
         cursor.close()
@@ -1505,51 +1543,134 @@ def handle_candidate_hire_data(candidate_id):
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # 1) Ubicar la oportunidad contratada de este candidato (y su modelo)
+        cursor.execute("""
+            SELECT opportunity_id, opp_model
+            FROM opportunity
+            WHERE candidato_contratado = %s
+            LIMIT 1
+        """, (candidate_id,))
+        opp = cursor.fetchone()
+        if not opp:
+            return jsonify({'error': 'Candidate is not linked to a hired opportunity'}), 404
+
+        opportunity_id, opp_model = opp
+
         if request.method == 'GET':
+            # 2) Traer datos desde hire_opportunity (nuevo origen)
             cursor.execute("""
-                SELECT references_notes, employee_salary, employee_fee, computer, extraperks, working_schedule, pto, start_date, employee_revenue_recruiting
-                FROM candidates
-                WHERE candidate_id = %s
-            """, (candidate_id,))
+                SELECT
+                    references,      -- referencias (texto rico)
+                    salary,          -- salario
+                    fee,             -- fee
+                    computer,        -- yes/no
+                    extra_perks,     -- perks (texto rico)
+                    working_schedule,
+                    pto,
+                    start_date,
+                    end_date,
+                    revenue          -- revenue (recruiting o staffing)
+                FROM hire_opportunity
+                WHERE candidate_id = %s AND opportunity_id = %s
+                LIMIT 1
+            """, (candidate_id, opportunity_id))
             row = cursor.fetchone()
+
             if not row:
-                return jsonify({'error': 'Candidate not found'}), 404
+                # Si aún no hay registro en hire_opportunity, devolver vacío
+                return jsonify({
+                    'references_notes': '',
+                    'employee_salary': None,
+                    'employee_fee': None,
+                    'computer': '',
+                    'extraperks': '',
+                    'working_schedule': '',
+                    'pto': '',
+                    'start_date': None,
+                    'employee_revenue': None,
+                    'employee_revenue_recruiting': None,
+                    'end_date': None
+                })
+
+            (references, salary, fee, computer, extra_perks, working_schedule,
+             pto, start_date, end_date, revenue) = row
+
+            # Mantener las mismas claves que espera tu JS
             return jsonify({
-                'references_notes': row[0],
-                'employee_salary': row[1],
-                'employee_fee': row[2],
-                'computer': row[3],
-                'extraperks': row[4],
-                'working_schedule': row[5],
-                'pto': row[6],
-                'employee_revenue': (row[1] or 0) + (row[2] or 0),
-                'employee_revenue_recruiting': row[8],
-                'start_date': row[7]
+                'references_notes': references,
+                'employee_salary': salary,
+                'employee_fee': fee,
+                'computer': computer,
+                'extraperks': extra_perks,
+                'working_schedule': working_schedule,
+                'pto': pto,
+                'start_date': start_date,
+                'end_date': end_date,
+                # Según modelo, llenar la clave que tu UI ya usa
+                'employee_revenue': revenue if (opp_model or '').lower() == 'staffing' else None,
+                'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None
             })
 
+        # PATCH -> escribir en hire_opportunity (nuevo origen)
         if request.method == 'PATCH':
-            data = request.get_json()
-            allowed_fields = ['references_notes', 'employee_salary', 'employee_fee', 'employee_revenue', 'computer', 'extraperks', 'working_schedule', 'pto', 'start_date','employee_revenue_recruiting']
-            updates = []
-            values = []
+            data = request.get_json() or {}
 
-            for field in allowed_fields:
-                if field in data:
-                    updates.append(f"{field} = %s")
-                    values.append(data[field])
+            # Mapeo de claves (frontend) -> columnas (hire_opportunity)
+            mapping = {
+                'references_notes': 'references',
+                'employee_salary': 'salary',
+                'employee_fee': 'fee',
+                'computer': 'computer',
+                'extraperks': 'extra_perks',
+                'working_schedule': 'working_schedule',
+                'pto': 'pto',
+                'start_date': 'start_date',
+                'employee_revenue': 'revenue',
+                'employee_revenue_recruiting': 'revenue'  # recluta también escribe revenue
+            }
 
-            if not updates:
+            set_cols, set_vals = [], []
+            insert_cols, insert_vals = ['candidate_id', 'opportunity_id'], [candidate_id, opportunity_id]
+
+            for k, col in mapping.items():
+                if k in data:
+                    set_cols.append(f"{col} = %s")
+                    set_vals.append(data[k])
+                    insert_cols.append(col)
+                    insert_vals.append(data[k])
+
+            if not set_cols:
                 return jsonify({'error': 'No valid fields provided'}), 400
 
-            values.append(candidate_id)
-            cursor.execute(f"""
-                UPDATE candidates
-                SET {', '.join(updates)}
-                WHERE candidate_id = %s
-            """, values)
+            # Asegurar que exista fila; si no, INSERT con lo que vino
+            cursor.execute("""
+                SELECT 1 FROM hire_opportunity
+                WHERE candidate_id = %s AND opportunity_id = %s
+                LIMIT 1
+            """, (candidate_id, opportunity_id))
+            exists = cursor.fetchone()
+
+            if not exists:
+                placeholders = ", ".join(["%s"] * len(insert_cols))
+                cursor.execute(f"""
+                    INSERT INTO hire_opportunity ({", ".join(insert_cols)})
+                    VALUES ({placeholders})
+                """, insert_vals)
+            else:
+                set_vals.extend([candidate_id, opportunity_id])
+                cursor.execute(f"""
+                    UPDATE hire_opportunity
+                    SET {", ".join(set_cols)}
+                    WHERE candidate_id = %s AND opportunity_id = %s
+                """, set_vals)
+
             conn.commit()
             return jsonify({'success': True})
+
     except Exception as e:
+        import traceback
+        print("❌ Error in /candidates/<id>/hire (hire_opportunity version):")
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
     finally:
         cursor.close()
