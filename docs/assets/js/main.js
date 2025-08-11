@@ -843,25 +843,35 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
   saveBtn.onclick = async () => {
     const date = document.getElementById('closeWinDate').value;
     const hireInput = document.getElementById('closeWinHireInput').value;
-    const candidateId = hireInput.split(' - ')[0];  // Extrae solo el ID
+    const candidateId = parseInt(hireInput.split(' - ')[0], 10); // solo el ID
 
     if (!date || !candidateId) {
       alert('Please select a hire and date.');
       return;
     }
 
+    // 1) Guardar fecha de cierre y candidato contratado en opportunity
     await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         opp_close_date: date,
-        candidato_contratado: parseInt(candidateId)
+        candidato_contratado: candidateId
       })
     });
 
+    // 2) CREAR/ASEGURAR la fila en hire_opportunity (backend ahora inserta aunque el body esté vacío)
+    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+
+    // 3) Recién ahora cambiamos el stage
     await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
+
+    // 4) Cerrar y redirigir a la pestaña Hire del candidato
     popup.style.display = 'none';
-    // 🔁 Redirigir automáticamente a la pestaña Hire del candidato contratado
     localStorage.setItem('fromCloseWin', 'true');
     window.location.href = `candidate-details.html?id=${candidateId}#hire`;
   };

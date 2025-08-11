@@ -1543,9 +1543,9 @@ def handle_candidate_hire_data(candidate_id):
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        # 1) Ubicar la oportunidad contratada de este candidato (y su modelo)
+        # 1) Oportunidad donde este candidato fue contratado (tomamos también account_id)
         cursor.execute("""
-            SELECT opportunity_id, opp_model
+            SELECT opportunity_id, opp_model, account_id
             FROM opportunity
             WHERE candidato_contratado = %s
             LIMIT 1
@@ -1554,22 +1554,22 @@ def handle_candidate_hire_data(candidate_id):
         if not opp:
             return jsonify({'error': 'Candidate is not linked to a hired opportunity'}), 404
 
-        opportunity_id, opp_model = opp
+        opportunity_id, opp_model, account_id = opp
 
         if request.method == 'GET':
-            # 2) Traer datos desde hire_opportunity (nuevo origen)
+            # 2) Traer datos desde hire_opportunity
             cursor.execute("""
                 SELECT
-                    references_notes,      -- referencias (texto rico)
-                    salary,          -- salario
-                    fee,             -- fee
-                    computer,        -- yes/no
-                    extra_perks,     -- perks (texto rico)
+                    references_notes,      -- referencias (rich text)
+                    salary,                -- salario
+                    fee,                   -- fee
+                    computer,              -- yes/no
+                    extra_perks,           -- perks (rich text)
                     working_schedule,
                     pto,
                     start_date,
                     end_date,
-                    revenue          -- revenue (recruiting o staffing)
+                    revenue                -- revenue (staffing o recruiting)
                 FROM hire_opportunity
                 WHERE candidate_id = %s AND opportunity_id = %s
                 LIMIT 1
@@ -1577,7 +1577,7 @@ def handle_candidate_hire_data(candidate_id):
             row = cursor.fetchone()
 
             if not row:
-                # Si aún no hay registro en hire_opportunity, devolver vacío
+                # Sin fila aún: devolvemos estructura vacía (UI ya sabe manejarla)
                 return jsonify({
                     'references_notes': '',
                     'employee_salary': None,
@@ -1587,15 +1587,14 @@ def handle_candidate_hire_data(candidate_id):
                     'working_schedule': '',
                     'pto': '',
                     'start_date': None,
+                    'end_date': None,
                     'employee_revenue': None,
-                    'employee_revenue_recruiting': None,
-                    'end_date': None
+                    'employee_revenue_recruiting': None
                 })
 
             (references_notes, salary, fee, computer, extra_perks, working_schedule,
              pto, start_date, end_date, revenue) = row
 
-            # Mantener las mismas claves que espera tu JS
             return jsonify({
                 'references_notes': references_notes,
                 'employee_salary': salary,
@@ -1606,16 +1605,14 @@ def handle_candidate_hire_data(candidate_id):
                 'pto': pto,
                 'start_date': start_date,
                 'end_date': end_date,
-                # Según modelo, llenar la clave que tu UI ya usa
                 'employee_revenue': revenue if (opp_model or '').lower() == 'staffing' else None,
                 'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None
             })
 
-        # PATCH -> escribir en hire_opportunity (nuevo origen)
+        # PATCH -> asegurar/actualizar fila en hire_opportunity
         if request.method == 'PATCH':
             data = request.get_json() or {}
 
-            # Mapeo de claves (frontend) -> columnas (hire_opportunity)
             mapping = {
                 'references_notes': 'references_notes',
                 'employee_salary': 'salary',
@@ -1626,11 +1623,12 @@ def handle_candidate_hire_data(candidate_id):
                 'pto': 'pto',
                 'start_date': 'start_date',
                 'employee_revenue': 'revenue',
-                'employee_revenue_recruiting': 'revenue'  # recluta también escribe revenue
+                'employee_revenue_recruiting': 'revenue'
             }
 
             set_cols, set_vals = [], []
-            insert_cols, insert_vals = ['candidate_id', 'opportunity_id'], [candidate_id, opportunity_id]
+            # 👇 Siempre insertamos candidate_id, opportunity_id y account_id si no existe
+            insert_cols, insert_vals = ['candidate_id', 'opportunity_id', 'account_id'], [candidate_id, opportunity_id, account_id]
 
             for k, col in mapping.items():
                 if k in data:
@@ -1639,10 +1637,7 @@ def handle_candidate_hire_data(candidate_id):
                     insert_cols.append(col)
                     insert_vals.append(data[k])
 
-            if not set_cols:
-                return jsonify({'error': 'No valid fields provided'}), 400
-
-            # Asegurar que exista fila; si no, INSERT con lo que vino
+            # ¿Existe ya?
             cursor.execute("""
                 SELECT 1 FROM hire_opportunity
                 WHERE candidate_id = %s AND opportunity_id = %s
@@ -1650,22 +1645,28 @@ def handle_candidate_hire_data(candidate_id):
             """, (candidate_id, opportunity_id))
             exists = cursor.fetchone()
 
+            created = False
+            updated = False
+
             if not exists:
                 placeholders = ", ".join(["%s"] * len(insert_cols))
                 cursor.execute(f"""
                     INSERT INTO hire_opportunity ({", ".join(insert_cols)})
                     VALUES ({placeholders})
                 """, insert_vals)
-            else:
+                created = True
+
+            if set_cols:
                 set_vals.extend([candidate_id, opportunity_id])
                 cursor.execute(f"""
                     UPDATE hire_opportunity
                     SET {", ".join(set_cols)}
                     WHERE candidate_id = %s AND opportunity_id = %s
                 """, set_vals)
+                updated = True
 
             conn.commit()
-            return jsonify({'success': True})
+            return jsonify({'success': True, 'created': created, 'updated': updated})
 
     except Exception as e:
         import traceback
@@ -1675,6 +1676,7 @@ def handle_candidate_hire_data(candidate_id):
     finally:
         cursor.close()
         conn.close()
+
 
 
 @app.after_request
