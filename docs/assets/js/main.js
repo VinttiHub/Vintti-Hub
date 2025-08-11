@@ -158,19 +158,26 @@ document.querySelectorAll('.filter-header button').forEach(button => {
 
           async function fetchDaysSinceBatch(opp, tr) {
             const oppId = opp.opportunity_id;
+
+            // 👉 Selecciona la celda de "Days since batch" una sola vez
+            const daysCell = tr.querySelector('td:last-child');
+            if (!daysCell) return;
+
             let referenceDate = null;
 
             try {
+              // ¿Se debe pausar el conteo?
               const pauseRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/pause_days_since_batch`);
               const pauseData = await pauseRes.json();
-              const shouldPause = pauseData.pause;
 
-              if (shouldPause) {
-                cell.textContent = '⏸️';
-                cell.title = 'Paused due to recent presentation';
+              if (pauseData && pauseData.pause) {
+                daysCell.textContent = '⏸️';
+                daysCell.title = 'Paused due to recent presentation';
+                daysCell.classList.remove('red-cell');
                 return;
               }
 
+              // Obtener fecha de referencia
               const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
               const result = await res.json();
 
@@ -180,18 +187,25 @@ document.querySelectorAll('.filter-header button').forEach(button => {
                 referenceDate = new Date(opp.nda_signature_or_start_date);
               }
 
-              if (referenceDate) {
-                const today = new Date();
-                const diffTime = today - referenceDate;
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
-                const cell = tr.querySelector('td:last-child');
-                if (cell) {
-                  cell.textContent = diffDays;
-                  if (diffDays >= 7) {
-                    cell.classList.add('red-cell');
-                    cell.innerHTML += ' ⚠️';
-                  }
-                }
+              if (!referenceDate) {
+                daysCell.textContent = '-';
+                daysCell.removeAttribute('title');
+                daysCell.classList.remove('red-cell');
+                return;
+              }
+
+              // Calcular días
+              const today = new Date();
+              const diffTime = today - referenceDate;
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
+
+              daysCell.textContent = diffDays;
+              daysCell.title = `Days since batch: ${diffDays}`;
+              if (diffDays >= 7) {
+                daysCell.classList.add('red-cell');
+                daysCell.innerHTML += ' ⚠️';
+              } else {
+                daysCell.classList.remove('red-cell');
               }
             } catch (err) {
               console.error(`Error fetching sourcing date para opp ${oppId}:`, err);
