@@ -885,12 +885,18 @@ if (goBackButton) {
     }
   });
 }
-document.getElementById('hire-display').addEventListener('click', () => {
-  const candidateId = document.getElementById('hire-display').getAttribute('data-candidate-id');
-  if (candidateId) {
-    window.location.href = `/candidate-details.html?id=${candidateId}`;
-  }
-});
+const hireEl = document.getElementById('hire-display');
+if (hireEl) {
+  hireEl.addEventListener('click', (e) => {
+    const id = e.currentTarget.dataset.candidateId;
+    if (!id) {
+      alert('❌ No hired candidate linked yet');
+      return;
+    }
+    window.location.href = `/candidate-details.html?id=${encodeURIComponent(id)}`;
+  });
+}
+
 
 
 
@@ -953,33 +959,31 @@ async function loadOpportunityData() {
     } else {
       document.getElementById('signed-tag').textContent = '—';
     }
-    // Cargar el select de hire con los candidatos
-    // Cargar el select de hire con los candidatos
+    // 🔹 Mostrar el HIRE y guardar id en data-candidate-id (sirve para redirigir)
     try {
       const hireDisplay = document.getElementById('hire-display');
-      const candidatoContratadoId = data.candidato_contratado;
+      const hiredId = data.candidato_contratado;
 
-      if (candidatoContratadoId) {
-        try {
-          const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidatoContratadoId}`);
-          if (res.ok) {
-            const candidato = await res.json();
-            hireDisplay.value = candidato.name || '—';
-            hireDisplay.setAttribute('data-candidate-id', candidato.candidate_id);
-            console.log(candidato)
-          } else {
-            hireDisplay.value = '—';
-          }
-        } catch (err) {
-          console.error('Error fetching hire name:', err);
-          hireDisplay.value = '—';
-        }
-      } else {
-        hireDisplay.value = '';
+      // Limpia estado previo
+      if (hireDisplay) {
+        hireDisplay.removeAttribute('data-candidate-id');
+        if ('value' in hireDisplay) hireDisplay.value = '—';
+        hireDisplay.textContent = '—';
       }
 
+      if (hireDisplay && hiredId) {
+        const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${hiredId}`);
+        if (r.ok) {
+          const cand = await r.json();
+          // Muestra el nombre (funciona si es input o si es span/div)
+          if ('value' in hireDisplay) hireDisplay.value = cand.name || '—';
+          hireDisplay.textContent = cand.name || '—';
+          // Guarda el id en dataset (más robusto que getAttribute)
+          hireDisplay.dataset.candidateId = String(cand.candidate_id);
+        }
+      }
     } catch (error) {
-      console.error('Error loading hire candidates:', error);
+      console.error('Error loading hire candidate:', error);
     }
       window.currentAccountId = data.account_id;
         try {
