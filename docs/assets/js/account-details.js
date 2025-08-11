@@ -250,288 +250,315 @@ function loadCandidates(accountId) {
 }
 
 function fillEmployeesTables(candidates) {
-  const staffingTableBody = document.querySelector('#employees .card:nth-of-type(1) tbody');
+  const staffingTableBody   = document.querySelector('#employees .card:nth-of-type(1) tbody');
   const recruitingTableBody = document.querySelector('#employees .card:nth-of-type(2) tbody');
 
-  staffingTableBody.innerHTML = '';   // Limpiar
+  staffingTableBody.innerHTML = '';
   recruitingTableBody.innerHTML = '';
 
   let hasStaffing = false;
   let hasRecruiting = false;
 
-  if (!candidates.length) return;
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    staffingTableBody.innerHTML   = `<tr><td colspan="15">No employees in Staffing</td></tr>`;
+    recruitingTableBody.innerHTML = `<tr><td colspan="10">No employees in Recruiting</td></tr>`;
+    return;
+  }
 
   candidates.forEach(candidate => {
-    // Crear fila de tabla:
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${candidate.status || '—'}</td>
-      <td>
-        <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
-          ${candidate.name || '—'}
-        </a>
-      </td>
-      <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-      <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
-      <td>${candidate.opp_position_name || '—'}</td>
-      <td>$${candidate.employee_fee ?? '—'}</td>
-      <td>$${candidate.employee_salary ?? '—'}</td>
-      <td>$${candidate.employee_revenue ?? '—'}</td>
-      <td>
-        <input 
-          type="number"
-          class="discount-input"
-          placeholder="$"
-          value="${candidate.discount_dolar || ''}"
-          data-candidate-id="${candidate.candidate_id}"
-        />
-      </td>
-      <td>
-      <input 
-        type="text" 
-        class="month-range-picker" 
-        placeholder="Select range"
-        readonly 
-        data-candidate-id="${candidate.candidate_id}"
-        value="${candidate.discount_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
-      />
-      </td>
-      <td>—</td>
-      <td>—</td>
-      <td>—</td>
-      <td>—</td>
-      <td>—</td>
-    `;
-    // 👉 Agregar cálculo de Discount Months y ver si está expirado
-// 🎯 Ubicamos celdas necesarias
-const monthsCell = row.children[10]; // Discount Months
-const dateRangeCell = row.children[9]; // Date Range
-const dollarCell = row.children[8]; // Discount $
-
-if (candidate.discount_daterange && candidate.discount_daterange.includes(',')) {
-  const [startStr, endStr] = candidate.discount_daterange.replace('[','').replace(']','').split(',').map(d => d.trim());
-
-  const start = new Date(startStr);
-  const end = new Date(endStr);
-
-  if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-    // 🧮 Calcular meses
-    const months =
-      (end.getFullYear() - start.getFullYear()) * 12 +
-      (end.getMonth() - start.getMonth()) + 1;
-
-    monthsCell.textContent = months;
-
-    // ⏳ Verificar si expiró
-    const now = new Date();
-    const current = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-
-    const isExpired = endMonth < current;
-
-    // 💬 Badge visual
-    const badge = document.createElement('span');
-    badge.textContent = isExpired ? 'expired' : 'active';
-    badge.style.backgroundColor = isExpired ? '#ffe6e6' : '#e6f5e6';
-    badge.style.color = isExpired ? '#b30000' : '#006600';
-    badge.style.padding = '2px 8px';
-    badge.style.borderRadius = '12px';
-    badge.style.fontSize = '11px';
-    badge.style.marginLeft = '8px';
-    badge.style.fontWeight = '600';
-    badge.style.display = 'inline-block';
-
-    const dateInput = dateRangeCell.querySelector('.month-range-picker');
-    if (dateInput && dateInput.parentElement) {
-      dateInput.parentElement.appendChild(badge);
-    }
-
-    if (isExpired) {
-      [monthsCell, dateRangeCell, dollarCell].forEach(cell => {
-        cell.style.backgroundColor = '#fff0f0'; // rojo pastel más suave
-        cell.style.color = '#b30000';
-        cell.style.fontWeight = '500';
-      });
-    } else {
-      [monthsCell, dateRangeCell, dollarCell].forEach(cell => {
-        cell.style.backgroundColor = '#f2fff2'; // verde pastel suave
-        cell.style.color = '#006600';
-      });
-    }
-  }
-}
-
-
-    // Inicializar Litepicker en el input recién creado
-const monthPickerInput = row.querySelector('.month-range-picker');
-
-if (monthPickerInput) {
-  // ⬇️ Este bloque va afuera del objeto, antes del new Litepicker
-const daterange = candidate.discount_daterange;
-let startDate = null;
-let endDate = null;
-
-if (daterange && daterange.includes(',')) {
-  const dates = daterange.replace('[', '').replace(']', '').split(',');
-  if (dates.length === 2) {
-    startDate = new Date(dates[0].trim().slice(0, 7) + '-15');
-    endDate = new Date(dates[1].trim().slice(0, 7) + '-15');
-  }
-}
-
-  // ⬇️ Creamos el objeto de opciones para Litepicker
-  const litepickerOptions = {
-    element: monthPickerInput,
-    format: 'MMM YYYY',
-    numberOfMonths: 2,
-    numberOfColumns: 2,
-    singleMode: false,
-    allowRepick: true,
-    dropdowns: {
-      minYear: 2020,
-      maxYear: 2030,
-      months: true,
-      years: true
-    },
-    setup: (picker) => {
-      picker.on('selected', (date1, date2) => {
-        const candidateId = monthPickerInput.dataset.candidateId;
-        if (!candidateId) return;
-
-        const start = date1.format('YYYY-MM-DD');
-        const end = date2.format('YYYY-MM-DD');
-
-        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ discount_daterange: `[${start},${end}]` })
-        }).then(res => {
-          if (!res.ok) throw new Error("Error al guardar discount_daterange");
-          console.log('🟢 Discount date range actualizado');
-        }).catch(err => {
-          console.error('❌ Error:', err);
-        });
-      });
-    }
-  };
-
-  // ⬇️ Solo si hay valores previos, se agregan
-  if (startDate && endDate) {
-    litepickerOptions.startDate = startDate;
-    litepickerOptions.endDate = endDate;
-  }
-
-  // ⬇️ Finalmente, inicializamos el picker
-  new Litepicker(litepickerOptions);
-}
-
-    const discountInput = row.querySelector('.discount-input');
-    discountInput.addEventListener('blur', () => {
-      const candidateId = discountInput.dataset.candidateId;
-      const value = discountInput.value;
-      updateCandidateField(candidateId, 'discount_dolar', value);
-    });
+    // ---------- STAFFING ----------
     if (candidate.opp_model === 'Staffing') {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${candidate.status || '—'}</td>
+        <td>
+          <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
+            ${candidate.name || '—'}
+          </a>
+        </td>
+        <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
+        <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
+        <td>${candidate.opp_position_name || '—'}</td>
+        <td>$${candidate.employee_fee ?? '—'}</td>
+        <td>$${candidate.employee_salary ?? '—'}</td>
+        <td>$${candidate.employee_revenue ?? '—'}</td>
+        <td>
+          <input 
+            type="number"
+            class="discount-input"
+            placeholder="$"
+            value="${candidate.discount_dolar || ''}"
+            data-candidate-id="${candidate.candidate_id}"
+          />
+        </td>
+        <td>
+          <input 
+            type="text" 
+            class="month-range-picker" 
+            placeholder="Select range"
+            readonly 
+            data-candidate-id="${candidate.candidate_id}"
+            value="${candidate.discount_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
+          />
+        </td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+      `;
+
+      // ----- Lógica de Discount SOLO para Staffing -----
+      const monthsCell    = row.children[10]; // Discount Months
+      const dateRangeCell = row.children[9];  // Discount Date Range
+      const dollarCell    = row.children[8];  // Discount $
+
+      if (candidate.discount_daterange && candidate.discount_daterange.includes(',')) {
+        const [startStr, endStr] = candidate.discount_daterange
+          .replace('[','').replace(']','')
+          .split(',').map(d => d.trim());
+
+        const start = new Date(startStr);
+        const end   = new Date(endStr);
+
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          // Meses (inclusive)
+          const months =
+            (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth()) + 1;
+          monthsCell.textContent = months;
+
+          // Badge activo/expirado
+          const now = new Date();
+          const current = new Date(now.getFullYear(), now.getMonth(), 1);
+          const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+          const isExpired = endMonth < current;
+
+          const badge = document.createElement('span');
+          badge.textContent = isExpired ? 'expired' : 'active';
+          badge.style.backgroundColor = isExpired ? '#ffe6e6' : '#e6f5e6';
+          badge.style.color = isExpired ? '#b30000' : '#006600';
+          badge.style.padding = '2px 8px';
+          badge.style.borderRadius = '12px';
+          badge.style.fontSize = '11px';
+          badge.style.marginLeft = '8px';
+          badge.style.fontWeight = '600';
+          badge.style.display = 'inline-block';
+
+          const dateInput = dateRangeCell.querySelector('.month-range-picker');
+          if (dateInput && dateInput.parentElement) {
+            dateInput.parentElement.appendChild(badge);
+          }
+
+          if (isExpired) {
+            [monthsCell, dateRangeCell, dollarCell].forEach(cell => {
+              cell.style.backgroundColor = '#fff0f0';
+              cell.style.color = '#b30000';
+              cell.style.fontWeight = '500';
+            });
+          } else {
+            [monthsCell, dateRangeCell, dollarCell].forEach(cell => {
+              cell.style.backgroundColor = '#f2fff2';
+              cell.style.color = '#006600';
+            });
+          }
+        }
+      }
+
+      // Inicializar Litepicker (si hay valores previos, precargar)
+      const monthPickerInput = row.querySelector('.month-range-picker');
+      if (monthPickerInput) {
+        const daterange = candidate.discount_daterange;
+        let startDate = null;
+        let endDate = null;
+
+        if (daterange && daterange.includes(',')) {
+          const dates = daterange.replace('[', '').replace(']', '').split(',');
+          if (dates.length === 2) {
+            startDate = new Date(dates[0].trim().slice(0, 7) + '-15');
+            endDate   = new Date(dates[1].trim().slice(0, 7) + '-15');
+          }
+        }
+
+        const litepickerOptions = {
+          element: monthPickerInput,
+          format: 'MMM YYYY',
+          numberOfMonths: 2,
+          numberOfColumns: 2,
+          singleMode: false,
+          allowRepick: true,
+          dropdowns: { minYear: 2020, maxYear: 2030, months: true, years: true },
+          setup: (picker) => {
+            picker.on('selected', (date1, date2) => {
+              const candidateId = monthPickerInput.dataset.candidateId;
+              if (!candidateId) return;
+
+              const start = date1.format('YYYY-MM-DD');
+              const end   = date2.format('YYYY-MM-DD');
+
+              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ discount_daterange: `[${start},${end}]` })
+              })
+              .then(res => {
+                if (!res.ok) throw new Error("Error al guardar discount_daterange");
+                console.log('🟢 Discount date range actualizado');
+              })
+              .catch(err => console.error('❌ Error:', err));
+            });
+          }
+        };
+
+        if (startDate && endDate) {
+          litepickerOptions.startDate = startDate;
+          litepickerOptions.endDate   = endDate;
+        }
+
+        new Litepicker(litepickerOptions);
+      }
+
+      const discountInput = row.querySelector('.discount-input');
+      if (discountInput) {
+        discountInput.addEventListener('blur', () => {
+          const candidateId = discountInput.dataset.candidateId;
+          const value = discountInput.value;
+          updateCandidateField(candidateId, 'discount_dolar', value);
+        });
+      }
+
       staffingTableBody.appendChild(row);
       hasStaffing = true;
-    } else if (candidate.opp_model === 'Recruiting') {
-      recruitingTableBody.appendChild(row);
-      hasRecruiting = true;
     }
 
-    // Según peoplemodel lo metemos en la tabla correcta:
-    if (candidate.opp_model === 'Staffing') {
-      staffingTableBody.appendChild(row);
-    } else if (candidate.opp_model === 'Recruiting') {
+    // ---------- RECRUITING ----------
+    else if (candidate.opp_model === 'Recruiting') {
+      const probation =
+        candidate.probation_days ??
+        candidate.probation ??
+        candidate.probation_days_recruiting ?? '—';
+
+      const revenueRecruit =
+        (candidate.employee_revenue_recruiting ??
+         candidate.employee_revenue ??
+         '—');
+
+      const referralVal =
+        (candidate.referral ??
+         candidate.referral_dolar ??
+         '—');
+
+      const referralRange =
+        candidate.referral_daterange
+          ? candidate.referral_daterange
+              .replace('[','').replace(']','')
+              .split(',').map(d => d.trim()).join(' - ')
+          : '—';
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${candidate.status || '—'}</td>
+        <td>
+          <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
+            ${candidate.name || '—'}
+          </a>
+        </td>
+        <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
+        <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
+        <td>${candidate.opp_position_name || '—'}</td>
+        <td>${probation}</td>
+        <td>$${candidate.employee_salary ?? '—'}</td>
+        <td>$${revenueRecruit}</td>
+        <td>${referralVal}</td>
+        <td>${referralRange}</td>
+      `;
+
       recruitingTableBody.appendChild(row);
+      hasRecruiting = true;
     }
   });
 
   if (!hasStaffing) {
-  staffingTableBody.innerHTML = `<tr><td colspan="100%">No employees in Staffing</td></tr>`;
-}
-if (!hasRecruiting) {
-  recruitingTableBody.innerHTML = `<tr><td colspan="100%">No employees in Recruiting</td></tr>`;
-}
-const alertDiv = document.getElementById("discount-alert");
-const discountCountEl = document.getElementById("discount-count");
-const discountListEl = document.getElementById("discount-list");
+    staffingTableBody.innerHTML = `<tr><td colspan="15">No employees in Staffing</td></tr>`;
+  }
+  if (!hasRecruiting) {
+    recruitingTableBody.innerHTML = `<tr><td colspan="10">No employees in Recruiting</td></tr>`;
+  }
 
-const discountCandidates = candidates.filter(c => {
-  if (!c.discount_dolar || !c.discount_daterange || !c.discount_daterange.includes(',')) return false;
+  // ------- Alertas de Discount (solo Staffing) -------
+  const alertDiv        = document.getElementById("discount-alert");
+  const discountCountEl = document.getElementById("discount-count");
+  const discountListEl  = document.getElementById("discount-list");
 
-  const [ , endStr ] = c.discount_daterange.replace('[', '').replace(']', '').split(',').map(s => s.trim());
-  const endDate = new Date(endStr);
-  const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endMonthStart = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+  const discountCandidates = candidates.filter(c => {
+    if (c.opp_model !== 'Staffing') return false;
+    if (!c.discount_dolar || !c.discount_daterange || !c.discount_daterange.includes(',')) return false;
 
-  return endMonthStart >= currentMonthStart; // ✅ Solo incluir si no está expirado
-});
+    const [, endStr] = c.discount_daterange.replace('[', '').replace(']', '').split(',').map(s => s.trim());
+    const endDate = new Date(endStr);
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endMonthStart = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
 
+    return endMonthStart >= currentMonthStart; // solo no expirados
+  });
 
-if (discountCandidates.length > 0) {
-  discountCountEl.innerText = discountCandidates.length;
-  discountListEl.innerHTML = '';
-discountCandidates.sort((a, b) => {
-  const endA = a.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
-  const endB = b.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
-  return new Date(endA) - new Date(endB);
-});
+  if (discountCandidates.length > 0) {
+    discountCountEl.innerText = discountCandidates.length;
+    discountListEl.innerHTML = '';
 
-discountCandidates.forEach(c => {
-  const endDate = c.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
-
-  if (endDate) {
-    const formattedEnd = new Date(endDate).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short'
+    discountCandidates.sort((a, b) => {
+      const endA = a.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+      const endB = b.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+      return new Date(endA) - new Date(endB);
     });
 
-    const li = document.createElement('li');
-    const discountDollar = c.discount_dolar ? `$${c.discount_dolar}` : '';
-    li.innerHTML = `💵 ${discountDollar} until <strong>${formattedEnd}</strong>`;
+    discountCandidates.forEach(c => {
+      const endDate = c.discount_daterange.match(/\d{4}-\d{2}-\d{2}/g)?.[1];
+      if (endDate) {
+        const formattedEnd = new Date(endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+        const li = document.createElement('li');
+        const discountDollar = c.discount_dolar ? `$${c.discount_dolar}` : '';
+        li.innerHTML = `💵 ${discountDollar} until <strong>${formattedEnd}</strong>`;
+        discountListEl.appendChild(li);
+      }
+    });
 
-    discountListEl.appendChild(li);
+    alertDiv.classList.remove("hidden");
+  } else {
+    alertDiv.classList.add("hidden");
   }
-});
 
-  alertDiv.classList.remove("hidden");
-} else {
-  alertDiv.classList.add("hidden");
-}
-// 🔁 Determinar tipo de contrato
-let contractType = '—';
-if (hasStaffing && !hasRecruiting) {
-  contractType = 'Staffing';
-} else if (!hasStaffing && hasRecruiting) {
-  contractType = 'Recruiting';
-} else if (hasStaffing && hasRecruiting) {
-  contractType = 'Mix';
-}
+  // ------- Contract visual + persistencia -------
+  let contractType = '—';
+  if (hasStaffing && !hasRecruiting) {
+    contractType = 'Staffing';
+  } else if (!hasStaffing && hasRecruiting) {
+    contractType = 'Recruiting';
+  } else if (hasStaffing && hasRecruiting) {
+    contractType = 'Mix';
+  }
 
-// 📝 Mostrar el contract visualmente en el overview
-const contractField = Array.from(document.querySelectorAll('#overview .accordion-content p'))
-  .find(p => p.textContent.includes('Contract:'));
-if (contractField) {
-  contractField.innerHTML = `<strong>Contract:</strong> ${contractType}`;
-}
+  const contractField = Array.from(document.querySelectorAll('#overview .accordion-content p'))
+    .find(p => p.textContent.includes('Contract:'));
+  if (contractField) {
+    contractField.innerHTML = `<strong>Contract:</strong> ${contractType}`;
+  }
 
-// 💾 Guardar en la base de datos si es distinto
-const accountId = getIdFromURL();
-if (accountId && contractType !== '—') {
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contract: contractType })
-  })
-  .then(res => {
-    if (!res.ok) throw new Error('Error updating contract');
-    console.log('✅ Contract updated to:', contractType);
-  })
-  .catch(err => console.error('❌ Error updating contract:', err));
+  const accountId = getIdFromURL();
+  if (accountId && contractType !== '—') {
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract: contractType })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Error updating contract');
+      console.log('✅ Contract updated to:', contractType);
+    })
+    .catch(err => console.error('❌ Error updating contract:', err));
+  }
 }
 
-}
   function getIdFromURL() {
     const params = new URLSearchParams(window.location.search);
     return params.get('id');
