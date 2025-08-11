@@ -1,5 +1,8 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+// ✅ Guarda siempre el id del hire aquí
+window.hireCandidateId = null;
+
 function toggleActiveButton(command, button) {
   document.execCommand(command, false, '');
   button.classList.toggle('active');
@@ -226,6 +229,8 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
 
   // ✅ Cargar datos reales de la oportunidad
   loadOpportunityData();
+  console.log('🔎 hireCandidateId after load:', window.hireCandidateId);
+
   document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
   document.getElementById('emailPopup').classList.remove('hidden');
 
@@ -885,18 +890,19 @@ if (goBackButton) {
     }
   });
 }
-const hireEl = document.getElementById('hire-display');
-if (hireEl) {
-  hireEl.addEventListener('click', (e) => {
-    const id = e.currentTarget.dataset.candidateId;
-    if (!id) {
-      alert('❌ No hired candidate linked yet');
-      return;
-    }
-    window.location.href = `/candidate-details.html?id=${encodeURIComponent(id)}`;
-  });
-}
+// 🔗 Redirección robusta al perfil del hire
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('#hire-display');
+  if (!el) return;
 
+  const id = (window.hireCandidateId || el.dataset.candidateId || el.getAttribute('data-candidate-id') || '').trim();
+
+  if (!id) {
+    alert('❌ No hired candidate linked yet');
+    return;
+  }
+  window.location.href = `/candidate-details.html?id=${encodeURIComponent(id)}`;
+});
 
 
 
@@ -959,14 +965,16 @@ async function loadOpportunityData() {
     } else {
       document.getElementById('signed-tag').textContent = '—';
     }
-    // 🔹 Mostrar el HIRE y guardar id en data-candidate-id (sirve para redirigir)
+
+    // 🔹 Mostrar el HIRE y guardar id en dataset + variable global (con fallback)
     try {
       const hireDisplay = document.getElementById('hire-display');
-      const hiredId = data.candidato_contratado;
+      const hiredId = Number(data.candidato_contratado) || null;
 
-      // Limpia estado previo
       if (hireDisplay) {
+        // limpia estado
         hireDisplay.removeAttribute('data-candidate-id');
+        hireDisplay.dataset.candidateId = '';
         if ('value' in hireDisplay) hireDisplay.value = '—';
         hireDisplay.textContent = '—';
       }
@@ -975,15 +983,31 @@ async function loadOpportunityData() {
         const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${hiredId}`);
         if (r.ok) {
           const cand = await r.json();
-          // Muestra el nombre (funciona si es input o si es span/div)
+          console.log('👤 Candidate API payload:', cand);
+
+          // pinta nombre (sirve si hireDisplay es input o span/div)
           if ('value' in hireDisplay) hireDisplay.value = cand.name || '—';
           hireDisplay.textContent = cand.name || '—';
-          // Guarda el id en dataset (más robusto que getAttribute)
-          hireDisplay.dataset.candidateId = String(cand.candidate_id);
+
+          // ⚠️ toma id con fallback por si el payload no trae candidate_id
+          const cidRaw = (cand.candidate_id ?? cand.id ?? cand.candidateId ?? hiredId);
+          const cid = String(cidRaw);
+
+          // guarda en dataset, atributo y variable global
+          hireDisplay.dataset.candidateId = cid;
+          hireDisplay.setAttribute('data-candidate-id', cid);
+          window.hireCandidateId = cid;
+
+          console.log('👤 Hired candidate set:', cid, '-', cand.name);
+        } else {
+          window.hireCandidateId = null;
         }
+      } else {
+        window.hireCandidateId = null;
       }
     } catch (error) {
       console.error('Error loading hire candidate:', error);
+      window.hireCandidateId = null;
     }
       window.currentAccountId = data.account_id;
         try {
