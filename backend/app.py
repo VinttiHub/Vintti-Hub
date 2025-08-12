@@ -17,6 +17,8 @@ from db import get_connection
 import re
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
+import json, re, uuid
+from datetime import datetime
 
 
 
@@ -360,6 +362,64 @@ def login():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     
+
+def _extract_key_from_url(presigned_or_s3_url: str):
+    """
+    Convierte un URL (incluso presignado) a una S3 key 'accounts/<file>.pdf'
+    """
+    if not presigned_or_s3_url:
+        return None
+    m = re.search(r"accounts%2F(.+?\.pdf)", presigned_or_s3_url)
+    if not m:
+        m = re.search(r"accounts/(.+?\.pdf)", presigned_or_s3_url)
+    return f"accounts/{m.group(1)}" if m else None
+
+def _get_account_pdf_keys(cursor, account_id):
+    """
+    Lee account.pdf_s3 y devuelve una lista de keys S3.
+    Soporta formato legacy (una sola URL presignada en texto).
+    """
+    cursor.execute("SELECT pdf_s3 FROM account WHERE account_id = %s", (account_id,))
+    row = cursor.fetchone()
+    keys = []
+    if row and row[0]:
+        raw = row[0]
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                keys = [k for k in data if isinstance(k, str)]
+            elif isinstance(data, str):
+                # legacy string -> lo tratamos abajo
+                raise ValueError("legacy string")
+        except Exception:
+            # legacy: valor único en texto (posible URL presignada)
+            k = _extract_key_from_url(raw)
+            if k:
+                keys = [k]
+    return keys
+
+def _set_account_pdf_keys(cursor, account_id, keys):
+    cursor.execute(
+        "UPDATE account SET pdf_s3 = %s WHERE account_id = %s",
+        (json.dumps(keys), account_id)
+    )
+
+def _make_pdf_payload(keys):
+    """ Genera URLs presignadas frescas (7 días) para cada key. """
+    pdfs = []
+    for key in keys:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': key},
+            ExpiresIn=604800  # 7 días
+        )
+        pdfs.append({
+            "key": key,
+            "url": url,
+            "name": key.split('/')[-1]
+        })
+    return pdfs
+
 @app.route('/accounts/<account_id>')
 def get_account_by_id(account_id):
     try:
@@ -2032,6 +2092,7 @@ def delete_candidate_from_batch():
         return jsonify({'success': True}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 @app.route('/accounts/<account_id>/upload_pdf', methods=['POST'])
 def upload_account_pdf(account_id):
     pdf_file = request.files.get('pdf')
@@ -2039,30 +2100,93 @@ def upload_account_pdf(account_id):
         return jsonify({"error": "Missing PDF file"}), 400
 
     try:
+        # S3 key única
         filename = f"accounts/{account_id}_{uuid.uuid4()}.pdf"
+
+        # Subir a S3
         s3_client.upload_fileobj(
             pdf_file,
             S3_BUCKET,
             filename,
             ExtraArgs={'ContentType': 'application/pdf'}
         )
-        signed_url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET, 'Key': filename},
-            ExpiresIn=604800  # 7 días
-        )
 
+        # Actualizar lista de keys en account.pdf_s3 (JSON array)
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE account SET pdf_s3 = %s WHERE account_id = %s", (signed_url, account_id))
+
+        keys = _get_account_pdf_keys(cursor, account_id)
+        if filename not in keys:
+            keys.append(filename)
+        _set_account_pdf_keys(cursor, account_id, keys)
         conn.commit()
+
+        # Devolver lista completa con URLs presignadas frescas
+        pdfs = _make_pdf_payload(keys)
+
         cursor.close()
         conn.close()
 
-        return jsonify({"message": "PDF uploaded", "pdf_url": signed_url}), 200
+        return jsonify({"message": "PDF uploaded", "pdfs": pdfs}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+    
+@app.route('/accounts/<account_id>/pdfs', methods=['GET'])
+def list_account_pdfs(account_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        keys = _get_account_pdf_keys(cursor, account_id)
+        # Normaliza a JSON array si venía en legacy
+        _set_account_pdf_keys(cursor, account_id, keys)
+        conn.commit()
+
+        pdfs = _make_pdf_payload(keys)
+
+        cursor.close()
+        conn.close()
+        return jsonify(pdfs)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@app.route('/accounts/<account_id>/pdfs', methods=['DELETE'])
+def delete_account_pdf_v2(account_id):
+    try:
+        data = request.get_json(silent=True) or {}
+        key = data.get("key")  # Debe venir tipo "accounts/<account_id>_<uuid>.pdf"
+        if not key or not key.startswith("accounts/"):
+            return jsonify({"error": "Missing or invalid key"}), 400
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Leer keys actuales
+        keys = _get_account_pdf_keys(cursor, account_id)
+
+        if key not in keys:
+            cursor.close(); conn.close()
+            return jsonify({"error": "Key not found for this account"}), 404
+
+        # Eliminar de S3
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+
+        # Quitar de la lista y persistir
+        keys = [k for k in keys if k != key]
+        _set_account_pdf_keys(cursor, account_id, keys)
+        conn.commit()
+
+        pdfs = _make_pdf_payload(keys)
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({"message": "PDF deleted", "pdfs": pdfs}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/accounts/<account_id>/delete_pdf', methods=['DELETE'])
 def delete_account_pdf(account_id):
     try:

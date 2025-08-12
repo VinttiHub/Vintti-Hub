@@ -34,6 +34,7 @@ document.body.style.backgroundColor = 'var(--bg)';
       fillAccountDetails(data);
       loadAssociatedOpportunities(id);
       loadCandidates(id);
+      loadAccountPdfs(id); // ⬅️ NUEVO: pinta la grilla de PDFs
     })
     .catch(err => {
       console.error('Error fetching accounts details:', err);
@@ -585,36 +586,30 @@ function saveDiscountDolar(candidateId, value) {
 const uploadBtn = document.getElementById("uploadPdfBtn");
 const pdfInput = document.getElementById("pdfUpload");
 const previewContainer = document.getElementById("pdfPreviewContainer");
-
-uploadBtn.addEventListener("click", () => {
-  const file = pdfInput.files[0];
-  if (!file) return alert("Please select a PDF file.");
-
-  const formData = new FormData();
-  formData.append("pdf", file);
+if (pdfInput) pdfInput.setAttribute('multiple', 'multiple');
+uploadBtn.addEventListener("click", async () => {
+  const files = Array.from(pdfInput.files || []).filter(f => f.type === 'application/pdf');
+  if (!files.length) return alert("Please select at least one PDF.");
 
   const accountId = getIdFromURL();
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/upload_pdf`, {
-    method: "POST",
-    body: formData,
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.pdf_url) {
-        previewContainer.innerHTML = `
-          <a href="${data.pdf_url}" target="_blank">📄 View uploaded PDF</a>
-          <button id="deletePdfBtn" class="delete-pdf-btn">🗑️</button>
-        `;
-        document.getElementById("deletePdfBtn").addEventListener("click", deletePDF);
-      } else {
-        alert("Error uploading PDF.");
-      }
-    })
-    .catch(err => {
-      console.error("Error uploading PDF:", err);
-      alert("Upload failed");
-    });
+  try {
+    await Promise.all(files.map(file => {
+      const formData = new FormData();
+      formData.append("pdf", file);
+      return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/upload_pdf`, {
+        method: "POST",
+        body: formData,
+      }).then(r => r.ok ? r.json() : Promise.reject(r));
+    }));
+
+    pdfInput.value = "";
+    await loadAccountPdfs(accountId);
+  } catch (err) {
+    console.error("Error uploading PDFs:", err);
+    alert("Upload failed");
+  }
 });
+
 function updateCandidateField(candidateId, field, value) {
   if (field === 'discount_dolar') {
     const numericValue = parseFloat(value.replace(/[^\d.]/g, ''));
@@ -632,22 +627,181 @@ function updateCandidateField(candidateId, field, value) {
     .catch(err => console.error('❌ Failed to save field:', err));
   }
 }
-function deletePDF() {
+async function deletePDF(key) {
   const accountId = getIdFromURL();
-  if (!accountId) return;
+  if (!accountId || !key) return;
 
   if (!confirm("Are you sure you want to delete this PDF?")) return;
 
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/delete_pdf`, {
-    method: "DELETE"
-  })
-  .then(res => {
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/pdfs`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key })
+    });
     if (!res.ok) throw new Error("Failed to delete PDF");
-    previewContainer.innerHTML = "";
-    alert("PDF deleted successfully");
-  })
-  .catch(err => {
+    await loadAccountPdfs(accountId);
+  } catch (err) {
     console.error("Error deleting PDF:", err);
     alert("Failed to delete PDF");
+  }
+}
+async function loadAccountPdfs(accountId) {
+  try {
+    ensurePdfStyles();
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/pdfs`);
+    const pdfs = await res.json();
+    renderPdfGrid(pdfs);
+  } catch (err) {
+    console.error("Error loading account PDFs:", err);
+  }
+}
+
+function renderPdfGrid(pdfs = []) {
+  const container = document.getElementById("pdfPreviewContainer");
+  if (!container) return;
+
+  container.classList.add("pdf-grid");
+  container.innerHTML = "";
+
+  if (!Array.isArray(pdfs) || pdfs.length === 0) {
+    container.innerHTML = `
+      <div class="pdf-empty">
+        <div>📄 No contracts uploaded yet</div>
+        <small>Use the upload button to add one or more PDFs.</small>
+      </div>`;
+    return;
+  }
+
+  pdfs.forEach(pdf => {
+    const card = document.createElement("div");
+    card.className = "pdf-card";
+    card.innerHTML = `
+      <a href="${pdf.url}" target="_blank" class="pdf-open-overlay" title="Open in new tab"></a>
+      <object data="${pdf.url}#view=FitH&toolbar=0" type="application/pdf" class="pdf-thumb">
+        <div class="pdf-fallback">
+          Preview not supported. <a href="${pdf.url}" target="_blank">Open</a>
+        </div>
+      </object>
+      <div class="pdf-meta">
+        <span class="pdf-name" title="${pdf.name}">${truncateFileName(pdf.name, 26)}</span>
+        <div class="pdf-actions">
+          <a href="${pdf.url}" target="_blank" class="open-btn">Open</a>
+          <button class="delete-btn" data-key="${pdf.key}" title="Delete">🗑️</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll(".delete-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      e.preventDefault();
+      const key = btn.getAttribute("data-key");
+      deletePDF(key);
+    });
   });
 }
+
+function truncateFileName(name, maxLen = 26) {
+  if (!name) return "";
+  return name.length > maxLen ? name.slice(0, maxLen - 7) + "…" + name.slice(-6) : name;
+}
+
+function ensurePdfStyles() {
+  if (document.getElementById("pdf-styles")) return;
+  const style = document.createElement("style");
+  style.id = "pdf-styles";
+  style.textContent = `
+    /* Grid contenedor */
+    #pdfPreviewContainer.pdf-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    /* Tarjeta */
+    .pdf-card {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 8px 22px var(--shadow);
+      overflow: hidden;
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .pdf-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 28px var(--shadow);
+    }
+    /* Área clicable completa para abrir */
+    .pdf-open-overlay {
+      position: absolute;
+      inset: 0 0 40px 0; /* no cubre el footer de meta */
+      z-index: 1;
+    }
+    /* Preview PDF */
+    .pdf-thumb {
+      width: 100%;
+      height: 240px;
+      border: none;
+      background: #fff;
+      display: block;
+    }
+    .pdf-fallback { padding: 24px; font-size: 13px; }
+    /* Meta */
+    .pdf-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(0,0,0,0.02));
+      backdrop-filter: saturate(110%) blur(2px);
+    }
+    .pdf-name {
+      max-width: 65%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-weight: 600;
+      color: var(--text);
+      font-size: 12.5px;
+    }
+    .pdf-actions {
+      display: flex;
+      gap: 8px;
+      z-index: 2;
+    }
+    .open-btn {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      text-decoration: none;
+      color: var(--text);
+    }
+    .open-btn:hover { background: var(--accent); }
+    .delete-btn {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      opacity: .8;
+    }
+    .delete-btn:hover { opacity: 1; transform: scale(1.05); }
+    /* Vacío */
+    .pdf-empty {
+      border: 1.5px dashed var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      color: #666;
+      background: var(--card);
+    }
+  `;
+  document.head.appendChild(style);
+}
+
