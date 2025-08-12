@@ -1046,7 +1046,12 @@ def get_candidates_by_account_opportunities(account_id):
                 h.end_date,
                 c.status,
                 h.discount_dolar,
-                h.discount_daterange
+                h.discount_daterange,
+                -- NUEVO 👇
+                h.referral_dolar,
+                h.referral_daterange,
+                h.buyout_dolar,
+                h.buyout_daterange
             FROM opportunity o
             LEFT JOIN candidates c
                 ON o.candidato_contratado = c.candidate_id
@@ -1634,18 +1639,23 @@ def handle_candidate_hire_data(candidate_id):
             # 2) Traer datos desde hire_opportunity
             cursor.execute("""
                 SELECT
-                    references_notes,      -- referencias (rich text)
-                    salary,                -- salario
-                    fee,                   -- fee
-                    computer,              -- yes/no
-                    extra_perks,           -- perks (rich text)
+                    references_notes,
+                    salary,
+                    fee,
+                    computer,
+                    extra_perks,
                     working_schedule,
                     pto,
                     discount_dolar,
                     discount_daterange,
                     start_date,
                     end_date,
-                    revenue                -- revenue (staffing o recruiting)
+                    revenue,
+                    -- NUEVO 👇
+                    referral_dolar,
+                    referral_daterange,
+                    buyout_dolar,
+                    buyout_daterange
                 FROM hire_opportunity
                 WHERE candidate_id = %s AND opportunity_id = %s
                 LIMIT 1
@@ -1666,11 +1676,17 @@ def handle_candidate_hire_data(candidate_id):
                     'start_date': None,
                     'end_date': None,
                     'employee_revenue': None,
-                    'employee_revenue_recruiting': None
+                    'employee_revenue_recruiting': None,
+                    # NUEVO 👇
+                    'referral_dolar': None,
+                    'referral_daterange': None,
+                    'buyout_dolar': None,
+                    'buyout_daterange': None
                 })
 
             (references_notes, salary, fee, computer, extra_perks, working_schedule,
-            pto, discount_dolar, discount_daterange, start_date, end_date, revenue) = row
+             pto, discount_dolar, discount_daterange, start_date, end_date, revenue,
+             referral_dolar, referral_daterange, buyout_dolar, buyout_daterange) = row
 
             return jsonify({
                 'references_notes': references_notes,
@@ -1685,8 +1701,14 @@ def handle_candidate_hire_data(candidate_id):
                 'start_date': start_date,
                 'end_date': end_date,
                 'employee_revenue': revenue if (opp_model or '').lower() == 'staffing' else None,
-                'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None
+                'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None,
+                # NUEVO 👇
+                'referral_dolar': referral_dolar,
+                'referral_daterange': referral_daterange,
+                'buyout_dolar': buyout_dolar,
+                'buyout_daterange': buyout_daterange
             })
+
 
 
         # PATCH -> asegurar/actualizar fila en hire_opportunity
@@ -1705,8 +1727,14 @@ def handle_candidate_hire_data(candidate_id):
                 'employee_revenue': 'revenue',
                 'employee_revenue_recruiting': 'revenue',
                 'discount_dolar': 'discount_dolar',
-                'discount_daterange': 'discount_daterange'
+                'discount_daterange': 'discount_daterange',
+                # NUEVO 👇
+                'referral_dolar': 'referral_dolar',
+                'referral_daterange': 'referral_daterange',
+                'buyout_dolar': 'buyout_dolar',
+                'buyout_daterange': 'buyout_daterange'
             }
+
 
             set_cols, set_vals = [], []
             # 👇 Siempre insertamos candidate_id, opportunity_id y account_id si no existe

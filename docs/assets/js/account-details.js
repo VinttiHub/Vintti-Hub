@@ -283,6 +283,8 @@ function fillEmployeesTables(candidates) {
         <td>$${candidate.employee_fee ?? '—'}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
         <td>$${candidate.employee_revenue ?? '—'}</td>
+
+        <!-- Discount $ -->
         <td>
           <input 
             type="number"
@@ -292,6 +294,8 @@ function fillEmployeesTables(candidates) {
             data-candidate-id="${candidate.candidate_id}"
           />
         </td>
+
+        <!-- Discount Date Range -->
         <td>
           <input 
             type="text" 
@@ -302,10 +306,51 @@ function fillEmployeesTables(candidates) {
             value="${candidate.discount_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
           />
         </td>
-        <td>—</td>
-        <td>—</td>
-        <td>—</td>
-        <td>—</td>
+
+        <!-- Discount Months (badge) -->
+        <td></td>
+
+        <!-- NUEVO: Referral $ -->
+        <td>
+          <input 
+            type="number"
+            class="referral-input"
+            placeholder="$"
+            value="${candidate.referral_dolar || ''}"
+            data-candidate-id="${candidate.candidate_id}"
+          />
+        </td>
+
+        <!-- NUEVO: Referral Date Range -->
+        <td>
+          <input 
+            type="text" 
+            class="referral-range-picker" 
+            placeholder="Select range"
+            readonly 
+            data-candidate-id="${candidate.candidate_id}"
+            value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
+          />
+        </td>
+
+        <!-- NUEVO: Buy Out $ -->
+        <td>
+          <input 
+            type="number"
+            class="buyout-input"
+            placeholder="$"
+            value="${candidate.buyout_dolar || ''}"
+            data-candidate-id="${candidate.candidate_id}"
+          />
+        </td>
+
+        <!-- NUEVO: Buy Out Month (mes & año) -->
+        <td>
+          <div class="buyout-month-wrap" data-candidate-id="${candidate.candidate_id}">
+            <select class="buyout-month"></select>
+            <select class="buyout-year"></select>
+          </div>
+        </td>
       `;
 
       // ----- Lógica de Discount SOLO para Staffing -----
@@ -362,6 +407,95 @@ function fillEmployeesTables(candidates) {
               cell.style.color = '#006600';
             });
           }
+        }
+      }
+      // === Referral ===
+      const referralInput = row.querySelector('.referral-input');
+      if (referralInput) {
+        referralInput.addEventListener('input', () => formatDollarInput(referralInput));
+        referralInput.addEventListener('blur', () => {
+          const candidateId = referralInput.dataset.candidateId;
+          const value = referralInput.value;
+          updateCandidateField(candidateId, 'referral_dolar', value);
+        });
+      }
+
+      const referralPickerInput = row.querySelector('.referral-range-picker');
+      if (referralPickerInput) {
+        // Precargar rango si ya existía
+        const rr = candidate.referral_daterange;
+        let startDateR = null, endDateR = null;
+        if (rr && rr.includes(',')) {
+          const [s,e] = rr.replace('[','').replace(']','').split(',').map(d => d.trim());
+          startDateR = new Date(s.slice(0,7) + '-15');
+          endDateR   = new Date(e.slice(0,7) + '-15');
+        }
+
+        const refOptions = {
+          element: referralPickerInput,
+          format: 'MMM YYYY',
+          numberOfMonths: 2,
+          numberOfColumns: 2,
+          singleMode: false,
+          allowRepick: true,
+          dropdowns: { minYear: 2020, maxYear: 2030, months: true, years: true },
+          setup: (picker) => {
+            picker.on('selected', (date1, date2) => {
+              const candidateId = referralPickerInput.dataset.candidateId;
+              if (!candidateId) return;
+              const start = date1.format('YYYY-MM-DD');
+              const end   = date2.format('YYYY-MM-DD');
+              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`);
+            });
+          }
+        };
+        if (startDateR && endDateR) { refOptions.startDate = startDateR; refOptions.endDate = endDateR; }
+        new Litepicker(refOptions);
+      }
+
+      // === Buy Out (mes/año) ===
+      const wrap = row.querySelector('.buyout-month-wrap');
+      if (wrap) {
+        const mSel = wrap.querySelector('.buyout-month');
+        const ySel = wrap.querySelector('.buyout-year');
+        const candidateId = wrap.dataset.candidateId;
+
+        // Opciones de mes
+        const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+        mSel.innerHTML = months.map((m,idx) => `<option value="${m}">${new Date(2000, idx, 1).toLocaleString('en-US',{month:'short'})}</option>`).join('');
+
+        // Opciones de año (rango dinámico)
+        const nowY = new Date().getFullYear();
+        const years = Array.from({length: 9}, (_,i) => nowY - 4 + i); // [nowY-4 .. nowY+4]
+        ySel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+        // Preselección si ya hay valor guardado (acepta "YYYY-MM" o "[YYYY-MM-01,YYYY-MM-01]")
+        let preY = null, preM = null;
+        const bo = candidate.buyout_daterange;
+        if (bo) {
+          const ym = (bo.match(/\d{4}-\d{2}/) || [])[0];
+          if (ym) { preY = ym.slice(0,4); preM = ym.slice(5,7); }
+        }
+        if (preY && years.includes(+preY)) ySel.value = preY;
+        if (preM && months.includes(preM)) mSel.value = preM;
+
+        const saveBuyout = () => {
+          const y = ySel.value, m = mSel.value;
+          if (!y || !m) return;
+          // Guardamos como "YYYY-MM" (simple y suficiente para tu UI)
+          updateCandidateField(candidateId, 'buyout_daterange', `${y}-${m}`);
+        };
+        mSel.addEventListener('change', saveBuyout);
+        ySel.addEventListener('change', saveBuyout);
+
+        // Guardar Buyout $
+        const buyoutInput = row.querySelector('.buyout-input');
+        if (buyoutInput) {
+          buyoutInput.addEventListener('input', () => formatDollarInput(buyoutInput));
+          buyoutInput.addEventListener('blur', () => {
+            const value = buyoutInput.value;
+            updateCandidateField(candidateId, 'buyout_dolar', value);
+          });
         }
       }
 
@@ -466,12 +600,76 @@ function fillEmployeesTables(candidates) {
         <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
         <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
         <td>${candidate.opp_position_name || '—'}</td>
-        <td>${probation}</td>
+        <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
-        <td>$${revenueRecruit}</td>
-        <td>${referralVal}</td>
-        <td>${referralRange}</td>
+        <td>$${(candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '—')}</td>
+
+        <!-- NUEVO: Referral $ -->
+        <td>
+          <input 
+            type="number"
+            class="ref-rec-input"
+            placeholder="$"
+            value="${candidate.referral_dolar || ''}"
+            data-candidate-id="${candidate.candidate_id}"
+          />
+        </td>
+
+        <!-- NUEVO: Referral Date Range -->
+        <td>
+          <input 
+            type="text" 
+            class="ref-rec-range-picker" 
+            placeholder="Select range"
+            readonly 
+            data-candidate-id="${candidate.candidate_id}"
+            value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
+          />
+        </td>
       `;
+      // Recruiting: guardar referral $
+      const refRecInput = row.querySelector('.ref-rec-input');
+      if (refRecInput) {
+        refRecInput.addEventListener('input', () => formatDollarInput(refRecInput));
+        refRecInput.addEventListener('blur', () => {
+          const candidateId = refRecInput.dataset.candidateId;
+          const value = refRecInput.value;
+          updateCandidateField(candidateId, 'referral_dolar', value);
+        });
+      }
+
+      // Recruiting: referral date range
+      const refRecPickerInput = row.querySelector('.ref-rec-range-picker');
+      if (refRecPickerInput) {
+        const rr = candidate.referral_daterange;
+        let startDateR = null, endDateR = null;
+        if (rr && rr.includes(',')) {
+          const [s,e] = rr.replace('[','').replace(']','').split(',').map(d => d.trim());
+          startDateR = new Date(s.slice(0,7) + '-15');
+          endDateR   = new Date(e.slice(0,7) + '-15');
+        }
+
+        const options = {
+          element: refRecPickerInput,
+          format: 'MMM YYYY',
+          numberOfMonths: 2,
+          numberOfColumns: 2,
+          singleMode: false,
+          allowRepick: true,
+          dropdowns: { minYear: 2020, maxYear: 2030, months: true, years: true },
+          setup: (picker) => {
+            picker.on('selected', (date1, date2) => {
+              const candidateId = refRecPickerInput.dataset.candidateId;
+              if (!candidateId) return;
+              const start = date1.format('YYYY-MM-DD');
+              const end   = date2.format('YYYY-MM-DD');
+              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`);
+            });
+          }
+        };
+        if (startDateR && endDateR) { options.startDate = startDateR; options.endDate = endDateR; }
+        new Litepicker(options);
+      }
 
       recruitingTableBody.appendChild(row);
       hasRecruiting = true;
@@ -611,13 +809,17 @@ uploadBtn.addEventListener("click", async () => {
 });
 
 function updateCandidateField(candidateId, field, value) {
-  // 🎯 Los descuentos ahora se guardan en hire_opportunity
-  if (field === 'discount_dolar' || field === 'discount_daterange') {
-    const payloadValue = field === 'discount_dolar'
+  // 🎯 Estos campos se guardan en hire_opportunity
+  if ([
+      'discount_dolar','discount_daterange',
+      'referral_dolar','referral_daterange',
+      'buyout_dolar','buyout_daterange'
+    ].includes(field)) {
+    const payloadValue = (field.endsWith('_dolar'))
       ? parseFloat(String(value).replace(/[^\d.]/g, ''))
       : value;
 
-    if (field === 'discount_dolar' && isNaN(payloadValue)) return;
+    if (field.endsWith('_dolar') && isNaN(payloadValue)) return;
 
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
       method: 'PATCH',
@@ -625,14 +827,14 @@ function updateCandidateField(candidateId, field, value) {
       body: JSON.stringify({ [field]: payloadValue })
     })
     .then(res => {
-      if (!res.ok) throw new Error('Error saving discount (hire_opportunity)');
+      if (!res.ok) throw new Error(`Error saving ${field} (hire_opportunity)`);
       console.log(`💾 ${field} saved in hire_opportunity for candidate ${candidateId}`);
     })
     .catch(err => console.error('❌ Failed to save field:', err));
     return;
   }
 
-  // Fallback para otros campos que aún se actualicen en candidates
+  // Fallback para otros campos (tabla candidates)
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
