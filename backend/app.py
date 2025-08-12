@@ -123,28 +123,27 @@ def get_accounts_light():
                 ELSE NULL
                 END AS contract,
 
-                -- TRR (Recruiting): suma employee_revenue_recruiting del candidato contratado
-                COALESCE(SUM(
-                    CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(c.employee_revenue_recruiting, 0) ELSE 0 END
-                ), 0) AS trr,
-
-                -- TSF (Staffing): suma employee_fee del candidato contratado
-                COALESCE(SUM(
-                    CASE WHEN o.opp_model = 'Staffing' THEN COALESCE(c.employee_fee, 0) ELSE 0 END
-                ), 0) AS tsf,
-
-                -- TSR (Staffing): suma employee_salary del candidato contratado
-                COALESCE(SUM(
-                    CASE WHEN o.opp_model = 'Staffing' THEN COALESCE(c.employee_salary, 0) ELSE 0 END
-                ), 0) AS tsr
+                -- 🔶 TRR/TSF/TSR ahora desde hire_opportunity (agregada por opp para evitar duplicados)
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(h.revenue, 0) ELSE 0 END), 0) AS trr,
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.fee,     0) ELSE 0 END), 0) AS tsf,
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.salary,  0) ELSE 0 END), 0) AS tsr
 
             FROM account a
             LEFT JOIN users u ON a.account_manager = u.email_vintti
             LEFT JOIN opportunity o ON o.account_id = a.account_id
-            LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+            LEFT JOIN (
+                SELECT
+                    opportunity_id,
+                    MAX(salary)  AS salary,
+                    MAX(fee)     AS fee,
+                    MAX(revenue) AS revenue
+                FROM hire_opportunity
+                GROUP BY opportunity_id
+            ) h ON h.opportunity_id = o.opportunity_id
             GROUP BY a.account_id, a.client_name, u.user_name, a.account_manager, a.priority
             ORDER BY a.client_name ASC
         """)
+
 
 
         rows = cursor.fetchall()
@@ -215,24 +214,22 @@ def get_accounts():
             opp_ids = [r[0] for r in opp_rows]
             opp_model_map = {r[0]: r[1] for r in opp_rows}
 
-            # Obtener candidatos vinculados a esas oportunidades
+            # Obtener candidatos/hire data desde hire_opportunity
             cursor.execute("""
-                SELECT oc.opportunity_id, c.employee_salary, c.employee_fee, c.employee_revenue, c.employee_revenue_recruiting
-                FROM opportunity_candidates oc
-                JOIN candidates c ON oc.candidate_id = c.candidate_id
-                WHERE oc.opportunity_id = ANY(%s)
+                SELECT h.opportunity_id, h.salary, h.fee, h.revenue
+                FROM hire_opportunity h
+                WHERE h.opportunity_id = ANY(%s)
             """, (opp_ids,))
 
             trr = tsf = tsr = 0
-            for row in cursor.fetchall():
-                opp_id, salary, fee, revenue, revenue_recruiting = row
+            for opp_id, salary, fee, revenue in cursor.fetchall():
                 model = opp_model_map.get(opp_id)
-
                 if model == 'Recruiting':
-                    trr += revenue_recruiting or 0
+                    trr += (revenue or 0)
                 elif model == 'Staffing':
-                    tsf += fee or 0
-                    tsr += salary or 0
+                    tsf += (fee or 0)
+                    tsr += (salary or 0)
+
 
             # Guardar los valores en la tabla account
             cursor.execute("""
@@ -429,13 +426,22 @@ def get_account_by_id(account_id):
         # 1) Calcular TRR/TSF/TSR para ESTA cuenta (solo hires), en una sola query
         cursor.execute("""
             SELECT
-                COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN c.employee_revenue_recruiting ELSE 0 END), 0) AS trr,
-                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN c.employee_fee                 ELSE 0 END), 0) AS tsf,
-                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN c.employee_salary              ELSE 0 END), 0) AS tsr
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(h.revenue, 0) ELSE 0 END), 0) AS trr,
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.fee,     0) ELSE 0 END), 0) AS tsf,
+                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.salary,  0) ELSE 0 END), 0) AS tsr
             FROM opportunity o
-            LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+            LEFT JOIN (
+                SELECT
+                    opportunity_id,
+                    MAX(salary)  AS salary,
+                    MAX(fee)     AS fee,
+                    MAX(revenue) AS revenue
+                FROM hire_opportunity
+                GROUP BY opportunity_id
+            ) h ON h.opportunity_id = o.opportunity_id
             WHERE o.account_id = %s
         """, (account_id,))
+
         sums = cursor.fetchone()
         trr = sums[0] or 0
         tsf = sums[1] or 0
@@ -1033,18 +1039,23 @@ def get_candidates_by_account_opportunities(account_id):
                 o.opportunity_id,
                 o.opp_model,
                 o.opp_position_name,
-                c.employee_salary,
-                c.employee_fee,
-                c.employee_revenue,
-                c.start_date,
-                c.enddate,
+                h.salary  AS employee_salary,
+                h.fee     AS employee_fee,
+                h.revenue AS employee_revenue,
+                h.start_date,
+                h.end_date,
                 c.status,
-                c.discount_dolar,
-                c.discount_daterange
+                h.discount_dolar,
+                h.discount_daterange
             FROM opportunity o
-            LEFT JOIN candidates c ON o.candidato_contratado = c.candidate_id
+            LEFT JOIN candidates c
+                ON o.candidato_contratado = c.candidate_id
+            LEFT JOIN hire_opportunity h
+                ON h.opportunity_id = o.opportunity_id
+            AND h.candidate_id   = c.candidate_id
             WHERE o.account_id = %s
         """, (account_id,))
+
         
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
