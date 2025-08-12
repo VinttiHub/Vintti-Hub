@@ -297,9 +297,9 @@ function fillEmployeesTables(candidates) {
 
         <!-- Discount Date Range -->
         <td>
-          <input 
-            type="text" 
-            class="month-range-picker" 
+         <input 
+           type="text" 
+           class="month-range-picker range-chip" 
             placeholder="Select range"
             readonly 
             data-candidate-id="${candidate.candidate_id}"
@@ -312,20 +312,23 @@ function fillEmployeesTables(candidates) {
 
         <!-- NUEVO: Referral $ -->
         <td>
-          <input 
-            type="number"
-            class="referral-input"
-            placeholder="$"
-            value="${candidate.referral_dolar || ''}"
-            data-candidate-id="${candidate.candidate_id}"
-          />
+         <div class="currency-wrap">
+           <input 
+             type="number"
+             class="referral-input input-chip"
+             placeholder="0.00"
+             step="0.01" min="0" inputmode="decimal"
+             value="${candidate.referral_dolar ?? ''}"
+             data-candidate-id="${candidate.candidate_id}"
+           />
+         </div>
         </td>
 
         <!-- NUEVO: Referral Date Range -->
         <td>
-          <input 
-            type="text" 
-            class="referral-range-picker" 
+         <input 
+           type="text" 
+           class="referral-range-picker range-chip" 
             placeholder="Select range"
             readonly 
             data-candidate-id="${candidate.candidate_id}"
@@ -335,21 +338,24 @@ function fillEmployeesTables(candidates) {
 
         <!-- NUEVO: Buy Out $ -->
         <td>
-          <input 
-            type="number"
-            class="buyout-input"
-            placeholder="$"
-            value="${candidate.buyout_dolar || ''}"
-            data-candidate-id="${candidate.candidate_id}"
-          />
+         <div class="currency-wrap">
+           <input 
+             type="number"
+             class="buyout-input input-chip"
+             placeholder="0.00"
+             step="0.01" min="0" inputmode="decimal"
+             value="${candidate.buyout_dolar ?? ''}"
+             data-candidate-id="${candidate.candidate_id}"
+           />
+         </div>
         </td>
 
         <!-- NUEVO: Buy Out Month (mes & año) -->
         <td>
-          <div class="buyout-month-wrap" data-candidate-id="${candidate.candidate_id}">
-            <select class="buyout-month"></select>
-            <select class="buyout-year"></select>
-          </div>
+         <div class="buyout-month-wrap segmented" data-candidate-id="${candidate.candidate_id}">
+           <select class="buyout-month select-chip"></select>
+           <select class="buyout-year select-chip"></select>
+         </div>
         </td>
       `;
 
@@ -380,15 +386,8 @@ function fillEmployeesTables(candidates) {
           const isExpired = endMonth < current;
 
           const badge = document.createElement('span');
+          badge.className = `badge-pill ${isExpired ? 'expired' : 'active'}`;
           badge.textContent = isExpired ? 'expired' : 'active';
-          badge.style.backgroundColor = isExpired ? '#ffe6e6' : '#e6f5e6';
-          badge.style.color = isExpired ? '#b30000' : '#006600';
-          badge.style.padding = '2px 8px';
-          badge.style.borderRadius = '12px';
-          badge.style.fontSize = '11px';
-          badge.style.marginLeft = '8px';
-          badge.style.fontWeight = '600';
-          badge.style.display = 'inline-block';
 
           const dateInput = dateRangeCell.querySelector('.month-range-picker');
           if (dateInput && dateInput.parentElement) {
@@ -412,7 +411,6 @@ function fillEmployeesTables(candidates) {
       // === Referral ===
       const referralInput = row.querySelector('.referral-input');
       if (referralInput) {
-        referralInput.addEventListener('input', () => formatDollarInput(referralInput));
         referralInput.addEventListener('blur', () => {
           const candidateId = referralInput.dataset.candidateId;
           const value = referralInput.value;
@@ -491,7 +489,6 @@ function fillEmployeesTables(candidates) {
         // Guardar Buyout $
         const buyoutInput = row.querySelector('.buyout-input');
         if (buyoutInput) {
-          buyoutInput.addEventListener('input', () => formatDollarInput(buyoutInput));
           buyoutInput.addEventListener('blur', () => {
             const value = buyoutInput.value;
             updateCandidateField(candidateId, 'buyout_dolar', value);
@@ -606,20 +603,23 @@ function fillEmployeesTables(candidates) {
 
         <!-- NUEVO: Referral $ -->
         <td>
-          <input 
-            type="number"
-            class="ref-rec-input"
-            placeholder="$"
-            value="${candidate.referral_dolar || ''}"
-            data-candidate-id="${candidate.candidate_id}"
-          />
+         <div class="currency-wrap">
+           <input 
+             type="number"
+             class="ref-rec-input input-chip"
+             placeholder="0.00"
+             step="0.01" min="0" inputmode="decimal"
+             value="${candidate.referral_dolar ?? ''}"
+             data-candidate-id="${candidate.candidate_id}"
+           />
+         </div>
         </td>
 
         <!-- NUEVO: Referral Date Range -->
         <td>
-          <input 
-            type="text" 
-            class="ref-rec-range-picker" 
+       <input 
+         type="text" 
+         class="ref-rec-range-picker range-chip" 
             placeholder="Select range"
             readonly 
             data-candidate-id="${candidate.candidate_id}"
@@ -630,7 +630,6 @@ function fillEmployeesTables(candidates) {
       // Recruiting: guardar referral $
       const refRecInput = row.querySelector('.ref-rec-input');
       if (refRecInput) {
-        refRecInput.addEventListener('input', () => formatDollarInput(refRecInput));
         refRecInput.addEventListener('blur', () => {
           const candidateId = refRecInput.dataset.candidateId;
           const value = refRecInput.value;
@@ -762,9 +761,14 @@ function fillEmployeesTables(candidates) {
     const params = new URLSearchParams(window.location.search);
     return params.get('id');
   }
-  function formatDollarInput(input) {
-  const val = input.value.replace(/\$/g, '').replace(/[^\d.]/g, '');
-  input.value = val ? `$${val}` : '';
+function formatDollarInput(input) {
+  const raw = String(input.value || '').replace(/[^\d.]/g, '');
+  if (input.type === 'number') {
+    // Para type="number" no inyectamos '$' (Safari/Chrome lo rechazan)
+    input.value = raw;
+  } else {
+    input.value = raw ? `$${raw}` : '';
+  }
 }
 function saveDiscountDolar(candidateId, value) {
   const numericValue = parseFloat(value.replace(/[^\d.]/g, ''));
