@@ -396,7 +396,7 @@ function fillEmployeesTables(candidates) {
               const start = date1.format('YYYY-MM-DD');
               const end   = date2.format('YYYY-MM-DD');
 
-              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ discount_daterange: `[${start},${end}]` })
@@ -572,7 +572,7 @@ function saveDiscountDolar(candidateId, value) {
   const numericValue = parseFloat(value.replace(/[^\d.]/g, ''));
   if (isNaN(numericValue)) return;
 
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ discount_dolar: numericValue })
@@ -611,22 +611,40 @@ uploadBtn.addEventListener("click", async () => {
 });
 
 function updateCandidateField(candidateId, field, value) {
-  if (field === 'discount_dolar') {
-    const numericValue = parseFloat(value.replace(/[^\d.]/g, ''));
-    if (isNaN(numericValue)) return;
+  // 🎯 Los descuentos ahora se guardan en hire_opportunity
+  if (field === 'discount_dolar' || field === 'discount_daterange') {
+    const payloadValue = field === 'discount_dolar'
+      ? parseFloat(String(value).replace(/[^\d.]/g, ''))
+      : value;
 
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+    if (field === 'discount_dolar' && isNaN(payloadValue)) return;
+
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: numericValue })
+      body: JSON.stringify({ [field]: payloadValue })
     })
     .then(res => {
-      if (!res.ok) throw new Error('Error saving discount');
-      console.log(`💾 ${field} saved for candidate ${candidateId}`);
+      if (!res.ok) throw new Error('Error saving discount (hire_opportunity)');
+      console.log(`💾 ${field} saved in hire_opportunity for candidate ${candidateId}`);
     })
     .catch(err => console.error('❌ Failed to save field:', err));
+    return;
   }
+
+  // Fallback para otros campos que aún se actualicen en candidates
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ [field]: value })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Error saving field');
+    console.log(`💾 ${field} saved for candidate ${candidateId}`);
+  })
+  .catch(err => console.error('❌ Failed to save field:', err));
 }
+
 async function deletePDF(key) {
   const accountId = getIdFromURL();
   if (!accountId || !key) return;

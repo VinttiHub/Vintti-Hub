@@ -1641,6 +1641,8 @@ def handle_candidate_hire_data(candidate_id):
                     extra_perks,           -- perks (rich text)
                     working_schedule,
                     pto,
+                    discount_dolar,
+                    discount_daterange,
                     start_date,
                     end_date,
                     revenue                -- revenue (staffing o recruiting)
@@ -1651,7 +1653,6 @@ def handle_candidate_hire_data(candidate_id):
             row = cursor.fetchone()
 
             if not row:
-                # Sin fila aún: devolvemos estructura vacía (UI ya sabe manejarla)
                 return jsonify({
                     'references_notes': '',
                     'employee_salary': None,
@@ -1660,6 +1661,8 @@ def handle_candidate_hire_data(candidate_id):
                     'extraperks': '',
                     'working_schedule': '',
                     'pto': '',
+                    'discount_dolar': None,
+                    'discount_daterange': None,
                     'start_date': None,
                     'end_date': None,
                     'employee_revenue': None,
@@ -1667,7 +1670,7 @@ def handle_candidate_hire_data(candidate_id):
                 })
 
             (references_notes, salary, fee, computer, extra_perks, working_schedule,
-             pto, start_date, end_date, revenue) = row
+            pto, discount_dolar, discount_daterange, start_date, end_date, revenue) = row
 
             return jsonify({
                 'references_notes': references_notes,
@@ -1677,11 +1680,14 @@ def handle_candidate_hire_data(candidate_id):
                 'extraperks': extra_perks,
                 'working_schedule': working_schedule,
                 'pto': pto,
+                'discount_dolar': discount_dolar,
+                'discount_daterange': discount_daterange,
                 'start_date': start_date,
                 'end_date': end_date,
                 'employee_revenue': revenue if (opp_model or '').lower() == 'staffing' else None,
                 'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None
             })
+
 
         # PATCH -> asegurar/actualizar fila en hire_opportunity
         if request.method == 'PATCH':
@@ -1697,7 +1703,9 @@ def handle_candidate_hire_data(candidate_id):
                 'pto': 'pto',
                 'start_date': 'start_date',
                 'employee_revenue': 'revenue',
-                'employee_revenue_recruiting': 'revenue'
+                'employee_revenue_recruiting': 'revenue',
+                'discount_dolar': 'discount_dolar',
+                'discount_daterange': 'discount_daterange'
             }
 
             set_cols, set_vals = [], []
