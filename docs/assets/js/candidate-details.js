@@ -36,12 +36,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const hireWorkingSchedule = document.getElementById('hire-working-schedule');
   const hirePTO = document.getElementById('hire-pto');
   const hireStartDate = document.getElementById('hire-start-date');
+  const hireEndDate = document.getElementById('hire-end-date');
   const video_link = videoLinkInput.innerHTML.trim();
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
   if (hireStartDate) {
     hireStartDate.addEventListener('blur', () => updateHireField('start_date', hireStartDate.value));
+  }
+  if (hireEndDate) {
+    hireEndDate.addEventListener('blur', () => updateHireField('end_date', hireEndDate.value));
   }
 
   // === Fetch candidate info ===
@@ -1108,6 +1112,8 @@ function loadHireData() {
   document.getElementById('hire-pto').value = data.pto || '';
   document.getElementById('hire-start-date').value = data.start_date || '';
   document.getElementById('hire-references').innerHTML = data.references_notes || '';
+  const endDateEl = document.getElementById('hire-end-date');
+  if (endDateEl) endDateEl.value = data.end_date || '';
 
 const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
 const isRecruiting = modelText?.includes('recruiting');

@@ -1724,6 +1724,7 @@ def handle_candidate_hire_data(candidate_id):
                 'working_schedule': 'working_schedule',
                 'pto': 'pto',
                 'start_date': 'start_date',
+                'end_date': 'end_date', 
                 'employee_revenue': 'revenue',
                 'employee_revenue_recruiting': 'revenue',
                 'discount_dolar': 'discount_dolar',
