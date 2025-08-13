@@ -37,7 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const hirePTO = document.getElementById('hire-pto');
   const hireStartDate = document.getElementById('hire-start-date');
   const hireEndDate = document.getElementById('hire-end-date');
-  const video_link = videoLinkInput.innerHTML.trim();
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));

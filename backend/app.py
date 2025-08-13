@@ -1135,7 +1135,7 @@ def get_resume(candidate_id):
                     "education": "[]",
                     "tools": "[]",
                     "languages": "[]",
-                    "video_link": "[]",
+                    "video_link": "",
                     "extract_cv_pdf": "",
                     "cv_pdf_s3": ""
                 })
