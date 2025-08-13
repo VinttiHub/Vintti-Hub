@@ -20,36 +20,43 @@ from psycopg2.extras import RealDictCursor
 import json, re, uuid
 from datetime import datetime
 
-
-
+# 👇 MOVER ARRIBA: cargar .env ANTES de leer cualquier variable
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-affinda = AffindaAPI(
-  credential=TokenCredential(token=os.getenv('AFFINDA_API_KEY'))
-)
+# --- ENV KEYS (safe) ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if OPENAI_API_KEY:
+    openai.api_key = OPENAI_API_KEY
+
+AFFINDA_API_KEY = os.getenv('AFFINDA_API_KEY')
 WORKSPACE_ID = os.getenv('AFFINDA_WORKSPACE_ID')
-DOC_TYPE_ID = os.getenv('AFFINDA_DOCUMENT_TYPE_ID')
+DOC_TYPE_ID   = os.getenv('AFFINDA_DOCUMENT_TYPE_ID')
 
-load_dotenv()
+# Inicialización perezosa/segura de Affinda
+affinda = None
+if AFFINDA_API_KEY:
+    try:
+        affinda = AffindaAPI(credential=TokenCredential(token=AFFINDA_API_KEY))
+    except Exception:
+        logging.exception("❌ No se pudo inicializar Affinda; continuaré sin Affinda.")
 
-# Configurar cliente S3
+# Configurar cliente S3 DESPUÉS de load_dotenv()
 s3_client = boto3.client(
     's3',
     region_name=os.getenv('AWS_REGION'),
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
     aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
 )
-
 S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
-
 register_ai_routes(app)
+
 
 def fetch_data_from_table(table_name):
     try:
@@ -538,9 +545,9 @@ def upload_candidate_cv(candidate_id):
         # 🆕 NUEVO: correr Affinda y guardar en candidates.affinda_scrapper
         # =========================
         affinda_json = None
-        if ext == 'pdf':
+        if ext == 'pdf' and affinda:
             try:
-                # Rebobinar el stream para mandar el mismo archivo a Affinda
+                # Rebobinar el stream para Affinda
                 try:
                     f.stream.seek(0)
                     file_for_affinda = f.stream
@@ -555,20 +562,19 @@ def upload_candidate_cv(candidate_id):
                     wait=True
                 )
                 data = doc.data
-                # Normalizar a string JSON
                 try:
                     affinda_json = json.dumps(data)
                 except TypeError:
                     try:
-                        # distintos SDKs devuelven objetos; fallback seguro
                         affinda_json = json.dumps(doc.as_dict())
                     except Exception:
-                        affinda_json = json.dumps(
-                            getattr(data, "__dict__", {"raw": str(data)})
-                        )
+                        affinda_json = json.dumps(getattr(data, "__dict__", {"raw": str(data)}))
             except Exception:
                 logging.exception("Affinda extraction failed (candidate_id=%s, key=%s)", candidate_id, s3_key)
+        elif ext == 'pdf' and not affinda:
+            logging.warning("Affinda no configurado; omitiendo extracción.")
         # =========================
+
 
         conn = get_connection()
         cursor = conn.cursor()
@@ -1495,6 +1501,8 @@ def extract_pdf_affinda():
         return jsonify({"error": "candidate_id and pdf required"}), 400
 
     try:
+        if not affinda:
+            return jsonify({"error": "Affinda no está configurado (faltan variables de entorno)."}), 500
         print("📤 Subiendo PDF a Affinda...")
         doc = affinda.create_document(
             file=pdf_file,
