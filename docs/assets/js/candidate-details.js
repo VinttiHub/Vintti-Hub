@@ -31,8 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const addToolBtn = document.getElementById('addToolBtn');
   addToolBtn.addEventListener('click', () => addToolEntry());
 
-  const videoLinkInput = document.getElementById('videoLinkInput');
-  videoLinkInput.addEventListener('blur', () => saveResume());
+
   const hireWorkingSchedule = document.getElementById('hire-working-schedule');
   const hirePTO = document.getElementById('hire-pto');
   const hireStartDate = document.getElementById('hire-start-date');
@@ -194,6 +193,65 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     document.getElementById('comments').value = data.comments || '';
     document.getElementById("field-created-by").textContent = data.created_by || '—';
     document.getElementById("field-created-at").textContent = data.created_at ? new Date(data.created_at).toLocaleString() : '—';
+// ✅ VIDEO LINK: carga y guardado desacoplado del resto del resume
+const videoLinkEl = document.getElementById('videoLinkInput');
+if (videoLinkEl) {
+  const normalizeUrl = (u) => {
+    let v = (u || '').trim();
+    // quitar espacios internos comunes al pegar
+    v = v.replace(/\s+/g, '');
+    if (v && !/^https?:\/\//i.test(v)) v = 'https://' + v.replace(/^\/+/, '');
+    return v;
+  };
+
+  // Exponer al scope global para refrescar cuando cambias de pestaña
+  window.loadVideoLink = async function () {
+    const cid = new URLSearchParams(window.location.search).get('id');
+    if (!cid) return;
+    try {
+      const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${cid}`);
+      const d = await r.json();
+      const v = (d.video_link ?? '').toString();
+      if (videoLinkEl.textContent !== v) videoLinkEl.textContent = v; // 👈 contenteditable usa textContent
+      videoLinkEl.dataset.original = v; // guarda valor original
+    } catch (e) {
+      console.warn('⚠️ No se pudo cargar video_link:', e);
+    }
+  };
+
+  async function persistVideoLink() {
+    const cid = new URLSearchParams(window.location.search).get('id');
+    if (!cid) return;
+
+    let val = normalizeUrl(videoLinkEl.textContent); // 👈 leer del contenteditable
+    videoLinkEl.textContent = val;
+
+    // Evita PATCH si no cambió
+    if ((videoLinkEl.dataset.original || '') === val) return;
+
+    try {
+      await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${cid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ video_link: val })
+      });
+      videoLinkEl.dataset.original = val; // sincronizado
+    } catch (e) {
+      console.error('❌ Error guardando video_link:', e);
+    }
+  }
+
+  // Disparadores de guardado
+  videoLinkEl.addEventListener('blur', persistVideoLink);
+  // En contenteditable "change" NO dispara; no lo uses
+  videoLinkEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); videoLinkEl.blur(); }
+  });
+
+  // Carga inicial
+  loadVideoLink();
+}
+
   })
   .catch(err => {
     console.error('❌ Error fetching candidate:', err);
@@ -208,7 +266,13 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       JSON.parse(data.education || '[]').forEach(entry => addEducationEntry(entry));
       JSON.parse(data.tools || '[]').forEach(entry => addToolEntry(entry));
       JSON.parse(data.languages || '[]').forEach(entry => addLanguageEntry(entry));
-      videoLinkInput.value = data.video_link || '';
+const videoLinkEl2 = document.getElementById('videoLinkInput');
+if (videoLinkEl2) {
+  const v = (data.video_link ?? '').toString();
+  if (videoLinkEl2.textContent !== v) videoLinkEl2.textContent = v; // 👈 usar textContent
+  videoLinkEl2.dataset.original = v;
+}
+
     });
 
 function addEducationEntry(entry = { institution: '', title: '', start_date: '', end_date: '', current: false, description: '' }) {
@@ -425,15 +489,12 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
       level: div.querySelector('.language-level').value
     }));
 
-    const videoLinkDiv = document.getElementById('videoLinkInput');
-    const video_link = videoLinkDiv?.innerText?.trim() || null;
     console.log("📝 Saving resume with:", {
       about,
       education,
       work_experience,
       tools,
-      languages,
-      video_link,
+      languages
     });
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
@@ -444,8 +505,7 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
       education,
       work_experience,
       tools,
-      languages,
-      video_link,
+      languages
     }),
   }).then(() => {
     // Reordenar después de guardar
@@ -533,11 +593,15 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   document.getElementById('ai-close').addEventListener('click', () => {
   document.getElementById('ai-popup').classList.add('hidden');
 });
+const clientBtn = document.getElementById('client-version-btn'); // ✅ defínelo aquí
 if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
   aiButton.classList.remove('hidden');
-  clientBtn.classList.remove('hidden');
-  clientBtn.style.display = 'inline-block';
+  if (clientBtn) {
+    clientBtn.classList.remove('hidden');
+    clientBtn.style.display = 'inline-block';
+  }
 }
+// ❌ No uses 'tabId' aquí (no existe en este scope)
 
   // 👇 AGREGAR ESTO AL FINAL DEL DOMContentLoaded
   if (document.querySelector('.tab.active')?.dataset.tab === 'opportunities') {
@@ -1039,6 +1103,8 @@ document.querySelectorAll('.tab').forEach(tab => {
       aiButton.classList.remove('hidden');
       clientBtn.classList.remove('hidden');
       clientBtn.style.display = 'inline-block';
+      // 🔁 Refresca usando el loader centralizado
+if (typeof loadVideoLink === 'function') loadVideoLink();
     } else {
       aiButton.classList.add('hidden');
       clientBtn.style.display = 'none';
