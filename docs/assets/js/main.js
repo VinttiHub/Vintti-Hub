@@ -159,34 +159,27 @@ document.querySelectorAll('.filter-header button').forEach(button => {
           async function fetchDaysSinceBatch(opp, tr) {
             const oppId = opp.opportunity_id;
 
-            // 👉 Selecciona la celda de "Days since batch" una sola vez
+            // 👉 celda de "Days Since Sourcing" (última columna)
             const daysCell = tr.querySelector('td:last-child');
             if (!daysCell) return;
 
-            let referenceDate = null;
-
             try {
-              // ¿Se debe pausar el conteo?
-              const pauseRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/pause_days_since_batch`);
-              const pauseData = await pauseRes.json();
-
-              if (pauseData && pauseData.pause) {
-                daysCell.textContent = '⏸️';
-                daysCell.title = 'Paused due to recent presentation';
-                daysCell.classList.remove('red-cell');
-                return;
-              }
-
-              // Obtener fecha de referencia
-              const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
-              const result = await res.json();
-
-              if (result.latest_sourcing_date) {
-                referenceDate = new Date(result.latest_sourcing_date);
+              // 1) Intentar usar la fecha ya enriquecida o el start_date
+              let referenceDate = null;
+              if (opp.latest_sourcing_date) {
+                referenceDate = new Date(opp.latest_sourcing_date);
               } else if (opp.nda_signature_or_start_date) {
                 referenceDate = new Date(opp.nda_signature_or_start_date);
+              } else {
+                // 2) Fallback: pedirla al backend
+                const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/latest_sourcing_date`);
+                const result = await res.json();
+                if (result.latest_sourcing_date) {
+                  referenceDate = new Date(result.latest_sourcing_date);
+                }
               }
 
+              // 3) Si no hay fecha, no contamos
               if (!referenceDate) {
                 daysCell.textContent = '-';
                 daysCell.removeAttribute('title');
@@ -194,13 +187,14 @@ document.querySelectorAll('.filter-header button').forEach(button => {
                 return;
               }
 
-              // Calcular días
+              // 4) Calcular días (misma fórmula que usas en Days)
               const today = new Date();
               const diffTime = today - referenceDate;
               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
 
+              // 5) Pintar valor y alerta roja si ≥ 7
               daysCell.textContent = diffDays;
-              daysCell.title = `Days since batch: ${diffDays}`;
+              daysCell.title = `Days since sourcing: ${diffDays}`;
               if (diffDays >= 7) {
                 daysCell.classList.add('red-cell');
                 daysCell.innerHTML += ' ⚠️';
