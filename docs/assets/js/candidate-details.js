@@ -1073,6 +1073,183 @@ function updatePhrase() {
 }
 const addLanguageBtn = document.getElementById('addLanguageBtn');
 addLanguageBtn.addEventListener('click', () => addLanguageEntry());
+// ====== Candidate CVs (upload/list/delete/open) ======
+(() => {
+  const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const drop = document.getElementById('cv-drop');
+  const input = document.getElementById('cv-input');
+  const browseBtn = document.getElementById('cv-browse');
+  const refreshBtn = document.getElementById('cv-refresh');
+  const list = document.getElementById('cv-list');
+  // === Mini indicador abajo-derecha ===
+  const cvIndicator = (() => {
+    const el = document.createElement('div');
+    el.className = 'cv-indicator';
+    el.innerHTML = `<span class="spinner"></span><span class="msg">Extracting info from CV…</span>`;
+    document.body.appendChild(el);
+
+    const setIcon = (type) => {
+      const first = el.firstElementChild;
+      if (!first) return;
+      if (type === 'spinner') {
+        first.className = 'spinner';
+      } else if (type === 'check') {
+        first.className = 'check';
+      }
+    };
+
+    return {
+      show(msg = 'Extracting info from CV…') {
+        setIcon('spinner');
+        el.querySelector('.msg').textContent = msg;
+        el.classList.add('show');
+      },
+      success(msg = 'Extracted') {
+        setIcon('check');
+        el.querySelector('.msg').textContent = msg;
+      },
+      hide() {
+        el.classList.remove('show');
+      }
+    };
+  })();
+
+  if (!drop || !input || !list) return;
+
+  function render(items = []) {
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
+      return;
+    }
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'cv-item';
+      row.innerHTML = `
+        <span class="cv-name" title="${it.name}">${it.name}</span>
+        <div class="cv-actions">
+          <a class="btn" href="${it.url}" target="_blank" rel="noopener">Open</a>
+          <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
+        </div>
+      `;
+      row.querySelector('.danger').addEventListener('click', async (e) => {
+        const key = e.currentTarget.getAttribute('data-key');
+        if (!key) return;
+        if (!confirm('Delete this file?')) return;
+        await fetch(`${apiBase}/candidates/${candidateId}/cvs`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        });
+        await loadCVs();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  async function loadCVs() {
+    try {
+      const r = await fetch(`${apiBase}/candidates/${candidateId}/cvs`);
+      const data = await r.json();
+      render(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.warn('Failed to load CVs', e);
+      render([]);
+    }
+  }
+  // Exponer para refrescos cuando cambias de pestaña
+  window.loadCVs = loadCVs;
+
+  async function uploadFile(file) {
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      alert('Only PDF, PNG, JPG/JPEG or WEBP are allowed.');
+      return;
+    }
+
+    // Detectar si es PDF para mostrar "Extracting..."
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      drop.classList.add('dragover');
+
+      // 🔔 Indicador no bloqueante
+      if (isPdf) {
+        cvIndicator.show('Extracting info from CV…');
+      } else {
+        cvIndicator.show('Uploading file…');
+      }
+
+      const r = await fetch(`${apiBase}/candidates/${candidateId}/cvs`, {
+        method: 'POST',
+        body: fd
+      });
+
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        throw new Error(t || `Upload failed (${r.status})`);
+      }
+
+      const data = await r.json();
+      render(data.items || []);
+
+      // ✅ pequeño feedback de éxito
+      cvIndicator.success(isPdf ? 'CV extracted' : 'Uploaded');
+      setTimeout(() => cvIndicator.hide(), 900);
+    } catch (e) {
+      console.error('Upload failed', e);
+      alert('Upload failed');
+      cvIndicator.hide();
+    } finally {
+      drop.classList.remove('dragover');
+      input.value = '';
+    }
+  }
+
+  // Drag & Drop
+  ;['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.add('dragover');
+  }));
+  ;['dragleave','dragend','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.remove('dragover');
+  }));
+  drop.addEventListener('drop', e => {
+    const files = e.dataTransfer?.files;
+    if (files?.length) uploadFile(files[0]);
+  });
+
+  // Click/browse
+  browseBtn.addEventListener('click', () => input.click());
+  drop.addEventListener('click', (e) => {
+    // Evita abrir si se hace click en acciones
+    if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
+    input.click();
+  });
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) uploadFile(f);
+  });
+
+  refreshBtn.addEventListener('click', async () => {
+  const ic = refreshBtn.querySelector('.btn-icon');
+  refreshBtn.disabled = true;
+  ic?.classList.add('spin');
+  await loadCVs();
+  setTimeout(() => ic?.classList.remove('spin'), 400);
+  refreshBtn.disabled = false;
+});
+
+
+  // Carga inicial si ya estás en Overview
+  if (document.querySelector('.tab.active')?.dataset.tab === 'overview') {
+    loadCVs();
+  }
+})();
 
 
 
@@ -1116,6 +1293,9 @@ if (typeof loadVideoLink === 'function') loadVideoLink();
     if (tabId === 'hire') {
       loadHireData();
     }
+    if (tabId === 'overview') {
+  if (typeof loadCVs === 'function') loadCVs();
+}
   });
 });
 

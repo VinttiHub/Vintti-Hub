@@ -416,6 +416,221 @@ def _make_pdf_payload(keys):
             "name": key.split('/')[-1]
         })
     return pdfs
+# ---------- CANDIDATE CVS (PDFs/Imágenes) ----------
+def _extract_cv_key_from_url(presigned_or_s3_url: str):
+    """
+    Convierte cualquier URL (incluso presignada) a una S3 key 'cvs/<file>'
+    Soporta .pdf, .png, .jpg, .jpeg, .webp
+    """
+    if not presigned_or_s3_url:
+        return None
+    m = re.search(r"cvs%2F(.+?\.(?:pdf|png|jpg|jpeg|webp))", presigned_or_s3_url, re.IGNORECASE)
+    if not m:
+        m = re.search(r"cvs/(.+?\.(?:pdf|png|jpg|jpeg|webp))", presigned_or_s3_url, re.IGNORECASE)
+    return f"cvs/{m.group(1)}" if m else None
+
+def _get_cv_keys(cursor, candidate_id: int):
+    """
+    Lee resume.cv_pdf_s3 y devuelve lista de keys S3.
+    Soporta legacy: string con URL en vez de JSON list.
+    """
+    cursor.execute("SELECT cv_pdf_s3 FROM resume WHERE candidate_id = %s", (candidate_id,))
+    row = cursor.fetchone()
+    keys = []
+    if row and row[0]:
+        raw = row[0]
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                keys = [k for k in data if isinstance(k, str)]
+            elif isinstance(data, str):
+                raise ValueError("legacy string")
+        except Exception:
+            k = _extract_cv_key_from_url(raw)
+            if k:
+                keys = [k]
+    return keys
+
+def _ensure_resume_row(cursor, candidate_id: int):
+    cursor.execute("SELECT 1 FROM resume WHERE candidate_id = %s", (candidate_id,))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO resume (candidate_id) VALUES (%s)", (candidate_id,))
+
+def _set_cv_keys(cursor, candidate_id: int, keys: list[str]):
+    _ensure_resume_row(cursor, candidate_id)
+    cursor.execute(
+        "UPDATE resume SET cv_pdf_s3 = %s WHERE candidate_id = %s",
+        (json.dumps(keys), candidate_id)
+    )
+
+def _make_cv_payload(keys: list[str]):
+    """
+    Genera URLs presignadas (7 días) para cada key, con nombre bonito.
+    """
+    items = []
+    for key in keys:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': key},
+            ExpiresIn=604800  # 7 días
+        )
+        items.append({
+            "key": key,
+            "url": url,
+            "name": key.split('/')[-1]
+        })
+    return items
+# ---------------------------------------------------
+@app.route('/candidates/<int:candidate_id>/cvs', methods=['GET'])
+def list_candidate_cvs(candidate_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        keys = _get_cv_keys(cursor, candidate_id)
+        # Normaliza a JSON list si era legacy
+        _set_cv_keys(cursor, candidate_id, keys)
+        conn.commit()
+
+        items = _make_cv_payload(keys)
+
+        cursor.close(); conn.close()
+        return jsonify(items)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/candidates/<int:candidate_id>/cvs', methods=['POST'])
+def upload_candidate_cv(candidate_id):
+    """
+    FormData: file=<archivo> (pdf o imagen)
+    """
+    f = request.files.get('file')
+    if not f:
+        return jsonify({"error": "Missing file"}), 400
+
+    # Validaciones básicas de tipo
+    allowed_ext = ('pdf', 'png', 'jpg', 'jpeg', 'webp')
+    filename_orig = (f.filename or '').lower()
+    ext = filename_orig.rsplit('.', 1)[-1] if '.' in filename_orig else ''
+    if ext not in allowed_ext:
+        return jsonify({"error": f"Unsupported file type .{ext}. Allowed: {', '.join(allowed_ext)}"}), 400
+
+    try:
+        s3_key = f"cvs/{candidate_id}_{uuid.uuid4()}.{ext}"
+        content_type = f.mimetype or {
+            'pdf': 'application/pdf',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'webp': 'image/webp'
+        }.get(ext, 'application/octet-stream')
+
+        # Subir a S3
+        s3_client.upload_fileobj(
+            f,
+            S3_BUCKET,
+            s3_key,
+            ExtraArgs={'ContentType': content_type}
+        )
+
+        # =========================
+        # 🆕 NUEVO: correr Affinda y guardar en candidates.affinda_scrapper
+        # =========================
+        affinda_json = None
+        if ext == 'pdf':
+            try:
+                # Rebobinar el stream para mandar el mismo archivo a Affinda
+                try:
+                    f.stream.seek(0)
+                    file_for_affinda = f.stream
+                except Exception:
+                    f.seek(0)
+                    file_for_affinda = f
+
+                doc = affinda.create_document(
+                    file=file_for_affinda,
+                    workspace=WORKSPACE_ID,
+                    document_type=DOC_TYPE_ID,
+                    wait=True
+                )
+                data = doc.data
+                # Normalizar a string JSON
+                try:
+                    affinda_json = json.dumps(data)
+                except TypeError:
+                    try:
+                        # distintos SDKs devuelven objetos; fallback seguro
+                        affinda_json = json.dumps(doc.as_dict())
+                    except Exception:
+                        affinda_json = json.dumps(
+                            getattr(data, "__dict__", {"raw": str(data)})
+                        )
+            except Exception:
+                logging.exception("Affinda extraction failed (candidate_id=%s, key=%s)", candidate_id, s3_key)
+        # =========================
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # 🆕 Guardar resultado de Affinda si lo obtuvimos
+        if affinda_json:
+            cursor.execute(
+                "UPDATE candidates SET affinda_scrapper = %s WHERE candidate_id = %s",
+                (affinda_json, candidate_id)
+            )
+
+        # Mantener tu lógica de almacenar la lista de CVs en resume.cv_pdf_s3
+        keys = _get_cv_keys(cursor, candidate_id)
+        if s3_key not in keys:
+            keys.append(s3_key)
+        _set_cv_keys(cursor, candidate_id, keys)
+        conn.commit()
+
+        items = _make_cv_payload(keys)
+
+        cursor.close(); conn.close()
+        return jsonify({"message": "CV uploaded", "items": items}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+@app.route('/candidates/<int:candidate_id>/cvs', methods=['DELETE'])
+def delete_candidate_cv(candidate_id):
+    """
+    JSON body: { "key": "cvs/<candidate_id>_<uuid>.<ext>" }
+    """
+    data = request.get_json(silent=True) or {}
+    key = data.get("key")
+    if not key or not key.startswith("cvs/"):
+        return jsonify({"error": "Missing or invalid key"}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        keys = _get_cv_keys(cursor, candidate_id)
+        if key not in keys:
+            cursor.close(); conn.close()
+            return jsonify({"error": "Key not found for this candidate"}), 404
+
+        # Eliminar en S3
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+
+        # Actualizar lista
+        keys = [k for k in keys if k != key]
+        _set_cv_keys(cursor, candidate_id, keys)
+        conn.commit()
+
+        items = _make_cv_payload(keys)
+
+        cursor.close(); conn.close()
+        return jsonify({"message": "CV deleted", "items": items}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/accounts/<account_id>')
 def get_account_by_id(account_id):
@@ -779,7 +994,8 @@ def get_candidate_by_id(candidate_id):
                 linkedin_scrapper,
                 cv_pdf_scrapper,
                 discount_dolar,
-                discount_daterange
+                discount_daterange,
+                affinda_scrapper
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))
