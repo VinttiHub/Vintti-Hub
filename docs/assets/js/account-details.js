@@ -194,17 +194,6 @@ function fillAccountDetails(data) {
 
   const websiteLink = document.getElementById('website-link');
   if (websiteLink) websiteLink.href = data.website || '#';
-if (data.pdf_s3) {
-  const previewContainer = document.getElementById("pdfPreviewContainer");
-  previewContainer.innerHTML = `
-    <a href="${data.pdf_s3}" target="_blank">📄 View PDF</a>
-    <button id="deletePdfBtn" title="Delete PDF">🗑️</button>
-  `;
-  const deleteBtn = document.getElementById("deletePdfBtn");
-  if (deleteBtn) {
-    deleteBtn.addEventListener("click", deletePDF);
-  }
-}
 document.getElementById('account-tsf').textContent = `$${data.tsf ?? 0}`;
 document.getElementById('account-tsr').textContent = `$${data.tsr ?? 0}`;
 document.getElementById('account-trr').textContent = `$${data.trr ?? 0}`;
@@ -870,61 +859,123 @@ async function deletePDF(key) {
     alert("Failed to delete PDF");
   }
 }
+async function renamePDF(key, new_name) {
+  const accountId = getIdFromURL();
+  if (!accountId || !key || !new_name) return;
+
+  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/pdfs`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, new_name })
+  });
+
+  if (!res.ok) throw new Error("Failed to rename PDF");
+  await loadAccountPdfs(accountId);
+}
 async function loadAccountPdfs(accountId) {
   try {
-    ensurePdfStyles();
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/pdfs`);
     const pdfs = await res.json();
-    renderPdfGrid(pdfs);
+    renderPdfList(pdfs);
   } catch (err) {
     console.error("Error loading account PDFs:", err);
   }
 }
 
-function renderPdfGrid(pdfs = []) {
+function renderPdfList(pdfs = []) {
   const container = document.getElementById("pdfPreviewContainer");
   if (!container) return;
 
-  container.classList.add("pdf-grid");
+  container.classList.add("contracts-list");
   container.innerHTML = "";
 
   if (!Array.isArray(pdfs) || pdfs.length === 0) {
     container.innerHTML = `
-      <div class="pdf-empty">
-        <div>📄 No contracts uploaded yet</div>
-        <small>Use the upload button to add one or more PDFs.</small>
+      <div class="contract-item" style="justify-content:center; color:#666;">
+        📄 No contracts uploaded yet — use the Upload button.
       </div>`;
     return;
   }
 
   pdfs.forEach(pdf => {
-    const card = document.createElement("div");
-    card.className = "pdf-card";
-    card.innerHTML = `
-      <a href="${pdf.url}" target="_blank" class="pdf-open-overlay" title="Open in new tab"></a>
-      <object data="${pdf.url}#view=FitH&toolbar=0" type="application/pdf" class="pdf-thumb">
-        <div class="pdf-fallback">
-          Preview not supported. <a href="${pdf.url}" target="_blank">Open</a>
-        </div>
-      </object>
-      <div class="pdf-meta">
-        <span class="pdf-name" title="${pdf.name}">${truncateFileName(pdf.name, 26)}</span>
-        <div class="pdf-actions">
-          <a href="${pdf.url}" target="_blank" class="open-btn">Open</a>
-          <button class="delete-btn" data-key="${pdf.key}" title="Delete">🗑️</button>
-        </div>
+    const row = document.createElement("div");
+    row.className = "contract-item";
+
+    row.innerHTML = `
+      <div class="contract-left">
+        <span class="file-icon">📄</span>
+        <a class="file-name" href="${pdf.url}" target="_blank" title="${pdf.name}">${pdf.name}</a>
+        <input class="file-edit" type="text" value="${pdf.name}" />
+      </div>
+      <div class="contract-right">
+        <button class="icon-btn rename-btn">Rename</button>
+        <button class="icon-btn save-btn hidden">Save</button>
+        <button class="icon-btn cancel-btn hidden">Cancel</button>
+        <a class="link-btn" href="${pdf.url}" target="_blank">Open</a>
+        <button class="icon-btn icon-danger delete-btn" data-key="${pdf.key}">Delete</button>
       </div>
     `;
-    container.appendChild(card);
-  });
 
-  container.querySelectorAll(".delete-btn").forEach(btn => {
-    btn.addEventListener("click", e => {
-      e.stopPropagation();
+    const nameLink   = row.querySelector(".file-name");
+    const nameInput  = row.querySelector(".file-edit");
+    const renameBtn  = row.querySelector(".rename-btn");
+    const saveBtn    = row.querySelector(".save-btn");
+    const cancelBtn  = row.querySelector(".cancel-btn");
+    const deleteBtn  = row.querySelector(".delete-btn");
+
+    // Rename flow
+    const enterEdit = () => {
+      nameLink.classList.add("hidden");
+      nameInput.classList.remove("hidden");
+      renameBtn.classList.add("hidden");
+      saveBtn.classList.remove("hidden");
+      cancelBtn.classList.remove("hidden");
+      nameInput.focus();
+      nameInput.select();
+    };
+    const exitEdit = () => {
+      nameLink.classList.remove("hidden");
+      nameInput.classList.add("hidden");
+      renameBtn.classList.remove("hidden");
+      saveBtn.classList.add("hidden");
+      cancelBtn.classList.add("hidden");
+    };
+
+    renameBtn.addEventListener("click", enterEdit);
+    cancelBtn.addEventListener("click", exitEdit);
+
+    saveBtn.addEventListener("click", async () => {
+      let newName = (nameInput.value || "").trim();
+      if (!newName) return;
+
+      // asegúrate de mantener .pdf
+      if (!/\.pdf$/i.test(newName)) newName += ".pdf";
+      // sanea nombre (sin slashes)
+      newName = newName.replace(/[\/\\]/g, "-");
+
+      try {
+        await renamePDF(pdf.key, newName);
+        exitEdit();
+      } catch (e) {
+        alert("Failed to rename file");
+        console.error(e);
+      }
+    });
+
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveBtn.click();
+      if (e.key === "Escape") cancelBtn.click();
+    });
+
+    // Delete
+    deleteBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      const key = btn.getAttribute("data-key");
+      e.stopPropagation();
+      const key = deleteBtn.getAttribute("data-key");
       deletePDF(key);
     });
+
+    container.appendChild(row);
   });
 }
 

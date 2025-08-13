@@ -52,13 +52,21 @@
               <p><strong>Total Staffing Fee:</strong> <span id="account-tsf" class="placeholder">Not available</span></p>
               <p><strong>Total Staffing Revenue:</strong> <span id="account-tsr" class="placeholder">Not available</span></p>
               <p><strong>Total Recruiting Revenue:</strong> <span id="account-trr" class="placeholder">Not available</span></p>
-              <div class="pdf-upload-section grid-item">
-                <label for="pdfUpload"><strong>Contract PDF:</strong></label>
-                <input type="file" id="pdfUpload" accept="application/pdf" />
-                <button id="uploadPdfBtn">Upload PDF</button>
-                <div id="pdfPreviewContainer"></div>
-              </div>
           </div>
+          <!-- Contracts (full width, below grid) -->
+            <div class="contracts-block" id="contracts-block">
+              <div class="contracts-header">
+                <div class="contracts-titles">
+                  <h3>Contracts</h3>
+                  <p class="subtle">Upload and manage all contract PDFs for this account.</p>
+                </div>
+                <div class="upload-row">
+                  <input type="file" id="pdfUpload" accept="application/pdf" multiple />
+                  <button id="uploadPdfBtn">Upload</button>
+                </div>
+              </div>
+              <div id="pdfPreviewContainer" class="contracts-list"></div>
+            </div>
           <div class="comment-box">
             <label for="comments"><strong>Comments:</strong></label>
             <textarea id="comments" placeholder="Write comments here..."></textarea>

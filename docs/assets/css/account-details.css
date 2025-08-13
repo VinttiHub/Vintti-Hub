@@ -531,105 +531,6 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 .month-range-picker::placeholder {
   color: #aaa;
 }
-.pdf-upload-section {
-  background-color: var(--card);
-  padding: 16px;
-  border-radius: 16px;
-  box-shadow: 0 2px 6px var(--shadow);
-  margin-top: 20px;
-  transition: all 0.3s ease;
-}
-
-.pdf-upload-section label {
-  font-weight: 600;
-  color: var(--text);
-  display: block;
-  margin-bottom: 8px;
-}
-
-#pdfUpload {
-  display: block;
-  margin-bottom: 12px;
-  padding: 8px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background-color: #fff;
-  font-family: inherit;
-}
-
-#uploadPdfBtn {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background-color 0.2s;
-}
-
-#uploadPdfBtn:hover {
-  background-color: #574fd6;
-}
-
-#pdfPreviewContainer {
-  margin-top: 12px;
-  font-weight: 500;
-}
-
-#pdfPreviewContainer a {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 6px 12px;
-  background-color: var(--accent);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  text-decoration: none;
-  color: var(--text);
-  transition: background-color 0.2s;
-}
-#pdfPreviewContainer a:hover {
-  background-color: var(--accent-strong);
-}
-.pdf-upload-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-#pdfPreviewContainer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-#pdfPreviewContainer a {
-  padding: 6px 10px;
-  background-color: var(--accent);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  color: var(--text);
-  text-decoration: none;
-  transition: background-color 0.2s ease;
-}
-
-#pdfPreviewContainer a:hover {
-  background-color: var(--accent-strong);
-}
-
-#deletePdfBtn {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  cursor: pointer;
-  color: #ff4d4d;
-  transition: transform 0.2s ease;
-}
-
-#deletePdfBtn:hover {
-  transform: scale(1.2);
-}
 .employee-link {
   text-decoration: none;
   color: var(--text);
@@ -760,4 +661,126 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 /* Opcional: alinear celdas de dinero/rango */
 td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   vertical-align: middle;
+}
+/* === Contracts full-width block === */
+.contracts-block{
+  width:100%;
+  margin:24px 0 12px 0;
+  background: var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow: 0 8px 22px var(--shadow);
+  overflow:hidden;
+}
+.contracts-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 18px;
+  background: linear-gradient(180deg, #fff 0%, #fafafa 100%);
+}
+.contracts-titles h3{
+  margin:0;
+  font-size:18px;
+  font-weight:700;
+  color:var(--text);
+}
+.contracts-titles .subtle{
+  margin:2px 0 0 0;
+  font-size:13px;
+  color:#7a7a7a;
+}
+.upload-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.upload-row input[type="file"]{
+  padding:8px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff;
+}
+.upload-row #uploadPdfBtn{
+  background-color: var(--primary);
+  color:#fff;
+  border:none;
+  padding:10px 14px;
+  border-radius:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.upload-row #uploadPdfBtn:hover{ filter:brightness(0.95); }
+
+/* Lista de contratos */
+.contracts-list{
+  display:block;
+  padding:6px 8px 12px 8px;
+}
+.contract-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:12px 14px;
+  border-top:1px solid var(--border);
+  background:#fff;
+}
+.contract-item:hover{ background:#f9f9fb; }
+.contract-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.file-icon{
+  font-size:18px;
+}
+.file-name{
+  max-width:520px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-weight:600;
+  color:var(--text);
+  text-decoration:none;
+}
+.file-name:hover{ text-decoration:underline; }
+.file-edit{
+  display:none;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:14px;
+  width:360px;
+  background:#fff;
+}
+.contract-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.icon-btn, .link-btn{
+  border:1px solid var(--border);
+  background:#fff;
+  border-radius:12px;
+  padding:8px 12px;
+  font-size:13px;
+  cursor:pointer;
+  text-decoration:none;
+  color:var(--text);
+}
+.icon-btn:hover, .link-btn:hover{ background:var(--accent); }
+.icon-danger{
+  border-color:#ffd6d6;
+  color:#b30000;
+}
+.icon-danger:hover{ background:#ffecec; }
+.hidden{ display:none !important; }
+
+/* Responsive */
+@media (max-width: 768px){
+  .file-name{ max-width:200px; }
+  .file-edit{ width:100%; }
 }
