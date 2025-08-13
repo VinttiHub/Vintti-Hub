@@ -1,3 +1,4 @@
+from __future__ import annotations
 from flask import Flask, jsonify, request
 import os
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 import json, re, uuid
 from datetime import datetime
+from typing import List
+
 
 # 👇 MOVER ARRIBA: cargar .env ANTES de leer cualquier variable
 load_dotenv()
@@ -463,14 +466,14 @@ def _ensure_resume_row(cursor, candidate_id: int):
     if not cursor.fetchone():
         cursor.execute("INSERT INTO resume (candidate_id) VALUES (%s)", (candidate_id,))
 
-def _set_cv_keys(cursor, candidate_id: int, keys: list[str]):
+def _set_cv_keys(cursor, candidate_id: int, keys: List[str]):
     _ensure_resume_row(cursor, candidate_id)
     cursor.execute(
         "UPDATE resume SET cv_pdf_s3 = %s WHERE candidate_id = %s",
         (json.dumps(keys), candidate_id)
     )
 
-def _make_cv_payload(keys: list[str]):
+def _make_cv_payload(keys: List[str]):
     """
     Genera URLs presignadas (7 días) para cada key, con nombre bonito.
     """
