@@ -42,8 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let htmlRow = `
           <tr data-id="${item.account_id}">
             <td>${item.client_name || '—'}</td>
-            <td>${item.calculated_status || '—'}</td>
-            <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">No sales lead assigned</span>'}</td>
+            <td class="status-td" data-id="${item.account_id}">
+              <span class="chip chip--loading" aria-label="Loading status">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              </span>
+            </td>
+            <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">Unavailable</span>'}</td>
             <td class="muted-cell">${contractTxt}</td>
             <td>${trrTxt}</td>
             <td>${tsfTxt}</td>
@@ -53,8 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (showPriorityColumn) {
           htmlRow += `
             <td>
-              <select class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : ''}" data-id="${item.account_id}">
-                <option value="">—</option>
+              <select
+                class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : 'priority-empty'}"
+                data-id="${item.account_id}">
+                <option value="" ${item.priority ? '' : 'selected'}> </option>
                 <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
                 <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
                 <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
@@ -101,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       });
+      computeAndPaintAccountStatuses();
       // Mover selector de "mostrar X registros por página" al contenedor deseado
 const lengthMenu = document.querySelector('#accountTable_length');
 const customLengthContainer = document.getElementById('datatable-length-container');
@@ -114,9 +121,10 @@ document.querySelectorAll('.priority-select').forEach(select => {
     const newPriority = select.value;
 
     // Quitar clases anteriores
-    select.classList.remove('priority-a', 'priority-b', 'priority-c');
+    select.classList.remove('priority-a', 'priority-b', 'priority-c', 'priority-empty');
 
-    // Agregar clase correspondiente
+    // Agregar clase correspondiente (y estado vacío)
+    if (!newPriority) select.classList.add('priority-empty');
     if (newPriority === 'A') select.classList.add('priority-a');
     if (newPriority === 'B') select.classList.add('priority-b');
     if (newPriority === 'C') select.classList.add('priority-c');
@@ -125,7 +133,7 @@ document.querySelectorAll('.priority-select').forEach(select => {
       await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priority: newPriority })
+        body: JSON.stringify({ priority: newPriority || null })
       });
       console.log(`✅ Priority updated for account ${accountId}`);
     } catch (error) {
@@ -257,3 +265,118 @@ function fmtMoney(v) {
   return `$${num.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
+// —— Helpers de normalización ——
+function norm(s) {
+  return (s || '').toString().toLowerCase().trim();
+}
+function normalizeStage(stage) {
+  const v = norm(stage);
+  if (/sourc|interview|negotiat/.test(v)) return 'pipeline';
+  if (/closed[_\s-]?won|close[_\s-]?win/.test(v)) return 'won';
+  if (/closed[_\s-]?lost|close[_\s-]?lost/.test(v)) return 'lost';
+  return 'other';
+}
+function isActiveHire(h) {
+  // Prioriza campo status si existe
+  const st = norm(h.status);
+  if (st === 'active') return true;
+  if (st === 'inactive') return false;
+
+  // Si no, vemos end_date: activo si NO hay fecha real
+  const ed = (h.end_date ?? '').toString().trim().toLowerCase();
+  if (!ed || ed === 'null' || ed === 'none' || ed === 'undefined' || ed === '0000-00-00') return true;
+  // YYYY-MM o YYYY-MM-DD válido => inactivo
+  return false;
+}
+function renderAccountStatusChip(statusText) {
+  const s = norm(statusText);
+  if (s === 'active client')   return '<span class="chip chip--active-client">Active Client</span>';
+  if (s === 'inactive client') return '<span class="chip chip--inactive-client">Inactive Client</span>';
+  if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
+  return '—';
+}
+function deriveStatusFrom(opps = [], hires = []) {
+  if (!Array.isArray(opps) || opps.length === 0) return '—';
+
+  const stages = opps.map(o => normalizeStage(o.opp_stage || o.stage));
+  const hasPipeline = stages.some(s => s === 'pipeline');
+  if (hasPipeline) return 'Lead in Process';
+
+  const closedOnly = stages.every(s => s === 'won' || s === 'lost');
+  const wins = stages.filter(s => s === 'won').length;
+
+  if (closedOnly && wins > 0) {
+    const total = (hires || []).length;
+    const activeCount = (hires || []).filter(isActiveHire).length;
+    if (total > 0 && activeCount > 0)  return 'Active Client';
+    if (total > 0 && activeCount === 0) return 'Inactive Client';
+  }
+  return '—';
+}
+
+// —— Runner con límite de concurrencia (para fallback) ——
+async function runWithConcurrency(tasks, limit = 6) {
+  const queue = tasks.slice();
+  const workers = Array.from({ length: limit }, async () => {
+    while (queue.length) await queue.shift()();
+  });
+  await Promise.all(workers);
+}
+
+// —— Cálculo y pintado batch ——
+async function computeAndPaintAccountStatuses() {
+  const rows = [...document.querySelectorAll('#accountTableBody tr')];
+  const ids  = rows.map(r => Number(r.dataset.id)).filter(Boolean);
+  if (!ids.length) return;
+
+  // 1) Intento recomendado: 1 request batch al backend
+  //    POST /accounts/status/summary  -> { [id]: { status: "Active Client" | ... } }
+  let summary = null;
+  try {
+    const r = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/status/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_ids: ids })
+    });
+    if (r.ok) summary = await r.json();
+  } catch (e) { /* ignoramos y hacemos fallback */ }
+
+  // 2) Fallback sin bloquear: concurrencia limitada usando endpoints existentes
+  if (!summary) {
+    summary = {};
+    const tasks = ids.map(id => async () => {
+      try {
+        const [opps, hires] = await Promise.all([
+          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}/opportunities`).then(r => r.json()),
+          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}/opportunities/candidates`).then(r => r.json()),
+        ]);
+        summary[id] = { status: deriveStatusFrom(opps, hires) };
+      } catch { summary[id] = { status: '—' }; }
+    });
+    await runWithConcurrency(tasks, 6); // <-- ajusta si quieres más/menos paralelismo
+  }
+
+  // 3) Pintar y persistir (no bloquea UI)
+  for (const id of ids) {
+    const td = document.querySelector(`#accountTableBody tr[data-id="${id}"] td.status-td`);
+    const status = summary?.[id]?.status || '—';
+    if (td) td.innerHTML = renderAccountStatusChip(status);
+
+    // Guarda en DB para cachearlo (best-effort, sin await)
+    if (status !== '—') {
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calculated_status: status })
+      }).catch(() => {});
+    }
+  }
+}
+function renderAccountStatusChip(statusText) {
+  const s = norm(statusText);
+  if (s === 'active client')   return '<span class="chip chip--active-client">Active Client</span>';
+  if (s === 'inactive client') return '<span class="chip chip--inactive-client">Inactive Client</span>';
+  if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
+  // sin dato: chip gris (nada de '-')
+  return '<span class="chip chip--empty">No data</span>';
+}
