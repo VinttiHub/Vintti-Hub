@@ -92,19 +92,21 @@ def get_candidates_light():
                 c.country,
                 c.phone,
                 c.linkedin,
-                CASE WHEN o.candidato_contratado IS NOT NULL THEN '✔️' ELSE NULL END AS employee
+                CASE WHEN EXISTS (
+                    SELECT 1 
+                    FROM opportunity o 
+                    WHERE o.candidato_contratado = c.candidate_id
+                ) THEN '✔️' ELSE NULL END AS employee
             FROM candidates c
-            LEFT JOIN opportunity o ON o.candidato_contratado = c.candidate_id
+            ORDER BY c.candidate_id DESC
         """)
 
         rows = cursor.fetchall()
         colnames = [desc[0] for desc in cursor.description]
         candidates = [dict(zip(colnames, row)) for row in rows]
 
-        cursor.close()
-        conn.close()
+        cursor.close(); conn.close()
         return jsonify(candidates)
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

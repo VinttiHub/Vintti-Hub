@@ -1,59 +1,55 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.body.classList.add('light-mode');
 
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/light')
-    .then(response => response.json())
-    .then(data => {
-      const tbody = document.getElementById('candidatesTableBody');
-      tbody.innerHTML = '';
+  const tbody = document.getElementById('candidatesTableBody');
 
+  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/light')
+    .then(r => r.json())
+    .then(data => {
+      // Limpia y arma TODO en un DocumentFragment (menos reflows)
       if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6">No data available</td></tr>`;
         return;
       }
 
-      let delay = 0;
-      data.forEach(candidate => {
+      const frag = document.createDocumentFragment();
+
+      for (const candidate of data) {
         const tr = document.createElement('tr');
         tr.dataset.id = candidate.candidate_id || '';
+
+        const phone = candidate.phone ? String(candidate.phone).replace(/\D/g, '') : '';
+        const linkedin = candidate.linkedin || '';
+
         tr.innerHTML = `
           <td>${candidate.condition || '-'}</td>
           <td>${candidate.name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
-            <button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${candidate.phone}', '_blank')">
-              <i class='fab fa-whatsapp'></i>
-            </button>
+            ${phone
+              ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
+                   <i class='fab fa-whatsapp'></i>
+                 </button>`
+              : '—'}
           </td>
           <td>
-            <button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${candidate.linkedin}', '_blank')">
-              <i class='fab fa-linkedin-in'></i>
-            </button>
+            ${linkedin
+              ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
+                   <i class='fab fa-linkedin-in'></i>
+                 </button>`
+              : '—'}
           </td>
           <td class="employee-cell">
             ${candidate.employee ? candidate.employee : "<i class='fa-solid fa-xmark gray-x'></i>"}
           </td>
         `;
-        tbody.appendChild(tr);
-        document.getElementById('candidatesTableBody').addEventListener('click', function (e) {
-          const row = e.target.closest('tr');
-          if (!row) return;
+        frag.appendChild(tr);
+      }
 
-          const id = row.getAttribute('data-id');
-          if (id) {
-            const clickSound = document.getElementById('click-sound');
-            if (clickSound) {
-              clickSound.play();
-              setTimeout(() => {
-                window.location.href = `candidate-details.html?id=${id}`;
-              }, 200);
-            } else {
-              window.location.href = `candidate-details.html?id=${id}`;
-            }
-          }
-        });
-      });
+      // Un solo reemplazo del tbody
+      tbody.replaceChildren(frag);
 
+      // Inicializa DataTable después de inyectar filas
       const table = $('#candidatesTable').DataTable({
         responsive: true,
         pageLength: 50,
@@ -64,69 +60,72 @@ document.addEventListener('DOMContentLoaded', () => {
           lengthMenu: "Mostrar _MENU_ registros por página",
           zeroRecords: "No se encontraron resultados",
           info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-          paginate: {
-            first: "Primero",
-            last: "Último",
-            next: "Siguiente",
-            previous: "Anterior"
-          }
+          paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
         }
-      });// Mover el selector de registros al contenedor izquierdo
+      });
+
+      // Mover el selector de registros al contenedor izquierdo
       const dataTableLength = document.querySelector('.dataTables_length');
       const wrapper = document.getElementById('datatable-wrapper');
-      if (dataTableLength && wrapper) {
-        wrapper.appendChild(dataTableLength);
-      }
+      if (dataTableLength && wrapper) wrapper.appendChild(dataTableLength);
 
-      document.getElementById('searchByName').addEventListener('input', function () {
-        table.column(1).search(this.value).draw();
+      // Búsqueda por nombre con debounce (evita recalcular en cada tecla)
+      const searchInput = document.getElementById('searchByName');
+      let t;
+      searchInput.addEventListener('input', function () {
+        clearTimeout(t);
+        const v = this.value;
+        t = setTimeout(() => table.column(1).search(v).draw(), 150);
       });
     })
-    .catch(err => {
-      console.error('❌ Error al obtener candidatos:', err);
-    });
+    .catch(err => console.error('❌ Error al obtener candidatos:', err));
 
-// 🟣 SIDEBAR TOGGLE CON MEMORIA
-const sidebar = document.querySelector('.sidebar');
-const mainContent = document.querySelector('.main-content');
-const toggleButton = document.getElementById('sidebarToggle');
-const toggleIcon = document.getElementById('sidebarToggleIcon');
+  // ✅ Un solo listener (delegado) PARA TODO el tbody, fuera del bucle
+  tbody.addEventListener('click', (e) => {
+    const row = e.target.closest('tr');
+    if (!row) return;
+    const id = row.dataset.id;
+    if (!id) return;
 
-// Leer estado anterior
-const savedState = localStorage.getItem('sidebarHidden') === 'true';
-if (savedState) {
-  sidebar.classList.add('custom-sidebar-hidden');
-  mainContent.classList.add('custom-main-expanded');
-  toggleIcon.classList.remove('fa-chevron-left');
-  toggleIcon.classList.add('fa-chevron-right');
-  toggleButton.style.left = '12px';
-} else {
-  toggleButton.style.left = '220px';
-}
+    const clickSound = document.getElementById('click-sound');
+    if (clickSound) {
+      try { clickSound.currentTime = 0; clickSound.play(); } catch (_) {}
+      setTimeout(() => { window.location.href = `candidate-details.html?id=${id}`; }, 120);
+    } else {
+      window.location.href = `candidate-details.html?id=${id}`;
+    }
+  });
 
-toggleButton.addEventListener('click', () => {
-  const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
-  mainContent.classList.toggle('custom-main-expanded', isHidden);
-  toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
-  toggleIcon.classList.toggle('fa-chevron-right', isHidden);
-  toggleButton.style.left = isHidden ? '12px' : '220px';
-  localStorage.setItem('sidebarHidden', isHidden); // 🧠 guardar estado
-});
-const summaryLink = document.getElementById('summaryLink');
-const currentUserEmail = localStorage.getItem('user_email');
-const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+  // 🟣 SIDEBAR TOGGLE CON MEMORIA (igual que lo tenías)
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('.main-content');
+  const toggleButton = document.getElementById('sidebarToggle');
+  const toggleIcon = document.getElementById('sidebarToggleIcon');
 
-if (summaryLink && allowedEmails.includes(currentUserEmail)) {
-  summaryLink.style.display = 'block';
-}
+  const savedState = localStorage.getItem('sidebarHidden') === 'true';
+  if (savedState) {
+    sidebar.classList.add('custom-sidebar-hidden');
+    mainContent.classList.add('custom-main-expanded');
+    toggleIcon.classList.remove('fa-chevron-left');
+    toggleIcon.classList.add('fa-chevron-right');
+    toggleButton.style.left = '12px';
+  } else {
+    toggleButton.style.left = '220px';
+  }
 
+  toggleButton.addEventListener('click', () => {
+    const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
+    mainContent.classList.toggle('custom-main-expanded', isHidden);
+    toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
+    toggleIcon.classList.toggle('fa-chevron-right', isHidden);
+    toggleButton.style.left = isHidden ? '12px' : '220px';
+    localStorage.setItem('sidebarHidden', isHidden);
+  });
 
-
-
-
-
-
-
+  const summaryLink = document.getElementById('summaryLink');
+  const currentUserEmail = localStorage.getItem('user_email');
+  const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
+  if (summaryLink && allowedEmails.includes(currentUserEmail)) summaryLink.style.display = 'block';
 });
 
 // Filtros tipo Excel
