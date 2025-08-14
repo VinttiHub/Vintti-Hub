@@ -1170,54 +1170,66 @@ addLanguageBtn.addEventListener('click', () => addLanguageEntry());
   // Exponer para refrescos cuando cambias de pestaña
   window.loadCVs = loadCVs;
 
-  async function uploadFile(file) {
-    const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      alert('Only PDF, PNG, JPG/JPEG or WEBP are allowed.');
-      return;
-    }
+async function uploadFile(file) {
+  // ✅ Acepta PDFs/imágenes aunque Safari no ponga MIME
+  const allowedMimes = new Set([
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'application/octet-stream', // Safari a veces
+    '' // Safari a veces lo deja vacío
+  ]);
+  const extOk = /\.(pdf|png|jpe?g|webp)$/i.test((file.name || ''));
+  const typeOk = allowedMimes.has(file.type);
 
-    // Detectar si es PDF para mostrar "Extracting..."
-    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
-
-    const fd = new FormData();
-    fd.append('file', file);
-
-    try {
-      drop.classList.add('dragover');
-
-      // 🔔 Indicador no bloqueante
-      if (isPdf) {
-        cvIndicator.show('Extracting info from CV…');
-      } else {
-        cvIndicator.show('Uploading file…');
-      }
-
-      const r = await fetch(`${apiBase}/candidates/${candidateId}/cvs`, {
-        method: 'POST',
-        body: fd
-      });
-
-      if (!r.ok) {
-        const t = await r.text().catch(() => '');
-        throw new Error(t || `Upload failed (${r.status})`);
-      }
-
-      const data = await r.json();
-      render(data.items || []);
-
-      // ✅ pequeño feedback de éxito
-      cvIndicator.success(isPdf ? 'CV extracted' : 'Uploaded');
-      setTimeout(() => cvIndicator.hide(), 900);
-    } catch (e) {
-      console.error('Upload failed', e);
-      alert('Upload failed');
-      cvIndicator.hide();
-    } finally {
-      drop.classList.remove('dragover');
-      input.value = '';
-    }
+  if (!typeOk && !extOk) {
+    alert('Only PDF, PNG, JPG/JPEG or WEBP are allowed.');
+    return;
   }
+
+  // Detectar si es PDF para el indicador
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  try {
+    drop.classList.add('dragover');
+
+    // 🔔 Indicador no bloqueante
+    if (isPdf) {
+      cvIndicator.show('Extracting info from CV…');
+    } else {
+      cvIndicator.show('Uploading file…');
+    }
+
+    const r = await fetch(`${apiBase}/candidates/${candidateId}/cvs`, {
+      method: 'POST',
+      body: fd
+    });
+
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      throw new Error(t || `Upload failed (${r.status})`);
+    }
+
+    const data = await r.json();
+    render(data.items || []);
+
+    // ✅ feedback de éxito
+    cvIndicator.success(isPdf ? 'CV extracted' : 'Uploaded');
+    setTimeout(() => cvIndicator.hide(), 900);
+  } catch (e) {
+    console.error('Upload failed', e);
+    alert('Upload failed');
+    cvIndicator.hide();
+  } finally {
+    drop.classList.remove('dragover');
+    // ✅ Importante: permite re-seleccionar el mismo archivo
+    input.value = '';
+  }
+}
 
   // Drag & Drop
   ;['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
