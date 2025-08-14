@@ -21,6 +21,8 @@ from psycopg2.extras import RealDictCursor
 import json, re, uuid
 from datetime import datetime
 from typing import List
+from coresignal_routes import bp as coresignal_bp
+
 
 
 # 👇 MOVER ARRIBA: cargar .env ANTES de leer cualquier variable
@@ -59,7 +61,7 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 register_ai_routes(app)
-
+app.register_blueprint(coresignal_bp)
 
 def fetch_data_from_table(table_name):
     try:
@@ -1006,7 +1008,8 @@ def get_candidate_by_id(candidate_id):
                 cv_pdf_scrapper,
                 discount_dolar,
                 discount_daterange,
-                affinda_scrapper
+                affinda_scrapper,
+                coresignal_scrapper
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))

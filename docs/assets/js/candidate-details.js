@@ -124,6 +124,16 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     } else {
       openBtn.style.display = 'none';
     }
+    // ⬇️ Dispara la extracción SOLO si coresignal_scrapper está vacío y hay LinkedIn válido
+    if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(d => console.log('🔄 Coresignal sync:', d))
+      .catch(e => console.warn('⚠️ Coresignal sync failed', e));
+    }
     console.log("🎯 Valor desde DB:", data.country);
 
     const flagEmoji = getFlagEmoji(data.country || '');
