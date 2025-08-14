@@ -2,6 +2,7 @@
 import os, re, json, urllib.parse, requests
 from flask import Blueprint, jsonify, request
 from db import get_connection
+from typing import Optional
 
 bp = Blueprint("coresignal", __name__, url_prefix="/coresignal")
 API_BASE = "https://api.coresignal.com/cdapi/v2"
@@ -10,7 +11,7 @@ API_KEY  = os.getenv("CORESIGNAL_API_KEY")
 def _h():
     return {"apikey": API_KEY, "accept": "application/json"}
 
-def _slug_from_linkedin(url: str) -> str | None:
+def _slug_from_linkedin(url: str) -> Optional[str]:
     if not url: 
         return None
     url = url.strip()
