@@ -799,25 +799,27 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   letter-spacing: 0.1px;
   user-select: none;
   white-space: nowrap;
+  cursor: default;              /* ❗ no luce como clickeable */
 }
 
-/* Active (azul) */
+/* Active (verde) */
 .status-chip.active {
-  background: #eaf3ff;          /* azul muy suave */
-  border-color: #cfe4ff;
-  color: #0a63d1;
+  background: #eaf9ef;          /* verde suave */
+  border-color: #cfeeda;
+  color: #1f7a3a;
 }
 
-/* Inactive (amarillo) */
+/* Inactive (rojo) */
 .status-chip.inactive {
-  background: #fff8df;          /* amarillo suave */
-  border-color: #ffe7a3;
-  color: #9a6a00;
+  background: #ffeaea;          /* rojo suave */
+  border-color: #ffd3d3;
+  color: #b0182b;
 }
 
-/* Micro-animación al pasar el mouse (sutil) */
+/* Hover sutil (sin “botón”) */
 .status-chip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px var(--shadow);
-  transition: transform .12s ease, box-shadow .12s ease;
+  /* sin transform */
+  filter: saturate(108%) brightness(102%);
+  box-shadow: 0 1px 6px var(--shadow) inset, 0 3px 10px var(--shadow);
+  transition: filter .15s ease, box-shadow .15s ease;
 }

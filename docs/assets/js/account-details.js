@@ -267,7 +267,7 @@ function fillEmployeesTables(candidates) {
           </a>
         </td>
         <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${candidate.end_date ? new Date(candidate.end_date).toLocaleDateString('en-US') : '—'}</td>
+        <td>${fmtISODate(candidate.end_date)}</td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>$${candidate.employee_fee ?? '—'}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -1085,4 +1085,13 @@ function renderStatusChip(status) {
   const cls = (s === 'inactive') ? 'inactive' : 'active';
   const label = cls.charAt(0).toUpperCase() + cls.slice(1);
   return `<span class="status-chip ${cls}">${label}</span>`;
+}
+function isRealISODate(v) {
+  if (!v) return false;
+  const s = String(v).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+function fmtISODate(v) {
+  // devuelve vacío si no hay fecha real
+  return isRealISODate(v) ? new Date(v).toLocaleDateString('en-US') : '';
 }
