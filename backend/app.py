@@ -2497,6 +2497,68 @@ def delete_account_pdf(account_id):
     except Exception as e:
         print("❌ Error deleting PDF:", str(e))
         return jsonify({"error": str(e)}), 500
+@app.route('/accounts/<account_id>/pdfs', methods=['PATCH'])
+def rename_account_pdf(account_id):
+    """
+    JSON body: { "key": "accounts/<old>.pdf", "new_name": "Nuevo nombre.pdf" }
+    - Copia el objeto a una nueva key y borra la vieja.
+    - Actualiza la lista guardada en account.pdf_s3 (JSON array).
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        key = data.get("key")
+        new_name = (data.get("new_name") or "").strip()
+
+        if not key or not key.startswith("accounts/"):
+            return jsonify({"error": "Missing or invalid key"}), 400
+        if not new_name:
+            return jsonify({"error": "Missing new_name"}), 400
+
+        # Sanitizar nombre
+        new_name = re.sub(r"[\\/]", "-", new_name)  # sin slashes
+        if not new_name.lower().endswith(".pdf"):
+            new_name += ".pdf"
+
+        dest_key = f"accounts/{new_name}"
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Leer keys actuales de la cuenta y validar pertenencia
+        keys = _get_account_pdf_keys(cursor, account_id)
+        if key not in keys:
+            cursor.close(); conn.close()
+            return jsonify({"error": "Key not found for this account"}), 404
+
+        # Evitar colisiones de nombre
+        if dest_key in keys and dest_key != key:
+            cursor.close(); conn.close()
+            return jsonify({"error": "A file with that name already exists"}), 409
+
+        # Renombrar en S3: copy -> delete
+        s3_client.copy_object(
+            Bucket=S3_BUCKET,
+            CopySource={'Bucket': S3_BUCKET, 'Key': key},
+            Key=dest_key,
+            ContentType='application/pdf',
+            MetadataDirective='REPLACE'
+        )
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+
+        # Reemplazar en la lista persistida
+        new_keys = [dest_key if k == key else k for k in keys]
+        _set_account_pdf_keys(cursor, account_id, new_keys)
+        conn.commit()
+
+        # Devolver lista con URLs presignadas frescas
+        pdfs = _make_pdf_payload(new_keys)
+
+        cursor.close(); conn.close()
+        return jsonify({"message": "PDF renamed", "pdfs": pdfs}), 200
+
+    except Exception as e:
+        logging.exception("❌ rename_account_pdf failed")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

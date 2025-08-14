@@ -823,3 +823,37 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   box-shadow: 0 1px 6px var(--shadow) inset, 0 3px 10px var(--shadow);
   transition: filter .15s ease, box-shadow .15s ease;
 }
+/* Rename: input visible y cómodo al editar */
+.contracts-list .contract-item .file-edit {
+  min-width: 220px;
+  max-width: 50vw;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  outline: none;
+}
+/* Ocultar genérico */
+.hidden { display: none !important; }
+
+/* Rename: input visible y cómodo al editar */
+.contracts-list .contract-item .file-edit {
+  display: inline-block;         /* fuerza visibilidad cuando no está .hidden */
+  min-width: 220px;
+  max-width: 50vw;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);       /* más contraste que var(--bg) */
+  color: var(--text);
+  outline: none;
+}
+
+.contracts-list .contract-item .file-edit::placeholder {
+  color: #6b7280; /* gris medio legible */
+  opacity: 0.95;
+}
+/* Anti-reglas globales que oculten inputs */
+.contracts-list .contract-item .file-edit:not(.hidden) { display: inline-block !important; }

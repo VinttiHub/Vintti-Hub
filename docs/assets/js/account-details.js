@@ -905,7 +905,14 @@ function renderPdfList(pdfs = []) {
       <div class="contract-left">
         <span class="file-icon">📄</span>
         <a class="file-name" href="${pdf.url}" target="_blank" title="${pdf.name}">${pdf.name}</a>
-        <input class="file-edit" type="text" value="${pdf.name}" />
+        <input
+          class="file-edit hidden"
+          type="text"
+          value="${pdf.name}"
+          placeholder="Type a new name…"
+          aria-label="Rename file"
+          data-orig="${pdf.name}"
+        />
       </div>
       <div class="contract-right">
         <button class="icon-btn rename-btn">Rename</button>
@@ -924,48 +931,63 @@ function renderPdfList(pdfs = []) {
     const deleteBtn  = row.querySelector(".delete-btn");
 
     // Rename flow
-    const enterEdit = () => {
-      nameLink.classList.add("hidden");
-      nameInput.classList.remove("hidden");
-      renameBtn.classList.add("hidden");
-      saveBtn.classList.remove("hidden");
-      cancelBtn.classList.remove("hidden");
-      nameInput.focus();
-      nameInput.select();
-    };
-    const exitEdit = () => {
-      nameLink.classList.remove("hidden");
-      nameInput.classList.add("hidden");
-      renameBtn.classList.remove("hidden");
-      saveBtn.classList.add("hidden");
-      cancelBtn.classList.add("hidden");
-    };
+const enterEdit = () => {
+  nameLink.classList.add('hidden');
+  renameBtn.classList.add('hidden');
 
-    renameBtn.addEventListener("click", enterEdit);
-    cancelBtn.addEventListener("click", exitEdit);
+  nameInput.classList.remove('hidden');
+  saveBtn.classList.remove('hidden');
+  cancelBtn.classList.remove('hidden');
 
-    saveBtn.addEventListener("click", async () => {
-      let newName = (nameInput.value || "").trim();
-      if (!newName) return;
+  // Asegura que el input tenga el nombre actual y se enfoque
+  nameInput.value = nameInput.dataset.orig || nameLink.textContent || '';
+  requestAnimationFrame(() => {
+    nameInput.focus();
+    nameInput.select();
+  });
+};
 
-      // asegúrate de mantener .pdf
-      if (!/\.pdf$/i.test(newName)) newName += ".pdf";
-      // sanea nombre (sin slashes)
-      newName = newName.replace(/[\/\\]/g, "-");
+const exitEdit = () => {
+  nameLink.classList.remove('hidden');
+  renameBtn.classList.remove('hidden');
 
-      try {
-        await renamePDF(pdf.key, newName);
-        exitEdit();
-      } catch (e) {
-        alert("Failed to rename file");
-        console.error(e);
-      }
-    });
+  nameInput.classList.add('hidden');
+  saveBtn.classList.add('hidden');
+  cancelBtn.classList.add('hidden');
+};
 
-    nameInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") saveBtn.click();
-      if (e.key === "Escape") cancelBtn.click();
-    });
+// init: garantiza que arranca oculto
+nameInput.classList.add('hidden');
+
+renameBtn.addEventListener("click", enterEdit);
+cancelBtn.addEventListener("click", exitEdit);
+
+saveBtn.addEventListener("click", async () => {
+  let newName = (nameInput.value || "").trim();
+  if (!newName) return;
+
+  if (!/\.pdf$/i.test(newName)) newName += ".pdf";
+  newName = newName.replace(/[\/\\]/g, "-");
+
+  try {
+    // feedback inmediato
+    nameLink.textContent = newName;
+    nameLink.title = newName;
+
+    await renamePDF(pdf.key, newName);
+    // actualiza el "original" para próximos edits
+    nameInput.dataset.orig = newName;
+    exitEdit();
+  } catch (e) {
+    alert("Failed to rename file");
+    console.error(e);
+  }
+});
+
+nameInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") saveBtn.click();
+  if (e.key === "Escape") cancelBtn.click();
+});
 
     // Delete
     deleteBtn.addEventListener("click", (e) => {
