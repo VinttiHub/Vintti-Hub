@@ -784,3 +784,40 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   .file-name{ max-width:200px; }
   .file-edit{ width:100%; }
 }
+/* ===== Status Chip (Apple-like) ===== */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 2px 6px var(--shadow);
+  letter-spacing: 0.1px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Active (azul) */
+.status-chip.active {
+  background: #eaf3ff;          /* azul muy suave */
+  border-color: #cfe4ff;
+  color: #0a63d1;
+}
+
+/* Inactive (amarillo) */
+.status-chip.inactive {
+  background: #fff8df;          /* amarillo suave */
+  border-color: #ffe7a3;
+  color: #9a6a00;
+}
+
+/* Micro-animación al pasar el mouse (sutil) */
+.status-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px var(--shadow);
+  transition: transform .12s ease, box-shadow .12s ease;
+}

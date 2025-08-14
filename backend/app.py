@@ -1257,26 +1257,25 @@ def get_candidates_by_account_opportunities(account_id):
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT 
-                c.candidate_id,
-                c.name,
-                c.stage,
-                o.opportunity_id,
-                o.opp_model,
-                o.opp_position_name,
-                h.salary  AS employee_salary,
-                h.fee     AS employee_fee,
-                h.revenue AS employee_revenue,
-                h.start_date,
-                h.end_date,
-                c.status,
-                h.discount_dolar,
-                h.discount_daterange,
-                -- NUEVO 👇
-                h.referral_dolar,
-                h.referral_daterange,
-                h.buyout_dolar,
-                h.buyout_daterange
+        SELECT 
+            c.candidate_id,
+            c.name,
+            c.stage,
+            o.opportunity_id,
+            o.opp_model,
+            o.opp_position_name,
+            h.salary  AS employee_salary,
+            h.fee     AS employee_fee,
+            h.revenue AS employee_revenue,
+            h.start_date,
+            h.end_date,
+            COALESCE(h.status, CASE WHEN h.end_date IS NULL THEN 'active' ELSE 'inactive' END) AS status,
+            h.discount_dolar,
+            h.discount_daterange,
+            h.referral_dolar,
+            h.referral_daterange,
+            h.buyout_dolar,
+            h.buyout_daterange
             FROM opportunity o
             LEFT JOIN candidates c
                 ON o.candidato_contratado = c.candidate_id
@@ -2008,6 +2007,12 @@ def handle_candidate_hire_data(candidate_id):
                 SET status = %s
                 WHERE candidate_id = %s AND opportunity_id = %s
             """, ('Client hired', candidate_id, opportunity_id))
+            # Después de insertar/actualizar hire_opportunity, forzamos el status
+            cursor.execute("""
+                UPDATE hire_opportunity
+                SET status = CASE WHEN end_date IS NULL THEN 'active' ELSE 'inactive' END
+                WHERE candidate_id = %s AND opportunity_id = %s
+            """, (candidate_id, opportunity_id))
 
             conn.commit()
             return jsonify({'success': True, 'created': created, 'updated': updated})

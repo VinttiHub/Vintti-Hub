@@ -260,14 +260,14 @@ function fillEmployeesTables(candidates) {
     if (candidate.opp_model === 'Staffing') {
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td>${candidate.status || '—'}</td>
+        <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
         <td>
           <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
             ${candidate.name || '—'}
           </a>
         </td>
         <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
+        <td>${candidate.end_date ? new Date(candidate.end_date).toLocaleDateString('en-US') : '—'}</td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>$${candidate.employee_fee ?? '—'}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -577,14 +577,14 @@ function fillEmployeesTables(candidates) {
 
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td>${candidate.status || '—'}</td>
+        <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
         <td>
           <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
             ${candidate.name || '—'}
           </a>
         </td>
         <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${candidate.enddate ? new Date(candidate.enddate).toLocaleDateString('en-US') : '—'}</td>
+        <td>${candidate.end_date ? new Date(candidate.end_date).toLocaleDateString('en-US') : '—'}</td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -1080,3 +1080,9 @@ function ensurePdfStyles() {
   document.head.appendChild(style);
 }
 
+function renderStatusChip(status) {
+  const s = String(status || '').toLowerCase();
+  const cls = (s === 'inactive') ? 'inactive' : 'active';
+  const label = cls.charAt(0).toUpperCase() + cls.slice(1);
+  return `<span class="status-chip ${cls}">${label}</span>`;
+}
