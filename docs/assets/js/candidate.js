@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.json())
     .then(data => {
       if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6">No data available</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">No data available</td></tr>`;
         return;
       }
 
@@ -35,19 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>
             ${phone
               ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
-                   <i class='fab fa-whatsapp'></i>
-                 </button>`
+                  <i class='fab fa-whatsapp'></i>
+                </button>`
               : '—'}
           </td>
           <td>
             ${linkedin
               ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
-                   <i class='fab fa-linkedin-in'></i>
-                 </button>`
+                  <i class='fab fa-linkedin-in'></i>
+                </button>`
               : '—'}
-          </td>
-          <td class="employee-cell">
-            ${candidate.employee ? candidate.employee : "<i class='fa-solid fa-xmark gray-x'></i>"}
           </td>
         `;
         frag.appendChild(tr);
