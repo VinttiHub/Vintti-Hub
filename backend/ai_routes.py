@@ -12,18 +12,69 @@ from flask import Flask, jsonify, request
 import requests
 import re
 import datetime
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# ai_routes.py
+import io, tempfile
+from openai import OpenAI
 from flask import request, jsonify
 import logging
 import traceback
 import openai
 import json
 from db import get_connection 
+import time
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> str:
+    """
+    Sube el PDF a OpenAI Files y lo pasa al modelo como `input_file`.
+    Devuelve el texto extraído en inglés, limpio y en formato plano.
+    """
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # 1) Subir el PDF a Files (purpose=user_data)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
+        tmp.write(pdf_bytes)
+        tmp.flush()
+        up = client.files.create(file=open(tmp.name, "rb"), purpose="user_data")
+
+    # 2) Pedir extracción de texto útil para CV
+    prompt = (
+        "Extract every resume-relevant fact from the attached PDF. "
+        "Return clean plain text in English, no markdown, no tables, no JSON. "
+        "Include: full name (if present), contacts, headline/summary, skills/tools, "
+        "work experience with titles, companies, locations, date ranges, responsibilities, "
+        "education (degrees, institutions, dates), certifications, languages. "
+        "Do not invent information. " + (prompt_hint or "")
+    )
+
+    resp = client.responses.create(
+        model="gpt-4o-mini",
+        input=[{
+            "role": "user",
+            "content": [
+                {"type": "input_file", "file_id": up.id},
+                {"type": "input_text", "text": prompt}
+            ]
+        }],
+        max_output_tokens=4000,
+    )
+
+    # SDK nuevo suele exponer .output_text; si no, armamos desde .output
+    text = getattr(resp, "output_text", None)
+    if not text:
+        parts = []
+        try:
+            for item in (resp.output or []):
+                # Mensajes con contenido textual
+                for c in getattr(item, "content", []) or []:
+                    t = getattr(c, "text", None)
+                    if t:
+                        parts.append(t)
+        except Exception:
+            pass
+        text = "\n".join(p for p in parts if p)
+
+    return (text or "").strip()
 
 def register_ai_routes(app):
     @app.route('/ai/improve_tools', methods=['POST'])
@@ -863,27 +914,91 @@ def register_ai_routes(app):
         except Exception as e:
             logging.error("❌ /ai/coresignal_to_linkedin_scrapper failed\n" + traceback.format_exc())
             return jsonify({"error": str(e)}), 500
-
-
-import time
-def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
-    for attempt in range(retries):
+    @app.route('/ai/extract_cv_from_pdf', methods=['POST'])
+    def extract_cv_from_pdf():
+        """
+        Extrae texto del último CV (PDF) y lo guarda en candidates.affinda_scrapper y candidates.cv_pdf_scrapper
+        Solo corre si affinda_scrapper está vacío.
+        Body: { "candidate_id": "<id>", "pdf_url": "<https://.../cv.pdf>" }
+        """
         try:
-            response = openai.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-            return response
-        except openai.RateLimitError as e:
-            logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")
-            if hasattr(e, 'response') and e.response is not None:
-                logging.warning("🔎 Response headers: %s", e.response.headers)
-            time.sleep(10)
-        except Exception as e:
-            logging.error("❌ Error en llamada a OpenAI: " + str(e))
-            raise e
-    raise Exception("Exceeded maximum retries due to rate limit")
+            data = request.get_json(force=True) or {}
+            candidate_id = str(data.get('candidate_id', '')).strip()
+            pdf_url = (data.get('pdf_url') or '').strip()
 
- 
+            if not candidate_id:
+                return jsonify({"error": "candidate_id is required"}), 400
+
+            conn = get_connection()
+            cur = conn.cursor()
+
+            # 1) Verificar estado actual
+            cur.execute("""
+                SELECT COALESCE(affinda_scrapper, ''), COALESCE(cv_pdf_scrapper, '')
+                FROM candidates WHERE candidate_id = %s
+            """, (candidate_id,))
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close()
+                return jsonify({"error": "Candidate not found"}), 404
+
+            affinda_now, cv_pdf_now = row
+            if (affinda_now or "").strip():
+                cur.close(); conn.close()
+                return jsonify({"skipped": True, "reason": "affinda_scrapper already has content"}), 200
+
+            if not pdf_url:
+                cur.close(); conn.close()
+                return jsonify({"skipped": True, "reason": "pdf_url missing"}), 200
+
+            # 2) Descargar PDF
+            r = requests.get(pdf_url, timeout=45)
+            if not r.ok or not r.content:
+                cur.close(); conn.close()
+                return jsonify({"error": f"Failed to download PDF ({r.status_code})"}), 502
+
+            # 3) Enviar a OpenAI para extraer texto
+            extracted = _extract_pdf_text_with_openai(r.content)
+
+            if not extracted:
+                cur.close(); conn.close()
+                return jsonify({"error": "Empty extraction from OpenAI"}), 500
+
+            # 4) Guardar en ambas columnas
+            cur.execute("""
+                UPDATE candidates
+                SET affinda_scrapper = %s, cv_pdf_scrapper = %s
+                WHERE candidate_id = %s
+            """, (extracted, extracted, candidate_id))
+            conn.commit()
+            cur.close(); conn.close()
+
+            # Devolvemos el texto por si lo quieres pintar en UI
+            return jsonify({"updated": True, "extracted_text": extracted}), 200
+
+        except Exception as e:
+            logging.error("❌ /ai/extract_cv_from_pdf failed\n" + traceback.format_exc())
+            return jsonify({"error": str(e)}), 500
+
+
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
+        for attempt in range(retries):
+            try:
+                response = openai.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                return response
+            except openai.RateLimitError as e:
+                logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")
+                if hasattr(e, 'response') and e.response is not None:
+                    logging.warning("🔎 Response headers: %s", e.response.headers)
+                time.sleep(10)
+            except Exception as e:
+                logging.error("❌ Error en llamada a OpenAI: " + str(e))
+                raise e
+        raise Exception("Exceeded maximum retries due to rate limit")
+
+    

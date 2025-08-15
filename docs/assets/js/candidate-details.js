@@ -1303,7 +1303,46 @@ async function uploadFile(file) {
   setTimeout(() => ic?.classList.remove('spin'), 400);
   refreshBtn.disabled = false;
 });
+// 🔁 Auto-extracción del PDF con OpenAI si affinda_scrapper está vacío
+(async function autoExtractFromPdfOnLoad() {
+  try {
+    const base = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+    const cid = new URLSearchParams(window.location.search).get('id');
+    if (!cid) return;
 
+    // 1) Leer candidato para saber si affinda_scrapper ya tiene valor
+    const cand = await fetch(`${base}/candidates/${cid}`).then(r => r.json());
+    const hasAffinda = (cand.affinda_scrapper || '').trim().length > 0;
+    if (hasAffinda) return;
+
+    // 2) Buscar un PDF en la lista de CVs
+    const items = await fetch(`${base}/candidates/${cid}/cvs`).then(r => r.json()).catch(() => []);
+    const pdf = (Array.isArray(items) ? items : []).find(it => /\.pdf$/i.test(it.name || '')) || null;
+    if (!pdf || !pdf.url) return;
+
+    // 3) Indicador + llamada al backend
+    cvIndicator.show('Extracting info from CV…');
+    const res = await fetch(`${base}/ai/extract_cv_from_pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: cid, pdf_url: pdf.url })
+    });
+    const out = await res.json();
+
+    // 4) Pintar en el textarea de la AI si existe y cerramos indicador
+    if (out.extracted_text) {
+      const aiCvScrap = document.getElementById('ai-cv-scrap');
+      if (aiCvScrap) aiCvScrap.value = out.extracted_text;
+      cvIndicator.success('CV extracted');
+      setTimeout(() => cvIndicator.hide(), 900);
+    } else {
+      cvIndicator.hide();
+    }
+  } catch (e) {
+    console.warn('⚠️ autoExtractFromPdfOnLoad failed', e);
+    try { cvIndicator.hide(); } catch {}
+  }
+})();
 
   // Carga inicial si ya estás en Overview
   if (document.querySelector('.tab.active')?.dataset.tab === 'overview') {
