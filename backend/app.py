@@ -2577,7 +2577,6 @@ def candidates_light_fast():
               c.country,
               c.phone,
               c.linkedin,
-              c.employee,
               h.start_date,
               h.end_date,
               h.has_hire,
