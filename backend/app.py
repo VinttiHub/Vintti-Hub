@@ -2562,7 +2562,45 @@ def rename_account_pdf(account_id):
     except Exception as e:
         logging.exception("❌ rename_account_pdf failed")
         return jsonify({"error": str(e)}), 500
+@app.route('/candidates/light_fast', methods=['GET'])
+def candidates_light_fast():
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
+        cur.execute("""
+            SELECT
+              c.candidate_id,
+              c.name,
+              c.country,
+              c.phone,
+              c.linkedin,
+              c.employee,
+              h.start_date,
+              h.end_date,
+              CASE
+                WHEN h.start_date IS NULL THEN 'unhired'
+                WHEN h.end_date   IS NULL THEN 'active'
+                ELSE 'inactive'
+              END AS condition
+            FROM candidates c
+            LEFT JOIN LATERAL (
+              SELECT start_date, end_date
+              FROM hire_opportunity h
+              WHERE h.candidate_id = c.candidate_id
+              ORDER BY (h.end_date IS NULL) DESC, h.start_date DESC NULLS LAST
+              LIMIT 1
+            ) h ON TRUE
+            ORDER BY c.name ASC;
+        """)
+
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        import traceback, logging
+        logging.exception("Error in /candidates/light_fast")
+        return jsonify({"error": str(e)}), 500
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)

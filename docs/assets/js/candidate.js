@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.body.classList.add('light-mode');
 
+  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const tbody = document.getElementById('candidatesTableBody');
 
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/light')
+  fetch(`${API_BASE}/candidates/light_fast`)
     .then(r => r.json())
     .then(data => {
-      // Limpia y arma TODO en un DocumentFragment (menos reflows)
       if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6">No data available</td></tr>`;
         return;
@@ -21,8 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const phone = candidate.phone ? String(candidate.phone).replace(/\D/g, '') : '';
         const linkedin = candidate.linkedin || '';
 
+        const condition = candidate.condition || 'unhired';
+        const chipClass = {
+          active:   'status-active',
+          inactive: 'status-inactive',
+          unhired:  'status-unhired'
+        }[condition] || 'status-unhired';
+
         tr.innerHTML = `
-          <td>${computeCondition(candidate)}</td>
+          <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
           <td>${candidate.name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
@@ -46,10 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
         frag.appendChild(tr);
       }
 
-      // Un solo reemplazo del tbody
       tbody.replaceChildren(frag);
 
-      // Inicializa DataTable después de inyectar filas
       const table = $('#candidatesTable').DataTable({
         responsive: true,
         pageLength: 50,
@@ -64,12 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      // Mover el selector de registros al contenedor izquierdo
       const dataTableLength = document.querySelector('.dataTables_length');
       const wrapper = document.getElementById('datatable-wrapper');
       if (dataTableLength && wrapper) wrapper.appendChild(dataTableLength);
 
-      // Búsqueda por nombre con debounce (evita recalcular en cada tecla)
       const searchInput = document.getElementById('searchByName');
       let t;
       searchInput.addEventListener('input', function () {
@@ -79,42 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     })
     .catch(err => console.error('❌ Error al obtener candidatos:', err));
-// === Condition helpers ===
-const NO_START_LABEL = 'Unhired'; // cámbialo por 'Pending' o 'Prospect' si te gusta más
 
-function isRealISODate(v) {
-  if (!v) return false;
-  const s = String(v).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(s);
-  return !isNaN(d.getTime());
-}
-
-function normalizeLabel(s) {
-  if (!s) return '';
-  const t = String(s).toLowerCase();
-  if (t.includes('inactive')) return 'Inactive';
-  if (t.includes('active'))   return 'Active';
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function computeCondition(candidate) {
-  // Si el payload NO trae estas claves, mantenemos el valor que venga (si existe)
-  const hasStartKey = Object.prototype.hasOwnProperty.call(candidate, 'start_date');
-  const hasEndKey   = Object.prototype.hasOwnProperty.call(candidate, 'end_date');
-
-  if (!hasStartKey && !hasEndKey) {
-    return normalizeLabel(candidate.condition || candidate.status || '—');
-  }
-
-  const hasStart = isRealISODate(candidate.start_date);
-  const hasEnd   = isRealISODate(candidate.end_date);
-
-  if (!hasStart) return NO_START_LABEL;   // no contratado / sin fecha de inicio
-  return hasEnd ? 'Inactive' : 'Active';  // con start_date: activo si no hay end_date
-}
-
-  // ✅ Un solo listener (delegado) PARA TODO el tbody, fuera del bucle
+  // Navegación por fila
   tbody.addEventListener('click', (e) => {
     const row = e.target.closest('tr');
     if (!row) return;
@@ -130,36 +99,103 @@ function computeCondition(candidate) {
     }
   });
 
-// 🟣 SIDEBAR TOGGLE CON MEMORIA (sin left hardcodeado)
-const sidebar = document.querySelector('.sidebar');
-const mainContent = document.querySelector('.main-content');
-const toggleButton = document.getElementById('sidebarToggle');
-const toggleIcon = document.getElementById('sidebarToggleIcon');
+  // Sidebar
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('.main-content');
+  const toggleButton = document.getElementById('sidebarToggle');
+  const toggleIcon = document.getElementById('sidebarToggleIcon');
 
-// aplica estado guardado
-const savedState = localStorage.getItem('sidebarHidden') === 'true';
-if (savedState) {
-  sidebar.classList.add('custom-sidebar-hidden');
-  mainContent.classList.add('custom-main-expanded');
-  toggleIcon.classList.remove('fa-chevron-left');
-  toggleIcon.classList.add('fa-chevron-right');
-}
+  const savedState = localStorage.getItem('sidebarHidden') === 'true';
+  if (savedState) {
+    sidebar.classList.add('custom-sidebar-hidden');
+    mainContent.classList.add('custom-main-expanded');
+    toggleIcon.classList.remove('fa-chevron-left');
+    toggleIcon.classList.add('fa-chevron-right');
+    toggleButton.style.left = '12px';
+  } else {
+    toggleButton.style.left = '220px';
+  }
 
-toggleButton.addEventListener('click', () => {
-  const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
-  mainContent.classList.toggle('custom-main-expanded', isHidden);
-  toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
-  toggleIcon.classList.toggle('fa-chevron-right', isHidden);
-  localStorage.setItem('sidebarHidden', isHidden);
-});
+  toggleButton.addEventListener('click', () => {
+    const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
+    mainContent.classList.toggle('custom-main-expanded', isHidden);
+    toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
+    toggleIcon.classList.toggle('fa-chevron-right', isHidden);
+    toggleButton.style.left = isHidden ? '12px' : '220px';
+    localStorage.setItem('sidebarHidden', isHidden);
+  });
 
   const summaryLink = document.getElementById('summaryLink');
   const currentUserEmail = localStorage.getItem('user_email');
   const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
   if (summaryLink && allowedEmails.includes(currentUserEmail)) summaryLink.style.display = 'block';
+
+  // ---------------- helpers Condition ----------------
+  async function kickoffConditionResolve(tableInstance) {
+    const rows = Array.from(document.querySelectorAll('#candidatesTableBody tr'));
+    const tasks = rows.map(tr => async () => {
+      const id = tr.dataset.id;
+      const cell = tr.querySelector('.condition-cell');
+      if (!id || !cell) return;
+
+      try {
+        const hire = await fetchHireDates(id);
+        const start = hire?.start_date || hire?.[0]?.start_date || null;
+        const end   = hire?.end_date   || hire?.[0]?.end_date   || null;
+
+        const condition = !start ? 'unhired' : (end ? 'inactive' : 'active');
+        renderCondition(cell, condition);
+
+        // (Opcional) actualizar DataTables internamente para filtros/búsquedas futuras
+        // Busca índice de la fila en DataTables y sincroniza la columna 0
+        const rowIdx = tableInstance.row(tr).index();
+        if (rowIdx != null && rowIdx >= 0) {
+          tableInstance.cell(rowIdx, 0).data(cell.innerHTML);
+        }
+      } catch (e) {
+        // En error, mostrar "unhired"
+        renderCondition(cell, 'unhired');
+      }
+    });
+
+    await runWithConcurrency(tasks, 8); // limita concurrencia para no saturar la red
+  }
+
+  async function fetchHireDates(candidateId) {
+    // Preferimos un GET que ya usas para PATCH: /candidates/:id/hire
+    // Debe devolver al menos { start_date, end_date } o []/{} si no hay registro
+    try {
+      const r = await fetch(`${API_BASE}/candidates/${candidateId}/hire`, { method: 'GET' });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch {
+      return null;
+    }
+  }
+
+  function renderCondition(cell, condition) {
+    const cls = {
+      active: 'status-active',
+      inactive: 'status-inactive',
+      unhired: 'status-unhired'
+    }[condition] || 'status-unhired';
+
+    cell.innerHTML = `<span class="status-chip ${cls}">${condition}</span>`;
+  }
+
+  async function runWithConcurrency(tasks, limit) {
+    let i = 0;
+    const workers = new Array(limit).fill(0).map(async () => {
+      while (i < tasks.length) {
+        const t = tasks[i++];
+        await t();
+      }
+    });
+    await Promise.all(workers);
+  }
 });
 
-// Filtros tipo Excel
+// ===== Filtros tipo Excel (tu código tal cual) =====
 function createColumnFilter(columnIndex, table) {
   document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
 
@@ -167,7 +203,7 @@ function createColumnFilter(columnIndex, table) {
     .column(columnIndex)
     .data()
     .toArray()
-    .map(item => item.trim())
+    .map(item => (item || '').toString().trim())
     .filter((v, i, a) => v && a.indexOf(v) === i)
     .sort();
 
@@ -186,9 +222,9 @@ function createColumnFilter(columnIndex, table) {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.value = value;
+    checkbox.value = value.replace(/<[^>]*>/g, ''); // limpia HTML
     label.appendChild(checkbox);
-    label.append(' ' + value);
+    label.append(' ' + checkbox.value);
     checkboxContainer.appendChild(label);
   });
 
