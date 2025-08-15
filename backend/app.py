@@ -2604,7 +2604,6 @@ def candidates_light_fast():
     except Exception as e:
         import logging; logging.exception("Error in /candidates/light_fast")
         return jsonify({"error": str(e)}), 500
-    
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
