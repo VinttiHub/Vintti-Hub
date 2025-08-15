@@ -1,3 +1,41 @@
+:root{
+  --sidebar-width: 250px;         /* ancho único para TODOS los sidebars */
+  --toggle-size: 36px;            /* diámetro del botón burbuja */
+}
+
+/* Sidebar del mismo ancho en todas las páginas */
+.sidebar{
+  width: var(--sidebar-width);
+}
+
+/* Botón burbuja SIEMPRE pegado al borde derecho del sidebar (mitad adentro, mitad afuera) */
+.sidebar-wow-toggle{
+  position: fixed;
+  top: 20px;
+  left: calc(var(--sidebar-width) - (var(--toggle-size) / 2));
+  width: var(--toggle-size);
+  height: var(--toggle-size);
+  background-color: #fff;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  cursor: pointer;
+  transition: left .3s ease, transform .3s ease, background .3s ease;
+}
+
+/* Cuando el sidebar está oculto, la burbuja se va a 12px del borde de la ventana */
+.custom-sidebar-hidden + .sidebar-wow-toggle{
+  left: 12px;
+}
+
+/* (opcional) en móviles, muévelo a 12px para evitar desalineados si ocultas el sidebar */
+@media (max-width: 900px){
+  .sidebar-wow-toggle{ left: 12px; }
+}
+
 /* GENERAL RESET */
 body {
     font-family: 'Onest', sans-serif;

@@ -14,9 +14,6 @@ if (toggleSidebarButton && sidebar && mainContent) {
       icon.classList.toggle("fa-chevron-left", !isHidden);
       icon.classList.toggle("fa-chevron-right", isHidden);
     }
-
-    // Mueve el botón dependiendo del estado del sidebar
-    toggleSidebarButton.style.left = isHidden ? '12px' : '220px';
   });
 }
 

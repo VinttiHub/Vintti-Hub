@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const linkedin = candidate.linkedin || '';
 
         tr.innerHTML = `
-          <td>${candidate.condition || '-'}</td>
+          <td>${computeCondition(candidate)}</td>
           <td>${candidate.name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
@@ -79,6 +79,40 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     })
     .catch(err => console.error('❌ Error al obtener candidatos:', err));
+// === Condition helpers ===
+const NO_START_LABEL = 'Unhired'; // cámbialo por 'Pending' o 'Prospect' si te gusta más
+
+function isRealISODate(v) {
+  if (!v) return false;
+  const s = String(v).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s);
+  return !isNaN(d.getTime());
+}
+
+function normalizeLabel(s) {
+  if (!s) return '';
+  const t = String(s).toLowerCase();
+  if (t.includes('inactive')) return 'Inactive';
+  if (t.includes('active'))   return 'Active';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function computeCondition(candidate) {
+  // Si el payload NO trae estas claves, mantenemos el valor que venga (si existe)
+  const hasStartKey = Object.prototype.hasOwnProperty.call(candidate, 'start_date');
+  const hasEndKey   = Object.prototype.hasOwnProperty.call(candidate, 'end_date');
+
+  if (!hasStartKey && !hasEndKey) {
+    return normalizeLabel(candidate.condition || candidate.status || '—');
+  }
+
+  const hasStart = isRealISODate(candidate.start_date);
+  const hasEnd   = isRealISODate(candidate.end_date);
+
+  if (!hasStart) return NO_START_LABEL;   // no contratado / sin fecha de inicio
+  return hasEnd ? 'Inactive' : 'Active';  // con start_date: activo si no hay end_date
+}
 
   // ✅ Un solo listener (delegado) PARA TODO el tbody, fuera del bucle
   tbody.addEventListener('click', (e) => {
@@ -96,31 +130,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 🟣 SIDEBAR TOGGLE CON MEMORIA (igual que lo tenías)
-  const sidebar = document.querySelector('.sidebar');
-  const mainContent = document.querySelector('.main-content');
-  const toggleButton = document.getElementById('sidebarToggle');
-  const toggleIcon = document.getElementById('sidebarToggleIcon');
+// 🟣 SIDEBAR TOGGLE CON MEMORIA (sin left hardcodeado)
+const sidebar = document.querySelector('.sidebar');
+const mainContent = document.querySelector('.main-content');
+const toggleButton = document.getElementById('sidebarToggle');
+const toggleIcon = document.getElementById('sidebarToggleIcon');
 
-  const savedState = localStorage.getItem('sidebarHidden') === 'true';
-  if (savedState) {
-    sidebar.classList.add('custom-sidebar-hidden');
-    mainContent.classList.add('custom-main-expanded');
-    toggleIcon.classList.remove('fa-chevron-left');
-    toggleIcon.classList.add('fa-chevron-right');
-    toggleButton.style.left = '12px';
-  } else {
-    toggleButton.style.left = '220px';
-  }
+// aplica estado guardado
+const savedState = localStorage.getItem('sidebarHidden') === 'true';
+if (savedState) {
+  sidebar.classList.add('custom-sidebar-hidden');
+  mainContent.classList.add('custom-main-expanded');
+  toggleIcon.classList.remove('fa-chevron-left');
+  toggleIcon.classList.add('fa-chevron-right');
+}
 
-  toggleButton.addEventListener('click', () => {
-    const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
-    mainContent.classList.toggle('custom-main-expanded', isHidden);
-    toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
-    toggleIcon.classList.toggle('fa-chevron-right', isHidden);
-    toggleButton.style.left = isHidden ? '12px' : '220px';
-    localStorage.setItem('sidebarHidden', isHidden);
-  });
+toggleButton.addEventListener('click', () => {
+  const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
+  mainContent.classList.toggle('custom-main-expanded', isHidden);
+  toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
+  toggleIcon.classList.toggle('fa-chevron-right', isHidden);
+  localStorage.setItem('sidebarHidden', isHidden);
+});
 
   const summaryLink = document.getElementById('summaryLink');
   const currentUserEmail = localStorage.getItem('user_email');
