@@ -102,29 +102,28 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     const openBtn = document.getElementById('linkedin-open-btn');
     let linkedinUrl = (data.linkedin || '').trim();
-    linkedinUrl = linkedinUrl.replace(/^[-–—\s]+/, ''); // elimina guiones largos y espacios del inicio
+    // limpia guiones/espacios iniciales (— – -)
+    linkedinUrl = linkedinUrl.replace(/^[-–—\s]+/, '');
 
     console.log("🔗 Clean LinkedIn:", linkedinUrl);
-    if (linkedinUrl.startsWith('www')) {
-      linkedinUrl = 'https://' + linkedinUrl;
-    }
-    if (linkedinUrl.startsWith('http')) {
-      openBtn.href = linkedinUrl;
-      openBtn.style.display = 'inline-flex';
-      openBtn.style.visibility = 'visible';
-      openBtn.style.opacity = 1;
-      openBtn.addEventListener('click', (e) => {
-        e.preventDefault(); // evita conflictos si el href no es válido
-        if (linkedinUrl && linkedinUrl.startsWith('http')) {
+
+    if (openBtn) {
+      if (linkedinUrl.startsWith('www')) linkedinUrl = 'https://' + linkedinUrl;
+      if (linkedinUrl.startsWith('http')) {
+        openBtn.href = linkedinUrl;
+        openBtn.style.display = 'inline-flex';
+        openBtn.style.visibility = 'visible';
+        openBtn.style.opacity = 1;
+        openBtn.onclick = (e) => {
+          e.preventDefault();
           window.open(linkedinUrl, '_blank');
-        } else {
-          console.warn("❌ Invalid LinkedIn URL:", linkedinUrl);
-        }
-      });
-    } else {
-      openBtn.style.display = 'none';
+        };
+      } else {
+        openBtn.style.display = 'none';
+      }
     }
-    // ⬇️ Dispara la extracción SOLO si coresignal_scrapper está vacío y hay LinkedIn válido
+
+    // Llama a Coresignal solo si NO hay coresignal_scrapper y el LinkedIn es válido
     if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
       fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, {
         method: 'POST',
@@ -134,6 +133,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
       .then(d => console.log('🔄 Coresignal sync:', d))
       .catch(e => console.warn('⚠️ Coresignal sync failed', e));
     }
+
     console.log("🎯 Valor desde DB:", data.country);
 
     const flagEmoji = getFlagEmoji(data.country || '');
@@ -551,22 +551,30 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   }
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
-  aiButton.classList.add('hidden');
-  const aiPopup = document.getElementById('ai-popup');
-  const aiLinkedInScrap = document.getElementById('ai-linkedin-scrap');
-  const aiCvScrap = document.getElementById('ai-cv-scrap');
+  if (aiButton) {
+    aiButton.classList.add('hidden');
+    aiButton.addEventListener('click', () => {
+      const aiPopup = document.getElementById('ai-popup');
+      if (aiPopup) aiPopup.classList.toggle('hidden');
+    });
+  }
 
-  aiButton.addEventListener('click', () => {
-    aiPopup.classList.toggle('hidden');
-  });
+  const aiLinkedInScrap = document.getElementById('ai-linkedin-scrap');
+  const aiCvScrap       = document.getElementById('ai-cv-scrap');
+
+  const setAIScrapsFrom = (d) => {
+    if (aiLinkedInScrap) aiLinkedInScrap.value = d.linkedin_scrapper || '';
+    if (aiCvScrap)       aiCvScrap.value       = d.cv_pdf_scrapper   || '';
+  };
+
 
   // Obtener los datos del backend
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     .then(res => res.json())
     .then(data => {
-      aiLinkedInScrap.value = data.linkedin_scrapper || '';
-      aiCvScrap.value = data.cv_pdf_scrapper || '';
-      const bothEmpty = !data.linkedin_scrapper && !data.cv_pdf_scrapper;
+      setAIScrapsFrom(data);
+      const bothEmpty = !(data.linkedin_scrapper && data.linkedin_scrapper.trim()) &&
+                        !(data.cv_pdf_scrapper && data.cv_pdf_scrapper.trim());
       // ⭐ Habilitar solo botón de About si existe entry en tabla resume
       const aboutStarBtn = document.querySelector('#about-star-button');
       if (aboutStarBtn) {
@@ -607,27 +615,24 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
         }
       });
     });
-    
-
-  // Guardar en blur
-  aiLinkedInScrap.addEventListener('blur', () => {
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ linkedin_scrapper: aiLinkedInScrap.value.trim() })
+    if (aiLinkedInScrap) {
+    aiLinkedInScrap.addEventListener('blur', () => {
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ linkedin_scrapper: aiLinkedInScrap.value.trim() })
+      });
     });
-  });
-
-  aiCvScrap.addEventListener('blur', () => {
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cv_pdf_scrapper: aiCvScrap.value.trim() })
+  }
+  if (aiCvScrap) {
+    aiCvScrap.addEventListener('blur', () => {
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cv_pdf_scrapper: aiCvScrap.value.trim() })
+      });
     });
-  });
-  document.getElementById('ai-close').addEventListener('click', () => {
-  document.getElementById('ai-popup').classList.add('hidden');
-});
+  }
 const clientBtn = document.getElementById('client-version-btn'); // ✅ defínelo aquí
 if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
   aiButton.classList.remove('hidden');
@@ -693,13 +698,13 @@ const saveUpdateBtn = document.getElementById('save-salary-update');
 const salaryInput = document.getElementById('update-salary');
 const feeInput = document.getElementById('update-fee');
 
-window.loadSalaryUpdates = function () {
+function loadSalaryUpdates() {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`)
     .then(res => res.json())
     .then(data => {
+      const salaryUpdatesBox = document.getElementById('salary-updates-box');
       salaryUpdatesBox.innerHTML = '';
 
-      // Cabecera de tabla
       const header = document.createElement('div');
       header.className = 'salary-entry';
       header.style.fontWeight = 'bold';
@@ -711,20 +716,18 @@ window.loadSalaryUpdates = function () {
       `;
       salaryUpdatesBox.appendChild(header);
 
-      // Filas con datos
       data.forEach(update => {
         const div = document.createElement('div');
         div.className = 'salary-entry';
         div.innerHTML = `
           <span>$${update.salary}</span>
-          <span>$${update.fee}</span>
+          <span>$${update.fee ?? ''}</span>
           <span>${new Date(update.date).toLocaleDateString()}</span>
           <button data-id="${update.update_id}" class="delete-salary-update">🗑️</button>
         `;
         salaryUpdatesBox.appendChild(div);
       });
 
-      // Eliminar
       document.querySelectorAll('.delete-salary-update').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
@@ -735,6 +738,8 @@ window.loadSalaryUpdates = function () {
       });
     });
 }
+window.loadSalaryUpdates = loadSalaryUpdates; // opcional, por si la llamas como global
+
 
 hireSalary.addEventListener('blur', async () => {
   const salary = parseFloat(hireSalary.value);
