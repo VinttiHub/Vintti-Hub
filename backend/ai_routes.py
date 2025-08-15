@@ -727,55 +727,49 @@ def register_ai_routes(app):
             candidate_name = (db_name or "").strip()
 
             # ---------- PROMPT DE ALTA CALIDAD (PLAIN TEXT, EN INGLÉS) ----------
-            # ====== PROMPT MEJORADO (sin headings, sin bullets, sin resúmenes, sin límite de palabras) ======
             prompt = f"""
-            You are a strict cleaner/extractor for CV building. Input is a noisy JSON-like block (possibly Spanish/Portuguese). Produce ONE block of plain English text that preserves every concrete, relevant fact for a CV. Do NOT invent anything.
+            You are a STRICT CV extractor. Input is a noisy JSON-like block (maybe Spanish/Portuguese). Output ONE plain English block that preserves every concrete, job-relevant fact. Do NOT invent.
 
-            PRIORITY & FIELD MAPPING (use source keys if present):
-            - EXPERIENCE (key names like "experience"): include EVERY role with: Job Title, Company, Location (if any), Start–End dates (normalize to MM/YYYY when month exists; otherwise YYYY; use "Present" for current roles). Keep reverse chronological order. Do not omit roles unless they are obvious duplicates.
-            - EDUCATION (key names like "education"): include degrees/programs (e.g., "Master's degree, Data Science", "Bachelor's degree, Mathematics") with Institution and dates. Scholarships/awards are NOT a replacement for degrees; only add them at the end as optional honors if space permits.
-            - CERTIFICATIONS (key "certifications"): include title, issuer, and dates if present.
-            - LANGUAGES (key "languages"): include language and proficiency level.
-            - SKILLS/TOOLS (key "skills" or inferred from text): keep concise, comma-separated.
-            - OPTIONAL HONORS/AWARDS (key "awards"): include briefly only if clearly professional and not duplicative.
+            INCLUDE (if present) — keep EVERYTHING relevant, dedupe, and drop items with "deleted": 1:
+            - Full name.
+            - Headline.
+            - Location (city, country).
+            - LinkedIn profile URL and profile photo URL.
+            - Summary (short).
+            - EXPERIENCE: every role with Title, Company, Location, Start–End (use MM/YYYY when month exists else YYYY; "Present" for current), Industry, Company size (range or employees_count), and Duration if available. Reverse chronological order.
+            - EDUCATION: degree/program, institution, dates.
+            - CERTIFICATIONS: title, issuer, dates, credential URL.
+            - AWARDS/HONORS: title, issuer, date, short note.
+            - VOLUNTEERING: role, organization, cause, dates.
+            - LANGUAGES: language + proficiency (normalize to "Native or bilingual", "Full professional", "Professional working", "Elementary", etc.).
+            - SKILLS/TOOLS if explicitly listed.
+            - Any relevant counts (connections/followers) if present.
 
             REMOVE COMPLETELY:
-            - Greetings, marketing fluff, UI labels (“show more”), navigation, legal/privacy text.
-            - Duplicate entries, section labels/headings of any kind, bullets or list markers, numbering.
-            - Emojis, decorative characters, repeated punctuation.
-            - All links/URLs, usernames/handles, IDs, trackers.
-            - Emails, phone numbers, postal addresses, personal identifiers.
-            - Raw JSON keys, code fences, markdown.
+            - Duplicates, UI labels, emojis, bullets, numbering, raw JSON keys, tracking params, emails/phones/addresses, and any entries where "deleted": 1.
 
             TRANSFORMATIONS:
-            - Translate everything to English.
-            - Normalize whitespace to single spaces; use plain ASCII punctuation.
-            - Fix odd encodings; standardize dashes and quotes.
-            - Merge duplicates across arrays (e.g., repeated positions or certs).
-            - Prefer structured fields over free-text if both exist.
-            - When both month and year are present, output MM/YYYY; when only year exists, output YYYY.
+            - Translate to English.
+            - Normalize whitespace and punctuation.
+            - Merge duplicates across arrays/variants.
+            - Prefer structured fields over free text.
 
             FORMAT RULES (very important):
-            - Plain text ONLY. No JSON. No markdown. No headings or labels (do NOT write "Education:" or "Work Experience:" or anything with a colon at line start).
-            - No bullets or list markers (do NOT use "-", "•", "*", "1." at any line).
-            - Present the content as compact sentences/lines, separated by a single newline between logical groups. Acceptable examples:
-            - Full name (only if clearly present).
-            - Role lines like: "Big Data Developer — Bluetab, an IBM Company (Colombia), 09/2023–Present."
-            - Next roles as separate lines in reverse chronological order.
-            - Education lines like: "Master's degree, Data Science — Escuela Colombiana de Ingeniería Julio Garavito, 2022–2023."
-            - Certifications/languages/skills as succinct lines; skills can be comma-separated.
-            - NO word limit; include all relevant facts found.
+            - Plain text ONLY, no JSON, no markdown, no headings like "Education:" at the start of a line.
+            - Short, compact lines separated by a single newline between logical groups.
+            - Acceptable line styles:
+            - "Big Data Developer — Bluetab, an IBM Company (Colombia), 09/2023–Present. Industry: IT Services and IT Consulting. Company size: 1,001–5,000."
+            - "Master's degree, Data Science — Escuela Colombiana de Ingeniería Julio Garavito, 2022–2023."
+            - "English — Full professional proficiency."
 
-            FAILURE GUARDS:
-            - Do NOT replace education with scholarships only; degrees/programs must be included when present.
-            - Do NOT omit work experience if it exists in the source.
-            - If the name is not clearly present, omit it entirely (do not add any "Name:" label).
+            Only use facts that exist in the source. Do NOT replace degrees with scholarships; put scholarships in Awards/Honors only.
 
-            SOURCE:
+            SOURCE
             ---
             {source}
             ---
             """
+
 
             chat = call_openai_with_retry(
                             model="gpt-4o",
