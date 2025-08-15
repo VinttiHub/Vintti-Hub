@@ -1873,6 +1873,7 @@ def handle_candidate_hire_data(candidate_id):
                     references_notes,
                     salary,
                     fee,
+                    setup_fee, 
                     computer,
                     extra_perks,
                     working_schedule,
@@ -1899,6 +1900,7 @@ def handle_candidate_hire_data(candidate_id):
                     'employee_salary': None,
                     'employee_fee': None,
                     'computer': '',
+                    'setup_fee': setup_fee,
                     'extraperks': '',
                     'working_schedule': '',
                     'pto': '',
@@ -1915,7 +1917,7 @@ def handle_candidate_hire_data(candidate_id):
                     'buyout_daterange': None
                 })
 
-            (references_notes, salary, fee, computer, extra_perks, working_schedule,
+            (references_notes, setup_fee, salary, fee, computer, extra_perks, working_schedule,
              pto, discount_dolar, discount_daterange, start_date, end_date, revenue,
              referral_dolar, referral_daterange, buyout_dolar, buyout_daterange) = row
 
@@ -1950,6 +1952,7 @@ def handle_candidate_hire_data(candidate_id):
                 'references_notes': 'references_notes',
                 'employee_salary': 'salary',
                 'employee_fee': 'fee',
+                'setup_fee': 'setup_fee',
                 'computer': 'computer',
                 'extraperks': 'extra_perks',
                 'working_schedule': 'working_schedule',

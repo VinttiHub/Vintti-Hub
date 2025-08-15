@@ -664,6 +664,14 @@ const hireFee = document.getElementById('hire-fee');
 const hireComputer = document.getElementById('hire-computer');
 const hirePerks = document.getElementById('hire-extraperks');
 console.log(document.getElementById('hire-extraperks').innerHTML)
+const hireSetupFee = document.getElementById('hire-setup-fee');
+if (hireSetupFee) {
+  hireSetupFee.addEventListener('blur', () => {
+    const val = parseFloat(hireSetupFee.value);
+    if (isNaN(val)) return;
+    updateHireField('setup_fee', val);
+  });
+}
 
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
@@ -1429,6 +1437,8 @@ function loadHireData() {
 .then(data => {
   const salaryInput = document.getElementById('hire-salary');
   const feeInput = document.getElementById('hire-fee');
+const setupEl = document.getElementById('hire-setup-fee');
+if (setupEl) setupEl.value = data.setup_fee || '';
 
   salaryInput.value = data.employee_salary || '';
   feeInput.value = data.employee_fee || '';
@@ -1544,9 +1554,11 @@ function hideTooltip() {
 function adaptHireFieldsByModel(model) {
   const feeField = document.getElementById('hire-fee').closest('.field');
   const revenueInput = document.getElementById('hire-revenue');
+  const setupField = document.getElementById('setup-fee-field');
 
   if (model.toLowerCase() === 'recruiting') {
     feeField.style.display = 'none';
+    if (setupField) setupField.style.display = 'none';
     revenueInput.disabled = false;
 
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
@@ -1565,6 +1577,7 @@ function adaptHireFieldsByModel(model) {
     revenueInput.classList.remove('disabled-hover');
   } else if (model.toLowerCase() === 'staffing') {
     feeField.style.display = 'block';
+    if (setupField) setupField.style.display = 'block';
     revenueInput.disabled = true;
     revenueInput.classList.add('disabled-hover');
 
