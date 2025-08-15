@@ -874,7 +874,7 @@ trigger.addEventListener('click', () => {
 });
 
 picker.addEventListener('emoji-click', event => {
-  const emoji = event.detail.unicode; // emoji unicode, p.ej. "😊"
+  const emoji = event.detail.unicode; 
   editor.focus();
   document.execCommand('insertText', false, emoji);
   picker.style.display = 'none';
@@ -882,12 +882,32 @@ picker.addEventListener('emoji-click', event => {
 // Botón de Go Back
 const goBackButton = document.getElementById('goBackButton');
 if (goBackButton) {
-  goBackButton.addEventListener('click', () => {
-    if (document.referrer) {
-      window.history.back();
-    } else {
-      window.location.href = '/'; // Cambia por la home si quieres
+  goBackButton.addEventListener('click', (e) => {
+    e.preventDefault();
+
+    // 1) permite pasar la URL de retorno por querystring: ?from=/opportunities.html
+    const fromParam = new URLSearchParams(location.search).get('from');
+    if (fromParam) {
+      location.assign(fromParam);
+      return;
     }
+
+    // 2) referrer (sirve aunque se haya abierto en otra pestaña)
+    if (document.referrer) {
+      location.assign(document.referrer);
+      return;
+    }
+
+    // 3) última URL conocida de la tabla (si la guardas en sessionStorage)
+    const lastOpps = sessionStorage.getItem('last_opps_url');
+    if (lastOpps) {
+      location.assign(lastOpps);
+      return;
+    }
+
+    // 4) fallback fijo (ajústalo si tu ruta es distinta)
+    const fallback = goBackButton.dataset.fallback || '/opportunities.html';
+    location.assign(fallback);
   });
 }
 // 🔗 Redirección robusta al perfil del hire
