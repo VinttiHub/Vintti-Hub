@@ -677,6 +677,115 @@ def register_ai_routes(app):
             logging.error("❌ Error en /generate_resume_fields:")
             logging.error(traceback.format_exc())
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+    @app.route('/ai/coresignal_to_linkedin_scrapper', methods=['POST'])
+    def coresignal_to_linkedin_scrapper():
+        """
+        Genera y guarda en candidates.linkedin_scrapper un texto plano en inglés
+        (Name, Summary, Work Experience) a partir de candidates.coresignal_scrapper,
+        SOLO si coresignal_scrapper tiene contenido y linkedin_scrapper está vacío.
+        """
+        try:
+            data = request.get_json(force=True)
+            candidate_id = str(data.get('candidate_id')).strip()
+            if not candidate_id:
+                return jsonify({"error": "candidate_id is required"}), 400
+
+            conn = get_connection()
+            cur = conn.cursor()
+
+            # Lee estado actual
+            cur.execute("""
+                SELECT COALESCE(coresignal_scrapper, ''), COALESCE(linkedin_scrapper, ''),
+                       COALESCE(name, '')
+                FROM candidates
+                WHERE candidate_id = %s
+            """, (candidate_id,))
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close()
+                return jsonify({"error": "Candidate not found"}), 404
+
+            coresignal_raw, linkedin_scrap_current, db_name = row
+            coresignal_raw = (coresignal_raw or "").strip()
+            linkedin_scrap_current = (linkedin_scrap_current or "").strip()
+
+            # Reglas de activación
+            if not coresignal_raw:
+                cur.close(); conn.close()
+                return jsonify({"skipped": True, "reason": "coresignal_scrapper vacío"}), 200
+            if linkedin_scrap_current:
+                cur.close(); conn.close()
+                return jsonify({"skipped": True, "reason": "linkedin_scrapper ya tiene valor"}), 200
+
+            # Opcional: limpieza rápida de HTML/ruido
+            def _clean(txt: str) -> str:
+                txt = re.sub(r'<[^>]+>', ' ', txt)       # quita tags HTML
+                txt = re.sub(r'\s+', ' ', txt).strip()   # colapsa espacios
+                return txt
+
+            source = _clean(coresignal_raw)[:12000]  # recorte por seguridad
+            candidate_name = (db_name or "").strip()
+
+            # ---------- PROMPT DE ALTA CALIDAD (PLAIN TEXT, EN INGLÉS) ----------
+            prompt = f"""
+            You are a precise cleaner for CV preparation. The input is a noisy text block (possibly Spanish/Portuguese). Produce ONE block of plain English text that keeps ONLY information useful for building a CV. Do NOT invent anything.
+
+            KEEP (verbatim when possible, but translated to English):
+            - Person's name only if clearly present in the source.
+            - Job titles, employers, locations, dates (normalize to MM/YYYY when month exists, otherwise YYYY), responsibilities, achievements, seniority, industries, tools/technologies, certifications, education, languages.
+
+            REMOVE COMPLETELY:
+            - Greetings, marketing fluff, navigation/legal/footer text, privacy/disclaimer text.
+            - Duplicates, section labels (e.g., "Experience", "Summary"), bullets or numbering.
+            - Emojis, decorative characters, repeated punctuation, ALL links/URLs, hashtags, usernames/handles, IDs.
+            - Emails, phone numbers, street addresses, social handles.
+            - JSON keys, table artifacts, headings, quotes, code fences, markdown.
+
+            TRANSFORMATIONS:
+            - Translate everything to English.
+            - Strip HTML/markdown/artifacts.
+            - Normalize whitespace to single spaces; separate logical paragraphs with a single blank line at most.
+            - Replace curly quotes/dashes with ASCII equivalents, fix odd encodings.
+            - Merge duplicate facts and keep a coherent chronological flow when obvious.
+
+            FORMAT:
+            - Return PLAIN TEXT only.
+            - No bullets, no headings, no labels (do not add "Name:" or similar), no preface or postscript.
+            - No word limit; include all relevant information found.
+            - If the name is not clearly present, omit it entirely.
+
+            SOURCE:
+            ---
+            {source}
+            ---
+            """
+            chat = call_openai_with_retry(
+                            model="gpt-4o",
+                            messages=[
+                                {"role": "system", "content": "You are an expert resume writer. Output plain text only."},
+                                {"role": "user", "content": prompt}
+                            ],
+                            temperature=0.4,
+                            max_tokens=950
+                        )
+
+            out_text = (chat.choices[0].message.content or "").strip()
+
+                        # Guarda en candidates.linkedin_scrapper
+            cur.execute("""
+                            UPDATE candidates
+                            SET linkedin_scrapper = %s
+                            WHERE candidate_id = %s
+                        """, (out_text, candidate_id))
+            conn.commit()
+            cur.close(); conn.close()
+
+            return jsonify({"linkedin_scrapper": out_text, "updated": True}), 200
+
+        except Exception as e:
+                        logging.error("❌ /ai/coresignal_to_linkedin_scrapper failed\n" + traceback.format_exc())
+                        return jsonify({"error": str(e)}), 500
+
 
 
 import time

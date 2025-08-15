@@ -261,6 +261,31 @@ if (videoLinkEl) {
   // Carga inicial
   loadVideoLink();
 }
+    // 🔁 Autogenerar linkedin_scrapper DESDE coresignal_scrapper si aplica
+    const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+    const hasCore = (data.coresignal_scrapper || '').trim().length > 0;
+    const hasLinkedinScrap = (data.linkedin_scrapper || '').trim().length > 0;
+
+    if (hasCore && !hasLinkedinScrap) {
+      // Opcional: pequeño indicador no bloqueante en la esquina (reutiliza si ya tienes algo similar)
+      console.log('🧠 Building linkedin_scrapper from coresignal_scrapper…');
+
+      fetch(`${apiBase}/ai/coresignal_to_linkedin_scrapper`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ candidate_id: candidateId })
+      })
+      .then(r => r.json())
+      .then(r => {
+        // Actualiza UI en caliente si existe el textarea oculto/visible
+        const aiLinkedInScrap = document.getElementById('ai-linkedin-scrap');
+        if (aiLinkedInScrap && r.linkedin_scrapper) {
+          aiLinkedInScrap.value = r.linkedin_scrapper;
+        }
+        console.log('✅ linkedin_scrapper updated from coresignal:', !!r.linkedin_scrapper);
+      })
+      .catch(err => console.warn('⚠️ coresignal_to_linkedin_scrapper failed', err));
+    }
 
   })
   .catch(err => {
