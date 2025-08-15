@@ -1302,6 +1302,49 @@ async function uploadFile(file) {
     loadCVs();
   }
 })();
+// === Close buttons (X) for Salary Update + AI Assistant popups ===
+const aiPopupEl = document.getElementById('ai-popup');
+const salaryPopupEl = document.getElementById('salary-update-popup');
+
+// Soporta varios selectores por si ya tienes distinto markup
+const aiCloseBtns = [
+  document.getElementById('ai-close'),
+  ...(aiPopupEl?.querySelectorAll('.close-ai-popup,[data-close="ai-popup"]') ?? [])
+];
+
+const salaryCloseBtns = [
+  document.getElementById('close-salary-update'),
+  ...(salaryPopupEl?.querySelectorAll('.close-salary-popup,[data-close="salary-update-popup"]') ?? [])
+];
+
+// Cerrar AI popup
+aiCloseBtns.forEach(btn => btn && btn.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  aiPopupEl?.classList.add('hidden');
+}));
+
+// Cerrar Salary Update popup + limpiar inputs
+salaryCloseBtns.forEach(btn => btn && btn.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (!salaryPopupEl) return;
+  salaryPopupEl.classList.add('hidden');
+  const s = document.getElementById('update-salary');
+  const f = document.getElementById('update-fee');
+  const d = document.getElementById('update-date');
+  if (s) s.value = '';
+  if (f) f.value = '';
+  if (d) d.value = '';
+}));
+
+// Cerrar haciendo click fuera (en el overlay)
+[aiPopupEl, salaryPopupEl].forEach(el => {
+  el?.addEventListener('click', (e) => {
+    // cierra solo si el click fue en el contenedor/overlay, no dentro del contenido
+    if (e.target === el) el.classList.add('hidden');
+  });
+});
+
+// Cerrar c
 
 
 
