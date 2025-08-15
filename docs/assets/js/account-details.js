@@ -822,6 +822,10 @@ function updateCandidateField(candidateId, field, value) {
     .then(res => {
       if (!res.ok) throw new Error(`Error saving ${field} (hire_opportunity)`);
       console.log(`💾 ${field} saved in hire_opportunity for candidate ${candidateId}`);
+        if (field.startsWith('buyout_')) {
+    const accountId = getIdFromURL && getIdFromURL();
+    if (accountId) loadCandidates(accountId);
+  }
     })
     .catch(err => console.error('❌ Failed to save field:', err));
     return;

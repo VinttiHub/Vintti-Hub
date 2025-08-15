@@ -2006,6 +2006,58 @@ def handle_candidate_hire_data(candidate_id):
                     WHERE candidate_id = %s AND opportunity_id = %s
                 """, set_vals)
                 updated = True
+                            # --- Sincronizar end_date con buyout_daterange cuando se edita buyout_* ---
+            # Regla: si viene buyout_dolar o buyout_daterange (y NO nos mandaron end_date manual),
+            # ponemos end_date = último día del mes indicado por buyout_daterange.
+            if ('buyout_dolar' in data or 'buyout_daterange' in data) and ('end_date' not in data):
+                def _end_date_from_buyout(val) -> str | None:
+                    """
+                    Acepta formatos:
+                    - 'YYYY-MM'
+                    - 'YYYY-MM-DD'
+                    - '[YYYY-MM-DD,YYYY-MM-DD]' (tomamos el último)
+                    Devuelve 'YYYY-MM-DD' (último día de ese mes) o None.
+                    """
+                    if not val:
+                        return None
+                    s = str(val)
+
+                    # 1) Si hay fechas completas en la cadena, toma la ÚLTIMA
+                    m_full = re.findall(r'\d{4}-\d{2}-\d{2}', s)
+                    if m_full:
+                        # toma la última aparición
+                        y, mo, d = map(int, m_full[-1].split('-'))
+                        last = calendar.monthrange(y, mo)[1]
+                        return f"{y:04d}-{mo:02d}-{last:02d}"
+
+                    # 2) Si viene 'YYYY-MM'
+                    m_ym = re.search(r'(\d{4})-(\d{2})', s)
+                    if m_ym:
+                        y = int(m_ym.group(1)); mo = int(m_ym.group(2))
+                        last = calendar.monthrange(y, mo)[1]
+                        return f"{y:04d}-{mo:02d}-{last:02d}"
+                    return None
+
+                # valor prioritario: lo que viene en el PATCH; si no, lo que ya hay en DB
+                bo_val = data.get('buyout_daterange')
+                if not bo_val:
+                    cursor.execute("""
+                        SELECT buyout_daterange
+                        FROM hire_opportunity
+                        WHERE candidate_id = %s AND opportunity_id = %s
+                        LIMIT 1
+                    """, (candidate_id, opportunity_id))
+                    row = cursor.fetchone()
+                    bo_val = row[0] if row else None
+
+                computed_end = _end_date_from_buyout(bo_val)
+                if computed_end:
+                    cursor.execute("""
+                        UPDATE hire_opportunity
+                        SET end_date = %s
+                        WHERE candidate_id = %s AND opportunity_id = %s
+                    """, (computed_end, candidate_id, opportunity_id))
+
             # 2.5) Marcar al candidato como "Client hired" en candidates_batches
             cursor.execute("""
                 UPDATE candidates_batches
