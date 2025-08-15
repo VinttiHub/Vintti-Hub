@@ -2562,6 +2562,8 @@ def rename_account_pdf(account_id):
     except Exception as e:
         logging.exception("❌ rename_account_pdf failed")
         return jsonify({"error": str(e)}), 500
+    
+
 @app.route('/candidates/light_fast', methods=['GET'])
 def candidates_light_fast():
     try:
@@ -2575,19 +2577,23 @@ def candidates_light_fast():
               c.country,
               c.phone,
               c.linkedin,
+              c.employee,
               h.start_date,
               h.end_date,
+              h.has_hire,
               CASE
-                WHEN h.start_date IS NULL THEN 'unhired'
-                WHEN h.end_date   IS NULL THEN 'active'
-                ELSE 'inactive'
+                WHEN h.has_hire IS NULL THEN 'unhired'                -- no hay fila en hire_opportunity
+                WHEN h.end_date IS NULL    THEN 'active'              -- hay fila y no tiene end_date
+                ELSE 'inactive'                                       -- hay fila y sí tiene end_date
               END AS condition
             FROM candidates c
             LEFT JOIN LATERAL (
-              SELECT start_date, end_date
+              SELECT TRUE AS has_hire, start_date, end_date
               FROM hire_opportunity h
               WHERE h.candidate_id = c.candidate_id
-              ORDER BY (h.end_date IS NULL) DESC, h.start_date DESC NULLS LAST
+              -- prioriza activo (end_date NULL); si no hay, el más reciente por start_date
+              ORDER BY (h.end_date IS NULL) DESC,
+                       h.start_date DESC NULLS LAST
               LIMIT 1
             ) h ON TRUE
             ORDER BY c.name ASC;
@@ -2597,9 +2603,10 @@ def candidates_light_fast():
         cur.close(); conn.close()
         return jsonify(rows)
     except Exception as e:
-        import traceback, logging
-        logging.exception("Error in /candidates/light_fast")
+        import logging; logging.exception("Error in /candidates/light_fast")
         return jsonify({"error": str(e)}), 500
+    
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
