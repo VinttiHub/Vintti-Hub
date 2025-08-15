@@ -727,46 +727,64 @@ def register_ai_routes(app):
             candidate_name = (db_name or "").strip()
 
             # ---------- PROMPT DE ALTA CALIDAD (PLAIN TEXT, EN INGLÉS) ----------
+            # ====== PROMPT MEJORADO (sin headings, sin bullets, sin resúmenes, sin límite de palabras) ======
             prompt = f"""
-            You are a precise cleaner for CV preparation. The input is a noisy text block (possibly Spanish/Portuguese). Produce ONE block of plain English text that keeps ONLY information useful for building a CV. Do NOT invent anything.
+            You are a strict cleaner/extractor for CV building. Input is a noisy JSON-like block (possibly Spanish/Portuguese). Produce ONE block of plain English text that preserves every concrete, relevant fact for a CV. Do NOT invent anything.
 
-            KEEP (verbatim when possible, but translated to English):
-            - Person's name only if clearly present in the source.
-            - Job titles, employers, locations, dates (normalize to MM/YYYY when month exists, otherwise YYYY), responsibilities, achievements, seniority, industries, tools/technologies, certifications, education, languages.
+            PRIORITY & FIELD MAPPING (use source keys if present):
+            - EXPERIENCE (key names like "experience"): include EVERY role with: Job Title, Company, Location (if any), Start–End dates (normalize to MM/YYYY when month exists; otherwise YYYY; use "Present" for current roles). Keep reverse chronological order. Do not omit roles unless they are obvious duplicates.
+            - EDUCATION (key names like "education"): include degrees/programs (e.g., "Master's degree, Data Science", "Bachelor's degree, Mathematics") with Institution and dates. Scholarships/awards are NOT a replacement for degrees; only add them at the end as optional honors if space permits.
+            - CERTIFICATIONS (key "certifications"): include title, issuer, and dates if present.
+            - LANGUAGES (key "languages"): include language and proficiency level.
+            - SKILLS/TOOLS (key "skills" or inferred from text): keep concise, comma-separated.
+            - OPTIONAL HONORS/AWARDS (key "awards"): include briefly only if clearly professional and not duplicative.
 
             REMOVE COMPLETELY:
-            - Greetings, marketing fluff, navigation/legal/footer text, privacy/disclaimer text.
-            - Duplicates, section labels (e.g., "Experience", "Summary"), bullets or numbering.
-            - Emojis, decorative characters, repeated punctuation, ALL links/URLs, hashtags, usernames/handles, IDs.
-            - Emails, phone numbers, street addresses, social handles.
-            - JSON keys, table artifacts, headings, quotes, code fences, markdown.
+            - Greetings, marketing fluff, UI labels (“show more”), navigation, legal/privacy text.
+            - Duplicate entries, section labels/headings of any kind, bullets or list markers, numbering.
+            - Emojis, decorative characters, repeated punctuation.
+            - All links/URLs, usernames/handles, IDs, trackers.
+            - Emails, phone numbers, postal addresses, personal identifiers.
+            - Raw JSON keys, code fences, markdown.
 
             TRANSFORMATIONS:
             - Translate everything to English.
-            - Strip HTML/markdown/artifacts.
-            - Normalize whitespace to single spaces; separate logical paragraphs with a single blank line at most.
-            - Replace curly quotes/dashes with ASCII equivalents, fix odd encodings.
-            - Merge duplicate facts and keep a coherent chronological flow when obvious.
+            - Normalize whitespace to single spaces; use plain ASCII punctuation.
+            - Fix odd encodings; standardize dashes and quotes.
+            - Merge duplicates across arrays (e.g., repeated positions or certs).
+            - Prefer structured fields over free-text if both exist.
+            - When both month and year are present, output MM/YYYY; when only year exists, output YYYY.
 
-            FORMAT:
-            - Return PLAIN TEXT only.
-            - No bullets, no headings, no labels (do not add "Name:" or similar), no preface or postscript.
-            - No word limit; include all relevant information found.
-            - If the name is not clearly present, omit it entirely.
+            FORMAT RULES (very important):
+            - Plain text ONLY. No JSON. No markdown. No headings or labels (do NOT write "Education:" or "Work Experience:" or anything with a colon at line start).
+            - No bullets or list markers (do NOT use "-", "•", "*", "1." at any line).
+            - Present the content as compact sentences/lines, separated by a single newline between logical groups. Acceptable examples:
+            - Full name (only if clearly present).
+            - Role lines like: "Big Data Developer — Bluetab, an IBM Company (Colombia), 09/2023–Present."
+            - Next roles as separate lines in reverse chronological order.
+            - Education lines like: "Master's degree, Data Science — Escuela Colombiana de Ingeniería Julio Garavito, 2022–2023."
+            - Certifications/languages/skills as succinct lines; skills can be comma-separated.
+            - NO word limit; include all relevant facts found.
+
+            FAILURE GUARDS:
+            - Do NOT replace education with scholarships only; degrees/programs must be included when present.
+            - Do NOT omit work experience if it exists in the source.
+            - If the name is not clearly present, omit it entirely (do not add any "Name:" label).
 
             SOURCE:
             ---
             {source}
             ---
             """
+
             chat = call_openai_with_retry(
                             model="gpt-4o",
                             messages=[
                                 {"role": "system", "content": "You are an expert resume writer. Output plain text only."},
                                 {"role": "user", "content": prompt}
                             ],
-                            temperature=0.4,
-                            max_tokens=950
+                            temperature=0.2,
+                            max_tokens=7000
                         )
 
             out_text = (chat.choices[0].message.content or "").strip()
