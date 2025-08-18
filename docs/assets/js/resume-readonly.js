@@ -77,19 +77,49 @@ if (education.length === 0) {
     const startDate = formatDate(edu.start_date);
     const endDate = edu.current ? "Present" : formatDate(edu.end_date);
     // 🎓 Education
-entry.innerHTML = `
-  <div class="edu-header">
-    <strong>${edu.institution || "—"}</strong>
-  </div>
-  <div class="edu-subheader">
-    <span class="edu-title">${edu.title || "—"}</span>
-    <span class="edu-dates">${startDate} – ${endDate}</span>
-  </div>
-  ${edu.description ? `<div class="resume-description">${edu.description}</div>` : ""}
-`;
+    const countryHtml = (edu.country && edu.country.trim())
+      ? `<div class="edu-country">${getFlagEmoji(edu.country)} ${edu.country}</div>`
+      : '';
+
+    entry.innerHTML = `
+      <div class="edu-header">
+        <strong>${edu.institution || "—"}</strong>
+      </div>
+      <div class="edu-subheader">
+        <span class="edu-title">${edu.title || "—"}</span>
+        <span class="edu-dates">${startDate} – ${endDate}</span>
+      </div>
+      ${countryHtml}
+      ${edu.description ? `<div class="resume-description">${edu.description}</div>` : ""}
+    `;
+
 
 
     educationList.appendChild(entry);
+    // ⬇️ Mostrar países de Education bajo el título
+(() => {
+  const el = document.getElementById("educationCountry");
+  if (!el) return;
+
+  // ordena por más reciente y arma lista única de países (más reciente primero)
+  const ordered = sortByEndDateDescending([...(education || [])])
+    .map(e => (e.country || '').trim())
+    .filter(Boolean);
+
+  const seen = new Set();
+  const unique = ordered.filter(c => !seen.has(c) && seen.add(c));
+
+  if (unique.length) {
+    const pretty = unique
+      .map(c => `${getFlagEmoji(c)} ${c}`.trim())
+      .join(' · ');
+    el.textContent = `Education: ${pretty}`;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+})();
+
   });
 }
 
@@ -218,5 +248,16 @@ function cleanHTML(html) {
   wrapper.innerHTML = wrapper.innerHTML.replace(/>\s+</g, '><');
 
   return wrapper.innerHTML.trim();
+}
+function getFlagEmoji(countryName) {
+  const flags = {
+    "Argentina":"🇦🇷","Bolivia":"🇧🇴","Brazil":"🇧🇷","Chile":"🇨🇱","Colombia":"🇨🇴","Costa Rica":"🇨🇷",
+    "Cuba":"🇨🇺","Dominican Republic":"🇩🇴","Ecuador":"🇪🇨","El Salvador":"🇸🇻","Guatemala":"🇬🇹",
+    "Honduras":"🇭🇳","Mexico":"🇲🇽","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
+    "Uruguay":"🇺🇾","Venezuela":"🇻🇪","United States":"🇺🇸","Canada":"🇨🇦","Spain":"🇪🇸","Portugal":"🇵🇹",
+    "United Kingdom":"🇬🇧","Germany":"🇩🇪","France":"🇫🇷","Italy":"🇮🇹","Netherlands":"🇳🇱","Poland":"🇵🇱",
+    "India":"🇮🇳","China":"🇨🇳","Japan":"🇯🇵","Australia":"🇦🇺"
+  };
+  return flags[countryName] || '';
 }
 

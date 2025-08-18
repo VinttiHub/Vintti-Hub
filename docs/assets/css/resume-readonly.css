@@ -234,3 +234,8 @@ body {
   color: #6b7280;
   white-space: nowrap;
 }
+.edu-country {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 8px;
+}

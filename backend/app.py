@@ -1395,7 +1395,6 @@ def update_resume(candidate_id):
         except Exception:
             # si algo raro viene, lo dejamos pasar como está para no romper requests
             pass
-
     try:
         print("📥 PATCH recibido para candidate_id:", candidate_id)
         data = request.get_json()
