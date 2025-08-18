@@ -88,6 +88,19 @@ document.querySelectorAll('.filter-header button').forEach(button => {
           }
         }
       }));
+      // ✅ Precalcular días para ordenar Sourcing
+      const today = new Date();
+      for (const opp of data) {
+        if (opp.opp_stage === 'Sourcing') {
+          const ref = opp.latest_sourcing_date || opp.nda_signature_or_start_date || null;
+          if (ref) {
+            const d = new Date(ref);
+            opp._days_since_batch = Math.ceil((today - d) / (1000 * 60 * 60 * 24)) - 1;
+          } else {
+            opp._days_since_batch = null; // sin fecha aún
+          }
+        }
+      }
 
       if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9">No data available</td></tr>';
@@ -135,9 +148,15 @@ document.querySelectorAll('.filter-header button').forEach(button => {
     // Ordenar internamente cada grupo por la fecha relevante
     Object.keys(grouped).forEach(stage => {
       grouped[stage].sort((a, b) => {
+        if (stage === 'Sourcing') {
+          const A = (typeof a._days_since_batch === 'number') ? a._days_since_batch : -Infinity;
+          const B = (typeof b._days_since_batch === 'number') ? b._days_since_batch : -Infinity;
+          return B - A; // 👈 mayor a menor por Days Since Batch
+        }
+        // 🔁 el resto queda con tu lógica por fecha
         const dateA = a._sort_date ? new Date(a._sort_date) : new Date(0);
         const dateB = b._sort_date ? new Date(b._sort_date) : new Date(0);
-        return dateB - dateA; // orden descendente
+        return dateB - dateA;
       });
     });
 
@@ -151,7 +170,10 @@ document.querySelectorAll('.filter-header button').forEach(button => {
           }
 
           const tr = document.createElement('tr');
-          let daysSinceBatch = '-';
+          let daysSinceBatch = (opp.opp_stage === 'Sourcing' && typeof opp._days_since_batch === 'number')
+          ? opp._days_since_batch
+          : '-';
+
 
           async function fetchDaysSinceBatch(opp, tr) {
             const oppId = opp.opportunity_id;
@@ -237,6 +259,22 @@ document.querySelectorAll('.filter-header button').forEach(button => {
           tbody.appendChild(tr);
           tr.style.opacity = 1;
           tr.style.animation = 'none';
+          if (opp.opp_stage === 'Sourcing') {
+            const daysCell = tr.querySelector('td:last-child');
+            if (typeof opp._days_since_batch === 'number') {
+              daysCell.title = `Days since sourcing: ${opp._days_since_batch}`;
+              if (opp._days_since_batch >= 7) {
+                daysCell.classList.add('red-cell');
+                daysCell.innerHTML = `${opp._days_since_batch} ⚠️`;
+              } else {
+                daysCell.classList.remove('red-cell');
+                daysCell.textContent = opp._days_since_batch;
+              }
+            } else {
+              // Sin fecha luego del enriquecimiento → usar tu fallback asíncrono existente
+              fetchDaysSinceBatch(opp, tr);
+            }
+}
 
           if (opp.opp_stage === 'Sourcing') {
             fetchDaysSinceBatch(opp, tr);
@@ -777,6 +815,13 @@ function calculateDaysAgo(dateStr) {
   const now = new Date();
   const diffTime = Math.abs(now - date);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
+  return diffDays;
+}
+function computeDaysSinceBatch(refDateStr) {
+  if (!refDateStr) return null;
+  const ref = new Date(refDateStr);
+  const today = new Date();
+  const diffDays = Math.ceil((today - ref) / (1000 * 60 * 60 * 24)) - 1; // mismo criterio que usas
   return diffDays;
 }
 
