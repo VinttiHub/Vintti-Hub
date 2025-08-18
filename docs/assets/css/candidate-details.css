@@ -1736,3 +1736,6 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60%;
 }
 .cv-actions .btn{ margin-left: 8px; }
+.month-year{display:flex;gap:8px;align-items:center}
+.month-year select{flex:1;min-width:120px}
+.month-year .btn-clear{white-space:nowrap}

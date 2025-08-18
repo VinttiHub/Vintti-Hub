@@ -39,12 +39,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
-  if (hireStartDate) {
-    hireStartDate.addEventListener('blur', () => updateHireField('start_date', hireStartDate.value));
-  }
-  if (hireEndDate) {
-    hireEndDate.addEventListener('blur', () => updateHireField('end_date', hireEndDate.value));
-  }
+  window._startPicker = mountMonthYearPicker('hire-start-picker', {
+    allowEmpty: true, // por si quieres dejarlo vacío
+    onChange: (iso) => updateHireField('start_date', iso) // guarda 'YYYY-MM-15' o ''
+  });
+
+  window._endPicker = mountMonthYearPicker('hire-end-picker', {
+    allowEmpty: true,
+    onChange: (iso) => updateHireField('end_date', iso) // guarda 'YYYY-MM-15' o ''
+  });
 
   // === Fetch candidate info ===
 fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
@@ -1552,6 +1555,62 @@ salaryCloseBtns.forEach(btn => btn && btn.addEventListener('click', (e) => {
     loadResignations();
   }
 })();
+function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = false, onChange } = {}) {
+  const root = document.getElementById(containerId);
+  if (!root) return null;
+
+  const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthSel = document.createElement('select');
+  const yearSel  = document.createElement('select');
+  const clearBtn = document.createElement('button');
+
+  // placeholders
+  monthSel.innerHTML = `<option value="">Month</option>` + months.slice(1)
+    .map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
+  yearSel.innerHTML = `<option value="">Year</option>`;
+  const now = new Date().getFullYear();
+  for (let y = now + 5; y >= 1990; y--) {
+    const opt = document.createElement('option');
+    opt.value = String(y);
+    opt.textContent = String(y);
+    yearSel.appendChild(opt);
+  }
+
+  clearBtn.type = 'button';
+  clearBtn.className = 'btn-soft btn-sm btn-clear';
+  clearBtn.textContent = 'Clear';
+  if (!allowEmpty) clearBtn.style.display = 'none';
+
+  root.replaceChildren(monthSel, yearSel, clearBtn);
+
+  function toISO() {
+    const y = yearSel.value, m = monthSel.value;
+    if (!y || !m) return allowEmpty ? '' : '';
+    return `${y}-${m}-15`; // 👈 día 15 forzado
+  }
+  function emit() {
+    if (typeof onChange !== 'function') return;
+    const y = yearSel.value, m = monthSel.value;
+    if (allowEmpty && !y && !m) { onChange(''); return; }
+    if (y && m) onChange(toISO());
+  }
+
+  monthSel.addEventListener('change', emit);
+  yearSel.addEventListener('change', emit);
+  clearBtn.addEventListener('click', () => { monthSel.value=''; yearSel.value=''; emit(); });
+
+  function setValue(iso) {
+    if (!iso) { monthSel.value=''; yearSel.value=''; return; }
+    const [datePart] = iso.split('T'); // soporta 'YYYY-MM-DD' o 'YYYY-MM-DDTHH:mm...'
+    const [y,m] = datePart.split('-');
+    if (y) yearSel.value = y;
+    if (m) monthSel.value = m;
+  }
+  setValue(initialValue);
+
+  return { setValue, getValue: toISO };
+}
+
 
 
 
@@ -1660,10 +1719,9 @@ if (setupEl) setupEl.value = data.setup_fee || '';
 
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
-  document.getElementById('hire-start-date').value = data.start_date || '';
   document.getElementById('hire-references').innerHTML = data.references_notes || '';
-  const endDateEl = document.getElementById('hire-end-date');
-  if (endDateEl) endDateEl.value = data.end_date || '';
+  if (window._startPicker) window._startPicker.setValue(data.start_date || '');
+  if (window._endPicker)   window._endPicker.setValue(data.end_date || '');
 
 const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
 const isRecruiting = modelText?.includes('recruiting');

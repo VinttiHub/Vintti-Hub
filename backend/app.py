@@ -1382,23 +1382,24 @@ def get_resume(candidate_id):
 
 @app.route('/resumes/<int:candidate_id>', methods=['POST', 'PATCH'])
 def update_resume(candidate_id):
-    # Normalizar education para asegurar key 'country'
-    if 'education' in data:
-        try:
-            edu_raw = data['education']
-            edu = json.loads(edu_raw) if isinstance(edu_raw, str) else edu_raw
-            if isinstance(edu, list):
-                for item in edu:
-                    if isinstance(item, dict) and 'country' not in item:
-                        item['country'] = ''
-            data['education'] = edu  # se guardará como JSON por el bloque existente
-        except Exception:
-            # si algo raro viene, lo dejamos pasar como está para no romper requests
-            pass
     try:
-        print("📥 PATCH recibido para candidate_id:", candidate_id)
-        data = request.get_json()
+        print("📥 PATCH/POST recibido para candidate_id:", candidate_id)
+        data = request.get_json(silent=True) or {}
         print("📦 JSON recibido:", data)
+
+        # Normalizar education para asegurar key 'country'
+        if 'education' in data:
+            try:
+                edu_raw = data['education']
+                edu = json.loads(edu_raw) if isinstance(edu_raw, str) else edu_raw
+                if isinstance(edu, list):
+                    for item in edu:
+                        if isinstance(item, dict) and 'country' not in item:
+                            item['country'] = ''
+                data['education'] = edu
+            except Exception:
+                # si algo raro viene, lo dejamos pasar como está para no romper requests
+                pass
 
         allowed_fields = [
             'about',
@@ -1409,18 +1410,12 @@ def update_resume(candidate_id):
             'video_link'
         ]
 
-        updates = []
-        values = []
-
+        updates, values = [], []
         for field in allowed_fields:
             if field in data:
                 updates.append(f"{field} = %s")
                 value = data[field]
-                if isinstance(value, (dict, list)):
-                    values.append(json.dumps(value))
-                else:
-                    values.append(value)
-
+                values.append(json.dumps(value) if isinstance(value, (dict, list)) else value)
 
         if not updates:
             print("❌ No valid fields in data:", data)
@@ -1452,9 +1447,7 @@ def update_resume(candidate_id):
             """, [candidate_id] + values[:-1])
 
         conn.commit()
-        cursor.close()
-        conn.close()
-
+        cursor.close(); conn.close()
         print("✅ Resume actualizado correctamente")
         return jsonify({'success': True}), 200
 
@@ -1914,7 +1907,7 @@ def handle_candidate_hire_data(candidate_id):
                     'employee_salary': None,
                     'employee_fee': None,
                     'computer': '',
-                    'setup_fee': setup_fee,
+                    'setup_fee': None,  
                     'extraperks': '',
                     'working_schedule': '',
                     'pto': '',
@@ -1930,17 +1923,18 @@ def handle_candidate_hire_data(candidate_id):
                     'buyout_dolar': None,
                     'buyout_daterange': None
                 })
-
-            (references_notes, setup_fee, salary, fee, computer, extra_perks, working_schedule,
-             pto, discount_dolar, discount_daterange, start_date, end_date, revenue,
-             referral_dolar, referral_daterange, buyout_dolar, buyout_daterange) = row
+            
+            (references_notes, salary, fee, setup_fee, computer, extra_perks, working_schedule,
+            pto, discount_dolar, discount_daterange, start_date, end_date, revenue,
+            referral_dolar, referral_daterange, buyout_dolar, buyout_daterange) = row
 
             return jsonify({
                 'references_notes': references_notes,
                 'employee_salary': salary,
                 'employee_fee': fee,
                 'computer': computer,
-                'extraperks': extra_perks,
+                'setup_fee': setup_fee,
+                'extraperks': extra_perks,  # <- tu key de front
                 'working_schedule': working_schedule,
                 'pto': pto,
                 'discount_dolar': discount_dolar,
@@ -1949,7 +1943,6 @@ def handle_candidate_hire_data(candidate_id):
                 'end_date': end_date,
                 'employee_revenue': revenue if (opp_model or '').lower() == 'staffing' else None,
                 'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None,
-                # NUEVO 👇
                 'referral_dolar': referral_dolar,
                 'referral_daterange': referral_daterange,
                 'buyout_dolar': buyout_dolar,
