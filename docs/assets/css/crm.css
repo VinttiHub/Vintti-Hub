@@ -778,3 +778,29 @@ body {
 
 /* Limpia estilos viejos si quedaban */
 .priority-a, .priority-b, .priority-c { background: none; }
+/* ——— Mini toast “auto-sort by Status” ——— */
+.tiny-toast{
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  background: #111827;
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
+  z-index: 10001;
+}
+.tiny-toast.show{
+  opacity: 1;
+  transform: translateY(0);
+}
+.tiny-toast.hide{
+  opacity: 0;
+  transform: translateY(-6px);
+}

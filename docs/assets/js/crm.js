@@ -42,11 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let htmlRow = `
           <tr data-id="${item.account_id}">
             <td>${item.client_name || '—'}</td>
-            <td class="status-td" data-id="${item.account_id}">
-              <span class="chip chip--loading" aria-label="Loading status">
-                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              </span>
-            </td>
+              <td class="status-td" data-id="${item.account_id}" data-order="99">
+                <span class="chip chip--loading" aria-label="Loading status">
+                  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                </span>
+              </td>
             <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">Unavailable</span>'}</td>
             <td class="muted-cell">${contractTxt}</td>
             <td>${trrTxt}</td>
@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       });
+      showSortToast();
       computeAndPaintAccountStatuses();
       // Mover selector de "mostrar X registros por página" al contenedor deseado
 const lengthMenu = document.querySelector('#accountTable_length');
@@ -293,7 +294,7 @@ function renderAccountStatusChip(statusText) {
   if (s === 'active client')   return '<span class="chip chip--active-client">Active Client</span>';
   if (s === 'inactive client') return '<span class="chip chip--inactive-client">Inactive Client</span>';
   if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
-  return '—';
+  return '<span class="chip chip--empty">No data</span>'; // sin dato
 }
 function deriveStatusFrom(opps = [], hires = []) {
   if (!Array.isArray(opps) || opps.length === 0) return '—';
@@ -327,10 +328,8 @@ async function runWithConcurrency(tasks, limit = 6) {
 async function computeAndPaintAccountStatuses() {
   const rows = [...document.querySelectorAll('#accountTableBody tr')];
   const ids  = rows.map(r => Number(r.dataset.id)).filter(Boolean);
-  if (!ids.length) return;
+  if (!ids.length) { hideSortToast(); return; }
 
-  // 1) Intento recomendado: 1 request batch al backend
-  //    POST /accounts/status/summary  -> { [id]: { status: "Active Client" | ... } }
   let summary = null;
   try {
     const r = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/status/summary', {
@@ -339,9 +338,8 @@ async function computeAndPaintAccountStatuses() {
       body: JSON.stringify({ account_ids: ids })
     });
     if (r.ok) summary = await r.json();
-  } catch (e) { /* ignoramos y hacemos fallback */ }
+  } catch (e) { /* fallback */ }
 
-  // 2) Fallback sin bloquear: concurrencia limitada usando endpoints existentes
   if (!summary) {
     summary = {};
     const tasks = ids.map(id => async () => {
@@ -353,16 +351,18 @@ async function computeAndPaintAccountStatuses() {
         summary[id] = { status: deriveStatusFrom(opps, hires) };
       } catch { summary[id] = { status: '—' }; }
     });
-    await runWithConcurrency(tasks, 6); // <-- ajusta si quieres más/menos paralelismo
+    await runWithConcurrency(tasks, 6);
   }
 
-  // 3) Pintar y persistir (no bloquea UI)
+  // Pintar chips + setear clave de orden en el <td>
   for (const id of ids) {
     const td = document.querySelector(`#accountTableBody tr[data-id="${id}"] td.status-td`);
     const status = summary?.[id]?.status || '—';
-    if (td) td.innerHTML = renderAccountStatusChip(status);
+    if (td) {
+      td.innerHTML = renderAccountStatusChip(status);
+      td.dataset.order = String(statusRank(status)); // 👈 clave para sort
+    }
 
-    // Guarda en DB para cachearlo (best-effort, sin await)
     if (status !== '—') {
       fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`, {
         method: 'PATCH',
@@ -371,6 +371,13 @@ async function computeAndPaintAccountStatuses() {
       }).catch(() => {});
     }
   }
+
+  // ▶️ Re-leer DOM y ordenar por la columna Status (índice 1)
+  const table = $('#accountTable').DataTable();
+  table.rows().invalidate('dom');     // re-cachea los data-order
+  table.order([[1, 'asc']]).draw(false);
+
+  hideSortToast(); // cerrar alerta
 }
 function renderAccountStatusChip(statusText) {
   const s = norm(statusText);
@@ -379,4 +386,25 @@ function renderAccountStatusChip(statusText) {
   if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
   // sin dato: chip gris (nada de '-')
   return '<span class="chip chip--empty">No data</span>';
+}
+// Rank para el orden deseado: Active → Lead → Inactive → No data
+function statusRank(statusText){
+  const s = norm(statusText);
+  if (s === 'active client')   return 0;
+  if (s === 'lead in process') return 1;
+  if (s === 'inactive client') return 2;
+  return 3; // No data / vacío
+}
+
+// Mini-toast
+function showSortToast(){
+  const t = document.getElementById('crmSortToast');
+  if (t) t.classList.add('show');
+}
+function hideSortToast(){
+  const t = document.getElementById('crmSortToast');
+  if (t){
+    t.classList.add('hide');
+    setTimeout(() => t.remove(), 400);
+  }
 }
