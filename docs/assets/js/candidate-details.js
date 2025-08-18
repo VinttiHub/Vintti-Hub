@@ -310,23 +310,29 @@ if (videoLinkEl2) {
 
     });
 
-function addEducationEntry(entry = { institution: '', title: '', start_date: '', end_date: '', current: false, description: '' }) {
+function addEducationEntry(entry = { institution: '', title: '', country: '', start_date: '', end_date: '', current: false, description: '' }) {
   const div = document.createElement('div');
   div.className = 'cv-card-entry pulse';
+
   div.innerHTML = `
     <div style="display: flex; gap: 20px; flex-wrap: wrap;">
       <div style="flex: 2.5; min-width: 320px;">
-        <input type="text" class="edu-title" value="${entry.institution}" placeholder="Institution" />
+        <input type="text" class="edu-title" value="${entry.institution || ''}" placeholder="Institution" />
         <input type="text" class="edu-degree" value="${entry.title || ''}" placeholder="Title/Degree" style="margin-top: 6px;" />
+        <select class="edu-country" style="margin-top: 6px; width: 100%;">
+          ${makeCountryOptions(entry.country || '')}
+        </select>
       </div>
 
       <div style="flex: 1.5; min-width: 300px;">
         <div style="display: flex; gap: 10px;">
-          <label style="flex: 1;">Start<br/><input type="month" class="edu-start" value="${entry.start_date?.slice(0,7)}" placeholder="yyyy-mm"/></label>
+          <label style="flex: 1;">Start<br/>
+            <input type="month" class="edu-start" value="${(entry.start_date || '').slice(0,7)}" placeholder="yyyy-mm"/>
+          </label>
           <label style="flex: 1;">End<br/>
-            ${entry.current 
+            ${entry.current
               ? `<input type="text" class="edu-end" value="Present" disabled />`
-              : `<input type="date" class="edu-end" value="${entry.end_date}" />`
+              : `<input type="date" class="edu-end" value="${entry.end_date || ''}" />`
             }
           </label>
         </div>
@@ -337,36 +343,44 @@ function addEducationEntry(entry = { institution: '', title: '', start_date: '',
         </div>
       </div>
     </div>
+
     <div class="rich-toolbar">
       <button type="button" data-command="bold"><b>B</b></button>
       <button type="button" data-command="italic"><i>I</i></button>
       <button type="button" data-command="insertUnorderedList">• List</button>
     </div>
-    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description}</div>
+    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description || ''}</div>
     <button class="remove-entry">🗑️</button>
   `;
+
+  // Rich text
   div.querySelectorAll('.rich-toolbar button').forEach(button => {
     button.addEventListener('click', () => {
       const command = button.getAttribute('data-command');
-      const targetId = button.getAttribute('data-target');
-      const target = targetId ? document.getElementById(targetId) : document.getSelection().focusNode?.parentElement;
-
+      const target = document.getSelection().focusNode?.parentElement;
       if (target && target.isContentEditable) {
         target.focus();
         document.execCommand(command, false, null);
       }
-      const isActive = document.queryCommandState(command);
-      button.classList.toggle('active', isActive);
+      button.classList.toggle('active', document.queryCommandState(command));
     });
   });
 
   setTimeout(() => div.classList.remove('pulse'), 500);
+
+  // Listeners
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
   div.querySelector('.edu-current').onchange = e => {
     div.querySelector('.edu-end').disabled = e.target.checked;
+    if (e.target.checked) div.querySelector('.edu-end').value = 'Present';
     saveResume();
   };
+
+  // Guarda en blur/cambio (incluimos el select)
   div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
+  const countrySel = div.querySelector('.edu-country');
+  countrySel.addEventListener('change', saveResume);
+
   educationList.appendChild(div);
   sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
 }
@@ -490,10 +504,11 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
     const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => ({
       institution: div.querySelector('.edu-title').value.trim(),
       title: div.querySelector('.edu-degree').value.trim(),
+      country: (div.querySelector('.edu-country')?.value || '').trim(),            // 👈 nuevo campo
       start_date: div.querySelector('.edu-start').value ? `${div.querySelector('.edu-start').value}-01` : '',
-      end_date: div.querySelector('.edu-end').value === 'Present' 
-        ? '' 
-        : div.querySelector('.edu-end').value.length === 7  // Si es yyyy-mm
+      end_date: div.querySelector('.edu-end').value === 'Present'
+        ? ''
+        : div.querySelector('.edu-end').value.length === 7
           ? `${div.querySelector('.edu-end').value}-01`
           : div.querySelector('.edu-end').value,
       current: div.querySelector('.edu-current').checked,
@@ -1856,4 +1871,16 @@ function sortEntriesByEndDate(containerId, cardSelector, endDateSelector, curren
 
   // Re-append sorted cards
   cards.forEach(card => container.appendChild(card));
+}
+// 🌎 Países para Education
+const EDU_COUNTRIES = [
+  "", "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Dominican Republic",
+  "Ecuador","El Salvador","Guatemala","Honduras","Mexico","Nicaragua","Panama","Paraguay","Peru",
+  "Uruguay","Venezuela","United States","Canada","Spain","Portugal","United Kingdom","Germany",
+  "France","Italy","Netherlands","Poland","India","China","Japan","Australia"
+];
+function makeCountryOptions(selected = "") {
+  return EDU_COUNTRIES.map(c =>
+    `<option value="${c}" ${c === selected ? "selected" : ""}>${c || "Select country"}</option>`
+  ).join("");
 }

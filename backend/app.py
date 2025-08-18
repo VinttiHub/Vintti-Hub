@@ -1382,6 +1382,20 @@ def get_resume(candidate_id):
 
 @app.route('/resumes/<int:candidate_id>', methods=['POST', 'PATCH'])
 def update_resume(candidate_id):
+    # Normalizar education para asegurar key 'country'
+    if 'education' in data:
+        try:
+            edu_raw = data['education']
+            edu = json.loads(edu_raw) if isinstance(edu_raw, str) else edu_raw
+            if isinstance(edu, list):
+                for item in edu:
+                    if isinstance(item, dict) and 'country' not in item:
+                        item['country'] = ''
+            data['education'] = edu  # se guardará como JSON por el bloque existente
+        except Exception:
+            # si algo raro viene, lo dejamos pasar como está para no romper requests
+            pass
+
     try:
         print("📥 PATCH recibido para candidate_id:", candidate_id)
         data = request.get_json()
