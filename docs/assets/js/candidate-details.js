@@ -413,7 +413,7 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
       // recuerda el último iso para volver si desmarcan
       hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
       hiddenEnd.value = 'Present';
-      disableMonthYear(endCid, true, 'Work experience marked as current.');
+      disableMonthYear(endCid, true, 'Education marked as current.');
     } else {
       disableMonthYear(endCid, false);
       const last = hiddenEnd.dataset.lastIso || '';
@@ -424,7 +424,7 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
   });
 
   // Si ya venía "current", deshabilita el picker de End
-  if (entry.current) disableMonthYear(endCid, true, 'Work experience marked as current.');
+  if (entry.current) disableMonthYear(endCid, true, 'Education marked as current.');
 
   // Ordenar tras agregar
   sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
@@ -1722,7 +1722,7 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   clearBtn.className = 'btn-clear';   // clase simple; la estilizamos arriba
   clearBtn.setAttribute('aria-label', 'Clear date');
   clearBtn.title = 'Clear';
-  clearBtn.textContent = '✕';
+  clearBtn.textContent = 'Clear';
   if (!allowEmpty) clearBtn.style.display = 'none';
 
   root.replaceChildren(monthSel, yearSel, clearBtn);

@@ -1735,112 +1735,70 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
 .cv-list .cv-name{
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60%;
 }
-.cv-actions .btn{ margin-left: 8px; }
-.month-year{display:flex;gap:8px;align-items:center}
-.month-year select{flex:1;min-width:120px}
-.month-year .btn-clear{white-space:nowrap}
-/* 🩹 Evita que los pickers se salgan de la tarjeta (Safari/Chrome) */
-.cv-card-entry label{
-  min-width: 0;             /* permite que el label (flex child) se encoja */
-}
 
-/* La fila de Mes/Año puede partirse en dos líneas si hace falta */
-.cv-card-entry .month-year{
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;          /* 👉 habilita salto de línea */
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-}
+/* === NUCLEAR OVERRIDE — Month/Year selects white & rounded === */
+html body .cv-card-entry .month-year select,
+html body #hire .month-year select {
+  /* Desactiva UI nativa (Safari/Chrome) para poder estilizar */
+  -webkit-appearance: none !important;
+  appearance: none !important;
 
-/* Los selects se reparten el ancho y SÍ pueden encogerse */
-.cv-card-entry .month-year select{
-  flex: 1 1 0;
-  min-width: 0;             /* clave para Safari */
-  box-sizing: border-box;
-}
-
-/* El botón Clear no obliga a crecer la fila; baja si no cabe */
-.cv-card-entry .month-year .btn-clear{
-  flex: 0 0 auto;
-  white-space: nowrap;
-  margin-left: auto;
-  order: 3;                 /* que quede al final; cae a la segunda línea si falta espacio */
-}
-
-/* En pantallas más angostas forzamos Clear a su propia línea */
-@media (max-width: 860px){
-  .cv-card-entry .month-year .btn-clear{
-    width: 100%;
-    margin-left: 0;
-  }
-}
-/* === Month/Year mini aesthetic === */
-.cv-card-entry .month-year{
-  display: grid;
-  grid-template-columns: auto auto auto; /* Month | Year | ✕ */
-  gap: 8px;
-  align-items: center;
-  max-width: 100%;
-}
-
-.cv-card-entry .month-year select{
-  width: auto !important;           /* se ajusta al texto */
-  min-width: 84px;                   /* evita recortes en meses largos */
-  height: 34px !important;
-  padding: 6px 10px !important;
-  border-radius: 12px !important;
-  background: #fff !important;
-  border: 1px solid #e5e7eb !important;
+  /* Estética */
+  background-color: #ffffff !important;
   color: #111827 !important;
-  font-size: 13px !important;
-  font-weight: 500;
-  -webkit-appearance: menulist !important;
-  appearance: menulist !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  height: 34px !important;
+  padding: 6px 12px !important;
+  padding-right: 28px !important;       /* espacio para la flecha */
+  border: 1px solid #e5e7eb !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background-clip: padding-box !important;
+
+  /* Flecha custom */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'%3E%3Cpath fill='%239ca3af' d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 16px 16px !important;
 }
 
-.cv-card-entry .month-year select.month{ min-width: 92px; }
-.cv-card-entry .month-year select.year{
-  min-width: 70px;
-  font-variant-numeric: tabular-nums;
+/* Compactar anchos */
+html body .cv-card-entry .month-year select.month { min-width: 64px !important; width: auto !important; }
+html body .cv-card-entry .month-year select.year  { min-width: 60px !important; width: auto !important; font-variant-numeric: tabular-nums !important; }
+
+/* Aire al borde d*
+/* Tiny "clear" pill — BLUE */
+html body .month-year .btn-clear{
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  background: var(--tab-active) !important;   /* azul */
+  color: #fff !important;
+  border: 1px solid var(--tab-active) !important;
+
+  height: 20px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;                  /* mini pill */
+  line-height: 18px !important;
+  border-radius: 999px !important;
+
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: lowercase !important;       /* muestra "clear" tal cual */
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-.cv-card-entry .month-year select:focus{
-  outline: none;
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.12);
+html body .month-year .btn-clear:hover{
+  filter: brightness(1.06) !important;
 }
 
-.cv-card-entry .month-year select:disabled{
-  opacity: .55;
-  cursor: not-allowed;
-}
-
-/* ✕ compacta y redonda */
-.cv-card-entry .month-year .btn-clear{
-  width: 28px; height: 28px;
-  border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #6b7280;
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 0; line-height: 1;
-}
-.cv-card-entry .month-year .btn-clear:hover{ background:#f3f4f6; }
-
-/* Cursor de ayuda cuando el End está deshabilitado por Current */
-.cv-card-entry .month-year.is-disabled{ cursor: help; }
-
-/* En móviles la ✕ salta abajo si no cabe */
-@media (max-width: 860px){
-  .cv-card-entry .month-year{
-    grid-template-columns: auto auto;
-  }
-  .cv-card-entry .month-year .btn-clear{
-    justify-self: end;
-    grid-column: 1 / -1;
-  }
+html body .month-year .btn-clear:active{
+  transform: scale(0.98) !important;
 }
