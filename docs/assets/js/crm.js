@@ -270,11 +270,16 @@ function fmtMoney(v) {
 function norm(s) {
   return (s || '').toString().toLowerCase().trim();
 }
+// —— Helpers de normalización ——
 function normalizeStage(stage) {
   const v = norm(stage);
-  if (/sourc|interview|negotiat/.test(v)) return 'pipeline';
-  if (/closed[_\s-]?won|close[_\s-]?win/.test(v)) return 'won';
-  if (/closed[_\s-]?lost|close[_\s-]?lost/.test(v)) return 'lost';
+  // Won / Lost (variantes: "closed won", "close win", etc.)
+  if (/closed?[_\s-]?won|close[_\s-]?win/.test(v))  return 'won';
+  if (/closed?[_\s-]?lost|close[_\s-]?lost/.test(v)) return 'lost';
+
+  // En proceso: sourcing, interview, negotiating, deep dive, etc.
+  if (/(sourc|interview|negotiat|deep\s?dive)/.test(v)) return 'pipeline';
+
   return 'other';
 }
 function isActiveHire(h) {
@@ -294,25 +299,33 @@ function renderAccountStatusChip(statusText) {
   if (s === 'active client')   return '<span class="chip chip--active-client">Active Client</span>';
   if (s === 'inactive client') return '<span class="chip chip--inactive-client">Inactive Client</span>';
   if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
-  return '<span class="chip chip--empty">No data</span>'; // sin dato
+  return '<span class="chip chip--empty">No data</span>'; // fallback
 }
 function deriveStatusFrom(opps = [], hires = []) {
+  // Sin oportunidades: conserva tu comportamiento especial
   if (!Array.isArray(opps) || opps.length === 0) return '—';
 
-  const stages = opps.map(o => normalizeStage(o.opp_stage || o.stage));
-  const hasPipeline = stages.some(s => s === 'pipeline');
+  const stages         = opps.map(o => normalizeStage(o.opp_stage || o.stage));
+  const hasWon         = stages.includes('won');
+  const allLost        = stages.every(s => s === 'lost');
+  const hasPipeline    = stages.some(s => s === 'pipeline');
+  const hasActiveHire  = (hires || []).some(isActiveHire);
+  const closedOnly     = stages.every(s => s === 'won' || s === 'lost');
+
+  // 🔝 Regla B: prioridad máxima
+  if (hasWon && hasActiveHire) return 'Active Client';
+
+  // 🟥 Regla A: todas perdidas
+  if (allLost) return 'Inactive Client';
+
+  // ▶️ Si hay pipeline y ninguna regla anterior aplicó
   if (hasPipeline) return 'Lead in Process';
 
-  const closedOnly = stages.every(s => s === 'won' || s === 'lost');
-  const wins = stages.filter(s => s === 'won').length;
+  // ⚖️ Cierre solo (won/lost) con wins pero sin hires activos → inactivo
+  if (closedOnly && hasWon && !hasActiveHire) return 'Inactive Client';
 
-  if (closedOnly && wins > 0) {
-    const total = (hires || []).length;
-    const activeCount = (hires || []).filter(isActiveHire).length;
-    if (total > 0 && activeCount > 0)  return 'Active Client';
-    if (total > 0 && activeCount === 0) return 'Inactive Client';
-  }
-  return '—';
+  // Sin señal clara
+  return 'No data';
 }
 
 // —— Runner con límite de concurrencia (para fallback) ——
@@ -378,14 +391,6 @@ async function computeAndPaintAccountStatuses() {
   table.order([[1, 'asc']]).draw(false);
 
   hideSortToast(); // cerrar alerta
-}
-function renderAccountStatusChip(statusText) {
-  const s = norm(statusText);
-  if (s === 'active client')   return '<span class="chip chip--active-client">Active Client</span>';
-  if (s === 'inactive client') return '<span class="chip chip--inactive-client">Inactive Client</span>';
-  if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
-  // sin dato: chip gris (nada de '-')
-  return '<span class="chip chip--empty">No data</span>';
 }
 // Rank para el orden deseado: Active → Lead → Inactive → No data
 function statusRank(statusText){
