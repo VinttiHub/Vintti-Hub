@@ -282,6 +282,15 @@ if (videoLinkEl) {
       .then(r => {
         // Actualiza UI en caliente si existe el textarea oculto/visible
         const aiLinkedInScrap = document.getElementById('ai-linkedin-scrap');
+        if (aiLinkedInScrap) {
+          aiLinkedInScrap.addEventListener('blur', () => {
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ linkedin_scrapper: aiLinkedInScrap.value.trim() })
+            });
+          });
+        }
         if (aiLinkedInScrap && r.linkedin_scrapper) {
           aiLinkedInScrap.value = r.linkedin_scrapper;
         }
@@ -314,33 +323,34 @@ if (videoLinkEl2) {
     });
 
 function addEducationEntry(entry = { institution: '', title: '', country: '', start_date: '', end_date: '', current: false, description: '' }) {
+  const id = uniqId('edu');
+  const startCid = `edu-start-${id}`;
+  const endCid   = `edu-end-${id}`;
+
   const div = document.createElement('div');
   div.className = 'cv-card-entry pulse';
 
   div.innerHTML = `
-    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-      <div style="flex: 2.5; min-width: 320px;">
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+      <div style="flex:2.2; min-width:320px;">
         <input type="text" class="edu-title" value="${entry.institution || ''}" placeholder="Institution" />
-        <input type="text" class="edu-degree" value="${entry.title || ''}" placeholder="Title/Degree" style="margin-top: 6px;" />
-        <select class="edu-country" style="margin-top: 6px; width: 100%;">
-          ${makeCountryOptions(entry.country || '')}
-        </select>
+        <input type="text" class="edu-degree" value="${entry.title || ''}" placeholder="Title/Degree" style="margin-top:6px;" />
+        <select class="edu-country" style="margin-top:6px; width:100%;">${makeCountryOptions(entry.country || '')}</select>
       </div>
 
-      <div style="flex: 1.5; min-width: 300px;">
-        <div style="display: flex; gap: 10px;">
-          <label style="flex: 1;">Start<br/>
-            <input type="month" class="edu-start" value="${(entry.start_date || '').slice(0,7)}" placeholder="yyyy-mm"/>
+      <div style="flex:2; min-width:360px;">
+        <div style="display:flex; gap:10px;">
+          <label style="flex:1;">Start<br/>
+            <div id="${startCid}" class="month-year"></div>
+            <input type="hidden" class="edu-start" value="">
           </label>
-          <label style="flex: 1;">End<br/>
-            ${entry.current
-              ? `<input type="text" class="edu-end" value="Present" disabled />`
-              : `<input type="date" class="edu-end" value="${entry.end_date || ''}" />`
-            }
+          <label style="flex:1;">End<br/>
+            <div id="${endCid}" class="month-year"></div>
+            <input type="hidden" class="edu-end" value="">
           </label>
         </div>
-        <div style="display: flex; justify-content: flex-end; padding-right: 62px; padding-top: -52px">
-          <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; text-transform: none;">
+        <div style="display:flex; justify-content:flex-end; padding-right:62px;">
+          <label style="display:flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap;">
             <input type="checkbox" class="edu-current" ${entry.current ? 'checked' : ''}/> Current
           </label>
         </div>
@@ -352,102 +362,173 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
       <button type="button" data-command="italic"><i>I</i></button>
       <button type="button" data-command="insertUnorderedList">• List</button>
     </div>
-    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description || ''}</div>
+    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:240px;">${entry.description || ''}</div>
     <button class="remove-entry">🗑️</button>
   `;
 
-  // Rich text
-  div.querySelectorAll('.rich-toolbar button').forEach(button => {
-    button.addEventListener('click', () => {
-      const command = button.getAttribute('data-command');
+  // Toolbar rich text
+  div.querySelectorAll('.rich-toolbar button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cmd = btn.getAttribute('data-command');
       const target = document.getSelection().focusNode?.parentElement;
-      if (target && target.isContentEditable) {
-        target.focus();
-        document.execCommand(command, false, null);
-      }
-      button.classList.toggle('active', document.queryCommandState(command));
+      if (target && target.isContentEditable) { target.focus(); document.execCommand(cmd, false, null); }
+      btn.classList.toggle('active', document.queryCommandState(cmd));
     });
   });
 
   setTimeout(() => div.classList.remove('pulse'), 500);
 
-  // Listeners
+  // Eventos de entry
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-  div.querySelector('.edu-current').onchange = e => {
-    div.querySelector('.edu-end').disabled = e.target.checked;
-    if (e.target.checked) div.querySelector('.edu-end').value = 'Present';
-    saveResume();
-  };
-
-  // Guarda en blur/cambio (incluimos el select)
+  div.querySelector('.edu-country').addEventListener('change', saveResume);
   div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
-  const countrySel = div.querySelector('.edu-country');
-  countrySel.addEventListener('change', saveResume);
 
   educationList.appendChild(div);
+
+  // 🔗 Hidden inputs que usará saveResume()
+  const hiddenStart = div.querySelector('.edu-start');
+  const hiddenEnd   = div.querySelector('.edu-end');
+
+  // 🗓️ Montar pickers (Start/End) — forzamos día 15 en el valor emitido
+  const startPicker = mountMonthYearPicker(startCid, {
+    allowEmpty: true,
+    initialValue: entry.start_date || '',
+    onChange: (iso) => { hiddenStart.value = iso; saveResume(); }
+  });
+
+  const endPicker = mountMonthYearPicker(endCid, {
+    allowEmpty: true,
+    initialValue: entry.current ? '' : (entry.end_date || ''),
+    onChange: (iso) => { hiddenEnd.value = iso; saveResume(); }
+  });
+
+  // Inicializar hidden con lo que vino del backend
+  hiddenStart.value = entry.start_date || '';
+  hiddenEnd.value   = entry.current ? 'Present' : (entry.end_date || '');
+
+  // ✅ Current toggle: deshabilita el picker de End y guarda "Present"
+  const currentCb = div.querySelector('.edu-current');
+  currentCb.addEventListener('change', e => {
+    if (e.target.checked) {
+      // recuerda el último iso para volver si desmarcan
+      hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
+      hiddenEnd.value = 'Present';
+      disableMonthYear(endCid, true, 'Work experience marked as current.');
+    } else {
+      disableMonthYear(endCid, false);
+      const last = hiddenEnd.dataset.lastIso || '';
+      if (last) { endPicker.setValue(last); hiddenEnd.value = last; }
+      else { endPicker.setValue(''); hiddenEnd.value = ''; }
+    }
+    saveResume();
+  });
+
+  // Si ya venía "current", deshabilita el picker de End
+  if (entry.current) disableMonthYear(endCid, true, 'Work experience marked as current.');
+
+  // Ordenar tras agregar
   sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
 }
 
 
 function addWorkExperienceEntry(entry = { title: '', company: '', start_date: '', end_date: '', current: false, description: '' }) {
+  const id = uniqId('work');
+  const startCid = `work-start-${id}`;
+  const endCid   = `work-end-${id}`;
+
   const div = document.createElement('div');
   div.className = 'cv-card-entry pulse';
   div.innerHTML = `
-    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-      <div style="flex: 2.5; min-width: 320px;">
-        <input type="text" class="work-title" value="${entry.title}" placeholder="Title" />
-        <input type="text" class="work-company" value="${entry.company}" placeholder="Company" style="margin-top: 6px;" />
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+      <div style="flex:2.2; min-width:320px;">
+        <input type="text" class="work-title" value="${entry.title || ''}" placeholder="Title" />
+        <input type="text" class="work-company" value="${entry.company || ''}" placeholder="Company" style="margin-top:6px;" />
       </div>
 
-      <div style="flex: 1.5; min-width: 300px;">
-        <div style="display: flex; gap: 10px;">
-          <label style="flex: 1;">Start<br/><input type="month" class="work-start" value="${entry.start_date?.slice(0,7)}" /></label>
-          <label style="flex: 1;">End<br/>
-            ${entry.current 
-              ? `<input type="text" class="work-end" value="Present" disabled />`
-              : `<input type="date" class="work-end" value="${entry.end_date}" />`
-            }
+      <div style="flex:2; min-width:360px;">
+        <div style="display:flex; gap:10px;">
+          <label style="flex:1;">Start<br/>
+            <div id="${startCid}" class="month-year"></div>
+            <input type="hidden" class="work-start" value="">
+          </label>
+          <label style="flex:1;">End<br/>
+            <div id="${endCid}" class="month-year"></div>
+            <input type="hidden" class="work-end" value="">
           </label>
         </div>
-        <div style="display: flex; justify-content: flex-end; padding-top: -52px; padding-right: 62px;">
-          <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap;">
+        <div style="display:flex; justify-content:flex-end; padding-right:62px;">
+          <label style="display:flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap;">
             <input type="checkbox" class="work-current" ${entry.current ? 'checked' : ''}/> Current
           </label>
         </div>
       </div>
     </div>
+
     <div class="rich-toolbar">
       <button type="button" data-command="bold"><b>B</b></button>
       <button type="button" data-command="italic"><i>I</i></button>
       <button type="button" data-command="insertUnorderedList">• List</button>
     </div>
-    <div class="work-desc rich-input" contenteditable="true" placeholder="Description" style="min-height: 240px;">${entry.description}</div>
+    <div class="work-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:240px;">${entry.description || ''}</div>
     <button class="remove-entry">🗑️</button>
   `;
 
-  div.querySelectorAll('.rich-toolbar button').forEach(button => {
-    button.addEventListener('click', () => {
-      const command = button.getAttribute('data-command');
-      const targetId = button.getAttribute('data-target');
-      const target = targetId ? document.getElementById(targetId) : document.getSelection().focusNode?.parentElement;
-
-      if (target && target.isContentEditable) {
-        target.focus();
-        document.execCommand(command, false, null);
-      }
-      const isActive = document.queryCommandState(command);
-      button.classList.toggle('active', isActive);
+  // Toolbar rich text
+  div.querySelectorAll('.rich-toolbar button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cmd = btn.getAttribute('data-command');
+      const target = document.getSelection().focusNode?.parentElement;
+      if (target && target.isContentEditable) { target.focus(); document.execCommand(cmd, false, null); }
+      btn.classList.toggle('active', document.queryCommandState(cmd));
     });
   });
 
   setTimeout(() => div.classList.remove('pulse'), 500);
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-  div.querySelector('.work-current').onchange = e => {
-    div.querySelector('.work-end').disabled = e.target.checked;
-    saveResume();
-  };
   div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
+
   workExperienceList.appendChild(div);
+
+  // Hidden que usa saveResume()
+  const hiddenStart = div.querySelector('.work-start');
+  const hiddenEnd   = div.querySelector('.work-end');
+
+  // Montar pickers
+  const startPicker = mountMonthYearPicker(startCid, {
+    allowEmpty: true,
+    initialValue: entry.start_date || '',
+    onChange: (iso) => { hiddenStart.value = iso; saveResume(); }
+  });
+
+  const endPicker = mountMonthYearPicker(endCid, {
+    allowEmpty: true,
+    initialValue: entry.current ? '' : (entry.end_date || ''),
+    onChange: (iso) => { hiddenEnd.value = iso; saveResume(); }
+  });
+
+  // Inicial
+  hiddenStart.value = entry.start_date || '';
+  hiddenEnd.value   = entry.current ? 'Present' : (entry.end_date || '');
+
+  // Current toggle
+  const currentCb = div.querySelector('.work-current');
+  currentCb.addEventListener('change', e => {
+    if (e.target.checked) {
+      hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
+      hiddenEnd.value = 'Present';
+      // Dentro de addWorkExperienceEntry:
+      disableMonthYear(endCid, true, 'Work experience marked as current.');
+    } else {
+      disableMonthYear(endCid, false);
+      const last = hiddenEnd.dataset.lastIso || '';
+      if (last) { endPicker.setValue(last); hiddenEnd.value = last; }
+      else { endPicker.setValue(''); hiddenEnd.value = ''; }
+    }
+    saveResume();
+  });
+  if (entry.current) disableMonthYear(endCid, true, 'Work experience marked as current.');
+
+  // Ordenar tras agregar
   sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
 }
 
@@ -501,72 +582,57 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   document.getElementById('languagesList').appendChild(div);
 }
 
-  function saveResume() {
-    const about = document.getElementById('aboutField').innerText.trim();
+function saveResume() {
+  const about = document.getElementById('aboutField').innerText.trim();
 
-    const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => ({
+  const education = Array.from(document.querySelectorAll('#educationList .cv-card-entry')).map(div => {
+    const startRaw = (div.querySelector('.edu-start')?.value || '').trim();
+    const endRaw   = (div.querySelector('.edu-end')?.value || '').trim();
+    return {
       institution: div.querySelector('.edu-title').value.trim(),
-      title: div.querySelector('.edu-degree').value.trim(),
-      country: (div.querySelector('.edu-country')?.value || '').trim(),            // 👈 nuevo campo
-      start_date: div.querySelector('.edu-start').value ? `${div.querySelector('.edu-start').value}-01` : '',
-      end_date: div.querySelector('.edu-end').value === 'Present'
-        ? ''
-        : div.querySelector('.edu-end').value.length === 7
-          ? `${div.querySelector('.edu-end').value}-01`
-          : div.querySelector('.edu-end').value,
-      current: div.querySelector('.edu-current').checked,
+      title:       div.querySelector('.edu-degree').value.trim(),
+      country:     (div.querySelector('.edu-country')?.value || '').trim(),
+      start_date:  normalizeISO15(startRaw),            // 👈 fuerza día 15
+      end_date:    normalizeISO15(endRaw),              // 👈 fuerza día 15 ('' si Present)
+      current:     div.querySelector('.edu-current').checked,
       description: div.querySelector('.edu-desc').innerHTML.trim(),
-    }));
+    };
+  });
 
-    const work_experience = Array.from(document.querySelectorAll('#workExperienceList .cv-card-entry')).map(div => ({
-      title: div.querySelector('.work-title').value.trim(),
-      company: div.querySelector('.work-company').value.trim(),
-      start_date: div.querySelector('.work-start').value ? `${div.querySelector('.work-start').value}-01` : '',
-      end_date: div.querySelector('.work-end').value === 'Present' 
-        ? '' 
-        : div.querySelector('.work-end').value.length === 7
-          ? `${div.querySelector('.work-end').value}-01`
-          : div.querySelector('.work-end').value,
-      current: div.querySelector('.work-current').checked,
+  const work_experience = Array.from(document.querySelectorAll('#workExperienceList .cv-card-entry')).map(div => {
+    const startRaw = (div.querySelector('.work-start')?.value || '').trim();
+    const endRaw   = (div.querySelector('.work-end')?.value || '').trim();
+    return {
+      title:       div.querySelector('.work-title').value.trim(),
+      company:     div.querySelector('.work-company').value.trim(),
+      start_date:  normalizeISO15(startRaw),            // 👈 fuerza día 15
+      end_date:    normalizeISO15(endRaw),              // 👈 fuerza día 15 ('' si Present)
+      current:     div.querySelector('.work-current').checked,
       description: div.querySelector('.work-desc').innerHTML.trim(),
-    }));
+    };
+  });
 
+  const tools = Array.from(document.querySelectorAll('#toolsList .cv-card-entry')).map(div => ({
+    tool:  div.querySelector('.tool-name').value.trim(),
+    level: div.querySelector('.tool-level').value,
+  }));
 
-
-    const tools = Array.from(document.querySelectorAll('#toolsList .cv-card-entry')).map(div => ({
-      tool: div.querySelector('.tool-name').value.trim(),
-      level: div.querySelector('.tool-level').value,
-    }));
-    const languages = Array.from(document.querySelectorAll('#languagesList .cv-card-entry')).map(div => ({
-      language: div.querySelector('.language-name').value.trim(),
-      level: div.querySelector('.language-level').value
-    }));
-
-    console.log("📝 Saving resume with:", {
-      about,
-      education,
-      work_experience,
-      tools,
-      languages
-    });
+  const languages = Array.from(document.querySelectorAll('#languagesList .cv-card-entry')).map(div => ({
+    language: div.querySelector('.language-name').value.trim(),
+    level:    div.querySelector('.language-level').value
+  }));
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      about,
-      education,
-      work_experience,
-      tools,
-      languages
-    }),
+    body: JSON.stringify({ about, education, work_experience, tools, languages }),
   }).then(() => {
     // Reordenar después de guardar
     sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
     sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
   });
+}
 
-  }
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
   if (aiButton) {
@@ -591,8 +657,21 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
     .then(res => res.json())
     .then(data => {
       setAIScrapsFrom(data);
-      const bothEmpty = !(data.linkedin_scrapper && data.linkedin_scrapper.trim()) &&
-                        !(data.cv_pdf_scrapper && data.cv_pdf_scrapper.trim());
+        const hasAnySource =
+          (data.linkedin_scrapper && data.linkedin_scrapper.trim()) ||
+          (data.cv_pdf_scrapper && data.cv_pdf_scrapper.trim()) ||
+          (data.affinda_scrapper && data.affinda_scrapper.trim()) ||
+          (data.coresignal_scrapper && data.coresignal_scrapper.trim()) ||
+          (data.linkedin && data.linkedin.trim());
+
+        document.querySelectorAll('.star-button').forEach(btn => {
+          if (!hasAnySource) {
+            btn.classList.add('disabled-star');
+            // … mismo tooltip/bloqueo que ya tienes
+          } else {
+            btn.classList.remove('disabled-star');
+          }
+        });
       // ⭐ Habilitar solo botón de About si existe entry en tabla resume
       const aboutStarBtn = document.querySelector('#about-star-button');
       if (aboutStarBtn) {
@@ -859,51 +938,102 @@ saveUpdateBtn.addEventListener('click', () => {
 if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadSalaryUpdates();
 }
-document.getElementById('ai-submit').addEventListener('click', async () => {
-  const linkedin_scrapper = document.getElementById('ai-linkedin-scrap').value.trim();
-  const cv_pdf_scrapper = document.getElementById('ai-cv-scrap').value.trim();
-  const candidateId = new URLSearchParams(window.location.search).get('id');
-  if (!linkedin_scrapper && !cv_pdf_scrapper) return;
+// ✅ Handler robusto para el botón de AI
+// ✅ Handler robusto para el botón de AI (reemplazo)
+const aiSubmitBtn = document.getElementById('ai-submit');
+if (aiSubmitBtn) {
+  aiSubmitBtn.addEventListener('click', async () => {
+    const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+    const candidateId = new URLSearchParams(window.location.search).get('id');
+    if (!candidateId) return;
 
-  // 👉 Mostrar mensaje de carga
-  startResumeLoader();
+    // 1) Intentar leer de los textareas si existen
+    const linEl = document.getElementById('ai-linkedin-scrap');
+    const cvEl  = document.getElementById('ai-cv-scrap');
+    let linkedin_scrapper = (linEl?.value || '').trim();
+    let cv_pdf_scrapper   = (cvEl?.value  || '').trim();
 
-  try {
-    const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/generate_resume_fields', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidate_id: candidateId, linkedin_scrapper, cv_pdf_scrapper })
-    });
+    // 2) Fallback: leer del backend si está vacío o no hay inputs
+    let hasLinkedinUrl = false;
+    let hasAnyCvFile   = false;
+    if (!linkedin_scrapper || !cv_pdf_scrapper) {
+      try {
+        const cand = await fetch(`${apiBase}/candidates/${candidateId}`).then(r => r.json());
+        // usar scrappers si existen; si no, usar fuentes equivalentes
+        if (!linkedin_scrapper) {
+          linkedin_scrapper = (cand.linkedin_scrapper || cand.coresignal_scrapper || '').trim();
+        }
+        if (!cv_pdf_scrapper) {
+          cv_pdf_scrapper = (cand.cv_pdf_scrapper || cand.affinda_scrapper || '').trim();
+        }
+        hasLinkedinUrl = !!(cand.linkedin || '').trim();
+      } catch (e) {
+        console.warn('⚠️ Fallback read failed', e);
+      }
 
-    const result = await response.json();
-
-    if (result.about) document.getElementById('aboutField').innerText = result.about;
-
-    if (result.education) {
-      document.getElementById('educationList').innerHTML = '';
-      JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+      // 3) Último recurso: ¿hay algún CV subido?
+      try {
+        const files = await fetch(`${apiBase}/candidates/${candidateId}/cvs`).then(r => r.json());
+        hasAnyCvFile = Array.isArray(files) && files.length > 0;
+      } catch {}
     }
 
-    if (result.work_experience) {
-      document.getElementById('workExperienceList').innerHTML = '';
-      JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+    // 4) Validación: permitir si hay al menos UNA fuente (scrapper/linkedin/cv)
+    const hasAnySource =
+      !!linkedin_scrapper ||
+      !!cv_pdf_scrapper   ||
+      hasLinkedinUrl      ||
+      hasAnyCvFile;
+
+    if (!hasAnySource) {
+      alert('Please add LinkedIn or CV info before generating.');
+      return;
     }
 
-    if (result.tools) {
-      document.getElementById('toolsList').innerHTML = '';
-      JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
-    }
+    // 5) Generar: enviar lo que tengamos (el backend también recibe candidate_id)
+    startResumeLoader();
+    try {
+      const response = await fetch(`${apiBase}/generate_resume_fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          linkedin_scrapper: linkedin_scrapper || '',   // puede ir vacío si no hay
+          cv_pdf_scrapper:   cv_pdf_scrapper   || ''    // idem
+        })
+      });
 
-    // ✅ Cerrar popup
-    document.getElementById('ai-popup').classList.add('hidden');
-  } catch (err) {
-    console.error('❌ Error generating resume:', err);
-    alert("Something went wrong while generating the resume. Please try again.");
-  } finally {
-    // ✅ Ocultar loader sin importar si funcionó o falló
-    stopResumeLoader();
-  }
-});
+      const result = await response.json();
+
+      if (result.about) document.getElementById('aboutField').innerText = result.about;
+
+      if (result.education) {
+        document.getElementById('educationList').innerHTML = '';
+        JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+      }
+
+      if (result.work_experience) {
+        document.getElementById('workExperienceList').innerHTML = '';
+        JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+      }
+
+      if (result.tools) {
+        document.getElementById('toolsList').innerHTML = '';
+        JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
+      }
+
+      // cerrar popup si existe
+      document.getElementById('ai-popup')?.classList.add('hidden');
+    } catch (err) {
+      console.error('❌ Error generating resume:', err);
+      alert("Something went wrong while generating the resume. Please try again.");
+    } finally {
+      stopResumeLoader();
+    }
+  });
+}
+
+
 document.querySelectorAll('.star-button').forEach(button => {
   const popupId = button.getAttribute('data-target');
 
@@ -1350,6 +1480,15 @@ async function uploadFile(file) {
     // 4) Pintar en el textarea de la AI si existe y cerramos indicador
     if (out.extracted_text) {
       const aiCvScrap = document.getElementById('ai-cv-scrap');
+        if (aiCvScrap) {
+          aiCvScrap.addEventListener('blur', () => {
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cv_pdf_scrapper: aiCvScrap.value.trim() })
+            });
+          });
+        }
       if (aiCvScrap) aiCvScrap.value = out.extracted_text;
       cvIndicator.success('CV extracted');
       setTimeout(() => cvIndicator.hide(), 900);
@@ -1560,9 +1699,12 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   if (!root) return null;
 
   const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const clearBtn = document.createElement('button');
   const monthSel = document.createElement('select');
   const yearSel  = document.createElement('select');
-  const clearBtn = document.createElement('button');
+
+  monthSel.className = 'month mini-select';
+  yearSel.className  = 'year mini-select';
 
   // placeholders
   monthSel.innerHTML = `<option value="">Month</option>` + months.slice(1)
@@ -1577,8 +1719,10 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   }
 
   clearBtn.type = 'button';
-  clearBtn.className = 'btn-soft btn-sm btn-clear';
-  clearBtn.textContent = 'Clear';
+  clearBtn.className = 'btn-clear';   // clase simple; la estilizamos arriba
+  clearBtn.setAttribute('aria-label', 'Clear date');
+  clearBtn.title = 'Clear';
+  clearBtn.textContent = '✕';
   if (!allowEmpty) clearBtn.style.display = 'none';
 
   root.replaceChildren(monthSel, yearSel, clearBtn);
@@ -1941,4 +2085,27 @@ function makeCountryOptions(selected = "") {
   return EDU_COUNTRIES.map(c =>
     `<option value="${c}" ${c === selected ? "selected" : ""}>${c || "Select country"}</option>`
   ).join("");
+}
+// 🔧 Helpers para los pickers dinámicos
+function uniqId(prefix='uid') {
+  if (window.crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+function disableMonthYear(containerId, disabled, tooltipText = 'Marked as current.') {
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  root.querySelectorAll('select').forEach(s => s.disabled = disabled);
+  if (disabled) {
+    root.setAttribute('title', tooltipText);
+    root.classList.add('is-disabled');
+  } else {
+    root.removeAttribute('title');
+    root.classList.remove('is-disabled');
+  }
+}
+function normalizeISO15(raw) {
+  if (!raw || raw === 'Present') return '';
+  if (/^\d{4}-\d{2}$/.test(raw)) return `${raw}-15`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.replace(/-\d{2}$/, '-15');
+  return raw;
 }
