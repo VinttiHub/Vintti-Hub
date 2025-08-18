@@ -532,7 +532,7 @@ def upload_candidate_cv(candidate_id):
         return jsonify({"error": f"Unsupported file type .{ext}. Allowed: {', '.join(allowed_ext)}"}), 400
 
     try:
-        s3_key = f"cvs/{candidate_id}_{uuid.uuid4()}.{ext}"
+        s3_key = f"cvs/resume_{candidate_id}_{uuid.uuid4()}.{ext}"
         content_type = f.mimetype or {
             'pdf': 'application/pdf',
             'png': 'image/png',
@@ -2660,6 +2660,83 @@ def candidates_light_fast():
     except Exception as e:
         import logging; logging.exception("Error in /candidates/light_fast")
         return jsonify({"error": str(e)}), 500
+# ---------- RESIGNATION LETTERS (PDF en S3, sin DB) ----------
+@app.route('/candidates/<int:candidate_id>/resignations', methods=['GET'])
+def list_resignations(candidate_id):
+    try:
+        prefix = f"resignations/resignation-letter_{candidate_id}_"
+        items = _list_s3_with_prefix(prefix)
+        return jsonify(items)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/candidates/<int:candidate_id>/resignations', methods=['POST'])
+def upload_resignation(candidate_id):
+    f = request.files.get('file')
+    if not f:
+        return jsonify({"error": "Missing file"}), 400
+
+    filename_orig = (f.filename or '').lower()
+    if not (filename_orig.endswith('.pdf') or f.mimetype == 'application/pdf'):
+        return jsonify({"error": "Only PDF is allowed for resignation letters"}), 400
+
+    try:
+        s3_key = f"resignations/resignation-letter_{candidate_id}_{uuid.uuid4()}.pdf"
+        s3_client.upload_fileobj(
+            f, S3_BUCKET, s3_key,
+            ExtraArgs={'ContentType': 'application/pdf'}
+        )
+        # devolver lista actualizada
+        prefix = f"resignations/resignation-letter_{candidate_id}_"
+        items = _list_s3_with_prefix(prefix)
+        return jsonify({"message": "Resignation letter uploaded", "items": items})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/candidates/<int:candidate_id>/resignations', methods=['DELETE'])
+def delete_resignation(candidate_id):
+    data = request.get_json(silent=True) or {}
+    key = data.get("key")
+    if not key or not key.startswith(f"resignations/resignation-letter_{candidate_id}_"):
+        return jsonify({"error": "Missing or invalid key"}), 400
+    try:
+        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+        # devolver lista actualizada
+        prefix = f"resignations/resignation-letter_{candidate_id}_"
+        items = _list_s3_with_prefix(prefix)
+        return jsonify({"message": "Resignation letter deleted", "items": items})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+# --------------------------------------------------------------
+
+def _list_s3_with_prefix(prefix: str):
+    """Devuelve [{'key','url','name'}] para objetos bajo un prefijo S3."""
+    items = []
+    continuation = None
+    while True:
+        kw = {'Bucket': S3_BUCKET, 'Prefix': prefix}
+        if continuation:
+            kw['ContinuationToken'] = continuation
+        resp = s3_client.list_objects_v2(**kw)
+        for obj in resp.get('Contents', []):
+            key = obj['Key']
+            url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': S3_BUCKET, 'Key': key},
+                ExpiresIn=604800  # 7 días
+            )
+            items.append({
+                'key': key,
+                'url': url,
+                'name': key.split('/')[-1]
+            })
+        if resp.get('IsTruncated'):
+            continuation = resp.get('NextContinuationToken')
+        else:
+            break
+    return items
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

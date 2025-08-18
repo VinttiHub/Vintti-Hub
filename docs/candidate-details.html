@@ -186,28 +186,48 @@
   <label>Created at</label>
   <div id="field-created-at">—</div>
 </div>
-<!-- ===== Candidate CVs (Apple-like) ===== -->
-<div class="field" id="cv-card">
-  <label style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-    <span>Candidate CV</span>
-    <button id="cv-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
-  <span class="btn-icon" aria-hidden="true">↻</span>
-  <span class="btn-text">Refresh</span>
-</button>
-  </label>
-
-  <!-- Mantén este div como primer "value" para seguir el patrón de las cards -->
-  <div class="value">
-    <div id="cv-drop" class="cv-drop" tabindex="0">
-      <input id="cv-input" type="file" accept=".pdf,image/*" hidden />
-      <div class="cv-cta">
-        Drop a CV here, or
-        <button id="cv-browse" type="button" class="btn-soft btn-sm">Browse</button>
+<!-- ===== Documents row (CV + Resignation Letter) ===== -->
+<div class="doc-row">
+  <!-- CV / Resume -->
+  <div class="field doc-card" id="cv-card">
+    <label class="doc-card-label">
+      <span>Candidate CV</span>
+      <button id="cv-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
+        <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
+      </button>
+    </label>
+    <div class="value two-by-two">
+      <div id="cv-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
+        <input id="cv-input" type="file" accept=".pdf,image/*" hidden />
+        <div class="cv-cta">
+          Drop a CV here, or
+          <button id="cv-browse" type="button" class="btn-soft btn-sm">Browse</button>
+        </div>
+        <div class="cv-hint">Only PDF is allowed</div>
       </div>
-      <div class="cv-hint">Supported: PDF</div>
+      <div id="cv-list" class="cv-list" style="grid-column: 1 / -1;"></div>
     </div>
+  </div>
 
-    <div id="cv-list" class="cv-list"></div>
+  <!-- Resignation Letter -->
+  <div class="field doc-card" id="resig-card">
+    <label class="doc-card-label">
+      <span>Resignation Letter</span>
+      <button id="resig-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
+        <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
+      </button>
+    </label>
+    <div class="value two-by-two">
+      <div id="resig-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
+        <input id="resig-input" type="file" accept=".pdf" hidden />
+        <div class="cv-cta">
+          Drop a PDF here, or
+          <button id="resig-browse" type="button" class="btn-soft btn-sm">Browse</button>
+        </div>
+        <div class="cv-hint">Only PDF is allowed</div>
+      </div>
+      <div id="resig-list" class="cv-list" style="grid-column: 1 / -1;"></div>
+    </div>
   </div>
 </div>
 

@@ -1345,9 +1345,11 @@ async function uploadFile(file) {
 })();
 
   // Carga inicial si ya estás en Overview
-  if (document.querySelector('.tab.active')?.dataset.tab === 'overview') {
-    loadCVs();
-  }
+if (document.querySelector('.tab.active')?.dataset.tab === 'overview') {
+  if (typeof loadCVs === 'function') loadCVs();
+  if (typeof loadResignations === 'function') loadResignations();
+}
+
 })();
 // === Close buttons (X) for Salary Update + AI Assistant popups ===
 const aiPopupEl = document.getElementById('ai-popup');
@@ -1390,8 +1392,152 @@ salaryCloseBtns.forEach(btn => btn && btn.addEventListener('click', (e) => {
     if (e.target === el) el.classList.add('hidden');
   });
 });
+// ====== Candidate Resignation Letters (upload/list/delete/open) ======
+(() => {
+  const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const candidateId = new URLSearchParams(window.location.search).get('id');
+  const drop = document.getElementById('resig-drop');
+  const input = document.getElementById('resig-input');
+  const browseBtn = document.getElementById('resig-browse');
+  const refreshBtn = document.getElementById('resig-refresh');
+  const list = document.getElementById('resig-list');
 
-// Cerrar c
+  // indicador mini (independiente del de CV)
+  const resIndicator = (() => {
+    const el = document.createElement('div');
+    el.className = 'cv-indicator';
+    el.innerHTML = `<span class="spinner"></span><span class="msg">Uploading…</span>`;
+    document.body.appendChild(el);
+
+    const setIcon = (type) => {
+      const first = el.firstElementChild;
+      if (!first) return;
+      first.className = (type === 'check') ? 'check' : 'spinner';
+    };
+    return {
+      show(msg = 'Uploading…'){ setIcon('spinner'); el.querySelector('.msg').textContent = msg; el.classList.add('show'); },
+      success(msg = 'Uploaded'){ setIcon('check'); el.querySelector('.msg').textContent = msg; },
+      hide(){ el.classList.remove('show'); }
+    };
+  })();
+
+  if (!candidateId || !drop || !input || !list) return;
+
+  function render(items = []) {
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
+      return;
+    }
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'cv-item';
+      row.innerHTML = `
+        <span class="cv-name" title="${it.name}">${it.name}</span>
+        <div class="cv-actions">
+          <a class="btn" href="${it.url}" target="_blank" rel="noopener">Open</a>
+          <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
+        </div>
+      `;
+      row.querySelector('.danger').addEventListener('click', async (e) => {
+        const key = e.currentTarget.getAttribute('data-key');
+        if (!key) return;
+        if (!confirm('Delete this file?')) return;
+        await fetch(`${apiBase}/candidates/${candidateId}/resignations`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        });
+        await loadResignations();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  async function loadResignations() {
+    try {
+      const r = await fetch(`${apiBase}/candidates/${candidateId}/resignations`);
+      const data = await r.json();
+      render(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.warn('Failed to load resignations', e);
+      render([]);
+    }
+  }
+  window.loadResignations = loadResignations;
+
+  async function uploadResignation(file) {
+    // Solo PDF
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+    if (!isPdf) {
+      alert('Only PDF is allowed.');
+      return;
+    }
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      drop.classList.add('dragover');
+      resIndicator.show('Uploading resignation letter…');
+      const r = await fetch(`${apiBase}/candidates/${candidateId}/resignations`, {
+        method: 'POST',
+        body: fd
+      });
+      if (!r.ok) {
+        const t = await r.text().catch(()=>'');
+        throw new Error(t || `Upload failed (${r.status})`);
+      }
+      await loadResignations();
+      resIndicator.success('Uploaded');
+      setTimeout(() => resIndicator.hide(), 900);
+    } catch (e) {
+      console.error('Upload failed', e);
+      alert('Upload failed');
+      resIndicator.hide();
+    } finally {
+      drop.classList.remove('dragover');
+      input.value = '';
+    }
+  }
+
+  // Drag & Drop
+  ;['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover');
+  }));
+  ;['dragleave','dragend','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover');
+  }));
+  drop.addEventListener('drop', e => {
+    const files = e.dataTransfer?.files;
+    if (files?.length) uploadResignation(files[0]);
+  });
+
+  // Click/browse
+  browseBtn.addEventListener('click', () => input.click());
+  drop.addEventListener('click', (e) => {
+    if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
+    input.click();
+  });
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) uploadResignation(f);
+  });
+
+  // Refresh
+  refreshBtn.addEventListener('click', async () => {
+    const ic = refreshBtn.querySelector('.btn-icon');
+    refreshBtn.disabled = true;
+    ic?.classList.add('spin');
+    await loadResignations();
+    setTimeout(() => ic?.classList.remove('spin'), 400);
+    refreshBtn.disabled = false;
+  });
+
+  // carga inicial si ya estás en Overview
+  if (document.querySelector('.tab.active')?.dataset.tab === 'overview') {
+    loadResignations();
+  }
+})();
+
 
 
 

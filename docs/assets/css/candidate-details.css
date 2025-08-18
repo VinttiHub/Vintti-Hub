@@ -1695,3 +1695,44 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
   opacity:.6;
 }
 .modal-close:hover{ opacity:1; }
+/* fila de dos tarjetas a lo ancho */
+.doc-row{
+  grid-column: 1 / -1;           /* ocupa todo el ancho de la grid padre */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* tarjetas de documentos */
+.doc-card{
+  display: flex;
+  flex-direction: column;
+}
+.doc-card-label{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap:10px;
+}
+.value.two-by-two{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* responsive: apilar en pantallas estrechas */
+@media (max-width: 980px){
+  .doc-row{ grid-template-columns: 1fr; }
+}
+
+/* opcional: lista de archivos consistente */
+.cv-list .cv-item{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:8px 10px; border:1px solid #eee; border-radius:10px;
+  background:#fff;
+}
+.cv-list .cv-name{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60%;
+}
+.cv-actions .btn{ margin-left: 8px; }
