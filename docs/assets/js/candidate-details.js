@@ -150,13 +150,15 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     // Llama a Coresignal solo si NO hay coresignal_scrapper y el LinkedIn es válido
     if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      .then(r => r.json())
-      .then(d => console.log('🔄 Coresignal sync:', d))
-      .catch(e => console.warn('⚠️ Coresignal sync failed', e));
+      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
+        .then(async r => {
+          let payload;
+          try { payload = await r.json(); } catch { payload = await r.text(); }
+          console.log('🔄 Coresignal sync:', { ok: r.ok, status: r.status, payload });
+        })
+              .then(r => r.json())
+            .then(d => console.log('🔄 Coresignal sync:', d))
+        .catch(e => console.warn('⚠️ Coresignal sync failed', e));
     }
 
     console.log("🎯 Valor desde DB:", data.country);
