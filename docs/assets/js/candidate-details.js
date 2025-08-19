@@ -39,15 +39,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
   hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
   hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
-  window._startPicker = mountMonthYearPicker('hire-start-picker', {
-    allowEmpty: true, // por si quieres dejarlo vacío
-    onChange: (iso) => updateHireField('start_date', iso) // guarda 'YYYY-MM-15' o ''
-  });
+// === HIRE DATES: usar input nativo día/mes/año y aislar del estilo de Resume ===
+(function restoreHireDates() {
+  const hostStart = document.getElementById('hire-start-picker');
+  const hostEnd   = document.getElementById('hire-end-picker');
 
-  window._endPicker = mountMonthYearPicker('hire-end-picker', {
-    allowEmpty: true,
-    onChange: (iso) => updateHireField('end_date', iso) // guarda 'YYYY-MM-15' o ''
-  });
+  // Inyecta inputs nativos dentro de los contenedores existentes (no cambia HTML)
+  if (hostStart && !hostStart.querySelector('input[type="date"]')) {
+    hostStart.innerHTML = '<input type="date" id="hire-start-date" />';
+  }
+  if (hostEnd && !hostEnd.querySelector('input[type="date"]')) {
+    hostEnd.innerHTML = '<input type="date" id="hire-end-date" />';
+  }
+
+  const startInp = document.getElementById('hire-start-date');
+  const endInp   = document.getElementById('hire-end-date');
+
+  if (startInp) {
+    startInp.addEventListener('change', () => {
+      updateHireField('start_date', startInp.value || '');
+    });
+  }
+  if (endInp) {
+    endInp.addEventListener('change', () => {
+      updateHireField('end_date', endInp.value || '');
+    });
+  }
+
+  // Asegura que nada intente usar los pickers de mes/año en Hire
+  window._startPicker = undefined;
+  window._endPicker = undefined;
+})();
 
   // === Fetch candidate info ===
 fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
@@ -1864,8 +1886,12 @@ if (setupEl) setupEl.value = data.setup_fee || '';
   document.getElementById('hire-working-schedule').value = data.working_schedule || '';
   document.getElementById('hire-pto').value = data.pto || '';
   document.getElementById('hire-references').innerHTML = data.references_notes || '';
-  if (window._startPicker) window._startPicker.setValue(data.start_date || '');
-  if (window._endPicker)   window._endPicker.setValue(data.end_date || '');
+const startInp = document.getElementById('hire-start-date');
+const endInp   = document.getElementById('hire-end-date');
+// backend puede traer 'YYYY-MM-DD' o con hora → recorta a 10
+if (startInp) startInp.value = (data.start_date || '').slice(0, 10);
+if (endInp)   endInp.value   = (data.end_date   || '').slice(0, 10);
+
 
 const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
 const isRecruiting = modelText?.includes('recruiting');
