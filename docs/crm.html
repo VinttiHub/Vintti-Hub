@@ -26,10 +26,6 @@
     <h1 class="page-title">CRM</h1>
     <button class="new-btn" onclick="openPopup()">New</button>
   </div>
-  <!-- Mini alerta de orden por Status -->
-  <div id="crmSortToast" class="tiny-toast" role="status" aria-live="polite">
-    Auto-sort by <b>Status</b> when ready.
-  </div>
 
 <div class="crm-controls-bar">
   <div id="datatable-length-container"></div>
@@ -169,6 +165,23 @@
   </div>
 </div>
 
+<!-- Toast de ordenamiento -->
+<div id="crmSortToast" class="sort-toast" role="status" aria-live="polite" style="display:none">
+  <div class="sort-toast__content">
+    <div class="sort-toast__header">
+      <span class="sort-toast__dot"></span>
+      <span>Prepping the cutest view — sorting the table by <b>Status</b>…</span>
+    </div>
+
+    <div class="sort-toast__progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="sort-toast__bar" style="width:0%"></div>
+    </div>
+
+    <div class="sort-toast__meta">
+      <span id="sortToastPercent">0%</span>
+    </div>
+  </div>
+</div>
 
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>

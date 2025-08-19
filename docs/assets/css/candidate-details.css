@@ -1803,11 +1803,6 @@ html body .month-year .btn-clear:active{
   transform: scale(0.98) !important;
 }
 /* --- Aislar estilos de fechas: Resume ≠ Hire --- */
-
-/* 1) El Resume mantiene su look; Hire NO usa selects .month-year */
-#resume .cv-card-entry .month-year select { /* (ya lo tienes) */ }
-
-/* 2) Si por herencia quedara algún select dentro de #hire .month-year, lo reseteamos */
 #hire .month-year select {
   all: revert;
 }
@@ -1829,12 +1824,3 @@ html body .month-year .btn-clear:active{
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
 }
-
-/* 4) MUY IMPORTANTE: tu override global apuntaba también a #hire
-   Si tienes algo como:
-   html body .cv-card-entry .month-year select,
-   html body #hire .month-year select { ... }
-   cámbialo a SOLO el de Resume:
-*/
-html body .cv-card-entry .month-year select { /* deja aquí tus estilos de Resume */ }
-/* y elimina la parte de "html body #hire .month-year select" */

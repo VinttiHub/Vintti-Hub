@@ -14,48 +14,49 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 📦 Obtener datos desde Flask
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
-    .then(res => res.json())
-    .then(data => {
-      console.log("Datos recibidos desde el backend:", data);
-      // Destruir DataTable previa si ya existe
-      if ($.fn.DataTable.isDataTable('#accountTable')) {
-        $('#accountTable').DataTable().destroy();
-      }
+// 📦 Obtener datos desde Flask
+fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
+  .then(res => res.json())
+  .then(async (data) => {
+    console.log("Datos recibidos desde el backend:", data);
+    if ($.fn.DataTable.isDataTable('#accountTable')) {
+      $('#accountTable').DataTable().destroy();
+    }
 
-      const tableBody = document.getElementById('accountTableBody');
-      tableBody.innerHTML = '';
+    const tableBody = document.getElementById('accountTableBody');
+    tableBody.innerHTML = '';
 
-      if (!Array.isArray(data) || data.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
-        return;
-      }
-      const currentUserEmail = localStorage.getItem('user_email');
-      const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
-      const showPriorityColumn = allowedEmails.includes(currentUserEmail);
-      data.forEach(item => {
-        const contractTxt = item.contract || '<span class="placeholder">No hires yet</span>';
-        const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">$0</span>';
-        const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">$0</span>';
-        const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">$0</span>';
+    if (!Array.isArray(data) || data.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
+      return;
+    }
 
-        let htmlRow = `
-          <tr data-id="${item.account_id}">
-            <td>${item.client_name || '—'}</td>
-              <td class="status-td" data-id="${item.account_id}" data-order="99">
-                <span class="chip chip--loading" aria-label="Loading status">
-                  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-                </span>
-              </td>
-            <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">Unavailable</span>'}</td>
-            <td class="muted-cell">${contractTxt}</td>
-            <td>${trrTxt}</td>
-            <td>${tsfTxt}</td>
-            <td>${tsrTxt}</td>
-        `;
+    const currentUserEmail = localStorage.getItem('user_email');
+    const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
+    const showPriorityColumn = allowedEmails.includes(currentUserEmail);
 
-        if (showPriorityColumn) {
-          htmlRow += `
+    // ——— Render de filas SIN DataTables todavía ———
+    // (más rápido: un solo innerHTML)
+    const rowsHtml = data.map(item => {
+      const contractTxt = item.contract || '<span class="placeholder">No hires yet</span>';
+      const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">$0</span>';
+      const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">$0</span>';
+      const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">$0</span>';
+
+      return `
+        <tr data-id="${item.account_id}">
+          <td>${item.client_name || '—'}</td>
+          <td class="status-td" data-id="${item.account_id}" data-order="99">
+            <span class="chip chip--loading" aria-label="Loading status">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </span>
+          </td>
+          <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">Unavailable</span>'}</td>
+          <td class="muted-cell">${contractTxt}</td>
+          <td>${trrTxt}</td>
+          <td>${tsfTxt}</td>
+          <td>${tsrTxt}</td>
+          ${showPriorityColumn ? `
             <td>
               <select
                 class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : 'priority-empty'}"
@@ -65,89 +66,116 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
                 <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
               </select>
-            </td>
-          `;
-        }
-        htmlRow += `</tr>`;
-        tableBody.innerHTML += htmlRow;
-      });
+            </td>` : ``}
+        </tr>`;
+    }).join('');
+    tableBody.innerHTML = rowsHtml;
 
-
-      // 👇 Inserta el nuevo <th> si aplica
-      if (showPriorityColumn) {
-        const priorityHeader = document.createElement('th');
-        priorityHeader.textContent = 'Priority';
-        document.querySelector('#accountTable thead tr').appendChild(priorityHeader);
-      }
-
-      document.querySelectorAll('#accountTableBody tr').forEach(row => {
-        row.addEventListener('click', () => {
-          const id = row.getAttribute('data-id');
-          if (id) {
-            window.location.href = `account-details.html?id=${id}`;
-          }
-        });
-      });
-
-      $('#accountTable').DataTable({
-        responsive: true,
-        pageLength: 50,
-        dom: 'lrtip',
-        lengthMenu: [[50, 100, 150], [50, 100, 150]],
-        language: {
-          search: "🔍 Buscar:",
-          lengthMenu: "Mostrar _MENU_ registros por página",
-          zeroRecords: "No se encontraron resultados",
-          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-          paginate: {
-            first: "Primero",
-            last: "Último",
-            next: "Siguiente",
-            previous: "Anterior"
-          }
-        }
-      });
-      showSortToast();
-      computeAndPaintAccountStatuses();
-      // Mover selector de "mostrar X registros por página" al contenedor deseado
-const lengthMenu = document.querySelector('#accountTable_length');
-const customLengthContainer = document.getElementById('datatable-length-container');
-if (lengthMenu && customLengthContainer) {
-  customLengthContainer.appendChild(lengthMenu);
-}
-
-document.querySelectorAll('.priority-select').forEach(select => {
-  select.addEventListener('change', async () => {
-    const accountId = select.getAttribute('data-id');
-    const newPriority = select.value;
-
-    // Quitar clases anteriores
-    select.classList.remove('priority-a', 'priority-b', 'priority-c', 'priority-empty');
-
-    // Agregar clase correspondiente (y estado vacío)
-    if (!newPriority) select.classList.add('priority-empty');
-    if (newPriority === 'A') select.classList.add('priority-a');
-    if (newPriority === 'B') select.classList.add('priority-b');
-    if (newPriority === 'C') select.classList.add('priority-c');
-
-    try {
-      await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priority: newPriority || null })
-      });
-      console.log(`✅ Priority updated for account ${accountId}`);
-    } catch (error) {
-      console.error('❌ Error updating priority:', error);
+    // 👉 Cabecera "Priority" si aplica
+    if (showPriorityColumn) {
+      const th = document.createElement('th');
+      th.textContent = 'Priority';
+      document.querySelector('#accountTable thead tr').appendChild(th);
     }
-  });
-});
 
-
-    })
-    .catch(err => {
-      console.error('Error fetching account data:', err);
+    // Navegación por fila (delegado para que no se rompa con DataTables)
+    document.getElementById('accountTableBody').addEventListener('click', (e) => {
+      const row = e.target.closest('tr[data-id]');
+      if (!row) return;
+      const id = row.getAttribute('data-id');
+      if (id) window.location.href = `account-details.html?id=${id}`;
     });
+
+    // ♻️ Toast mientras se calcula
+    const ids = data.map(x => Number(x.account_id)).filter(Boolean);
+    const rowById = new Map(
+      [...document.querySelectorAll('#accountTableBody tr')].map(r => [Number(r.dataset.id), r])
+    );
+
+    // ♻️ Toast con “paso extra” para el ordenamiento
+    showSortToast(ids.length + 1);
+
+    // 🧮 Calcula y actualiza barra (solo incrementos durante el cálculo)
+    await computeAndPaintAccountStatuses({
+      ids,
+      rowById,
+      onProgress: (inc) => updateSortToast(inc)  // ← solo incrementa
+    });
+
+    // ✅ DataTables: subimos a 100% cuando ya dibujó con el orden aplicado
+    let _finalized = false;
+    const finalizeToast = () => {
+      if (_finalized) return;
+      _finalized = true;
+      updateSortToast(1);       // ← último “tick” reservado para el sort/draw
+      setTimeout(hideSortToast, 400);
+    };
+
+    // Importante: engancha el primer draw ANTES o justo al crear la tabla
+    const $tbl = $('#accountTable');
+    $tbl.one('draw.dt', finalizeToast);
+
+    const table = $tbl.DataTable({
+      responsive: true,
+      pageLength: 50,
+      deferRender: true,
+      dom: 'lrtip',
+      lengthMenu: [[50, 100, 150], [50, 100, 150]],
+      order: [[1, 'asc']],
+      language: {
+        search: "🔍 Buscar:",
+        lengthMenu: "Mostrar _MENU_ registros por página",
+        zeroRecords: "No se encontraron resultados",
+        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+        paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
+      },
+      // Respaldo por si algo impide capturar el primer draw
+      initComplete: finalizeToast
+    });
+
+    // Mover selector "mostrar X registros"
+    const lengthMenu = document.querySelector('#accountTable_length');
+    const customLengthContainer = document.getElementById('datatable-length-container');
+    if (lengthMenu && customLengthContainer) customLengthContainer.appendChild(lengthMenu);
+
+    // Buscador por Client Name
+    const clientSearchInput = document.getElementById('searchClientInput');
+    if (clientSearchInput) {
+      clientSearchInput.addEventListener('input', function () {
+        table.column(0).search(this.value, true, false).draw();
+      });
+    }
+
+    // Priority: listeners (delegado por simplicidad/robustez)
+    document.getElementById('accountTableBody').addEventListener('change', async (e) => {
+      const select = e.target.closest('.priority-select');
+      if (!select) return;
+      const accountId = select.getAttribute('data-id');
+      const newPriority = select.value;
+
+      select.classList.remove('priority-a', 'priority-b', 'priority-c', 'priority-empty');
+      if (!newPriority) select.classList.add('priority-empty');
+      if (newPriority === 'A') select.classList.add('priority-a');
+      if (newPriority === 'B') select.classList.add('priority-b');
+      if (newPriority === 'C') select.classList.add('priority-c');
+
+      try {
+        await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priority: newPriority || null })
+        });
+        console.log(`✅ Priority updated for account ${accountId}`);
+      } catch (error) {
+        console.error('❌ Error updating priority:', error);
+      }
+    });
+
+    hideSortToast(); // cerrar alerta al final
+  })
+  .catch(err => {
+    console.error('Error fetching account data:', err);
+  });
 
   // 🆕 Crear nuevo account desde el formulario
   const form = document.querySelector('.popup-form');
@@ -338,59 +366,139 @@ async function runWithConcurrency(tasks, limit = 6) {
 }
 
 // —— Cálculo y pintado batch ——
-async function computeAndPaintAccountStatuses() {
-  const rows = [...document.querySelectorAll('#accountTableBody tr')];
-  const ids  = rows.map(r => Number(r.dataset.id)).filter(Boolean);
-  if (!ids.length) { hideSortToast(); return; }
+// 🧮 Calcula y pinta el status de TODOS los accounts (con progreso opcional)
+async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
+  const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const CHUNK = 200;                        // tamaño de lote para /status/summary
+  const CONC_SUMMARY = 4;                   // concurrencia para summary
+  const CONC_FALLBACK = Math.min(navigator.hardwareConcurrency || 8, 8); // fallback por cuenta
 
-  let summary = null;
-  try {
-    const r = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/status/summary', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ account_ids: ids })
-    });
-    if (r.ok) summary = await r.json();
-  } catch (e) { /* fallback */ }
+  // Progreso inicial (si el caller lo usa)
+  onProgress?.(0, ids.length);
 
-  if (!summary) {
-    summary = {};
-    const tasks = ids.map(id => async () => {
-      try {
-        const [opps, hires] = await Promise.all([
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}/opportunities`).then(r => r.json()),
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}/opportunities/candidates`).then(r => r.json()),
-        ]);
-        summary[id] = { status: deriveStatusFrom(opps, hires) };
-      } catch { summary[id] = { status: '—' }; }
-    });
-    await runWithConcurrency(tasks, 6);
+  // Guarda los resultados aquí: { [id]: { status: "..." } }
+  const summary = {};
+
+  // Normaliza la respuesta del endpoint /accounts/status/summary a {id: {status}}
+  function mergeSummary(resp) {
+    let added = 0;
+
+    if (Array.isArray(resp)) {
+      // Ej: [{account_id: 123, status: "Active Client"}]
+      for (const it of resp) {
+        const id = Number(it.account_id ?? it.id ?? it.accountId);
+        if (!id) continue;
+        const status = it.status ?? it.calculated_status ?? it.value ?? '—';
+        if (!summary[id]) added++;
+        summary[id] = { status };
+      }
+      return added;
+    }
+
+    if (resp && typeof resp === 'object') {
+      // Ej: { "123": {status: "Active Client"}, "124": "Inactive Client" }
+      for (const [k, v] of Object.entries(resp)) {
+        const id = Number(k);
+        if (!id) continue;
+        let status;
+        if (v && typeof v === 'object') status = v.status ?? v.calculated_status ?? v.value ?? '—';
+        else status = v ?? '—';
+        if (!summary[id]) added++;
+        summary[id] = { status };
+      }
+      return added;
+    }
+
+    return 0;
   }
 
-  // Pintar chips + setear clave de orden en el <td>
+  // 1) Intento principal: summary en lotes
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += CHUNK) chunks.push(ids.slice(i, i + CHUNK));
+
+  let chunkIndex = 0;
+  await Promise.all(
+    Array.from({ length: CONC_SUMMARY }, async () => {
+      while (true) {
+        const myIndex = chunkIndex++;
+        if (myIndex >= chunks.length) break;
+        const partIds = chunks[myIndex];
+
+        try {
+          const r = await fetch(`${API}/accounts/status/summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_ids: partIds })
+          });
+          if (r.ok) {
+            const json = await r.json();
+            const added = mergeSummary(json);
+            if (added > 0) onProgress?.(added); // avanza progreso por IDs resueltos
+          }
+        } catch (_) {
+          // silencioso; faltantes se resuelven con fallback
+        }
+      }
+    })
+  );
+
+  // 2) Fallback por cuenta para los que falten
+  const missing = ids.filter(id => !summary[id]);
+  if (missing.length) {
+    const tasks = missing.map(id => async () => {
+      try {
+        const [opps, hires] = await Promise.all([
+          fetch(`${API}/accounts/${id}/opportunities`).then(r => r.json()),
+          fetch(`${API}/accounts/${id}/opportunities/candidates`).then(r => r.json()),
+        ]);
+        summary[id] = { status: deriveStatusFrom(opps, hires) };
+      } catch {
+        summary[id] = { status: '—' };
+      } finally {
+        onProgress?.(1); // cada cuenta faltante completada
+      }
+    });
+    await runWithConcurrency(tasks, CONC_FALLBACK);
+  }
+
+  // 3) Pintar chips + clave de orden en el DOM (todas las filas)
   for (const id of ids) {
-    const td = document.querySelector(`#accountTableBody tr[data-id="${id}"] td.status-td`);
+    const row = rowById.get(id);
+    if (!row) continue;
+    const td = row.querySelector('td.status-td');
     const status = summary?.[id]?.status || '—';
     if (td) {
       td.innerHTML = renderAccountStatusChip(status);
-      td.dataset.order = String(statusRank(status)); // 👈 clave para sort
-    }
-
-    if (status !== '—') {
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calculated_status: status })
-      }).catch(() => {});
+      td.dataset.order = String(statusRank(status));
     }
   }
 
-  // ▶️ Re-leer DOM y ordenar por la columna Status (índice 1)
-  const table = $('#accountTable').DataTable();
-  table.rows().invalidate('dom');     // re-cachea los data-order
-  table.order([[1, 'asc']]).draw(false);
+  // 4) Persistir: intenta bulk, si falla cae a PATCH concurrente
+  try {
+    const updates = ids.map(id => ({
+      account_id: id,
+      calculated_status: summary?.[id]?.status || '—'
+    }));
+    const rb = await fetch(`${API}/accounts/status/bulk_update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates })
+    });
+    if (!rb.ok) throw new Error('bulk endpoint not available');
+  } catch {
+    const patchTasks = ids.map(id => async () => {
+      try {
+        await fetch(`${API}/accounts/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ calculated_status: summary?.[id]?.status || '—' })
+        });
+      } catch { /* noop */ }
+    });
+    await runWithConcurrency(patchTasks, 6);
+  }
 
-  hideSortToast(); // cerrar alerta
+  return summary; // por si quieres usarlo después
 }
 // Rank para el orden deseado: Active → Lead → Inactive → No data
 function statusRank(statusText){
@@ -402,14 +510,80 @@ function statusRank(statusText){
 }
 
 // Mini-toast
-function showSortToast(){
+// —— Estado interno del toast de ordenamiento —— //
+const _sortToastState = {
+  total: 0,
+  done: 0,
+  start: 0,
+};
+
+function _ensureSortToast() {
   const t = document.getElementById('crmSortToast');
-  if (t) t.classList.add('show');
-}
-function hideSortToast(){
-  const t = document.getElementById('crmSortToast');
-  if (t){
-    t.classList.add('hide');
-    setTimeout(() => t.remove(), 400);
+  if (!t) {
+    console.warn('crmSortToast element not found.');
   }
+  return t;
+}
+
+// Muestra el toast. Si pasas total > 0, mostrará porcentaje; si no, usa modo indeterminado.
+function showSortToast(total = 0) {
+  const t = _ensureSortToast();
+  if (!t) return;
+
+  _sortToastState.total = Number(total) || 0;
+  _sortToastState.done = 0;
+  _sortToastState.start = Date.now();
+
+  const bar = t.querySelector('.sort-toast__bar');
+  const percent = t.querySelector('#sortToastPercent');
+  const progress = t.querySelector('.sort-toast__progress');
+
+  if (bar) bar.style.width = '0%';
+  if (percent) percent.textContent = (_sortToastState.total ? '0%' : '…');
+  if (progress) progress.setAttribute('aria-valuenow', '0');
+
+  t.classList.remove('hide');
+  t.style.display = 'block';
+  if (_sortToastState.total) t.classList.remove('indeterminate');
+  else t.classList.add('indeterminate');
+  requestAnimationFrame(() => t.classList.add('show'));
+}
+
+// Actualiza progreso. Puedes llamar con (done, total) o solo con (incremento).
+function updateSortToast(doneOrInc, maybeTotal) {
+  const t = _ensureSortToast();
+  if (!t) return;
+
+  if (typeof maybeTotal === 'number' && maybeTotal > 0) {
+    _sortToastState.total = maybeTotal;
+    _sortToastState.done = Math.max(0, Math.min(maybeTotal, doneOrInc));
+  } else {
+    _sortToastState.done = Math.max(0, _sortToastState.done + (Number(doneOrInc) || 0));
+  }
+
+  const { done, total } = _sortToastState;
+  const bar = t.querySelector('.sort-toast__bar');
+  const percent = t.querySelector('#sortToastPercent');
+  const progress = t.querySelector('.sort-toast__progress');
+
+  if (total > 0) {
+    const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+    if (bar) bar.style.width = pct + '%';
+    if (percent) percent.textContent = pct + '%';
+    if (progress) progress.setAttribute('aria-valuenow', String(pct));
+    t.classList.remove('indeterminate');
+  } else {
+    // modo indeterminado
+    if (percent) percent.textContent = '…';
+    t.classList.add('indeterminate');
+  }
+}
+
+function hideSortToast() {
+  const t = _ensureSortToast();
+  if (!t) return;
+
+  t.classList.add('hide');
+  t.classList.remove('show');
+  setTimeout(() => { t.style.display = 'none'; }, 250);
 }
