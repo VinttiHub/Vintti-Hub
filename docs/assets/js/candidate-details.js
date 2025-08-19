@@ -685,15 +685,6 @@ function saveResume() {
           (data.affinda_scrapper && data.affinda_scrapper.trim()) ||
           (data.coresignal_scrapper && data.coresignal_scrapper.trim()) ||
           (data.linkedin && data.linkedin.trim());
-
-        document.querySelectorAll('.star-button').forEach(btn => {
-          if (!hasAnySource) {
-            btn.classList.add('disabled-star');
-            // … mismo tooltip/bloqueo que ya tienes
-          } else {
-            btn.classList.remove('disabled-star');
-          }
-        });
       // ⭐ Habilitar solo botón de About si existe entry en tabla resume
       const aboutStarBtn = document.querySelector('#about-star-button');
       if (aboutStarBtn) {
@@ -716,23 +707,27 @@ function saveResume() {
           });
       }
 
-      document.querySelectorAll('.star-button').forEach(btn => {
-        if (bothEmpty) {
-          btn.classList.add('disabled-star');
+    // 👇 calcula si NO hay ninguna fuente (linkedin/cv/affinda/coresignal/url)
+    const bothEmpty = !(
+      (data.linkedin_scrapper && data.linkedin_scrapper.trim()) ||
+      (data.cv_pdf_scrapper && data.cv_pdf_scrapper.trim()) ||
+      (data.affinda_scrapper && data.affinda_scrapper.trim()) ||
+      (data.coresignal_scrapper && data.coresignal_scrapper.trim()) ||
+      (data.linkedin && data.linkedin.trim())
+    );
 
-          // Tooltip + bloquear acción
-          btn.addEventListener('click', e => {
-            e.preventDefault();
-            e.stopPropagation();
-          });
+    // Aplica estado + bloqueo + tooltip en un solo paso
+    document.querySelectorAll('.star-button').forEach(btn => {
+      btn.classList.toggle('disabled-star', bothEmpty);
 
-          btn.addEventListener('mouseenter', () => {
-            showStarTooltip(btn);
-          });
+      if (bothEmpty) {
+        const block = (e) => { e.preventDefault(); e.stopPropagation(); };
+        btn.addEventListener('click', block);
+        btn.addEventListener('mouseenter', () => showStarTooltip(btn));
+        btn.addEventListener('mouseleave', hideStarTooltip);
+      }
+    });
 
-          btn.addEventListener('mouseleave', hideStarTooltip);
-        }
-      });
     });
     if (aiLinkedInScrap) {
     aiLinkedInScrap.addEventListener('blur', () => {
