@@ -177,45 +177,66 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
     console.error('Error fetching account data:', err);
   });
 
-  // 🆕 Crear nuevo account desde el formulario
-  const form = document.querySelector('.popup-form');
+// 🆕 Crear nuevo account desde el formulario
+const form = document.querySelector('.popup-form');
 
-  if (form) {
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+if (form) {
+  // Referencia al dropdown nuevo (debe existir en el HTML con name="where_come_from")
+  const sourceSelect = form.querySelector('select[name="where_come_from"]');
 
-  const formData = new FormData(form);
-  const data = Object.fromEntries(formData.entries());
-
-  console.log("📤 Enviando datos al backend:", data);  // ✅ Ver qué datos se envían
-
-  try {
-    const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
+  // Limpia mensajes de validación cuando cambia
+  if (sourceSelect) {
+    sourceSelect.addEventListener('change', () => {
+      sourceSelect.setCustomValidity('');
     });
+  }
 
-    console.log("📥 Respuesta recibida:", response);  // ✅ Ver el status y headers
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-    if (response.ok) {
-      const responseData = await response.json();
-      console.log("✅ Éxito al crear account:", responseData);
-      alert('✅ Account created!');
-      location.reload();
-    } else {
-      const errorText = await response.text();
-      console.warn("⚠️ Error al crear account:", errorText);
-      alert('Error: ' + errorText);
+    // Validación suave por si el required no dispara (Safari viejito, etc.)
+    if (sourceSelect && !sourceSelect.value) {
+      sourceSelect.setCustomValidity('Please select a lead source');
+      sourceSelect.reportValidity();
+      return;
     }
-  } catch (err) {
-    console.error("❌ Error inesperado al enviar request:", err);
-    alert('⚠️ Error sending request');
-  }
-});
-  }
+
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // Asegurar string limpio
+    if (data.where_come_from != null) {
+      data.where_come_from = String(data.where_come_from).trim();
+    }
+
+    console.log("📤 Enviando datos al backend:", data);
+
+    try {
+      const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      console.log("📥 Respuesta recibida:", response);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log("✅ Éxito al crear account:", responseData);
+        alert('✅ Account created!');
+        location.reload();
+      } else {
+        const errorText = await response.text();
+        console.warn("⚠️ Error al crear account:", errorText);
+        alert('Error: ' + errorText);
+      }
+    } catch (err) {
+      console.error("❌ Error inesperado al enviar request:", err);
+      alert('⚠️ Error sending request');
+    }
+  });
+}
+
 // 🟣 SIDEBAR TOGGLE CON MEMORIA (único y sin colisión)
 const sidebarToggleBtn = document.getElementById('sidebarToggle');
 const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');

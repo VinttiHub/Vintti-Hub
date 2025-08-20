@@ -333,6 +333,7 @@ body {
 
 /* INPUTS */
 .popup-form input[type="text"],
+.popup-form input[type="email"],
 .popup-form select,
 .popup-form textarea {
     background-color: #fefefe;

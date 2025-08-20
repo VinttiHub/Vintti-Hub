@@ -154,7 +154,20 @@
         <label>LinkedIn</label>
         <input type="text" name="linkedin" placeholder="LinkedIn URL" />
       </div>
-
+      <div class="popup-field">
+        <label>Lead source</label>
+        <select name="where_come_from" required>
+          <option value="" disabled selected>Select source</option>
+          <option>Google</option>
+          <option>Campaign</option>
+          <option>LinkedIn</option>
+          <option>Referral</option>
+          <option>Cold call in</option>
+          <option>ChatGPT</option>
+          <option>Community</option>
+          <option>Internet</option>
+        </select>
+      </div>
       <div class="popup-field full">
         <label>About</label>
         <textarea name="about" placeholder="Write a description..."></textarea>

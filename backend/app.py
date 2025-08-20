@@ -841,8 +841,9 @@ def accounts():
             query = """
                 INSERT INTO account (
                     client_name, Size, timezone, state,
-                    website, linkedin, comments, mail
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    website, linkedin, comments, mail,
+                    where_come_from
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             cursor.execute(query, (
@@ -853,7 +854,8 @@ def accounts():
                 data.get("website"),
                 data.get("linkedin"),
                 data.get("about"),
-                data.get("mail")  # ✅ Nuevo campo mail
+                data.get("mail"),
+                data.get("where_come_from")  # ✅ nuevo
             ))
 
             conn.commit()
@@ -1145,7 +1147,8 @@ def update_account_fields(account_id):
         'timezone',
         'pain_points',
         'priority',
-        'contract'
+        'contract',
+        'where_come_from' 
     ]
 
     updates = []
