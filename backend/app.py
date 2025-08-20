@@ -1114,22 +1114,6 @@ def update_opportunity_fields(opportunity_id):
                     except (TypeError, ValueError):
                         return jsonify({'error': 'candidato_contratado must be an integer'}), 400
 
-                    # Inserción idempotente SIN requerir UNIQUE
-                    logging.info("🧩 Asegurando fila en hire_opportunity (cand=%s, opp=%s)", candidate_hired_id, opportunity_id)
-                    cursor.execute("""
-                        INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
-                        SELECT %s, %s, o.account_id
-                        FROM opportunity o
-                        WHERE o.opportunity_id = %s
-                          AND NOT EXISTS (
-                              SELECT 1
-                              FROM hire_opportunity h
-                              WHERE h.candidate_id = %s
-                                AND h.opportunity_id = %s
-                          )
-                    """, (candidate_hired_id, opportunity_id, opportunity_id, candidate_hired_id, opportunity_id))
-                    logging.info("✅ INSERT hire_opportunity (si no existía)")
-
                     # Marcar status "Client hired" en batches vinculados a esta opp
                     cursor.execute("""
                         UPDATE candidates_batches cb
