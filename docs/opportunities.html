@@ -126,6 +126,23 @@
       <option>Replacement</option>
     </select>
   </div>
+  <!-- Replacement extra fields (hidden by default) -->
+  <div id="replacementFields" style="display:none;">
+    <div class="popup-field">
+      <label for="replacementCandidate">Candidate to replace</label>
+      <input type="text"
+             id="replacementCandidate"
+             list="replacementCandidates"
+             placeholder="Search candidate by name..."
+             autocomplete="off" />
+      <datalist id="replacementCandidates"></datalist>
+    </div>
+
+    <div class="popup-field">
+      <label for="replacementEndDate">Replacement end date</label>
+      <input type="date" id="replacementEndDate" />
+    </div>
+  </div>
 
   <button type="submit" class="create-btn">Create</button>
 </form>

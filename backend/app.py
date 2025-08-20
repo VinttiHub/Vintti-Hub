@@ -786,39 +786,42 @@ def create_opportunity():
     sales_lead = data.get('sales_lead')
     opp_type = data.get('opp_type')
 
+    # 🆕 opcionales para Replacement
+    replacement_of = data.get('replacement_of')              # candidate_id
+    replacement_end_date = data.get('replacement_end_date')  # 'YYYY-MM-DD'
+
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # 🔍 Buscar el account_id según el client_name
         cursor.execute("SELECT account_id FROM account WHERE client_name = %s LIMIT 1", (client_name,))
         account_row = cursor.fetchone()
-
         if not account_row:
             return jsonify({'error': f'No account found for client_name: {client_name}'}), 400
-
         account_id = account_row[0]
-        # 🔍 Obtener el siguiente opportunity_id
+
         cursor.execute("SELECT COALESCE(MAX(opportunity_id), 0) + 1 FROM opportunity")
         new_opportunity_id = cursor.fetchone()[0]
 
-        # 🔽 Insertar con ID manual
         cursor.execute("""
             INSERT INTO opportunity (
-                opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead, opp_type, opp_stage
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (new_opportunity_id, account_id, opp_model, position_name, sales_lead, opp_type, 'Deep Dive'))
+                opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead,
+                opp_type, opp_stage, replacement_of, replacement_end_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            new_opportunity_id, account_id, opp_model, position_name, sales_lead,
+            opp_type, 'Deep Dive', replacement_of, replacement_end_date
+        ))
+
         conn.commit()
-
-        cursor.close()
-        conn.close()
-
+        cursor.close(); conn.close()
         return jsonify({'message': 'Opportunity created successfully'}), 201
 
     except Exception as e:
         import traceback
-        print(traceback.format_exc())  # También útil por si miras logs luego
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
     
 
 
@@ -1058,7 +1061,9 @@ def update_opportunity_fields(opportunity_id):
         'hr_job_description',
         'comments',
         'motive_close_lost',
-        'client_interviewing_process'
+        'client_interviewing_process',
+        'replacement_of',
+        'replacement_end_date'
     ]
 
     updates, values = [], []

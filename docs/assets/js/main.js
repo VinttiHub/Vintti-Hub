@@ -1,5 +1,53 @@
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- Replacement UI wiring ---
+const oppTypeSelect = document.getElementById('opp_type');
+const replacementFields = document.getElementById('replacementFields');
+const replacementCandidateInput = document.getElementById('replacementCandidate');
+const replacementCandidatesList  = document.getElementById('replacementCandidates');
+const replacementEndDateInput    = document.getElementById('replacementEndDate');
+
+function toggleReplacementFields() {
+  const isReplacement = oppTypeSelect && oppTypeSelect.value === 'Replacement';
+  if (replacementFields) replacementFields.style.display = isReplacement ? 'block' : 'none';
+  if (!isReplacement) {
+    if (replacementCandidateInput) replacementCandidateInput.value = '';
+    if (replacementEndDateInput) replacementEndDateInput.value = '';
+  }
+}
+oppTypeSelect?.addEventListener('change', toggleReplacementFields);
+toggleReplacementFields();
+
+// Small debounce helper
+function debounce(fn, wait = 250) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+}
+
+// Live search against /candidates?search=
+replacementCandidateInput?.addEventListener('input', debounce(async (e) => {
+  const q = e.target.value.trim();
+  if (q.length < 2) return; // avoid spam
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(q)}`);
+    const items = await res.json();
+    replacementCandidatesList.innerHTML = '';
+    items.forEach(({ candidate_id, name }) => {
+      const opt = document.createElement('option');
+      opt.value = `${candidate_id} - ${name}`;
+      replacementCandidatesList.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Error searching candidates:', err);
+  }
+}, 250));
+
+function getReplacementCandidateId() {
+  if (!replacementCandidateInput?.value) return null;
+  const idStr = replacementCandidateInput.value.split(' - ')[0];
+  const id = parseInt(idStr, 10);
+  return Number.isInteger(id) ? id : null;
+}
+
 const toggleSidebarButton = document.getElementById("sidebarToggleUnique");
 const sidebar = document.querySelector(".sidebar");
 const mainContent = document.querySelector(".main-content");
@@ -652,30 +700,50 @@ const createButton = createOpportunityForm?.querySelector('.create-btn');
 
 if (createOpportunityForm && createButton) {
 
-  // Validación dinámica → activar o desactivar botón
+  // Habilitar/deshabilitar botón según campos
   createOpportunityForm.addEventListener('input', () => {
-    const clientName = createOpportunityForm.client_name.value.trim();
-    const oppModel = createOpportunityForm.opp_model.value;
+    const clientName   = createOpportunityForm.client_name.value.trim();
+    const oppModel     = createOpportunityForm.opp_model.value;
     const positionName = createOpportunityForm.position_name.value.trim();
-    const salesLead = createOpportunityForm.sales_lead.value;
-    const oppType = createOpportunityForm.opp_type.value;
+    const salesLead    = createOpportunityForm.sales_lead.value;
+    const oppType      = createOpportunityForm.opp_type.value;
 
-    const allFilled = clientName && oppModel && positionName && salesLead && oppType;
+    const needsReplacement = oppType === 'Replacement';
+    const hasRepCandidate  = !!getReplacementCandidateId();
+    const hasRepEndDate    = !!replacementEndDateInput?.value;
+
+    const allFilled = clientName && oppModel && positionName && salesLead && oppType &&
+                      (!needsReplacement || (hasRepCandidate && hasRepEndDate));
+
     createButton.disabled = !allFilled;
   });
 
-  // Validación al hacer submit
+  // Submit
   createOpportunityForm.addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const formData = {
-      client_name: createOpportunityForm.client_name.value.trim(),
-      opp_model: createOpportunityForm.opp_model.value,
+      client_name:   createOpportunityForm.client_name.value.trim(),
+      opp_model:     createOpportunityForm.opp_model.value,
       position_name: createOpportunityForm.position_name.value.trim(),
-      sales_lead: createOpportunityForm.sales_lead.value,
-      opp_type: createOpportunityForm.opp_type.value,
-      opp_stage: 'Deep Dive'
+      sales_lead:    createOpportunityForm.sales_lead.value,
+      opp_type:      createOpportunityForm.opp_type.value,
+      opp_stage:     'Deep Dive'
     };
+
+    if (formData.opp_type === 'Replacement') {
+      const repId = getReplacementCandidateId();
+      if (!repId) {
+        alert('Please select a valid candidate to replace (pick from the list).');
+        return;
+      }
+      if (!replacementEndDateInput.value) {
+        alert('Please select the replacement end date.');
+        return;
+      }
+      formData.replacement_of = repId;                          // ← guarda candidate_id
+      formData.replacement_end_date = replacementEndDateInput.value; // ← guarda fecha
+    }
 
     try {
       const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities', {
@@ -700,6 +768,7 @@ if (createOpportunityForm && createButton) {
     }
   });
 }
+
 
 fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts')
   .then(response => response.json())
