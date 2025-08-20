@@ -2079,12 +2079,27 @@ def handle_candidate_hire_data(candidate_id):
                         WHERE candidate_id = %s AND opportunity_id = %s
                     """, (computed_end, candidate_id, opportunity_id))
 
-            # 2.5) Marcar al candidato como "Client hired" en candidates_batches
+            # 2.5) Marcar al candidato como "Client hired" en candidates_batches (vía batch)
             cursor.execute("""
-                UPDATE candidates_batches
+                UPDATE candidates_batches cb
                 SET status = %s
-                WHERE candidate_id = %s AND opportunity_id = %s
+                WHERE cb.candidate_id = %s
+                  AND EXISTS (
+                    SELECT 1
+                    FROM batch b
+                    WHERE b.batch_id = cb.batch_id
+                      AND b.opportunity_id = %s
+                  )
             """, ('Client hired', candidate_id, opportunity_id))
+
+            # Fallback: si no hay batches ligados a esta opp, marcar cualquier batch del candidato
+            if cursor.rowcount == 0:
+                cursor.execute("""
+                    UPDATE candidates_batches
+                    SET status = %s
+                    WHERE candidate_id = %s
+                """, ('Client hired', candidate_id))
+
             # Después de insertar/actualizar hire_opportunity, forzamos el status
             cursor.execute("""
                 UPDATE hire_opportunity
