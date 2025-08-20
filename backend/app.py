@@ -1113,17 +1113,14 @@ def update_opportunity_fields(opportunity_id):
                     except (TypeError, ValueError):
                         return jsonify({'error': 'candidato_contratado must be an integer'}), 400
 
-                    # 2.1) Asegurar fila en hire_opportunity (sin duplicar)
+                    # ✅ Insertar de forma idempotente (no depende de batches)
                     cursor.execute("""
                         INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
                         SELECT %s, %s, o.account_id
                         FROM opportunity o
                         WHERE o.opportunity_id = %s
-                          AND NOT EXISTS (
-                            SELECT 1 FROM hire_opportunity
-                            WHERE candidate_id = %s AND opportunity_id = %s
-                          )
-                    """, (candidate_hired_id, opportunity_id, opportunity_id, candidate_hired_id, opportunity_id))
+                        ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
+                    """, (candidate_hired_id, opportunity_id, opportunity_id))
 
                     # 2.2) Actualizar status en candidates_batches a "Client hired" para batches de esta opp
                     cursor.execute("""
@@ -2006,6 +2003,11 @@ def handle_candidate_hire_data(candidate_id):
             set_cols, set_vals = [], []
             # 👇 Siempre insertamos candidate_id, opportunity_id y account_id si no existe
             insert_cols, insert_vals = ['candidate_id', 'opportunity_id', 'account_id'], [candidate_id, opportunity_id, account_id]
+            cursor.execute("""
+                INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
+            """, (candidate_id, opportunity_id, account_id))
 
             for k, col in mapping.items():
                 if k in data:

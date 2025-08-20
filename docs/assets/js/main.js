@@ -991,7 +991,7 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
     await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({ opportunity_id: Number(opportunityId) }) // 👈 clave del fix
     });
 
     // 3) Recién ahora cambiamos el stage
