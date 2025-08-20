@@ -332,20 +332,33 @@ def get_candidates():
         return jsonify({"error": str(e)}), 500
 
 def search_candidates():
-    q = request.args.get('search', '').strip()
+    q = (request.args.get('search') or '').strip()
+    # evita búsquedas vacías o de 1 char para no cargar DB
+    if len(q) < 2:
+        return jsonify([])
+
     conn = get_connection()
     cur = conn.cursor()
-    # fuzzy match en nombre
-    cur.execute("""
-      SELECT candidate_id, name 
-      FROM candidates
-      WHERE name ILIKE %s
-      ORDER BY similarity(name, %s) DESC
-      LIMIT 5;
-    """, (f'%{q}%', q))
-    rows = cur.fetchall()
-    cur.close(); conn.close()
-    return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
+    try:
+        # ✅ sin pg_trgm, ranking básico por nombre
+        pattern = f"%{q}%"
+        cur.execute("""
+            SELECT candidate_id, name
+            FROM candidates
+            WHERE name ILIKE %s
+            ORDER BY LOWER(name) ASC
+            LIMIT 10;
+        """, (pattern,))
+        rows = cur.fetchall()
+        return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
+    except Exception as e:
+        # log y respuesta controlada
+        import logging, traceback
+        logging.error("search_candidates failed: %s\n%s", e, traceback.format_exc())
+        return jsonify([]), 200
+    finally:
+        cur.close(); conn.close()
+
 
 
 @app.route('/login', methods=['POST'])

@@ -694,6 +694,14 @@ document.getElementById('login-form')?.addEventListener('submit', async function
     alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
   }
 });
+// 🔧 HAZ GLOBAL el helper para que exista donde lo usas
+window.getReplacementCandidateId = function () {
+  const input = document.getElementById('replacementCandidate');
+  if (!input || !input.value) return null;
+  const idStr = String(input.value).split(' - ')[0].trim();
+  const id = parseInt(idStr, 10);
+  return Number.isFinite(id) ? id : null;
+};
 
 const createOpportunityForm = document.getElementById('createOpportunityForm');
 const createButton = createOpportunityForm?.querySelector('.create-btn');
