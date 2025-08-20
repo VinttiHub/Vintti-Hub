@@ -1063,7 +1063,8 @@ def update_opportunity_fields(opportunity_id):
         'motive_close_lost',
         'client_interviewing_process',
         'replacement_of',
-        'replacement_end_date'
+        'replacement_end_date',
+        'candidato_contratado' 
     ]
 
     updates, values = [], []
