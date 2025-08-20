@@ -703,11 +703,14 @@ window.getReplacementCandidateId = function () {
   return Number.isFinite(id) ? id : null;
 };
 
+// --- Create Opportunity form (drop-in fix de scope) ---
 const createOpportunityForm = document.getElementById('createOpportunityForm');
 const createButton = createOpportunityForm?.querySelector('.create-btn');
 
-if (createOpportunityForm && createButton) {
+// helper seguro para leer el end date del replacement
+const getReplacementEndDateEl = () => document.getElementById('replacementEndDate');
 
+if (createOpportunityForm && createButton) {
   // Habilitar/deshabilitar botón según campos
   createOpportunityForm.addEventListener('input', () => {
     const clientName   = createOpportunityForm.client_name.value.trim();
@@ -718,7 +721,7 @@ if (createOpportunityForm && createButton) {
 
     const needsReplacement = oppType === 'Replacement';
     const hasRepCandidate  = !!getReplacementCandidateId();
-    const hasRepEndDate    = !!replacementEndDateInput?.value;
+    const hasRepEndDate    = !!getReplacementEndDateEl()?.value;
 
     const allFilled = clientName && oppModel && positionName && salesLead && oppType &&
                       (!needsReplacement || (hasRepCandidate && hasRepEndDate));
@@ -727,7 +730,7 @@ if (createOpportunityForm && createButton) {
   });
 
   // Submit
-  createOpportunityForm.addEventListener('submit', async function (e) {
+  createOpportunityForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const formData = {
@@ -741,16 +744,18 @@ if (createOpportunityForm && createButton) {
 
     if (formData.opp_type === 'Replacement') {
       const repId = getReplacementCandidateId();
+      const endEl = getReplacementEndDateEl();
+
       if (!repId) {
         alert('Please select a valid candidate to replace (pick from the list).');
         return;
       }
-      if (!replacementEndDateInput.value) {
+      if (!endEl?.value) {
         alert('Please select the replacement end date.');
         return;
       }
-      formData.replacement_of = repId;                          // ← guarda candidate_id
-      formData.replacement_end_date = replacementEndDateInput.value; // ← guarda fecha
+      formData.replacement_of = repId;
+      formData.replacement_end_date = endEl.value;
     }
 
     try {
@@ -759,7 +764,6 @@ if (createOpportunityForm && createButton) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-
       const result = await response.json();
 
       if (response.ok) {
