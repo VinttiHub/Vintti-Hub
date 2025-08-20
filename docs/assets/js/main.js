@@ -822,7 +822,7 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     case 'Close Win':
       return '<span class="stage-pill stage-closewin">Close Win</span>';
     case 'Closed Lost':
-      return '<span class="stage-pill stage-closewin">Close Win</span>';
+      return '<span class="stage-pill stage-closewin">Closed Lost</span>';
     case 'Negotiating':
       return '<span class="stage-pill stage-negotiating">Negotiating</span>';
     case 'Interviewing':
@@ -971,41 +971,48 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
   loadCandidatesForCloseWin();
 
   const saveBtn = document.getElementById('saveCloseWin');
-  saveBtn.onclick = async () => {
-    const date = document.getElementById('closeWinDate').value;
-    const hireInput = document.getElementById('closeWinHireInput').value;
-    const candidateId = parseInt(hireInput.split(' - ')[0], 10); // solo el ID
+saveBtn.onclick = async () => {
+  const date = document.getElementById('closeWinDate').value;
+  const hireInput = document.getElementById('closeWinHireInput').value;
+  const candidateId = parseInt(hireInput.split(' - ')[0], 10);
 
-    if (!date || !candidateId) {
-      alert('Please select a hire and date.');
-      return;
+  if (!date || !candidateId) {
+    alert('Please select a hire and date.');
+    return;
+  }
+
+  try {
+    // 1) Guardar fecha + contratado en opportunity (con logs y errores claros)
+    await patchOppFields(opportunityId, {
+      opp_close_date: date,
+      candidato_contratado: candidateId
+    });
+
+    // 2) Asegurar la fila en hire_opportunity (tu endpoint ya es idempotente)
+    const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: Number(opportunityId) })
+    });
+    if (!res2.ok) {
+      const t = await res2.text();
+      console.error('❌ /candidates/{id}/hire PATCH failed:', res2.status, t);
+      throw new Error(`hire PATCH ${res2.status}: ${t}`);
     }
 
-    // 1) Guardar fecha de cierre y candidato contratado en opportunity
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        opp_close_date: date,
-        candidato_contratado: candidateId
-      })
-    });
-
-    // 2) CREAR/ASEGURAR la fila en hire_opportunity (backend ahora inserta aunque el body esté vacío)
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: Number(opportunityId) }) // 👈 clave del fix
-    });
-
-    // 3) Recién ahora cambiamos el stage
+    // 3) Cambiar stage
     await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
 
-    // 4) Cerrar y redirigir a la pestaña Hire del candidato
+    // 4) Cerrar y redirigir
     popup.style.display = 'none';
     localStorage.setItem('fromCloseWin', 'true');
     window.location.href = `candidate-details.html?id=${candidateId}#hire`;
-  };
+  } catch (err) {
+    console.error('❌ Close Win flow failed:', err);
+    alert(`Close Win failed:\n${err.message}`);
+  }
+};
+
 }
 
 function loadCandidatesForCloseWin() {
@@ -1092,4 +1099,18 @@ function openCloseLostPopup(opportunityId, dropdownElement) {
 
 function closeCloseLostPopup() {
   document.getElementById('closeLostPopup').style.display = 'none';
+}
+async function patchOppFields(oppId, payload) {
+  console.log("📤 PATCH /opportunities/%s/fields", oppId, payload);
+  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    console.error('❌ fields PATCH failed:', res.status, text);
+    throw new Error(`fields PATCH ${res.status}: ${text}`);
+  }
+  try { return JSON.parse(text); } catch { return text; }
 }

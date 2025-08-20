@@ -1050,11 +1050,10 @@ def get_candidate_by_id(candidate_id):
 @app.route('/opportunities/<int:opportunity_id>/fields', methods=['PATCH'])
 def update_opportunity_fields(opportunity_id):
     data = request.get_json() or {}
+    logging.info("📥 PATCH /opportunities/%s/fields payload=%s", opportunity_id, json.dumps(data, default=str))
 
-    # 🔔 Campo "virtual" (solo trigger, NO se guarda en opportunity)
     candidate_hired_id = data.get('candidato_contratado')
 
-    # ✅ Campos que sí se actualizan en opportunity
     updatable_fields = [
         'nda_signature_or_start_date',
         'since_sourcing',
@@ -1066,7 +1065,7 @@ def update_opportunity_fields(opportunity_id):
         'max_salary',
         'years_experience',
         'fee',
-        'opp_comments',
+        'opp_comments',  # ojo: sólo si realmente existe en la tabla; si no, no lo envíes
         'first_meeting_recording',
         'opp_close_date',
         'opp_sales_lead',
@@ -1077,52 +1076,61 @@ def update_opportunity_fields(opportunity_id):
         'client_interviewing_process',
         'replacement_of',
         'replacement_end_date',
-        'candidato_contratado' 
+        'candidato_contratado'
     ]
 
     updates, values = [], []
     for field in updatable_fields:
         if field in data:
-            # Castear a DATE los campos de fecha
             if field in ('opp_close_date', 'nda_signature_or_start_date', 'since_sourcing'):
                 updates.append(f"{field} = %s::date")
             else:
                 updates.append(f"{field} = %s")
             values.append(data[field])
 
-    if not updates and not candidate_hired_id:
+    if not updates and candidate_hired_id is None:
+        logging.warning("⚠️ Nada que actualizar y sin candidato_contratado")
         return jsonify({'error': 'No valid fields provided'}), 400
 
     try:
         conn = get_connection()
         with conn:
             with conn.cursor() as cursor:
-                # 1) Actualizar opportunity (si hay algo que actualizar)
+                # 1) Update de opportunity
                 if updates:
+                    logging.info("🛠 SET %s", ', '.join(updates))
                     values.append(opportunity_id)
                     cursor.execute(f"""
                         UPDATE opportunity
                         SET {', '.join(updates)}
                         WHERE opportunity_id = %s
                     """, values)
+                    logging.info("✅ UPDATE opportunity (%s filas)", cursor.rowcount)
 
-                # 2) Si vino "candidato_contratado", disparar efectos de Close Win
+                # 2) Efectos de Close Win (si vino candidato_contratado)
                 if candidate_hired_id is not None:
                     try:
                         candidate_hired_id = int(candidate_hired_id)
                     except (TypeError, ValueError):
                         return jsonify({'error': 'candidato_contratado must be an integer'}), 400
 
-                    # ✅ Insertar de forma idempotente (no depende de batches)
+                    # Inserción idempotente SIN requerir UNIQUE
+                    logging.info("🧩 Asegurando fila en hire_opportunity (cand=%s, opp=%s)", candidate_hired_id, opportunity_id)
                     cursor.execute("""
                         INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
                         SELECT %s, %s, o.account_id
                         FROM opportunity o
                         WHERE o.opportunity_id = %s
-                        ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
-                    """, (candidate_hired_id, opportunity_id, opportunity_id))
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM hire_opportunity h
+                              WHERE h.candidate_id = %s
+                                AND h.opportunity_id = %s
+                          )
+                    """, (candidate_hired_id, opportunity_id, opportunity_id, candidate_hired_id, opportunity_id))
+                    logging.info("✅ INSERT hire_opportunity (si no existía)")
 
-                    # 2.2) Actualizar status en candidates_batches a "Client hired" para batches de esta opp
+                    # Marcar status "Client hired" en batches vinculados a esta opp
                     cursor.execute("""
                         UPDATE candidates_batches cb
                         SET status = %s
@@ -1134,20 +1142,18 @@ def update_opportunity_fields(opportunity_id):
                               AND b.opportunity_id = %s
                           )
                     """, ('Client hired', candidate_hired_id, opportunity_id))
-
-                    # Fallback: si no hay batches ligados a esta opp, actualizar cualquier batch del candidato
                     if cursor.rowcount == 0:
                         cursor.execute("""
                             UPDATE candidates_batches
                             SET status = %s
                             WHERE candidate_id = %s
                         """, ('Client hired', candidate_hired_id))
+                    logging.info("🟢 candidates_batches actualizado")
 
         return jsonify({'success': True}), 200
 
     except Exception as e:
-        # Log claro para ver la causa exacta en server logs
-        print("Error updating opportunity fields:", e)
+        logging.exception("❌ Error updating opportunity fields (opp=%s)", opportunity_id)
         return jsonify({'error': str(e)}), 500
 
 
