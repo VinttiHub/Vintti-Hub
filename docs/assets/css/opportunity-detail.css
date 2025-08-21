@@ -2261,3 +2261,16 @@ input:checked + .slider::before {
   position: static !important;
   margin: 12px 0 20px 0;
 }
+/* Centra la flecha dentro de cualquier popup */
+.popup-content .arrow-btn,
+#goToCreateCandidateBtn.arrow-btn {
+  display: inline-flex;
+  margin: 8px auto 0;    /* ← centra horizontal */
+  align-self: center;    /* ← centra en contenedor flex column */
+  width: 48px;
+  height: 48px;
+}
+
+#precreate-no-match { 
+  text-align: center;    /* por si la flecha vive dentro de este bloque */
+}

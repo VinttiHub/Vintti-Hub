@@ -7,6 +7,50 @@ function toggleActiveButton(command, button) {
   document.execCommand(command, false, '');
   button.classList.toggle('active');
 }
+// --- SPEED UPS: caché + prewarm de candidatos para búsquedas instantáneas ---
+const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+let __cands = { data: [], idx: [], ts: 0 };
+let __candsInFlight = null;
+
+const quickDebounce = (fn, ms = 120) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+function buildIndex(list) {
+  return list.map(c => ({ ...c, _haystack: norm(`${c.name} ${c.linkedin} ${c.phone}`) }));
+}
+
+async function fetchAllCandidates() {
+  const r = await fetch(`${API_BASE}/candidates`, { cache: 'no-store' });
+  const data = await r.json();
+  __cands = { data, idx: buildIndex(data), ts: Date.now() };
+  try { localStorage.setItem('all_candidates_cache', JSON.stringify({ ts: __cands.ts, data })); } catch {}
+  return __cands;
+}
+
+async function getCandidatesCached() {
+  const fresh = (Date.now() - __cands.ts) < CAND_CACHE_TTL && __cands.idx.length;
+  if (fresh) return __cands;
+  if (__candsInFlight) return __candsInFlight; // ya hay una petición andando
+
+  // Warm start desde localStorage si existe
+  if (!__cands.data.length) {
+    try {
+      const raw = localStorage.getItem('all_candidates_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        __cands = { data: parsed.data || [], idx: buildIndex(parsed.data || []), ts: parsed.ts || 0 };
+      }
+    } catch {}
+  }
+  __candsInFlight = fetchAllCandidates().finally(() => { __candsInFlight = null; });
+  return __candsInFlight;
+}
+
+// 🔥 Precalienta en cuanto carga la página (mitiga cold start del backend)
+document.addEventListener('DOMContentLoaded', () => { getCandidatesCached(); });
+
 document.addEventListener('DOMContentLoaded', () => {
   // 🔹 Mostrar popup para elegir acción
 document.getElementById('createCandidateBtn').addEventListener('click', () => {
@@ -45,7 +89,7 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', () =>
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
 });
-document.getElementById('openNewCandidatePopup').addEventListener('click', async () => {
+function openPreCreateModal() {
   document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
   document.getElementById('preCreateCheckPopup').classList.remove('hidden');
 
@@ -59,81 +103,70 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', async
   foundMsg.style.display = 'none';
   noMatch.style.display = 'none';
 
-  const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates');
-  const candidates = await res.json();
-
-  input.addEventListener('input', () => {
-    const term = input.value.toLowerCase().trim().split(' ');
+  // Un (1) único listener siempre, sin duplicados en reaperturas
+  input.oninput = quickDebounce(async () => {
+    const termRaw = input.value.trim();
+    const term = norm(termRaw);
     results.innerHTML = '';
     foundMsg.style.display = 'none';
     noMatch.style.display = 'none';
+    if (!term || term.length < 2) return;
 
-    const matches = candidates.filter(c => {
-      const name = c.name?.toLowerCase() || '';
-      const linkedin = c.linkedin?.toLowerCase() || '';
-      const phone = c.phone?.toLowerCase() || '';
+    const tokens = term.split(/\s+/).filter(Boolean);
+    const { idx } = await getCandidatesCached();
 
-      return term.every(t =>
-        name.includes(t) ||
-        linkedin.includes(t) ||
-        phone.includes(t)
-      );
-    });
-
-
-    if (matches.length === 0 && term.join('').length > 3) {
-      noMatch.style.display = 'block';
-    } else if (matches.length > 0) {
-      foundMsg.style.display = 'block';
-      matches.forEach(c => {
-        const li = document.createElement('li');
-        li.classList.add('search-result-item');
-        li.setAttribute('data-candidate-id', c.candidate_id);
-
-        const matchBy = term.map(t => {
-          if ((c.name || '').toLowerCase().includes(t)) return 'Name';
-          if ((c.linkedin || '').toLowerCase().includes(t)) return 'LinkedIn';
-          if ((c.phone || '').toLowerCase().includes(t)) return 'Phone';
-          return null;
-        }).filter(Boolean)[0] || 'Name';
-
-        li.innerHTML = `
-          <div style="font-weight: 600;">${c.name}</div>
-          <div style="font-size: 12px; color: #666;">🔍 Match by ${matchBy}</div>
-        `;
-
-        li.classList.add('search-result-item');
-        li.setAttribute('data-candidate-id', c.candidate_id);
-        results.appendChild(li);
-
-        li.addEventListener('click', async () => {
-          const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
-          if (!opportunityId || !c.candidate_id) return alert('❌ Invalid candidate or opportunity');
-
-          // 🔁 Insertar en tabla intermedia
-          await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ candidate_id: c.candidate_id })
-          });
-
-          // 🔁 Mostrar tarjeta en columna "Contactado"
-          const cardTemplate = document.getElementById('candidate-card-template');
-          const newCard = cardTemplate.content.cloneNode(true);
-          newCard.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
-          newCard.querySelector('.candidate-email').textContent = c.email || '';
-          newCard.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-          newCard.querySelector('.candidate-status-dropdown')?.remove();
-          document.querySelector('#contacted').appendChild(newCard);
-
-          document.getElementById('preCreateCheckPopup').classList.add('hidden');
-          showFriendlyPopup(`✅ ${c.name} added to pipeline`);
-          loadPipelineCandidates();
-        });
-      });
+    // filtro ultra rápido + top 50 para no saturar el DOM
+    const matches = [];
+    for (const c of idx) {
+      if (tokens.every(t => c._haystack.includes(t))) {
+        matches.push(c);
+        if (matches.length >= 50) break;
+      }
     }
-  });
-});
+
+    if (!matches.length && term.length >= 3) {
+      noMatch.style.display = 'block';
+      return;
+    }
+
+    foundMsg.style.display = 'block';
+    for (const c of matches) {
+      const li = document.createElement('li');
+      li.className = 'search-result-item';
+      li.dataset.candidateId = c.candidate_id;
+      li.innerHTML = `
+        <div style="font-weight:600;">${c.name || '(no name)'}</div>
+        <div style="font-size:12px;color:#666;">🔍 Match</div>
+      `;
+      li.addEventListener('click', async () => {
+        const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+        if (!opportunityId || !c.candidate_id) return alert('❌ Invalid candidate or opportunity');
+
+        await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidate_id: c.candidate_id })
+        });
+
+        const tpl = document.getElementById('candidate-card-template');
+        const frag = tpl.content.cloneNode(true);
+        frag.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
+        frag.querySelector('.candidate-email').textContent = c.email || '';
+        frag.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+        frag.querySelector('.candidate-status-dropdown')?.remove();
+        document.querySelector('#contacted').appendChild(frag);
+
+        document.getElementById('preCreateCheckPopup').classList.add('hidden');
+        showFriendlyPopup(`✅ ${c.name} added to pipeline`);
+        loadPipelineCandidates?.();
+      });
+      results.appendChild(li);
+    }
+  }, 120);
+}
+
+document.getElementById('openNewCandidatePopup').addEventListener('click', openPreCreateModal);
+
 
 document.getElementById('goToCreateCandidateBtn').addEventListener('click', () => {
   document.getElementById('preCreateCheckPopup').classList.add('hidden');
@@ -548,135 +581,6 @@ aiGo.addEventListener('click', async () => {
     aiGo.textContent = "Let's Go 🚀";
     aiGo.disabled = false;
     aiPopup.classList.add('hidden');
-  }
-});
-
-// Popup para agregar candidato al batch
-document.addEventListener("click", async (e) => {
-  if (e.target.classList.contains("btn-add")) {
-        const batchBox = e.target.closest(".batch-box");
-    const batchId = batchBox ? batchBox.getAttribute("data-batch-id") : null;
-
-    if (!batchId) {
-      console.error("Batch ID not found");
-      return;
-    }
-    const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batchId}/candidates`);
-    const batchCandidates = await batchCandidatesRes.json();
-    const assignedCandidateIds = batchCandidates.map(c => c.candidate_id);
-
-    console.log("✅ Click en Add Candidate detectado");
-    const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
-    if (!opportunityId || opportunityId === '—') return;
-
-    // Obtener candidatos de la oportunidad
-    try {
-      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
-      const candidates = await res.json();
-      console.log("🧠 Todos los candidatos de la oportunidad:", candidates);
-
-      if (!res.ok && filtered.error) {
-        showFriendlyPopup(`🌸 ${filtered.error}`);
-        return;
-      }
-      const filtered = candidates.filter(c => c.stage === "En proceso con Cliente");
-      const availableCandidates = candidates.filter(c => !assignedCandidateIds.includes(c.candidate_id));
-      console.log("🧪 Candidatos con 'En proceso con Cliente':", filtered);
-      // Limpiar resultados anteriores
-      const resultsList = document.getElementById("candidateSearchResults");
-      resultsList.innerHTML = "";
-
-      availableCandidates.forEach(c => {
-        const li = document.createElement('li');
-        li.classList.add('search-result-item');
-        li.setAttribute('data-candidate-id', c.candidate_id);
-        const matchBy = 'Name'; // No hay búsqueda activa, así que no se necesita mostrar "match by"
-
-        li.innerHTML = `
-          <div style="font-weight: 600;">${c.name}</div>
-          <div style="font-size: 12px; color: #666;">🔍 Match by ${matchBy}</div>
-        `;
-
-        li.classList.add("search-result-item");
-        li.setAttribute("data-candidate-id", c.candidate_id);
-        resultsList.appendChild(li);
-        li.addEventListener("click", async () => {
-  const candidateId = li.getAttribute("data-candidate-id");
-  const selectedCandidate = {
-  candidate_id: candidateId,
-  name: li.textContent,
-  email: '' // puedes actualizar esto si luego quieres mostrar el email
-};
-
-
-  // Buscar el batch_id de la caja donde se hizo clic en “Add Candidate”
-  const batchBox = e.target.closest(".batch-box");
-  if (!batchBox) return;
-
-  // Buscar el número del batch en el h3
-  const batchTitle = batchBox.querySelector("h3").textContent.trim();
-  const match = batchTitle.match(/#(\d+)/);
-  const batchNumber = match ? parseInt(match[1]) : null;
-
-  if (!batchNumber) {
-    alert("Batch number not found");
-    return;
-  }
-
-  const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
-
-  try {
-    // Llamar al backend para obtener los batch_id de la oportunidad
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
-    const data = await res.json();
-
-    // Buscar el batch con ese número
-    const selectedBatch = data.find(b => b.batch_number === batchNumber);
-    if (!selectedBatch) {
-      alert("Batch not found");
-      return;
-    }
-
-    const patchRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/batch`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ batch_id: selectedBatch.batch_id })
-    });
-
-    if (!patchRes.ok) {
-      throw new Error("Failed to update candidate batch");
-    }
-
-    alert("✅ Candidate assigned to batch");
-    await reloadBatchCandidates();
-    document.getElementById("batchCandidatePopup").classList.add("hidden");
-    await loadBatchesForOpportunity(opportunityId);
-    // Recargar sección de batches
-    await loadBatchesForOpportunity(opportunityId);
-  } catch (err) {
-    console.error("Error assigning batch:", err);
-    alert("❌ Error assigning candidate to batch");
-  }
-});
-      });
-
-      document.getElementById("batchCandidatePopup").classList.remove("hidden");
-
-      // Filtro dinámico
-      const searchInput = document.getElementById("candidateSearchInput");
-      searchInput.value = '';
-      searchInput.addEventListener("input", () => {
-        const term = searchInput.value.toLowerCase();
-        document.querySelectorAll(".search-result-item").forEach(item => {
-          item.style.display = item.textContent.toLowerCase().includes(term) ? "block" : "none";
-        });
-      });
-
-    } catch (err) {
-      console.error("Error loading candidates for batch:", err);
-    }
   }
 });
 
@@ -1580,80 +1484,90 @@ function toggleActiveButton(command, button) {
 async function loadAvailableCandidatesForBatch(batchId) {
   try {
     const opportunityId = document.getElementById("opportunity-id-text").getAttribute("data-id");
-
-    // Obtener candidatos de la oportunidad
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
-    const candidates = await res.json();
-
-    // Obtener todos los batches de la oportunidad
-    const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
-    const batches = await batchesRes.json();
-
-    // Obtener IDs de candidatos que ya están en cualquier batch de esta oportunidad
-    let assignedCandidateIds = [];
-    for (const batch of batches) {
-      const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
-      const batchCandidates = await batchCandidatesRes.json();
-      assignedCandidateIds = assignedCandidateIds.concat(batchCandidates.map(c => c.candidate_id));
-    }
-
-    // Filtrar candidatos disponibles: stage correcto y no asignados a ningún batch de esta oportunidad
-    const availableCandidates = candidates.filter(c =>
-      c.stage === "En proceso con Cliente" &&
-      !assignedCandidateIds.includes(c.candidate_id)
-    );
-
-    const resultsList = document.getElementById("candidateSearchResults");
-    resultsList.innerHTML = "";
-
-    if (availableCandidates.length === 0) {
-      resultsList.innerHTML = "<li>No candidates available</li>";
+    if (!opportunityId) {
+      console.error("No opportunityId");
       return;
     }
 
-    availableCandidates.forEach(c => {
-      const li = document.createElement('li');
-      li.classList.add('search-result-item');
-      li.setAttribute('data-candidate-id', c.candidate_id);
+    // Trae candidatos de la oportunidad y, EN PARALELO, los ya asignados a cualquier batch de esta opp
+    const [oppCands, assignedSet] = await Promise.all([
+      fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`).then(r => r.json()),
+      getAssignedCandidateIdsForOpportunity(opportunityId)
+    ]);
 
-      li.innerHTML = `
-        <div style="font-weight: 600;">${c.name}</div>
-        <div style="font-size: 12px; color: #666;">🔍 Match by Name</div>
-      `;
+    // Filtra: solo "En proceso con Cliente" y NO en ningún batch de esta opp
+    const available = (oppCands || []).filter(c =>
+      c.stage === "En proceso con Cliente" && !assignedSet.has(c.candidate_id)
+    );
 
-      li.addEventListener("click", async () => {
-        const confirmed = confirm(`Add ${c.name} to this batch?`);
-        if (!confirmed) return;
+    // Pinta lista
+    const resultsList = document.getElementById("candidateSearchResults");
+    resultsList.innerHTML = "";
 
-        const patchRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${c.candidate_id}/batch`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batch_id: batchId })
+    if (!available.length) {
+      resultsList.innerHTML = "<li>No candidates available</li>";
+    } else {
+      available.forEach(c => {
+        const li = document.createElement("li");
+        li.className = "search-result-item";
+        li.dataset.candidateId = c.candidate_id;
+
+        li.innerHTML = `
+          <div style="font-weight:600;">${c.name || "(no name)"}</div>
+          <div style="font-size:12px;color:#666;">📌 Status: ${c.stage || "—"}</div>
+        `;
+
+        li.addEventListener("click", async () => {
+          const ok = confirm(`Add ${c.name} to this batch?`);
+          if (!ok) return;
+
+          const patchRes = await fetch(`${API_BASE}/candidates/${c.candidate_id}/batch`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ batch_id: batchId })
+          });
+
+          if (patchRes.ok) {
+            showFriendlyPopup(`✅ ${c.name} added to batch`);
+            document.getElementById("batchCandidatePopup").classList.add("hidden");
+            await reloadBatchCandidates();
+          } else {
+            alert(`❌ Error adding ${c.name} to batch`);
+          }
         });
 
-        if (patchRes.ok) {
-          showFriendlyPopup(`✅ ${c.name} added to batch`);
-          document.getElementById("batchCandidatePopup").classList.add("hidden");
-          await reloadBatchCandidates();
-        } else {
-          alert(`❌ Error adding ${c.name} to batch`);
-        }
+        resultsList.appendChild(li);
       });
+    }
 
-      resultsList.appendChild(li);
-    });
-
-    // Reset search input
+    // 🔎 Buscador con un único listener (evitamos duplicados en reaperturas)
     const searchInput = document.getElementById("candidateSearchInput");
-    searchInput.value = '';
-    searchInput.addEventListener("input", () => {
-      const term = searchInput.value.toLowerCase();
+    searchInput.value = "";
+    searchInput.oninput = quickDebounce(() => {
+      const term = (searchInput.value || "").toLowerCase();
       document.querySelectorAll(".search-result-item").forEach(item => {
         item.style.display = item.textContent.toLowerCase().includes(term) ? "block" : "none";
       });
-    });
+    }, 120);
 
+    // Muestra la popup
+    document.getElementById("batchCandidatePopup").classList.remove("hidden");
   } catch (err) {
-    console.error('Error loading available candidates for batch:', err);
+    console.error("Error loading available candidates for batch:", err);
   }
+}
+
+async function getAssignedCandidateIdsForOpportunity(opportunityId) {
+  // Trae todos los batches de la oportunidad y junta los candidates de cada uno
+  const rBatches = await fetch(`${API_BASE}/opportunities/${opportunityId}/batches`);
+  const batches = await rBatches.json();
+  if (!Array.isArray(batches) || !batches.length) return new Set();
+
+  const lists = await Promise.all(
+    batches.map(b =>
+      fetch(`${API_BASE}/batches/${b.batch_id}/candidates`).then(r => r.json())
+    )
+  );
+
+  return new Set(lists.flat().map(c => c.candidate_id));
 }

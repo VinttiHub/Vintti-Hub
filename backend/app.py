@@ -26,6 +26,7 @@ import calendar
 
 
 
+
 # 👇 MOVER ARRIBA: cargar .env ANTES de leer cualquier variable
 load_dotenv()
 
