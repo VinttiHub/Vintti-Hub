@@ -2401,22 +2401,21 @@ function enableMultiRolesOnCard(card, enabled){
   const wrap    = card.querySelector('.mr-wrap');
   const toggle  = card.querySelector('.mr-toggle');
   const titleEl = card.querySelector('.work-title');
-const companyEl = card.querySelector('.work-company'); 
+  const companyEl = card.querySelector('.work-company');
   const startHost = document.getElementById(card.dataset.workStartCid || '');
   const datesRow  = startHost ? startHost.parentElement?.parentElement : null;
   const currentRow= card.querySelector('.work-current')?.closest('div');
   const descEl    = card.querySelector('.work-desc');
-
-  // toolbar del card principal
   const cardToolbar = card.querySelector(':scope > .rich-toolbar');
+
+  // ✅ Company SIEMPRE visible
+  companyEl?.classList.remove('mr-hidden');
 
   toggle.checked = !!enabled;
   wrap.classList.toggle('active', !!enabled);
 
   if (enabled){
-    companyEl?.classList.remove('mr-hidden'); // mostrar Company en MR
-
-    // 📦 Guarda snapshot para restaurar luego (solo 1 vez)
+    // NO tocar companyEl aquí (debe seguir visible)
     if (!card.dataset.mrBackup){
       const backup = {
         title:   titleEl?.value || '',
@@ -2437,20 +2436,16 @@ const companyEl = card.querySelector('.work-company');
 
     card.dataset.mr = '1';
   } else {
-    companyEl?.classList.add('mr-hidden');   
-    // 🔙 Restaurar si hay backup
+    // ⛔️ No ocultar Company NUNCA
+    // Restaurar estado "single"
     const backup = card.dataset.mrBackup ? JSON.parse(card.dataset.mrBackup) : null;
-
-    // Limpia la UI de mini-roles
     wrap.querySelector('.mr-list')?.replaceChildren();
 
-    // Si description tenía un .mr-pack, lo quitamos y volvemos al desc "single"
     if (descEl && descEl.querySelector('.mr-pack')) {
       descEl.innerHTML = backup?.desc || '';
     }
 
     if (backup){
-      // Campos base
       if (titleEl) titleEl.value = backup.title;
       const hs = card.querySelector('.work-start');
       const he = card.querySelector('.work-end');
@@ -2460,11 +2455,9 @@ const companyEl = card.querySelector('.work-company');
       if (he) he.value = backup.current ? 'Present' : (backup.end || '');
       if (wc) wc.checked = !!backup.current;
 
-      // Reflejar en los selects del picker
       if (card.dataset.workStartCid) setMonthYearUIFromISO(card.dataset.workStartCid, backup.start || '');
       if (card.dataset.workEndCid)   setMonthYearUIFromISO(card.dataset.workEndCid, backup.current ? '' : (backup.end || ''));
 
-      // Habilitar/deshabilitar picker End según current
       if (backup.current && card.dataset.workEndCid) {
         disableMonthYear(card.dataset.workEndCid, true, 'Work experience marked as current.');
       } else if (card.dataset.workEndCid) {
@@ -2472,7 +2465,6 @@ const companyEl = card.querySelector('.work-company');
       }
     }
 
-    // Mostrar controles "single" de nuevo
     titleEl?.classList.remove('mr-hidden');
     datesRow?.classList.remove('mr-hidden');
     currentRow?.classList.remove('mr-hidden');
@@ -2482,7 +2474,9 @@ const companyEl = card.querySelector('.work-company');
     card.dataset.mr = '';
     delete card.dataset.mrBackup;
 
-    // 💾 Guarda inmediatamente tras salir de MR
+    // Por si acaso, mantener Company visible
+    companyEl?.classList.remove('mr-hidden');
+
     if (typeof window.saveResume === 'function') window.saveResume();
   }
 }
