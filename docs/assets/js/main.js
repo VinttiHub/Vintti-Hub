@@ -1115,7 +1115,12 @@ async function patchOppFields(oppId, payload) {
   try { return JSON.parse(text); } catch { return text; }
 }
 // --- Equipments button (debajo de Opportunities Summary + visibilidad por email) ---
+// --- Equipments button (solo en la página con el menú lateral) ---
 (() => {
+  // Debe existir el link de Opportunities Summary en el menú lateral.
+  const summary = document.getElementById('summaryLink');
+  if (!summary) return; // Si no existe (ej. index), no creamos el botón.
+
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const equipmentsAllowed = [
     'angie@vintti.com',
@@ -1124,9 +1129,6 @@ async function patchOppFields(oppId, payload) {
     'lara@vintti.com'
   ];
 
-  const summary = document.getElementById('summaryLink');
-
-  // Crea el botón si no existe
   let eq = document.getElementById('equipmentsLink');
   if (!eq) {
     eq = document.createElement('a');
@@ -1134,26 +1136,14 @@ async function patchOppFields(oppId, payload) {
     eq.href = 'equipments.html';
     eq.textContent = 'Equipments';
 
-    // Copiamos las clases/estilos del botón "Opportunities Summary" si existe,
-    // si no, usamos una clase genérica que ya tienes (ajústala si usas otra).
-    eq.className = summary?.className || 'main-action-button';
-
-    // Oculto por defecto y con un pequeño margen para quedar debajo
+    // Usa exactamente las mismas clases/estilos del link de Opportunities Summary del menú lateral
+    eq.className = summary.className;
     eq.style.display = 'none';
-    eq.style.marginTop = '8px';
 
-    // Insertar justo debajo del botón de summary si existe; si no, lo agregamos a un contenedor razonable
-    if (summary && summary.parentNode) {
-      summary.insertAdjacentElement('afterend', eq);
-    } else {
-      (document.querySelector('.toolbar,.actions,.top-actions') || document.body).appendChild(eq);
-    }
+    // Insertar justo debajo de Opportunities Summary en el menú lateral
+    summary.insertAdjacentElement('afterend', eq);
   }
 
-  // Mostrar solo para los emails permitidos
-  if (equipmentsAllowed.includes(currentUserEmail)) {
-    eq.style.display = ''; // respeta el display natural de la clase clonada
-  } else {
-    eq.style.display = 'none';
-  }
+  // Mostrar solo para emails permitidos
+  eq.style.display = equipmentsAllowed.includes(currentUserEmail) ? '' : 'none';
 })();

@@ -527,7 +527,6 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
   div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', ()=>{ if (div.dataset.mr!=='1') saveResume(); }));
 
   workExperienceList.appendChild(div);
-div.querySelector('.work-company')?.classList.add('mr-hidden');
   // Hidden que usa saveResume()
   const hiddenStart = div.querySelector('.work-start');
   const hiddenEnd   = div.querySelector('.work-end');
@@ -2402,7 +2401,7 @@ function enableMultiRolesOnCard(card, enabled){
   const wrap    = card.querySelector('.mr-wrap');
   const toggle  = card.querySelector('.mr-toggle');
   const titleEl = card.querySelector('.work-title');
-const companyEl = card.querySelector('.work-company');
+const companyEl = card.querySelector('.work-company'); 
   const startHost = document.getElementById(card.dataset.workStartCid || '');
   const datesRow  = startHost ? startHost.parentElement?.parentElement : null;
   const currentRow= card.querySelector('.work-current')?.closest('div');
