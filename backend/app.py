@@ -2777,6 +2777,7 @@ def _list_s3_with_prefix(prefix: str):
             break
     return items
 # ---------- EQUIPMENTS (list & create) ----------
+# ---------- EQUIPMENTS (list, create, read, update, delete) ----------
 @app.route('/equipments', methods=['GET', 'POST'])
 def equipments_route():
     try:
@@ -2785,6 +2786,7 @@ def equipments_route():
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute("""
                 SELECT
+                    equipment_id,             -- 👈 asegurarnos de incluir el ID
                     candidate_id,
                     account_id,
                     pedido,         -- order date
@@ -2797,7 +2799,7 @@ def equipments_route():
                     costo,
                     equipos
                 FROM equipments
-                ORDER BY pedido DESC NULLS LAST, entrega DESC NULLS LAST, candidate_id DESC
+                ORDER BY pedido DESC NULLS LAST, entrega DESC NULLS LAST, equipment_id DESC
             """)
             rows = cur.fetchall()
             cur.close(); conn.close()
@@ -2825,7 +2827,6 @@ def equipments_route():
         costo           = data.get('costo') if data.get('costo') not in ('', None) else None
         equipos         = _none_if_empty(data.get('equipos'))
 
-        # Validaciones básicas
         missing = []
         if not candidate_id: missing.append('candidate_id')
         if not account_id:   missing.append('account_id')
@@ -2835,7 +2836,7 @@ def equipments_route():
             return jsonify({'error': f"Missing required fields: {', '.join(missing)}"}), 400
 
         conn = get_connection()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute("""
             INSERT INTO equipments (
                 candidate_id, account_id, pedido, proveedor, entrega, retiro,
@@ -2843,7 +2844,7 @@ def equipments_route():
             )
             VALUES (%s, %s, %s::date, %s, %s::date, %s::date,
                     %s::date, %s, %s, %s, %s)
-            RETURNING candidate_id, account_id, pedido, proveedor, entrega, retiro,
+            RETURNING equipment_id, candidate_id, account_id, pedido, proveedor, entrega, retiro,
                       almacenamiento, estado, pais, costo, equipos
         """, (
             int(candidate_id), int(account_id), pedido, proveedor, entrega, retiro,
@@ -2859,6 +2860,95 @@ def equipments_route():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/equipments/<int:equipment_id>', methods=['GET', 'PATCH', 'DELETE'])
+def equipment_item(equipment_id):
+    try:
+        if request.method == 'GET':
+            conn = get_connection()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("""
+                SELECT
+                    equipment_id,
+                    candidate_id,
+                    account_id,
+                    pedido,
+                    proveedor,
+                    entrega,
+                    retiro,
+                    almacenamiento,
+                    estado,
+                    pais,
+                    costo,
+                    equipos
+                FROM equipments
+                WHERE equipment_id = %s
+            """, (equipment_id,))
+            row = cur.fetchone()
+            cur.close(); conn.close()
+            if not row:
+                return jsonify({"error": "Not found"}), 404
+            return jsonify(row)
+
+        if request.method == 'DELETE':
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM equipments WHERE equipment_id = %s", (equipment_id,))
+            deleted = cur.rowcount
+            conn.commit()
+            cur.close(); conn.close()
+            if deleted == 0:
+                return jsonify({"error":"Not found"}), 404
+            return jsonify({"success": True})
+
+        # PATCH
+        data = request.get_json(silent=True) or {}
+
+        # Campos editables
+        mapping = {
+            'pedido': 'pedido',                 # fechas
+            'entrega': 'entrega',
+            'retiro': 'retiro',
+            'almacenamiento': 'almacenamiento',
+            'estado': 'estado',                 # enum texto
+            'pais': 'pais',
+            'costo': 'costo',                   # numérico
+            'equipos': 'equipos'                # texto
+        }
+
+        set_cols, set_vals = [], []
+        for k, col in mapping.items():
+            if k in data:
+                if k in ('pedido','entrega','retiro','almacenamiento'):
+                    set_cols.append(f"{col} = %s::date")
+                else:
+                    set_cols.append(f"{col} = %s")
+                set_vals.append(data[k])
+
+        if not set_cols:
+            return jsonify({"error": "No valid fields provided"}), 400
+
+        conn = get_connection()
+        cur = conn.cursor()
+        set_vals.append(equipment_id)
+        cur.execute(f"""
+            UPDATE equipments
+            SET {', '.join(set_cols)}
+            WHERE equipment_id = %s
+        """, set_vals)
+        if cur.rowcount == 0:
+            cur.close(); conn.close()
+            return jsonify({"error":"Not found"}), 404
+
+        conn.commit()
+        cur.close(); conn.close()
+
+        # devolver fila actualizada
+        return equipment_item(equipment_id)
+
+    except Exception as e:
+        import traceback; print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    
 # ---------- HIRE_OPPORTUNITY helper (used by front to resolver account activo) ----------
 @app.route('/hire_opportunity', methods=['GET'])
 def list_hire_opportunity():
