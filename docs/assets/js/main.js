@@ -1114,3 +1114,46 @@ async function patchOppFields(oppId, payload) {
   }
   try { return JSON.parse(text); } catch { return text; }
 }
+// --- Equipments button (debajo de Opportunities Summary + visibilidad por email) ---
+(() => {
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
+  const equipmentsAllowed = [
+    'angie@vintti.com',
+    'jazmin@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com'
+  ];
+
+  const summary = document.getElementById('summaryLink');
+
+  // Crea el botón si no existe
+  let eq = document.getElementById('equipmentsLink');
+  if (!eq) {
+    eq = document.createElement('a');
+    eq.id = 'equipmentsLink';
+    eq.href = 'equipments.html';
+    eq.textContent = 'Equipments';
+
+    // Copiamos las clases/estilos del botón "Opportunities Summary" si existe,
+    // si no, usamos una clase genérica que ya tienes (ajústala si usas otra).
+    eq.className = summary?.className || 'main-action-button';
+
+    // Oculto por defecto y con un pequeño margen para quedar debajo
+    eq.style.display = 'none';
+    eq.style.marginTop = '8px';
+
+    // Insertar justo debajo del botón de summary si existe; si no, lo agregamos a un contenedor razonable
+    if (summary && summary.parentNode) {
+      summary.insertAdjacentElement('afterend', eq);
+    } else {
+      (document.querySelector('.toolbar,.actions,.top-actions') || document.body).appendChild(eq);
+    }
+  }
+
+  // Mostrar solo para los emails permitidos
+  if (equipmentsAllowed.includes(currentUserEmail)) {
+    eq.style.display = ''; // respeta el display natural de la clase clonada
+  } else {
+    eq.style.display = 'none';
+  }
+})();

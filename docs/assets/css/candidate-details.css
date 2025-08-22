@@ -1614,7 +1614,7 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
 .btn-sm{ font-size:12px; line-height:1; padding:8px 12px; border-radius:999px; }
 .btn-soft{
   border:1px solid var(--border);
-  background:linear-gradient(180deg, var(--bg), var(--card));
+  background:var(--highlight);
   border-radius:999px; padding:8px 12px;
   display:inline-flex; align-items:center; gap:8px;
   cursor:pointer; user-select:none;
@@ -1737,25 +1737,20 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
 }
 
 /* === NUCLEAR OVERRIDE — Month/Year selects white & rounded === */
-html body .cv-card-entry .month-year select,
-html body #hire .month-year select {
-  /* Desactiva UI nativa (Safari/Chrome) para poder estilizar */
+#resume .cv-card-entry .month-year select,
+#resume .mr-entry .month-year select {
   -webkit-appearance: none !important;
   appearance: none !important;
-
-  /* Estética */
   background-color: #ffffff !important;
   color: #111827 !important;
   height: 34px !important;
   padding: 6px 12px !important;
-  padding-right: 28px !important;       /* espacio para la flecha */
+  padding-right: 28px !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 999px !important;
   box-shadow: none !important;
   outline: none !important;
   background-clip: padding-box !important;
-
-  /* Flecha custom */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'%3E%3Cpath fill='%239ca3af' d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E") !important;
   background-repeat: no-repeat !important;
   background-position: right 10px center !important;
@@ -1766,9 +1761,8 @@ html body #hire .month-year select {
 html body .cv-card-entry .month-year select.month { min-width: 64px !important; width: auto !important; }
 html body .cv-card-entry .month-year select.year  { min-width: 60px !important; width: auto !important; font-variant-numeric: tabular-nums !important; }
 
-/* Aire al borde d*
 /* Tiny "clear" pill — BLUE */
-html body .month-year .btn-clear{
+#resume .month-year .btn-clear{
   -webkit-appearance: none !important;
   appearance: none !important;
 
@@ -1794,6 +1788,7 @@ html body .month-year .btn-clear{
   box-shadow: none !important;
   outline: none !important;
 }
+#hire .month-year select { all: revert !important; }
 
 html body .month-year .btn-clear:hover{
   filter: brightness(1.06) !important;
@@ -1823,4 +1818,119 @@ html body .month-year .btn-clear:active{
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+/* === Multi-Roles (Work Experience) === */
+.mr-wrap{margin-top:12px;display:none}
+.mr-wrap.active{display:block}
+.mr-list{display:flex;flex-direction:column;gap:12px}
+.mr-entry{position:relative;background:#f3f4f6;border:1px solid #d1d5db;border-radius:8px;padding:14px}
+.mr-entry .remove-entry{position:absolute;top:10px;right:10px;background:#f3f4f6;color:#9ca3af;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer}
+.mr-entry .remove-entry:hover{background:#e5e7eb;color:#ef4444}
+.mr-row{display:flex;gap:16px;flex-wrap:wrap}
+.mr-row .mr-col{flex:1 1 280px;min-width:280px}
+.mr-title{width:100%;font-size:16px;font-weight:700;border:none;background:transparent;border-bottom:1px solid #d1d5db;padding:6px 0}
+.mr-toolbar{display:flex;gap:8px;margin:8px 0}
+.mr-desc{min-height:140px;border:1px solid #d1d5db;border-radius:8px;background:#fff;padding:10px;overflow:auto}
+.mr-add{margin-top:6px}
+.mr-hidden{display:none !important}
+.mr-hidden { display: none !important; }
+/* Fila de una mini-tarjeta en cuadrícula: Título | Start | End | Current */
+.mr-row{
+  display:grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap:12px;
+  align-items:end; /* alinea las labels y selects abajo */
+}
+
+/* Asegura que los selects de Month/Year queden en línea */
+.month-year{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:nowrap;
+}
+.month-year .mini-select{
+  min-width:110px;
+  height:36px;
+}
+.month-year .btn-clear{
+  height:32px;
+  padding:0 8px;
+}
+/* Deja lugar al botón eliminar y evita overflow en mini-rol */
+.mr-entry{
+  padding-right: 56px;      /* espacio para el botón 🗑️ */
+  box-sizing: border-box;
+}
+
+/* Grid más estable para la fila del mini-rol */
+.mr-row{
+  grid-template-columns: minmax(180px,2fr) 1fr 1fr max-content;
+  align-items: end;
+}
+
+.mr-row .mr-col{ min-width: 0; }          /* permite que las columnas encojan */
+.mr-row .mr-col:last-child{ justify-self: end; }
+
+/* Responsive: que no se corte en pantallas chicas */
+@media (max-width: 720px){
+  .mr-row{ grid-template-columns: 1fr 1fr; }
+  .mr-row .mr-col:last-child{ grid-column: 1 / -1; justify-self: start; }
+}
+#resume .cv-card-entry > div .month-year{ 
+  flex-wrap: wrap; 
+  row-gap: 6px;
+}
+#resume .cv-card-entry > div .month-year .btn-clear{
+  flex: 0 0 auto;
+  order: 3;               /* cae a la siguiente línea si no entra */
+  margin-top: 2px;
+}
+#resume .mr-entry .month-year{ flex-wrap: nowrap; } /* mini-rol sigue compacto */
+/* ✅ Fija layout del "Current" en mini-roles (no afecta a tarjetas principales) */
+.mr-entry { overflow: hidden; }
+
+.mr-entry .mr-col:last-child {
+  min-width: 120px;
+  justify-self: end;
+}
+
+.mr-entry .mr-col:last-child label {
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+/* Switch compacto SOLO para mini-roles */
+.mr-entry .mr-current {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  background: #d1d5db;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.mr-entry .mr-current::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.mr-entry .mr-current:checked {
+  background: #3b82f6;
+}
+
+.mr-entry .mr-current:checked::before {
+  transform: translateX(16px);
 }

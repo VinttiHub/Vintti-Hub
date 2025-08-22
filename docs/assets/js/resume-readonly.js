@@ -1,15 +1,26 @@
 document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const candidateId = urlParams.get("id");
-    function formatDate(dateStr) {
-      if (!dateStr) return "?";
-      const [year, month] = dateStr.split("-"); // Ignora el día
-      const date = new Date(`${year}-${month}-01T12:00:00Z`); // Forzamos día seguro en UTC para evitar desbordes
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-      });
-    }
+// Muestra esto cuando no hay fecha
+const NO_DATE_LABEL = "No date assigned";
+
+function formatDate(dateStr) {
+  // Acepta "YYYY-MM" o "YYYY-MM-DD". Si falta algo, devolvemos el label.
+  if (!dateStr || typeof dateStr !== "string") return NO_DATE_LABEL;
+  const [year, month] = dateStr.split("-");
+  if (!year || !month) return NO_DATE_LABEL;
+
+  const date = new Date(`${year}-${month}-01T12:00:00Z`); // día seguro en UTC
+  if (isNaN(date.getTime())) return NO_DATE_LABEL;
+
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+}
+
+function formatDateFromDateObj(d) {
+  if (!d || !(d instanceof Date) || isNaN(d.getTime())) return NO_DATE_LABEL;
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
+}
+
 
   if (!candidateId) {
     console.error("❌ Candidate ID missing in URL");
@@ -34,10 +45,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     // 🧠 About
-    const aboutP = document.getElementById("aboutField");
-    aboutP.textContent = data.about || "—";
+// 🧠 About
+const aboutP = document.getElementById("aboutField");
+aboutP.innerHTML = data.about || "—";
+cleanInlineStyles(aboutP);
+
 
 // 💼 Work Experience
+// 💼 Work Experience (LinkedIn-like multi-roles)
 const workExperienceList = document.getElementById("workExperienceList");
 let workExperience = [];
 try {
@@ -45,19 +60,129 @@ try {
 } catch (e) {
   console.error("❌ Error parsing work_experience:", e);
 }
-sortByEndDateDescending(workExperience).forEach((exp) => {
-  const entry = document.createElement("div");
-  const startDate = formatDate(exp.start_date);
-  const endDate = exp.current ? "Present" : formatDate(exp.end_date);
-  entry.className = "resume-entry";
-  // 💼 Work Experience
-  entry.innerHTML = `
-    <strong>${exp.company || "—"}</strong><br/>
-    <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
-    <div class="resume-description">${cleanHTML(exp.description || "")}</div>
+
+/* Helpers locales */
+function safeDate(d) {
+  try { return d ? new Date(d) : null; } catch { return null; }
+}
+function extractMultiRoles(exp) {
+  if (!exp || !exp.description) return null;
+
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = exp.description;
+
+  const pack = wrapper.querySelector('.mr-pack[data-type="multi-roles"]');
+  if (!pack) return null;
+
+  // 1) Primero intentamos con data-roles (url-encoded JSON)
+  let roles = [];
+  const rolesAttr = pack.getAttribute("data-roles");
+  if (rolesAttr) {
+    try {
+      roles = JSON.parse(decodeURIComponent(rolesAttr));
+    } catch (err) {
+      console.warn("⚠️ data-roles inválido:", err);
+    }
+  }
+
+  // 2) Si no vino data-roles, caemos al DOM (.mr-item)
+  if (!roles.length) {
+    pack.querySelectorAll(".mr-item").forEach((item) => {
+      roles.push({
+        title: (item.querySelector(".mr-title-txt")?.textContent || "").trim(),
+        start_date: item.getAttribute("data-start") || "",
+        end_date: item.getAttribute("data-end") || "",
+        current: false,
+        description_html: item.querySelector(".mr-desc-html")?.innerHTML || "",
+      });
+    });
+  }
+
+  // Normalizamos y ordenamos (más reciente primero por end_date o current)
+  roles = roles
+    .map((r) => ({
+      title: r.title || "",
+      start_date: r.start_date || "",
+      end_date: r.current ? "" : (r.end_date || ""),
+      current: !!r.current,
+      description_html: r.description_html || "",
+    }))
+    .sort((a, b) => {
+      const aEnd = a.current || !a.end_date ? new Date(2100, 0, 1) : new Date(a.end_date);
+      const bEnd = b.current || !b.end_date ? new Date(2100, 0, 1) : new Date(b.end_date);
+      return bEnd - aEnd;
+    });
+
+  return roles;
+}
+
+function renderExperienceEntry(exp) {
+  const roles = extractMultiRoles(exp);
+
+  // Caso normal (sin multi-roles o 1 rol)
+  if (!roles || roles.length <= 1) {
+    const entry = document.createElement("div");
+    entry.className = "resume-entry";
+    const startDate = formatDate(exp.start_date);
+    const endDate = exp.current ? "Present" : formatDate(exp.end_date);
+    entry.innerHTML = `
+      <strong>${exp.company || "—"}</strong><br/>
+      <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
+      <div class="resume-description">${cleanHTML(exp.description || "")}</div>
+    `;
+    return entry;
+  }
+
+  // Caso multi-roles (LinkedIn-like)
+  const container = document.createElement("div");
+  container.className = "resume-entry multi-company";
+
+  // Rango global de la empresa
+  const hasCurrent = roles.some((r) => r.current);
+  const overallStart = roles.reduce((min, r) => {
+    const d = safeDate(r.start_date);
+    return (!min || (d && d < min)) ? d : min;
+  }, null);
+  const overallEnd = hasCurrent
+    ? null
+    : roles.reduce((max, r) => {
+        const d = safeDate(r.end_date);
+        return (!max || (d && d > max)) ? d : max;
+      }, null);
+
+  const headerHTML = `
+    <div class="multi-header">
+      <div>
+        <div class="company-name">${exp.company || "—"}</div>
+        <div class="company-range">
+          ${formatDateFromDateObj(overallStart)} – ${overallEnd ? formatDateFromDateObj(overallEnd) : "Present"} · ${roles.length} roles
+        </div>
+      </div>
+    </div>
   `;
 
-  workExperienceList.appendChild(entry);
+  const rolesHTML = roles
+    .map((r) => {
+      const sd = formatDate(r.start_date);
+      const ed = r.current ? "Present" : formatDate(r.end_date);
+      const desc = r.description_html ? `<div class="multi-desc">${cleanHTML(r.description_html)}</div>` : "";
+      return `
+        <div class="multi-role ${r.current ? "current" : ""}">
+          <div class="multi-title">${r.title || "—"}</div>
+          <div class="multi-dates">${sd} – ${ed}</div>
+          ${desc}
+        </div>
+      `;
+    })
+    .join("");
+
+  container.innerHTML = headerHTML + `<div class="multi-timeline">${rolesHTML}</div>`;
+  return container;
+}
+
+/* Pintamos la experiencia (orden existente por fin de contrato) */
+sortByEndDateDescending(workExperience).forEach((exp) => {
+  workExperienceList.appendChild(renderExperienceEntry(exp));
 });
 
 // 🎓 Education
@@ -199,9 +324,6 @@ function cleanInlineStyles(element) {
     el.style.fontFamily = 'Onest, sans-serif';
   });
 }
-const aboutP = document.getElementById("aboutField");
-aboutP.innerHTML = data.about || "—";
-cleanInlineStyles(aboutP);
 function sortByEndDateDescending(entries) {
   return entries.sort((a, b) => {
     const dateA = a.current || !a.end_date ? new Date(2100, 0, 1) : new Date(a.end_date);

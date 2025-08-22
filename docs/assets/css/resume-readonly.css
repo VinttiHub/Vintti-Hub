@@ -239,3 +239,64 @@ body {
   color: #6b7280;
   margin: 2px 0 8px;
 }
+/* ===== Multi-Roles (LinkedIn-like) ===== */
+.multi-company {
+  padding: 18px 0 8px;
+  border-bottom: 1px solid #d9e1ea;
+}
+.multi-company:last-child { border-bottom: 0; }
+
+.multi-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.multi-header .company-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: #1a1a1a;
+}
+.multi-header .company-range {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.multi-timeline {
+  margin-left: 8px;
+  border-left: 2px solid #e5e7eb;
+  padding-left: 16px;
+}
+
+.multi-role {
+  position: relative;
+  margin: 18px 0;
+}
+.multi-role::before {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #4f93ff;
+  box-shadow: 0 0 0 3px #eaf3ff;
+}
+.multi-role.current::before { background: #10b981; } /* verde si es "current" */
+
+.multi-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: #111827;
+}
+.multi-dates {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 6px;
+}
+.multi-desc {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.7;
+}

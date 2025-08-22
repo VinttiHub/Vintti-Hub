@@ -2776,6 +2776,204 @@ def _list_s3_with_prefix(prefix: str):
         else:
             break
     return items
+# ---------- EQUIPMENTS (list & create) ----------
+@app.route('/equipments', methods=['GET', 'POST'])
+def equipments_route():
+    try:
+        if request.method == 'GET':
+            conn = get_connection()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("""
+                SELECT
+                    candidate_id,
+                    account_id,
+                    pedido,         -- order date
+                    proveedor,      -- 'quipteams' | 'bord'
+                    entrega,        -- delivery date
+                    retiro,         -- pickup request
+                    almacenamiento, -- storage date
+                    estado,         -- 'nueva' | 'vieja' | 'stockeada'
+                    pais,
+                    costo,
+                    equipos
+                FROM equipments
+                ORDER BY pedido DESC NULLS LAST, entrega DESC NULLS LAST, candidate_id DESC
+            """)
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            return jsonify(rows)
+
+        # POST
+        data = request.get_json() or {}
+
+        def _none_if_empty(v):
+            if v is None:
+                return None
+            if isinstance(v, str) and v.strip() == '':
+                return None
+            return v
+
+        candidate_id    = data.get('candidate_id')
+        account_id      = data.get('account_id')
+        proveedor       = _none_if_empty(data.get('proveedor'))         # 'quipteams' | 'bord'
+        estado          = _none_if_empty(data.get('estado'))            # 'nueva' | 'vieja' | 'stockeada'
+        pedido          = _none_if_empty(data.get('pedido'))            # 'YYYY-MM-DD' o None
+        entrega         = _none_if_empty(data.get('entrega'))
+        retiro          = _none_if_empty(data.get('retiro'))
+        almacenamiento  = _none_if_empty(data.get('almacenamiento'))
+        pais            = _none_if_empty(data.get('pais'))
+        costo           = data.get('costo') if data.get('costo') not in ('', None) else None
+        equipos         = _none_if_empty(data.get('equipos'))
+
+        # Validaciones básicas
+        missing = []
+        if not candidate_id: missing.append('candidate_id')
+        if not account_id:   missing.append('account_id')
+        if not proveedor:    missing.append('proveedor')
+        if not estado:       missing.append('estado')
+        if missing:
+            return jsonify({'error': f"Missing required fields: {', '.join(missing)}"}), 400
+
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO equipments (
+                candidate_id, account_id, pedido, proveedor, entrega, retiro,
+                almacenamiento, estado, pais, costo, equipos
+            )
+            VALUES (%s, %s, %s::date, %s, %s::date, %s::date,
+                    %s::date, %s, %s, %s, %s)
+            RETURNING candidate_id, account_id, pedido, proveedor, entrega, retiro,
+                      almacenamiento, estado, pais, costo, equipos
+        """, (
+            int(candidate_id), int(account_id), pedido, proveedor, entrega, retiro,
+            almacenamiento, estado, pais, costo, equipos
+        ))
+        created = cur.fetchone()
+        conn.commit()
+        cur.close(); conn.close()
+        return jsonify(created), 201
+
+    except Exception as e:
+        import traceback; print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+# ---------- HIRE_OPPORTUNITY helper (used by front to resolver account activo) ----------
+@app.route('/hire_opportunity', methods=['GET'])
+def list_hire_opportunity():
+    """
+    Uso principal: /hire_opportunity?candidate_id=123
+    Devuelve todas las filas de hire_opportunity para ese candidato.
+    El front elegirá la fila con end_date NULL como 'activa'.
+    """
+    try:
+        candidate_id = request.args.get('candidate_id', type=int)
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        if candidate_id:
+            cur.execute("""
+                SELECT candidate_id, opportunity_id, account_id, start_date, end_date, status
+                FROM hire_opportunity
+                WHERE candidate_id = %s
+                ORDER BY (end_date IS NULL) DESC,
+                         start_date DESC NULLS LAST
+            """, (candidate_id,))
+        else:
+            # opcional: listado acotado si no pasan candidate_id
+            cur.execute("""
+                SELECT candidate_id, opportunity_id, account_id, start_date, end_date, status
+                FROM hire_opportunity
+                ORDER BY candidate_id DESC
+                LIMIT 200
+            """)
+
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ---------- SEARCH: candidates that are in hire_opportunity (with active account) ----------
+@app.route('/search/candidates-in-hire', methods=['GET'])
+def search_candidates_in_hire():
+    """
+    Devuelve: [{candidate_id, name, account_id, account_name}]
+    - Solo candidatos presentes en hire_opportunity
+    - account_id: la fila activa (end_date NULL) o, si no hay activa, la más reciente por start_date
+    """
+    try:
+        q = (request.args.get('q') or '').strip()
+        if len(q) < 2:
+            return jsonify([])
+
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            WITH ranked AS (
+              SELECT
+                c.candidate_id,
+                c.name,
+                h.account_id,
+                h.start_date,
+                h.end_date,
+                ROW_NUMBER() OVER (
+                  PARTITION BY c.candidate_id
+                  ORDER BY (h.end_date IS NULL) DESC,
+                           h.start_date DESC NULLS LAST
+                ) AS rn
+              FROM candidates c
+              JOIN hire_opportunity h
+                ON h.candidate_id = c.candidate_id
+              WHERE c.name ILIKE %s
+            )
+            SELECT
+              r.candidate_id,
+              r.name,
+              r.account_id,
+              a.client_name AS account_name
+            FROM ranked r
+            LEFT JOIN account a ON a.account_id = r.account_id
+            WHERE r.rn = 1
+            ORDER BY LOWER(r.name) ASC
+            LIMIT 20;
+        """, (f"%{q}%",))
+        items = cur.fetchall()
+        cur.close(); conn.close()
+        return jsonify(items)
+    except Exception as e:
+        import traceback; print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+# ---------- Alias opcional para el fallback del front ----------
+@app.route('/candidates/search')
+def candidates_search_alias():
+    """
+    Alias compatible con el fallback del front:
+    /candidates/search?q=ana -> devuelve [{candidate_id, name}]
+    """
+    try:
+        q = (request.args.get('q') or '').strip()
+        if len(q) < 2:
+            return jsonify([])
+
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT candidate_id, name
+            FROM candidates
+            WHERE name ILIKE %s
+            ORDER BY LOWER(name) ASC
+            LIMIT 10
+        """, (f"%{q}%",))
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
+    except Exception as e:
+        return jsonify([]), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

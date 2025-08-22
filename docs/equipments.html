@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Equipments</title>
+  <link rel="stylesheet" href="assets/css/equipments.css" />
+  <script defer src="assets/js/equipments.js"></script>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="header-left">
+        <button class="btn ghost" id="backBtn" aria-label="Go back">
+          <span class="icon">←</span> Go back
+        </button>
+        <div>
+          <h1>Equipments</h1>
+          <p class="sub">Below you’ll find a clean summary of the equipment delivered to candidates.</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="btn primary" id="newBtn">
+          <span class="icon">＋</span> New
+        </button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="table-wrap">
+        <table class="pretty-table" id="equipmentsTable" aria-label="Equipments table">
+          <thead>
+            <tr>
+              <th>Candidate</th>
+              <th>Account</th>
+              <th>Provider</th>
+              <th>Order Date</th>
+              <th>Delivery Date</th>
+              <th>Pickup Request</th>
+              <th>Storage Date</th>
+              <th>Status</th>
+              <th>Country</th>
+              <th>Cost</th>
+              <th>Equipment</th>
+            </tr>
+          </thead>
+          <tbody id="equipmentsTbody">
+            <!-- rows injected by JS -->
+          </tbody>
+        </table>
+        <div class="empty" id="emptyState" hidden>No equipment yet. Click <b>New</b> to add the first one.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal" id="newModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 id="modalTitle">New equipment</h2>
+        <button class="btn icon-only" data-close aria-label="Close">✕</button>
+      </div>
+
+      <form id="newForm" class="form">
+        <div class="grid-2">
+          <!-- Candidate with search -->
+          <label class="field">
+            <span>Candidate</span>
+            <input type="text" id="candidateSearch" placeholder="Search by candidate name…" autocomplete="off" />
+            <input type="hidden" id="candidateId" />
+            <div class="suggestions" id="candidateSuggestions" hidden></div>
+          </label>
+
+          <!-- Account auto from active hire_opportunity -->
+          <label class="field">
+            <span>Account</span>
+            <input type="text" id="accountName" placeholder="Auto from active hire" readonly />
+            <input type="hidden" id="accountId" />
+          </label>
+
+          <label class="field">
+            <span>Provider</span>
+            <select id="provider">
+              <option value="">Select provider…</option>
+              <option value="quipteams">Quipteams</option>
+              <option value="bord">Bord</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Status</span>
+            <!-- labels en inglés; valores guardados en español -->
+            <select id="status">
+              <option value="">Select status…</option>
+              <option value="nueva">New</option>
+              <option value="vieja">Used</option>
+              <option value="stockeada">Stocked</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Order Date</span>
+            <input type="date" id="orderDate" />
+          </label>
+
+          <label class="field">
+            <span>Delivery Date</span>
+            <input type="date" id="deliveryDate" />
+          </label>
+
+          <label class="field">
+            <span>Pickup Request</span>
+            <input type="date" id="pickupDate" />
+          </label>
+
+          <label class="field">
+            <span>Storage Date</span>
+            <input type="date" id="storageDate" />
+          </label>
+
+          <label class="field">
+            <span>Country</span>
+            <input list="laCountries" id="country" placeholder="Type to search…" />
+            <datalist id="laCountries"></datalist>
+          </label>
+
+          <label class="field">
+            <span>Cost</span>
+            <input type="number" id="cost" min="0" step="1" placeholder="0" />
+          </label>
+
+          <label class="field full">
+            <span>Equipment</span>
+            <input type="text" id="equipmentTxt" placeholder="e.g., Laptop, Monitor, Mouse" />
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+</body>
+</html>
