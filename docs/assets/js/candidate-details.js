@@ -149,17 +149,15 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     }
 
     // Llama a Coresignal solo si NO hay coresignal_scrapper y el LinkedIn es válido
-    if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
-        .then(async r => {
-          let payload;
-          try { payload = await r.json(); } catch { payload = await r.text(); }
-          console.log('🔄 Coresignal sync:', { ok: r.ok, status: r.status, payload });
-        })
-              .then(r => r.json())
-            .then(d => console.log('🔄 Coresignal sync:', d))
-        .catch(e => console.warn('⚠️ Coresignal sync failed', e));
-    }
+if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
+  fetch(`${apiBase}/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
+    .then(async (r) => {
+      let payload;
+      try { payload = await r.json(); } catch { payload = await r.text(); }
+      console.log('🔄 Coresignal sync:', { ok: r.ok, status: r.status, payload });
+    })
+    .catch(e => console.warn('⚠️ Coresignal sync failed', e));
+}
 
     console.log("🎯 Valor desde DB:", data.country);
 
@@ -416,13 +414,13 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
   // 🗓️ Montar pickers (Start/End) — forzamos día 15 en el valor emitido
 const startPicker = mountMonthYearPicker(startCid, {
   allowEmpty: true,
-  initialValue: entry.start_date || '',
-  onChange: (iso) => { hiddenStart.value = iso; if (div.dataset.mr!=='1') window.saveResumeSoft(); }
+  initialValue: data.start_date || '',
+  onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
 });
 const endPicker = mountMonthYearPicker(endCid, {
   allowEmpty: true,
-  initialValue: entry.current ? '' : (entry.end_date || ''),
-  onChange: (iso) => { hiddenEnd.value = iso; if (div.dataset.mr!=='1') window.saveResumeSoft(); }
+  initialValue: data.current ? '' : (data.end_date || ''),
+  onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
 });
 
   // Inicializar hidden con lo que vino del backend
@@ -841,7 +839,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/i
 const hireFee = document.getElementById('hire-fee');
 const hireComputer = document.getElementById('hire-computer');
 const hirePerks = document.getElementById('hire-extraperks');
-console.log(document.getElementById('hire-extraperks').innerHTML)
+console.log(hirePerks?.innerHTML || '');
 const hireSetupFee = document.getElementById('hire-setup-fee');
 if (hireSetupFee) {
   hireSetupFee.addEventListener('blur', () => {
@@ -855,10 +853,8 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
 }
 
-hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
-hirePerks.addEventListener('blur', () => {
-  updateHireField('extraperks', hirePerks.innerHTML);
-});
+if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
+if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
 const hash = window.location.hash;
 if (hash === '#hire') {
   const hireTab = document.querySelector('.tab[data-tab="hire"]');
