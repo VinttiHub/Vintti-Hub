@@ -395,110 +395,121 @@ if (videoLinkEl2) {
     });
 
 function addEducationEntry(entry = { institution: '', title: '', country: '', start_date: '', end_date: '', current: false, description: '' }) {
-  const id = uniqId('edu');
-  const startCid = `edu-start-${id}`;
-  const endCid   = `edu-end-${id}`;
+  try {
+    const id = uniqId('edu');
+    const startCid = `edu-start-${id}`;
+    const endCid   = `edu-end-${id}`;
 
-  const div = document.createElement('div');
-  div.className = 'cv-card-entry pulse';
-
-  div.innerHTML = `
-    <div style="display:flex; gap:20px; flex-wrap:wrap;">
-      <div style="flex:2.2; min-width:320px;">
-        <input type="text" class="edu-title" value="${entry.institution || ''}" placeholder="Institution" />
-        <input type="text" class="edu-degree" value="${entry.title || ''}" placeholder="Title/Degree" style="margin-top:6px;" />
-        <select class="edu-country" style="margin-top:6px; width:100%;">${makeCountryOptions(entry.country || '')}</select>
-      </div>
-
-      <div style="flex:2; min-width:360px;">
-        <div style="display:flex; gap:10px;">
-          <label style="flex:1;">Start<br/>
-            <div id="${startCid}" class="month-year"></div>
-            <input type="hidden" class="edu-start" value="">
-          </label>
-          <label style="flex:1;">End<br/>
-            <div id="${endCid}" class="month-year"></div>
-            <input type="hidden" class="edu-end" value="">
-          </label>
-        </div>
-        <div style="display:flex; justify-content:flex-end; padding-right:62px;">
-          <label style="display:flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap;">
-            <input type="checkbox" class="edu-current" ${entry.current ? 'checked' : ''}/> Current
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <div class="rich-toolbar">
-      <button type="button" data-command="bold"><b>B</b></button>
-      <button type="button" data-command="italic"><i>I</i></button>
-      <button type="button" data-command="insertUnorderedList">• List</button>
-    </div>
-    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:240px;">${entry.description || ''}</div>
-    <button class="remove-entry">🗑️</button>
-  `;
-
-  // Toolbar rich text
-  div.querySelectorAll('.rich-toolbar button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const cmd = btn.getAttribute('data-command');
-      const target = document.getSelection().focusNode?.parentElement;
-      if (target && target.isContentEditable) { target.focus(); document.execCommand(cmd, false, null); }
-      btn.classList.toggle('active', document.queryCommandState(cmd));
-    });
-  });
-
-  setTimeout(() => div.classList.remove('pulse'), 500);
-
-  // Eventos de entry
-  div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-  div.querySelector('.edu-country').addEventListener('change', saveResume);
-  div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
-
-  educationList.appendChild(div);
-
-  // 🔗 Hidden inputs que usará saveResume()
-  const hiddenStart = div.querySelector('.edu-start');
-  const hiddenEnd   = div.querySelector('.edu-end');
-
-  // 🗓️ Montar pickers (Start/End) — forzamos día 15 en el valor emitido
-const startPicker = mountMonthYearPicker(startCid, {
-  allowEmpty: true,
-  initialValue: entry.start_date || '',
-  onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
-});
-const endPicker = mountMonthYearPicker(endCid, {
-  allowEmpty: true,
-  initialValue: entry.current ? '' : (entry.end_date || ''),
-  onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
-});
-
-  // Inicializar hidden con lo que vino del backend
-  hiddenStart.value = entry.start_date || '';
-  hiddenEnd.value   = entry.current ? 'Present' : (entry.end_date || '');
-
-  // ✅ Current toggle: deshabilita el picker de End y guarda "Present"
-  const currentCb = div.querySelector('.edu-current');
-  currentCb.addEventListener('change', e => {
-    if (e.target.checked) {
-      // recuerda el último iso para volver si desmarcan
-      hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
-      hiddenEnd.value = 'Present';
-      disableMonthYear(endCid, true, 'Education marked as current.');
-    } else {
-      disableMonthYear(endCid, false);
-      const last = hiddenEnd.dataset.lastIso || '';
-      if (last) { endPicker.setValue(last); hiddenEnd.value = last; }
-      else { endPicker.setValue(''); hiddenEnd.value = ''; }
+    // Defensa: si por error llegó un string, parseamos suave
+    if (typeof entry === 'string') {
+      try { entry = JSON.parse(entry); } catch { entry = {}; }
     }
-    saveResume();
-  });
+    entry = entry || {};
+    const inst  = entry.institution || '';
+    const title = entry.title || '';
+    const country = entry.country || '';
+    const start = entry.start_date || '';
+    const end   = entry.end_date || '';
+    const isCurrent = !!entry.current;
+    const desc  = entry.description || '';
 
-  // Si ya venía "current", deshabilita el picker de End
-  if (entry.current) disableMonthYear(endCid, true, 'Education marked as current.');
+    const div = document.createElement('div');
+    div.className = 'cv-card-entry pulse';
 
-  // Ordenar tras agregar
-  sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
+    div.innerHTML = `
+      <div style="display:flex; gap:20px; flex-wrap:wrap;">
+        <div style="flex:2.2; min-width:320px;">
+          <input type="text" class="edu-title" value="${inst}" placeholder="Institution" />
+          <input type="text" class="edu-degree" value="${title}" placeholder="Title/Degree" style="margin-top:6px;" />
+          <select class="edu-country" style="margin-top:6px; width:100%;">${makeCountryOptions(country)}</select>
+        </div>
+
+        <div style="flex:2; min-width:360px;">
+          <div style="display:flex; gap:10px;">
+            <label style="flex:1;">Start<br/>
+              <div id="${startCid}" class="month-year"></div>
+              <input type="hidden" class="edu-start" value="">
+            </label>
+            <label style="flex:1;">End<br/>
+              <div id="${endCid}" class="month-year"></div>
+              <input type="hidden" class="edu-end" value="">
+            </label>
+          </div>
+          <div style="display:flex; justify-content:flex-end; padding-right:62px;">
+            <label style="display:flex; align-items:center; gap:4px; font-size:13px; white-space:nowrap;">
+              <input type="checkbox" class="edu-current" ${isCurrent ? 'checked' : ''}/> Current
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="rich-toolbar">
+        <button type="button" data-command="bold"><b>B</b></button>
+        <button type="button" data-command="italic"><i>I</i></button>
+        <button type="button" data-command="insertUnorderedList">• List</button>
+      </div>
+      <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:240px;">${desc}</div>
+      <button class="remove-entry">🗑️</button>
+    `;
+
+    // Toolbar
+    div.querySelectorAll('.rich-toolbar button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.getAttribute('data-command');
+        const target = document.getSelection().focusNode?.parentElement;
+        if (target && target.isContentEditable) { target.focus(); document.execCommand(cmd, false, null); }
+        btn.classList.toggle('active', document.queryCommandState(cmd));
+      });
+    });
+
+    setTimeout(() => div.classList.remove('pulse'), 500);
+    div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
+    div.querySelector('.edu-country').addEventListener('change', saveResume);
+    div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
+
+    educationList.appendChild(div);
+
+    // Hidden inputs usados por saveResume
+    const hiddenStart = div.querySelector('.edu-start');
+    const hiddenEnd   = div.querySelector('.edu-end');
+
+    // Pickers (día 15 forzado)
+    const startPicker = mountMonthYearPicker(startCid, {
+      allowEmpty: true,
+      initialValue: start,
+      onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
+    });
+    const endPicker = mountMonthYearPicker(endCid, {
+      allowEmpty: true,
+      initialValue: isCurrent ? '' : end,
+      onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
+    });
+
+    hiddenStart.value = start;
+    hiddenEnd.value   = isCurrent ? 'Present' : end;
+
+    const currentCb = div.querySelector('.edu-current');
+    currentCb.addEventListener('change', e => {
+      if (e.target.checked) {
+        hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
+        hiddenEnd.value = 'Present';
+        disableMonthYear(endCid, true, 'Education marked as current.');
+      } else {
+        disableMonthYear(endCid, false);
+        const last = hiddenEnd.dataset.lastIso || '';
+        if (last) { endPicker.setValue(last); hiddenEnd.value = last; }
+        else { endPicker.setValue(''); hiddenEnd.value = ''; }
+      }
+      saveResume();
+    });
+
+    if (isCurrent) disableMonthYear(endCid, true, 'Education marked as current.');
+
+    // Reordenar
+    sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
+  } catch (err) {
+    console.error('❌ addEducationEntry falló con entry =', entry, err);
+  }
 }
 
 
