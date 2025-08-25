@@ -3001,9 +3001,25 @@ def update_resume(candidate_id):
         allow_clear = (request.args.get('allow_clear', 'false').lower() == 'true')
 
         def _is_blank(v):
-            if v is None: return True
-            if isinstance(v, str): return v.strip() == ""  # incluye "[]", "" etc si así lo decides
-            if isinstance(v, (list, dict)): return len(v) == 0
+            if v is None:
+                return True
+            if isinstance(v, str):
+                s = v.strip()
+                if s == "":
+                    return True
+                # trata '[]' o '{}' como vacío
+                if s in ("[]", "{}"):
+                    return True
+                # si viene un JSON string vacío, también trátalo como blanco
+                try:
+                    j = json.loads(s)
+                    if j == [] or j == {}:
+                        return True
+                except Exception:
+                    pass
+                return False
+            if isinstance(v, (list, dict)):
+                return len(v) == 0
             return False
 
         # Normalizar education para asegurar key 'country'

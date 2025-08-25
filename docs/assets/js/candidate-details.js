@@ -1,5 +1,54 @@
 
 document.addEventListener("DOMContentLoaded", () => {
+let resumeHydrated = false;  // se vuelve true cuando termina el primer GET /resumes y pintaste la UI
+let resumeDirty    = false;  // se marca true cuando el usuario cambia algo
+
+function markDirty() { resumeDirty = true; }
+
+  // 👇 Endurece parseos para soportar strings ya-JSON, arrays, HTML-encoded, y repr de Python con comillas simples
+function safeParseArray(raw, fallback = []) {
+  try {
+    if (raw == null || raw === '') return fallback;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'object') return raw;
+
+    let s = String(raw).trim();
+
+    // Decodifica entidades HTML por si el backend envió &quot; &amp; etc.
+    if (/[&][a-z]+;/.test(s)) {
+      const ta = document.createElement('textarea');
+      ta.innerHTML = s;
+      s = ta.value;
+    }
+
+    // Normaliza comillas “ ” ‘ ’ que en Safari pueden romper JSON
+    s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+    return JSON.parse(s);
+  } catch (e1) {
+    // Reintento: posible repr de Python con comillas simples
+    try {
+      let s2 = String(raw).trim();
+      if (/^[\[\{]/.test(s2) && /'/.test(s2) && !/"/.test(s2)) {
+        s2 = s2.replace(/'/g, '"');
+        return JSON.parse(s2);
+      }
+    } catch (_) {}
+
+    console.warn('⚠️ Invalid JSON array, fallback to empty. Value was:', raw);
+    return fallback;
+  }
+}
+
+function safeEachArray(label, raw, cb) {
+  const arr = safeParseArray(raw, []);
+  if (!Array.isArray(arr)) {
+    console.warn(`⚠️ ${label} is not an array, skipping.`, raw);
+    return;
+  }
+  arr.forEach(cb);
+}
+
   window.updateHireField = function(field, value) {
   const candidateId = new URLSearchParams(window.location.search).get('id');
   if (!candidateId) return;
@@ -331,10 +380,11 @@ if (videoLinkEl) {
     .then(res => res.json())
     .then(data => {
       aboutP.innerText = data.about || '';
-      JSON.parse(data.work_experience || '[]').forEach(entry => addWorkExperienceEntry(entry));
-      JSON.parse(data.education || '[]').forEach(entry => addEducationEntry(entry));
-      JSON.parse(data.tools || '[]').forEach(entry => addToolEntry(entry));
-      JSON.parse(data.languages || '[]').forEach(entry => addLanguageEntry(entry));
+      safeEachArray('work_experience', data.work_experience, addWorkExperienceEntry);
+      safeEachArray('education',       data.education,       addEducationEntry);
+      safeEachArray('tools',           data.tools,           addToolEntry);
+      safeEachArray('languages',       data.languages,       addLanguageEntry);
+
 const videoLinkEl2 = document.getElementById('videoLinkInput');
 if (videoLinkEl2) {
   const v = (data.video_link ?? '').toString();
@@ -414,12 +464,12 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
   // 🗓️ Montar pickers (Start/End) — forzamos día 15 en el valor emitido
 const startPicker = mountMonthYearPicker(startCid, {
   allowEmpty: true,
-  initialValue: data.start_date || '',
+  initialValue: entry.start_date || '',
   onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
 });
 const endPicker = mountMonthYearPicker(endCid, {
   allowEmpty: true,
-  initialValue: data.current ? '' : (data.end_date || ''),
+  initialValue: entry.current ? '' : (entry.end_date || ''),
   onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
 });
 
@@ -614,6 +664,8 @@ mrToggle.addEventListener('change', ()=>{
       el.addEventListener('change', saveResume);
     });
     toolsList.appendChild(div);
+     const name = div.querySelector('.tool-name');
+if (name && !entry.tool) name.focus();
   }
 function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   const div = document.createElement('div');
@@ -717,6 +769,22 @@ function saveResume() {
 }
 window.saveResumeSoft = debounce(saveResume, 300);
 window.saveResume = saveResume;
+// 💾 Autosave por escritura/cambio dentro de cada sección
+['educationList','workExperienceList','toolsList','languagesList'].forEach(id=>{
+  const node = document.getElementById(id);
+  if (!node) return;
+  node.addEventListener('input',  () => window.saveResumeSoft());
+  node.addEventListener('change', () => window.saveResumeSoft());
+});
+
+// Guardar cuando el usuario cambia de pestaña/ventana
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) saveResume();
+});
+
+// Pequeño “safety net” al cerrar/recargar
+window.addEventListener('beforeunload', () => { saveResume(); });
+
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
   if (aiButton) {
@@ -1086,19 +1154,17 @@ if (aiSubmitBtn) {
 
       if (result.education) {
         document.getElementById('educationList').innerHTML = '';
-        JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+        safeEachArray('education(result)', result.education, addEducationEntry);
       }
-
       if (result.work_experience) {
         document.getElementById('workExperienceList').innerHTML = '';
-        JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+        safeEachArray('work_experience(result)', result.work_experience, addWorkExperienceEntry);
       }
-
       if (result.tools) {
         document.getElementById('toolsList').innerHTML = '';
-        JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
+        safeEachArray('tools(result)', result.tools, addToolEntry);
       }
-
+      await saveResume();
       // cerrar popup si existe
       document.getElementById('ai-popup')?.classList.add('hidden');
     } catch (err) {
@@ -1196,6 +1262,7 @@ document.querySelector('#popup-education .generate-btn').addEventListener('click
       document.getElementById('educationList').innerHTML = '';
       JSON.parse(data.education).forEach(entry => addEducationEntry(entry));
     }
+    await saveResume();
 
     document.getElementById('popup-education').classList.add('hidden');
   } catch (err) {
@@ -1227,7 +1294,7 @@ document.querySelector('#popup-work .generate-btn').addEventListener('click', as
       document.getElementById('workExperienceList').innerHTML = '';
       JSON.parse(data.work_experience).forEach(entry => addWorkExperienceEntry(entry));
     }
-
+await saveResume();
     document.getElementById('popup-work').classList.add('hidden');
   } catch (err) {
     console.error("❌ Error improving work experience:", err);
@@ -1258,7 +1325,7 @@ document.querySelector('#popup-tools .generate-btn').addEventListener('click', a
       document.getElementById('toolsList').innerHTML = '';
       JSON.parse(data.tools).forEach(entry => addToolEntry(entry));
     }
-
+    await saveResume();
     document.getElementById('popup-tools').classList.add('hidden');
   } catch (err) {
     console.error("❌ Error improving tools:", err);
@@ -2362,16 +2429,16 @@ function addMiniRole(card, data = { title:'', start_date:'', end_date:'', curren
   const hiddenEnd   = entry.querySelector('.mr-end');
 
   // 🗓️ Montar pickers (ahora sí existen en el DOM)
-  const startPicker = mountMonthYearPicker(startCid, {
-    allowEmpty: true,
-    initialValue: entry.start_date || '',
-    onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
-  });
-  const endPicker = mountMonthYearPicker(endCid, {
-    allowEmpty: true,
-    initialValue: entry.current ? '' : (entry.end_date || ''),
-    onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
-  });
+const startPicker = mountMonthYearPicker(startCid, {
+  allowEmpty: true,
+  initialValue: data.start_date || '',
+  onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
+});
+const endPicker = mountMonthYearPicker(endCid, {
+  allowEmpty: true,
+  initialValue: data.current ? '' : (data.end_date || ''),
+  onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
+});
 
   // Iniciales
   hiddenStart.value = data.start_date || '';
