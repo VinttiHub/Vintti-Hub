@@ -414,17 +414,16 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
   const hiddenEnd   = div.querySelector('.edu-end');
 
   // 🗓️ Montar pickers (Start/End) — forzamos día 15 en el valor emitido
-  const startPicker = mountMonthYearPicker(startCid, {
-    allowEmpty: true,
-    initialValue: entry.start_date || '',
-    onChange: (iso) => { hiddenStart.value = iso; saveResume(); }
-  });
-
-  const endPicker = mountMonthYearPicker(endCid, {
-    allowEmpty: true,
-    initialValue: entry.current ? '' : (entry.end_date || ''),
-    onChange: (iso) => { hiddenEnd.value = iso; saveResume(); }
-  });
+const startPicker = mountMonthYearPicker(startCid, {
+  allowEmpty: true,
+  initialValue: entry.start_date || '',
+  onChange: (iso) => { hiddenStart.value = iso; if (div.dataset.mr!=='1') window.saveResumeSoft(); }
+});
+const endPicker = mountMonthYearPicker(endCid, {
+  allowEmpty: true,
+  initialValue: entry.current ? '' : (entry.end_date || ''),
+  onChange: (iso) => { hiddenEnd.value = iso; if (div.dataset.mr!=='1') window.saveResumeSoft(); }
+});
 
   // Inicializar hidden con lo que vino del backend
   hiddenStart.value = entry.start_date || '';
@@ -711,11 +710,14 @@ function saveResume() {
     }
   })
   .then(() => {
+      const active = document.activeElement;
+      if (active && active.closest && active.closest('.month-year')) return;
     // Reordenar después de guardar
     sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
     sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
   });
 }
+window.saveResumeSoft = debounce(saveResume, 300);
 window.saveResume = saveResume;
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
@@ -1832,11 +1834,27 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   }
 
   // 🆕 UX: si el usuario elige MES primero y no hay AÑO, colocamos el año actual automáticamente.
-  monthSel.addEventListener('change', () => {
-    if (!yearSel.value) yearSel.value = String(nowYear);
-    emit();
-  });
-  yearSel.addEventListener('change', emit);
+// ✅ Nuevo comportamiento:
+monthSel.addEventListener('change', () => {
+  const hadYear = !!yearSel.value;
+  if (!hadYear) {
+    yearSel.value = String(nowYear); // autocompleta, pero NO emitimos aún
+  } else {
+    emit(); // si ya había año, sí emitimos
+  }
+});
+
+// Emitimos cuando confirman año
+yearSel.addEventListener('change', emit);
+
+// Extra: si el usuario sale del picker y ya hay ambos valores, emitimos
+root.addEventListener('focusout', () => {
+  setTimeout(() => {
+    const y = yearSel.value, m = monthSel.value;
+    if (y && m) emit();
+  }, 0);
+}, true);
+
 
   clearBtn.addEventListener('click', () => { monthSel.value=''; yearSel.value=''; emit(); });
 
@@ -2248,8 +2266,11 @@ function syncMultiRolesToDescription(card){
   // Actualiza fechas agregadas del card padre
   updateAggregateDatesFromMultiRoles(card);
 
-  // 💾 Persistir (ya funciona porque ahora saveResume está en window)
-  if (typeof window.saveResume === 'function') window.saveResume();
+  if (typeof window.saveResumeSoft === 'function') {
+  window.saveResumeSoft();
+} else if (typeof window.saveResume === 'function') {
+  window.saveResume();
+}
 }
 
 
@@ -2347,14 +2368,13 @@ function addMiniRole(card, data = { title:'', start_date:'', end_date:'', curren
   // 🗓️ Montar pickers (ahora sí existen en el DOM)
   const startPicker = mountMonthYearPicker(startCid, {
     allowEmpty: true,
-    initialValue: data.start_date || '',
-    onChange: (iso)=>{ hiddenStart.value = iso; syncMultiRolesToDescription(card); }
+    initialValue: entry.start_date || '',
+    onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
   });
-
   const endPicker = mountMonthYearPicker(endCid, {
     allowEmpty: true,
-    initialValue: data.current ? '' : (data.end_date || ''),
-    onChange: (iso)=>{ hiddenEnd.value = iso; syncMultiRolesToDescription(card); }
+    initialValue: entry.current ? '' : (entry.end_date || ''),
+    onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
   });
 
   // Iniciales

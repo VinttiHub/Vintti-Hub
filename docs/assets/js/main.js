@@ -115,7 +115,8 @@ document.querySelectorAll('.filter-header button').forEach(button => {
       toggleButton.textContent = isExpanded ? 'ðŸ” Filters' : 'âŒ Close Filters';
     });
   }
-
+  const onOppPage = !!document.getElementById('opportunityTableBody');
+  if (onOppPage) {
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light')
     .then(response => response.json())
     .then(async data => {
@@ -467,7 +468,10 @@ const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))
       const spinner = document.getElementById('spinner-overlay');
       if (spinner) spinner.classList.add('hidden');
     });
-    
+    } else {
+  // Opcional: silencio/diagnóstico en index
+  console.debug('No hay tabla de oportunidades en esta página; omito inicialización.');
+}
 document.addEventListener('change', async (e) => {
     if (e.target && e.target.classList.contains('stage-dropdown')) {
       const newStage = e.target.value;
@@ -562,14 +566,6 @@ helloBtn.addEventListener('click', async () => {
   }
 });
   }
-window.addEventListener('pageshow', () => {
-  const tableCard = document.querySelector('.table-card');
-  if (tableCard.classList.contains('exit-left')) {
-    tableCard.classList.remove('exit-left');
-    tableCard.style.opacity = '1';
-    tableCard.style.transform = 'translateX(0)';
-  }
-});
 const summaryLink = document.getElementById('summaryLink');
 const currentUserEmail = localStorage.getItem('user_email');
 const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
@@ -1147,3 +1143,13 @@ async function patchOppFields(oppId, payload) {
   // Mostrar solo para emails permitidos
   eq.style.display = equipmentsAllowed.includes(currentUserEmail) ? '' : 'none';
 })();
+window.addEventListener('pageshow', () => {
+  const tableCard = document.querySelector('.table-card');
+  if (!tableCard) return;                 // ⬅️ evita el error en index
+  if (tableCard.classList.contains('exit-left')) {
+    tableCard.classList.remove('exit-left');
+    tableCard.style.opacity = '1';
+    tableCard.style.transform = 'translateX(0)';
+  }
+});
+ 

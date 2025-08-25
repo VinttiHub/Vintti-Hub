@@ -3064,6 +3064,91 @@ def candidates_search_alias():
         return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
     except Exception as e:
         return jsonify([]), 200
+@app.route('/resumes/<int:candidate_id>', methods=['POST', 'PATCH'])
+def update_resume(candidate_id):
+    try:
+        logging.info("📥 %s /resumes/%s", request.method, candidate_id)
+        data = request.get_json(silent=True) or {}
+        logging.info("🧾 Payload keys=%s  UA=%s  Referer=%s",
+                     list(data.keys()), request.headers.get('User-Agent'),
+                     request.headers.get('Referer'))
+
+        # 👇 Si no quieres permitir que valores 'vacíos' borren lo existente,
+        # deja esto en True. Para permitir borrar explícitamente, manda ?allow_clear=true
+        allow_clear = (request.args.get('allow_clear', 'false').lower() == 'true')
+
+        def _is_blank(v):
+            if v is None: return True
+            if isinstance(v, str): return v.strip() == ""  # incluye "[]", "" etc si así lo decides
+            if isinstance(v, (list, dict)): return len(v) == 0
+            return False
+
+        # Normalizar education para asegurar key 'country'
+        if 'education' in data:
+            try:
+                edu_raw = data['education']
+                edu = json.loads(edu_raw) if isinstance(edu_raw, str) else edu_raw
+                if isinstance(edu, list):
+                    for item in edu:
+                        if isinstance(item, dict) and 'country' not in item:
+                            item['country'] = ''
+                data['education'] = edu
+            except Exception:
+                pass
+
+        allowed_fields = ['about','work_experience','education','tools','languages','video_link']
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Traemos lo existente para decidir qué actualizar y qué ignorar si viene vacío
+        cursor.execute("""
+            SELECT about, work_experience, education, tools, languages, video_link
+            FROM resume WHERE candidate_id = %s
+        """, (candidate_id,))
+        row = cursor.fetchone()
+        existing_map = {}
+        if row:
+            cols = ['about','work_experience','education','tools','languages','video_link']
+            existing_map = dict(zip(cols, row))
+
+        # Si no existía fila, la creamos en blanco una sola vez (sin borrar nada)
+        if not row:
+            cursor.execute("INSERT INTO resume (candidate_id) VALUES (%s)", (candidate_id,))
+            conn.commit()
+
+        updates, values = [], []
+        for field in allowed_fields:
+            if field in data:
+                val = data[field]
+                # 🔒 Protección anti-borrado involuntario
+                if not allow_clear and _is_blank(val):
+                    logging.info("⏭️ Skip '%s' (blank value and allow_clear=False)", field)
+                    continue
+                if isinstance(val, (dict, list)):
+                    val = json.dumps(val)
+                updates.append(f"{field} = %s")
+                values.append(val)
+
+        if not updates:
+            cursor.close(); conn.close()
+            return jsonify({'success': True, 'skipped': True})  # nada que cambiar
+
+        values.append(candidate_id)
+        cursor.execute(f"""
+            UPDATE resume
+            SET {', '.join(updates)}
+            WHERE candidate_id = %s
+        """, values)
+        conn.commit()
+        cursor.close(); conn.close()
+        return jsonify({'success': True}), 200
+
+    except Exception as e:
+        import traceback
+        logging.exception("❌ Error en PATCH/POST /resumes")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
