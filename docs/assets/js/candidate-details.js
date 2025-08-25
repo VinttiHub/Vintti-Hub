@@ -1,5 +1,54 @@
 
 document.addEventListener("DOMContentLoaded", () => {
+let resumeHydrated = false;  // se vuelve true cuando termina el primer GET /resumes y pintaste la UI
+let resumeDirty    = false;  // se marca true cuando el usuario cambia algo
+
+function markDirty() { resumeDirty = true; }
+
+  // 👇 Endurece parseos para soportar strings ya-JSON, arrays, HTML-encoded, y repr de Python con comillas simples
+function safeParseArray(raw, fallback = []) {
+  try {
+    if (raw == null || raw === '') return fallback;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'object') return raw;
+
+    let s = String(raw).trim();
+
+    // Decodifica entidades HTML por si el backend envió &quot; &amp; etc.
+    if (/[&][a-z]+;/.test(s)) {
+      const ta = document.createElement('textarea');
+      ta.innerHTML = s;
+      s = ta.value;
+    }
+
+    // Normaliza comillas “ ” ‘ ’ que en Safari pueden romper JSON
+    s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+
+    return JSON.parse(s);
+  } catch (e1) {
+    // Reintento: posible repr de Python con comillas simples
+    try {
+      let s2 = String(raw).trim();
+      if (/^[\[\{]/.test(s2) && /'/.test(s2) && !/"/.test(s2)) {
+        s2 = s2.replace(/'/g, '"');
+        return JSON.parse(s2);
+      }
+    } catch (_) {}
+
+    console.warn('⚠️ Invalid JSON array, fallback to empty. Value was:', raw);
+    return fallback;
+  }
+}
+
+function safeEachArray(label, raw, cb) {
+  const arr = safeParseArray(raw, []);
+  if (!Array.isArray(arr)) {
+    console.warn(`⚠️ ${label} is not an array, skipping.`, raw);
+    return;
+  }
+  arr.forEach(cb);
+}
+
   window.updateHireField = function(field, value) {
   const candidateId = new URLSearchParams(window.location.search).get('id');
   if (!candidateId) return;
@@ -149,17 +198,15 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     }
 
     // Llama a Coresignal solo si NO hay coresignal_scrapper y el LinkedIn es válido
-    if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
-        .then(async r => {
-          let payload;
-          try { payload = await r.json(); } catch { payload = await r.text(); }
-          console.log('🔄 Coresignal sync:', { ok: r.ok, status: r.status, payload });
-        })
-              .then(r => r.json())
-            .then(d => console.log('🔄 Coresignal sync:', d))
-        .catch(e => console.warn('⚠️ Coresignal sync failed', e));
-    }
+if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
+  fetch(`${apiBase}/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
+    .then(async (r) => {
+      let payload;
+      try { payload = await r.json(); } catch { payload = await r.text(); }
+      console.log('🔄 Coresignal sync:', { ok: r.ok, status: r.status, payload });
+    })
+    .catch(e => console.warn('⚠️ Coresignal sync failed', e));
+}
 
     console.log("🎯 Valor desde DB:", data.country);
 
@@ -333,10 +380,11 @@ if (videoLinkEl) {
     .then(res => res.json())
     .then(data => {
       aboutP.innerText = data.about || '';
-      JSON.parse(data.work_experience || '[]').forEach(entry => addWorkExperienceEntry(entry));
-      JSON.parse(data.education || '[]').forEach(entry => addEducationEntry(entry));
-      JSON.parse(data.tools || '[]').forEach(entry => addToolEntry(entry));
-      JSON.parse(data.languages || '[]').forEach(entry => addLanguageEntry(entry));
+      safeEachArray('work_experience', data.work_experience, addWorkExperienceEntry);
+      safeEachArray('education',       data.education,       addEducationEntry);
+      safeEachArray('tools',           data.tools,           addToolEntry);
+      safeEachArray('languages',       data.languages,       addLanguageEntry);
+
 const videoLinkEl2 = document.getElementById('videoLinkInput');
 if (videoLinkEl2) {
   const v = (data.video_link ?? '').toString();
@@ -414,17 +462,16 @@ function addEducationEntry(entry = { institution: '', title: '', country: '', st
   const hiddenEnd   = div.querySelector('.edu-end');
 
   // 🗓️ Montar pickers (Start/End) — forzamos día 15 en el valor emitido
-  const startPicker = mountMonthYearPicker(startCid, {
-    allowEmpty: true,
-    initialValue: entry.start_date || '',
-    onChange: (iso) => { hiddenStart.value = iso; saveResume(); }
-  });
-
-  const endPicker = mountMonthYearPicker(endCid, {
-    allowEmpty: true,
-    initialValue: entry.current ? '' : (entry.end_date || ''),
-    onChange: (iso) => { hiddenEnd.value = iso; saveResume(); }
-  });
+const startPicker = mountMonthYearPicker(startCid, {
+  allowEmpty: true,
+  initialValue: entry.start_date || '',
+  onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
+});
+const endPicker = mountMonthYearPicker(endCid, {
+  allowEmpty: true,
+  initialValue: entry.current ? '' : (entry.end_date || ''),
+  onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
+});
 
   // Inicializar hidden con lo que vino del backend
   hiddenStart.value = entry.start_date || '';
@@ -462,11 +509,19 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
 
   const div = document.createElement('div');
   div.className = 'cv-card-entry pulse';
+  // guardamos ids para localizar filas luego
+  div.dataset.workStartCid = startCid;
+  div.dataset.workEndCid = endCid;
+
   div.innerHTML = `
     <div style="display:flex; gap:20px; flex-wrap:wrap;">
       <div style="flex:2.2; min-width:320px;">
         <input type="text" class="work-title" value="${entry.title || ''}" placeholder="Title" />
         <input type="text" class="work-company" value="${entry.company || ''}" placeholder="Company" style="margin-top:6px;" />
+        <div class="cv-switch" style="margin-top:10px;">
+          <span>Multiple roles in this company</span>
+          <input type="checkbox" class="mr-toggle"/>
+        </div>
       </div>
 
       <div style="flex:2; min-width:360px;">
@@ -488,6 +543,11 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
       </div>
     </div>
 
+    <div class="mr-wrap">
+      <div class="mr-list"></div>
+      <button type="button" class="btn-soft mr-add">Add role</button>
+    </div>
+
     <div class="rich-toolbar">
       <button type="button" data-command="bold"><b>B</b></button>
       <button type="button" data-command="italic"><i>I</i></button>
@@ -497,50 +557,51 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
     <button class="remove-entry">🗑️</button>
   `;
 
-  // Toolbar rich text
+  // Toolbar rich text (solo aplica si NO está en modo multi-roles)
   div.querySelectorAll('.rich-toolbar button').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (div.dataset.mr === '1') return; // description lo generamos en MR
       const cmd = btn.getAttribute('data-command');
-      const target = document.getSelection().focusNode?.parentElement;
-      if (target && target.isContentEditable) { target.focus(); document.execCommand(cmd, false, null); }
+      const target = div.querySelector('.work-desc');
+      target.focus(); document.execCommand(cmd, false, null);
       btn.classList.toggle('active', document.queryCommandState(cmd));
+      saveResume();
     });
   });
 
   setTimeout(() => div.classList.remove('pulse'), 500);
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-  div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', saveResume));
+  div.querySelectorAll('input, .rich-input').forEach(el => el.addEventListener('blur', ()=>{ if (div.dataset.mr!=='1') saveResume(); }));
 
   workExperienceList.appendChild(div);
-
   // Hidden que usa saveResume()
   const hiddenStart = div.querySelector('.work-start');
   const hiddenEnd   = div.querySelector('.work-end');
 
-  // Montar pickers
+  // Montar pickers principales
   const startPicker = mountMonthYearPicker(startCid, {
     allowEmpty: true,
     initialValue: entry.start_date || '',
-    onChange: (iso) => { hiddenStart.value = iso; saveResume(); }
+    onChange: (iso) => { hiddenStart.value = iso; if (div.dataset.mr!=='1') saveResume(); }
   });
 
   const endPicker = mountMonthYearPicker(endCid, {
     allowEmpty: true,
     initialValue: entry.current ? '' : (entry.end_date || ''),
-    onChange: (iso) => { hiddenEnd.value = iso; saveResume(); }
+    onChange: (iso) => { hiddenEnd.value = iso; if (div.dataset.mr!=='1') saveResume(); }
   });
 
   // Inicial
   hiddenStart.value = entry.start_date || '';
   hiddenEnd.value   = entry.current ? 'Present' : (entry.end_date || '');
 
-  // Current toggle
+  // Current toggle principal
   const currentCb = div.querySelector('.work-current');
   currentCb.addEventListener('change', e => {
+    if (div.dataset.mr === '1') return; // en MR lo controlan los sub-roles
     if (e.target.checked) {
       hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
       hiddenEnd.value = 'Present';
-      // Dentro de addWorkExperienceEntry:
       disableMonthYear(endCid, true, 'Work experience marked as current.');
     } else {
       disableMonthYear(endCid, false);
@@ -551,6 +612,33 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
     saveResume();
   });
   if (entry.current) disableMonthYear(endCid, true, 'Work experience marked as current.');
+
+  // === MULTI-ROLES wiring
+  const mrToggle = div.querySelector('.mr-toggle');
+  const mrAddBtn = div.querySelector('.mr-add');
+
+mrToggle.addEventListener('change', ()=>{
+  enableMultiRolesOnCard(div, mrToggle.checked);
+  if (mrToggle.checked){
+    if (!div.querySelector('.mr-entry')) addMiniRole(div);
+    // 🔥 fuerza sincronización inmediata para que se guarde el pack:
+    syncMultiRolesToDescription(div);
+  } else {
+    saveResume();
+  }
+});
+
+  mrAddBtn.addEventListener('click', ()=>{
+    addMiniRole(div);
+    syncMultiRolesToDescription(div);
+  });
+
+  // Hidratar desde description si ya trae paquete MR
+  const hydrated = tryHydrateMultiFromDescription(div, entry.description || '');
+  if (!hydrated){
+    // Si no está en MR, habilita edición normal
+    enableMultiRolesOnCard(div, false);
+  }
 
   // Ordenar tras agregar
   sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
@@ -571,11 +659,13 @@ function addWorkExperienceEntry(entry = { title: '', company: '', start_date: ''
     `;
     setTimeout(() => div.classList.remove('pulse'), 500);
     div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-    div.querySelectorAll('input, select').forEach(el => {
-      el.addEventListener('blur', saveResume);
-      el.addEventListener('change', saveResume);
-    });
+div.querySelectorAll('input, select').forEach(el => {
+  el.addEventListener('input',  () => { markDirty(); window.saveResumeSoft(); });
+  el.addEventListener('change', () => { markDirty(); window.saveResumeSoft(); });
+});
     toolsList.appendChild(div);
+     const name = div.querySelector('.tool-name');
+if (name && !entry.tool) name.focus();
   }
 function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   const div = document.createElement('div');
@@ -599,10 +689,10 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   `;
   setTimeout(() => div.classList.remove('pulse'), 500);
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-  div.querySelectorAll('select').forEach(el => {
-    el.addEventListener('blur', saveResume);
-    el.addEventListener('change', saveResume);
-  });
+div.querySelectorAll('select').forEach(el => {
+  el.addEventListener('input',  () => { markDirty(); window.saveResumeSoft(); });
+  el.addEventListener('change', () => { markDirty(); window.saveResumeSoft(); });
+});
   document.getElementById('languagesList').appendChild(div);
 }
 
@@ -616,8 +706,8 @@ function saveResume() {
       institution: div.querySelector('.edu-title').value.trim(),
       title:       div.querySelector('.edu-degree').value.trim(),
       country:     (div.querySelector('.edu-country')?.value || '').trim(),
-      start_date:  normalizeISO15(startRaw),            // 👈 fuerza día 15
-      end_date:    normalizeISO15(endRaw),              // 👈 fuerza día 15 ('' si Present)
+      start_date:  normalizeISO15(startRaw),
+      end_date:    normalizeISO15(endRaw),
       current:     div.querySelector('.edu-current').checked,
       description: div.querySelector('.edu-desc').innerHTML.trim(),
     };
@@ -629,9 +719,10 @@ function saveResume() {
     return {
       title:       div.querySelector('.work-title').value.trim(),
       company:     div.querySelector('.work-company').value.trim(),
-      start_date:  normalizeISO15(startRaw),            // 👈 fuerza día 15
-      end_date:    normalizeISO15(endRaw),              // 👈 fuerza día 15 ('' si Present)
+      start_date:  normalizeISO15(startRaw),
+      end_date:    normalizeISO15(endRaw),
       current:     div.querySelector('.work-current').checked,
+      // 👇 En modo multi-roles, .work-desc contiene el <div class="mr-pack"> que ya sincronizamos.
       description: div.querySelector('.work-desc').innerHTML.trim(),
     };
   });
@@ -646,16 +737,53 @@ function saveResume() {
     level:    div.querySelector('.language-level').value
   }));
 
+  // ✅ IMPORTANTE: enviar como STRINGS JSON (tu backend devuelve strings y luego los parseas)
+  const payload = {
+    about,
+    education: JSON.stringify(education),
+    work_experience: JSON.stringify(work_experience),
+    tools: JSON.stringify(tools),
+    languages: JSON.stringify(languages),
+  };
+
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ about, education, work_experience, tools, languages }),
-  }).then(() => {
+    body: JSON.stringify(payload),
+  })
+  .then(async (r) => {
+    const txt = await r.text().catch(()=> '');
+    if (!r.ok) {
+      console.error('❌ PATCH /resumes fallo', r.status, txt);
+    } else {
+      console.debug('✅ Resume guardado (incluye multi-roles)');
+    }
+  })
+  .then(() => {
+      const active = document.activeElement;
+      if (active && active.closest && active.closest('.month-year')) return;
     // Reordenar después de guardar
     sortEntriesByEndDate('workExperienceList', '.cv-card-entry', '.work-end', '.work-current');
     sortEntriesByEndDate('educationList', '.cv-card-entry', '.edu-end', '.edu-current');
   });
 }
+window.saveResumeSoft = debounce(saveResume, 300);
+window.saveResume = saveResume;
+// 💾 Autosave por escritura/cambio dentro de cada sección
+['educationList','workExperienceList','toolsList','languagesList'].forEach(id=>{
+  const node = document.getElementById(id);
+  if (!node) return;
+  node.addEventListener('input',  () => window.saveResumeSoft());
+  node.addEventListener('change', () => window.saveResumeSoft());
+});
+
+// Guardar cuando el usuario cambia de pestaña/ventana
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) saveResume();
+});
+
+// Pequeño “safety net” al cerrar/recargar
+window.addEventListener('beforeunload', () => { saveResume(); });
 
   // === AI Popup Logic ===
   const aiButton = document.getElementById('ai-action-button');
@@ -779,7 +907,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/i
 const hireFee = document.getElementById('hire-fee');
 const hireComputer = document.getElementById('hire-computer');
 const hirePerks = document.getElementById('hire-extraperks');
-console.log(document.getElementById('hire-extraperks').innerHTML)
+console.log(hirePerks?.innerHTML || '');
 const hireSetupFee = document.getElementById('hire-setup-fee');
 if (hireSetupFee) {
   hireSetupFee.addEventListener('blur', () => {
@@ -793,10 +921,8 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
   loadHireData();
 }
 
-hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
-hirePerks.addEventListener('blur', () => {
-  updateHireField('extraperks', hirePerks.innerHTML);
-});
+if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
+if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
 const hash = window.location.hash;
 if (hash === '#hire') {
   const hireTab = document.querySelector('.tab[data-tab="hire"]');
@@ -1028,19 +1154,17 @@ if (aiSubmitBtn) {
 
       if (result.education) {
         document.getElementById('educationList').innerHTML = '';
-        JSON.parse(result.education).forEach(entry => addEducationEntry(entry));
+        safeEachArray('education(result)', result.education, addEducationEntry);
       }
-
       if (result.work_experience) {
         document.getElementById('workExperienceList').innerHTML = '';
-        JSON.parse(result.work_experience).forEach(entry => addWorkExperienceEntry(entry));
+        safeEachArray('work_experience(result)', result.work_experience, addWorkExperienceEntry);
       }
-
       if (result.tools) {
         document.getElementById('toolsList').innerHTML = '';
-        JSON.parse(result.tools).forEach(entry => addToolEntry(entry));
+        safeEachArray('tools(result)', result.tools, addToolEntry);
       }
-
+      await saveResume();
       // cerrar popup si existe
       document.getElementById('ai-popup')?.classList.add('hidden');
     } catch (err) {
@@ -1138,6 +1262,7 @@ document.querySelector('#popup-education .generate-btn').addEventListener('click
       document.getElementById('educationList').innerHTML = '';
       JSON.parse(data.education).forEach(entry => addEducationEntry(entry));
     }
+    await saveResume();
 
     document.getElementById('popup-education').classList.add('hidden');
   } catch (err) {
@@ -1169,7 +1294,7 @@ document.querySelector('#popup-work .generate-btn').addEventListener('click', as
       document.getElementById('workExperienceList').innerHTML = '';
       JSON.parse(data.work_experience).forEach(entry => addWorkExperienceEntry(entry));
     }
-
+await saveResume();
     document.getElementById('popup-work').classList.add('hidden');
   } catch (err) {
     console.error("❌ Error improving work experience:", err);
@@ -1200,7 +1325,7 @@ document.querySelector('#popup-tools .generate-btn').addEventListener('click', a
       document.getElementById('toolsList').innerHTML = '';
       JSON.parse(data.tools).forEach(entry => addToolEntry(entry));
     }
-
+    await saveResume();
     document.getElementById('popup-tools').classList.add('hidden');
   } catch (err) {
     console.error("❌ Error improving tools:", err);
@@ -1713,6 +1838,19 @@ salaryCloseBtns.forEach(btn => btn && btn.addEventListener('click', (e) => {
     loadResignations();
   }
 })();
+
+
+
+
+
+
+
+
+
+
+
+
+});
 function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = false, onChange } = {}) {
   const root = document.getElementById(containerId);
   if (!root) return null;
@@ -1729,8 +1867,8 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   monthSel.innerHTML = `<option value="">Month</option>` + months.slice(1)
     .map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
   yearSel.innerHTML = `<option value="">Year</option>`;
-  const now = new Date().getFullYear();
-  for (let y = now + 5; y >= 1990; y--) {
+  const nowYear = new Date().getFullYear();
+  for (let y = nowYear + 5; y >= 1990; y--) {
     const opt = document.createElement('option');
     opt.value = String(y);
     opt.textContent = String(y);
@@ -1738,7 +1876,7 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   }
 
   clearBtn.type = 'button';
-  clearBtn.className = 'btn-clear';   // clase simple; la estilizamos arriba
+  clearBtn.className = 'btn-clear';
   clearBtn.setAttribute('aria-label', 'Clear date');
   clearBtn.title = 'Clear';
   clearBtn.textContent = 'Clear';
@@ -1749,7 +1887,7 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
   function toISO() {
     const y = yearSel.value, m = monthSel.value;
     if (!y || !m) return allowEmpty ? '' : '';
-    return `${y}-${m}-15`; // 👈 día 15 forzado
+    return `${y}-${m}-15`; // día 15 forzado
   }
   function emit() {
     if (typeof onChange !== 'function') return;
@@ -1758,13 +1896,34 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
     if (y && m) onChange(toISO());
   }
 
-  monthSel.addEventListener('change', emit);
-  yearSel.addEventListener('change', emit);
+  // 🆕 UX: si el usuario elige MES primero y no hay AÑO, colocamos el año actual automáticamente.
+// ✅ Nuevo comportamiento:
+monthSel.addEventListener('change', () => {
+  const hadYear = !!yearSel.value;
+  if (!hadYear) {
+    yearSel.value = String(nowYear); // autocompleta, pero NO emitimos aún
+  } else {
+    emit(); // si ya había año, sí emitimos
+  }
+});
+
+// Emitimos cuando confirman año
+yearSel.addEventListener('change', emit);
+
+// Extra: si el usuario sale del picker y ya hay ambos valores, emitimos
+root.addEventListener('focusout', () => {
+  setTimeout(() => {
+    const y = yearSel.value, m = monthSel.value;
+    if (y && m) emit();
+  }, 0);
+}, true);
+
+
   clearBtn.addEventListener('click', () => { monthSel.value=''; yearSel.value=''; emit(); });
 
   function setValue(iso) {
     if (!iso) { monthSel.value=''; yearSel.value=''; return; }
-    const [datePart] = iso.split('T'); // soporta 'YYYY-MM-DD' o 'YYYY-MM-DDTHH:mm...'
+    const [datePart] = iso.split('T');
     const [y,m] = datePart.split('-');
     if (y) yearSel.value = y;
     if (m) monthSel.value = m;
@@ -1773,18 +1932,6 @@ function mountMonthYearPicker(containerId, { initialValue = '', allowEmpty = fal
 
   return { setValue, getValue: toISO };
 }
-
-
-
-
-
-
-
-
-
-
-
-});
 
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -1852,6 +1999,7 @@ window.loadOpportunitiesForCandidate = function () {
 };
 function loadHireData() {
   const candidateId = new URLSearchParams(window.location.search).get('id');
+  const revenueInput = document.getElementById('hire-revenue');
   if (!candidateId) return;
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
@@ -1873,7 +2021,8 @@ if (setupEl) setupEl.value = data.setup_fee || '';
   } else {
     document.getElementById('hire-revenue').value = data.employee_revenue || '';
   }
-  if (model?.toLowerCase() === 'recruiting') {
+  const isRecruiting = model?.includes('recruiting');
+  if (isRecruiting)  {
   document.getElementById('hire-working-schedule').closest('.field').style.display = 'none';
   document.getElementById('hire-pto').closest('.field').style.display = 'none';
   document.getElementById('hire-computer').closest('.field').style.display = 'none';
@@ -1891,7 +2040,6 @@ if (endInp)   endInp.value   = (data.end_date   || '').slice(0, 10);
 
 
 const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-const isRecruiting = modelText?.includes('recruiting');
 
 // Solo aplica esta lógica si es Recruiting
 if (isRecruiting) {
@@ -1932,7 +2080,6 @@ if (isRecruiting) {
 const salaryInput = document.getElementById('hire-salary');
 const feeInput = document.getElementById('hire-fee');
 const tipMessage = "To update salary or fee, please use the 'Salary Updates' section below.";
-const revenueInput = document.getElementById('hire-revenue');
 const revenueMessage = "You can't edit revenue manually. It's auto-calculated.";
 
 [salaryInput, feeInput].forEach(input => {
@@ -2131,4 +2278,341 @@ function normalizeISO15(raw) {
   if (/^\d{4}-\d{2}$/.test(raw)) return `${raw}-15`;
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.replace(/-\d{2}$/, '-15');
   return raw;
+}
+function syncMultiRolesToDescription(card){
+  const list  = card.querySelector('.mr-list');
+  const desc  = card.querySelector('.work-desc');
+  const items = Array.from(list.querySelectorAll('.mr-entry'));
+
+  const pack = document.createElement('div');
+  pack.className = 'mr-pack';
+  pack.setAttribute('data-type','multi-roles');
+
+  const roles = [];
+
+  items.forEach(it => {
+    const title   = it.querySelector('.mr-title')?.value.trim() || '';
+    const start   = (it.querySelector('.mr-start')?.value || '').trim();
+    const endIso  = (it.querySelector('.mr-end')?.value   || '').trim();
+    const current = !!it.querySelector('.mr-current')?.checked;
+    const end     = current ? 'Present' : endIso;
+    const descHtml= it.querySelector('.mr-desc')?.innerHTML.trim() || '';
+
+    const isEmpty = !(title || descHtml || start || endIso || current);
+    if (isEmpty) return;
+
+    // HTML para re-hidratar
+    const node = document.createElement('div');
+    node.className = 'mr-item';
+    node.setAttribute('data-start', start);
+    node.setAttribute('data-end', end);
+    node.innerHTML = `
+      <div class="mr-title-txt">${escapeHtmlText(title)}</div>
+      <div class="mr-desc-html">${descHtml}</div>
+    `;
+    pack.appendChild(node);
+
+    // JSON paralelo (útil para backend/reportes)
+    roles.push({
+      title, start_date: start, end_date: current ? '' : endIso, current, description_html: descHtml
+    });
+  });
+
+  if (pack.children.length > 0) {
+    // mini-JSON embebido para quien lo necesite (URL-encoded para seguridad)
+    try { pack.setAttribute('data-roles', encodeURIComponent(JSON.stringify(roles))); } catch {}
+    desc.innerHTML = pack.outerHTML;
+  } else {
+    desc.innerHTML = '';
+  }
+
+  // Actualiza fechas agregadas del card padre
+  updateAggregateDatesFromMultiRoles(card);
+
+  if (typeof window.saveResumeSoft === 'function') {
+  window.saveResumeSoft();
+} else if (typeof window.saveResume === 'function') {
+  window.saveResume();
+}
+}
+
+
+function updateAggregateDatesFromMultiRoles(card){
+  const items = Array.from(card.querySelectorAll('.mr-entry'));
+  if (!items.length) return;
+
+  // earliest start y latest end (Present > cualquier fecha)
+  let minStart = null;
+  let maxEnd = null;
+  let hasPresent = false;
+
+  items.forEach(it=>{
+    const s = (it.querySelector('.mr-start')?.value || '').trim();
+    const e = (it.querySelector('.mr-end')?.value || '').trim();
+    const cur = it.querySelector('.mr-current')?.checked;
+
+    if (s) minStart = !minStart ? s : (new Date(s) < new Date(minStart) ? s : minStart);
+    if (cur) { hasPresent = true; }
+    else if (e) { maxEnd = !maxEnd ? e : (new Date(e) > new Date(maxEnd) ? e : maxEnd); }
+  });
+
+  // Escribe en los hidden del entry padre (los que saveResume ya usa)
+  const hiddenStart = card.querySelector('.work-start');
+  const hiddenEnd   = card.querySelector('.work-end');
+  const currentCb   = card.querySelector('.work-current');
+
+  if (hiddenStart) hiddenStart.value = minStart || '';
+  if (hiddenEnd)   hiddenEnd.value   = hasPresent ? 'Present' : (maxEnd || '');
+  if (currentCb)   currentCb.checked = !!hasPresent;
+}
+
+// Crea una mini-tarjeta (rol)
+function addMiniRole(card, data = { title:'', start_date:'', end_date:'', current:false, description:'' }){
+  const id = uniqId('mr');
+  const startCid = `mr-start-${id}`;
+  const endCid   = `mr-end-${id}`;
+
+  const entry = document.createElement('div');
+  entry.className = 'mr-entry';
+  entry.innerHTML = `
+    <button type="button" class="remove-entry" title="Remove">🗑️</button>
+    <div class="mr-row">
+      <div class="mr-col">
+        <input type="text" class="mr-title" placeholder="Role title" value="${data.title || ''}">
+      </div>
+      <div class="mr-col">
+        <label style="display:block;">Start</label>
+        <div id="${startCid}" class="month-year"></div>
+        <input type="hidden" class="mr-start" value="">
+      </div>
+      <div class="mr-col">
+        <label style="display:block;">End</label>
+        <div id="${endCid}" class="month-year"></div>
+        <input type="hidden" class="mr-end" value="">
+      </div>
+      <div class="mr-col" style="display:flex;align-items:flex-end;">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" class="mr-current" ${data.current ? 'checked' : ''}/> Current
+        </label>
+      </div>
+    </div>
+    <div class="mr-toolbar">
+      <button type="button" data-command="bold"><b>B</b></button>
+      <button type="button" data-command="italic"><i>I</i></button>
+      <button type="button" data-command="insertUnorderedList">• List</button>
+    </div>
+    <div class="mr-desc" contenteditable="true" placeholder="Description...">${data.description || ''}</div>
+  `;
+
+  // ➜ Primero insertar en el DOM
+  card.querySelector('.mr-list').appendChild(entry);
+
+  // Toolbar
+  entry.querySelectorAll('.mr-toolbar button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const cmd = btn.getAttribute('data-command');
+      const target = entry.querySelector('.mr-desc');
+      target.focus(); document.execCommand(cmd, false, null);
+      btn.classList.toggle('active', document.queryCommandState(cmd));
+      syncMultiRolesToDescription(card);
+    });
+  });
+
+  // Eliminar mini-rol
+  entry.querySelector('.remove-entry').addEventListener('click', ()=>{
+    entry.remove();
+    syncMultiRolesToDescription(card);
+  });
+
+  // Hidden que reflejan el valor
+  const hiddenStart = entry.querySelector('.mr-start');
+  const hiddenEnd   = entry.querySelector('.mr-end');
+
+  // 🗓️ Montar pickers (ahora sí existen en el DOM)
+const startPicker = mountMonthYearPicker(startCid, {
+  allowEmpty: true,
+  initialValue: data.start_date || '',
+  onChange: (iso) => { hiddenStart.value = iso; window.saveResumeSoft(); }
+});
+const endPicker = mountMonthYearPicker(endCid, {
+  allowEmpty: true,
+  initialValue: data.current ? '' : (data.end_date || ''),
+  onChange: (iso) => { hiddenEnd.value = iso; window.saveResumeSoft(); }
+});
+
+  // Iniciales
+  hiddenStart.value = data.start_date || '';
+  hiddenEnd.value   = data.current ? 'Present' : (data.end_date || '');
+
+  // Current toggle del mini-rol
+  const cur = entry.querySelector('.mr-current');
+  cur.addEventListener('change', e=>{
+    if (e.target.checked){
+      hiddenEnd.dataset.lastIso = hiddenEnd.value && hiddenEnd.value !== 'Present' ? hiddenEnd.value : '';
+      hiddenEnd.value = 'Present';
+      disableMonthYear(endCid, true, 'Role marked as current.');
+    } else {
+      disableMonthYear(endCid, false);
+      const last = hiddenEnd.dataset.lastIso || '';
+      if (last){ endPicker.setValue(last); hiddenEnd.value = last; }
+      else { endPicker.setValue(''); hiddenEnd.value=''; }
+    }
+    syncMultiRolesToDescription(card);
+  });
+  if (data.current) disableMonthYear(endCid, true, 'Role marked as current.');
+
+  // Sincronizar en blur / input
+  entry.querySelector('.mr-title').addEventListener('blur', ()=> syncMultiRolesToDescription(card));
+  entry.querySelector('.mr-desc').addEventListener('blur', ()=> syncMultiRolesToDescription(card));
+  // 📌 Guardado en vivo mientras se escribe/cambia
+const syncNow = () => syncMultiRolesToDescription(card);
+const syncSoft = debounce(syncNow, 600);
+
+// Título y descripción del mini-rol
+entry.querySelector('.mr-title').addEventListener('input', syncSoft);
+entry.querySelector('.mr-desc').addEventListener('input',  syncSoft);
+
+// Por si el usuario usa Enter o sale del campo
+entry.querySelector('.mr-title').addEventListener('blur', syncNow);
+entry.querySelector('.mr-desc').addEventListener('blur',  syncNow);
+
+// Los pickers ya llaman a syncNow en su onChange; mantenlo así.
+
+}
+
+function enableMultiRolesOnCard(card, enabled){
+  const wrap    = card.querySelector('.mr-wrap');
+  const toggle  = card.querySelector('.mr-toggle');
+  const titleEl = card.querySelector('.work-title');
+  const companyEl = card.querySelector('.work-company');
+  const startHost = document.getElementById(card.dataset.workStartCid || '');
+  const datesRow  = startHost ? startHost.parentElement?.parentElement : null;
+  const currentRow= card.querySelector('.work-current')?.closest('div');
+  const descEl    = card.querySelector('.work-desc');
+  const cardToolbar = card.querySelector(':scope > .rich-toolbar');
+
+  // ✅ Company SIEMPRE visible
+  companyEl?.classList.remove('mr-hidden');
+
+  toggle.checked = !!enabled;
+  wrap.classList.toggle('active', !!enabled);
+
+  if (enabled){
+    // NO tocar companyEl aquí (debe seguir visible)
+    if (!card.dataset.mrBackup){
+      const backup = {
+        title:   titleEl?.value || '',
+        start:   card.querySelector('.work-start')?.value || '',
+        end:     card.querySelector('.work-end')?.value   || '',
+        current: !!card.querySelector('.work-current')?.checked,
+        desc:    descEl?.innerHTML || ''
+      };
+      card.dataset.mrBackup = JSON.stringify(backup);
+    }
+
+    // Oculta controles "single"
+    titleEl?.classList.add('mr-hidden');
+    datesRow?.classList.add('mr-hidden');
+    currentRow?.classList.add('mr-hidden');
+    descEl?.classList.add('mr-hidden');
+    cardToolbar?.classList.add('mr-hidden');
+
+    card.dataset.mr = '1';
+  } else {
+    // ⛔️ No ocultar Company NUNCA
+    // Restaurar estado "single"
+    const backup = card.dataset.mrBackup ? JSON.parse(card.dataset.mrBackup) : null;
+    wrap.querySelector('.mr-list')?.replaceChildren();
+
+    if (descEl && descEl.querySelector('.mr-pack')) {
+      descEl.innerHTML = backup?.desc || '';
+    }
+
+    if (backup){
+      if (titleEl) titleEl.value = backup.title;
+      const hs = card.querySelector('.work-start');
+      const he = card.querySelector('.work-end');
+      const wc = card.querySelector('.work-current');
+
+      if (hs) hs.value = backup.start || '';
+      if (he) he.value = backup.current ? 'Present' : (backup.end || '');
+      if (wc) wc.checked = !!backup.current;
+
+      if (card.dataset.workStartCid) setMonthYearUIFromISO(card.dataset.workStartCid, backup.start || '');
+      if (card.dataset.workEndCid)   setMonthYearUIFromISO(card.dataset.workEndCid, backup.current ? '' : (backup.end || ''));
+
+      if (backup.current && card.dataset.workEndCid) {
+        disableMonthYear(card.dataset.workEndCid, true, 'Work experience marked as current.');
+      } else if (card.dataset.workEndCid) {
+        disableMonthYear(card.dataset.workEndCid, false);
+      }
+    }
+
+    titleEl?.classList.remove('mr-hidden');
+    datesRow?.classList.remove('mr-hidden');
+    currentRow?.classList.remove('mr-hidden');
+    descEl?.classList.remove('mr-hidden');
+    cardToolbar?.classList.remove('mr-hidden');
+
+    card.dataset.mr = '';
+    delete card.dataset.mrBackup;
+
+    // Por si acaso, mantener Company visible
+    companyEl?.classList.remove('mr-hidden');
+
+    if (typeof window.saveResume === 'function') window.saveResume();
+  }
+}
+
+// Intenta hidratar desde description si ya trae un paquete multi-roles
+function tryHydrateMultiFromDescription(card, descHtml){
+  if (!descHtml) return false;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = descHtml;
+  const pack = tmp.querySelector('.mr-pack[data-type="multi-roles"]');
+  if (!pack) return false;
+
+  enableMultiRolesOnCard(card, true);
+  const items = Array.from(pack.querySelectorAll('.mr-item'));
+  if (!items.length){ addMiniRole(card); return true; }
+
+  items.forEach(it=>{
+    const title = (it.querySelector('.mr-title-txt')?.textContent || '').trim();
+    const start = it.getAttribute('data-start') || '';
+    const end   = it.getAttribute('data-end') || '';
+    const current = end === 'Present';
+    const desc = it.querySelector('.mr-desc-html')?.innerHTML || '';
+    addMiniRole(card, { title, start_date:start, end_date: current ? '' : end, current, description:desc });
+  });
+
+  // Asegura que agreguemos fechas agregadas
+  updateAggregateDatesFromMultiRoles(card);
+  return true;
+}
+
+// Utilidad chiquita
+function escapeHtmlText(s=''){
+  // Mantén tags fuera del título por seguridad
+  const d = document.createElement('div'); d.textContent = s; return d.textContent;
+}
+function debounce(fn, wait = 500) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+}
+function setMonthYearUIFromISO(containerId, iso){
+  const root = document.getElementById(containerId);
+  if (!root) return;
+  const monthSel = root.querySelector('select.month');
+  const yearSel  = root.querySelector('select.year');
+  if (!monthSel || !yearSel) return;
+
+  if (!iso) {
+    monthSel.value = '';
+    yearSel.value  = '';
+    return;
+  }
+  const [datePart] = iso.split('T');
+  const [y, m] = datePart.split('-');
+  yearSel.value  = y || '';
+  monthSel.value = m || '';
 }

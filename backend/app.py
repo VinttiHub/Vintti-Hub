@@ -2987,8 +2987,10 @@ def candidates_search_alias():
         return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
     except Exception as e:
         return jsonify([]), 200
-@app.route('/resumes/<int:candidate_id>', methods=['POST', 'PATCH'])
+@app.route('/resumes/<int:candidate_id>', methods=['GET', 'PATCH', 'OPTIONS'])
 def update_resume(candidate_id):
+    if request.method == 'OPTIONS':
+        return '', 204
     try:
         logging.info("📥 %s /resumes/%s", request.method, candidate_id)
         data = request.get_json(silent=True) or {}
