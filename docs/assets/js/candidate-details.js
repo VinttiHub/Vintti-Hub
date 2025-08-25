@@ -199,7 +199,7 @@ fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
 
     // Llama a Coresignal solo si NO hay coresignal_scrapper y el LinkedIn es válido
 if (!data.coresignal_scrapper && linkedinUrl && linkedinUrl.startsWith('http')) {
-  fetch(`${apiBase}/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
+  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/coresignal/candidates/${candidateId}/sync`, { method: 'POST' })
     .then(async (r) => {
       let payload;
       try { payload = await r.json(); } catch { payload = await r.text(); }
