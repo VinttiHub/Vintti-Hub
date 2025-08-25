@@ -659,10 +659,10 @@ mrToggle.addEventListener('change', ()=>{
     `;
     setTimeout(() => div.classList.remove('pulse'), 500);
     div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-    div.querySelectorAll('input, select').forEach(el => {
-      el.addEventListener('blur', saveResume);
-      el.addEventListener('change', saveResume);
-    });
+div.querySelectorAll('input, select').forEach(el => {
+  el.addEventListener('input',  () => { markDirty(); window.saveResumeSoft(); });
+  el.addEventListener('change', () => { markDirty(); window.saveResumeSoft(); });
+});
     toolsList.appendChild(div);
      const name = div.querySelector('.tool-name');
 if (name && !entry.tool) name.focus();
@@ -689,10 +689,10 @@ function addLanguageEntry(entry = { language: '', level: 'Basic' }) {
   `;
   setTimeout(() => div.classList.remove('pulse'), 500);
   div.querySelector('.remove-entry').onclick = () => { div.remove(); saveResume(); };
-  div.querySelectorAll('select').forEach(el => {
-    el.addEventListener('blur', saveResume);
-    el.addEventListener('change', saveResume);
-  });
+div.querySelectorAll('select').forEach(el => {
+  el.addEventListener('input',  () => { markDirty(); window.saveResumeSoft(); });
+  el.addEventListener('change', () => { markDirty(); window.saveResumeSoft(); });
+});
   document.getElementById('languagesList').appendChild(div);
 }
 
