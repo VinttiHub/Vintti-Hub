@@ -32,7 +32,6 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
     }
 
     const currentUserEmail = localStorage.getItem('user_email');
-    const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
     const showPriorityColumn = allowedEmails.includes(currentUserEmail);
 
     // ——— Render de filas SIN DataTables todavía ———
@@ -608,3 +607,28 @@ function hideSortToast() {
   t.classList.remove('show');
   setTimeout(() => { t.style.display = 'none'; }, 250);
 }
+(() => {
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  // Quienes ven Summary
+  const summaryAllowed = [
+    'agustin@vintti.com',
+    'bahia@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com'
+  ];
+
+  // Quienes ven Equipments
+  const equipmentsAllowed = [
+    'angie@vintti.com',
+    'jazmin@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com'
+  ];
+
+  const summaryLink = document.getElementById('summaryLink');
+  const equipmentsLink = document.getElementById('equipmentsLink');
+
+  if (summaryLink)   summaryLink.style.display   = summaryAllowed.includes(email)   ? '' : 'none';
+  if (equipmentsLink) equipmentsLink.style.display = equipmentsAllowed.includes(email) ? '' : 'none';
+})();

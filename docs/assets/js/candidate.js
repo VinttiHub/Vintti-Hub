@@ -124,7 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const summaryLink = document.getElementById('summaryLink');
   const currentUserEmail = localStorage.getItem('user_email');
-  const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com'];
   if (summaryLink && allowedEmails.includes(currentUserEmail)) summaryLink.style.display = 'block';
 
   // ---------------- helpers Condition ----------------
@@ -250,3 +249,28 @@ document.addEventListener('click', (e) => {
     document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
   }
 });
+(() => {
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  // Quienes ven Summary
+  const summaryAllowed = [
+    'agustin@vintti.com',
+    'bahia@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com'
+  ];
+
+  // Quienes ven Equipments
+  const equipmentsAllowed = [
+    'angie@vintti.com',
+    'jazmin@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com'
+  ];
+
+  const summaryLink = document.getElementById('summaryLink');
+  const equipmentsLink = document.getElementById('equipmentsLink');
+
+  if (summaryLink)   summaryLink.style.display   = summaryAllowed.includes(email)   ? '' : 'none';
+  if (equipmentsLink) equipmentsLink.style.display = equipmentsAllowed.includes(email) ? '' : 'none';
+})();

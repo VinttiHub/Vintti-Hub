@@ -676,7 +676,7 @@ document.getElementById('login-form')?.addEventListener('submit', async function
       const nickname = data.nickname;
 
       // ✅ Guarda el email del usuario logueado
-      localStorage.setItem('user_email', email);
+      localStorage.setItem('user_email', email.toLowerCase().trim());
 
       // 🆕 Guarda un hint del avatar (opcional pero útil si quieres reusarlo en otras páginas)
       const avatarSrc = resolveAvatar(email);
