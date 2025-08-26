@@ -657,10 +657,9 @@ document.addEventListener('click', (e) => {
 });
 
 document.getElementById('login-form')?.addEventListener('submit', async function (e) {
-  e.preventDefault();
-
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
+  const form = e.currentTarget;
+  const email = form.email.value.trim();        // 👈 siempre el del form
+  const password = form.password.value;
   document.getElementById('click-sound').play();
   try {
     const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/login', {
@@ -1159,7 +1158,7 @@ window.addEventListener('pageshow', () => {
   }
 });
  // === Avatares por email ===
-const AVATAR_BASE = './assets/img/avatars/'; // cambia si tus imágenes viven en otra ruta
+const AVATAR_BASE = './assets/img/'; // cambia si tus imágenes viven en otra ruta
 const AVATAR_BY_EMAIL = {
   'agostina@vintti.com': 'agos.png',
   'bahia@vintti.com':    'bahia.png',

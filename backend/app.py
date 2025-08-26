@@ -362,8 +362,10 @@ def search_candidates():
 
 
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
+    if request.method == 'OPTIONS':
+        return ('', 204)
     data = request.json
     email = data.get("email")
     password = data.get("password")

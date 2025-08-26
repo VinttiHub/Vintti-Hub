@@ -13,8 +13,11 @@
   <div id="login-container" class="login-box">
   <h2>Login</h2>
   <form id="login-form">
-    <input type="email" id="email" placeholder="Enter your email" required>
-    <input type="password" id="password" placeholder="Enter your password" required>
+    <div class="input-with-avatar">
+      <input type="email" id="email" name="email" placeholder="Enter your email" autocomplete="username" required>
+      <img id="login-avatar" class="login-avatar" alt="" aria-hidden="true" loading="lazy">
+    </div>
+    <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
     <button type="submit">Login</button>
     <p id="chatResponse" style="margin-top: 10px; color: lime;"></p>
   </form>
@@ -26,6 +29,7 @@
       <p class="login-animation-text">Entering Vintti HUB...</p>
     </div>
   <h1 class="welcome-title">
+    <img id="welcome-avatar" class="welcome-avatar" alt="" aria-hidden="true" loading="lazy">
     <span id="personalized-greeting"></span>
     Welcome to <span class="gradient-text">Vintti HUB</span>
   </h1>

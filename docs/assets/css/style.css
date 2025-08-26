@@ -412,3 +412,57 @@ h1, h2, p {
     opacity: 0;
   }
 }
+/* --- Login: mismo tamaño de antes + campos igual de largos --- */
+
+/* ancho del form como antes */
+#login-form{
+  width: 400px;
+}
+
+/* ambos inputs llenan el ancho del form (idénticos) */
+#login-form input{
+  width: 100%;
+  padding: 12px;           /* como antes */
+  border-radius: 12px;     /* como antes */
+  border: 2px solid #ccc;  /* como antes */
+  font-size: 1rem;         /* como antes */
+  box-sizing: border-box;  /* asegura mismo ancho con el padding extra */
+}
+
+/* email con avatar dentro */
+.input-with-avatar{ position: relative; width: 100%; }
+
+/* padding extra sólo para el email para no tapar el texto */
+.input-with-avatar input{
+  padding-right: 200px;     /* 56 avatar + 10 gap + 10 “aire” */
+}
+
+/* avatar MÁS GRANDE */
+.login-avatar{
+  position: absolute;
+  right: -110px;
+  top: 50px;
+  transform: translateY(-50%);
+  width: 100px;             /* antes 36px */
+  height: 100px;            /* antes 36px */
+  border-radius: 50%;
+  object-fit: cover;
+  display: none;           /* el JS lo muestra cuando hay src */
+  pointer-events: none;
+}
+
+/* (opcional) avatar de bienvenida un poco más grande también */
+.welcome-avatar{
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 12px;
+  display: none;
+  object-fit: cover;
+}
+
+/* responsive: que el form se adapte en móvil */
+@media (max-width: 640px){
+  #login-form{ width: 100%; }
+}
