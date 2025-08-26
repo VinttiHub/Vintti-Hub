@@ -679,9 +679,15 @@ document.getElementById('login-form')?.addEventListener('submit', async function
       // ✅ Guarda el email del usuario logueado
       localStorage.setItem('user_email', email);
 
+      // 🆕 Guarda un hint del avatar (opcional pero útil si quieres reusarlo en otras páginas)
+      const avatarSrc = resolveAvatar(email);
+      if (avatarSrc) localStorage.setItem('user_avatar', avatarSrc);
+
       document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
       document.getElementById('login-container').style.display = 'none';
       document.getElementById('welcome-container').style.display = 'block';
+      // 🆕 Muestra avatar en la pantalla de bienvenida
+      showWelcomeAvatar(email);
     } else {
       alert(data.message || 'Correo o contraseña incorrectos.');
     }
@@ -1152,4 +1158,60 @@ window.addEventListener('pageshow', () => {
     tableCard.style.transform = 'translateX(0)';
   }
 });
- 
+ // === Avatares por email ===
+const AVATAR_BASE = './assets/img/avatars/'; // cambia si tus imágenes viven en otra ruta
+const AVATAR_BY_EMAIL = {
+  'agostina@vintti.com': 'agos.png',
+  'bahia@vintti.com':    'bahia.png',
+  'lara@vintti.com':     'lara.png',
+  'jazmin@vintti.com':   'jaz.png',
+  'pilar@vintti.com':    'pilar.png',
+  'agustin@vintti.com':  'agus.png'
+};
+
+function resolveAvatar(email) {
+  if (!email) return null;
+  const key = String(email).trim().toLowerCase();
+  const filename = AVATAR_BY_EMAIL[key];
+  return filename ? (AVATAR_BASE + filename) : null;
+}
+
+function showLoginAvatar(email) {
+  const img = document.getElementById('login-avatar');
+  if (!img) return;
+  const src = resolveAvatar(email);
+  if (src) {
+    img.src = src;
+    img.style.display = 'block';
+  } else {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+  }
+}
+
+function showWelcomeAvatar(email) {
+  const img = document.getElementById('welcome-avatar');
+  if (!img) return;
+  const src = resolveAvatar(email);
+  if (src) {
+    img.src = src;
+    img.style.display = 'inline-block';
+  } else {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+  }
+}
+
+// Mientras el usuario escribe el email en el login
+const emailInputEl = document.getElementById('email');
+emailInputEl?.addEventListener('input', () => {
+  showLoginAvatar(emailInputEl.value);
+});
+emailInputEl?.addEventListener('blur', () => {
+  showLoginAvatar(emailInputEl.value);
+});
+
+// Si ya había un email prellenado (autofill del navegador), refleja el avatar
+if (emailInputEl && emailInputEl.value) {
+  showLoginAvatar(emailInputEl.value);
+}

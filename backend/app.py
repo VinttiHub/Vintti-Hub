@@ -2699,7 +2699,7 @@ def _list_s3_with_prefix(prefix: str):
         else:
             break
     return items
-# ---------- EQUIPMENTS (list & create) ----------
+
 # ---------- EQUIPMENTS (list, create, read, update, delete) ----------
 @app.route('/equipments', methods=['GET', 'POST'])
 def equipments_route():
