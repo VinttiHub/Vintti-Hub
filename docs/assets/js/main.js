@@ -659,42 +659,49 @@ document.addEventListener('click', (e) => {
 });
 
 document.getElementById('login-form')?.addEventListener('submit', async function (e) {
+  e.preventDefault();                          // ✅ evita que la página se recargue (causante del "Load failed")
   const form = e.currentTarget;
-  const email = form.email.value.trim();        // 👈 siempre el del form
+  const email = form.email.value.trim();
   const password = form.password.value;
-  safePlay('click-sound');
+
+  // evitemos rechazos del audio en Safari si falla la carga
+  document.getElementById('click-sound')?.play().catch(() => {});
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn?.setAttribute('disabled', 'disabled');
+
   try {
-    const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/login', {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
 
-    const data = await response.json();
+    // leer el cuerpo con fallback por si no es JSON (para logs útiles)
+    const raw = await res.text();
+    let data = {};
+    try { data = JSON.parse(raw); } catch {}
 
-    if (response.ok && data.success) {
-      const nickname = data.nickname;
-
-      // ✅ Guarda el email del usuario logueado
-      localStorage.setItem('user_email', email.toLowerCase().trim());
-
-      // 🆕 Guarda un hint del avatar (opcional pero útil si quieres reusarlo en otras páginas)
-      const avatarSrc = resolveAvatar(email);
-      if (avatarSrc) localStorage.setItem('user_avatar', avatarSrc);
-
-      document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
-      document.getElementById('login-container').style.display = 'none';
-      document.getElementById('welcome-container').style.display = 'block';
-      // 🆕 Muestra avatar en la pantalla de bienvenida
-      showWelcomeAvatar(email);
-    } else {
-      alert(data.message || 'Correo o contraseña incorrectos.');
+    if (!res.ok || !data.success) {
+      const msg = (data && (data.message || data.error)) || `HTTP ${res.status}: ${raw}`;
+      alert(msg);
+      return;
     }
+
+    const nickname = data.nickname;
+    localStorage.setItem('user_email', email.toLowerCase());
+    const avatarSrc = resolveAvatar(email);
+    if (avatarSrc) localStorage.setItem('user_avatar', avatarSrc);
+
+    document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
+    document.getElementById('login-container').style.display = 'none';
+    document.getElementById('welcome-container').style.display = 'block';
+    showWelcomeAvatar(email);
   } catch (err) {
     console.error('Error en login:', err);
     alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
+  } finally {
+    submitBtn?.removeAttribute('disabled');
   }
 });
 // 🔧 HAZ GLOBAL el helper para que exista donde lo usas

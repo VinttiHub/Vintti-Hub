@@ -453,8 +453,8 @@ h1, h2, p {
 
 /* (opcional) avatar de bienvenida un poco más grande también */
 .welcome-avatar{
-  width: 56px;
-  height: 56px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   vertical-align: middle;
   margin-right: 12px;
