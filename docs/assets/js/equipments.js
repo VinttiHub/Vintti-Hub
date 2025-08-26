@@ -159,10 +159,11 @@ async function renderRow(r) {
 
 
 // ---------- inline edit ----------
+// --- inputs de edición: prellenar fechas correctamente
 function inputDate(value) {
   const el = document.createElement("input");
   el.type = "date";
-  el.value = (value || "").slice(0,10);
+  el.value = normalizeDateForInput(value);
   return el;
 }
 function inputSelectStatus(value) {
@@ -199,11 +200,11 @@ function inputText(value) {
   return el;
 }
 
+// --- enterEditMode: toma el id de la fila (no del objeto r)
 function enterEditMode(tr, r) {
   if (tr.dataset.editing === "1") return;
   tr.dataset.editing = "1";
 
-  // Reemplazar celdas por inputs
   const cells = {
     pedido: inputDate(r.pedido),
     entrega: inputDate(r.entrega),
@@ -217,24 +218,24 @@ function enterEditMode(tr, r) {
 
   Object.entries(cells).forEach(([col, el]) => {
     const td = tr.querySelector(`[data-col="${col}"]`);
-    if (!td) return;
-    td.innerHTML = "";
-    td.appendChild(el);
+    if (td) { td.innerHTML = ""; td.appendChild(el); }
   });
 
-  // Cambiar acciones a Save/Cancel
   const act = tr.querySelector(".actions");
   act.innerHTML = `
     <button class="btn primary sm" data-save>Save</button>
     <button class="btn ghost sm" data-cancel>Cancel</button>
   `;
+
+  const id = tr.dataset.id || getEquipmentId(r);
+
   act.querySelector("[data-save]").addEventListener("click", async () => {
     try {
+      if (!id || id === "null" || id === "undefined") throw new Error("Missing equipment_id");
       const payload = payloadFromEditRow(tr);
-      await updateEquipment(r.equipment_id, payload);
+      await updateEquipment(id, payload);
       toast("Equipment updated");
-      // refrescar fila (sin recargar toda la tabla)
-      const fresh = await fetchJSON(`${API_BASE}/equipments/${r.equipment_id}`);
+      const fresh = await fetchJSON(`${API_BASE}/equipments/${id}`);
       const newTr = await renderRow(fresh);
       tr.replaceWith(newTr);
     } catch (e) {
@@ -242,8 +243,9 @@ function enterEditMode(tr, r) {
       toast("Failed to update");
     }
   });
+
   act.querySelector("[data-cancel]").addEventListener("click", async () => {
-    const fresh = await fetchJSON(`${API_BASE}/equipments/${r.equipment_id}`);
+    const fresh = await fetchJSON(`${API_BASE}/equipments/${id}`);
     const newTr = await renderRow(fresh);
     tr.replaceWith(newTr);
   });
@@ -504,3 +506,14 @@ function dateCell(d, icon){
   if (!d) return "—";
   return `<span class="cell-ico">${icon}</span><span class="date-txt">${fmtDate(d)}</span>`;
 }
+// --- helpers nuevos arriba del archivo ---
+const getEquipmentId = (obj) => obj?.equipment_id ?? obj?.id ?? obj?.equipmentId ?? null;
+
+const normalizeDateForInput = (v) => {
+  if (!v) return "";
+  // si ya viene YYYY-MM-DD, úsalo tal cual
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  const d = new Date(v);
+  return isNaN(d) ? "" : d.toISOString().slice(0, 10);
+};
+
