@@ -1052,3 +1052,98 @@ body {
 .filter-header i.rotate-up {
   transform: rotate(180deg);
 }
+/* --- Sales Lead: burbuja + avatar (compacto) --- */
+.sales-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.lead-bubble {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: .5px;
+  border: 1px solid rgba(0,0,0,.06);
+}
+.lead-bubble.bl {           /* Bahía → lila pastel */
+  background: #f5e8ff;
+  color: #5b3ea6;
+}
+.lead-bubble.lr {           /* Lara → amarillo suave */
+  background: #fffbe6;
+  color: #8a6d00;
+}
+.lead-bubble.ar {           /* Agustín → azul suave */
+  background: #eaf4ff;
+  color: #205493;
+}
+.lead-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Columna Sales Lead más angosta */
+#opportunityTable thead th:nth-child(6),
+#opportunityTable tbody td:nth-child(6) { width: 140px; }
+
+/* --- Type: N / R bien fuertes --- */
+.type-badge{
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 12px;
+}
+.type-badge.N { background: #e6f9e6; color: #000000; border: 1px solid #e5fbe5;}
+.type-badge.R { background: #fff0e6; color: #000000; border: 1px solid #f9deca;}
+
+/* --- Chips de filtros activos (look Apple) --- */
+.active-filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:12px 16px;
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.03);
+  margin-bottom:16px;
+}
+.filter-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#f8f8f8;
+  border:1px solid #eee;
+  font-size:12px;
+}
+.filter-chip .x{ cursor:pointer; opacity:.65; }
+
+/* --- Buscador con lupa para Account --- */
+.search-input{ position: relative; }
+.search-input i{
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  font-size:14px;
+}
+.search-input input{ padding-left:32px; }
+/* Badges mini en los toggles de filtros */
+.filter-header label{ display:flex; align-items:center; gap:8px; }
+.filter-count{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:2px 8px; border-radius:999px; font-size:12px; line-height:18px;
+  background:#f6f6f6; border:1px solid #e9e9e9; color:#333;
+}

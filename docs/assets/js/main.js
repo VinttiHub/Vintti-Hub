@@ -280,9 +280,9 @@ document.querySelectorAll('.filter-header button').forEach(button => {
             <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
             <td>${opp.client_name || ''}</td>
             <td>${opp.opp_position_name || ''}</td>
-            <td>${opp.opp_type || ''}</td>
+            <td>${getTypeBadge(opp.opp_type)}</td>
             <td>${opp.opp_model || ''}</td>
-            <td>${opp.sales_lead_name || ''}</td>
+            <td class="sales-lead-cell">${getSalesLeadCell(opp)}</td>
             <td>
               <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}">
                 ${generateHROptions(opp.opp_hr_lead)}
@@ -357,6 +357,18 @@ document.querySelectorAll('.filter-header button').forEach(button => {
       }
     },
     {
+  targets: 5, // Sales Lead
+  render: function (data, type) {
+    if (type === 'filter' || type === 'sort') {
+      const div = document.createElement('div');
+      div.innerHTML = data;
+      const hidden = div.querySelector('.sr-only');
+      return hidden ? hidden.textContent : div.textContent || data;
+    }
+    return data;
+  }
+},
+    {
   targets: 6, // HR Lead column rendering
   render: function (data, type, row, meta) {
     if (type === 'filter' || type === 'sort') {
@@ -395,14 +407,48 @@ const dtLength = document.querySelector('#opportunityTable_length');
 const dtTarget = document.getElementById('dataTablesLengthTarget');
 if (dtLength && dtTarget) dtTarget.appendChild(dtLength);
 
-function buildMultiFilter(containerId, options, columnIndex) {
+   const selectedFilters = { Stage: [], SalesLead: [], HRLead: [] };
+
+ function renderActiveFilters() {
+   const bar = document.getElementById('activeFilters');
+   if (!bar) return;
+   const groups = Object.entries(selectedFilters).filter(([_, arr]) => arr.length);
+   if (!groups.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+   bar.style.display = 'flex';
+   bar.innerHTML = groups.map(([group, arr]) =>
+     arr.map(val => `
+       <span class="filter-chip" data-group="${group}" data-value="${val}">
+         <strong>${group}:</strong> ${val} <span class="x" title="Remove">✕</span>
+       </span>
+     `).join('')
+   ).join('');
+ }
+
+ // click en "x" del chip para quitarlo
+ document.addEventListener('click', (e) => {
+   const x = e.target.closest('.filter-chip .x');
+   if (!x) return;
+   const chip = x.parentElement;
+   const group = chip.getAttribute('data-group');
+   const value = chip.getAttribute('data-value');
+   const idMap = { Stage: 'filterStage', SalesLead: 'filterSalesLead', HRLead: 'filterHRLead' };
+   const cont = document.getElementById(idMap[group]);
+  if (cont) {
+    const cb = Array.from(cont.querySelectorAll('input[type="checkbox"]')).find(c => c.value === value);
+    if (cb) { cb.checked = false; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+   }
+ });
+
+const filterRegistry = [];
+
+function buildMultiFilter(containerId, options, columnIndex, displayName, filterKey) {
   const container = document.getElementById(containerId);
   const column = table.column(columnIndex);
+  filterRegistry.push({ containerId, columnIndex });
 
   const selectToggle = document.createElement('button');
   selectToggle.className = 'select-toggle';
   selectToggle.textContent = 'Deselect All';
-
   container.appendChild(selectToggle);
 
   const checkboxWrapper = document.createElement('div');
@@ -414,17 +460,30 @@ function buildMultiFilter(containerId, options, columnIndex) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = val;
-    checkbox.checked = !(val === 'Close Win' || val === 'Closed Lost');
-
+    checkbox.checked = !(val === 'Close Win' || val === 'Closed Lost'); // tu default
     label.appendChild(checkbox);
     label.append(' ' + val);
     checkboxWrapper.appendChild(label);
   });
 
+  const headerLabel = container.parentElement.querySelector('.filter-header label');
+
+  function setBadge(n){
+    let badge = headerLabel.querySelector('.filter-count');
+    if(!badge){
+      badge = document.createElement('span');
+      badge.className = 'filter-count';
+      headerLabel.appendChild(badge);
+    }
+    if (!n) badge.style.display = 'none';
+    else { badge.style.display = 'inline-flex'; badge.textContent = n; }
+  }
+
   function applyFilter() {
-    const checkboxes = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
-    const selected = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+    const cbs = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
+    const selected = Array.from(cbs).filter(c => c.checked).map(c => c.value);
     column.search(selected.length ? selected.join('|') : '', true, false).draw();
+    setBadge(selected.length);
   }
 
   checkboxWrapper.addEventListener('change', applyFilter);
@@ -432,11 +491,13 @@ function buildMultiFilter(containerId, options, columnIndex) {
   selectToggle.addEventListener('click', () => {
     const all = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
     const isDeselecting = selectToggle.textContent === 'Deselect All';
-
     all.forEach(cb => cb.checked = !isDeselecting);
     selectToggle.textContent = isDeselecting ? 'Select All' : 'Deselect All';
     applyFilter();
   });
+
+  // Estado inicial
+  applyFilter();
 }
 
       document.getElementById('opportunityTable').addEventListener('click', function(e) {
@@ -460,9 +521,9 @@ const uniqueHRLeads = [...new Set(
 const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))];
 
 
-      buildMultiFilter('filterStage', uniqueStages, 0);
-      buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5);
-      buildMultiFilter('filterHRLead', uniqueHRLeads, 6);
+ buildMultiFilter('filterStage',     uniqueStages,     0, 'Stage',      'Stage');
+ buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5, 'Sales Lead', 'SalesLead');
+ buildMultiFilter('filterHRLead',    uniqueHRLeads,    6, 'HR Lead',    'HRLead');
 
     })
     .catch(err => {
@@ -575,8 +636,6 @@ const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.c
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
 }
-
-
 
 
 
@@ -1234,4 +1293,56 @@ function safePlay(id) {
   } catch (e) {
     console.debug('🔇 Click sound exception:', e);
   }
+}
+// Map de email -> avatar ya lo tienes en AVATAR_BY_EMAIL y resolveAvatar()
+
+// Detecta email del sales lead si viene en el objeto; si no, infiere por el nombre
+function emailForSalesLead(opp) {
+  if (opp.sales_lead) return String(opp.sales_lead).toLowerCase();
+  const name = (opp.sales_lead_name || '').toLowerCase();
+  if (name.includes('bahia'))   return 'bahia@vintti.com';
+  if (name.includes('lara'))    return 'lara@vintti.com';
+  if (name.includes('agustin') || name.includes('agustina')) return 'agustin@vintti.com';
+  return '';
+}
+
+// Iniciales pedidas: Bahía → BL, Lara → LR, Agustín → AR
+function initialsForSalesLead(key) {
+  if (key.includes('bahia')   || key.includes('bahia@'))   return 'BL';
+  if (key.includes('lara')    || key.includes('lara@'))    return 'LR';
+  if (key.includes('agustin') || key.includes('agustina') || key.includes('agustin@')) return 'AR';
+  return '--';
+}
+
+// Clase de color de la burbuja
+function badgeClassForSalesLead(key) {
+  if (key.includes('bahia')   || key.includes('bahia@'))   return 'bl';
+  if (key.includes('lara')    || key.includes('lara@'))    return 'lr';
+  if (key.includes('agustin') || key.includes('agustina') || key.includes('agustin@')) return 'am';
+  return '';
+}
+
+function getSalesLeadCell(opp) {
+  const email = emailForSalesLead(opp);
+  const key   = (email || opp.sales_lead_name || '').toLowerCase();
+  const initials = initialsForSalesLead(key);
+  const bubbleCl = badgeClassForSalesLead(key);
+  const avatar = resolveAvatar(email);
+  const fullName = opp.sales_lead_name || ''; // escondido para filtro/orden
+
+  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
+  return `
+    <div class="sales-lead">
+      <span class="lead-bubble ${bubbleCl}">${initials}</span>
+      ${img}
+      <span class="sr-only" style="display:none">${fullName}</span>
+    </div>
+  `;
+}
+
+function getTypeBadge(type) {
+  const t = String(type || '').toLowerCase();
+  if (t.startsWith('new'))         return '<span class="type-badge N">N</span>';
+  if (t.startsWith('replacement')) return '<span class="type-badge R">R</span>';
+  return type || '';
 }
