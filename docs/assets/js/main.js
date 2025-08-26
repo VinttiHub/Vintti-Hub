@@ -1,6 +1,8 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- Replacement UI wiring ---
+    const el = document.getElementById('click-sound');
+  el?.load();
 const oppTypeSelect = document.getElementById('opp_type');
 const replacementFields = document.getElementById('replacementFields');
 const replacementCandidateInput = document.getElementById('replacementCandidate');
@@ -660,7 +662,7 @@ document.getElementById('login-form')?.addEventListener('submit', async function
   const form = e.currentTarget;
   const email = form.email.value.trim();        // 👈 siempre el del form
   const password = form.password.value;
-  document.getElementById('click-sound').play();
+  safePlay('click-sound');
   try {
     const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/login', {
       method: 'POST',
@@ -1116,7 +1118,6 @@ async function patchOppFields(oppId, payload) {
   try { return JSON.parse(text); } catch { return text; }
 }
 // --- Equipments button (debajo de Opportunities Summary + visibilidad por email) ---
-// --- Equipments button (solo en la página con el menú lateral) ---
 (() => {
   // Debe existir el link de Opportunities Summary en el menú lateral.
   const summary = document.getElementById('summaryLink');
@@ -1213,4 +1214,17 @@ emailInputEl?.addEventListener('blur', () => {
 // Si ya había un email prellenado (autofill del navegador), refleja el avatar
 if (emailInputEl && emailInputEl.value) {
   showLoginAvatar(emailInputEl.value);
+}
+function safePlay(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  try {
+    el.currentTime = 0;
+    const p = el.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(err => console.debug('🔇 Click sound blocked/failed:', err));
+    }
+  } catch (e) {
+    console.debug('🔇 Click sound exception:', e);
+  }
 }
