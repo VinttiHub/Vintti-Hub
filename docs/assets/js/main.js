@@ -1310,7 +1310,7 @@ function emailForSalesLead(opp) {
 function initialsForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'BL';
   if (key.includes('lara')    || key.includes('lara@'))    return 'LR';
-  if (key.includes('agustin') || key.includes('agustina') || key.includes('agustin@')) return 'AR';
+  if (key.includes('agustin') || key.includes('agustina') || key.includes('agustin@')) return 'AM';
   return '--';
 }
 
