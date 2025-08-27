@@ -217,7 +217,7 @@ a {
   outline: none;
   box-shadow: 0 0 0 2px #ffe0ec88;
 }
-#ai-popup button#ai-submit {
+#ai-popup button#ai-lets-go {
   background: linear-gradient(to right, #c084fc, #f472b6);
   color: white;
   font-weight: 600;
@@ -279,7 +279,7 @@ a {
   resize: vertical;
 }
 
-#ai-popup button#ai-submit {
+#ai-popup button#ai-lets-go {
   background-color: #7f5af0;
   color: white;
   border: none;
@@ -292,7 +292,7 @@ a {
   transition: background-color 0.3s ease;
 }
 
-#ai-popup button#ai-submit:hover {
+#ai-popup button#ai-lets-go:hover {
   background-color: #5a35c8;
 }
 
@@ -970,7 +970,7 @@ select:focus {
   resize: vertical;
 }
 
-.ai-fullscreen button#ai-submit {
+.ai-fullscreen button#ai-lets-go {
   margin-top: 30px;
   padding: 12px 24px;
   font-size: 16px;
@@ -982,7 +982,7 @@ select:focus {
   transition: background 0.2s ease;
 }
 
-.ai-fullscreen button#ai-submit:hover {
+.ai-fullscreen button#ai-lets-go:hover {
   background: #333;
 }
 #ai-loader {
@@ -1345,8 +1345,6 @@ select:focus {
   text-decoration: none;
   cursor: pointer;
   z-index: 999;
-  
-  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -1358,12 +1356,6 @@ select:focus {
 #client-version-btn:hover {
   background-color: #7b2cbf;
   transform: scale(1.05);
-}
-
-/* INDIVIDUAL POSITIONING */
-#ai-action-button {
-  top: 10px;
-  display: none;
 }
 
 
@@ -1934,3 +1926,11 @@ html body .month-year .btn-clear:active{
 .mr-entry .mr-current:checked::before {
   transform: translateX(16px);
 }
+/* 📍 Coloca el botón debajo del Client Version (que está en top:64px) */
+#ai-action-button {
+  display: flex;           /* centra el emoji y el texto */
+  top: 120px;              /* justo debajo del client-version-btn */
+}
+
+/* Por si algún otro estilo lo oculta, asegúrate que quitar .hidden lo muestre */
+#ai-action-button.hidden { display: none !important; }
