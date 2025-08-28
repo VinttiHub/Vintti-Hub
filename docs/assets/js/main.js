@@ -95,26 +95,33 @@ document.querySelectorAll('.filter-header button').forEach(button => {
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     .then(response => response.json())
     .then(users => {
-      const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
+      const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina'];
       allowedHRUsers = users.filter(user =>
         allowedSubstrings.some(name => user.user_name.includes(name))
       );
     })
     .catch(err => console.error('Error loading HR Leads:', err));
-    function generateHROptions(currentValue) {
-    let html = `<option disabled ${currentValue ? '' : 'selected'}>Assign HR Lead</option>`;
-    allowedHRUsers.forEach(user => {
-      const selected = user.email_vintti === currentValue ? 'selected' : '';
-      html += `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
-    });
-    return html;
-  }
+function generateHROptions(currentValue) {
+  // emails válidos que sí pueden seleccionarse
+  const allowedEmails = new Set(allowedHRUsers.map(u => u.email_vintti));
+  const isKnown = !!currentValue && allowedEmails.has(currentValue);
+
+  // si el valor actual NO está en la lista (ej. 'sol@...'), dejamos seleccionado el placeholder
+  let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign HR Lead</option>`;
+
+  allowedHRUsers.forEach(user => {
+    const selected = (isKnown && user.email_vintti === currentValue) ? 'selected' : '';
+    html += `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
+  });
+  return html;
+}
+
   if (toggleButton && filtersCard) {
     toggleButton.addEventListener('click', () => {
       const isExpanded = filtersCard.classList.contains('expanded');
       filtersCard.classList.toggle('expanded', !isExpanded);
       filtersCard.classList.toggle('hidden', isExpanded);
-      toggleButton.textContent = isExpanded ? 'ðŸ” Filters' : 'âŒ Close Filters';
+      toggleButton.textContent = isExpanded ? '🔍 Filters' : '✖ Close Filters';
     });
   }
   const onOppPage = !!document.getElementById('opportunityTableBody');
@@ -333,20 +340,22 @@ document.querySelectorAll('.filter-header button').forEach(button => {
         });
       }
     });
+console.info("🔢 Fetched opportunities:", data.length); // justo antes de crear la tabla
 
-  const table = $('#opportunityTable').DataTable({
+const table = $('#opportunityTable').DataTable({
+
   responsive: true,
-  pageLength: 50,
+  pageLength: 50,                         // puedes dejar 50 por defecto…
+  lengthMenu: [[50, 100, 150, -1], [50, 100, 150, 'All']], // …pero permite ver “All”
   dom: 'lrtip',
   ordering: false,
-  lengthMenu: [[50, 100, 150], [50, 100, 150]],
   columnDefs: [
     { targets: [0], width: "8%" },
     { targets: [1, 2, 3, 4, 5, 6, 8], width: "10%" },
     { targets: 7, width: "25%" },
     {
-      targets: 0, // Stage column rendering
-      render: function (data, type, row, meta) {
+      targets: 0,
+      render: function (data, type) {
         if (type === 'filter' || type === 'sort') {
           const div = document.createElement('div');
           div.innerHTML = data;
@@ -357,44 +366,41 @@ document.querySelectorAll('.filter-header button').forEach(button => {
       }
     },
     {
-  targets: 5, // Sales Lead
-  render: function (data, type) {
-    if (type === 'filter' || type === 'sort') {
-      const div = document.createElement('div');
-      div.innerHTML = data;
-      const hidden = div.querySelector('.sr-only');
-      return hidden ? hidden.textContent : div.textContent || data;
-    }
-    return data;
-  }
-},
+      targets: 5,
+      render: function (data, type) {
+        if (type === 'filter' || type === 'sort') {
+          const div = document.createElement('div');
+          div.innerHTML = data;
+          const hidden = div.querySelector('.sr-only');
+          return hidden ? hidden.textContent : div.textContent || data;
+        }
+        return data;
+      }
+    },
     {
-  targets: 6, // HR Lead column rendering
-  render: function (data, type, row, meta) {
-    if (type === 'filter' || type === 'sort') {
-      const div = document.createElement('div');
-      div.innerHTML = data;
-      const select = div.querySelector('select');
-      return select ? select.options[select.selectedIndex].textContent : data;
+      targets: 6,
+      render: function (data, type) {
+        if (type === 'filter' || type === 'sort') {
+          const div = document.createElement('div');
+          div.innerHTML = data;
+          const select = div.querySelector('select');
+          return select ? select.options[select.selectedIndex].textContent : data;
+        }
+        return data;
+      }
     }
-    return data;
-  }
-}
-
   ],
   language: {
     search: "🔍 Buscar:",
     lengthMenu: "Mostrar _MENU_ registros por página",
     zeroRecords: "No se encontraron resultados",
     info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-    paginate: {
-      first: "Primero",
-      last: "Último",
-      next: "Siguiente",
-      previous: "Anterior"
-    }
+    paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
   }
 });
+   table.search('');
+ table.columns().search('');
+ table.draw();
 const accountSearchInput = document.getElementById('accountSearchInput');
 if (accountSearchInput) {
   accountSearchInput.addEventListener('input', () => {
@@ -402,6 +408,41 @@ if (accountSearchInput) {
     table.column(1).search(value, true, false).draw(); // columna 1 = Account
   });
 }
+// 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
+if (!allowedHRUsers.length) {
+  try {
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
+    const users = await res.json();
+    const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina']; // (ya sin 'Sol')
+    allowedHRUsers = users.filter(u => allowedSubstrings.some(n => u.user_name.includes(n)));
+  } catch (e) {
+    console.error('Error reloading HR Leads:', e);
+  }
+}
+
+// Mapa email->nombre de HR permitidos
+const emailToNameMap = {};
+allowedHRUsers.forEach(u => emailToNameMap[u.email_vintti] = u.user_name);
+
+// STAGES (igual que antes)
+const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))];
+
+// SALES LEAD: agrega 'Unassigned' si hay filas sin nombre
+let uniqueSalesLeads = [...new Set(data.map(d => d.sales_lead_name).filter(Boolean))];
+if (data.some(d => !d.sales_lead_name)) {
+  uniqueSalesLeads.push('Unassigned'); // coincide con regex ^$ que pondremos abajo
+}
+
+// HR LEAD: usar el texto que realmente aparece en la celda del <select>
+// - si no hay hr o es legacy (no está en allowedHRUsers) -> 'Assign HR Lead'
+let uniqueHRLeads = [...new Set(
+  data.map(d => (d.opp_hr_lead && emailToNameMap[d.opp_hr_lead]) ? emailToNameMap[d.opp_hr_lead] : 'Assign HR Lead')
+)];
+const filterRegistry = [];
+// Llama a los filtros con estas opciones
+buildMultiFilter('filterStage',     uniqueStages,     0, 'Stage',      'Stage',    table);
+buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5, 'Sales Lead', 'SalesLead',table);
+buildMultiFilter('filterHRLead',    uniqueHRLeads,    6, 'HR Lead',    'HRLead',   table);
 
 const dtLength = document.querySelector('#opportunityTable_length');
 const dtTarget = document.getElementById('dataTablesLengthTarget');
@@ -439,11 +480,13 @@ if (dtLength && dtTarget) dtTarget.appendChild(dtLength);
    }
  });
 
-const filterRegistry = [];
 
-function buildMultiFilter(containerId, options, columnIndex, displayName, filterKey) {
+
+function buildMultiFilter(containerId, options, columnIndex, displayName, filterKey, dataTable) {
   const container = document.getElementById(containerId);
-  const column = table.column(columnIndex);
+  if (!container) return; // guard clause
+
+  const column = dataTable.column(columnIndex);
   filterRegistry.push({ containerId, columnIndex });
 
   const selectToggle = document.createElement('button');
@@ -460,29 +503,33 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = val;
-    checkbox.checked = !(val === 'Close Win' || val === 'Closed Lost'); // tu default
+    checkbox.checked = true; // ✅ todas seleccionadas por defecto (sin filtros)
     label.appendChild(checkbox);
     label.append(' ' + val);
     checkboxWrapper.appendChild(label);
   });
 
-  const headerLabel = container.parentElement.querySelector('.filter-header label');
-
+  const header = container.parentElement?.querySelector('.filter-header label');
   function setBadge(n){
-    let badge = headerLabel.querySelector('.filter-count');
+    if (!header) return;
+    let badge = header.querySelector('.filter-count');
     if(!badge){
       badge = document.createElement('span');
       badge.className = 'filter-count';
-      headerLabel.appendChild(badge);
+      header.appendChild(badge);
     }
     if (!n) badge.style.display = 'none';
     else { badge.style.display = 'inline-flex'; badge.textContent = n; }
   }
 
+  function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
   function applyFilter() {
     const cbs = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
     const selected = Array.from(cbs).filter(c => c.checked).map(c => c.value);
-    column.search(selected.length ? selected.join('|') : '', true, false).draw();
+    const pieces = selected.map(v => (v === 'Unassigned') ? '^$' : escapeRegex(v));
+    const pattern = selected.length ? pieces.join('|') : '';
+    column.search(pattern, true, false).draw();
     setBadge(selected.length);
   }
 
@@ -496,7 +543,6 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     applyFilter();
   });
 
-  // Estado inicial
   applyFilter();
 }
 
@@ -509,22 +555,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
           createColumnFilter(columnIndex, table);
         }
       });
-      const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))];
-      const uniqueSalesLeads = [...new Set(data.map(d => d.sales_lead_name).filter(Boolean))];
-      const emailToNameMap = {};
-allowedHRUsers.forEach(user => {
-  emailToNameMap[user.email_vintti] = user.user_name;
-});
-const uniqueHRLeads = [...new Set(
-  data.map(d => emailToNameMap[d.opp_hr_lead] || '').filter(Boolean)
-)];
 const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))];
-
-
- buildMultiFilter('filterStage',     uniqueStages,     0, 'Stage',      'Stage');
- buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5, 'Sales Lead', 'SalesLead');
- buildMultiFilter('filterHRLead',    uniqueHRLeads,    6, 'HR Lead',    'HRLead');
-
     })
     .catch(err => {
       console.error('Error fetching opportunities:', err);
