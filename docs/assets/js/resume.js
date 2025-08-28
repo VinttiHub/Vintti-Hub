@@ -110,12 +110,22 @@ function sanitizeHTML(html){
     return txt === '';
   }
 
-  function normalizeISO15(raw){
-    if (!raw || raw==='Present') return '';
-    if (/^\d{4}-\d{2}$/.test(raw)) return `${raw}-15`;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw.replace(/-\d{2}$/, '-15');
-    return raw;
+// 1) Reemplaza normalizeISO15 por una versión más robusta:
+function normalizeISO15(raw){
+  if (!raw) return '';
+  const s = String(raw).trim();
+  if (/^present$/i.test(s)) return '';
+  // Acepta YYYY, YYYY-MM, YYYY-MM-DD y también timestamps con tiempo
+  const m = s.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?/);
+  if (m) {
+    const yyyy = m[1];
+    const mm = m[2] || '06';
+    // normalizamos siempre a día 15
+    return `${yyyy}-${mm.padStart(2,'0')}-15`;
   }
+  return s; // si no matchea, lo devolvemos como viene
+}
+
 
   function safeParseArray(raw, fallback=[]){
     try{
@@ -195,7 +205,9 @@ function coerceLanguages(raw) {
     const yearSel =document.createElement('select'); yearSel.className='year mini-select';
     const clearBtn=document.createElement('button'); clearBtn.type='button'; clearBtn.className='btn-clear'; clearBtn.textContent='Clear';
     clearBtn.style.display = allowEmpty ? '' : 'none';
-
+root.addEventListener('focusout', () => {
+  setTimeout(() => emit(), 0);
+}, true);
     monthSel.innerHTML = `<option value="">Month</option>` + months.slice(1).map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
     yearSel.innerHTML = `<option value="">Year</option>` + Array.from({length: (nowYear+5)-1990+1},(_,k)=>nowYear+5-k)
       .map(y=>`<option value="${y}">${y}</option>`).join('');
@@ -205,18 +217,25 @@ function coerceLanguages(raw) {
     function val(){ const y=yearSel.value, m=monthSel.value; if (!y||!m) return allowEmpty ? '' : ''; return `${y}-${m}-15`; }
     function emit(){ if (typeof onChange==='function'){ const y=yearSel.value, m=monthSel.value; if (allowEmpty && !y && !m) onChange(''); else if (y&&m) onChange(val()); } }
 
-    monthSel.addEventListener('change', ()=>{ if (!yearSel.value) yearSel.value=String(nowYear); else emit(); });
+    monthSel.addEventListener('change', ()=>{
+  if (!yearSel.value) {
+    yearSel.value = String(nowYear);   // autocompleta año actual
+  }
+  emit();                              // ⬅️ SIEMPRE emite (con o sin autocompletar)
+});
     yearSel.addEventListener('change', emit);
     clearBtn.addEventListener('click', ()=>{ monthSel.value=''; yearSel.value=''; emit(); });
 
     // set initial
-    // dentro de mountMonthYearPicker(...)
 if (initial){
   const [d] = initial.split('T');
   const [y,m] = d.split('-');
   yearSel.value = y || '';
   monthSel.value = m || '';
-  if (y && m) setTimeout(emit, 0);  // <-- fuerza sincronización visible
+  if (y && m) {
+    emit();              // ← emite sincronamente para que read/save ya vea el valor
+    setTimeout(emit, 0); // ← tu emit asíncrono original
+  }
 }
 
 
@@ -286,17 +305,22 @@ function addEducationEntry(entry={ institution:'', title:'', country:'', start_d
   hStart.value = entry.start_date||'';
   hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
 
-  const toggleCurrent = (checked)=>{
-    if (checked){
-      hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
-      hEnd.value='Present';
-      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
-    } else {
-      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
-      const last = hEnd.dataset.lastIso||'';
-      if (last){ pEnd.set(last); hEnd.value=last; } else { pEnd.set(''); hEnd.value=''; }
-    }
-  };
+const toggleCurrent = (checked)=>{
+  if (checked){
+    hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
+    hEnd.value='Present';
+    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
+  } else {
+    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
+    const last = hEnd.dataset.lastIso||'';
+    if (last){ pEnd.set(last); hEnd.value=last; }
+    else { pEnd.set(''); hEnd.value=''; }
+  }
+  // 👇 añade esto (ajusta la clave según sea education/work)
+  touched.education = true;  // o touched.work_experience = true;
+  scheduleSave();
+};
+
   toggleCurrent(!!entry.current);
   if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
   curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.education=true; scheduleSave(); });
@@ -357,17 +381,22 @@ function addWorkExperienceEntry(entry={ title:'', company:'', start_date:'', end
   hStart.value = entry.start_date||'';
   hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
 
-  const toggleCurrent = (checked)=>{
-    if (checked){
-      hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
-      hEnd.value='Present';
-      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
-    } else {
-      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
-      const last = hEnd.dataset.lastIso||'';
-      if (last){ pEnd.set(last); hEnd.value=last; } else { pEnd.set(''); hEnd.value=''; }
-    }
-  };
+const toggleCurrent = (checked)=>{
+  if (checked){
+    hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
+    hEnd.value='Present';
+    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
+  } else {
+    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
+    const last = hEnd.dataset.lastIso||'';
+    if (last){ pEnd.set(last); hEnd.value=last; }
+    else { pEnd.set(''); hEnd.value=''; }
+  }
+  // 👇 añade esto (ajusta la clave según sea education/work)
+  touched.education = true;  // o touched.work_experience = true;
+  scheduleSave();
+};
+
   toggleCurrent(!!entry.current);
   if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
   curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.work_experience=true; scheduleSave(); });
@@ -456,41 +485,71 @@ function maybeAutolist(html){
   }
   return html;
 }
+function pickerToIso(root){
+  if (!root) return '';
+  const y = root.querySelector('.year')?.value || '';
+  const m = root.querySelector('.month')?.value || '';
+  return (y && m) ? `${y}-${m}-15` : '';
+}
 
 
   // ---------- DOM → Data (normalized, filtered) ----------
   function readResumeFromDOM(){
     const about = normalizeText(stripHtmlToText(aboutEl?.innerHTML || ''));
 
-    const education = qsa('#educationList .cv-card-entry').map(card=>{
-      const inst = normalizeText(card.querySelector('.edu-inst')?.value);
-      const title= normalizeText(card.querySelector('.edu-title')?.value);
-      const country = normalizeText(card.querySelector('.edu-country')?.value);
-      const start = normalizeISO15(card.querySelector('.edu-start')?.value?.trim()||'');
-      const end   = normalizeISO15(card.querySelector('.edu-end')?.value?.trim()||'');
-      const current = !!card.querySelector('.edu-current')?.checked;
-      const descHtml = sanitizeHTML(card.querySelector('.edu-desc')?.innerHTML||'');
-      const desc = isRichEmpty(descHtml) ? '' : descHtml;
-      const empty = !(inst||title||country||start||end||current||desc);
-      if (empty) return null;
-      return { institution:inst, title, country, start_date:start, end_date:end, current, description:desc };
-    }).filter(Boolean);
+// ----- EDUCATION -----
+// --- EDUCATION ---
+const education = qsa('#educationList .cv-card-entry').map(card=>{
+  const inst    = normalizeText(card.querySelector('.edu-inst')?.value);
+  const title   = normalizeText(card.querySelector('.edu-title')?.value);
+  const country = normalizeText(card.querySelector('.edu-country')?.value);
 
-    const work_experience = qsa('#workExperienceList .cv-card-entry').map(card=>{
-      const title = normalizeText(card.querySelector('.work-title')?.value);
-      const company = normalizeText(card.querySelector('.work-company')?.value);
-      const start = normalizeISO15(card.querySelector('.work-start')?.value?.trim()||'');
-      const endRaw= (card.querySelector('.work-end')?.value?.trim()||'');
-      const end   = normalizeISO15(endRaw);
-      const current = !!card.querySelector('.work-current')?.checked;
-const rawHtml  = card.querySelector('.work-desc')?.innerHTML || '';
-const descHtml = sanitizeHTML(maybeAutolist(rawHtml));   // (con la versión nueva arriba)
+  // hidden como fuente principal; picker sólo si hidden vacío
+  const startHidden = (card.querySelector('.edu-start')?.value || '').trim();
+  const endHidden   = (card.querySelector('.edu-end')?.value   || '').trim();
+  const startPick   = pickerToIso(card.querySelector('.picker-start'));
+  const endPick     = pickerToIso(card.querySelector('.picker-end'));
 
-      const desc = isRichEmpty(descHtml) ? '' : descHtml;
-      const empty = !(title||company||start||end||current||desc);
-      if (empty) return null;
-      return { title, company, start_date:start, end_date:end, current, description:desc };
-    }).filter(Boolean);
+  const current     = !!card.querySelector('.edu-current')?.checked;
+
+  const start = normalizeISO15(startHidden || startPick);
+  const end   = current ? '' : normalizeISO15(
+                  (/^present$/i.test(endHidden) ? '' : endHidden) || endPick
+                );
+
+  const descHtml = sanitizeHTML(card.querySelector('.edu-desc')?.innerHTML||'');
+  const desc     = isRichEmpty(descHtml) ? '' : descHtml;
+
+  const empty = !(inst||title||country||start||end||current||desc);
+  if (empty) return null;
+  return { institution:inst, title, country, start_date:start, end_date:end, current, description:desc };
+}).filter(Boolean);
+
+// --- WORK EXPERIENCE ---
+const work_experience = qsa('#workExperienceList .cv-card-entry').map(card=>{
+  const title   = normalizeText(card.querySelector('.work-title')?.value);
+  const company = normalizeText(card.querySelector('.work-company')?.value);
+
+  const startHidden = (card.querySelector('.work-start')?.value || '').trim();
+  const endHidden   = (card.querySelector('.work-end')?.value   || '').trim();
+  const startPick   = pickerToIso(card.querySelector('.picker-start'));
+  const endPick     = pickerToIso(card.querySelector('.picker-end'));
+
+  const current     = !!card.querySelector('.work-current')?.checked;
+
+  const start = normalizeISO15(startHidden || startPick);
+  const end   = current ? '' : normalizeISO15(
+                  (/^present$/i.test(endHidden) ? '' : endHidden) || endPick
+                );
+
+  const rawHtml  = card.querySelector('.work-desc')?.innerHTML || '';
+  const descHtml = sanitizeHTML(maybeAutolist(rawHtml));
+  const desc     = isRichEmpty(descHtml) ? '' : descHtml;
+
+  const empty = !(title||company||start||end||current||desc);
+  if (empty) return null;
+  return { title, company, start_date:start, end_date:end, current, description:desc };
+}).filter(Boolean);
 
     const tools = qsa('#toolsList .cv-card-entry').map(row=>{
       const tool = normalizeText(row.querySelector('.tool-name')?.value);
