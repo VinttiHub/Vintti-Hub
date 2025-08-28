@@ -210,7 +210,15 @@ function coerceLanguages(raw) {
     clearBtn.addEventListener('click', ()=>{ monthSel.value=''; yearSel.value=''; emit(); });
 
     // set initial
-    if (initial){ const [d]=initial.split('T'); const [y,m]=d.split('-'); yearSel.value=y||''; monthSel.value=m||''; }
+    // dentro de mountMonthYearPicker(...)
+if (initial){
+  const [d] = initial.split('T');
+  const [y,m] = d.split('-');
+  yearSel.value = y || '';
+  monthSel.value = m || '';
+  if (y && m) setTimeout(emit, 0);  // <-- fuerza sincronización visible
+}
+
 
     return { set(iso){ if(!iso){ monthSel.value=''; yearSel.value=''; return; } const [d]=iso.split('T'); const [y,m]=d.split('-'); yearSel.value=y||''; monthSel.value=m||''; }, get:val };
   }
@@ -290,6 +298,7 @@ function addEducationEntry(entry={ institution:'', title:'', country:'', start_d
     }
   };
   toggleCurrent(!!entry.current);
+  if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
   curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.education=true; scheduleSave(); });
 
   // Inputs
@@ -360,6 +369,7 @@ function addWorkExperienceEntry(entry={ title:'', company:'', start_date:'', end
     }
   };
   toggleCurrent(!!entry.current);
+  if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
   curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.work_experience=true; scheduleSave(); });
 
   card.querySelectorAll('input').forEach(el=>{
@@ -890,57 +900,78 @@ window.Resume = {
   get snapshot(){ return snapshot; },
   ensure: ensureResumeExists,
 
-  applyGenerated(result = {}) {
-    const has = (k) => Object.prototype.hasOwnProperty.call(result, k);
+applyGenerated(result = {}) {
+  const has = (k) => Object.prototype.hasOwnProperty.call(result, k);
 
-    // About
-    if (has('about') && result.about != null) {
-      if (aboutEl) aboutEl.innerHTML = result.about;
-      touched.about = true;
-    }
-
-    // Education (solo si la clave viene)
-    if (has('education')) {
-      const edu = safeParseArray(result.education, null); // null ≠ []
-      if (Array.isArray(edu)) {
-        if (eduList) eduList.innerHTML = '';
-        edu.forEach(addEducationEntry);
-        touched.education = true;
-      }
-    }
-
-    // Work Experience (solo si la clave viene)
-    if (has('work_experience')) {
-      const work = safeParseArray(result.work_experience, null);
-      if (Array.isArray(work)) {
-        if (workList) workList.innerHTML = '';
-        work.forEach(addWorkExperienceEntry);
-        touched.work_experience = true;
-      }
-    }
-
-    // Tools (solo si la clave viene)
-    if (has('tools')) {
-      const tools = safeParseArray(result.tools, null);
-      if (Array.isArray(tools)) {
-        if (toolsList) toolsList.innerHTML = '';
-        tools.forEach(addToolEntry);
-        touched.tools = true;
-      }
-    }
-
-    // Languages (solo si la clave viene)
-    if (has('languages')) {
-      const langs = safeParseArray(result.languages, null);
-      if (Array.isArray(langs)) {
-        if (langsList) langsList.innerHTML = '';
-        langs.forEach(addLanguageEntry);
-        touched.languages = true;
-      }
-    }
-
-    (typeof scheduleSave === 'function' ? scheduleSave : debouncedSave)();
+  // About
+  if (has('about') && result.about != null) {
+    if (aboutEl) aboutEl.innerHTML = result.about;
+    touched.about = true;
   }
+
+  // Education
+  if (has('education')) {
+    let edu = safeParseArray(result.education, null);
+    if (Array.isArray(edu)) {
+      edu = normalizeArrayDates(edu, 'edu');
+      if (eduList) eduList.innerHTML = '';
+      edu.forEach(addEducationEntry);
+      touched.education = true;
+    }
+  }
+
+  // Work Experience
+  if (has('work_experience')) {
+    let work = safeParseArray(result.work_experience, null);
+    if (Array.isArray(work)) {
+      work = normalizeArrayDates(work, 'work');
+      if (workList) workList.innerHTML = '';
+      work.forEach(addWorkExperienceEntry);
+      touched.work_experience = true;
+    }
+  }
+
+  // Tools
+  if (has('tools')) {
+    const tools = safeParseArray(result.tools, null);
+    if (Array.isArray(tools)) {
+      if (toolsList) toolsList.innerHTML = '';
+      tools.forEach(addToolEntry);
+      touched.tools = true;
+    }
+  }
+
+  // Languages
+  if (has('languages')) {
+    const langs = safeParseArray(result.languages, null);
+    if (Array.isArray(langs)) {
+      if (langsList) langsList.innerHTML = '';
+      langs.forEach(addLanguageEntry);
+      touched.languages = true;
+    }
+  }
+
+  // Guarda
+  (typeof scheduleSave === 'function' ? scheduleSave : debouncedSave)();
+  console.groupCollapsed('🤖 AI payload (raw)');
+console.table(safeParseArray(result.education, []).map(e => ({
+  kind: 'edu', start: e.start_date ?? e.start ?? e.from,
+  end: e.end_date ?? e.end ?? e.to, current: e.current
+})));
+console.table(safeParseArray(result.work_experience, []).map(w => ({
+  kind: 'work', start: w.start_date ?? w.start ?? w.from,
+  end: w.end_date ?? w.end ?? w.to, current: w.current
+})));
+console.groupEnd();
+// al final de applyGenerated(...)
+touched.education = touched.work_experience = true;
+
+// Espera a que los pickers hagan su emit() inicial (setTimeout 0) y GUARDAR.
+setTimeout(() => {
+  (typeof scheduleSave === 'function' ? scheduleSave : debouncedSave)();
+}, 0);
+}
+
 };
 
 
@@ -1061,3 +1092,111 @@ function wireDescEditors(descEl, touchKey) {
 }
 
 
+// --- Normalizadores para fechas que vienen de la AI ---
+const MONTH_MAP = {
+  // EN
+  jan:'01', january:'01', feb:'02', february:'02', mar:'03', march:'03',
+  apr:'04', april:'04', may:'05', jun:'06', june:'06',
+  jul:'07', july:'07', aug:'08', august:'08',
+  sep:'09', sept:'09', september:'09',
+  oct:'10', october:'10', nov:'11', november:'11', dec:'12', december:'12',
+  // ES
+  ene:'01', enero:'01', febr:'02', febreo:'02', febrero:'02',
+  marz:'03', marzo:'03', abr:'04', abril:'04',
+  may:'05', mayo:'05', jun:'06', junio:'06',
+  jul:'07', julio:'07', ago:'08', agosto:'08',
+  set:'09', sept:'09', septiembre:'09', sep:'09',
+  octu:'10', octubre:'10', nov:'11', noviembre:'11',
+  dic:'12', diciembre:'12'
+};
+
+const PRESENT_RE = /^(present|current|ongoing|now|to date|hasta la fecha|actualidad|presente|en curso)$/i;
+
+function toIso15(y, m) {
+  const yy = String(y).padStart(4,'0');
+  const mm = String(m).padStart(2,'0');
+  return `${yy}-${mm}-15`;
+}
+
+// Convierte strings variados -> 'YYYY-MM-15' o '' (si vacío / Present)
+function coerceIsoMonth15(input) {
+  if (input == null) return '';
+  let s = String(input).trim();
+  if (!s) return '';
+  if (PRESENT_RE.test(s)) return '';
+
+  // 1) ISO ya válido
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    // normaliza el día a 15
+    return s.replace(/-\d{2}$/, '-15');
+  }
+  if (/^\d{4}-\d{2}$/.test(s)) {
+    return `${s}-15`;
+  }
+
+  // 2) MM/YYYY o MM-YYYY
+  let m = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  if (m) {
+    const mm = Math.max(1, Math.min(12, parseInt(m[1],10)));
+    return toIso15(m[2], mm);
+  }
+
+  // 3) Mon YYYY  (Aug 2023 / Agosto 2023 / Ene 2021 / Sep 2019)
+  m = s.match(/^([A-Za-zÁÉÍÓÚÜÑ\.]+)\s+(\d{4})$/);
+  if (m) {
+    const key = m[1].toLowerCase().replace(/\./g,'').normalize('NFD').replace(/[\u0300-\u036f]/g,''); // quita acentos
+    const found = Object.keys(MONTH_MAP).find(k => key.startsWith(k));
+    if (found) return toIso15(m[2], MONTH_MAP[found]);
+  }
+
+  // 4) YYYY
+  m = s.match(/^(\d{4})$/);
+  if (m) return `${m[1]}-06-15`; // centro del año
+
+  // No se pudo mapear
+  return '';
+}
+
+// Normaliza claves y fechas de una entrada de educación o experiencia
+function normalizeEntryDates(entry = {}, kind = 'work') {
+  const e = { ...entry };
+
+  // alias de campos
+  e.start_date = e.start_date ?? e.start ?? e.from ?? e.startDate ?? '';
+  e.end_date   = e.end_date   ?? e.end   ?? e.to   ?? e.endDate   ?? '';
+
+  // “current” desde flags o desde el texto del end_date
+  let current = !!e.current;
+  if (!current) {
+    if (!e.end_date || PRESENT_RE.test(String(e.end_date))) current = true;
+  }
+
+  // Normaliza a ISO-15
+  const startIso = coerceIsoMonth15(e.start_date);
+  const endIso   = current ? '' : coerceIsoMonth15(e.end_date);
+
+  e.start_date = startIso;
+  e.end_date   = endIso;
+  e.current    = current;
+
+  // Alias de nombres (por si la AI devuelve otros)
+  if (kind === 'work') {
+    e.title   = (e.title ?? e.role ?? e.position ?? '').toString();
+    e.company = (e.company ?? e.employer ?? e.org ?? '').toString();
+  } else {
+    e.title       = (e.title ?? e.degree ?? e.program ?? e.qualification ?? '').toString();
+    e.institution = (e.institution ?? e.school ?? e.university ?? e.college ?? '').toString();
+    e.country     = (e.country ?? e.location ?? '').toString();
+  }
+
+  // Limpia “Present” textual en end_date (ya quedó en current)
+  if (!e.current && !e.end_date) {
+    // si no hay fin y no es current, lo dejamos vacío (no inventamos fechas)
+  }
+  return e;
+}
+
+function normalizeArrayDates(arr, kind) {
+  const A = Array.isArray(arr) ? arr : [];
+  return A.map(x => normalizeEntryDates(x, kind));
+}
