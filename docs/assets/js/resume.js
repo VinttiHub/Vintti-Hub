@@ -47,29 +47,63 @@ async function ensureResumeExists() {
     const d=document.createElement('div'); d.innerHTML=html||''; return (d.textContent||'').trim();
   }
 
-  function sanitizeHTML(html){
-    // whitelist: b,i,strong,em,ul,ol,li,br,a
-    const allowed = new Set(['B','I','STRONG','EM','UL','OL','LI','BR','A']);
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html || '';
-    const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_ELEMENT, null);
-    let node;
-    while(node = walker.nextNode()){
-      if(!allowed.has(node.tagName)){
-        const repl = document.createTextNode(node.textContent || '');
-        node.parentNode.replaceChild(repl, node);
-        continue;
+function sanitizeHTML(html){
+  if (!html) return '';
+  html = normalizeWeirdBullets(html);   // ← añade esto
+  // limpia caracteres de control (menos \n y \t)
+  html = String(html)
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ')
+    .replace(/\u00A0/g, '&nbsp;');
+
+  // ✅ ahora permitimos <p>
+  const allowed = new Set(['B','I','STRONG','EM','UL','OL','LI','BR','A','P']);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  // quitamos elementos no permitidos pero preservando contenido y saltos
+  const walker = document.createTreeWalker(tmp, NodeFilter.SHOW_ELEMENT, null);
+  const toRemove = [];
+  let node;
+  while (node = walker.nextNode()){
+    if (!allowed.has(node.tagName)) {
+      if (node.tagName === 'DIV' || node.tagName === 'SPAN') {
+        // unwrap e inserta un <br> como separador suave
+        const br = document.createElement('br');
+        node.parentNode.insertBefore(br, node.nextSibling);
+        while (node.firstChild) node.parentNode.insertBefore(node.firstChild, node);
+        toRemove.push(node);
+      } else {
+        while (node.firstChild) node.parentNode.insertBefore(node.firstChild, node);
+        toRemove.push(node);
       }
-      // strip attributes
-      for (const attr of Array.from(node.attributes)) {
-        if (node.tagName==='A' && attr.name==='href') continue;
-        node.removeAttribute(attr.name);
-      }
+      continue;
     }
-    // también elimina estilos inline fantasma heredados
-    tmp.querySelectorAll('*').forEach(n=>n.removeAttribute('style'));
-    return tmp.innerHTML;
+    // atributos: solo href seguro en <a>
+    for (const attr of Array.from(node.attributes)) {
+      if (node.tagName === 'A' && attr.name === 'href' && /^(https?:|mailto:)/i.test(node.getAttribute('href')||'')) continue;
+      node.removeAttribute(attr.name);
+    }
   }
+  toRemove.forEach(n=>n.remove());
+
+  // asegura que LI estén dentro de UL/OL
+  tmp.querySelectorAll('li').forEach(li=>{
+    const p = li.parentElement;
+    if (!p || !/^(UL|OL)$/.test(p.tagName)) {
+      const ul = document.createElement('ul');
+      li.replaceWith(ul);
+      ul.appendChild(li);
+    }
+  });
+
+  // limpia estilos inline fantasmas
+  tmp.querySelectorAll('*').forEach(n=>n.removeAttribute('style'));
+
+  return tmp.innerHTML
+    .replace(/<p>\s*<\/p>/g,'')           // elimina p vacíos
+    .replace(/(?:\s*<br>\s*){2,}/g,'<br>'); // colapsa múltiples <br>
+}
+
 
   function isRichEmpty(html){
     const txt = stripHtmlToText(html);
@@ -194,136 +228,148 @@ function coerceLanguages(raw) {
   const videoEl = byId('videoLinkInput');
 
   // ---------- Builders ----------
-  function addEducationEntry(entry={ institution:'', title:'', country:'', start_date:'', end_date:'', current:false, description:'' }){
-    const card = document.createElement('div');
-    card.className='cv-card-entry';
-    card.innerHTML = `
-      <div style="display:flex;gap:20px;flex-wrap:wrap">
-        <div style="flex:2.2;min-width:320px;">
-          <input type="text" class="edu-inst"   placeholder="Institution" value="${entry.institution||''}">
-          <input type="text" class="edu-title"  placeholder="Title/Degree" value="${entry.title||''}" style="margin-top:6px;">
-          <select class="edu-country" style="margin-top:6px;width:100%;">${countryOptions(entry.country||'')}</select>
+function addEducationEntry(entry={ institution:'', title:'', country:'', start_date:'', end_date:'', current:false, description:'' }){
+  const card = document.createElement('div');
+  card.className='cv-card-entry';
+  card.innerHTML = `
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div style="flex:2.2;min-width:320px;">
+        <input type="text" class="edu-inst"   placeholder="Institution" value="${entry.institution||''}">
+        <input type="text" class="edu-title"  placeholder="Title/Degree" value="${entry.title||''}" style="margin-top:6px;">
+        <select class="edu-country" style="margin-top:6px;width:100%;">${countryOptions(entry.country||'')}</select>
+      </div>
+      <div style="flex:2;min-width:360px;">
+        <div style="display:flex;gap:10px;">
+          <label style="flex:1;">Start<br><div class="picker-start"></div><input type="hidden" class="edu-start"></label>
+          <label style="flex:1;">End<br><div class="picker-end"></div><input type="hidden" class="edu-end"></label>
         </div>
-        <div style="flex:2;min-width:360px;">
-          <div style="display:flex;gap:10px;">
-            <label style="flex:1;">Start<br><div class="picker-start"></div><input type="hidden" class="edu-start"></label>
-            <label style="flex:1;">End<br><div class="picker-end"></div><input type="hidden" class="edu-end"></label>
-          </div>
-          <div style="display:flex;justify-content:flex-end;padding-right:62px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="edu-current" ${entry.current?'checked':''}> Current</label>
-          </div>
+        <div style="display:flex;justify-content:flex-end;padding-right:62px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="edu-current" ${entry.current?'checked':''}> Current</label>
         </div>
       </div>
-      <div class="rich-toolbar"><button data-cmd="bold"><b>B</b></button><button data-cmd="italic"><i>I</i></button><button data-cmd="insertUnorderedList">• List</button></div>
-      <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:160px;">${entry.description||''}</div>
-      <button class="remove-entry" title="Remove">🗑️</button>
-    `;
-    // editors
-    const desc = card.querySelector('.edu-desc');
-    card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
-      desc.focus(); document.execCommand(b.dataset.cmd,false,null);
-      touched.education = true; scheduleSave();
-    }));
-    card.querySelector('.remove-entry').addEventListener('click', ()=>{ card.remove(); touched.education = true; scheduleSave(); });
+    </div>
+    <div class="rich-toolbar"><button data-cmd="bold"><b>B</b></button><button data-cmd="italic"><i>I</i></button><button data-cmd="insertUnorderedList">• List</button></div>
+    <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:160px;">${sanitizeHTML(entry.description||'')}</div>
+    <button class="remove-entry" title="Remove">🗑️</button>
+  `;
 
-    // pickers
-    const hStart = card.querySelector('.edu-start');
-    const hEnd   = card.querySelector('.edu-end');
-    const curCb  = card.querySelector('.edu-current');
+  // Editor de descripción
+  const desc = card.querySelector('.edu-desc');
+  wireDescEditors(desc, 'education');
+  card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
+    desc.focus();
+    document.execCommand(b.dataset.cmd,false,null);
+    touched.education = true; scheduleSave();
+  }));
 
-    const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), { initial: entry.start_date||'', onChange:(iso)=>{ hStart.value=iso; touched.education=true; scheduleSave(); }});
-    const pEnd   = mountMonthYearPicker(card.querySelector('.picker-end'),   { initial: entry.current?'':(entry.end_date||''), onChange:(iso)=>{ hEnd.value=iso; touched.education=true; scheduleSave(); }});
+  // Botón borrar
+  card.querySelector('.remove-entry').addEventListener('click', ()=>{
+    card.remove(); touched.education = true; scheduleSave();
+  });
 
-    hStart.value = entry.start_date||'';
-    hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
+  // Pickers
+  const hStart = card.querySelector('.edu-start');
+  const hEnd   = card.querySelector('.edu-end');
+  const curCb  = card.querySelector('.edu-current');
 
-    const toggleCurrent = (checked)=>{
-      if (checked){
-        hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
-        hEnd.value='Present';
-        // disable end picker
-        card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
-      } else {
-        card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
-        const last = hEnd.dataset.lastIso||'';
-        if (last){ pEnd.set(last); hEnd.value=last; } else { pEnd.set(''); hEnd.value=''; }
-      }
-    };
-    toggleCurrent(!!entry.current);
-    curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.education=true; scheduleSave(); });
+  const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), { initial: entry.start_date||'', onChange:(iso)=>{ hStart.value=iso; touched.education=true; scheduleSave(); }});
+  const pEnd   = mountMonthYearPicker(card.querySelector('.picker-end'),   { initial: entry.current?'':(entry.end_date||''), onChange:(iso)=>{ hEnd.value=iso; touched.education=true; scheduleSave(); }});
 
-    // inputs
-    card.querySelectorAll('input,select').forEach(el=>{
-      el.addEventListener('input', ()=>{ touched.education=true; });
-      el.addEventListener('change', ()=>{ touched.education=true; scheduleSave(); });
-    });
-    desc.addEventListener('input', ()=>{ touched.education=true; });
+  hStart.value = entry.start_date||'';
+  hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
 
-    eduList.appendChild(card);
-  }
+  const toggleCurrent = (checked)=>{
+    if (checked){
+      hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
+      hEnd.value='Present';
+      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
+    } else {
+      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
+      const last = hEnd.dataset.lastIso||'';
+      if (last){ pEnd.set(last); hEnd.value=last; } else { pEnd.set(''); hEnd.value=''; }
+    }
+  };
+  toggleCurrent(!!entry.current);
+  curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.education=true; scheduleSave(); });
 
-  function addWorkExperienceEntry(entry={ title:'', company:'', start_date:'', end_date:'', current:false, description:'' }){
-    const card = document.createElement('div');
-    card.className='cv-card-entry';
-    card.innerHTML = `
-      <div style="display:flex;gap:20px;flex-wrap:wrap">
-        <div style="flex:2.2;min-width:320px;">
-          <input type="text" class="work-title"   placeholder="Title" value="${entry.title||''}">
-          <input type="text" class="work-company" placeholder="Company" value="${entry.company||''}" style="margin-top:6px;">
+  // Inputs
+  card.querySelectorAll('input,select').forEach(el=>{
+    el.addEventListener('input',  ()=>{ touched.education=true; });
+    el.addEventListener('change', ()=>{ touched.education=true; scheduleSave(); });
+  });
+
+  eduList.appendChild(card);
+}
+
+
+function addWorkExperienceEntry(entry={ title:'', company:'', start_date:'', end_date:'', current:false, description:'' }){
+  const card = document.createElement('div');
+  card.className='cv-card-entry';
+  card.innerHTML = `
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div style="flex:2.2;min-width:320px;">
+        <input type="text" class="work-title"   placeholder="Title" value="${entry.title||''}">
+        <input type="text" class="work-company" placeholder="Company" value="${entry.company||''}" style="margin-top:6px;">
+      </div>
+      <div style="flex:2;min-width:360px;">
+        <div style="display:flex;gap:10px;">
+          <label style="flex:1;">Start<br><div class="picker-start"></div><input type="hidden" class="work-start"></label>
+          <label style="flex:1;">End<br><div class="picker-end"></div><input type="hidden" class="work-end"></label>
         </div>
-        <div style="flex:2;min-width:360px;">
-          <div style="display:flex;gap:10px;">
-            <label style="flex:1;">Start<br><div class="picker-start"></div><input type="hidden" class="work-start"></label>
-            <label style="flex:1;">End<br><div class="picker-end"></div><input type="hidden" class="work-end"></label>
-          </div>
-          <div style="display:flex;justify-content:flex-end;padding-right:62px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="work-current" ${entry.current?'checked':''}> Current</label>
-          </div>
+        <div style="display:flex;justify-content:flex-end;padding-right:62px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="work-current" ${entry.current?'checked':''}> Current</label>
         </div>
       </div>
-      <div class="rich-toolbar"><button data-cmd="bold"><b>B</b></button><button data-cmd="italic"><i>I</i></button><button data-cmd="insertUnorderedList">• List</button></div>
-      <div class="work-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:200px;">${entry.description||''}</div>
-      <button class="remove-entry" title="Remove">🗑️</button>
-    `;
-    const desc = card.querySelector('.work-desc');
-    card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
-      desc.focus(); document.execCommand(b.dataset.cmd,false,null);
-      touched.work_experience = true; scheduleSave();
-    }));
-    card.querySelector('.remove-entry').addEventListener('click', ()=>{ card.remove(); touched.work_experience = true; scheduleSave(); });
+    </div>
+    <div class="rich-toolbar"><button data-cmd="bold"><b>B</b></button><button data-cmd="italic"><i>I</i></button><button data-cmd="insertUnorderedList">• List</button></div>
+    <div class="work-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:200px;">${sanitizeHTML(entry.description||'')}</div>
+    <button class="remove-entry" title="Remove">🗑️</button>
+  `;
 
-    const hStart = card.querySelector('.work-start');
-    const hEnd   = card.querySelector('.work-end');
-    const curCb  = card.querySelector('.work-current');
+  const desc = card.querySelector('.work-desc');
+  wireDescEditors(desc, 'work_experience');
+  card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
+    desc.focus();
+    document.execCommand(b.dataset.cmd,false,null);
+    touched.work_experience = true; scheduleSave();
+  }));
 
-    const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), { initial: entry.start_date||'', onChange:(iso)=>{ hStart.value=iso; touched.work_experience=true; scheduleSave(); }});
-    const pEnd   = mountMonthYearPicker(card.querySelector('.picker-end'),   { initial: entry.current?'':(entry.end_date||''), onChange:(iso)=>{ hEnd.value=iso; touched.work_experience=true; scheduleSave(); }});
+  card.querySelector('.remove-entry').addEventListener('click', ()=>{
+    card.remove(); touched.work_experience = true; scheduleSave();
+  });
 
-    hStart.value = entry.start_date||'';
-    hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
+  const hStart = card.querySelector('.work-start');
+  const hEnd   = card.querySelector('.work-end');
+  const curCb  = card.querySelector('.work-current');
 
-    const toggleCurrent = (checked)=>{
-      if (checked){
-        hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
-        hEnd.value='Present';
-        card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
-      } else {
-        card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
-        const last = hEnd.dataset.lastIso||'';
-        if (last){ pEnd.set(last); hEnd.value=last; } else { pEnd.set(''); hEnd.value=''; }
-      }
-    };
-    toggleCurrent(!!entry.current);
-    curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.work_experience=true; scheduleSave(); });
+  const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), { initial: entry.start_date||'', onChange:(iso)=>{ hStart.value=iso; touched.work_experience=true; scheduleSave(); }});
+  const pEnd   = mountMonthYearPicker(card.querySelector('.picker-end'),   { initial: entry.current?'':(entry.end_date||''), onChange:(iso)=>{ hEnd.value=iso; touched.work_experience=true; scheduleSave(); }});
 
-    card.querySelectorAll('input').forEach(el=>{
-      el.addEventListener('input', ()=>{ touched.work_experience=true; });
-      el.addEventListener('change', ()=>{ touched.work_experience=true; scheduleSave(); });
-    });
-    desc.addEventListener('input', ()=>{ touched.work_experience=true; });
+  hStart.value = entry.start_date||'';
+  hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
 
-    workList.appendChild(card);
-  }
+  const toggleCurrent = (checked)=>{
+    if (checked){
+      hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
+      hEnd.value='Present';
+      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
+    } else {
+      card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
+      const last = hEnd.dataset.lastIso||'';
+      if (last){ pEnd.set(last); hEnd.value=last; } else { pEnd.set(''); hEnd.value=''; }
+    }
+  };
+  toggleCurrent(!!entry.current);
+  curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.work_experience=true; scheduleSave(); });
+
+  card.querySelectorAll('input').forEach(el=>{
+    el.addEventListener('input',  ()=>{ touched.work_experience=true; });
+    el.addEventListener('change', ()=>{ touched.work_experience=true; scheduleSave(); });
+  });
+
+  workList.appendChild(card);
+}
+
 
   function addToolEntry(entry={ tool:'', level:'Basic' }){
     const row = document.createElement('div');
@@ -338,10 +384,11 @@ function coerceLanguages(raw) {
       <button class="remove-entry" title="Remove">🗑️</button>
     `;
     row.querySelector('.remove-entry').addEventListener('click', ()=>{ row.remove(); touched.tools=true; scheduleSave(); });
-    row.querySelectorAll('input,select').forEach(el=>{
-      el.addEventListener('input', ()=>{ touched.tools=true; });
-      el.addEventListener('change', ()=>{ touched.tools=true; scheduleSave(); });
-    });
+row.querySelectorAll('input,select').forEach(el=>{
+  el.addEventListener('input',  () => { touched.tools = true; scheduleSave(); });
+  el.addEventListener('change', () => { touched.tools = true; scheduleSave(); });
+});
+
     toolsList.appendChild(row);
     const name = row.querySelector('.tool-name'); if (name && !entry.tool) name.focus();
   }
@@ -367,12 +414,39 @@ function coerceLanguages(raw) {
       <button class="remove-entry" title="Remove">🗑️</button>
     `;
     row.querySelector('.remove-entry').addEventListener('click', ()=>{ row.remove(); touched.languages=true; scheduleSave(); });
-    row.querySelectorAll('select').forEach(el=>{
-      el.addEventListener('input', ()=>{ touched.languages=true; });
-      el.addEventListener('change', ()=>{ touched.languages=true; scheduleSave(); });
-    });
+row.querySelectorAll('select').forEach(el=>{
+  el.addEventListener('input',  () => { touched.languages = true; scheduleSave(); });
+  el.addEventListener('change', () => { touched.languages = true; scheduleSave(); });
+});
+
     langsList.appendChild(row);
   }
+function maybeAutolist(html){
+  const escape = (s) => { const t = document.createElement('textarea'); t.textContent = s || ''; return t.innerHTML; };
+  if (/<\/?(ul|ol|li)\b/i.test(html || '')) return html; // ya es una lista
+
+  const txt = (html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '');
+
+  const lines = txt.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const bulletRE = /^([\-*•·])\s+/;
+
+  const bulletCount = lines.filter(l => bulletRE.test(l)).length;
+
+  // requiere al menos 2 bullets y que sean ≥ 60% de las líneas
+  if (lines.length >= 2 && bulletCount >= 2 && bulletCount / lines.length >= 0.6) {
+    const items = lines
+      .map(l => l.replace(bulletRE, ''))
+      .filter(Boolean)
+      .map(it => `<li>${escape(it)}</li>`)
+      .join('');
+    return `<ul>${items}</ul>`;
+  }
+  return html;
+}
+
 
   // ---------- DOM → Data (normalized, filtered) ----------
   function readResumeFromDOM(){
@@ -399,7 +473,9 @@ function coerceLanguages(raw) {
       const endRaw= (card.querySelector('.work-end')?.value?.trim()||'');
       const end   = normalizeISO15(endRaw);
       const current = !!card.querySelector('.work-current')?.checked;
-      const descHtml = sanitizeHTML(card.querySelector('.work-desc')?.innerHTML||'');
+const rawHtml  = card.querySelector('.work-desc')?.innerHTML || '';
+const descHtml = sanitizeHTML(maybeAutolist(rawHtml));   // (con la versión nueva arriba)
+
       const desc = isRichEmpty(descHtml) ? '' : descHtml;
       const empty = !(title||company||start||end||current||desc);
       if (empty) return null;
@@ -442,7 +518,6 @@ async function saveNow(){
   }
 
   maybe('about', current.about);
-  // 👇 sigues enviando arrays como string (como antes)
   maybe('education', current.education, true);
   maybe('work_experience', current.work_experience, true);
   maybe('tools', current.tools, true);
@@ -451,8 +526,20 @@ async function saveNow(){
 
   if (Object.keys(patch).length === 0) return;
 
-  // ¿estás vaciando algo?
-  const clears = Object.entries(patch).some(([k, v]) => {
+  // --- NUEVO: detectar si se vació alguna description dentro de los arrays
+  const eduPrev = snapshot.education || [];
+  const eduCurr = current.education || [];
+  const workPrev = snapshot.work_experience || [];
+  const workCurr = current.work_experience || [];
+
+  const workChanges = _findDescChanges(workPrev, workCurr, 'work');
+  const eduChanges  = _findDescChanges(eduPrev,  eduCurr,  'edu');
+
+  const anyDescCleared = [...workChanges, ...eduChanges]
+    .some(ch => ch.type === 'cleared');
+
+  // allow_clear si: arrays en [] / campos en '' / o alguna description fue limpiada
+  const clearsTopLevel = Object.entries(patch).some(([k, v]) => {
     if (['education','work_experience','tools','languages'].includes(k)) {
       return v === '[]' || (Array.isArray(v) && v.length === 0);
     }
@@ -461,27 +548,66 @@ async function saveNow(){
     }
     return false;
   });
+  const needAllowClear = clearsTopLevel || anyDescCleared;
 
-  const url = `${API_BASE}/resumes/${candidateId}${clears ? '?allow_clear=true' : ''}`;
+  const url = `${API_BASE}/resumes/${candidateId}${needAllowClear ? '?allow_clear=true' : ''}`;
+
+  // --- LOG PREVIO AL PATCH ---
+  if (DEBUG_SAVE){
+    const changedKeys = Object.keys(patch);
+    console.groupCollapsed(
+      `💾 Guardar cambios → ${changedKeys.join(', ')} ${needAllowClear ? '(allow_clear)' : ''}`
+    );
+    if (workChanges.length){
+      console.groupCollapsed(`✍️ work_experience (${workChanges.length} cambio/s)`);
+      workChanges.forEach(ch=>{
+        console.log(`[${ch.type}] #${ch.index} ${ch.label}`);
+        console.log('  before:', _previewText(ch.before));
+        console.log('  after :', _previewText(ch.after));
+        console.log(`  lens  : ${ch.beforeLen} → ${ch.afterLen}`);
+      });
+      console.groupEnd();
+    }
+    if (eduChanges.length){
+      console.groupCollapsed(`✍️ education (${eduChanges.length} cambio/s)`);
+      eduChanges.forEach(ch=>{
+        console.log(`[${ch.type}] #${ch.index} ${ch.label}`);
+        console.log('  before:', _previewText(ch.before));
+        console.log('  after :', _previewText(ch.after));
+        console.log(`  lens  : ${ch.beforeLen} → ${ch.afterLen}`);
+      });
+      console.groupEnd();
+    }
+    console.groupEnd();
+  }
 
   try {
     saving = true;
 
     let triedCreate = false;
+    let lastRes = null;
     while (true) {
-      const res = await fetch(url, {
+      lastRes = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type':'application/json' },
         body: JSON.stringify(patch)
       });
-      if (res.ok) break;
-      if (res.status === 404 && !triedCreate) {
+      if (lastRes.ok) break;
+      if (lastRes.status === 404 && !triedCreate) {
         triedCreate = true;
         await ensureResumeExists(); // crea y reintenta
         continue;
       }
-      console.error('❌ PATCH /resumes failed', res.status, await res.text().catch(()=>'')); 
+      console.error('❌ PATCH /resumes failed', lastRes.status, await lastRes.text().catch(()=>'')); 
       break;
+    }
+
+    if (DEBUG_SAVE){
+      if (lastRes?.ok) {
+        console.info(`✅ PATCH /resumes (${needAllowClear ? 'allow_clear' : 'normal'}) OK`);
+      } else {
+        console.warn('⚠️ PATCH /resumes terminó con error');
+      }
     }
 
     // merge al snapshot: parsea arrays que enviamos como strings
@@ -503,8 +629,27 @@ async function saveNow(){
   }
 }
 
-  const scheduleSave = ()=>{ if (saving){ savePending=true; return; } debouncedSave(); };
-  const debouncedSave = debounce(saveNow, 350);
+
+const debouncedSave = debounce(saveNow, 250); // antes 500
+
+const scheduleSave  = () => { 
+  if (saving) { savePending = true; return; } 
+  debouncedSave(); 
+};
+
+// --- Exponer internos para helpers globales ---
+window.__resume = Object.assign(window.__resume || {}, {
+  touch: (k) => { try { if (k) touched[k] = true; } catch {} },
+  scheduleSave,
+  saveNow,
+  debouncedSave,
+  sanitizeHTML,
+  maybeAutolist,
+  isRichEmpty,
+  stripHtmlToText,   // ← exportado
+  normalizeText      // ← opcional, útil tenerlo afuera
+});
+
 
   // ---------- Load ----------
   async function loadResume(){
@@ -537,17 +682,17 @@ async function saveNow(){
   }
 
   // ---------- Events (mark touched) ----------
-  if (aboutEl){
-    aboutEl.contentEditable = 'true';
-    aboutEl.addEventListener('input', ()=>{ touched.about=true; });
-    aboutEl.addEventListener('blur',  ()=>{ touched.about=true; scheduleSave(); });
-  }
-  if (videoEl){
-    videoEl.contentEditable='true';
-    videoEl.addEventListener('keydown', e=>{ if (e.key==='Enter'){ e.preventDefault(); videoEl.blur(); }});
-    videoEl.addEventListener('input', ()=>{ touched.video_link=true; });
-    videoEl.addEventListener('blur',  ()=>{ touched.video_link=true; scheduleSave(); });
-  }
+if (aboutEl){
+  aboutEl.contentEditable = 'true';
+  aboutEl.addEventListener('input', () => markAndSave('about'));
+  aboutEl.addEventListener('blur',  () => markAndSave('about'));
+}
+if (videoEl){
+  videoEl.contentEditable = 'true';
+  videoEl.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); videoEl.blur(); }});
+  videoEl.addEventListener('input', () => markAndSave('video_link'));
+  videoEl.addEventListener('blur',  () => markAndSave('video_link'));
+}
 
   addEduBtn?.addEventListener('click', ()=>{ addEducationEntry(); touched.education=true; scheduleSave(); });
   addWorkBtn?.addEventListener('click', ()=>{ addWorkExperienceEntry(); touched.work_experience=true; scheduleSave(); });
@@ -555,17 +700,42 @@ async function saveNow(){
   addLangBtn?.addEventListener('click', ()=>{ addLanguageEntry(); touched.languages=true; scheduleSave(); });
 
   // Pegar texto plano en todos los contenteditable del resume
-  qsa('#resume [contenteditable="true"]').forEach(el=>{
-    el.addEventListener('paste', (e)=>{
-      e.preventDefault();
-      const text = (e.clipboardData||window.clipboardData).getData('text');
-      document.execCommand('insertText', false, text);
-    });
-    el.addEventListener('input', ()=>{
-      // limpiar estilos fantasmas
-      el.querySelectorAll('*').forEach(node=>node.removeAttribute('style'));
-    });
+
+function escapeHtml(s){ const t=document.createElement('textarea'); t.textContent = s || ''; return t.innerHTML; }
+
+qsa('#resume [contenteditable="true"]').forEach(el=>{
+  el.addEventListener('paste', (e)=>{
+    e.preventDefault();
+let text = (e.clipboardData||window.clipboardData).getData('text') || '';
+text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ').trim();
+// convierte 'ì ' (copiada de Word/Docs) a '- ' para bullets simples
+text = text.replace(/(^|\n)\s*ì\s+/g, '$1- ');
+
+
+    const lines = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    let html = '';
+
+    // si detecta bullets estilo "- ", "* " o "• " → crea <ul><li>…</li></ul>
+    if (lines.some(l => /^[-*•]\s+/.test(l))) {
+      const items = lines.map(l => l.replace(/^[-*•]\s+/, '')).filter(Boolean);
+      html = `<ul>${items.map(it => `<li>${escapeHtml(it)}</li>`).join('')}</ul>`;
+    } else if (lines.length > 1) {
+      // varias líneas → párrafos
+      html = lines.map(l => `<p>${escapeHtml(l)}</p>`).join('');
+    } else {
+      // una sola línea
+      html = escapeHtml(text);
+    }
+
+    document.execCommand('insertHTML', false, html);
   });
+
+  el.addEventListener('input', ()=>{
+    // limpia estilos inline
+    el.querySelectorAll('*').forEach(node=>node.removeAttribute('style'));
+  });
+});
+
 
   // ---------- AI Generate (usa tus ids existentes) ----------
 /* =========================
@@ -777,3 +947,117 @@ window.Resume = {
 
 
 })();
+
+// Helper para compatibilidad con el código antiguo
+function markAndSave(field) {
+  try { window.__resume?.touch?.(field); } catch {}
+  if (typeof window.__resume?.scheduleSave === 'function') {
+    window.__resume.scheduleSave();
+  } else if (typeof window.__resume?.debouncedSave === 'function') {
+    window.__resume.debouncedSave();
+  } else if (typeof window.__resume?.saveNow === 'function') {
+    window.__resume.saveNow();
+  }
+}
+
+function normalizeWeirdBullets(html) {
+  // quita 'ì ' sólo cuando aparece al inicio de línea o justo después de una etiqueta
+  return String(html || '').replace(/(^|>|\n|\r)\s*ì\s+/g, '$1');
+}
+// ==== DEBUG / LOGGING ==== 
+const DEBUG_SAVE = true;
+
+function _previewText(html, max = 140) {
+  const strip = (window.__resume && window.__resume.stripHtmlToText)
+    ? window.__resume.stripHtmlToText
+    : (h => { const d = document.createElement('div'); d.innerHTML = h || ''; return (d.textContent || '').trim(); });
+
+  const t = strip(html || '');
+  return t.length > max ? t.slice(0, max) + '…' : t;
+}
+
+function _descLen(html) {
+  const strip = (window.__resume && window.__resume.stripHtmlToText)
+    ? window.__resume.stripHtmlToText
+    : (h => { const d = document.createElement('div'); d.innerHTML = h || ''; return (d.textContent || '').trim(); });
+
+  return strip(html || '').length;
+}
+
+function _summarizeEntry(kind, e){
+  if (kind === 'work') {
+    const t = (e?.title || '').trim() || '(sin título)';
+    const c = (e?.company || '').trim();
+    return c ? `${t} @ ${c}` : t;
+  } else {
+    const t = (e?.title || '').trim() || '(sin título)';
+    const i = (e?.institution || '').trim();
+    return i ? `${t} – ${i}` : t;
+  }
+}
+function _findDescChanges(prevList=[], currList=[], kind='work'){
+  const changes = [];
+  const maxLen = Math.max(prevList.length, currList.length);
+  for (let i=0;i<maxLen;i++){
+    const prev = prevList[i];
+    const curr = currList[i];
+
+    // agregado o removido
+    if (!prev && curr){
+      changes.push({ type:'added', index:i, label:_summarizeEntry(kind, curr),
+                     before:'', after:curr.description||'', beforeLen:0, afterLen:_descLen(curr.description) });
+      continue;
+    }
+    if (prev && !curr){
+      changes.push({ type:'removed', index:i, label:_summarizeEntry(kind, prev),
+                     before:prev.description||'', after:'', beforeLen:_descLen(prev.description), afterLen:0 });
+      continue;
+    }
+
+    // actualizado
+    const b = prev?.description || '';
+    const a = curr?.description || '';
+    if (JSON.stringify(b) !== JSON.stringify(a)){
+      const bl = _descLen(b), al = _descLen(a);
+      const type = (bl>0 && al===0) ? 'cleared' : 'updated';
+      changes.push({ type, index:i, label:_summarizeEntry(kind, curr||prev),
+                     before:b, after:a, beforeLen:bl, afterLen:al });
+    }
+  }
+  return changes;
+}
+function wireDescEditors(descEl, touchKey) {
+  if (!descEl) return;
+
+  const R = window.__resume || {};
+
+  const flushIfEmpty = () => {
+    const html = descEl.innerHTML || '';
+    const cleaned = (R.sanitizeHTML || (x => x))((R.maybeAutolist || (x => x))(html));
+    const isEmpty = (R.isRichEmpty || (() => false))(cleaned);
+    if (isEmpty) {
+      descEl.innerHTML = '';
+      try { R.touch?.(touchKey); } catch {}
+      R.saveNow?.();
+      return true;
+    }
+    return false;
+  };
+
+  descEl.addEventListener('input', () => {
+    try { R.touch?.(touchKey); } catch {}
+    if (!flushIfEmpty()) R.debouncedSave?.();
+  });
+
+  descEl.addEventListener('blur', () => {
+    try { R.touch?.(touchKey); } catch {}
+    R.saveNow?.();
+  });
+
+  descEl.addEventListener('paste', () => {
+    try { R.touch?.(touchKey); } catch {}
+    setTimeout(() => { if (!flushIfEmpty()) R.saveNow?.(); }, 0);
+  });
+}
+
+
