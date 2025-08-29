@@ -1153,3 +1153,10 @@ body {
   margin-right:8px;
   border-radius:9999px; /* por si usas fondo */
 }
+/* opcional: ajustes suaves para HR */
+.hr-lead .lead-bubble {
+  width: 22px; height: 22px; line-height: 22px; 
+  display:inline-flex; align-items:center; justify-content:center;
+  border-radius:999px; font-weight:600; font-size:12px;
+}
+.hr-lead .lead-avatar { width: 22px; height: 22px; border-radius: 999px; object-fit: cover; }

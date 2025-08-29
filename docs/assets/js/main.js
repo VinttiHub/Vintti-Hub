@@ -1,3 +1,17 @@
+// === GLOBALS para HR Lead ===
+window.allowedHRUsers = window.allowedHRUsers || [];
+
+window.generateHROptions = function generateHROptions(currentValue) {
+  const allowedEmails = new Set((window.allowedHRUsers || []).map(u => u.email_vintti));
+  const isKnown = !!currentValue && allowedEmails.has(currentValue);
+
+  let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign HR Lead</option>`;
+  (window.allowedHRUsers || []).forEach(user => {
+    const selected = (isKnown && user.email_vintti === currentValue) ? 'selected' : '';
+    html += `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
+  });
+  return html;
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- Replacement UI wiring ---
@@ -90,20 +104,22 @@ document.querySelectorAll('.filter-header button').forEach(button => {
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
 
-  var allowedHRUsers = [];
+  // usar el global
+window.allowedHRUsers = window.allowedHRUsers || [];
+
 
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     .then(response => response.json())
     .then(users => {
       const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina'];
-      allowedHRUsers = users.filter(user =>
+      window.allowedHRUsers = users.filter(user =>
         allowedSubstrings.some(name => user.user_name.includes(name))
       );
     })
     .catch(err => console.error('Error loading HR Leads:', err));
 function generateHROptions(currentValue) {
   // emails válidos que sí pueden seleccionarse
-  const allowedEmails = new Set(allowedHRUsers.map(u => u.email_vintti));
+  const allowedEmails = new Set(window.allowedHRUsers.map(u => u.email_vintti));
   const isKnown = !!currentValue && allowedEmails.has(currentValue);
 
   // si el valor actual NO está en la lista (ej. 'sol@...'), dejamos seleccionado el placeholder
@@ -290,10 +306,8 @@ function generateHROptions(currentValue) {
             <td>${getTypeBadge(opp.opp_type)}</td>
             <td>${opp.opp_model || ''}</td>
             <td class="sales-lead-cell">${getSalesLeadCell(opp)}</td>
-            <td>
-              <select class="hr-lead-dropdown" data-id="${opp.opportunity_id}">
-                ${generateHROptions(opp.opp_hr_lead)}
-              </select>
+            <td class="hr-lead-cell">
+              ${getHRLeadCell(opp)}
             </td>
             <td>
               <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
@@ -608,13 +622,22 @@ if (select.classList.contains('stage-dropdown')) {
 });
 document.addEventListener('change', async e => {
   if (e.target.classList.contains('hr-lead-dropdown')) {
-    const oppId = e.target.dataset.id;
+    const oppId   = e.target.dataset.id;
     const newLead = e.target.value;
+
+    // 1) Persistir en backend
     await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ opp_hr_lead: newLead })
     });
+
+    // 2) Refrescar display (inicial + avatar) en la misma celda
+    const wrap = e.target.closest('.hr-lead-cell-wrap');
+    if (wrap) {
+      const current = wrap.querySelector('.hr-lead');
+      if (current) current.outerHTML = hrDisplayHTML(newLead);
+    }
   }
 });
 
@@ -1265,6 +1288,50 @@ const AVATAR_BY_EMAIL = {
   'pilar@vintti.com':    'pilar.png',
   'agustin@vintti.com':  'agus.png'
 };
+// --- HR initials (mostrar sólo 1 letra) ---
+const HR_INITIALS_BY_EMAIL = {
+  'agostina@vintti.com': 'A',
+  'jazmin@vintti.com':   'J',
+  'pilar@vintti.com':    'P'
+};
+
+function initialsForHRLead(emailOrName) {
+  const s = String(emailOrName || '').toLowerCase();
+  if (s.includes('agostina')) return 'AC';
+  if (s.includes('jazmin'))   return 'JP';
+  if (s.includes('pilar'))    return 'PF';
+  // por email exacto:
+  if (HR_INITIALS_BY_EMAIL[s]) return HR_INITIALS_BY_EMAIL[s];
+  return '—';
+}
+
+// HTML visible (inicial + avatar). El select va encima, invisible, para que abra con nombres completos.
+function hrDisplayHTML(email) {
+  const initials = initialsForHRLead(email);
+  const avatar   = resolveAvatar(email);
+  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
+  return `
+    <div class="hr-lead" style="display:flex;align-items:center;gap:6px;">
+      <span class="lead-bubble">${initials}</span>
+      ${img}
+    </div>
+  `;
+}
+
+// Celda completa: display visible + <select> (opciones con nombres completos)
+function getHRLeadCell(opp) {
+  const email = opp.opp_hr_lead || '';
+  return `
+    <div class="hr-lead-cell-wrap" style="position:relative;min-height:28px;">
+      ${hrDisplayHTML(email)}
+      <select class="hr-lead-dropdown"
+              data-id="${opp.opportunity_id}"
+              style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;">
+        ${generateHROptions(opp.opp_hr_lead)}
+      </select>
+    </div>
+  `;
+}
 
 function resolveAvatar(email) {
   if (!email) return null;
