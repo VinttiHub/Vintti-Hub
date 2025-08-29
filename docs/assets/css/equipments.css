@@ -324,3 +324,40 @@ td[data-col="costo"] .cost.high { color:#b91c1c; }   /* rojo */
 /* Un poco de ancho mínimo para que no se compriman en Safari */
 .pretty-table td[data-col="provider"]{ min-width: 160px; }
 .pretty-table td[data-col="pais"]{ min-width: 140px; }
+/* ==== Neutrales pero clickeables (links en la tabla) ==== */
+.pretty-table .cell-link{
+  display: inline-block;                 /* permite padding y fondo */
+  color: var(--text);                    /* quita el azul */
+  text-decoration: none;                 /* sin subrayado */
+  font-weight: 600;                      /* se sienten importantes */
+  cursor: pointer;
+  padding: 2px 6px;
+  margin: -2px -4px;                     /* compensa el padding para que no “salte” la línea */
+  border-radius: 10px;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+.pretty-table .cell-link:visited{
+  color: var(--text);                    /* evita morado visitado */
+}
+.pretty-table .cell-link:hover{
+  background: rgba(10,132,255,.10);      /* halo suave */
+  color: var(--brand);                   /* leve acento */
+}
+.pretty-table .cell-link:active{
+  transform: translateY(1px);            /* feedback de click */
+  color: var(--brand-press);
+}
+.pretty-table .cell-link:focus-visible{
+  outline: 2px solid rgba(10,132,255,.35);  /* accesible */
+  outline-offset: 2px;
+  background: rgba(10,132,255,.10);
+}
+.pretty-table .cell-link::after{
+  content: "↗";
+  opacity: 0;
+  margin-left: 4px;
+  font-size: 12px;
+  transition: opacity .15s ease, transform .15s ease;
+  transform: translateY(-1px);
+}
+.pretty-table .cell-link:hover::after{ opacity: .9; transform: translateY(0); }

@@ -1,3 +1,9 @@
+// ---------- links (ajusta si tus rutas son otras) ----------
+const LINKS = {
+  candidate: (id) => `/candidate-details.html?id=${encodeURIComponent(id)}`,
+  account:   (id) => `/crm/account-details.html?id=${encodeURIComponent(id)}`
+};
+
 // ---------- config ----------
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com"; // cambia si tu API vive en otra URL
 const TABLE_IDS = { tbody: "equipmentsTbody", empty: "emptyState" };
@@ -101,20 +107,30 @@ async function renderRow(r) {
   tr.dataset.id = r.equipment_id ?? "";
   tr.dataset.status = r.estado || "";
 
-  const candName = await getCandidateName(r.candidate_id);
-  const accName  = await getAccountName(r.account_id);
-  const status   = statusMap[r.estado] || { label: r.estado || "—", cls: "" };
-  const providerLabel = providers[r.proveedor] || (r.proveedor || "—");
+  // ✅ fetch both in parallel to avoid TDZ + speed up
+  const [candName, accName] = await Promise.all([
+    getCandidateName(r.candidate_id),
+    getAccountName(r.account_id),
+  ]);
 
-  const costCls   = costGrade(r.costo);
-  const equipEmoji= equipmentEmoji(r.equipos);
-  const flag      = flagEmoji(r.pais);
+  const candCell = (r.candidate_id && candName)
+    ? `<a class="cell-link" href="${LINKS.candidate(r.candidate_id)}" data-candidate-id="${r.candidate_id}">${escapeHTML(candName)}</a>`
+    : "—";
+
+  const accCell = (r.account_id && accName)
+    ? `<a class="cell-link" href="${LINKS.account(r.account_id)}" data-account-id="${r.account_id}">${escapeHTML(accName)}</a>`
+    : "—";
+
+  const status         = statusMap[r.estado] || { label: r.estado || "—", cls: "" };
+  const providerLabel  = providers[r.proveedor] || (r.proveedor || "—");
+  const costCls        = costGrade(r.costo);
+  const equipEmoji     = equipmentEmoji(r.equipos);
+  const flag           = flagEmoji(r.pais);
 
   tr.innerHTML = `
-    <td>${escapeHTML(candName || "—")}</td>
-    <td>${escapeHTML(accName  || "—")}</td>
+    <td data-col="candidate">${candCell}</td>
+    <td data-col="account">${accCell}</td>
 
-    <!-- 👇 Provider: icono + texto alineados -->
     <td data-col="provider">
       <span class="inline-cell">
         <span class="dot ${providerDotClass(r.proveedor)}"></span>
@@ -129,7 +145,6 @@ async function renderRow(r) {
 
     <td data-col="estado"><span class="badge ${status.cls}">${escapeHTML(status.label)}</span></td>
 
-    <!-- 👇 Country: banderita + texto alineados -->
     <td data-col="pais">
       <span class="inline-cell">
         ${flag ? `<span class="flag">${flag}</span>` : ""}
@@ -157,8 +172,6 @@ async function renderRow(r) {
 }
 
 
-
-// ---------- inline edit ----------
 // --- inputs de edición: prellenar fechas correctamente
 function inputDate(value) {
   const el = document.createElement("input");
