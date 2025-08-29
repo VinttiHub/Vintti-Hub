@@ -5,7 +5,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     "agostina@vintti.com": "Agostina",
     "jazmin@vintti.com": "Jazmín"
   };
-
+(function colorizeStageHeaders() {
+  const toSlug = (s) => s.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$|/g, '');
+  document.querySelectorAll('#summaryTable thead th').forEach((th, i) => {
+    const label = th.textContent.trim();
+    if (stages.includes(label)) {
+      th.classList.add('stage-title', `stage-title-${toSlug(label)}`);
+    }
+  });
+})();
   // Crear estructura de contadores
   const summaryCounts = {};
   Object.keys(emails).forEach(email => {

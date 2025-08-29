@@ -173,3 +173,39 @@ body {
   background-color: #ffccbc;
   color: #9f4a3c;
 }
+/* ===== Stage header colors (pastel) ===== */
+:root{
+  --neg-bg: #fce3ec;  --neg-text:#7a2a52;  /* Negotiating */
+  --int-bg: #edf5ff;  --int-text:#0b2e71;  /* Interviewing */
+  --src-bg: #e6fff5;  --src-text:#0a6847;  /* Sourcing */
+  --dd-bg:  #f3e6ff;  --dd-text: #6b2fb8; /* Deep Dive */
+  --nda-bg: #fff4e6;  --nda-text:#9a4f00; /* NDA Sent */
+}
+
+#summaryTable thead th.stage-title{
+  /* chip suave para destacar */
+  font-weight: 700;
+  border-radius: 10px;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.06);
+}
+
+/* 👇 un color por stage (override del fondo del thead) */
+#summaryTable thead th.stage-title-negotiating{
+  background: var(--neg-bg) !important; color: var(--neg-text);
+}
+#summaryTable thead th.stage-title-interviewing{
+  background: var(--int-bg) !important; color: var(--int-text);
+}
+#summaryTable thead th.stage-title-sourcing{
+  background: var(--src-bg) !important; color: var(--src-text);
+}
+#summaryTable thead th.stage-title-deep-dive{
+  background: var(--dd-bg) !important; color: var(--dd-text);
+}
+#summaryTable thead th.stage-title-nda-sent{
+  background: var(--nda-bg) !important; color: var(--nda-text);
+}
+
+/* Detallito: que no se pegue al borde del thead */
+#summaryTable thead th.stage-title { margin: 4px 6px; padding: 12px; }
+#summaryTable thead tr { background: transparent !important; }
