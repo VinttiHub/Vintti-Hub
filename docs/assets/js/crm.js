@@ -78,12 +78,29 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
     }
 
     // Navegación por fila (delegado para que no se rompa con DataTables)
-    document.getElementById('accountTableBody').addEventListener('click', (e) => {
-      const row = e.target.closest('tr[data-id]');
-      if (!row) return;
-      const id = row.getAttribute('data-id');
-      if (id) window.location.href = `account-details.html?id=${id}`;
-    });
+const $tbody = document.getElementById('accountTableBody');
+
+$tbody.addEventListener('click', (e) => {
+  // NO navegar si el click fue sobre el dropdown de Priority u otro control interactivo
+  if (e.target.closest('select.priority-select, option, input, button, a, label')) return;
+
+  const row = e.target.closest('tr[data-id]');
+  if (!row) return;
+
+  const id = row.getAttribute('data-id');
+  if (!id) return;
+
+  const url = `account-details.html?id=${id}`;
+  window.open(url, '_blank', 'noopener,noreferrer'); // ← pestaña nueva
+});
+
+// Salvaguarda extra: al abrir el select, evita que el click “burbujee” a la fila
+$tbody.addEventListener('mousedown', (e) => {
+  if (e.target.closest('select.priority-select')) {
+    e.stopPropagation();
+  }
+});
+
 
     // ♻️ Toast mientras se calcula
     const ids = data.map(x => Number(x.account_id)).filter(Boolean);
@@ -347,34 +364,43 @@ function renderAccountStatusChip(statusText) {
   if (s === 'active client')   return '<span class="chip chip--active-client">Active Client</span>';
   if (s === 'inactive client') return '<span class="chip chip--inactive-client">Inactive Client</span>';
   if (s === 'lead in process') return '<span class="chip chip--lead-process">Lead in Process</span>';
-  return '<span class="chip chip--empty">No data</span>'; // fallback
+  if (s === 'lead')            return '<span class="chip chip--lead">Lead</span>';
+  if (s === 'lead lost')       return '<span class="chip chip--lead-lost">Lead Lost</span>';
+  return '<span class="chip chip--empty">No data</span>';
 }
+
 function deriveStatusFrom(opps = [], hires = []) {
-  // Sin oportunidades: conserva tu comportamiento especial
-  if (!Array.isArray(opps) || opps.length === 0) return '—';
+  // --- candidatos (relaciones de oportunidades ↔ candidatos) ---
+  const hasCandidates = Array.isArray(hires) && hires.length > 0;
+  const anyActiveCandidate = hasCandidates && hires.some(isActiveHire);
+  const allCandidatesInactive = hasCandidates && hires.every(h => !isActiveHire(h));
 
-  const stages         = opps.map(o => normalizeStage(o.opp_stage || o.stage));
-  const hasWon         = stages.includes('won');
-  const allLost        = stages.every(s => s === 'lost');
-  const hasPipeline    = stages.some(s => s === 'pipeline');
-  const hasActiveHire  = (hires || []).some(isActiveHire);
-  const closedOnly     = stages.every(s => s === 'won' || s === 'lost');
+  // --- oportunidades ---
+  const stages = (Array.isArray(opps) ? opps : []).map(o => normalizeStage(o.opp_stage || o.stage));
+  const hasOpps = stages.length > 0;
+  const hasPipeline = stages.some(s => s === 'pipeline');
+  const allLost = hasOpps && stages.every(s => s === 'lost');
 
-  // 🔝 Regla B: prioridad máxima
-  if (hasWon && hasActiveHire) return 'Active Client';
+  // 1) Active client → ≥1 candidato activo
+  if (anyActiveCandidate) return 'Active Client';
 
-  // 🟥 Regla A: todas perdidas
-  if (allLost) return 'Inactive Client';
+  // 2) Inactive client → tiene candidatos y todos inactivos
+  if (allCandidatesInactive) return 'Inactive Client';
 
-  // ▶️ Si hay pipeline y ninguna regla anterior aplicó
+  // 5) Lead → no tiene ninguna oportunidad asociada (y tampoco candidatos)
+  if (!hasOpps && !hasCandidates) return 'Lead';
+
+  // 4) Lead lost → todas sus oportunidades son close lost y no tiene candidatos
+  if (allLost && !hasCandidates) return 'Lead Lost';
+
+  // 3) Lead in process → igual a como lo hacemos ahora
   if (hasPipeline) return 'Lead in Process';
 
-  // ⚖️ Cierre solo (won/lost) con wins pero sin hires activos → inactivo
-  if (closedOnly && hasWon && !hasActiveHire) return 'Inactive Client';
-
-  // Sin señal clara
-  return 'No data';
+  // Fallbacks razonables:
+  if (!hasOpps && hasCandidates) return 'Inactive Client'; // tiene candidatos pero ninguno activo
+  return 'Lead in Process'; // estado intermedio cuando hay señales pero no encaja 1:1
 }
+
 
 // —— Runner con límite de concurrencia (para fallback) ——
 async function runWithConcurrency(tasks, limit = 6) {
@@ -525,9 +551,12 @@ function statusRank(statusText){
   const s = norm(statusText);
   if (s === 'active client')   return 0;
   if (s === 'lead in process') return 1;
-  if (s === 'inactive client') return 2;
-  return 3; // No data / vacío
+  if (s === 'lead')            return 2;
+  if (s === 'inactive client') return 3;
+  if (s === 'lead lost')       return 4;
+  return 5; // No data / —
 }
+
 
 // Mini-toast
 // —— Estado interno del toast de ordenamiento —— //
