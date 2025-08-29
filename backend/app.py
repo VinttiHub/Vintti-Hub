@@ -1160,7 +1160,8 @@ def update_account_fields(account_id):
         'pain_points',
         'priority',
         'contract',
-        'where_come_from' 
+        'where_come_from',
+        'calculated_status' 
     ]
 
     updates = []
@@ -3060,6 +3061,128 @@ def resumes(candidate_id):
     except Exception as e:
         logging.exception("❌ Error en PATCH /resumes")
         return jsonify({'error': str(e)}), 500
+# === NEW: Summary por cuentas (POST) ===
+@app.route('/accounts/status/summary', methods=['POST', 'OPTIONS'])
+def accounts_status_summary():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    payload = request.get_json(silent=True) or {}
+    account_ids = payload.get('account_ids') or []
+    if not account_ids:
+        return jsonify([])
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # Booleans por cuenta para decidir el status final
+        cur.execute("""
+            WITH opps AS (
+              SELECT
+                account_id,
+                COUNT(*)                    AS total_opps,
+                COUNT(*) FILTER (WHERE lower(opp_stage) LIKE '%%lost%%') AS lost_opps,
+                BOOL_OR(
+                  lower(opp_stage) LIKE '%%sourc%%'
+                  OR lower(opp_stage) LIKE '%%interview%%'
+                  OR lower(opp_stage) LIKE '%%negotiat%%'
+                  OR lower(opp_stage) LIKE '%%deep%%'
+                ) AS has_pipeline
+              FROM opportunity
+              WHERE account_id = ANY(%s)
+              GROUP BY account_id
+            ),
+            hires AS (
+              SELECT
+                o.account_id,
+                COUNT(*) > 0 AS has_candidates,
+                BOOL_OR(COALESCE(lower(h.status)='active', h.end_date IS NULL)) AS any_active
+              FROM opportunity o
+              JOIN hire_opportunity h ON h.opportunity_id = o.opportunity_id
+              WHERE o.account_id = ANY(%s)
+              GROUP BY o.account_id
+            )
+            SELECT
+              a.account_id,
+              COALESCE(hi.has_candidates, FALSE) AS has_candidates,
+              COALESCE(hi.any_active, FALSE)     AS any_active_candidate,
+              COALESCE(op.total_opps, 0) > 0     AS has_opps,
+              COALESCE(op.has_pipeline, FALSE)   AS has_pipeline,
+              (COALESCE(op.total_opps,0) > 0 AND COALESCE(op.lost_opps,0) = COALESCE(op.total_opps,0)) AS all_lost
+            FROM account a
+            LEFT JOIN opps  op ON op.account_id = a.account_id
+            LEFT JOIN hires hi ON hi.account_id = a.account_id
+            WHERE a.account_id = ANY(%s)
+            ORDER BY a.account_id
+        """, (account_ids, account_ids, account_ids))
+
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+
+        def decide(has_candidates, any_active, has_opps, has_pipeline, all_lost):
+            if any_active:                     return 'Active Client'
+            if has_candidates and not any_active: return 'Inactive Client'
+            if (not has_opps) and (not has_candidates): return 'Lead'
+            if all_lost and not has_candidates: return 'Lead Lost'
+            if has_pipeline:                   return 'Lead in Process'
+            if (not has_opps) and has_candidates: return 'Inactive Client'
+            return 'Lead in Process'
+
+        out = []
+        for (acc_id, has_candidates, any_active, has_opps, has_pipeline, all_lost) in rows:
+            out.append({
+                "account_id": acc_id,
+                "status": decide(has_candidates, any_active, has_opps, has_pipeline, all_lost)
+            })
+        return jsonify(out)
+    except Exception as e:
+        # Si algo falla, devolvemos vacío para que el front use el fallback
+        import logging, traceback
+        logging.error("summary failed: %s\n%s", e, traceback.format_exc())
+        return jsonify([]), 200
+
+
+# === NEW: Bulk update de calculated_status (POST) ===
+@app.route('/accounts/status/bulk_update', methods=['POST', 'OPTIONS'])
+def accounts_status_bulk_update():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    payload = request.get_json(silent=True) or {}
+    updates = payload.get('updates') or []
+    if not updates:
+        return jsonify({"updated": 0, "persisted": False}), 200
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        # ¿Existe la columna?
+        cur.execute("""
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'account' AND column_name = 'calculated_status'
+            LIMIT 1
+        """)
+        has_col = cur.fetchone() is not None
+
+        updated = 0
+        if has_col:
+            for it in updates:
+                acc_id = it.get('account_id') or it.get('id')
+                status = it.get('calculated_status') or it.get('status') or it.get('value')
+                if not acc_id:
+                    continue
+                cur.execute("UPDATE account SET calculated_status = %s WHERE account_id = %s",
+                            (status, acc_id))
+                updated += cur.rowcount
+            conn.commit()
+
+        cur.close(); conn.close()
+        return jsonify({"updated": updated, "persisted": has_col}), 200
+    except Exception as e:
+        # No rompemos el flujo del front (solo informamos)
+        return jsonify({"updated": 0, "persisted": False, "note": str(e)}), 200
 
 
 
