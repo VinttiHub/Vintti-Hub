@@ -110,22 +110,6 @@ function sanitizeHTML(html){
     return txt === '';
   }
 
-// 1) Reemplaza normalizeISO15 por una versión más robusta:
-function normalizeISO15(raw){
-  if (!raw) return '';
-  const s = String(raw).trim();
-  if (/^present$/i.test(s)) return '';
-  // Acepta YYYY, YYYY-MM, YYYY-MM-DD y también timestamps con tiempo
-  const m = s.match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?/);
-  if (m) {
-    const yyyy = m[1];
-    const mm = m[2] || '06';
-    // normalizamos siempre a día 15
-    return `${yyyy}-${mm.padStart(2,'0')}-15`;
-  }
-  return s; // si no matchea, lo devolvemos como viene
-}
-
 
   function safeParseArray(raw, fallback=[]){
     try{
@@ -199,48 +183,75 @@ function coerceLanguages(raw) {
   const countryOptions = (sel="") => EDU_COUNTRIES.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c||'Select country'}</option>`).join('');
 
   // ---------- Month-Year Picker (self-contained) ----------
-  function mountMonthYearPicker(root, { initial='', allowEmpty=true, onChange }={}){
-    const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const monthSel=document.createElement('select'); monthSel.className='month mini-select';
-    const yearSel =document.createElement('select'); yearSel.className='year mini-select';
-    const clearBtn=document.createElement('button'); clearBtn.type='button'; clearBtn.className='btn-clear'; clearBtn.textContent='Clear';
-    clearBtn.style.display = allowEmpty ? '' : 'none';
-root.addEventListener('focusout', () => {
-  setTimeout(() => emit(), 0);
-}, true);
-    monthSel.innerHTML = `<option value="">Month</option>` + months.slice(1).map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
-    yearSel.innerHTML = `<option value="">Year</option>` + Array.from({length: (nowYear+5)-1990+1},(_,k)=>nowYear+5-k)
-      .map(y=>`<option value="${y}">${y}</option>`).join('');
+function mountMonthYearPicker(root, { initial='', allowEmpty=true, onChange } = {}) {
+  const months = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const monthSel = document.createElement('select'); monthSel.className = 'month mini-select';
+  const yearSel  = document.createElement('select'); yearSel.className  = 'year mini-select';
+  const clearBtn = document.createElement('button'); clearBtn.type='button'; clearBtn.className='btn-clear'; clearBtn.textContent='Clear';
+  clearBtn.style.display = allowEmpty ? '' : 'none';
 
-    root.replaceChildren(monthSel, yearSel, clearBtn);
+  const val = () => {
+    const y = yearSel.value, m = monthSel.value;
+    return (y && m) ? `${y}-${m}-15` : '';
+  };
 
-    function val(){ const y=yearSel.value, m=monthSel.value; if (!y||!m) return allowEmpty ? '' : ''; return `${y}-${m}-15`; }
-    function emit(){ if (typeof onChange==='function'){ const y=yearSel.value, m=monthSel.value; if (allowEmpty && !y && !m) onChange(''); else if (y&&m) onChange(val()); } }
+  const emit = (why='') => {
+    const iso = val();
+    // 🔎 trazas
+    console.debug(`[picker] ${why} → month=${monthSel.value} year=${yearSel.value} iso=${iso || '(empty)'}`);
+    if (typeof onChange === 'function') {
+      if (allowEmpty && !yearSel.value && !monthSel.value) onChange('');
+      else if (yearSel.value && monthSel.value) onChange(iso);
+    }
+  };
 
-    monthSel.addEventListener('change', ()=>{
-  if (!yearSel.value) {
-    yearSel.value = String(nowYear);   // autocompleta año actual
+  monthSel.innerHTML = `<option value="">Month</option>` + months.slice(1)
+    .map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
+  yearSel.innerHTML = `<option value="">Year</option>` + Array.from({length: (nowYear+5)-1990+1},(_,k)=>nowYear+5-k)
+    .map(y=>`<option value="${y}">${y}</option>`).join('');
+
+  root.replaceChildren(monthSel, yearSel, clearBtn);
+
+  // 🔁 foco/blur: asegura un emit al salir
+  root.addEventListener('focusout', () => setTimeout(()=>emit('focusout'), 0), true);
+
+  // 🗓️ Cambios — emitimos SIEMPRE
+  const handleMonth = () => {
+    setTimeout(()=>emit('month change'), 0);
+  };
+  const handleYear = () => setTimeout(()=>emit('year change'), 0);
+
+  ['change','input'].forEach(ev => {
+    monthSel.addEventListener(ev, handleMonth);
+    yearSel.addEventListener(ev, handleYear);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    monthSel.value = ''; yearSel.value = '';
+    emit('clear');
+  });
+
+  // ⏩ set initial
+  if (initial){
+    const [d] = initial.split('T');
+    const [y,m] = d.split('-');
+    yearSel.value = y || '';
+    monthSel.value = m || '';
+    emit('initial');
   }
-  emit();                              // ⬅️ SIEMPRE emite (con o sin autocompletar)
-});
-    yearSel.addEventListener('change', emit);
-    clearBtn.addEventListener('click', ()=>{ monthSel.value=''; yearSel.value=''; emit(); });
 
-    // set initial
-if (initial){
-  const [d] = initial.split('T');
-  const [y,m] = d.split('-');
-  yearSel.value = y || '';
-  monthSel.value = m || '';
-  if (y && m) {
-    emit();              // ← emite sincronamente para que read/save ya vea el valor
-    setTimeout(emit, 0); // ← tu emit asíncrono original
-  }
+  return {
+    set(iso){
+      if (!iso) { monthSel.value=''; yearSel.value=''; emit('set empty'); return; }
+      const [d] = iso.split('T');
+      const [y,m] = d.split('-');
+      yearSel.value = y || ''; monthSel.value = m || '';
+      emit('set programmatic');
+    },
+    get: val
+  };
 }
 
-
-    return { set(iso){ if(!iso){ monthSel.value=''; yearSel.value=''; return; } const [d]=iso.split('T'); const [y,m]=d.split('-'); yearSel.value=y||''; monthSel.value=m||''; }, get:val };
-  }
 
   // ---------- DOM refs ----------
   const aboutEl = byId('aboutField');
@@ -285,6 +296,7 @@ function addEducationEntry(entry={ institution:'', title:'', country:'', start_d
   wireDescEditors(desc, 'education');
   card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
     desc.focus();
+    console.debug(`[current] ${checked ? 'ON' : 'OFF'}`);
     document.execCommand(b.dataset.cmd,false,null);
     touched.education = true; scheduleSave();
   }));
@@ -299,31 +311,59 @@ function addEducationEntry(entry={ institution:'', title:'', country:'', start_d
   const hEnd   = card.querySelector('.edu-end');
   const curCb  = card.querySelector('.edu-current');
 
-  const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), { initial: entry.start_date||'', onChange:(iso)=>{ hStart.value=iso; touched.education=true; scheduleSave(); }});
-  const pEnd   = mountMonthYearPicker(card.querySelector('.picker-end'),   { initial: entry.current?'':(entry.end_date||''), onChange:(iso)=>{ hEnd.value=iso; touched.education=true; scheduleSave(); }});
-
+  const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), {
+  initial: entry.start_date || '',
+  onChange: (iso) => {
+    hStart.value = iso;
+    if (hydrated) { touched.education = true; scheduleSave(); }
+  }
+});
+const pEnd = mountMonthYearPicker(card.querySelector('.picker-end'), {
+  initial: entry.current ? '' : (entry.end_date || ''),
+  onChange: (iso) => {
+    hEnd.value = iso;
+    if (hydrated) { touched.education = true; scheduleSave(); }
+  }
+});
   hStart.value = entry.start_date||'';
   hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
+  if (entry.end_date) hEnd.dataset.lastIso = entry.end_date;
 
-const toggleCurrent = (checked)=>{
+// Reemplaza tu toggleCurrent en EDUCATION por:
+const toggleCurrent = (checked, { silent=false } = {}) => {
   if (checked){
-    hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
-    hEnd.value='Present';
-    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
+    // guarda lo último válido (hidden o picker) para restaurar al desmarcar
+    const prevIso = (hEnd.value && hEnd.value !== 'Present')
+      ? hEnd.value
+      : pickerToIso(card.querySelector('.picker-end')) || '';
+    if (prevIso) hEnd.dataset.lastIso = prevIso;
+
+    hEnd.value = 'Present';
+    card.querySelectorAll('.picker-end select').forEach(s => s.disabled = true);
   } else {
-    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
-    const last = hEnd.dataset.lastIso||'';
-    if (last){ pEnd.set(last); hEnd.value=last; }
-    else { pEnd.set(''); hEnd.value=''; }
+    card.querySelectorAll('.picker-end select').forEach(s => s.disabled = false);
+    // ⚠️ NO limpies al iniciar: restaura si hay algo, si no, deja tal cual
+    const restore = hEnd.dataset.lastIso || hEnd.value || '';
+    if (restore) { pEnd.set(restore); hEnd.value = restore; }
   }
-  // 👇 añade esto (ajusta la clave según sea education/work)
-  touched.education = true;  // o touched.work_experience = true;
-  scheduleSave();
+
+  // sólo marcar y guardar cuando es acción del usuario
+  if (!silent && hydrated) { touched.education = true; scheduleSave(); }
 };
 
-  toggleCurrent(!!entry.current);
-  if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
-  curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.education=true; scheduleSave(); });
+// Llamada inicial (no debe guardar ni limpiar):
+toggleCurrent(!!entry.current, { silent: true });
+
+// Deja este listener (aquí sí se guarda):
+curCb.addEventListener('change', e => {
+  toggleCurrent(e.target.checked); // aquí NO silent
+  touched.education = true;
+  scheduleSave();
+});
+
+// Mantén esta línea, ahora hEnd.value no se habrá vaciado
+if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
+
 
   // Inputs
   card.querySelectorAll('input,select').forEach(el=>{
@@ -375,31 +415,59 @@ function addWorkExperienceEntry(entry={ title:'', company:'', start_date:'', end
   const hEnd   = card.querySelector('.work-end');
   const curCb  = card.querySelector('.work-current');
 
-  const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), { initial: entry.start_date||'', onChange:(iso)=>{ hStart.value=iso; touched.work_experience=true; scheduleSave(); }});
-  const pEnd   = mountMonthYearPicker(card.querySelector('.picker-end'),   { initial: entry.current?'':(entry.end_date||''), onChange:(iso)=>{ hEnd.value=iso; touched.work_experience=true; scheduleSave(); }});
-
+const pStart = mountMonthYearPicker(card.querySelector('.picker-start'), {
+  initial: entry.start_date || '',
+  onChange: (iso) => {
+    hStart.value = iso;
+    if (hydrated) { touched.work_experience = true; scheduleSave(); }
+  }
+});
+const pEnd = mountMonthYearPicker(card.querySelector('.picker-end'), {
+  initial: entry.current ? '' : (entry.end_date || ''),
+  onChange: (iso) => {
+    hEnd.value = iso;
+    if (hydrated) { touched.work_experience = true; scheduleSave(); }
+  }
+});
   hStart.value = entry.start_date||'';
   hEnd.value   = entry.current ? 'Present' : (entry.end_date||'');
+if (entry.end_date) hEnd.dataset.lastIso = entry.end_date;
 
-const toggleCurrent = (checked)=>{
+// Reemplaza tu toggleCurrent en EDUCATION por:
+const toggleCurrent = (checked, { silent=false } = {}) => {
   if (checked){
-    hEnd.dataset.lastIso = (hEnd.value && hEnd.value!=='Present') ? hEnd.value : '';
-    hEnd.value='Present';
-    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=true);
+    // guarda lo último válido (hidden o picker) para restaurar al desmarcar
+    const prevIso = (hEnd.value && hEnd.value !== 'Present')
+      ? hEnd.value
+      : pickerToIso(card.querySelector('.picker-end')) || '';
+    if (prevIso) hEnd.dataset.lastIso = prevIso;
+
+    hEnd.value = 'Present';
+    card.querySelectorAll('.picker-end select').forEach(s => s.disabled = true);
   } else {
-    card.querySelectorAll('.picker-end select').forEach(s=>s.disabled=false);
-    const last = hEnd.dataset.lastIso||'';
-    if (last){ pEnd.set(last); hEnd.value=last; }
-    else { pEnd.set(''); hEnd.value=''; }
+    card.querySelectorAll('.picker-end select').forEach(s => s.disabled = false);
+    // ⚠️ NO limpies al iniciar: restaura si hay algo, si no, deja tal cual
+    const restore = hEnd.dataset.lastIso || hEnd.value || '';
+    if (restore) { pEnd.set(restore); hEnd.value = restore; }
   }
-  // 👇 añade esto (ajusta la clave según sea education/work)
-  touched.education = true;  // o touched.work_experience = true;
-  scheduleSave();
+
+  // sólo marcar y guardar cuando es acción del usuario
+  if (!silent && hydrated) { touched.work_experience = true; scheduleSave(); }
 };
 
-  toggleCurrent(!!entry.current);
-  if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
-  curCb.addEventListener('change', e=>{ toggleCurrent(e.target.checked); touched.work_experience=true; scheduleSave(); });
+// Llamada inicial (no debe guardar ni limpiar):
+toggleCurrent(!!entry.current, { silent: true });
+
+// Deja este listener (aquí sí se guarda):
+curCb.addEventListener('change', e => {
+  toggleCurrent(e.target.checked); // aquí NO silent
+  touched.work_experience = true;
+  scheduleSave();
+});
+
+// Mantén esta línea, ahora hEnd.value no se habrá vaciado
+if (!entry.current && hEnd.value) pEnd.set(hEnd.value);
+
 
   card.querySelectorAll('input').forEach(el=>{
     el.addEventListener('input',  ()=>{ touched.work_experience=true; });
@@ -505,24 +573,25 @@ const education = qsa('#educationList .cv-card-entry').map(card=>{
   const country = normalizeText(card.querySelector('.edu-country')?.value);
 
   // hidden como fuente principal; picker sólo si hidden vacío
-  const startHidden = (card.querySelector('.edu-start')?.value || '').trim();
-  const endHidden   = (card.querySelector('.edu-end')?.value   || '').trim();
-  const startPick   = pickerToIso(card.querySelector('.picker-start'));
-  const endPick     = pickerToIso(card.querySelector('.picker-end'));
 
-  const current     = !!card.querySelector('.edu-current')?.checked;
+const startPick = pickerToIso(card.querySelector('.picker-start'));
+const endPick   = pickerToIso(card.querySelector('.picker-end'));
+const startHidden = (card.querySelector('.edu-start' /* o .work-start */)?.value || '').trim();
+const endHidden   = (card.querySelector('.edu-end'   /* o .work-end  */)?.value || '').trim();
+const current = !!card.querySelector('.edu-current'  /* o .work-current */)?.checked;
 
-  const start = normalizeISO15(startHidden || startPick);
-  const end   = current ? '' : normalizeISO15(
-                  (/^present$/i.test(endHidden) ? '' : endHidden) || endPick
-                );
+const start = normalizeISO15(startPick || startHidden);
 
-  const descHtml = sanitizeHTML(card.querySelector('.edu-desc')?.innerHTML||'');
-  const desc     = isRichEmpty(descHtml) ? '' : descHtml;
+const descHtml = sanitizeHTML(card.querySelector('.edu-desc')?.innerHTML||'');
+const desc     = isRichEmpty(descHtml) ? '' : descHtml;
 
-  const empty = !(inst||title||country||start||end||current||desc);
-  if (empty) return null;
-  return { institution:inst, title, country, start_date:start, end_date:end, current, description:desc };
+const endRaw = current ? '' : (endPick || endHidden);
+const end    = normalizeISO15(endRaw);
+
+const empty = !(inst||title||country||start||end||current||desc);
+if (empty) return null;
+return { institution:inst, title, country, start_date:start, end_date:end, current, description:desc };
+
 }).filter(Boolean);
 
 // --- WORK EXPERIENCE ---
@@ -535,12 +604,15 @@ const work_experience = qsa('#workExperienceList .cv-card-entry').map(card=>{
   const startPick   = pickerToIso(card.querySelector('.picker-start'));
   const endPick     = pickerToIso(card.querySelector('.picker-end'));
 
-  const current     = !!card.querySelector('.work-current')?.checked;
+  const current = !!card.querySelector('.work-current')?.checked;
 
-  const start = normalizeISO15(startHidden || startPick);
-  const end   = current ? '' : normalizeISO15(
-                  (/^present$/i.test(endHidden) ? '' : endHidden) || endPick
-                );
+  // 👈 Prioriza el picker; usa hidden como fallback seguro
+  const start = normalizeISO15(startPick || startHidden);
+  // preferí lo que está en el picker; si current está on, queda vacío
+const endRaw = current ? '' : (endPick || endHidden);
+const end    = normalizeISO15(endRaw);
+
+
 
   const rawHtml  = card.querySelector('.work-desc')?.innerHTML || '';
   const descHtml = sanitizeHTML(maybeAutolist(rawHtml));
@@ -1152,6 +1224,15 @@ function wireDescEditors(descEl, touchKey) {
 
 
 // --- Normalizadores para fechas que vienen de la AI ---
+// ✅ Sustituye ambas funciones por estas
+const PRESENT_RE = /^(present|current|ongoing|now|to date|hasta la fecha|actualidad|presente|en curso)$/i;
+
+function toIso15(y, m) {
+  const yy = String(y).padStart(4,'0');
+  const mm = String(m).padStart(2,'0');
+  return `${yy}-${mm}-15`;
+}
+
 const MONTH_MAP = {
   // EN
   jan:'01', january:'01', feb:'02', february:'02', mar:'03', march:'03',
@@ -1160,22 +1241,54 @@ const MONTH_MAP = {
   sep:'09', sept:'09', september:'09',
   oct:'10', october:'10', nov:'11', november:'11', dec:'12', december:'12',
   // ES
-  ene:'01', enero:'01', febr:'02', febreo:'02', febrero:'02',
-  marz:'03', marzo:'03', abr:'04', abril:'04',
+  ene:'01', enero:'01', feb:'02', febr:'02', febrero:'02',
+  mar:'03', marzo:'03', abr:'04', abril:'04',
   may:'05', mayo:'05', jun:'06', junio:'06',
   jul:'07', julio:'07', ago:'08', agosto:'08',
   set:'09', sept:'09', septiembre:'09', sep:'09',
-  octu:'10', octubre:'10', nov:'11', noviembre:'11',
+  oct:'10', octubre:'10', nov:'11', noviembre:'11',
   dic:'12', diciembre:'12'
 };
 
-const PRESENT_RE = /^(present|current|ongoing|now|to date|hasta la fecha|actualidad|presente|en curso)$/i;
+function normalizeISO15(raw) {
+  if (raw == null) return '';
+  let s = String(raw).trim();
+  if (!s || PRESENT_RE.test(s)) return '';
 
-function toIso15(y, m) {
-  const yy = String(y).padStart(4,'0');
-  const mm = String(m).padStart(2,'0');
-  return `${yy}-${mm}-15`;
+  // quita tiempo si viene "YYYY-MM-DDTHH:mm..."
+  s = s.split('T')[0];
+
+  // 1) YYYY-M[-D]
+  let m = s.match(/^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (m) {
+    const y = +m[1], mo = Math.min(12, Math.max(1, +m[2]));
+    return toIso15(y, mo);
+  }
+
+  // 2) YYYY[/\-]MM
+  m = s.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if (m) return toIso15(+m[1], +m[2]);
+
+  // 3) MM[/\-]YYYY (mes primero)
+  m = s.match(/^(\d{1,2})[\/\-](\d{4})$/);
+  if (m) return toIso15(+m[2], +m[1]);
+
+  // 4) Mon YYYY / Mes YYYY
+  m = s.match(/^([A-Za-zÁÉÍÓÚÜÑ\.]+)\s+(\d{4})$/);
+  if (m) {
+    const key = m[1].toLowerCase().replace(/\./g,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const hit = Object.keys(MONTH_MAP).find(k => key.startsWith(k));
+    if (hit) return toIso15(+m[2], +MONTH_MAP[hit]);
+  }
+
+  // 5) YYYY
+  m = s.match(/^(\d{4})$/);
+  if (m) return `${m[1]}-06-15`;
+
+  // nada parseable → vacío
+  return '';
 }
+
 
 // Convierte strings variados -> 'YYYY-MM-15' o '' (si vacío / Present)
 function coerceIsoMonth15(input) {
@@ -1220,25 +1333,27 @@ function coerceIsoMonth15(input) {
 function normalizeEntryDates(entry = {}, kind = 'work') {
   const e = { ...entry };
 
-  // alias de campos
-  e.start_date = e.start_date ?? e.start ?? e.from ?? e.startDate ?? '';
-  e.end_date   = e.end_date   ?? e.end   ?? e.to   ?? e.endDate   ?? '';
+  // aliases
+  const rawStart = e.start_date ?? e.start ?? e.from ?? e.startDate ?? '';
+  const rawEnd   = e.end_date   ?? e.end   ?? e.to   ?? e.endDate   ?? '';
 
-  // “current” desde flags o desde el texto del end_date
+  // parse
+  const startIso = coerceIsoMonth15(rawStart);
+  const endIso   = coerceIsoMonth15(rawEnd);
+
+  // regla: si hay endIso -> NO es current; si no hay endIso -> current según flag o texto
   let current = !!e.current;
-  if (!current) {
-    if (!e.end_date || PRESENT_RE.test(String(e.end_date))) current = true;
+  if (endIso) {
+    current = false;
+  } else if (!current) {
+    if (!rawEnd || PRESENT_RE.test(String(rawEnd))) current = true;
   }
 
-  // Normaliza a ISO-15
-  const startIso = coerceIsoMonth15(e.start_date);
-  const endIso   = current ? '' : coerceIsoMonth15(e.end_date);
-
   e.start_date = startIso;
-  e.end_date   = endIso;
+  e.end_date   = current ? '' : endIso;
   e.current    = current;
 
-  // Alias de nombres (por si la AI devuelve otros)
+  // alias de nombres
   if (kind === 'work') {
     e.title   = (e.title ?? e.role ?? e.position ?? '').toString();
     e.company = (e.company ?? e.employer ?? e.org ?? '').toString();
@@ -1248,12 +1363,9 @@ function normalizeEntryDates(entry = {}, kind = 'work') {
     e.country     = (e.country ?? e.location ?? '').toString();
   }
 
-  // Limpia “Present” textual en end_date (ya quedó en current)
-  if (!e.current && !e.end_date) {
-    // si no hay fin y no es current, lo dejamos vacío (no inventamos fechas)
-  }
   return e;
 }
+
 
 function normalizeArrayDates(arr, kind) {
   const A = Array.isArray(arr) ? arr : [];
