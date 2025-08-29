@@ -1,7 +1,7 @@
 // ---------- links (ajusta si tus rutas son otras) ----------
 const LINKS = {
   candidate: (id) => `/candidate-details.html?id=${encodeURIComponent(id)}`,
-  account:   (id) => `/crm/account-details.html?id=${encodeURIComponent(id)}`
+  account:   (id) => `/account-details.html?id=${encodeURIComponent(id)}`
 };
 
 // ---------- config ----------
