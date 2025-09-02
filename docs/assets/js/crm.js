@@ -1,3 +1,76 @@
+// === Sales Lead visuals (como en Opportunities) ===
+window.AVATAR_BASE = window.AVATAR_BASE || './assets/img/';
+window.AVATAR_BY_EMAIL = {  // se fusiona con lo que ya tengas
+  'agostina@vintti.com': 'agos.png',
+  'bahia@vintti.com':    'bahia.png',
+  'lara@vintti.com':     'lara.png',
+  'jazmin@vintti.com':   'jaz.png',
+  'pilar@vintti.com':    'pilar.png',
+  'agustin@vintti.com':  'agus.png',
+  'agustina.barbero@vintti.com': 'agustina.png',
+  ...(window.AVATAR_BY_EMAIL || {})
+};
+
+if (typeof window.resolveAvatar !== 'function') {
+  window.resolveAvatar = function resolveAvatar(email) {
+    if (!email) return null;
+    const key = String(email).trim().toLowerCase();
+    const filename = window.AVATAR_BY_EMAIL[key];
+    return filename ? (window.AVATAR_BASE + filename) : null;
+  };
+}
+
+// Iniciales & color igual que en Opps
+function initialsForSalesLead(key='') {
+  const s = key.toLowerCase();
+  if (s.includes('bahia'))   return 'BL';
+  if (s.includes('lara'))    return 'LR';
+  if (s.includes('agustin')) return 'AM';
+  return '--';
+}
+function badgeClassForSalesLead(key='') {
+  const s = key.toLowerCase();
+  if (s.includes('bahia'))   return 'bl';
+  if (s.includes('lara'))    return 'lr';
+  if (s.includes('agustin')) return 'am';
+  return '';
+}
+
+// Fallback simple para mapear nombre→email si el backend no manda el email crudo
+function emailFromNameGuess(name='') {
+  const s = name.toLowerCase();
+  if (s.includes('bahia'))   return 'bahia@vintti.com';
+  if (s.includes('lara'))    return 'lara@vintti.com';
+  if (s.includes('agustin')) return 'agustin@vintti.com';
+  return '';
+}
+
+// 📦 Render desde los campos del account (account_manager / account_manager_name)
+function getAccountSalesLeadCell(item) {
+  // Preferir el email real del account_manager si viene en el JSON;
+  // si no, tratar de inferirlo por el nombre.
+  const email = (item.account_manager || emailFromNameGuess(item.account_manager_name || '')).toLowerCase();
+  const name  = item.account_manager_name || '';
+
+  // key para iniciales/clase (usa lo que haya)
+  const key = (email || name).toLowerCase();
+  const initials = initialsForSalesLead(key);
+  const bubbleCl = badgeClassForSalesLead(key);
+
+  const avatar = window.resolveAvatar(email);
+  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
+
+  // nombre oculto para filtros/orden (igual que en Opps)
+  return `
+    <div class="sales-lead">
+      <span class="lead-bubble ${bubbleCl}">${initials}</span>
+      ${img}
+      <span class="sr-only" style="display:none">${name}</span>
+    </div>
+  `;
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
 
   // 🔍 Toggle filtros
@@ -50,7 +123,11 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
               <span class="dot"></span><span class="dot"></span><span class="dot"></span>
             </span>
           </td>
-          <td class="muted-cell">${item.account_manager_name ? item.account_manager_name : '<span class="placeholder">Unavailable</span>'}</td>
+          <td class="sales-lead-cell">
+            ${ (item.account_manager || item.account_manager_name)
+                ? getAccountSalesLeadCell(item)
+                : '<span class="placeholder">Unassigned</span>' }
+          </td>
           <td class="muted-cell">${contractTxt}</td>
           <td>${trrTxt}</td>
           <td>${tsfTxt}</td>
@@ -69,6 +146,8 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light')
         </tr>`;
     }).join('');
     tableBody.innerHTML = rowsHtml;
+const th3 = document.querySelector('#accountTable thead tr th:nth-child(3)');
+if (th3) th3.textContent = 'Sales Lead';
 
     // 👉 Cabecera "Priority" si aplica
     if (showPriorityColumn) {

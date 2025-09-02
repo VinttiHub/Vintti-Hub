@@ -901,3 +901,40 @@ body {
 .priority-select:focus  { outline: none; border-color: #cddcfe; box-shadow: 0 0 0 4px rgba(13,110,253,.12); }
 .priority-select::-ms-expand { display:none; }
 
+.sales-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.lead-bubble {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: .5px;
+  border: 1px solid rgba(0,0,0,.06);
+}
+.lead-bubble.bl {           /* Bahía → lila pastel */
+  background: #f5e8ff;
+  color: #5b3ea6;
+}
+.lead-bubble.lr {           /* Lara → amarillo suave */
+  background: #fffbe6;
+  color: #8a6d00;
+}
+.lead-bubble.ar {           /* Agustín → azul suave */
+  background: #eaf4ff;
+  color: #205493;
+}
+.lead-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+}
