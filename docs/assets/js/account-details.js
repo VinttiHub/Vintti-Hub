@@ -1,3 +1,20 @@
+// === Navegación a opportunity details ===
+const OPPORTUNITY_DETAILS_PATH = '/opportunity-detail.html'; 
+// Si tu archivo se llama diferente (p.ej. '/opportunity-detail.html'),
+// cambia solo esta constante.
+
+function getOpportunityId(opp) {
+  // Tolerante a distintos nombres de campo
+  return opp?.opp_id ?? opp?.opportunity_id ?? opp?.id ?? opp?.oppId ?? null;
+}
+
+function goToOpportunity(oppId) {
+  if (!oppId) {
+    console.warn('No opportunity id provided for navigation');
+    return;
+  }
+  window.location.href = `${OPPORTUNITY_DETAILS_PATH}?id=${encodeURIComponent(oppId)}`;
+}
 document.addEventListener('DOMContentLoaded', () => {
 document.body.style.backgroundColor = 'var(--bg)';
 
@@ -212,19 +229,52 @@ function fillOpportunitiesTable(opportunities) {
     return;
   }
 
-  opportunities.forEach(opp => {
-    const hireContent = opp.candidate_name
-      ? opp.candidate_name
-      : `<span class="no-hire">Not hired yet</span>`;
+opportunities.forEach(opp => {
+  const oppId = getOpportunityId(opp);
 
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td>${opp.opp_position_name || '—'}</td>
-      <td>${opp.opp_stage || '—'}</td>
-      <td>${hireContent}</td>
-    `;
-    tbody.appendChild(row);
-  });
+  const hireContent = opp.candidate_name
+    ? opp.candidate_name
+    : `<span class="no-hire">Not hired yet</span>`;
+
+  const row = document.createElement('tr');
+
+  // Si hay id, convierto el nombre del puesto en link (permite abrir en nueva pestaña)
+  const positionCellHTML = oppId
+    ? `<a class="opp-link" href="${OPPORTUNITY_DETAILS_PATH}?id=${encodeURIComponent(oppId)}" title="Open opportunity">${opp.opp_position_name || '—'}</a>`
+    : (opp.opp_position_name || '—');
+
+  row.innerHTML = `
+    <td>${positionCellHTML}</td>
+    <td>${opp.opp_stage || '—'}</td>
+    <td>${hireContent}</td>
+  `;
+
+  // Fila clickeable + accesible si hay id
+  if (oppId) {
+    row.classList.add('clickable-row');
+    row.dataset.oppId = oppId;
+    row.title = 'Open opportunity details';
+    row.tabIndex = 0; // accesible con teclado
+
+    // click en toda la fila
+    row.addEventListener('click', (e) => {
+      // Si hicieron click en el <a>, deja que el link haga su trabajo
+      if (e.target.closest('a')) return;
+      goToOpportunity(oppId);
+    });
+
+    // Enter o Space también navegan
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        goToOpportunity(oppId);
+      }
+    });
+  }
+
+  tbody.appendChild(row);
+});
+
 }
 
 function loadCandidates(accountId) {

@@ -857,3 +857,14 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 }
 /* Anti-reglas globales que oculten inputs */
 .contracts-list .contract-item .file-edit:not(.hidden) { display: inline-block !important; }
+/* Fila clickeable */
+.styled-table tbody tr.clickable-row { cursor: pointer; }
+.styled-table tbody tr.clickable-row:hover { background: #f8f9ff; }
+
+/* Link de oportunidad dentro de la celda (no azul, sin subrayado ruidoso) */
+.opp-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(0,0,0,.2);
+}
+.opp-link:hover { border-bottom-style: solid; }
