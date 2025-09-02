@@ -1161,7 +1161,8 @@ def update_account_fields(account_id):
         'priority',
         'contract',
         'where_come_from',
-        'calculated_status' 
+        'calculated_status',
+        'account_manager' 
     ]
 
     updates = []
