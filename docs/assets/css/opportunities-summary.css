@@ -1,11 +1,42 @@
-/* opportunities-summary.css */
+/* ===== Base ===== */
+:root{
+  /* Pasteles por stage */
+  --neg-bg: #fce3ec;  --neg-text:#7a2a52;  --neg-veil: rgba(252,227,236,.45);
+  --int-bg: #edf5ff;  --int-text:#0b2e71;  --int-veil: rgba(237,245,255,.45);
+  --src-bg: #e6fff5;  --src-text:#0a6847;  --src-veil: rgba(230,255,245,.45);
+  --dd-bg:  #f3e6ff;  --dd-text:#6b2fb8;  --dd-veil:  rgba(243,230,255,.45);
+  --nda-bg: #fff4e6;  --nda-text:#9a4f00;  --nda-veil: rgba(255,244,230,.45);
 
+  /* Glass tech */
+  --glass-bg1: rgba(255,255,255,.65);
+  --glass-bg2: rgba(255,255,255,.38);
+  --glass-border1: rgba(79,70,229,.28);
+  --glass-border2: rgba(56,189,248,.22);
+  --glass-shadow: 0 24px 50px rgba(17,24,39,.14);
+  --radius: 18px;
+}
+/* ——— Asegurar que el degradé llene toda la página ——— */
+html, body { height: 100%; }
 body {
+  min-height: 100vh;
   margin: 0;
-  padding: 0;
-  font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', sans-serif;
-  background-color: #f9f9f9;
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
+  background-attachment: fixed; /* mantiene el gradiente hasta el fondo */
   color: #333;
+}
+
+/* ——— Glass Tech SIN borde ——— */
+.opportunity-summary-table{
+  position: relative;
+  padding: 1.4rem;
+  border-radius: 18px;
+  border: none;                     /* ⬅️ sin borde */
+  background: linear-gradient(180deg, var(--glass-bg1), var(--glass-bg2)); /* solo el fill frosted */
+  backdrop-filter: blur(12px) saturate(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
 }
 
 .summary-container {
@@ -14,198 +45,233 @@ body {
   padding: 3rem 2rem;
 }
 
+/* Header */
 .summary-header {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2.2rem;
   padding: 0 1rem;
 }
-
 .summary-header h1 {
-  font-size: 2.8rem;
-  font-weight: 700;
-  background: linear-gradient(to right, #4f46e5, #38bdf8);
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg,#4f46e5,#38bdf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 0.6rem;
+  margin: 0 0 .5rem;
 }
-
 .summary-header p {
-  font-size: 1.15rem;
-  color: #444;
+  font-size: 1.06rem;
+  color: #505a6b;
   max-width: 640px;
   margin: 0 auto;
   line-height: 1.6;
 }
 
-.opportunity-summary-table {
-  overflow-x: auto;
-  background-color: white;
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-  padding: 2rem;
-}
 
+/* Tabla */
 #summaryTable {
   width: 100%;
-  border-collapse: collapse;
-  text-align: center;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
-}
-
-#summaryTable thead {
-  background-color: #fafafa;
-  border-bottom: 2px solid #e0e0e0;
-}
-
-#summaryTable th, #summaryTable td {
-  padding: 16px;
-  font-size: 0.95rem;
-  color: #333;
-}
-
-#summaryTable th {
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  background-color: #f1f3f5;
-}
-
-#summaryTable td {
-  border-bottom: 1px solid #eee;
-}
-
-#summaryTable tr:last-child td {
-  border-bottom: none;
-}
-
-@media (max-width: 768px) {
-  .summary-header h1 {
-    font-size: 2rem;
-  }
-
-  .summary-header p {
-    font-size: 1rem;
-  }
-
-  #summaryTable th, #summaryTable td {
-    padding: 12px;
-    font-size: 0.9rem;
-  }
-}
-.opportunity-summary-table {
-  animation: fadeSlideIn 0.7s ease forwards;
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-@keyframes fadeSlideIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.last-updated {
   text-align: center;
-  margin-top: 2rem;
-  color: #777;
-  font-size: 0.85rem;
-  font-style: italic;
-}
-.go-back-button {
-  position: absolute;
-  top: 24px;
-  left: 32px;
-  background: transparent;
-  border: none;
-  font-size: 1rem;
-  color: #4f46e5;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-}
-
-.go-back-button:hover {
-  background-color: rgba(79, 70, 229, 0.08);
-  transform: translateX(-2px);
-}
-
-#summaryTable {
-  border-radius: 16px;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
-#summaryTable th:first-child {
-  border-top-left-radius: 12px;
+/* Thead “frosted” + glow */
+#summaryTable thead {
+  position: relative;
+}
+#summaryTable thead::after{
+  content:"";
+  position:absolute; left:0; right:0; bottom:-12px; height:20px;
+  filter: blur(10px);
+  background: radial-gradient(80% 100% at 50% 0%, rgba(79,70,229,.20), transparent 60%);
+  pointer-events:none;
 }
 
-#summaryTable th:last-child {
-  border-top-right-radius: 12px;
+/* Celdas */
+#summaryTable th, #summaryTable td {
+  padding: 16px;
+  font-size: .96rem;
+  color: #1f2937;
+  background: rgba(255,255,255,.65);
 }
-.priority-breakdown {
-  display: flex;
-  gap: 6px;
-  margin-top: 4px;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
+#summaryTable td { border-bottom: 1px solid rgba(0,0,0,.04); }
+#summaryTable tr:last-child td { border-bottom: none; }
+
+/* Primera columna (HR Lead) – nunca click */
+#summaryTable tbody td:first-child{
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: .2px;
+  color:#0f172a;
+  background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.6));
+  cursor: default !important;
 }
 
-.priority {
-  padding: 2px 6px;
-  border-radius: 12px;
-  color: white;
-  background-color: gray;
+/* Celdas clickeables (solo números, se añade por JS) */
+#summaryTable td.is-clickable{
+  cursor: pointer;
+  transition: transform .03s ease, box-shadow .15s ease;
+}
+#summaryTable td.is-clickable:active{
+  transform: translateY(1px);
 }
 
-.priority.A {
-  background-color: #a8e6cf;
-  color: #2d7a52;
-}
-
-.priority.B {
-  background-color: #fff9c4;
-  color: #9f8f00;
-}
-
-.priority.C {
-  background-color: #ffccbc;
-  color: #9f4a3c;
-}
-/* ===== Stage header colors (pastel) ===== */
-:root{
-  --neg-bg: #fce3ec;  --neg-text:#7a2a52;  /* Negotiating */
-  --int-bg: #edf5ff;  --int-text:#0b2e71;  /* Interviewing */
-  --src-bg: #e6fff5;  --src-text:#0a6847;  /* Sourcing */
-  --dd-bg:  #f3e6ff;  --dd-text: #6b2fb8; /* Deep Dive */
-  --nda-bg: #fff4e6;  --nda-text:#9a4f00; /* NDA Sent */
-}
-
+/* ===== Stage header chips con gradiente + glow ===== */
 #summaryTable thead th.stage-title{
-  /* chip suave para destacar */
-  font-weight: 700;
-  border-radius: 10px;
+  position: relative;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-radius: 12px;
+  padding: 14px 10px;
   box-shadow: inset 0 -1px 0 rgba(0,0,0,.06);
 }
 
-/* 👇 un color por stage (override del fondo del thead) */
+/* Negotiating */
 #summaryTable thead th.stage-title-negotiating{
-  background: var(--neg-bg) !important; color: var(--neg-text);
+  color: var(--neg-text);
+  background: linear-gradient(135deg, var(--neg-bg), #ffffff);
 }
+#summaryTable thead th.stage-title-negotiating::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--neg-veil); filter: blur(10px); border-radius: 999px;
+}
+/* Interviewing */
 #summaryTable thead th.stage-title-interviewing{
-  background: var(--int-bg) !important; color: var(--int-text);
+  color: var(--int-text);
+  background: linear-gradient(135deg, var(--int-bg), #ffffff);
 }
+#summaryTable thead th.stage-title-interviewing::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--int-veil); filter: blur(10px); border-radius: 999px;
+}
+/* Sourcing */
 #summaryTable thead th.stage-title-sourcing{
-  background: var(--src-bg) !important; color: var(--src-text);
+  color: var(--src-text);
+  background: linear-gradient(135deg, var(--src-bg), #ffffff);
 }
+#summaryTable thead th.stage-title-sourcing::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--src-veil); filter: blur(10px); border-radius: 999px;
+}
+/* Deep Dive */
 #summaryTable thead th.stage-title-deep-dive{
-  background: var(--dd-bg) !important; color: var(--dd-text);
+  color: var(--dd-text);
+  background: linear-gradient(135deg, var(--dd-bg), #ffffff);
 }
+#summaryTable thead th.stage-title-deep-dive::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--dd-veil); filter: blur(10px); border-radius: 999px;
+}
+/* NDA Sent */
 #summaryTable thead th.stage-title-nda-sent{
-  background: var(--nda-bg) !important; color: var(--nda-text);
+  color: var(--nda-text);
+  background: linear-gradient(135deg, var(--nda-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-nda-sent::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--nda-veil); filter: blur(10px); border-radius: 999px;
 }
 
-/* Detallito: que no se pegue al borde del thead */
-#summaryTable thead th.stage-title { margin: 4px 6px; padding: 12px; }
+/* Ajustes de head row */
 #summaryTable thead tr { background: transparent !important; }
+
+/* ===== Hover de columna con velo del color del stage ===== */
+/* Mapeamos el índice de columna (2..6) a un velo distinto */
+#summaryTable[data-hover-col="2"] th:nth-child(2),
+#summaryTable[data-hover-col="2"] td:nth-child(2){
+  box-shadow: inset 0 0 0 100vmax var(--neg-veil);
+}
+#summaryTable[data-hover-col="3"] th:nth-child(3),
+#summaryTable[data-hover-col="3"] td:nth-child(3){
+  box-shadow: inset 0 0 0 100vmax var(--int-veil);
+}
+#summaryTable[data-hover-col="4"] th:nth-child(4),
+#summaryTable[data-hover-col="4"] td:nth-child(4){
+  box-shadow: inset 0 0 0 100vmax var(--src-veil);
+}
+#summaryTable[data-hover-col="5"] th:nth-child(5),
+#summaryTable[data-hover-col="5"] td:nth-child(5){
+  box-shadow: inset 0 0 0 100vmax var(--dd-veil);
+}
+#summaryTable[data-hover-col="6"] th:nth-child(6),
+#summaryTable[data-hover-col="6"] td:nth-child(6){
+  box-shadow: inset 0 0 0 100vmax var(--nda-veil);
+}
+
+/* Animación de entrada sutil */
+.opportunity-summary-table {
+  animation: fadeSlideIn .7s ease forwards;
+  opacity: 0; transform: translateY(18px);
+}
+@keyframes fadeSlideIn { to { opacity:1; transform: translateY(0); } }
+
+/* Last updated + botón back */
+.last-updated {
+  text-align: center;
+  margin-top: 1.6rem;
+  color: #6b7280;
+  font-size: .86rem; font-style: italic;
+}
+.go-back-button {
+  position: absolute;
+  top: 24px; left: 32px;
+  background: transparent; border: none; font-size: 1rem;
+  color: #4f46e5; font-weight: 600; cursor: pointer;
+  padding: .5rem 1rem; border-radius: 10px; transition: .2s;
+}
+.go-back-button:hover {
+  background-color: rgba(79,70,229,.08);
+  transform: translateX(-2px);
+}
+
+/* Desglose prioridad (chips) */
+.priority-breakdown{
+  display:flex; gap:6px; margin-top:6px; justify-content:center;
+  font-size:12px; font-weight:700;
+}
+.priority{ padding:2px 6px; border-radius:12px; color:#fff; }
+.priority.A{ background:#a8e6cf; color:#2d7a52; }
+.priority.B{ background:#fff9c4; color:#9f8f00; }
+.priority.C{ background:#ffccbc; color:#9f4a3c; }
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .summary-header h1 { font-size: 2rem; }
+  .summary-header p  { font-size: .98rem; }
+  #summaryTable th, #summaryTable td { padding: 12px; font-size: .9rem; }
+}
+/* === Layout: centrar contenido === */
+html, body { height: 100%; }
+
+body{
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto; /* fila 1: contenido centrado / fila 2: last-updated */
+  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
+  background-attachment: fixed;
+}
+
+/* Centra el bloque principal (titulo + tabla) */
+.summary-container{
+  align-self: center;     /* centra verticalmente dentro de la fila 1 */
+  justify-self: center;   /* centra horizontalmente */
+  margin: 0 auto;
+  width: min(1200px, 92vw);
+  padding: 3rem 2rem;
+}
+
+/* Mantén el "Last updated" en la parte baja y centrado */
+#lastUpdated{
+  justify-self: center;
+  align-self: end;
+  margin: 1.6rem 0 2.4rem;
+}
+
+/* El botón Go Back ya es absolute, no se ve afectado */
+.go-back-button{ position: absolute; top: 24px; left: 32px; }
