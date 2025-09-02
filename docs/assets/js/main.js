@@ -925,17 +925,41 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     const salesDropdown = document.getElementById('sales_lead');
     if (!salesDropdown) return;
 
-    const allowedPrefixes = ['Agustin', 'Lara', 'Bahia'];
-    const filtered = users.filter(user =>
-      allowedPrefixes.some(prefix => user.user_name.startsWith(prefix))
-    );
+fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+  .then(response => response.json())
+  .then(users => {
+    const salesDropdown = document.getElementById('sales_lead');
+    if (!salesDropdown) return;
 
-    filtered.forEach(user => {
-      const option = document.createElement('option');
-      option.value = user.email_vintti;
-      option.textContent = user.user_name;
-      salesDropdown.appendChild(option);
+    // ✅ Allow-list estricta por email (evita confundir Agustin vs Agustina)
+    const allowedEmails = new Set([
+      'agustin@vintti.com',
+      'bahia@vintti.com',
+      'lara@vintti.com'
+    ]);
+
+    // Limpia opciones previas y agrega placeholder
+    salesDropdown.innerHTML = '<option disabled selected>Select Sales Lead</option>';
+
+    // Filtra por email exacto (case-insensitive)
+    users
+      .filter(u => allowedEmails.has((u.email_vintti || '').toLowerCase()))
+      // (opcional) orden alfabético por nombre
+      .sort((a, b) => a.user_name.localeCompare(b.user_name))
+      .forEach(user => {
+        const option = document.createElement('option');
+        option.value = (user.email_vintti || '').toLowerCase();
+        option.textContent = user.user_name; // se verá “Agustín”, “Bahía”, “Lara”
+        salesDropdown.appendChild(option);
+      });
+
+    // 🔒 Defensa extra (por si el backend cambia nombres):
+    // elimina cualquier opción que contenga "agustina" en el label
+    Array.from(salesDropdown.options).forEach(opt => {
+      if (/agustina\b/i.test(opt.textContent)) opt.remove();
     });
+  })
+  .catch(err => console.error('Error loading sales leads:', err));
   })
   .catch(err => console.error('Error loading sales leads:', err));
 
