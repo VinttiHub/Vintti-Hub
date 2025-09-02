@@ -111,7 +111,7 @@ window.allowedHRUsers = window.allowedHRUsers || [];
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     .then(response => response.json())
     .then(users => {
-      const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina'];
+      const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Agustina'];
       window.allowedHRUsers = users.filter(user =>
         allowedSubstrings.some(name => user.user_name.includes(name))
       );
@@ -1286,7 +1286,8 @@ const AVATAR_BY_EMAIL = {
   'lara@vintti.com':     'lara.png',
   'jazmin@vintti.com':   'jaz.png',
   'pilar@vintti.com':    'pilar.png',
-  'agustin@vintti.com':  'agus.png'
+  'agustin@vintti.com':  'agus.png',
+  'agustina.barbero@vintti.com':  'agustina.png'
 };
 // --- HR initials (mostrar sólo 1 letra) ---
 const HR_INITIALS_BY_EMAIL = {
@@ -1300,6 +1301,7 @@ function initialsForHRLead(emailOrName) {
   if (s.includes('agostina')) return 'AC';
   if (s.includes('jazmin'))   return 'JP';
   if (s.includes('pilar'))    return 'PF';
+  if (s.includes('agustina'))    return 'AB';
   // por email exacto:
   if (HR_INITIALS_BY_EMAIL[s]) return HR_INITIALS_BY_EMAIL[s];
   return '—';
@@ -1400,7 +1402,7 @@ function emailForSalesLead(opp) {
   const name = (opp.sales_lead_name || '').toLowerCase();
   if (name.includes('bahia'))   return 'bahia@vintti.com';
   if (name.includes('lara'))    return 'lara@vintti.com';
-  if (name.includes('agustin') || name.includes('agustina')) return 'agustin@vintti.com';
+  if (name.includes('agustin')) return 'agustin@vintti.com';
   return '';
 }
 
@@ -1408,7 +1410,7 @@ function emailForSalesLead(opp) {
 function initialsForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'BL';
   if (key.includes('lara')    || key.includes('lara@'))    return 'LR';
-  if (key.includes('agustin') || key.includes('agustina') || key.includes('agustin@')) return 'AM';
+  if (key.includes('agustin')) return 'AM';
   return '--';
 }
 
@@ -1416,7 +1418,7 @@ function initialsForSalesLead(key) {
 function badgeClassForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'bl';
   if (key.includes('lara')    || key.includes('lara@'))    return 'lr';
-  if (key.includes('agustin') || key.includes('agustina') || key.includes('agustin@')) return 'am';
+  if (key.includes('agustin')) return 'am';
   return '';
 }
 

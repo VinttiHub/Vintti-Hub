@@ -944,7 +944,7 @@ async function loadOpportunityData() {
           salesLeadSelect.innerHTML = `<option value="">Select Sales Lead...</option>`;
           hrLeadSelect.innerHTML = `<option value="">Select HR Lead...</option>`;
 
-          const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Sol'];
+          const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Agustina'];
 
           users.forEach(user => {
             const option1 = document.createElement('option');
