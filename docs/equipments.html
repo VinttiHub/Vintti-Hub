@@ -139,9 +139,12 @@
             <input type="number" id="cost" min="0" step="1" placeholder="0" />
           </label>
 
-          <label class="field full">
+          <label class="field full" id="equipmentField">
             <span>Equipment</span>
-            <input type="text" id="equipmentTxt" placeholder="e.g., Laptop, Monitor, Mouse" />
+            <!-- multiselect UI -->
+            <div id="equipmentMulti" class="ms-root" tabindex="0" aria-label="Choose equipment"></div>
+            <!-- valor real (por compatibilidad con tu código) -->
+            <input type="hidden" id="equipmentTxt" />
           </label>
         </div>
 

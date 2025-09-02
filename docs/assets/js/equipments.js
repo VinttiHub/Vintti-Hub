@@ -53,6 +53,99 @@ const cache = {
   candidateName: new Map(),  // id -> name
   accountName: new Map(),    // id -> client_name
 };
+const EQUIPMENT_OPTIONS = [
+  { value: "Laptop",     emoji: "💻" },
+  { value: "Monitor",    emoji: "🖥️" },
+  { value: "Mouse",      emoji: "🖱️" },
+  { value: "Keyboard",   emoji: "⌨️" },
+  { value: "Headphones", emoji: "🎧" },
+  { value: "Dock",       emoji: "🧩" },
+  { value: "Phone",      emoji: "📱" },
+  { value: "Tablet",     emoji: "📱" },
+  { value: "Router",     emoji: "📶" },
+  { value: "Chair",      emoji: "💺" }
+];
+
+const emojiFor = (v) => (EQUIPMENT_OPTIONS.find(o => o.value.toLowerCase() === String(v).toLowerCase())?.emoji || "📦");
+
+function parseEquipos(raw){
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  const s = String(raw).trim();
+  try { const j = JSON.parse(s); if (Array.isArray(j)) return j.map(String).filter(Boolean); } catch {}
+  return s.split(",").map(x => x.trim()).filter(Boolean);
+}
+function stringifyEquipos(arr){ return JSON.stringify((arr||[]).map(String).filter(Boolean)); }
+function createMultiSelect(initial=[]) {
+  const root = document.createElement("div");
+  root.className = "ms-root";
+  root.tabIndex = 0;
+
+  const state = new Set(initial);
+
+  const input = document.createElement("input");
+  input.className = "ms-input";
+  input.placeholder = state.size ? "" : "Select equipment…";
+
+  const dd = document.createElement("div");
+  dd.className = "ms-dd";
+  dd.hidden = true;
+
+  function renderChips() {
+    [...root.querySelectorAll(".ms-chip,.ms-plus")].forEach(n => n.remove());
+    const items = [...state];
+    items.forEach(v => {
+      const chip = document.createElement("span");
+      chip.className = "ms-chip";
+      chip.innerHTML = `<span class="e">${emojiFor(v)}</span><span class="t">${v}</span><span class="x" aria-label="remove">✕</span>`;
+      chip.querySelector(".x").addEventListener("click", (e) => { e.stopPropagation(); state.delete(v); renderChips(); renderDD(); root.dispatchEvent(new CustomEvent("change")); });
+      root.insertBefore(chip, input);
+    });
+    if (items.length === 0) {
+      const hint = document.createElement("span");
+      hint.className = "ms-plus";
+      hint.textContent = "Select equipment…";
+      root.insertBefore(hint, input);
+    }
+  }
+
+  function renderDD() {
+    dd.innerHTML = "";
+    EQUIPMENT_OPTIONS.forEach(opt => {
+      const row = document.createElement("div");
+      row.className = "ms-opt";
+      row.innerHTML = `<span class="ms-emoji">${opt.emoji}</span><span>${opt.value}</span><input type="checkbox" ${state.has(opt.value) ? "checked":""} style="margin-left:auto">`;
+      row.addEventListener("click", () => {
+        if (state.has(opt.value)) state.delete(opt.value); else state.add(opt.value);
+        renderChips(); renderDD(); root.dispatchEvent(new CustomEvent("change"));
+      });
+      dd.appendChild(row);
+    });
+  }
+
+  function open(){ dd.hidden = false; renderDD(); }
+  function close(){ dd.hidden = true; }
+
+  root.addEventListener("click", () => open());
+  input.addEventListener("focus", () => open());
+  document.addEventListener("click", (e) => { if (!root.contains(e.target)) close(); });
+
+  root.appendChild(input);
+  root.appendChild(dd);
+  renderChips();
+
+  // API
+  root.getValues = () => [...state];
+  root.setValues = (arr=[]) => { state.clear(); arr.forEach(v=>state.add(v)); renderChips(); renderDD(); };
+  return root;
+}
+function inputEquipmentMulti(value) {
+  const selected = parseEquipos(value);
+  const root = createMultiSelect(selected);
+  // para payloadFromEditRow detectarlo fácil
+  root.dataset.ms = "equipos";
+  return root;
+}
 
 // ---------- initial boot ----------
 document.addEventListener("DOMContentLoaded", () => {
@@ -79,6 +172,15 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error(err);
     toast("Failed to load equipments");
   });
+  // montar multiselect en el modal
+const msMount = document.getElementById("equipmentMulti");
+if (msMount && !msMount.dataset.ready) {
+  const ms = createMultiSelect([]);
+  ms.id = "equipmentMultiInner";
+  msMount.appendChild(ms);
+  msMount.dataset.ready = "1";
+}
+
 });
 
 // ---------- load & render table ----------
@@ -126,6 +228,15 @@ async function renderRow(r) {
   const costCls        = costGrade(r.costo);
   const equipEmoji     = equipmentEmoji(r.equipos);
   const flag           = flagEmoji(r.pais);
+  const eqArr = parseEquipos(r.equipos);
+  const eqHtml = (() => {
+    if (!eqArr.length) return "—";
+    const shown = eqArr.slice(0, 3);
+    const more = eqArr.length - shown.length;
+    const pills = shown.map(v => `<span class="eq-pill"><span>${emojiFor(v)}</span><span>${escapeHTML(v)}</span></span>`).join("");
+    return `<div class="eq-list">${pills}${more>0?`<span class="eq-pill eq-more">+${more}</span>`:""}</div>`;
+  })();
+
 
   tr.innerHTML = `
     <td data-col="candidate">${candCell}</td>
@@ -156,9 +267,7 @@ async function renderRow(r) {
       <span class="cost ${costCls}">${fmtCurrency(r.costo)}</span>
     </td>
 
-    <td data-col="equipos">
-      ${r.equipos ? `<span class="inline-cell"><span class="eq-emoji">${equipEmoji}</span><span>${escapeHTML(r.equipos)}</span></span>` : "—"}
-    </td>
+    <td data-col="equipos">${eqHtml}</td>
 
     <td class="actions">
       <button class="btn ghost sm" data-edit aria-label="Edit">✎ Edit</button>
@@ -226,7 +335,7 @@ function enterEditMode(tr, r) {
     estado: inputSelectStatus(r.estado),
     pais: inputCountry(r.pais),
     costo: inputNumber(r.costo),
-    equipos: inputText(r.equipos),
+    equipos: inputEquipmentMulti(r.equipos),
   };
 
   Object.entries(cells).forEach(([col, el]) => {
@@ -265,7 +374,7 @@ function enterEditMode(tr, r) {
 }
 
 function payloadFromEditRow(tr) {
-  const get = (col) => tr.querySelector(`[data-col="${col}"] input, [data-col="${col}"] select`);
+  const get = (col) => tr.querySelector(`[data-col="${col}"] input, [data-col="${col}"] select, [data-col="${col}"] .ms-root`);
 
   const pedido = toISO(get("pedido")?.value);
   const entrega = toISO(get("entrega")?.value);
@@ -275,10 +384,18 @@ function payloadFromEditRow(tr) {
   const pais = (get("pais")?.value || "").trim() || null;
   const costoRaw = get("costo")?.value;
   const costo = (costoRaw === "" || costoRaw == null) ? null : Number(costoRaw);
-  const equipos = (get("equipos")?.value || "").trim() || null;
 
+  let equipos = null;
+  const eqNode = get("equipos");
+  if (eqNode?.dataset?.ms === "equipos") {
+    equipos = eqNode.getValues();              // ← array
+  } else {
+    const txt = (eqNode?.value || "").trim();
+    equipos = txt ? parseEquipos(txt) : null;  // ← también array
+  }
   return { pedido, entrega, retiro, almacenamiento, estado, pais, costo, equipos };
 }
+
 
 async function updateEquipment(id, payload){
   // Enviar solo campos de edición
@@ -453,7 +570,10 @@ async function onSaveNew(e){
   const almacenamiento = toISO($("#storageDate").value);
   const pais         = $("#country").value || null;
   const costo        = $("#cost").value !== "" ? Number($("#cost").value) : null;
-  const equipos      = $("#equipmentTxt").value || null;
+  // antes: const equipos = $("#equipmentTxt").value || null;
+const ms = document.querySelector("#equipmentMulti .ms-root") || document.getElementById("equipmentMultiInner");
+const equipos = ms ? ms.getValues() : parseEquipos($("#equipmentTxt").value || "");
+
 
   if(!candidate_id){ toast("Select a candidate"); return; }
   if(!account_id){ toast("No active account for this candidate"); return; }

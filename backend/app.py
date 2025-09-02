@@ -2661,6 +2661,34 @@ def _list_s3_with_prefix(prefix: str):
     return items
 
 # ---------- EQUIPMENTS (list, create, read, update, delete) ----------
+def _normalize_equipos(val):
+    """
+    Acepta:
+      - list -> se json.dumps
+      - str JSON -> se carga; si es list se json.dumps
+      - 'a, b, c' -> ['a','b','c'] -> json.dumps
+      - '', None -> None
+    Devuelve (json_str or None)
+    """
+    if val is None:
+        return None
+    if isinstance(val, list):
+        return json.dumps([str(x).strip() for x in val if str(x).strip()])
+    s = str(val).strip()
+    if not s:
+        return None
+    # ¿ya es JSON?
+    try:
+        j = json.loads(s)
+        if isinstance(j, list):
+            return json.dumps([str(x).strip() for x in j if str(x).strip()])
+    except Exception:
+        pass
+    # coma-separado
+    parts = [p.strip() for p in s.split(',') if p.strip()]
+    return json.dumps(parts) if parts else None
+
+
 @app.route('/equipments', methods=['GET', 'POST'])
 def equipments_route():
     try:
@@ -2669,15 +2697,15 @@ def equipments_route():
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute("""
                 SELECT
-                    equipment_id,             -- 👈 asegurarnos de incluir el ID
+                    equipment_id,
                     candidate_id,
                     account_id,
-                    pedido,         -- order date
-                    proveedor,      -- 'quipteams' | 'bord'
-                    entrega,        -- delivery date
-                    retiro,         -- pickup request
-                    almacenamiento, -- storage date
-                    estado,         -- 'nueva' | 'vieja' | 'stockeada'
+                    TO_CHAR(pedido, 'YYYY-MM-DD')          AS pedido,
+                    proveedor,
+                    TO_CHAR(entrega, 'YYYY-MM-DD')         AS entrega,
+                    TO_CHAR(retiro, 'YYYY-MM-DD')          AS retiro,
+                    TO_CHAR(almacenamiento, 'YYYY-MM-DD')  AS almacenamiento,
+                    estado,
                     pais,
                     costo,
                     equipos
@@ -2692,10 +2720,8 @@ def equipments_route():
         data = request.get_json() or {}
 
         def _none_if_empty(v):
-            if v is None:
-                return None
-            if isinstance(v, str) and v.strip() == '':
-                return None
+            if v is None: return None
+            if isinstance(v, str) and v.strip() == '': return None
             return v
 
         candidate_id    = data.get('candidate_id')
@@ -2708,7 +2734,7 @@ def equipments_route():
         almacenamiento  = _none_if_empty(data.get('almacenamiento'))
         pais            = _none_if_empty(data.get('pais'))
         costo           = data.get('costo') if data.get('costo') not in ('', None) else None
-        equipos         = _none_if_empty(data.get('equipos'))
+        equipos         = _normalize_equipos(data.get('equipos'))
 
         missing = []
         if not candidate_id: missing.append('candidate_id')
@@ -2727,8 +2753,19 @@ def equipments_route():
             )
             VALUES (%s, %s, %s::date, %s, %s::date, %s::date,
                     %s::date, %s, %s, %s, %s)
-            RETURNING equipment_id, candidate_id, account_id, pedido, proveedor, entrega, retiro,
-                      almacenamiento, estado, pais, costo, equipos
+            RETURNING
+                equipment_id,
+                candidate_id,
+                account_id,
+                TO_CHAR(pedido, 'YYYY-MM-DD')          AS pedido,
+                proveedor,
+                TO_CHAR(entrega, 'YYYY-MM-DD')         AS entrega,
+                TO_CHAR(retiro, 'YYYY-MM-DD')          AS retiro,
+                TO_CHAR(almacenamiento, 'YYYY-MM-DD')  AS almacenamiento,
+                estado,
+                pais,
+                costo,
+                equipos
         """, (
             int(candidate_id), int(account_id), pedido, proveedor, entrega, retiro,
             almacenamiento, estado, pais, costo, equipos
@@ -2754,11 +2791,11 @@ def equipment_item(equipment_id):
                     equipment_id,
                     candidate_id,
                     account_id,
-                    pedido,
+                    TO_CHAR(pedido, 'YYYY-MM-DD')          AS pedido,
                     proveedor,
-                    entrega,
-                    retiro,
-                    almacenamiento,
+                    TO_CHAR(entrega, 'YYYY-MM-DD')         AS entrega,
+                    TO_CHAR(retiro, 'YYYY-MM-DD')          AS retiro,
+                    TO_CHAR(almacenamiento, 'YYYY-MM-DD')  AS almacenamiento,
                     estado,
                     pais,
                     costo,
@@ -2786,16 +2823,15 @@ def equipment_item(equipment_id):
         # PATCH
         data = request.get_json(silent=True) or {}
 
-        # Campos editables
         mapping = {
-            'pedido': 'pedido',                 # fechas
+            'pedido': 'pedido',
             'entrega': 'entrega',
             'retiro': 'retiro',
             'almacenamiento': 'almacenamiento',
-            'estado': 'estado',                 # enum texto
+            'estado': 'estado',
             'pais': 'pais',
-            'costo': 'costo',                   # numérico
-            'equipos': 'equipos'                # texto
+            'costo': 'costo',
+            'equipos': 'equipos'
         }
 
         set_cols, set_vals = [], []
@@ -2803,15 +2839,19 @@ def equipment_item(equipment_id):
             if k in data:
                 if k in ('pedido','entrega','retiro','almacenamiento'):
                     set_cols.append(f"{col} = %s::date")
+                    set_vals.append(data[k])
+                elif k == 'equipos':
+                    set_cols.append(f"{col} = %s")
+                    set_vals.append(_normalize_equipos(data[k]))
                 else:
                     set_cols.append(f"{col} = %s")
-                set_vals.append(data[k])
+                    set_vals.append(data[k])
 
         if not set_cols:
             return jsonify({"error": "No valid fields provided"}), 400
 
         conn = get_connection()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         set_vals.append(equipment_id)
         cur.execute(f"""
             UPDATE equipments
@@ -2822,15 +2862,33 @@ def equipment_item(equipment_id):
             cur.close(); conn.close()
             return jsonify({"error":"Not found"}), 404
 
+        # ⬇️  SIN recursión: devolvemos la fila actualizada ya formateada
+        cur.execute("""
+            SELECT
+                equipment_id,
+                candidate_id,
+                account_id,
+                TO_CHAR(pedido, 'YYYY-MM-DD')          AS pedido,
+                proveedor,
+                TO_CHAR(entrega, 'YYYY-MM-DD')         AS entrega,
+                TO_CHAR(retiro, 'YYYY-MM-DD')          AS retiro,
+                TO_CHAR(almacenamiento, 'YYYY-MM-DD')  AS almacenamiento,
+                estado,
+                pais,
+                costo,
+                equipos
+            FROM equipments
+            WHERE equipment_id = %s
+        """, (equipment_id,))
+        updated = cur.fetchone()
         conn.commit()
         cur.close(); conn.close()
-
-        # devolver fila actualizada
-        return equipment_item(equipment_id)
+        return jsonify(updated)
 
     except Exception as e:
         import traceback; print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
     
 # ---------- HIRE_OPPORTUNITY helper (used by front to resolver account activo) ----------
 @app.route('/hire_opportunity', methods=['GET'])
