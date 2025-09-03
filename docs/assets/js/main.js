@@ -685,7 +685,7 @@ helloBtn.addEventListener('click', async () => {
   }
 const summaryLink = document.getElementById('summaryLink');
 const currentUserEmail = localStorage.getItem('user_email');
-const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com'];
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com','agostina@vintti.com'];
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
@@ -935,7 +935,8 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     const allowedEmails = new Set([
       'agustin@vintti.com',
       'bahia@vintti.com',
-      'lara@vintti.com'
+      'lara@vintti.com',
+      'agostina@vintti.com'
     ]);
 
     // Limpia opciones previas y agrega placeholder

@@ -275,3 +275,205 @@ body{
 
 /* El botón Go Back ya es absolute, no se ve afectado */
 .go-back-button{ position: absolute; top: 24px; left: 32px; }
+/* ===== Drilldown (tabla detalle) ===== */
+.drilldown.hidden { display:none; }
+.drilldown{
+  margin-top: 18px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--glass-bg1), var(--glass-bg2));
+  backdrop-filter: blur(12px) saturate(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: var(--glass-shadow);
+  border: none;
+  overflow: hidden;
+  animation: fadeSlideIn .5s ease forwards;
+}
+
+.drilldown-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.drilldown-header h3{
+  margin:0; font-size:1.1rem; font-weight:800;
+  letter-spacing:.01em;
+  background: linear-gradient(90deg,#4f46e5,#38bdf8);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.drilldown-sub{ margin:.2rem 0 0; color:#526070; font-size:.9rem; }
+
+.btn-clear{
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; padding: 6px 10px;
+  border-radius: 10px; color:#334155;
+}
+.btn-clear:hover{ background: rgba(79,70,229,.08); }
+
+.drilldown-table-wrapper{ width:100%; overflow:auto; }
+
+.dd-table{
+  width:100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.dd-table thead th{
+  position: sticky; top: 0; z-index: 1;
+  text-align:left; font-weight:800; letter-spacing:.02em;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.dd-table tbody td{
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+  background: rgba(255,255,255,.55);
+  color:#111827;
+}
+.dd-table tbody tr.dd-row{
+  cursor: pointer;
+  transition: transform .06s ease, background .2s ease, box-shadow .2s ease;
+}
+.dd-table tbody tr.dd-row:hover{
+  background: rgba(0,0,0,.03);
+  transform: translateY(-1px);
+}
+.dd-empty{
+  padding: 18px; text-align:center; color:#6b7280;
+}
+.hidden{ display:none; }
+
+/* Badges por stage (usa tu paleta pastel) */
+.dd-badge{
+  display:inline-block; padding:6px 10px; border-radius:999px;
+  font-size:.75rem; font-weight:800; letter-spacing:.02em;
+}
+.dd-badge-neg{ color:var(--neg-text);  background:var(--neg-bg); }
+.dd-badge-int{ color:var(--int-text);  background:var(--int-bg); }
+.dd-badge-src{ color:var(--src-text);  background:var(--src-bg); }
+.dd-badge-dd { color:var(--dd-text);   background:var(--dd-bg); }
+.dd-badge-nda{ color:var(--nda-text);  background:var(--nda-bg); }
+
+/* Marca la celda activa */
+#summaryTable td.is-selected{
+  box-shadow: inset 0 0 0 999px rgba(56,189,248,.13);
+  border-radius: 8px;
+}
+/* Chips pastel para Position / Account */
+.chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:999px; font-weight:700;
+  font-size:.88rem; letter-spacing:.01em;
+  background: rgba(79,70,229,.06);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.04);
+}
+.chip .emoji{ font-size:1rem; line-height:1; }
+.chip-position{ background:#f1f0ff; color:#4f46e5; }
+.chip-account{  background:#eaf6ff; color:#0b2e71; }
+
+/* Zebra muy sutil para filas */
+.dd-table tbody tr:nth-child(odd) td{ background: rgba(255,255,255,.58); }
+.dd-table tbody tr:nth-child(even) td{ background: rgba(255,255,255,.72); }
+
+/* Títulos de celdas en detalle */
+.dd-title{ font-weight:800; letter-spacing:.01em; }
+
+/* Emojis en headers de stage (tabla principal) */
+#summaryTable thead th.stage-title-negotiating::before { content:"🤝 "; }
+#summaryTable thead th.stage-title-interviewing::before{ content:"🎤 "; }
+#summaryTable thead th.stage-title-sourcing::before    { content:"🧭 "; }
+#summaryTable thead th.stage-title-deep-dive::before   { content:"🔎 "; }
+#summaryTable thead th.stage-title-nda-sent::before    { content:"📝 "; }
+/* Header: aseguramos que se vea el texto y el emoji insertados por JS */
+#summaryTable thead th .stage-emoji{ margin-right:.4rem; }
+#summaryTable thead th .stage-label{ font-weight:800; }
+
+/* Si antes usabas ::before para el emoji, lo anulamos para evitar doble icono */
+#summaryTable thead th[class*="stage-title-"]::before { content: none !important; }
+
+/* Hover de columna SOLO en header (no en filas) */
+#summaryTable[data-hover-col="2"] th:nth-child(2){ box-shadow: inset 0 0 0 100vmax var(--neg-veil); }
+#summaryTable[data-hover-col="3"] th:nth-child(3){ box-shadow: inset 0 0 0 100vmax var(--int-veil); }
+#summaryTable[data-hover-col="4"] th:nth-child(4){ box-shadow: inset 0 0 0 100vmax var(--src-veil); }
+#summaryTable[data-hover-col="5"] th:nth-child(5){ box-shadow: inset 0 0 0 100vmax var(--dd-veil); }
+#summaryTable[data-hover-col="6"] th:nth-child(6){ box-shadow: inset 0 0 0 100vmax var(--nda-veil); }
+
+/* Chips de desglose A/B/C: neutros (sin color) */
+.priority-breakdown{ display:flex; gap:6px; margin-top:6px; justify-content:center; font-size:12px; font-weight:700; }
+.priority{ padding:2px 6px; border-radius:12px; background: rgba(0,0,0,.06); color:#334155; border: 1px solid rgba(0,0,0,.08); }
+
+/* Chips de la tabla detalle: neutros (sin emojis y sin colores vivos) */
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px;
+       font-weight:600; font-size:.88rem; letter-spacing:.01em;
+       background: rgba(0,0,0,.04); color:#0f172a; box-shadow: inset 0 -1px 0 rgba(0,0,0,.04); }
+.chip-position, .chip-account{ background: rgba(0,0,0,.04); color:#0f172a; }
+
+/* Celdas del detalle: fondo claro neutro (no pasteles) */
+.dd-table tbody td{ background: rgba(255,255,255,.72); }
+.dd-table tbody tr.dd-row:hover{ background: rgba(0,0,0,.03); }
+
+/* (Opcional) si tenías zebra con colores, déjala neutra o elimínala */
+.dd-table tbody tr:nth-child(odd) td{ background: rgba(255,255,255,.72); }
+.dd-table tbody tr:nth-child(even) td{ background: rgba(255,255,255,.86); }
+/* === FIX 1: el badge del stage debe mostrar texto aunque el h3 tenga gradiente === */
+.drilldown-header h3 .dd-badge{
+  -webkit-text-fill-color: initial !important; /* anula el transparente heredado */
+}
+
+/* (opcional pero recomendable) si el nombre en <strong> quedara pálido, fuerza color normal: */
+.drilldown-header h3 strong{
+  -webkit-text-fill-color: initial !important;
+  color: #111827;
+}
+
+/* === FIX 2: quitar los “globos” grises en la tabla de detalle === */
+.dd-table .chip,
+.dd-table .chip-position,
+.dd-table .chip-account{
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: #111827 !important;
+  font-weight: 600;
+}
+/* Selección por stage (relleno pastel y texto del color del stage) */
+#summaryTable td.is-selected{ border-radius:8px; }
+#summaryTable td.is-selected-neg{ box-shadow: inset 0 0 0 999px var(--neg-veil); color: var(--neg-text); }
+#summaryTable td.is-selected-int{ box-shadow: inset 0 0 0 999px var(--int-veil); color: var(--int-text); }
+#summaryTable td.is-selected-src{ box-shadow: inset 0 0 0 999px var(--src-veil); color: var(--src-text); }
+#summaryTable td.is-selected-dd { box-shadow: inset 0 0 0 999px var(--dd-veil);  color: var(--dd-text); }
+#summaryTable td.is-selected-nda{ box-shadow: inset 0 0 0 999px var(--nda-veil); color: var(--nda-text); }
+/* Solo el header en negrilla; filas normales */
+.dd-table thead th{ font-weight: 800; }
+.dd-table tbody td,
+.dd-table tbody .dd-title{ font-weight: 400 !important; }
+
+/* Zebra pastel (nude/rose casi blanco) */
+:root{
+  --zebra-1: #fffefe;  /* blanco apenas cálido */
+  --zebra-2: #fbf7f9;  /* rosa nude MUY suave */
+}
+
+.dd-table tbody tr:nth-child(odd)  td{ background: var(--zebra-1) !important; }
+.dd-table tbody tr:nth-child(even) td{ background: var(--zebra-2) !important; }
+
+/* Quita “chips/globos” y cualquier sombra/realce en filas */
+.dd-table .chip,
+.dd-table .chip-position,
+.dd-table .chip-account{
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: #111827 !important;
+  font-weight: 400 !important; /* sin negrilla */
+}
+
+/* Mantén el hover discreto */
+.dd-table tbody tr.dd-row:hover{
+  background: rgba(0,0,0,.03) !important;
+  transform: translateY(-1px);
+}

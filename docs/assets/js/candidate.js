@@ -257,7 +257,8 @@ document.addEventListener('click', (e) => {
     'agustin@vintti.com',
     'bahia@vintti.com',
     'angie@vintti.com',
-    'lara@vintti.com'
+    'lara@vintti.com',
+    'agostina@vintti.com'
   ];
 
   // Quienes ven Equipments
