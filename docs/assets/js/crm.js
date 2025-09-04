@@ -1,3 +1,30 @@
+// ——— Decidir manager por status ———
+function managerEmailForStatus(statusText='') {
+  const s = (statusText || '').toLowerCase().trim();
+  if (s === 'active client')   return 'lara@vintti.com';
+  if (s === 'lead in process') return 'bahia@vintti.com';
+  return null; // otros -> no cambiar
+}
+
+// ——— PATCH a /accounts/<id> con el account_manager ———
+async function patchAccountManager(accountId, email) {
+  const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  await fetch(`${API}/accounts/${accountId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_manager: email })
+  });
+}
+
+// ——— Render rápido del manager en la celda (igual estilo que Opps) ———
+function paintManagerCell(rowEl, email) {
+  if (!rowEl) return;
+  const cell = rowEl.querySelector('.sales-lead-cell');
+  if (!cell) return;
+  const item = { account_manager: email, account_manager_name: email };
+  cell.innerHTML = getAccountSalesLeadCell(item);
+}
+
 // === Sales Lead visuals (como en Opportunities) ===
 window.AVATAR_BASE = window.AVATAR_BASE || './assets/img/';
 window.AVATAR_BY_EMAIL = {  // se fusiona con lo que ya tengas
@@ -191,11 +218,55 @@ $tbody.addEventListener('mousedown', (e) => {
     showSortToast(ids.length + 1);
 
     // 🧮 Calcula y actualiza barra (solo incrementos durante el cálculo)
-    await computeAndPaintAccountStatuses({
-      ids,
-      rowById,
-      onProgress: (inc) => updateSortToast(inc)  // ← solo incrementa
+// 🧮 Calcula y actualiza barra (solo incrementos durante el cálculo)
+const summary = await computeAndPaintAccountStatuses({
+  ids,
+  rowById,
+  onProgress: (inc) => updateSortToast(inc)
+});
+
+// 🟣 Asignar account_manager según status (solo Active/Lead in Process)
+await (async function assignManagersFromStatus() {
+  const tasks = [];
+
+  for (const [idStr, obj] of Object.entries(summary || {})) {
+    const accountId = Number(idStr);
+    const status = obj?.status || '';
+    const targetEmail = managerEmailForStatus(status);
+    if (!targetEmail) continue; // otros status -> no tocar
+
+    // Evitar PATCH innecesario si ya está pintado con ese manager
+    const row = rowById.get(accountId);
+    const currentCellEmail = (() => {
+      if (!row) return '';
+      const hiddenName = row.querySelector('.sales-lead-cell .sr-only');
+      return (hiddenName?.textContent || '').toLowerCase().trim();
+    })();
+    if (currentCellEmail === targetEmail) {
+      // ya coinciden visualmente; igual intentamos evitar parchar si la BD ya lo tiene
+      // (no lo sabemos con certeza desde el front, pero podemos pintar y omitir PATCH)
+      continue;
+    }
+
+    tasks.push(async () => {
+      try {
+        await patchAccountManager(accountId, targetEmail);
+        paintManagerCell(row, targetEmail);      // refresca UI
+        // console.log(`✅ account ${accountId} → ${targetEmail}`);
+      } catch (e) {
+        console.warn(`⚠️ No se pudo asignar manager a ${accountId}:`, e);
+      } finally {
+        updateSortToast(1); // opcional: marcar avance visual
+      }
     });
+  }
+
+  // Reutilizamos tu runner con concurrencia amable
+  if (tasks.length) {
+    await runWithConcurrency(tasks, 6);
+  }
+})();
+
 
     // ✅ DataTables: subimos a 100% cuando ya dibujó con el orden aplicado
     let _finalized = false;

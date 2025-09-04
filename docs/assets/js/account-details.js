@@ -42,20 +42,20 @@ document.body.style.backgroundColor = 'var(--bg)';
   });
 
   // Cargar datos
-  const id = getIdFromURL();
-  if (!id) return;
+const id = getIdFromURL();
+if (!id) return;
 
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)
-    .then(res => res.json())
-    .then(data => {
-      fillAccountDetails(data);
-      loadAssociatedOpportunities(id);
-      loadCandidates(id);
-      loadAccountPdfs(id); // ⬅️ NUEVO: pinta la grilla de PDFs
-    })
-    .catch(err => {
-      console.error('Error fetching accounts details:', err);
-    });
+fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)
+  .then(res => res.json())
+  .then(data => {
+    window.__accountDetails = data; // cache por si lo necesitas
+    fillAccountDetails(data);
+    loadAssociatedOpportunities(id); // ← sólo pinta, no calcula manager
+    loadCandidates(id);
+    loadAccountPdfs(id);
+  })
+  .catch(err => console.error('Error fetching accounts details:', err));
+
 // Botón de Go Back
 const goBackButton = document.getElementById('goBackButton');
 if (goBackButton) {
@@ -117,102 +117,20 @@ if (closeBtn) {
     document.getElementById("discount-alert").classList.add("hidden");
   });
 }
-// ... dentro de DOMContentLoaded
-fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)
-  .then(res => res.json())
-  .then(data => {
-    window.__accountDetails = data; // cache por si lo necesitas
-    fillAccountDetails(data);
-    // ⬇️ pasamos el manager actual para evitar PATCH innecesario
-    loadAssociatedOpportunities(id, (data.account_manager || '').toLowerCase());
-    loadCandidates(id);
-    loadAccountPdfs(id);
-  })
-  .catch(err => console.error('Error fetching accounts details:', err));
 
-function loadAssociatedOpportunities(accountId, currentManagerLower = '') {
+
+function loadAssociatedOpportunities(accountId) {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
     .then(res => res.json())
     .then(data => {
       console.log("Oportunidades asociadas:", data);
-      fillOpportunitiesTable(data);
-      // ⬇️ calcula y, si aplica, asigna el manager
-      assignAccountManagerFromOpps(accountId, data, currentManagerLower);
+      fillOpportunitiesTable(data); // ← sólo render
     })
     .catch(err => {
       console.error("Error cargando oportunidades asociadas:", err);
     });
 }
-
-
-
-
-
-
-
 });
-function assignAccountManagerFromOpps(accountId, opportunities = [], currentManagerLower = '') {
-  // Contar por email
-  const counts = new Map();      // email -> count
-  const recency = new Map();     // email -> { latestDateMs, latestOppId }
-
-  for (const o of (opportunities || [])) {
-    const raw = (o?.opp_sales_lead ?? '').trim().toLowerCase();
-    if (!raw) continue;
-    // contar
-    counts.set(raw, (counts.get(raw) || 0) + 1);
-
-    // desempate por "reciente"
-    const dateStr = o?.opp_close_date || o?.nda_signature_or_start_date || '';
-    const dateMs  = dateStr ? Date.parse(dateStr) : 0;
-    const oppId   = getOpportunityId(o) ?? -1;
-
-    const prev = recency.get(raw) || { latestDateMs: -1, latestOppId: -1 };
-    const next = {
-      latestDateMs: Math.max(prev.latestDateMs, isNaN(dateMs) ? -1 : dateMs),
-      latestOppId:  Math.max(prev.latestOppId, oppId)
-    };
-    recency.set(raw, next);
-  }
-
-  const emails = Array.from(counts.keys());
-  if (emails.length === 0) {
-    console.log('🔎 No hay opp_sales_lead válidos para este account.');
-    return;
-  }
-
-  // ordenar por frecuencia desc, luego por “reciente”, luego por id, luego alfabético
-  emails.sort((a, b) => {
-    const c = counts.get(b) - counts.get(a);
-    if (c !== 0) return c;
-    const rb = recency.get(b) || { latestDateMs: -1, latestOppId: -1 };
-    const ra = recency.get(a) || { latestDateMs: -1, latestOppId: -1 };
-    if (rb.latestDateMs !== ra.latestDateMs) return rb.latestDateMs - ra.latestDateMs;
-    if (rb.latestOppId  !== ra.latestOppId)  return rb.latestOppId  - ra.latestOppId;
-    return a.localeCompare(b);
-  });
-
-  const winner = emails[0];
-  if (!winner) return;
-
-  // Evita escribir si ya está igual
-  if (winner === currentManagerLower) {
-    console.log(`✅ account_manager ya es ${winner}, no se actualiza.`);
-    return;
-  }
-
-  // Persistir en account.account_manager
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ account_manager: winner })
-  })
-  .then(r => {
-    if (!r.ok) throw new Error('PATCH account_manager failed');
-    console.log(`🟢 account_manager actualizado a ${winner}`);
-  })
-  .catch(err => console.error('❌ Error asignando account_manager:', err));
-}
 
 function editField(field) {
   const currentLink = document.getElementById(`${field}-link`).href;

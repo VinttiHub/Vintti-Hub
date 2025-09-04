@@ -935,8 +935,7 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     const allowedEmails = new Set([
       'agustin@vintti.com',
       'bahia@vintti.com',
-      'lara@vintti.com',
-      'agostina@vintti.com'
+      'lara@vintti.com'
     ]);
 
     // Limpia opciones previas y agrega placeholder
