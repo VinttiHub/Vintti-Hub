@@ -2274,3 +2274,80 @@ input:checked + .slider::before {
 #precreate-no-match { 
   text-align: center;    /* por si la flecha vive dentro de este bloque */
 }
+/* ===== Career Publish popup: layout grande y orden ===== */
+#publishCareerPopup .popup-content{
+  width: min(1100px, 92vw) !important;
+  max-height: 86vh !important;
+  overflow: auto !important;
+  padding: 28px !important;
+  border-radius: 16px !important;
+}
+
+/* grid 2x2 dentro de la popup */
+#publishCareerPopup .overview-grid{
+  display:grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 18px 24px !important;
+  align-items:start;
+}
+
+/* Cualquier “full” ocupa todo el ancho */
+#publishCareerPopup .overview-grid .input-group.full{
+  grid-column: 1 / -1 !important;
+}
+
+/* Botonera abajo a la derecha */
+#publishCareerPopup .popup-content .actions-row{
+  display:flex; gap:10px; justify-content:flex-end; margin-top: 10px;
+}
+
+/* Inputs visualmente consistentes */
+#publishCareerPopup .input-group input,
+#publishCareerPopup .input-group select,
+#publishCareerPopup .input-group textarea{
+  width:100%;
+  max-width: none !important;
+  border:1px solid #e2e8f0;
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:14px;
+  background:#fff;
+}
+#publishCareerPopup .input-group input:focus,
+#publishCareerPopup .input-group select:focus,
+#publishCareerPopup .input-group textarea:focus{
+  border-color:#d8b4f8;
+  box-shadow:0 0 0 3px rgba(216,180,248,.25);
+  outline:none;
+}
+
+/* Normalizar Choices (country/city) para que NO se deformen ni brillen raro */
+#publishCareerPopup .choices{
+  width:100% !important;
+  border:1px solid #e2e8f0 !important;
+  border-radius:12px !important;
+  min-height:44px !important;
+  padding:0 !important;
+  box-shadow:none !important;
+  background:#fff !important;
+}
+#publishCareerPopup .choices:focus-within{
+  box-shadow:0 0 0 3px rgba(216,180,248,.25) !important;
+  border-color:#d8b4f8 !important;
+}
+#publishCareerPopup .choices__inner{
+  border:none !important;
+  background:transparent !important;
+  min-height:44px !important;
+  display:flex; align-items:center;
+  padding:0 12px !important;
+}
+#publishCareerPopup .choices__list--single{ padding:0 !important; }
+#publishCareerPopup .choices__list--dropdown{
+  z-index: 100000 !important;
+  border-radius:12px !important;
+}
+/* Oculta el select viejo de Tools dentro de la popup de Career */
+#publishCareerPopup #career-tools { 
+  display: none !important; 
+}

@@ -867,58 +867,191 @@ function openPublishCareerPopup() {
   const pop = document.getElementById('publishCareerPopup');
   pop.classList.remove('hidden');
 
-  // Prefills desde la página
+  // Prefills desde la página / DB
   const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id') || '';
   const jobTitle = document.getElementById('details-opportunity-name').value || '';
-
-  // Usar la data ya cargada por loadOpportunityData()
   const data = window.currentOpportunityData || {};
+
   const desc = data.career_description || data.hr_job_description || '';
   const reqs = data.career_requirements || '';
   const addi = data.career_additional_info || '';
 
-  document.getElementById('career-jobid').value = oppId;
-  document.getElementById('career-job').value = jobTitle;
+  const savedCountry = data.career_country || '';
+  const savedCity    = data.career_city || '';
+  const savedTools   = Array.isArray(data.career_tools) ? data.career_tools.filter(Boolean) : [];
+
+  // Campos base
+  document.getElementById('career-jobid').value       = oppId;
+  document.getElementById('career-job').value         = data.career_job || jobTitle || '';
   document.getElementById('career-description').value = desc;
-  document.getElementById('career-requirements').value = reqs;
-  document.getElementById('career-additional').value = addi;
+  document.getElementById('career-requirements').value= reqs;
+  document.getElementById('career-additional').value  = addi;
 
-  // Choices: Country
-  const countrySelect = document.getElementById('career-country');
-  countrySelect.innerHTML = '<option value="">Select country...</option>' +
-    LATAM_COUNTRIES.map(c => `<option>${c}</option>`).join('');
-  if (countryChoices) countryChoices.destroy();
-  countryChoices = new Choices(countrySelect, { searchEnabled: true, shouldSort: true, removeItemButton: false });
+  // Selects varios (si existen en DB, muéstralos)
+  document.getElementById('career-jobtype').value     = data.career_job_type || '';
+  document.getElementById('career-seniority').value   = data.career_seniority || '';
+  document.getElementById('career-exp-level').value   = data.career_experience_level || '';
+  document.getElementById('career-field').value       = data.career_field || '';
+  document.getElementById('career-modality').value    = data.career_modality || '';
+  document.getElementById('career-years').value       = data.career_years_experience || '';
 
-  // Choices: City (inicia vacío y deshabilitado)
-  const citySelect = document.getElementById('career-city');
-  citySelect.innerHTML = '<option value="">Select a country first</option>';
-  citySelect.disabled = true;
-  if (cityChoices) cityChoices.destroy();
-  cityChoices = new Choices(citySelect, { searchEnabled: true, shouldSort: true, removeItemButton: false });
+  // ===== Country (Choices) =====
+  const countryEl = document.getElementById('career-country');
+  countryEl.innerHTML =
+    '<option value="">Select country...</option>' +
+    LATAM_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('');
 
-  // Dependencia País -> Ciudad
-  countrySelect.addEventListener('change', () => {
-    const country = countrySelect.value;
+  // si el país guardado no está en la lista, lo agregamos para no perderlo
+  if (savedCountry && !LATAM_COUNTRIES.includes(savedCountry)) {
+    countryEl.insertAdjacentHTML('beforeend', `<option value="${savedCountry}">${savedCountry}</option>`);
+  }
+  countryEl.value = savedCountry || '';
+
+  if (window.countryChoices) window.countryChoices.destroy();
+  window.countryChoices = new Choices(countryEl, {
+    searchEnabled: true,
+    shouldSort: true,
+    removeItemButton: false,
+    searchPlaceholderValue: 'Search country…'
+  });
+
+  // ===== City (Choices) dependiente del país =====
+  const cityEl = document.getElementById('career-city');
+
+  // helper para poblar ciudades según país actual
+  const buildCityChoices = (country, presetCity='') => {
     const cities = CITIES_BY_COUNTRY[country] || [];
-    citySelect.disabled = !cities.length;
-    cityChoices.clearStore();
-    cityChoices.setChoices(cities.map(ct => ({ value: ct, label: ct })), 'value', 'label', true);
-    if (!cities.length) {
-      cityChoices.setChoices([{ value: '', label: 'Select a country first', disabled: true, selected: true }], 'value', 'label', true);
+    if (window.cityChoices) window.cityChoices.destroy();
+    cityEl.innerHTML = '';
+    if (cities.length) {
+      cityEl.disabled = false;
+      // si la ciudad guardada no está entre las conocidas, la añadimos
+      const list = [...cities];
+      if (presetCity && !list.includes(presetCity)) list.unshift(presetCity);
+
+      cityEl.insertAdjacentHTML('beforeend',
+        `<option value="">Select city…</option>` +
+        list.map(ct => `<option value="${ct}">${ct}</option>`).join('')
+      );
+      cityEl.value = presetCity || '';
+      window.cityChoices = new Choices(cityEl, {
+        searchEnabled: true,
+        shouldSort: true,
+        removeItemButton: false,
+        searchPlaceholderValue: 'Search city…'
+      });
+    } else {
+      cityEl.disabled = true;
+      cityEl.insertAdjacentHTML('beforeend', `<option value="">Select a country first</option>`);
+      window.cityChoices = new Choices(cityEl, {
+        searchEnabled: true,
+        shouldSort: true,
+        removeItemButton: false
+      });
+      window.cityChoices.disable();
+    }
+  };
+
+  // construir ciudades para el país guardado (si había)
+  buildCityChoices(savedCountry, savedCity);
+
+  // listener normal (sin {once:true}) para cambios manuales
+  countryEl.addEventListener('change', () => {
+    const country = countryEl.value;
+    buildCityChoices(country, '');
+  });
+
+  // ===== Tools & Skills con chips (preload desde DB) =====
+  mountToolsChips(savedTools);
+}
+
+function mountToolsChips(initial=[]) {
+  const holder = document.querySelector('#publishCareerPopup .field-tools');
+  if (!holder) return;
+
+  // limpia y vuelve a construir (no rompemos el <label>)
+  const label = holder.querySelector('label');
+  const hints = holder.querySelector('small');
+  holder.querySelectorAll('.tools-chips, .tools-input').forEach(n => n.remove());
+
+  const chips = document.createElement('div');
+  chips.className = 'tools-chips';
+  chips.style.display = 'flex';
+  chips.style.flexWrap = 'wrap';
+  chips.style.gap = '8px';
+  chips.style.padding = '8px 10px';
+  chips.style.border = '1px solid #e2e8f0';
+  chips.style.borderRadius = '12px';
+  chips.style.background = '#fff';
+
+  const input = document.createElement('input');
+  input.className = 'tools-input';
+  input.type = 'text';
+  input.placeholder = 'Type a tool and press Enter';
+  input.style.border = 'none';
+  input.style.outline = 'none';
+  input.style.flex = '1';
+  input.style.minWidth = '160px';
+  input.style.padding = '6px 4px';
+  input.autocomplete = 'off';
+
+  // estado en memoria
+  window.__careerTools = Array.isArray(initial) ? [...initial] : [];
+
+  const render = () => {
+    // borra chips existentes (menos el input)
+    chips.querySelectorAll('.chip').forEach(n => n.remove());
+    window.__careerTools.forEach((t, idx) => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = t;
+      chip.style.padding = '6px 10px';
+      chip.style.borderRadius = '16px';
+      chip.style.background = '#dce9f8';
+      chip.style.color = '#0a1f44';
+      chip.style.fontSize = '12px';
+      chip.style.display = 'inline-flex';
+      chip.style.alignItems = 'center';
+      chip.style.gap = '8px';
+
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '✕';
+      x.style.border = 'none';
+      x.style.background = 'transparent';
+      x.style.cursor = 'pointer';
+      x.style.fontSize = '12px';
+      x.onclick = () => {
+        window.__careerTools.splice(idx, 1);
+        render();
+      };
+
+      chip.appendChild(x);
+      // Insertar chip antes del input
+      chips.insertBefore(chip, input);
+    });
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = input.value.trim();
+      if (!val) return;
+      if (!window.__careerTools.includes(val)) {
+        window.__careerTools.push(val);
+        render();
+      }
+      input.value = '';
     }
   });
 
-  // Tools (tags libres)
-  const toolsSelect = document.getElementById('career-tools');
-  toolsSelect.innerHTML = ''; // limpio siempre
-  if (toolsChoices) toolsChoices.destroy();
-  toolsChoices = new Choices(toolsSelect, {
-    removeItemButton: true,
-    duplicateItemsAllowed: false,
-    addItems: true,
-    addItemFilter: value => value.trim().length > 0
-  });
+  // Ensambla
+  chips.appendChild(input);
+  // Recolocar dentro del holder
+  if (hints) holder.insertBefore(chips, hints);
+  else holder.appendChild(chips);
+
+  render();
 }
 
 function closePublishCareerPopup() {
@@ -934,24 +1067,29 @@ async function saveCareerPayload(publish = false) {
   const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   if (!oppId) return alert('❌ Invalid Opportunity ID');
 
+  // Si existen chips, tomamos esas; si no, intentamos Choices (por compatibilidad)
+  const toolsFromChips = (window.__careerTools || []).filter(Boolean);
+  const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : [])
+    .filter(Boolean);
+  const finalTools = toolsFromChips.length ? toolsFromChips : toolsFromChoices;
+
   const payload = {
-    career_job_id: document.getElementById('career-jobid').value,
-    career_job: document.getElementById('career-job').value,
-    career_country: document.getElementById('career-country').value,
-    career_city: document.getElementById('career-city').value,
-    career_job_type: document.getElementById('career-jobtype').value,
-    career_seniority: document.getElementById('career-seniority').value,
-    career_years_experience: document.getElementById('career-years').value,
-    career_experience_level: document.getElementById('career-exp-level').value,
-    career_field: document.getElementById('career-field').value,
-    career_modality: document.getElementById('career-modality').value,
-    career_tools: toolsChoices ? toolsChoices.getValue(true) : [],
-    career_description: document.getElementById('career-description').value,
-    career_requirements: document.getElementById('career-requirements').value,
-    career_additional_info: document.getElementById('career-additional').value
+    career_job_id: document.getElementById('career-jobid').value || '',
+    career_job: document.getElementById('career-job').value || '',
+    career_country: document.getElementById('career-country').value || '',
+    career_city: document.getElementById('career-city').value || '',
+    career_job_type: document.getElementById('career-jobtype').value || '',
+    career_seniority: document.getElementById('career-seniority').value || '',
+    career_years_experience: document.getElementById('career-years').value || '',
+    career_experience_level: document.getElementById('career-exp-level').value || '',
+    career_field: document.getElementById('career-field').value || '',
+    career_modality: document.getElementById('career-modality').value || '',
+    career_tools: finalTools,
+    career_description: document.getElementById('career-description').value || '',
+    career_requirements: document.getElementById('career-requirements').value || '',
+    career_additional_info: document.getElementById('career-additional').value || ''
   };
 
-  // Marca opcional si “publicamos”
   if (publish) payload.career_published = true;
 
   try {
@@ -972,11 +1110,9 @@ async function saveCareerPayload(publish = false) {
   }
 }
 
+
 document.getElementById('saveDraftCareerBtn').addEventListener('click', () => saveCareerPayload(false));
 document.getElementById('publishCareerBtn').addEventListener('click', () => saveCareerPayload(true));
-
-
-
 
 
 
@@ -1162,7 +1298,6 @@ async function loadOpportunityData() {
 } catch (err) {
   console.error("❌ Error loading stage from opportunities/light:", err);
 }
-window.currentOpportunityData = data;
       }
       function formatDate(dateStr) {
         if (!dateStr) return '';

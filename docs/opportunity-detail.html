@@ -553,6 +553,7 @@ the Vintti team</textarea>
       <div class="input-group">
         <label>Job Type</label>
         <select id="career-jobtype">
+          <option value="" selected disabled>Select…</option>
           <option value="full-time">Full time</option>
           <option value="part-time">Part time</option>
         </select>
@@ -562,11 +563,46 @@ the Vintti team</textarea>
       <div class="input-group">
         <label>Seniority</label>
         <select id="career-seniority">
-          <option>entry-level</option>
-          <option>junior</option>
-          <option>semi-senior</option>
-          <option>senior</option>
-          <option>manager</option>
+          <option value="" selected disabled>Select…</option>
+          <option value="entry-level">entry-level</option>
+          <option value="junior">junior</option>
+          <option value="semi-senior">semi-senior</option>
+          <option value="senior">senior</option>
+          <option value="manager">manager</option>
+        </select>
+      </div>
+
+      <!-- Experience Level -->
+      <div class="input-group">
+        <label>Experience Level</label>
+        <select id="career-exp-level">
+          <option value="" selected disabled>Select…</option>
+          <option value="entry level job">entry level job</option>
+          <option value="experienced">experienced</option>
+        </select>
+      </div>
+
+      <!-- Field -->
+      <div class="input-group">
+        <label>Field</label>
+        <select id="career-field">
+          <option value="" selected disabled>Select…</option>
+          <option value="accounting">accounting</option>
+          <option value="it">it</option>
+          <option value="legal">legal</option>
+          <option value="marketing">marketing</option>
+          <option value="virtual assistant">virtual assistant</option>
+        </select>
+      </div>
+
+      <!-- Work modality -->
+      <div class="input-group">
+        <label>Work modality</label>
+        <select id="career-modality">
+          <option value="" selected disabled>Select…</option>
+          <option value="remote">remote</option>
+          <option value="hybrid">hybrid</option>
+          <option value="on site">on site</option>
         </select>
       </div>
 
@@ -575,68 +611,35 @@ the Vintti team</textarea>
         <label>Years of Experience</label>
         <input id="career-years" type="number" min="0" placeholder="e.g. 3" />
       </div>
+  <!-- Tools & Skills (déjalo aquí o muévelo al final del bloque; con la clase igual se va al final) -->
+  <div class="input-group full field-tools">
+    <label>Tools &amp; Skills</label>
+    <select id="career-tools" multiple></select>
+    <small>Add items and press Enter</small>
+  </div>
+  <!-- Description -->
+  <div class="input-group full field-desc">
+    <label>Description</label>
+    <textarea id="career-description" class="taller-textarea" placeholder="Job description..."></textarea>
+  </div>
 
-      <!-- Experience Level -->
-      <div class="input-group">
-        <label>Experience Level</label>
-        <select id="career-exp-level">
-          <option>entry level job</option>
-          <option>experienced</option>
-        </select>
-      </div>
+  <!-- Requirements -->
+  <div class="input-group full field-req">
+    <label>Requirements</label>
+    <textarea id="career-requirements" class="taller-textarea" placeholder="Requirements..."></textarea>
+  </div>
 
-      <!-- Field -->
-      <div class="input-group">
-        <label>Field</label>
-        <select id="career-field">
-          <option>accounting</option>
-          <option>it</option>
-          <option>legal</option>
-          <option>marketing</option>
-          <option>virtual assistant</option>
-        </select>
-      </div>
+  <!-- Additional Info -->
+  <div class="input-group full field-add">
+    <label>Additional Information</label>
+    <textarea id="career-additional" class="taller-textarea" placeholder="Additional information..."></textarea>
+  </div>
 
-      <!-- Work modality -->
-      <div class="input-group">
-        <label>Work modality</label>
-        <select id="career-modality">
-          <option>remote</option>
-          <option>hybrid</option>
-          <option>on site</option>
-        </select>
-      </div>
+  <div class="actions-row">
+    <button id="saveDraftCareerBtn">Save Draft</button>
+    <button id="publishCareerBtn" class="header-btn">Publish</button>
+  </div>
 
-      <!-- Tools & Skills -->
-      <div class="input-group full">
-        <label>Tools &amp; Skills</label>
-        <select id="career-tools" multiple></select>
-        <small>Add items and press Enter</small>
-      </div>
-
-      <!-- Description -->
-      <div class="input-group full">
-        <label>Description</label>
-        <textarea id="career-description" class="taller-textarea" placeholder="Job description..."></textarea>
-      </div>
-
-      <!-- Requirements -->
-      <div class="input-group full">
-        <label>Requirements</label>
-        <textarea id="career-requirements" class="taller-textarea" placeholder="Requirements..."></textarea>
-      </div>
-
-      <!-- Additional Info -->
-      <div class="input-group full">
-        <label>Additional Information</label>
-        <textarea id="career-additional" class="taller-textarea" placeholder="Additional information..."></textarea>
-      </div>
-    </div>
-
-    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
-      <button id="saveDraftCareerBtn">Save Draft</button>
-      <button id="publishCareerBtn" class="header-btn">Publish</button>
-    </div>
   </div>
 </div>
 
