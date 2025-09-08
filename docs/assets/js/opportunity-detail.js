@@ -2,6 +2,41 @@ let emailToChoices = null;
 let emailCcChoices = null;
 // ✅ Guarda siempre el id del hire aquí
 window.hireCandidateId = null;
+function stripHtmlToText(html) {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const text = tmp.textContent || tmp.innerText || '';
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function parseToolsValue(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.filter(Boolean).map(String);
+
+  if (typeof val === 'string') {
+    let s = val.trim();
+
+    // Caso JSON: '["book","node"]'
+    if (s.startsWith('[')) {
+      try {
+        const arr = JSON.parse(s);
+        return Array.isArray(arr) ? arr.filter(Boolean).map(v => String(v).trim()) : [];
+      } catch { /* fall through */ }
+    }
+
+    // Caso Postgres text[]: '{book,"react,js",node}'
+    if (s.startsWith('{') && s.endsWith('}')) s = s.slice(1, -1);
+
+    // Split simple por comas + quitar comillas externas
+    return s
+      .split(',')
+      .map(t => t.replace(/^"(.*)"$/,'$1').replace(/\\"/g, '"').trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
 
 function toggleActiveButton(command, button) {
   document.execCommand(command, false, '');
@@ -878,7 +913,7 @@ function openPublishCareerPopup() {
 
   const savedCountry = data.career_country || '';
   const savedCity    = data.career_city || '';
-  const savedTools   = Array.isArray(data.career_tools) ? data.career_tools.filter(Boolean) : [];
+  const savedTools = parseToolsValue(data.career_tools);
 
   // Campos base
   document.getElementById('career-jobid').value       = oppId;
@@ -1127,6 +1162,7 @@ async function loadOpportunityData() {
   try {
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}`);
     const data = await res.json();
+    window.currentOpportunityData = data;
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
     document.getElementById('opportunity-id-text').setAttribute('data-id', data.opportunity_id);
@@ -1270,7 +1306,9 @@ async function loadOpportunityData() {
         } catch (err) {
           console.error('Error loading users for Sales/HR Lead:', err);
         }
-
+        if (data.hr_job_description && stripHtmlToText(data.hr_job_description).length > 20) {
+          await runJDClassifierAndPersist(data);
+        }
 
         } catch (err) {
           console.error("Error loading opportunity:", err);
@@ -1382,6 +1420,51 @@ async function updateAccountField(fieldName, fieldValue) {
   } catch (err) {
     console.error(`Error updating ${fieldName} in account:`, err);
   }
+}
+async function runJDClassifierAndPersist(opportunityData) {
+  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (!oppId) return;
+
+  const jdHtml = opportunityData.hr_job_description || '';
+  const payload = { job_description: jdHtml };
+
+  // Llama a tu nuevo endpoint AI
+  const r = await fetch(`${API_BASE.replace(/\/$/, '')}/ai/jd_to_career_fields`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!r.ok) {
+    const t = await r.text();
+    console.warn('⚠️ jd_to_career_fields returned non-OK:', t);
+    return;
+  }
+
+  const { career_description, career_requirements, career_additional_info } = await r.json();
+
+  // Pinta si existen los campos (en la popup o en la página)
+  const descEl = document.getElementById('career-description');
+  const reqsEl = document.getElementById('career-requirements');
+  const addiEl = document.getElementById('career-additional');
+
+  if (descEl) descEl.value = career_description || '';
+  if (reqsEl) reqsEl.value = career_requirements || '';
+  if (addiEl) addiEl.value = career_additional_info || '';
+
+  // Persiste en DB (usa tu endpoint PATCH de fields)
+  // Importante: no cambies nada si vino vacío; pero si quieres forzar guardado igual, elimina los "if (..)"
+  if (typeof career_description === 'string') {
+    await updateOpportunityField('career_description', career_description);
+  }
+  if (typeof career_requirements === 'string') {
+    await updateOpportunityField('career_requirements', career_requirements);
+  }
+  if (typeof career_additional_info === 'string') {
+    await updateOpportunityField('career_additional_info', career_additional_info);
+  }
+
+  console.log('✅ JD classified & saved.');
 }
 
 function getAccountId() {

@@ -21,6 +21,8 @@ import openai
 import json
 from db import get_connection 
 import time
+import re
+from flask import jsonify, request
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -77,6 +79,103 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
     return (text or "").strip()
 
 def register_ai_routes(app):
+    @app.route('/ai/jd_to_career_fields', methods=['POST', 'OPTIONS'])
+    def jd_to_career_fields():
+        """
+        Recibe: { "job_description": "<texto o HTML del JD>" }
+        Devuelve: { "career_description": str, "career_requirements": str, "career_additional_info": str }
+        *No inventa información; solo reorganiza lo que viene en el JD.*
+        """
+        # CORS preflight
+        if request.method == 'OPTIONS':
+            resp = app.response_class(status=204)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+            return resp
+
+        try:
+            data = request.get_json(force=True) or {}
+            raw_jd = (data.get('job_description') or '').strip()
+            if not raw_jd:
+                return jsonify({"error": "job_description is required"}), 400
+
+            # Quita HTML simple si te llega el editor con tags
+            import re
+            jd_plain = re.sub(r'<[^>]+>', ' ', raw_jd)
+            jd_plain = re.sub(r'\s+', ' ', jd_plain).strip()
+
+            prompt = f"""
+You are an ATS-friendly job description analyzer.
+Read ONLY the provided job description text and return a STRICT JSON object with 3 fields:
+
+- career_description: one cohesive paragraph that summarizes the role and its main responsibilities exactly as stated in the JD (no lists, no headings).
+- career_requirements: a bullet list using "- " (hyphen + space) of the qualifications/requirements explicitly asked for in the JD (education, years of experience, skills, tools, certifications, languages, etc).
+- career_additional_info: everything relevant that is NOT already included above (company info, benefits, nice to have, location, schedule, compensation clues, culture, notes).
+
+Rules:
+- DO NOT invent, infer or generalize beyond what is explicitly stated in the JD.
+- If a section doesn't exist in the JD, return an empty string for that field.
+- Output valid, minified JSON. No markdown, no extra commentary, no code fences.
+- Translate everything to English.
+
+JOB DESCRIPTION (verbatim):
+---
+{jd_plain}
+---
+"""
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,       # 👈 cero creatividad = no inventar
+                max_tokens=1200
+            )
+
+            content = (chat.choices[0].message.content or "").strip()
+
+            # Limpia si llegara con ```json ... ```
+            import json, re
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+            try:
+                obj = json.loads(cleaned)
+            except Exception:
+                # fallback: devolver todo vacío para no romper el front
+                obj = {
+                    "career_description": "",
+                    "career_requirements": "",
+                    "career_additional_info": ""
+                }
+
+            # Normaliza tipos → siempre strings
+            def as_text(v):
+                if v is None:
+                    return ""
+                if isinstance(v, list):
+                    # Si vino como lista, únelas con saltos
+                    return "\n".join(str(x).strip() for x in v if str(x).strip())
+                return str(v).strip()
+
+            result = {
+                "career_description": as_text(obj.get("career_description", "")),
+                "career_requirements": as_text(obj.get("career_requirements", "")),
+                "career_additional_info": as_text(obj.get("career_additional_info", ""))
+            }
+
+            resp = jsonify(result)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 200
+
+        except Exception as e:
+            logging.error("❌ /ai/jd_to_career_fields failed\n" + traceback.format_exc())
+            resp = jsonify({"error": str(e)})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 500
+
+
     @app.route('/ai/improve_tools', methods=['POST'])
     def improve_tools_section():
         try:
