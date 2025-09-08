@@ -2026,6 +2026,139 @@ def handle_candidate_hire_data(candidate_id):
     finally:
         cursor.close()
         conn.close()
+# === Google Sheets Helpers ===
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+
+SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+
+def _sheets_credentials():
+    """
+    Crea credenciales desde:
+    - GOOGLE_SERVICE_ACCOUNT_JSON (contenido JSON inline), o
+    - GOOGLE_SERVICE_ACCOUNT_FILE (ruta a .json)
+    """
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    sa_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
+    if sa_json:
+        import json as _json, io as _io
+        info = _json.loads(sa_json)
+        return Credentials.from_service_account_info(info, scopes=SHEETS_SCOPES)
+    elif sa_file:
+        return Credentials.from_service_account_file(sa_file, scopes=SHEETS_SCOPES)
+    raise RuntimeError("Service Account credentials not configured")
+
+def _sheets_service():
+    creds = _sheets_credentials()
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+def _strip_html(s: str) -> str:
+    if not s:
+        return ""
+    import re
+    text = re.sub(r"<br\s*/?>", "\n", s, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def _tools_to_formatted(val) -> str:
+    """
+    Convierte distintos formatos a 'a,b,c' (sin llaves, sin comillas).
+    Soporta: list, '["a","b"]', '{a,"b,c"}', 'a,b,c'.
+    """
+    if val is None:
+        return ""
+    if isinstance(val, list):
+        return ",".join(str(x).strip() for x in val if str(x).strip())
+
+    s = str(val).strip()
+    # JSON array
+    if s.startswith("["):
+        try:
+            import json as _json
+            arr = _json.loads(s)
+            if isinstance(arr, list):
+                return ",".join(str(x).strip() for x in arr if str(x).strip())
+        except Exception:
+            pass
+    # Postgres text[] -> {a,"b,c"}  -> a,"b,c"
+    if s.startswith("{") and s.endswith("}"):
+        s = s[1:-1]
+    # split por comas y quita comillas
+    items = []
+    for part in s.split(","):
+        part = part.strip()
+        if part.startswith('"') and part.endswith('"'):
+            part = part[1:-1].replace('\\"', '"')
+        if part:
+            items.append(part)
+    return ",".join(items)
+
+def _get_sheet_headers(service, spreadsheet_id, sheet_name):
+    resp = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"{sheet_name}!1:1"
+    ).execute()
+    values = resp.get("values", [[]])
+    headers = values[0] if values else []
+    return [h.strip() for h in headers]
+
+def _get_first_sheet_name(service, spreadsheet_id):
+    meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    sheets = meta.get("sheets", [])
+    if not sheets:
+        raise RuntimeError("Spreadsheet has no sheets")
+    return sheets[0]["properties"]["title"]
+
+def _next_item_id(service, spreadsheet_id, sheet_name, item_id_header="Item ID") -> int:
+    """
+    Lee la columna 'Item ID' y devuelve max+1. Si no hay, devuelve 1.
+    """
+    headers = _get_sheet_headers(service, spreadsheet_id, sheet_name)
+    try:
+        col_idx = headers.index(item_id_header)  # 0-based
+    except ValueError:
+        # si no existe el header, asumimos que el sheet viene con headers correctos.
+        # Puedes agregar lógica para crearlo si quieres.
+        col_idx = None
+
+    # Leer todo el sheet (solo la columna Item ID si la ubicamos)
+    if col_idx is not None:
+        # Convierte índice a letra(s) de columna (A=1)
+        import string
+        def col_letter(n):
+            res = ""
+            n += 1
+            while n:
+                n, rem = divmod(n - 1, 26)
+                res = string.ascii_uppercase[rem] + res
+            return res
+        col_letter_id = col_letter(col_idx)
+        rng = f"{sheet_name}!{col_letter_id}:{col_letter_id}"
+    else:
+        rng = f"{sheet_name}!A:Z"
+
+    resp = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=rng
+    ).execute()
+    rows = resp.get("values", [])
+
+    # Primera fila es header
+    max_id = 0
+    for i, r in enumerate(rows):
+        if i == 0:
+            continue
+        if not r:
+            continue
+        val = r[0] if col_idx is None else r[0]  # ya pedimos solo esa col
+        try:
+            num = int(val)
+            if num > max_id:
+                max_id = num
+        except Exception:
+            continue
+    return max_id + 1 if max_id >= 0 else 1
 
 
 
@@ -3261,6 +3394,136 @@ def accounts_status_bulk_update():
         # No rompemos el flujo del front (solo informamos)
         return jsonify({"updated": 0, "persisted": False, "note": str(e)}), 200
 
+@app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
+def publish_career_to_sheet(opportunity_id):
+    """
+    1) Recibe payload con campos career_* (como tu saveDraft).
+    2) Calcula 'Item ID' leyendo el Google Sheet (max + 1).
+    3) Genera fila alineada por encabezados del sheet y la inserta.
+    4) Persiste en BD: sets career_id = Item ID, career_published = true y actualiza los career_*.
+    5) Devuelve career_id.
+    """
+    if not GOOGLE_SHEETS_SPREADSHEET_ID:
+        return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID env var"}), 500
+
+    data = request.get_json() or {}
+
+    # 0) Cargar (si falta algo) lo que ya esté en DB, para tener todos los career_*
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM opportunity WHERE opportunity_id = %s LIMIT 1", (opportunity_id,))
+        row = cur.fetchone()
+        colnames = [d[0] for d in cur.description]
+        db_opportunity = dict(zip(colnames, row)) if row else {}
+    except Exception:
+        logging.exception("Error reading opportunity before publish")
+        db_opportunity = {}
+    finally:
+        try:
+            cur.close(); conn.close()
+        except Exception:
+            pass
+
+    # Payload final: payload tiene prioridad, si no, DB
+    def pick(k):
+        return data.get(k) if k in data else db_opportunity.get(k)
+
+    # 1) Armar valores
+    job_id         = pick('career_job_id') or str(opportunity_id)
+    job            = pick('career_job') or db_opportunity.get('opp_position_name')
+    country        = pick('career_country') or ''
+    city           = pick('career_city') or ''
+    job_type       = pick('career_job_type') or ''
+    seniority      = pick('career_seniority') or ''
+    years_exp      = pick('career_years_experience') or ''
+    exp_level      = pick('career_experience_level') or ''
+    field          = pick('career_field') or ''
+    modality       = pick('career_modality') or ''
+    tools_raw      = pick('career_tools') or []
+    description    = _strip_html(pick('career_description') or db_opportunity.get('hr_job_description') or '')
+    requirements   = _strip_html(pick('career_requirements') or '')
+    additional     = _strip_html(pick('career_additional_info') or '')
+    tools_fmt      = _tools_to_formatted(tools_raw)
+    version_blank  = ""  # siempre espacio en blanco según tu requerimiento
+
+    # 2) Sheets: detectar nombre de la primera hoja y headers
+    service = _sheets_service()
+    sheet_name = _get_first_sheet_name(service, GOOGLE_SHEETS_SPREADSHEET_ID)
+    headers = _get_sheet_headers(service, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_name)
+
+    # 3) Calcular próximo Item ID y preparar el row dict por header
+    item_id = _next_item_id(service, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_name, item_id_header="Item ID")
+
+    # Mapa Sheet Header -> valor
+    mapped = {
+        "Job ID": job_id,                              # career_job_id
+        "Job": job,                                    # career_job
+        "Location Country": country,                   # career_country
+        "Location City": city,                         # career_city
+        "Job Type": job_type,                          # career_job_type
+        "Seniority": seniority,                        # career_seniority
+        "Years of Experience": years_exp,              # career_years_experience
+        "Experience Level": exp_level,                 # career_experience_level
+        "Field": field,                                # career_field
+        "Remote Type": modality,                       # career_modality
+        "Tools & Skills": tools_fmt,                   # guardamos formateado (más útil para vista)
+        "Tools & Skills Formatted": tools_fmt,         # por si quieres ambas iguales
+        "Description": description,                    # career_description
+        "Requirements": requirements,                  # career_requirements
+        "Additional Information": additional,          # career_additional_info
+        "Version": version_blank,                      # blanco
+        "Item ID": item_id                             # NUEVO consecutivo
+    }
+
+    # 4) Construir fila en el orden de headers del sheet
+    row = [mapped.get(h, "") for h in headers]
+
+    # 5) Append
+    service.spreadsheets().values().append(
+        spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+        range=f"{sheet_name}!A1",
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
+        body={"values": [row]}
+    ).execute()
+
+    # 6) Persistir en BD: career_id + career_published + todos los career_* del payload
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # armamos set dinámico
+        updates = [
+            ("career_id", item_id),
+            ("career_published", True),
+            ("career_job_id", job_id),
+            ("career_job", job),
+            ("career_country", country),
+            ("career_city", city),
+            ("career_job_type", job_type),
+            ("career_seniority", seniority),
+            ("career_years_experience", years_exp),
+            ("career_experience_level", exp_level),
+            ("career_field", field),
+            ("career_modality", modality),
+            ("career_tools", json.dumps(_tools_to_formatted(tools_raw).split(",")) if tools_fmt else json.dumps([])),
+            ("career_description", description),
+            ("career_requirements", requirements),
+            ("career_additional_info", additional),
+        ]
+
+        set_sql = ", ".join([f"{k} = %s" for k, _ in updates])
+        vals = [v for _, v in updates] + [opportunity_id]
+        cur.execute(f"UPDATE opportunity SET {set_sql} WHERE opportunity_id = %s", vals)
+
+        conn.commit()
+        cur.close(); conn.close()
+    except Exception:
+        logging.exception("Error updating DB with career_id after publish")
+        return jsonify({"error": "Sheet OK, but DB update failed", "career_id": item_id}), 500
+
+    return jsonify({"success": True, "career_id": item_id})
 
 
 if __name__ == '__main__':

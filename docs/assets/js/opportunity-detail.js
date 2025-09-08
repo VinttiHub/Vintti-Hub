@@ -1149,6 +1149,66 @@ async function saveCareerPayload(publish = false) {
 document.getElementById('saveDraftCareerBtn').addEventListener('click', () => saveCareerPayload(false));
 document.getElementById('publishCareerBtn').addEventListener('click', () => saveCareerPayload(true));
 
+document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
+
+async function publishCareerNow() {
+  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (!oppId) return alert('❌ Invalid Opportunity ID');
+
+  // Usa chips si existen, o fallback a Choices
+  const toolsFromChips = (window.__careerTools || []).filter(Boolean);
+  const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
+  const finalTools = toolsFromChips.length ? toolsFromChips : toolsFromChoices;
+
+  const payload = {
+    career_job_id: document.getElementById('career-jobid').value || oppId,
+    career_job: document.getElementById('career-job').value || '',
+    career_country: document.getElementById('career-country').value || '',
+    career_city: document.getElementById('career-city').value || '',
+    career_job_type: document.getElementById('career-jobtype').value || '',
+    career_seniority: document.getElementById('career-seniority').value || '',
+    career_years_experience: document.getElementById('career-years').value || '',
+    career_experience_level: document.getElementById('career-exp-level').value || '',
+    career_field: document.getElementById('career-field').value || '',
+    career_modality: document.getElementById('career-modality').value || '',
+    career_tools: finalTools, // array → el backend formatea
+    career_description: document.getElementById('career-description').value || '',
+    career_requirements: document.getElementById('career-requirements').value || '',
+    career_additional_info: document.getElementById('career-additional').value || ''
+  };
+
+  // UI feedback (opcional)
+  const btn = document.getElementById('publishCareerBtn');
+  btn.disabled = true;
+  btn.textContent = 'Publishing…';
+
+  try {
+    const res = await fetch(`${API_BASE}/careers/${oppId}/publish`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('❌ Publish error:', data);
+      alert('❌ Error publishing to Career Sheet');
+    } else {
+      showFriendlyPopup(`✅ Published! Item ID: ${data.career_id}`);
+      // Opcional: refresca datos locales
+      window.currentOpportunityData = window.currentOpportunityData || {};
+      window.currentOpportunityData.career_id = data.career_id;
+      window.currentOpportunityData.career_published = true;
+      closePublishCareerPopup();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('❌ Network error publishing');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Publish';
+  }
+}
 
 
 
