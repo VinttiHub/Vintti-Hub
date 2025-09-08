@@ -176,6 +176,10 @@
         </div>
         <div class="job-header-right">
           <button class="header-btn">Send</button>
+          <!-- 👇 NUEVO -->
+          <button id="publish-career-btn" class="header-btn" style="margin-left:8px;">
+            Publish to Career Site
+          </button>
         </div>
       </div>
       <div class="toolbar" id="job-toolbar">
@@ -512,6 +516,127 @@ the Vintti team</textarea>
     <label for="presentationDateInput">Presentation Date</label>
     <input type="date" id="presentationDateInput" />
     <button id="confirmCreateBatchBtn">Create Batch</button>
+  </div>
+</div>
+<!-- Publish Career Popup -->
+<div id="publishCareerPopup" class="popup hidden">
+  <div class="popup-content" style="max-width:820px;">
+    <span class="close-btn" id="closePublishCareerPopup">&times;</span>
+    <h2>Publish to Career Site</h2>
+
+    <div class="overview-grid">
+      <!-- Job ID -->
+      <div class="input-group">
+        <label>Job ID</label>
+        <input id="career-jobid" type="text" readonly />
+      </div>
+
+      <!-- Job (title) -->
+      <div class="input-group">
+        <label>Job</label>
+        <input id="career-job" type="text" placeholder="Job title..." />
+      </div>
+
+      <!-- Country -->
+      <div class="input-group">
+        <label>Country</label>
+        <select id="career-country"></select>
+      </div>
+
+      <!-- City -->
+      <div class="input-group">
+        <label>City</label>
+        <select id="career-city" disabled></select>
+      </div>
+
+      <!-- Job Type -->
+      <div class="input-group">
+        <label>Job Type</label>
+        <select id="career-jobtype">
+          <option value="full-time">Full time</option>
+          <option value="part-time">Part time</option>
+        </select>
+      </div>
+
+      <!-- Seniority -->
+      <div class="input-group">
+        <label>Seniority</label>
+        <select id="career-seniority">
+          <option>entry-level</option>
+          <option>junior</option>
+          <option>semi-senior</option>
+          <option>senior</option>
+          <option>manager</option>
+        </select>
+      </div>
+
+      <!-- Years of Experience -->
+      <div class="input-group">
+        <label>Years of Experience</label>
+        <input id="career-years" type="number" min="0" placeholder="e.g. 3" />
+      </div>
+
+      <!-- Experience Level -->
+      <div class="input-group">
+        <label>Experience Level</label>
+        <select id="career-exp-level">
+          <option>entry level job</option>
+          <option>experienced</option>
+        </select>
+      </div>
+
+      <!-- Field -->
+      <div class="input-group">
+        <label>Field</label>
+        <select id="career-field">
+          <option>accounting</option>
+          <option>it</option>
+          <option>legal</option>
+          <option>marketing</option>
+          <option>virtual assistant</option>
+        </select>
+      </div>
+
+      <!-- Work modality -->
+      <div class="input-group">
+        <label>Work modality</label>
+        <select id="career-modality">
+          <option>remote</option>
+          <option>hybrid</option>
+          <option>on site</option>
+        </select>
+      </div>
+
+      <!-- Tools & Skills -->
+      <div class="input-group full">
+        <label>Tools &amp; Skills</label>
+        <select id="career-tools" multiple></select>
+        <small>Add items and press Enter</small>
+      </div>
+
+      <!-- Description -->
+      <div class="input-group full">
+        <label>Description</label>
+        <textarea id="career-description" class="taller-textarea" placeholder="Job description..."></textarea>
+      </div>
+
+      <!-- Requirements -->
+      <div class="input-group full">
+        <label>Requirements</label>
+        <textarea id="career-requirements" class="taller-textarea" placeholder="Requirements..."></textarea>
+      </div>
+
+      <!-- Additional Info -->
+      <div class="input-group full">
+        <label>Additional Information</label>
+        <textarea id="career-additional" class="taller-textarea" placeholder="Additional information..."></textarea>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+      <button id="saveDraftCareerBtn">Save Draft</button>
+      <button id="publishCareerBtn" class="header-btn">Publish</button>
+    </div>
   </div>
 </div>
 

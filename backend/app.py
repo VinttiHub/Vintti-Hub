@@ -1068,7 +1068,7 @@ def update_opportunity_fields(opportunity_id):
         'max_salary',
         'years_experience',
         'fee',
-        'opp_comments',  # ojo: sólo si realmente existe en la tabla; si no, no lo envíes
+        'opp_comments',
         'first_meeting_recording',
         'opp_close_date',
         'opp_sales_lead',
@@ -1079,8 +1079,26 @@ def update_opportunity_fields(opportunity_id):
         'client_interviewing_process',
         'replacement_of',
         'replacement_end_date',
-        'candidato_contratado'
+        'candidato_contratado',
+
+        # 👇 NUEVOS (Career Site)
+        'career_job_id',
+        'career_job',
+        'career_country',
+        'career_city',
+        'career_job_type',
+        'career_seniority',
+        'career_years_experience',
+        'career_experience_level',
+        'career_field',
+        'career_modality',
+        'career_tools',  # JSON/text
+        'career_description',
+        'career_requirements',
+        'career_additional_info',
+        'career_published'  # boolean/text
     ]
+
 
     updates, values = [], []
     for field in updatable_fields:

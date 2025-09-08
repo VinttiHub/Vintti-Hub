@@ -827,6 +827,153 @@ document.addEventListener('click', (e) => {
   }
   window.location.href = `/candidate-details.html?id=${encodeURIComponent(id)}`;
 });
+// ====== Career publish – setup ======
+let countryChoices = null;
+let cityChoices = null;
+let toolsChoices = null;
+
+// Lista de países de LATAM (inglés corto)
+const LATAM_COUNTRIES = [
+  "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Ecuador",
+  "El Salvador","Guatemala","Honduras","Mexico","Nicaragua","Panama","Paraguay",
+  "Peru","Puerto Rico","Dominican Republic","Uruguay","Venezuela"
+];
+
+// Ciudades por país (principales) — puedes ampliar cuando quieras
+const CITIES_BY_COUNTRY = {
+  "Argentina": ["Buenos Aires","Córdoba","Rosario","Mendoza","La Plata"],
+  "Bolivia": ["La Paz","Santa Cruz de la Sierra","Cochabamba"],
+  "Brazil": ["São Paulo","Rio de Janeiro","Belo Horizonte","Brasília","Curitiba","Porto Alegre","Recife","Salvador"],
+  "Chile": ["Santiago","Valparaíso","Viña del Mar","Concepción"],
+  "Colombia": ["Bogotá","Medellín","Cali","Barranquilla","Bucaramanga","Cartagena"],
+  "Costa Rica": ["San José","Alajuela","Heredia","Cartago"],
+  "Cuba": ["La Habana","Santiago de Cuba","Camagüey"],
+  "Ecuador": ["Quito","Guayaquil","Cuenca"],
+  "El Salvador": ["San Salvador","Santa Ana","San Miguel"],
+  "Guatemala": ["Guatemala City","Quetzaltenango","Mixco"],
+  "Honduras": ["Tegucigalpa","San Pedro Sula","La Ceiba"],
+  "Mexico": ["Mexico City","Guadalajara","Monterrey","Puebla","Querétaro","Tijuana"],
+  "Nicaragua": ["Managua","León","Masaya"],
+  "Panama": ["Panama City","Colón","David"],
+  "Paraguay": ["Asunción","Ciudad del Este","Encarnación"],
+  "Peru": ["Lima","Arequipa","Trujillo"],
+  "Puerto Rico": ["San Juan","Ponce","Mayagüez"],
+  "Dominican Republic": ["Santo Domingo","Santiago de los Caballeros","La Romana"],
+  "Uruguay": ["Montevideo","Punta del Este","Salto"],
+  "Venezuela": ["Caracas","Maracaibo","Valencia","Barquisimeto"]
+};
+
+function openPublishCareerPopup() {
+  const pop = document.getElementById('publishCareerPopup');
+  pop.classList.remove('hidden');
+
+  // Prefills desde la página
+  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id') || '';
+  const jobTitle = document.getElementById('details-opportunity-name').value || '';
+
+  // Usar la data ya cargada por loadOpportunityData()
+  const data = window.currentOpportunityData || {};
+  const desc = data.career_description || data.hr_job_description || '';
+  const reqs = data.career_requirements || '';
+  const addi = data.career_additional_info || '';
+
+  document.getElementById('career-jobid').value = oppId;
+  document.getElementById('career-job').value = jobTitle;
+  document.getElementById('career-description').value = desc;
+  document.getElementById('career-requirements').value = reqs;
+  document.getElementById('career-additional').value = addi;
+
+  // Choices: Country
+  const countrySelect = document.getElementById('career-country');
+  countrySelect.innerHTML = '<option value="">Select country...</option>' +
+    LATAM_COUNTRIES.map(c => `<option>${c}</option>`).join('');
+  if (countryChoices) countryChoices.destroy();
+  countryChoices = new Choices(countrySelect, { searchEnabled: true, shouldSort: true, removeItemButton: false });
+
+  // Choices: City (inicia vacío y deshabilitado)
+  const citySelect = document.getElementById('career-city');
+  citySelect.innerHTML = '<option value="">Select a country first</option>';
+  citySelect.disabled = true;
+  if (cityChoices) cityChoices.destroy();
+  cityChoices = new Choices(citySelect, { searchEnabled: true, shouldSort: true, removeItemButton: false });
+
+  // Dependencia País -> Ciudad
+  countrySelect.addEventListener('change', () => {
+    const country = countrySelect.value;
+    const cities = CITIES_BY_COUNTRY[country] || [];
+    citySelect.disabled = !cities.length;
+    cityChoices.clearStore();
+    cityChoices.setChoices(cities.map(ct => ({ value: ct, label: ct })), 'value', 'label', true);
+    if (!cities.length) {
+      cityChoices.setChoices([{ value: '', label: 'Select a country first', disabled: true, selected: true }], 'value', 'label', true);
+    }
+  });
+
+  // Tools (tags libres)
+  const toolsSelect = document.getElementById('career-tools');
+  toolsSelect.innerHTML = ''; // limpio siempre
+  if (toolsChoices) toolsChoices.destroy();
+  toolsChoices = new Choices(toolsSelect, {
+    removeItemButton: true,
+    duplicateItemsAllowed: false,
+    addItems: true,
+    addItemFilter: value => value.trim().length > 0
+  });
+}
+
+function closePublishCareerPopup() {
+  document.getElementById('publishCareerPopup').classList.add('hidden');
+}
+
+// Abrir / Cerrar
+document.getElementById('publish-career-btn').addEventListener('click', openPublishCareerPopup);
+document.getElementById('closePublishCareerPopup').addEventListener('click', closePublishCareerPopup);
+
+// Guardar/Publish (persistimos en opportunity via PATCH /fields)
+async function saveCareerPayload(publish = false) {
+  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  if (!oppId) return alert('❌ Invalid Opportunity ID');
+
+  const payload = {
+    career_job_id: document.getElementById('career-jobid').value,
+    career_job: document.getElementById('career-job').value,
+    career_country: document.getElementById('career-country').value,
+    career_city: document.getElementById('career-city').value,
+    career_job_type: document.getElementById('career-jobtype').value,
+    career_seniority: document.getElementById('career-seniority').value,
+    career_years_experience: document.getElementById('career-years').value,
+    career_experience_level: document.getElementById('career-exp-level').value,
+    career_field: document.getElementById('career-field').value,
+    career_modality: document.getElementById('career-modality').value,
+    career_tools: toolsChoices ? toolsChoices.getValue(true) : [],
+    career_description: document.getElementById('career-description').value,
+    career_requirements: document.getElementById('career-requirements').value,
+    career_additional_info: document.getElementById('career-additional').value
+  };
+
+  // Marca opcional si “publicamos”
+  if (publish) payload.career_published = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t || 'Failed to save');
+    }
+    showFriendlyPopup(publish ? '✅ Published to Career Site (saved in DB)' : '💾 Draft saved');
+    closePublishCareerPopup();
+  } catch (err) {
+    console.error(err);
+    alert('❌ Error saving career data');
+  }
+}
+
+document.getElementById('saveDraftCareerBtn').addEventListener('click', () => saveCareerPayload(false));
+document.getElementById('publishCareerBtn').addEventListener('click', () => saveCareerPayload(true));
 
 
 
@@ -1015,7 +1162,7 @@ async function loadOpportunityData() {
 } catch (err) {
   console.error("❌ Error loading stage from opportunities/light:", err);
 }
-
+window.currentOpportunityData = data;
       }
       function formatDate(dateStr) {
         if (!dateStr) return '';
