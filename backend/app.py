@@ -64,6 +64,51 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 app = Flask(__name__)
 register_ai_routes(app)
 app.register_blueprint(coresignal_bp)
+# --- enum canonicals para el Sheet ---
+_CANON = {
+    "career_job_type": {
+        "full-time": "Full-time", "full time":"Full-time", "fulltime":"Full-time",
+        "part-time": "part-time", "part time":"part-time",
+        "contract": "Contract", "freelance":"Contract", "temporary":"Contract",
+        "internship":"Internship"
+    },
+    "career_seniority": {
+        "junior":"Junior",
+        "semi-senior":"Semi-senior", "semisenior":"Semi-senior", "semi senior":"Semi-senior",
+        "senior":"Senior",
+        "entry-level":"Entry-level", "entry level":"Entry-level"
+    },
+    "career_experience_level": {
+        "entry-level job":"Entry-level Job", "entry level job":"Entry-level Job",
+        "experienced":"Experienced"
+    },
+    "career_field": {
+        "it":"IT", "tech":"IT",
+        "marketing":"Marketing", "sales":"Sales", "accounting":"Accounting",
+        "virtual assistant":"Virtual Assistant", "virtual…":"Virtual Assistant", "virtual":"Virtual Assistant"
+    },
+    "career_modality": {
+        "remote":"Remote", "on-site":"On-site", "onsite":"On-site", "hybrid":"Hybrid"
+    },
+}
+
+def _titlecase_city(s: str) -> str:
+    if not s: return ""
+    return " ".join(p.capitalize() for p in s.strip().split())
+
+def _canon_enum(field: str, val: str) -> str:
+    if not val: return ""
+    v = val.strip().lower()
+    m = _CANON.get(field, {})
+    return m.get(v, val.strip().capitalize() if field!="career_field" else val.strip())
+
+def _canon_country(s: str) -> str:
+    if not s: return ""
+    # casos típicos
+    if s.strip().lower() in ("any country","anycountry","any"):
+        return "Any Country"
+    # title case genérico (respetando acrónimos como "USA" si quieres extenderlo)
+    return " ".join(p.capitalize() for p in s.strip().split())
 
 def fetch_data_from_table(table_name):
     try:
@@ -3432,14 +3477,14 @@ def publish_career_to_sheet(opportunity_id):
     # 1) Armar valores
     job_id         = pick('career_job_id') or str(opportunity_id)
     job            = pick('career_job') or db_opportunity.get('opp_position_name')
-    country        = pick('career_country') or ''
-    city           = pick('career_city') or ''
-    job_type       = pick('career_job_type') or ''
-    seniority      = pick('career_seniority') or ''
-    years_exp      = pick('career_years_experience') or ''
-    exp_level      = pick('career_experience_level') or ''
-    field          = pick('career_field') or ''
-    modality       = pick('career_modality') or ''
+    country   = _canon_country(pick('career_country') or '')
+    city      = _titlecase_city(pick('career_city') or '')
+    job_type  = _canon_enum('career_job_type', pick('career_job_type') or '')
+    seniority = _canon_enum('career_seniority', pick('career_seniority') or '')
+    years_exp = (pick('career_years_experience') or '').strip()
+    exp_level = _canon_enum('career_experience_level', pick('career_experience_level') or '')
+    field     = _canon_enum('career_field', pick('career_field') or '')
+    modality  = _canon_enum('career_modality', pick('career_modality') or '')
     tools_raw      = pick('career_tools') or []
     description    = _strip_html(pick('career_description') or db_opportunity.get('hr_job_description') or '')
     requirements   = _strip_html(pick('career_requirements') or '')
@@ -3524,6 +3569,55 @@ def publish_career_to_sheet(opportunity_id):
         return jsonify({"error": "Sheet OK, but DB update failed", "career_id": item_id}), 500
 
     return jsonify({"success": True, "career_id": item_id})
+@app.route('/opportunities/<opportunity_id>/batches', methods=['GET'])
+def get_batches(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT batch_id, batch_number, opportunity_id, presentation_date
+            FROM batch
+            WHERE opportunity_id = %s
+            ORDER BY batch_number ASC
+        """, (opportunity_id,))
+        rows = cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+        data = [dict(zip(cols, r)) for r in rows]
+        cursor.close(); conn.close()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+@app.route('/batches/<int:batch_id>', methods=['PATCH'])
+def update_batch(batch_id):
+    try:
+        data = request.get_json(silent=True) or {}
+        pres = (data.get('presentation_date') or '').strip()
+        if not pres:
+            return jsonify({'error':'presentation_date is required'}), 400
+
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE batch
+            SET presentation_date = %s::date
+            WHERE batch_id = %s
+        """, (pres, batch_id))
+        if cur.rowcount == 0:
+            cur.close(); conn.close()
+            return jsonify({'error':'Not found'}), 404
+        conn.commit()
+
+        # devolver la fila actualizada (opcional)
+        cur.execute("""
+            SELECT batch_id, batch_number, opportunity_id, presentation_date
+            FROM batch WHERE batch_id = %s
+        """, (batch_id,))
+        row = cur.fetchone()
+        cols = [d[0] for d in cur.description]
+        cur.close(); conn.close()
+        return jsonify(dict(zip(cols, row)))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
