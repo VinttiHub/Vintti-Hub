@@ -1,6 +1,20 @@
 let emailToChoices = null;
 let emailCcChoices = null;
 // ✅ Guarda siempre el id del hire aquí
+function getOpportunityId() {
+  const el = document.getElementById('opportunity-id-text');
+  const fromDataset = (el?.getAttribute('data-id') || '').trim();
+  if (fromDataset && fromDataset !== '—') return fromDataset;
+
+  const fromQS = new URLSearchParams(location.search).get('id');
+  if (fromQS) return fromQS;
+
+  const fromText = (el?.textContent || '').trim();
+  if (fromText && fromText !== '—') return fromText;
+
+  return '';
+}
+
 window.hireCandidateId = null;
 function stripHtmlToText(html) {
   if (!html) return '';
@@ -51,6 +65,59 @@ let __candsInFlight = null;
 
 const quickDebounce = (fn, ms = 120) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+// ===== AUTOSAVE infra para Career fields =====
+const AUTOSAVE_MS = 350; // debounce
+const _autosaveAbort = new Map(); // por-campo -> AbortController
+
+const saveCareerField = quickDebounce(async (field, value) => {
+  const oppId = getOpportunityId();
+  if (!oppId) return;
+
+  // Cancela petición previa del mismo campo
+  try { _autosaveAbort.get(field)?.abort(); } catch {}
+  const ac = new AbortController();
+  _autosaveAbort.set(field, ac);
+
+  const payload = { [field]: value };
+  try {
+    const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: ac.signal
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      console.warn(`❌ Autosave ${field} failed:`, t);
+      showTinyToast('⚠️ error saving');
+      return;
+    }
+    // keep local cache fresh
+    window.currentOpportunityData = window.currentOpportunityData || {};
+    window.currentOpportunityData[field] = value;
+    showTinyToast('✅ saved');
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error(`❌ Autosave ${field}:`, err);
+      showTinyToast('⚠️ network error');
+    }
+  }
+}, AUTOSAVE_MS);
+
+// Mini toast sutil (esquina inferior)
+function showTinyToast(msg){
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = `
+    position: fixed; left: 16px; bottom: 16px; z-index: 99999;
+    background: #f6e9ff; color:#6b21a8; border:1px solid #e9d5ff;
+    padding:8px 12px; border-radius:14px; font:600 12px/1.1 Inter, sans-serif;
+    box-shadow:0 4px 12px rgba(0,0,0,.08); opacity:.98; transform: translateY(0);
+    transition: all .25s ease;
+  `;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.style.opacity=.0; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(), 220); }, 900);
+}
 
 function buildIndex(list) {
   return list.map(c => ({ ...c, _haystack: norm(`${c.name} ${c.linkedin} ${c.phone}`) }));
@@ -174,7 +241,7 @@ function openPreCreateModal() {
         <div style="font-size:12px;color:#666;">🔍 Match</div>
       `;
       li.addEventListener('click', async () => {
-        const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+        const opportunityId = getOpportunityId();
         if (!opportunityId || !c.candidate_id) return alert('❌ Invalid candidate or opportunity');
 
         await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
@@ -227,7 +294,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   const input = document.getElementById('candidate-name');
   const candidateId = input.getAttribute('data-candidate-id');
   const name = input.value;
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const opportunityId = getOpportunityId();
   if (!candidateId || !opportunityId) return alert('❌ Select a candidate first');
 
   // Crear en tabla intermedia
@@ -549,7 +616,7 @@ tabs.forEach((tab, index) => {
 
     if (tabName === 'Pipeline') loadPipelineCandidates();
 if (tabName === 'Candidates') {
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const opportunityId = getOpportunityId();
   if (opportunityId && opportunityId !== '—') {
     loadBatchesForOpportunity(opportunityId);
     loadPresentationTable(opportunityId);
@@ -626,14 +693,14 @@ aiGo.addEventListener('click', async () => {
     // Cargar batches si estamos ya en la pestaña "Candidates"
     const activeTab = document.querySelector(".nav-item.active");
     if (activeTab && activeTab.textContent.trim() === "Candidates") {
-      const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+      const opportunityId = getOpportunityId();
       if (opportunityId && opportunityId !== '—') {
         loadBatchesForOpportunity(opportunityId);
       }
     }
 
     document.getElementById('signOffBtn').addEventListener('click', async () => {
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const opportunityId = getOpportunityId();
   if (!opportunityId) return;
 
   document.getElementById('signOffPopup').classList.remove('hidden');
@@ -903,7 +970,7 @@ function openPublishCareerPopup() {
   pop.classList.remove('hidden');
 
   // Prefills desde la página / DB
-  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id') || '';
+  const oppId = getOpportunityId();
   const jobTitle = document.getElementById('details-opportunity-name').value || '';
   const data = window.currentOpportunityData || {};
 
@@ -1099,7 +1166,7 @@ document.getElementById('closePublishCareerPopup').addEventListener('click', clo
 
 // Guardar/Publish (persistimos en opportunity via PATCH /fields)
 async function saveCareerPayload(publish = false) {
-  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const oppId = getOpportunityId();
   if (!oppId) return alert('❌ Invalid Opportunity ID');
 
   // Si existen chips, tomamos esas; si no, intentamos Choices (por compatibilidad)
@@ -1152,7 +1219,7 @@ document.getElementById('publishCareerBtn').addEventListener('click', () => save
 document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
 
 async function publishCareerNow() {
-  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const oppId = getOpportunityId();
   if (!oppId) return alert('❌ Invalid Opportunity ID');
 
   // Usa chips si existen, o fallback a Choices
@@ -1423,7 +1490,7 @@ function calculateDaysAgo(dateStr) {
   return diffDays;
 }
 async function updateOpportunityField(fieldName, fieldValue) {
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const opportunityId = getOpportunityId();
   if (opportunityId === '—' || opportunityId === '') {
     console.error('Opportunity ID not found');
     return;
@@ -1482,7 +1549,7 @@ async function updateAccountField(fieldName, fieldValue) {
   }
 }
 async function runJDClassifierAndPersist(opportunityData) {
-  const oppId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const oppId = getOpportunityId();
   if (!oppId) return;
 
   const jdHtml = opportunityData.hr_job_description || '';
@@ -1541,7 +1608,7 @@ document.getElementById('closeCreateBatchPopup').addEventListener('click', () =>
 
 document.getElementById('confirmCreateBatchBtn').addEventListener('click', async () => {
   const presentationDate = document.getElementById('presentationDateInput').value;
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const opportunityId = getOpportunityId();
 
   if (!presentationDate) return alert('❌ Please select a presentation date');
 
@@ -1606,7 +1673,7 @@ async function loadBatchesForOpportunity(opportunityId) {
 }
 
 async function reloadBatchCandidates() {
-  const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
+  const opportunityId = getOpportunityId();
   if (opportunityId && opportunityId !== '—') {
     await loadBatchesForOpportunity(opportunityId);
   }
