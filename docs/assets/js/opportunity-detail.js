@@ -1,6 +1,19 @@
 let emailToChoices = null;
 let emailCcChoices = null;
-// ✅ Guarda siempre el id del hire aquí
+async function refreshOpportunityData() {
+  const oppId = getOpportunityId();
+  if (!oppId) return null;
+  try {
+    const res = await fetch(`${API_BASE}/opportunities/${oppId}`, { cache: 'no-store' });
+    const fresh = await res.json();
+    window.currentOpportunityData = fresh || {};
+    return fresh;
+  } catch (e) {
+    console.warn('⚠️ Could not refresh opportunity data before opening popup', e);
+    return window.currentOpportunityData || {};
+  }
+}
+
 function getOpportunityId() {
   const el = document.getElementById('opportunity-id-text');
   const fromDataset = (el?.getAttribute('data-id') || '').trim();
@@ -965,14 +978,24 @@ const CITIES_BY_COUNTRY = {
   "Venezuela": ["Caracas","Maracaibo","Valencia","Barquisimeto"]
 };
 
-function openPublishCareerPopup() {
+async function openPublishCareerPopup() {
   const pop = document.getElementById('publishCareerPopup');
   pop.classList.remove('hidden');
 
+  // 🔄 Trae datos frescos del server
+  const data = await refreshOpportunityData();
+
+  // ✅ Toma referencias ANTES de usarlas
+  const countryEl = document.getElementById('career-country');
+  const cityEl    = document.getElementById('career-city');
+  if (!countryEl || !cityEl) {
+    console.error('❌ career-country or career-city not found in DOM');
+    return;
+  }
+
   // Prefills desde la página / DB
-  const oppId = getOpportunityId();
+  const oppId    = getOpportunityId();
   const jobTitle = document.getElementById('details-opportunity-name').value || '';
-  const data = window.currentOpportunityData || {};
 
   const desc = data.career_description || data.hr_job_description || '';
   const reqs = data.career_requirements || '';
@@ -980,30 +1003,103 @@ function openPublishCareerPopup() {
 
   const savedCountry = data.career_country || '';
   const savedCity    = data.career_city || '';
-  const savedTools = parseToolsValue(data.career_tools);
+  const savedTools   = parseToolsValue(data.career_tools);
+// --- Helpers de selección tolerante ---
+const _normKey = s => (s || '')
+  .toString()
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/\p{Diacritic}/gu, '')
+  .replace(/[\s\-_]/g, ''); // quita espacios/guiones
+
+function setSelectByApproxValue(selectEl, rawValue, { synonyms = {} } = {}) {
+  if (!selectEl) return;
+  const valRaw = (rawValue ?? '').toString().trim();
+  if (!valRaw) { selectEl.value = ''; return; }
+
+  const key = _normKey(valRaw);
+
+  // 1) sinónimos (normalizados)
+  const synHit = Object.entries(synonyms).find(([from]) => _normKey(from) === key);
+  const desired = synHit ? synonyms[synHit[0]] : valRaw;
+
+  // 2) intentos de match por value/text normalizados
+  const opts = Array.from(selectEl.options);
+  const desiredKey = _normKey(desired);
+
+  // 2a) match estricto por value normalizado
+  let opt = opts.find(o => _normKey(o.value) === desiredKey);
+  if (!opt) {
+    // 2b) match por label/texto mostrado
+    opt = opts.find(o => _normKey(o.textContent || '') === desiredKey);
+  }
+  if (opt) {
+    opt.selected = true;
+    selectEl.value = opt.value; // asegura .value correcto
+    return;
+  }
+
+  // 3) si no existe esa opción, la creamos para reflejar lo que hay en BD
+  const created = document.createElement('option');
+  created.value = desired;
+  created.textContent = desired;
+  selectEl.appendChild(created);
+  selectEl.value = desired;
+}
+
+// Mapas de sinónimos útiles
+const SYN_JOB_TYPE = {
+  'Full time': 'Full-time',
+  'Fulltime': 'Full-time',
+  'Part time': 'Part-time',
+  'Parttime': 'Part-time'
+};
+const SYN_MODALITY = {
+  'On site': 'On-site',
+  'Onsite': 'On-site',
+  'Remote only': 'Remote',
+  'Hybrid/remote': 'Hybrid'
+};
+const SYN_SENIORITY = {
+  'Semi senior': 'Semi-senior',
+  'Semisenior': 'Semi-senior',
+  'Mid': 'Semi-senior',
+  'Manager/Senior': 'Manager'
+};
+const SYN_EXP_LEVEL = {
+  'Entry level': 'Entry level job',
+  'Entry-level': 'Entry level job',
+  'Experienced': 'Experienced'
+};
+const SYN_FIELD = {
+  'IT': 'it',
+  'I.T.': 'it',
+  'Marketing & Sales': 'marketing',
+  'Virtual Assistant': 'virtual assistant',
+  'Legal Dept': 'legal'
+};
 
   // Campos base
-  document.getElementById('career-jobid').value       = oppId;
-  document.getElementById('career-job').value         = data.career_job || jobTitle || '';
-  document.getElementById('career-description').value = desc;
-  document.getElementById('career-requirements').value= reqs;
-  document.getElementById('career-additional').value  = addi;
+  document.getElementById('career-jobid').value        = oppId;
+  document.getElementById('career-job').value          = data.career_job || jobTitle || '';
+  document.getElementById('career-description').value  = desc;
+  document.getElementById('career-requirements').value = reqs;
+  document.getElementById('career-additional').value   = addi;
 
-  // Selects varios (si existen en DB, muéstralos)
-  document.getElementById('career-jobtype').value     = data.career_job_type || '';
-  document.getElementById('career-seniority').value   = data.career_seniority || '';
-  document.getElementById('career-exp-level').value   = data.career_experience_level || '';
-  document.getElementById('career-field').value       = data.career_field || '';
-  document.getElementById('career-modality').value    = data.career_modality || '';
-  document.getElementById('career-years').value       = data.career_years_experience || '';
+  // Selects varios
+setSelectByApproxValue(document.getElementById('career-jobtype'),   data.career_job_type,        { synonyms: SYN_JOB_TYPE });
+setSelectByApproxValue(document.getElementById('career-seniority'), data.career_seniority,       { synonyms: SYN_SENIORITY });
+setSelectByApproxValue(document.getElementById('career-exp-level'), data.career_experience_level,{ synonyms: SYN_EXP_LEVEL });
+setSelectByApproxValue(document.getElementById('career-field'),     data.career_field,           { synonyms: SYN_FIELD });
+setSelectByApproxValue(document.getElementById('career-modality'),  data.career_modality,        { synonyms: SYN_MODALITY });
+
+  document.getElementById('career-years').value     = data.career_years_experience || '';
 
   // ===== Country (Choices) =====
-  const countryEl = document.getElementById('career-country');
   countryEl.innerHTML =
     '<option value="">Select country...</option>' +
     LATAM_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('');
 
-  // si el país guardado no está en la lista, lo agregamos para no perderlo
   if (savedCountry && !LATAM_COUNTRIES.includes(savedCountry)) {
     countryEl.insertAdjacentHTML('beforeend', `<option value="${savedCountry}">${savedCountry}</option>`);
   }
@@ -1016,18 +1112,16 @@ function openPublishCareerPopup() {
     removeItemButton: false,
     searchPlaceholderValue: 'Search country…'
   });
+  // 👇 Fuerza el valor seleccionado en Choices (evita que quede el anterior)
+  try { window.countryChoices.setChoiceByValue(savedCountry || ''); } catch {}
 
-  // ===== City (Choices) dependiente del país =====
-  const cityEl = document.getElementById('career-city');
-
-  // helper para poblar ciudades según país actual
+  // Helper para poblar ciudades
   const buildCityChoices = (country, presetCity='') => {
     const cities = CITIES_BY_COUNTRY[country] || [];
     if (window.cityChoices) window.cityChoices.destroy();
     cityEl.innerHTML = '';
     if (cities.length) {
       cityEl.disabled = false;
-      // si la ciudad guardada no está entre las conocidas, la añadimos
       const list = [...cities];
       if (presetCity && !list.includes(presetCity)) list.unshift(presetCity);
 
@@ -1042,30 +1136,80 @@ function openPublishCareerPopup() {
         removeItemButton: false,
         searchPlaceholderValue: 'Search city…'
       });
+      // 👇 Igual que arriba: asegura selección real
+      try { window.cityChoices.setChoiceByValue(presetCity || ''); } catch {}
     } else {
       cityEl.disabled = true;
       cityEl.insertAdjacentHTML('beforeend', `<option value="">Select a country first</option>`);
-      window.cityChoices = new Choices(cityEl, {
-        searchEnabled: true,
-        shouldSort: true,
-        removeItemButton: false
-      });
+      window.cityChoices = new Choices(cityEl, { searchEnabled: true, shouldSort: true, removeItemButton: false });
       window.cityChoices.disable();
     }
   };
 
-  // construir ciudades para el país guardado (si había)
+  // Construir ciudades con el país guardado
   buildCityChoices(savedCountry, savedCity);
 
-  // listener normal (sin {once:true}) para cambios manuales
+  // Cambio de país → reconstruye ciudades
   countryEl.addEventListener('change', () => {
     const country = countryEl.value;
     buildCityChoices(country, '');
-  });
+    saveCareerField('career_city', ''); // limpia en DB
+  }, { signal: (window.__publishCareerAC || {}).signal });
 
-  // ===== Tools & Skills con chips (preload desde DB) =====
+  // ===== Tools & Skills con chips =====
   mountToolsChips(savedTools);
+
+  // === AUTOSAVE bindings for Publish Career popup ===
+  if (window.__publishCareerAC) {
+    try { window.__publishCareerAC.abort(); } catch {}
+  }
+  window.__publishCareerAC = new AbortController();
+  const SIG = { signal: window.__publishCareerAC.signal };
+
+  const bind = (selector, field, evt = 'input', xform = v => v) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.addEventListener(evt, () => {
+      const raw = (el.type === 'checkbox') ? el.checked : (el.value ?? '');
+      saveCareerField(field, xform(raw));
+    }, SIG);
+  };
+
+  // Text inputs / selects
+  bind('#career-job',               'career_job', 'input');
+  bind('#career-country',           'career_country', 'change');
+  bind('#career-city',              'career_city', 'change');
+  bind('#career-jobtype',           'career_job_type', 'change');
+  bind('#career-seniority',         'career_seniority', 'change');
+  bind('#career-years',             'career_years_experience', 'input');
+  bind('#career-exp-level',         'career_experience_level', 'change');
+  bind('#career-field',             'career_field', 'change');
+  bind('#career-modality',          'career_modality', 'change');
+
+  // Textareas
+  bind('#career-description', 'career_description', 'input');
+  bind('#career-requirements','career_requirements','input');
+  bind('#career-additional',  'career_additional_info','input');
+
+  // Si cambia el país, limpia city en DB (además de la UI)
+  countryEl.addEventListener('change', () => {
+    saveCareerField('career_city', '');
+  }, SIG);
 }
+
+function closePublishCareerPopup() {
+  if (window.__publishCareerAC) {
+    try { window.__publishCareerAC.abort(); } catch {}
+    window.__publishCareerAC = null;
+  }
+  document.getElementById('publishCareerPopup').classList.add('hidden');
+}
+
+// 🔧 Evita doble submit en Publish (deja SOLO uno)
+const publishBtn = document.getElementById('publishCareerBtn');
+publishBtn.replaceWith(publishBtn.cloneNode(true));
+document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
+
 
 function mountToolsChips(initial=[]) {
   const holder = document.querySelector('#publishCareerPopup .field-tools');
@@ -1126,6 +1270,7 @@ function mountToolsChips(initial=[]) {
       x.onclick = () => {
         window.__careerTools.splice(idx, 1);
         render();
+        saveCareerField('career_tools', [...window.__careerTools]);
       };
 
       chip.appendChild(x);
@@ -1142,6 +1287,7 @@ function mountToolsChips(initial=[]) {
       if (!window.__careerTools.includes(val)) {
         window.__careerTools.push(val);
         render();
+        saveCareerField('career_tools', [...window.__careerTools]);
       }
       input.value = '';
     }
@@ -1157,6 +1303,11 @@ function mountToolsChips(initial=[]) {
 }
 
 function closePublishCareerPopup() {
+  // ❌ corta todos los listeners de esta sesión de popup
+  if (window.__publishCareerAC) {
+    try { window.__publishCareerAC.abort(); } catch {}
+    window.__publishCareerAC = null;
+  }
   document.getElementById('publishCareerPopup').classList.add('hidden');
 }
 
@@ -1164,15 +1315,12 @@ function closePublishCareerPopup() {
 document.getElementById('publish-career-btn').addEventListener('click', openPublishCareerPopup);
 document.getElementById('closePublishCareerPopup').addEventListener('click', closePublishCareerPopup);
 
-// Guardar/Publish (persistimos en opportunity via PATCH /fields)
 async function saveCareerPayload(publish = false) {
   const oppId = getOpportunityId();
   if (!oppId) return alert('❌ Invalid Opportunity ID');
 
-  // Si existen chips, tomamos esas; si no, intentamos Choices (por compatibilidad)
-  const toolsFromChips = (window.__careerTools || []).filter(Boolean);
-  const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : [])
-    .filter(Boolean);
+  const toolsFromChips   = (window.__careerTools || []).filter(Boolean);
+  const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
   const finalTools = toolsFromChips.length ? toolsFromChips : toolsFromChoices;
 
   const payload = {
@@ -1204,6 +1352,10 @@ async function saveCareerPayload(publish = false) {
       const t = await res.text();
       throw new Error(t || 'Failed to save');
     }
+
+    // 🟢 **IMPORTANTE**: sincroniza cache local para que openPublishCareerPopup use los valores nuevos
+    window.currentOpportunityData = Object.assign({}, window.currentOpportunityData || {}, payload);
+
     showFriendlyPopup(publish ? '✅ Published to Career Site (saved in DB)' : '💾 Draft saved');
     closePublishCareerPopup();
   } catch (err) {
@@ -1214,7 +1366,6 @@ async function saveCareerPayload(publish = false) {
 
 
 document.getElementById('saveDraftCareerBtn').addEventListener('click', () => saveCareerPayload(false));
-document.getElementById('publishCareerBtn').addEventListener('click', () => saveCareerPayload(true));
 
 document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
 
