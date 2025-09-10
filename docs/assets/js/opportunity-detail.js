@@ -1279,9 +1279,9 @@ if (aiStarBtn) {
       const out = await r.json();
 
       // 🔮 Rellenar los 3 editores ricos
-      const descEditor = document.querySelector('#career-description ~ .rich-wrap .job-description-editor');
-      const reqsEditor = document.querySelector('#career-requirements ~ .rich-wrap .job-description-editor');
-      const addiEditor = document.querySelector('#career-additional ~ .rich-wrap .job-description-editor');
+      const descEditor = document.getElementById('career-description')?.previousElementSibling?.querySelector('.job-description-editor');
+      const reqsEditor = document.getElementById('career-requirements')?.previousElementSibling?.querySelector('.job-description-editor');
+      const addiEditor = document.getElementById('career-additional')?.previousElementSibling?.querySelector('.job-description-editor');
 
       if (descEditor) descEditor.innerHTML = out.career_description || '';
       if (reqsEditor) reqsEditor.innerHTML = out.career_requirements || '';
@@ -1347,10 +1347,6 @@ if (grid && actions && descAnchor && actions.nextElementSibling !== descAnchor) 
   actions.style.gridColumn = '1 / -1';
   actions.style.margin = '6px 0 2px';
 }
-requestAnimationFrame(() => {
-  try { window.countryChoices?.setChoiceByValue(document.getElementById('career-country').value || ''); } catch {}
-  try { window.cityChoices?.setChoiceByValue(document.getElementById('career-city').value || ''); } catch {}
-});
 
 }
 // 🧰 Crea un editor rico desde un <textarea> existente
