@@ -1,5 +1,61 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+// 🔧 Opciones fijas para Tools & Skills (sin escritura libre)
+const CAREER_TOOL_OPTIONS = [
+  "Problem Solving",
+  "Teamwork",
+  "Time Management",
+  "Adaptability",
+  "Critical Thinking",
+  "Leadership",
+  "Creativity",
+  "Technical Skills",
+  "Interpersonal Skills",
+  "Communication Skills"
+];
+
+// Monta Choices en #career-tools SIN permitir crear valores nuevos
+function mountToolsDropdown(selected = []) {
+  const sel = document.getElementById('career-tools');
+  if (!sel) return;
+
+  // limpiar opciones y poblar
+  sel.innerHTML = CAREER_TOOL_OPTIONS
+    .map(v => `<option value="${v}">${v}</option>`)
+    .join('');
+
+  // destruir instancia anterior si existe
+  if (window.toolsChoices) {
+    try { window.toolsChoices.destroy(); } catch {}
+  }
+
+  // Instancia Choices (chips) SOLO con opciones existentes
+  window.toolsChoices = new Choices(sel, {
+    removeItemButton: true,
+    shouldSort: false,
+    searchPlaceholderValue: 'Search skill…',
+    searchEnabled: true,
+    allowHTML: true,      // render safe; el texto viene fijo de nuestra lista
+    duplicateItemsAllowed: false,
+    addItems: true,       // permite seleccionar del dropdown
+    addItemFilter: () => true,
+    // ⚠️ clave: en <select> Choices NO permite crear valores inexistentes
+    // (solo en <input type="text">). Así que no hay "free typing".
+  });
+
+  // Seleccionar las que ya vienen de BD (tolerante)
+  (Array.isArray(selected) ? selected : parseToolsValue(selected)).forEach(v => {
+    const opt = CAREER_TOOL_OPTIONS.find(o => o.toLowerCase() === String(v).toLowerCase());
+    if (opt) window.toolsChoices.setChoiceByValue(opt);
+  });
+
+  // Autosave en cada cambio
+  sel.addEventListener('change', () => {
+    const vals = window.toolsChoices.getValue(true); // array de strings
+    saveCareerField('career_tools', vals);
+  }, { signal: (window.__publishCareerAC || {}).signal });
+}
+
 async function refreshOpportunityData() {
   const oppId = getOpportunityId();
   if (!oppId) return null;
@@ -949,10 +1005,12 @@ let toolsChoices = null;
 
 // Lista de países de LATAM (inglés corto)
 const LATAM_COUNTRIES = [
+  "Latin America", 
   "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Ecuador",
   "El Salvador","Guatemala","Honduras","Mexico","Nicaragua","Panama","Paraguay",
   "Peru","Puerto Rico","Dominican Republic","Uruguay","Venezuela"
 ];
+
 
 // Ciudades por país (principales) — puedes ampliar cuando quieras
 const CITIES_BY_COUNTRY = {
@@ -1117,6 +1175,15 @@ setSelectByApproxValue(document.getElementById('career-modality'),  data.career_
 
   // Helper para poblar ciudades
   const buildCityChoices = (country, presetCity='') => {
+      if (country === 'Latin America') {
+    if (window.cityChoices) window.cityChoices.destroy();
+    cityEl.disabled = false;
+    cityEl.innerHTML = `<option value="Any Country">Any Country</option>`;
+    window.cityChoices = new Choices(cityEl, { searchEnabled: false, shouldSort: false });
+    try { window.cityChoices.setChoiceByValue('Any Country'); } catch {}
+    saveCareerField('career_city', 'Any Country');
+    return;
+  }
     const cities = CITIES_BY_COUNTRY[country] || [];
     if (window.cityChoices) window.cityChoices.destroy();
     cityEl.innerHTML = '';
@@ -1157,7 +1224,7 @@ setSelectByApproxValue(document.getElementById('career-modality'),  data.career_
   }, { signal: (window.__publishCareerAC || {}).signal });
 
   // ===== Tools & Skills con chips =====
-  mountToolsChips(savedTools);
+  mountToolsDropdown(savedTools);
 
   // === AUTOSAVE bindings for Publish Career popup ===
   if (window.__publishCareerAC) {
@@ -1165,6 +1232,82 @@ setSelectByApproxValue(document.getElementById('career-modality'),  data.career_
   }
   window.__publishCareerAC = new AbortController();
   const SIG = { signal: window.__publishCareerAC.signal };
+// ⚙️ Upgradear los 3 textareas a rich editors con autosave HTML
+const descEditor = createRichEditor('career-description', 'career_description', SIG.signal);
+const reqsEditor = createRichEditor('career-requirements', 'career_requirements', SIG.signal);
+const addiEditor = createRichEditor('career-additional', 'career_additional_info', SIG.signal);
+
+// Prefill desde DB como HTML (ya los inicializamos así en createRichEditor con el value del textarea),
+// pero si quieres forzar contenido de la última carga:
+if (descEditor) descEditor.innerHTML = (data.career_description || data.hr_job_description || '');
+if (reqsEditor) reqsEditor.innerHTML = (data.career_requirements || '');
+if (addiEditor) addiEditor.innerHTML = (data.career_additional_info || '');
+// 👉 Enganche del botón ⭐ dentro de openPublishCareerPopup()
+const aiStarBtn   = document.getElementById('career-ai-btn');
+const aiStarStatus = document.getElementById('career-ai-status');
+
+if (aiStarBtn) {
+  aiStarBtn.onclick = async () => {
+    const oppId = getOpportunityId();
+    if (!oppId) return alert('❌ Invalid Opportunity ID');
+
+    // Fuente del JD: editor visible de la página (preferido), o BD.
+    const jdFromPage = document.getElementById('job-description-textarea')?.innerHTML || '';
+    const jd = stripHtmlToText(jdFromPage).length ? jdFromPage : (window.currentOpportunityData?.hr_job_description || '');
+
+    if (!stripHtmlToText(jd).length) {
+      return alert('❌ No Job Description to use');
+    }
+
+    // UI feedback
+    aiStarBtn.disabled = true;
+    const _orig = aiStarBtn.innerHTML;
+    aiStarBtn.innerHTML = '⭐ Generating…';
+    if (aiStarStatus) { aiStarStatus.style.display = 'inline-block'; aiStarStatus.textContent = '⏳ Generating…'; }
+
+    try {
+      // Llamada directa al endpoint de AI (evitamos runJDClassifierAndPersist porque rellena <textarea> ocultos)
+      const r = await fetch(`${API_BASE}/ai/jd_to_career_fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_description: jd })
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(t || 'AI error');
+      }
+      const out = await r.json();
+
+      // 🔮 Rellenar los 3 editores ricos
+      const descEditor = document.querySelector('#career-description ~ .rich-wrap .job-description-editor');
+      const reqsEditor = document.querySelector('#career-requirements ~ .rich-wrap .job-description-editor');
+      const addiEditor = document.querySelector('#career-additional ~ .rich-wrap .job-description-editor');
+
+      if (descEditor) descEditor.innerHTML = out.career_description || '';
+      if (reqsEditor) reqsEditor.innerHTML = out.career_requirements || '';
+      if (addiEditor) addiEditor.innerHTML = out.career_additional_info || '';
+
+      // 💾 Persistir en la BD (guardamos el HTML de los editores)
+      await Promise.all([
+        saveCareerField('career_description', descEditor?.innerHTML || ''),
+        saveCareerField('career_requirements', reqsEditor?.innerHTML || ''),
+        saveCareerField('career_additional_info', addiEditor?.innerHTML || '')
+      ]);
+
+      if (aiStarStatus) aiStarStatus.textContent = '✅ Ready';
+      setTimeout(() => { if (aiStarStatus) aiStarStatus.style.display = 'none'; }, 900);
+
+      alert('✅ Campos generados y guardados');
+    } catch (err) {
+      console.error('❌ Error generating career fields:', err);
+      if (aiStarStatus) { aiStarStatus.textContent = '❌ Error'; setTimeout(()=> aiStarStatus.style.display='none', 1200); }
+      alert('❌ Error generando los campos');
+    } finally {
+      aiStarBtn.disabled = false;
+      aiStarBtn.innerHTML = _orig;
+    }
+  };
+}
 
   const bind = (selector, field, evt = 'input', xform = v => v) => {
     const el = document.querySelector(selector);
@@ -1195,7 +1338,95 @@ setSelectByApproxValue(document.getElementById('career-modality'),  data.career_
   countryEl.addEventListener('change', () => {
     saveCareerField('career_city', '');
   }, SIG);
+  // 👉 mover el bloque de acciones justo arriba de Description
+const grid = document.querySelector('#publishCareerPopup .overview-grid');
+const actions = document.getElementById('career-ai-btn')?.closest('.career-actions');
+const descAnchor = grid.querySelector('.field-desc');
+if (grid && actions && descAnchor && actions.nextElementSibling !== descAnchor) {
+  grid.insertBefore(actions, descAnchor);
+  actions.style.gridColumn = '1 / -1';
+  actions.style.margin = '6px 0 2px';
 }
+
+}
+// 🧰 Crea un editor rico desde un <textarea> existente
+function createRichEditor(textareaId, fieldName, acSignal) {
+  const ta = document.getElementById(textareaId);
+  if (!ta) return;
+
+  // ✅ Si ya se “enhanced”, reutiliza el editor existente
+  if (ta.dataset.enhanced === '1') {
+    const existing = ta.nextElementSibling?.classList?.contains('rich-wrap')
+      ? ta.nextElementSibling.querySelector('.job-description-editor')
+      : null;
+    return existing || null;
+  }
+
+  // contenedor
+  const wrap = document.createElement('div');
+  wrap.className = 'rich-wrap';
+  ta.parentNode.insertBefore(wrap, ta);
+  ta.style.display = 'none';
+  ta.dataset.enhanced = '1'; // ← marca como convertido
+
+  // toolbar (compacta)
+  const bar = document.createElement('div');
+  bar.className = 'toolbar small-toolbar';
+  bar.style.marginBottom = '6px';
+  bar.innerHTML = `
+    <button type="button" data-cmd="bold"><b>B</b></button>
+    <button type="button" data-cmd="italic"><i>I</i></button>
+    <button type="button" data-cmd="ul">• List</button>
+    <div style="display:inline-block; position:relative;">
+      <button type="button" data-emoji>😊</button>
+      <emoji-picker class="popup-emoji" style="display:none; position:absolute; top:100%; left:0;"></emoji-picker>
+    </div>
+  `;
+
+  // editor
+  const ed = document.createElement('div');
+  ed.className = 'job-description-editor';
+  ed.contentEditable = 'true';
+  ed.style.minHeight = '120px';
+  ed.style.border = '1px solid #e2e8f0';
+  ed.style.borderRadius = '10px';
+  ed.style.padding = '10px';
+  ed.style.background = '#fff';
+  ed.innerHTML = ta.value || '';
+
+  // wire toolbar (un solo handler, delegación)
+  bar.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const cmd = btn.dataset.cmd;
+    if (cmd === 'bold') document.execCommand('bold');
+    if (cmd === 'italic') document.execCommand('italic');
+    if (cmd === 'ul') document.execCommand('insertUnorderedList');
+    if (btn.hasAttribute('data-emoji')) {
+      const picker = bar.querySelector('.popup-emoji');
+      picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+    }
+  }, { signal: acSignal });
+
+  // emojis (un solo listener)
+  const picker = bar.querySelector('emoji-picker');
+  picker.addEventListener('emoji-click', (ev) => {
+    ed.focus();
+    document.execCommand('insertText', false, ev.detail.unicode);
+    picker.style.display = 'none';
+  }, { signal: acSignal });
+
+  // autosave HTML
+  const onChange = () => saveCareerField(fieldName, ed.innerHTML);
+  ed.addEventListener('input', onChange, { signal: acSignal });
+  ed.addEventListener('blur', onChange, { signal: acSignal });
+
+  // montar
+  wrap.appendChild(bar);
+  wrap.appendChild(ed);
+  return ed;
+}
+
 
 function closePublishCareerPopup() {
   if (window.__publishCareerAC) {
@@ -1321,7 +1552,7 @@ async function saveCareerPayload(publish = false) {
 
   const toolsFromChips   = (window.__careerTools || []).filter(Boolean);
   const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
-  const finalTools = toolsFromChips.length ? toolsFromChips : toolsFromChoices;
+  const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
 
   const payload = {
     career_job_id: document.getElementById('career-jobid').value || '',
@@ -1335,9 +1566,10 @@ async function saveCareerPayload(publish = false) {
     career_field: document.getElementById('career-field').value || '',
     career_modality: document.getElementById('career-modality').value || '',
     career_tools: finalTools,
-    career_description: document.getElementById('career-description').value || '',
-    career_requirements: document.getElementById('career-requirements').value || '',
-    career_additional_info: document.getElementById('career-additional').value || ''
+career_description: (document.querySelector('#career-description ~ .rich-wrap .job-description-editor')?.innerHTML || ''),
+career_requirements: (document.querySelector('#career-requirements ~ .rich-wrap .job-description-editor')?.innerHTML || ''),
+career_additional_info: (document.querySelector('#career-additional ~ .rich-wrap .job-description-editor')?.innerHTML || '')
+
   };
 
   if (publish) payload.career_published = true;
@@ -1376,7 +1608,7 @@ async function publishCareerNow() {
   // Usa chips si existen, o fallback a Choices
   const toolsFromChips = (window.__careerTools || []).filter(Boolean);
   const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
-  const finalTools = toolsFromChips.length ? toolsFromChips : toolsFromChoices;
+  const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
 
   const payload = {
     career_job_id: document.getElementById('career-jobid').value || oppId,
@@ -1583,9 +1815,6 @@ async function loadOpportunityData() {
 
         } catch (err) {
           console.error('Error loading users for Sales/HR Lead:', err);
-        }
-        if (data.hr_job_description && stripHtmlToText(data.hr_job_description).length > 20) {
-          await runJDClassifierAndPersist(data);
         }
 
         } catch (err) {
