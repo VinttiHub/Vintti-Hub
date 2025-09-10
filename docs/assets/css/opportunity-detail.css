@@ -2297,9 +2297,35 @@ input:checked + .slider::before {
 }
 
 /* Botonera abajo a la derecha */
-#publishCareerPopup .popup-content .actions-row{
-  display:flex; gap:10px; justify-content:flex-end; margin-top: 10px;
+/* ==== Botonera centrada y más discreta ==== */
+#publishCareerPopup .popup-content .actions-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;   /* 👉 centrado */
+  align-items: center;
+  margin: 12px 0 0 0;
+  grid-column: 1 / -1;       /* que ocupe el ancho del grid */
 }
+
+/* Botones un toque más pequeños */
+#publishCareerPopup .popup-content .actions-row button {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+/* Opcional: look más sobrio */
+#saveDraftCareerBtn {
+  background: #eef2ff !important;
+  color: #1f2a44 !important;
+  border: 1px solid #dbe2ff !important;
+}
+#publishCareerBtn {
+  background: #0a84ff !important;
+  color: #fff !important;
+}
+#publishCareerBtn:hover { filter: brightness(0.95); }
+
 
 /* Inputs visualmente consistentes */
 #publishCareerPopup .input-group input,
@@ -2425,3 +2451,85 @@ input:checked + .slider::before {
 
 /* Botón peligro (delete) */
 .btn-delete { color: var(--danger) !important; }
+/* ==== FIX doble borde en Country/City (Choices) ==== */
+#publishCareerPopup #career-country,
+#publishCareerPopup #career-city {
+  border: none !important; /* el <select> original (aunque quede oculto) */
+}
+
+/* El contenedor visual tendrá el ÚNICO borde */
+#publishCareerPopup #career-country + .choices,
+#publishCareerPopup #career-city + .choices {
+  border: 1px solid #d0d5dc !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+}
+
+/* Quita el borde “pequeño” interno */
+#publishCareerPopup #career-country + .choices .choices__inner,
+#publishCareerPopup #career-city + .choices .choices__inner {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 42px !important;
+  display: flex; align-items: center;
+  padding: 0 12px !important;
+}
+
+/* Dropdown consistente, sin doble borde */
+#publishCareerPopup #career-country + .choices .choices__list--dropdown,
+#publishCareerPopup #career-city + .choices .choices__list--dropdown {
+  border: 1px solid #d0d5dc !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.08) !important;
+  margin-top: 4px !important;
+}
+
+/* Placeholders y texto alineados */
+#publishCareerPopup #career-country + .choices .choices__list--single,
+#publishCareerPopup #career-city + .choices .choices__list--single {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+#publishCareerPopup #career-country + .choices .choices__placeholder,
+#publishCareerPopup #career-city + .choices .choices__placeholder {
+  color: #8a8f98 !important;
+}
+/* ==== Toolbar: a la derecha y compacta ==== */
+#publishCareerPopup .rich-wrap .toolbar.small-toolbar {
+  display: flex;
+  justify-content: flex-end;   /* 👉 derecha */
+  align-items: center;
+  gap: 6px;                    /* botones más pegados */
+  margin: 0 0 6px 0;           /* sin margen lateral extraño */
+  padding: 0;                  /* quita el padding que empujaba a la izquierda */
+}
+
+#publishCareerPopup .rich-wrap .toolbar.small-toolbar button {
+  padding: 4px 8px;            /* más pequeños */
+  font-size: 12px;             /* más pequeños */
+  border-radius: 8px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+#publishCareerPopup .rich-wrap .toolbar.small-toolbar button:hover {
+  background: #eee;
+}
+#publishCareerPopup .rich-wrap .toolbar.small-toolbar button.active {
+  background: #e9ddfb;
+  box-shadow: inset 0 0 0 1.5px #b78af9;
+  font-weight: 600;
+}
+
+/* Picker de emojis emergente bien anclado a la derecha */
+#publishCareerPopup .rich-wrap .toolbar.small-toolbar .popup-emoji {
+  right: 0;
+  left: auto;
+  top: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.08);
+}

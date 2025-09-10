@@ -1347,6 +1347,10 @@ if (grid && actions && descAnchor && actions.nextElementSibling !== descAnchor) 
   actions.style.gridColumn = '1 / -1';
   actions.style.margin = '6px 0 2px';
 }
+requestAnimationFrame(() => {
+  try { window.countryChoices?.setChoiceByValue(document.getElementById('career-country').value || ''); } catch {}
+  try { window.cityChoices?.setChoiceByValue(document.getElementById('career-city').value || ''); } catch {}
+});
 
 }
 // 🧰 Crea un editor rico desde un <textarea> existente
