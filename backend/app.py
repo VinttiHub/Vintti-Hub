@@ -2144,12 +2144,6 @@ class _RichRunsParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         t = tag.lower()
-        if t == 'li':
-            if self._text():
-                if not self._text().endswith('\n'):
-                    self._append('\n')
-            self._append('• ')
-            self._ensure_run(len(self._text()), self._current_fmt())
         # bloques que fuerzan salto antes
         if t in ('p','div','section','article','header','footer','aside','tr','h1','h2','h3','h4','h5','h6'):
             self._append('\n')
@@ -2196,10 +2190,11 @@ class _RichRunsParser(HTMLParser):
         return ''.join(self.buf)
 
 def _html_to_richtext_runs(s: str):
+    """
+    Devuelve: (plain_text, text_format_runs_list)
+    """
     if not s:
         return "", []
-    # 👇 eliminamos tags de formato para que NO haya negritas/itálicas
-    s = re.sub(r'(?is)</?\s*(b|strong|i|em)\b[^>]*>', '', s)
     p = _RichRunsParser()
     p.feed(s)
     text = p._text()
@@ -2219,7 +2214,7 @@ def _html_to_richtext_runs(s: str):
             continue
         runs.append({'startIndex': idx, **({'format': fmt} if fmt else {})})
         last_fmt = fmt
-    return text, []
+    return text, runs
 
 
 def _get_sheet_headers(service, spreadsheet_id, sheet_name):
