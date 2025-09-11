@@ -2086,31 +2086,33 @@ from html.parser import HTMLParser
 def _html_to_sheet_text_plain(s: str) -> str:
     if not s:
         return ""
+    # <br> -> \n
     s = re.sub(r'(?i)<br\s*/?>', '\n', s)
 
-    # <li> como líneas con •
-    s = re.sub(r'(?is)<\s*li[^>]*>\s*', '\n• ', s)
-    s = re.sub(r'(?is)</\s*li\s*>', '', s)
+    # Abrir <li> -> "• " (sin salto previo); cerrar </li> -> "\n"
+    s = re.sub(r'(?is)<\s*li[^>]*>\s*', '• ', s)
+    s = re.sub(r'(?is)</\s*li\s*>', '\n', s)
 
-    # cierres de bloques => salto de línea
+    # Cierres de bloques -> \n
     s = re.sub(r'(?is)</\s*(p|div|section|article|header|footer|aside|h[1-6]|tr|ul|ol)\s*>', '\n', s)
 
-    # quitar el resto de etiquetas
+    # Quitar el resto de etiquetas
     s = re.sub(r'(?is)<[^>]+>', '', s)
 
-    # entidades y normalizaciones
-    s = _html.unescape(s)
-    s = s.replace('\u00A0', ' ')
+    # Entidades/espacios
+    s = _html.unescape(s).replace('\u00A0', ' ')
     s = s.replace('\r\n', '\n').replace('\r', '\n')
     s = re.sub(r'[ \t]+\n', '\n', s)
     s = re.sub(r'\n{3,}', '\n\n', s)
     s = re.sub(r'[ \t]+$', '', s, flags=re.M)
+    s = s.lstrip()              # 👈 elimina espacios/saltos al inicio
     s = re.sub(r'\s+$', '', s)
     return s
 
 
 # --- Parse HTML -> (full_text, textFormatRuns[]) para Sheets ---
 class _RichRunsParser(HTMLParser):
+
     def __init__(self):
         super().__init__()
         self.buf = []
@@ -2142,6 +2144,12 @@ class _RichRunsParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         t = tag.lower()
+        if t == 'li':
+            if self._text():
+                if not self._text().endswith('\n'):
+                    self._append('\n')
+            self._append('• ')
+            self._ensure_run(len(self._text()), self._current_fmt())
         # bloques que fuerzan salto antes
         if t in ('p','div','section','article','header','footer','aside','tr','h1','h2','h3','h4','h5','h6'):
             self._append('\n')
@@ -2188,11 +2196,10 @@ class _RichRunsParser(HTMLParser):
         return ''.join(self.buf)
 
 def _html_to_richtext_runs(s: str):
-    """
-    Devuelve: (plain_text, text_format_runs_list)
-    """
     if not s:
         return "", []
+    # 👇 eliminamos tags de formato para que NO haya negritas/itálicas
+    s = re.sub(r'(?is)</?\s*(b|strong|i|em)\b[^>]*>', '', s)
     p = _RichRunsParser()
     p.feed(s)
     text = p._text()
@@ -2212,7 +2219,7 @@ def _html_to_richtext_runs(s: str):
             continue
         runs.append({'startIndex': idx, **({'format': fmt} if fmt else {})})
         last_fmt = fmt
-    return text, runs
+    return text, []
 
 
 def _get_sheet_headers(service, spreadsheet_id, sheet_name):
