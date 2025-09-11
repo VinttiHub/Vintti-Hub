@@ -2079,38 +2079,141 @@ def _sheets_service():
 # Reemplaza _strip_html por esto (o agrega este y úsalo en publish):
 import re, html as _html
 
-def _html_to_sheet_text(s: str) -> str:
-    """
-    Convierte HTML a texto plano preservando saltos de línea reales para Google Sheets.
-    - <br> -> \n
-    - </p>, </div>, </li>, </h1>..</h6>, </section>, </tr> -> \n
-    - <li> -> "• "
-    - Decodifica entidades (&nbsp; -> espacio normal)
-    - Limpia duplicados sin colapsar los \n
-    """
+import html as _html
+from html.parser import HTMLParser
+
+# --- Parse HTML -> plain text con \n y bullets ---
+def _html_to_sheet_text_plain(s: str) -> str:
     if not s:
         return ""
-    # Saltos explícitos
     s = re.sub(r'(?i)<br\s*/?>', '\n', s)
 
-    # Bullets
-    s = re.sub(r'(?i)<\s*li[^>]*>\s*', '• ', s)
+    # <li> como líneas con •
+    s = re.sub(r'(?is)<\s*li[^>]*>\s*', '\n• ', s)
+    s = re.sub(r'(?is)</\s*li\s*>', '', s)
 
-    # Cierres de bloques que implican salto de línea
-    s = re.sub(r'(?i)</\s*(p|div|section|article|header|footer|aside|h[1-6]|tr)\s*>', '\n', s)
+    # cierres de bloques => salto de línea
+    s = re.sub(r'(?is)</\s*(p|div|section|article|header|footer|aside|h[1-6]|tr|ul|ol)\s*>', '\n', s)
 
-    # Quita el resto de etiquetas
-    s = re.sub(r'<[^>]+>', '', s)
+    # quitar el resto de etiquetas
+    s = re.sub(r'(?is)<[^>]+>', '', s)
 
-    # Decodifica entidades (&nbsp; etc.)
+    # entidades y normalizaciones
     s = _html.unescape(s)
-
-    # Normaliza saltos (pero sin colapsarlos)
+    s = s.replace('\u00A0', ' ')
     s = s.replace('\r\n', '\n').replace('\r', '\n')
-    s = re.sub(r'[ \t]+\n', '\n', s)     # espacios antes de \n
-    s = re.sub(r'\n{3,}', '\n\n', s)     # no más de 2 \n seguidos
+    s = re.sub(r'[ \t]+\n', '\n', s)
+    s = re.sub(r'\n{3,}', '\n\n', s)
+    s = re.sub(r'[ \t]+$', '', s, flags=re.M)
+    s = re.sub(r'\s+$', '', s)
+    return s
 
-    return s.strip()
+
+# --- Parse HTML -> (full_text, textFormatRuns[]) para Sheets ---
+class _RichRunsParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.buf = []
+        self.stack = []  # [{'bold':bool, 'italic':bool}]
+        self.runs = []   # [{'startIndex':int, 'format':{...}}]
+        self._last_fmt = {}
+        self._ensure_run(0, {})
+
+    def _current_fmt(self):
+        fmt = {}
+        for st in self.stack:
+            if st.get('bold'): fmt['bold'] = True
+            if st.get('italic'): fmt['italic'] = True
+        return fmt
+
+    def _ensure_run(self, start, fmt):
+        # Inicia un run si cambia el formato
+        if not self.runs:
+            if fmt:
+                self.runs.append({'startIndex': start, 'format': fmt})
+            return
+        if (self._last_fmt or {}) != (fmt or {}):
+            if fmt:
+                self.runs.append({'startIndex': start, 'format': fmt})
+            else:
+                # formato "limpio"
+                self.runs.append({'startIndex': start})
+        self._last_fmt = fmt or {}
+
+    def handle_starttag(self, tag, attrs):
+        t = tag.lower()
+        # bloques que fuerzan salto antes
+        if t in ('p','div','section','article','header','footer','aside','tr','h1','h2','h3','h4','h5','h6'):
+            self._append('\n')
+        if t == 'br':
+            self._append('\n')
+            return
+        if t in ('ul','ol'):
+            # salto para separar lista
+            if self.buf and not self.buf[-1].endswith('\n'):
+                self._append('\n')
+        st = {}
+        if t in ('b','strong'):
+            st['bold'] = True
+        if t in ('i','em'):
+            st['italic'] = True
+        self.stack.append(st)
+        self._ensure_run(len(self._text()), self._current_fmt())
+
+        if t == 'li':
+            # Nueva línea con viñeta
+            if not self._text().endswith('\n'):
+                self._append('\n')
+            self._append('• ')
+            self._ensure_run(len(self._text()), self._current_fmt())
+
+    def handle_endtag(self, tag):
+        t = tag.lower()
+        if self.stack:
+            self.stack.pop()
+        if t in ('p','div','section','article','header','footer','aside','tr','ul','ol','h1','h2','h3','h4','h5','h6'):
+            self._append('\n')
+        self._ensure_run(len(self._text()), self._current_fmt())
+
+    def handle_data(self, data):
+        if not data: return
+        txt = _html.unescape(data).replace('\u00A0', ' ')
+        self._append(txt)
+
+    def _append(self, s):
+        if s:
+            self.buf.append(s)
+
+    def _text(self):
+        return ''.join(self.buf)
+
+def _html_to_richtext_runs(s: str):
+    """
+    Devuelve: (plain_text, text_format_runs_list)
+    """
+    if not s:
+        return "", []
+    p = _RichRunsParser()
+    p.feed(s)
+    text = p._text()
+    # Normaliza saltos y espacios como en plain
+    text = text.replace('\r\n','\n').replace('\r','\n')
+    text = re.sub(r'[ \t]+\n', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'[ \t]+$', '', text, flags=re.M)
+    text = re.sub(r'\s+$', '', text)
+    # Limpia runs fuera de rango y fusiona duplicados consecutivos con mismo formato
+    runs = []
+    last_fmt = None
+    for r in p.runs:
+        idx = max(0, min(len(text), int(r.get('startIndex', 0))))
+        fmt = r.get('format', None)
+        if runs and runs[-1].get('startIndex') == idx and (runs[-1].get('format') or {}) == (fmt or {}):
+            continue
+        runs.append({'startIndex': idx, **({'format': fmt} if fmt else {})})
+        last_fmt = fmt
+    return text, runs
+
 
 def _get_sheet_headers(service, spreadsheet_id, sheet_name):
     resp = service.spreadsheets().values().get(
@@ -3621,14 +3724,15 @@ def publish_career_to_sheet(opportunity_id):
         return jsonify({"error": "Sheets append failed", "detail": str(e)}), 502
 
     # (H) Aplicar WRAP **solo a la fila insertada** en columnas largas
+    # (H) Aplicar WRAP **solo a la fila** y escribir Rich Text (bold/italic) en columnas largas
     try:
         updated = append_resp.get("updates", {}) or {}
         updated_range = updated.get("updatedRange")  # ej: "'Open Positions'!A42:Q42"
         if not updated_range:
             raise RuntimeError("No updatedRange from append; cannot compute rowIndex")
 
-        right = updated_range.split("!", 1)[1]       # "A42:Q42"
-        start_a1 = right.split(":", 1)[0]            # "A42"
+        right = updated_range.split("!", 1)[1]  # "A42:Q42"
+        start_a1 = right.split(":", 1)[0]       # "A42"
 
         def _a1_to_row_col(a1: str):
             m = re.match(r"([A-Za-z]+)(\d+)$", a1)
@@ -3637,39 +3741,109 @@ def publish_career_to_sheet(opportunity_id):
             col = 0
             for ch in col_letters:
                 col = col * 26 + (ord(ch) - ord('A') + 1)
-            return (row_num - 1, col - 1)            # 0-based
+            return (row_num - 1, col - 1)  # 0-based
+
         start_row_idx, _ = _a1_to_row_col(start_a1)
 
-        header_to_idx = {h: i for i, h in enumerate(headers)}
-        wrap_headers = ["Description", "Requirements", "Additional Information"]
-        wrap_cols = [header_to_idx[h] for h in wrap_headers if h in header_to_idx]
-        if wrap_cols:
-            meta = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
-            target_sheet = next((st for st in meta.get("sheets", [])
-                                 if st.get("properties", {}).get("title") == sheet_name),
-                                meta["sheets"][0])
-            sheet_id = target_sheet["properties"]["sheetId"]
+        # Sheet meta
+        meta = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
+        target_sheet = next((st for st in meta.get("sheets", [])
+                             if st.get("properties", {}).get("title") == sheet_name),
+                            meta["sheets"][0])
+        sheet_id = target_sheet["properties"]["sheetId"]
 
-            requests = [{
+        header_to_idx = {h: i for i, h in enumerate(headers)}
+        rich_headers = ["Description", "Requirements", "Additional Information"]
+        rich_cols = [header_to_idx[h] for h in rich_headers if h in header_to_idx]
+
+        # Preferimos el HTML crudo del payload si vino; sino el plain que ya armamos.
+        html_desc = data.get('sheet_description_html') or pick('career_description') or db_opportunity.get('hr_job_description') or ''
+        html_reqs = data.get('sheet_requirements_html') or pick('career_requirements') or ''
+        html_addi = data.get('sheet_additional_html') or pick('career_additional_info') or ''
+
+        desc_text, desc_runs = _html_to_richtext_runs(html_desc)
+        reqs_text, reqs_runs = _html_to_richtext_runs(html_reqs)
+        addi_text, addi_runs = _html_to_richtext_runs(html_addi)
+
+        # Fallback: si por alguna razón no hay texto (o vació), usa el plain ya calculado
+        if not desc_text: desc_text = description
+        if not reqs_text: reqs_text = requirements
+        if not addi_text: addi_text = additional
+
+        # Construimos celdas específicas (en el orden de rich_headers)
+        cells_by_header = {
+            "Description": {
+                "userEnteredValue": {"stringValue": desc_text},
+                **({"textFormatRuns": desc_runs} if desc_runs else {})
+            },
+            "Requirements": {
+                "userEnteredValue": {"stringValue": reqs_text},
+                **({"textFormatRuns": reqs_runs} if reqs_runs else {})
+            },
+            "Additional Information": {
+                "userEnteredValue": {"stringValue": addi_text},
+                **({"textFormatRuns": addi_runs} if addi_runs else {})
+            },
+        }
+
+        # Peticiones: 1) Wrap solo en esa fila/columnas largas, 2) updateCells con RichText
+        requests = []
+
+        # 1) Wrap
+        for col_idx in rich_cols:
+            requests.append({
                 "repeatCell": {
                     "range": {
                         "sheetId": sheet_id,
                         "startRowIndex": start_row_idx,
-                        "endRowIndex": start_row_idx + 1,      # SOLO esa fila
+                        "endRowIndex": start_row_idx + 1,
                         "startColumnIndex": col_idx,
                         "endColumnIndex": col_idx + 1
                     },
                     "cell": {"userEnteredFormat": {"wrapStrategy": "WRAP"}},
                     "fields": "userEnteredFormat.wrapStrategy"
                 }
-            } for col_idx in wrap_cols]
+            })
 
+        # 2) Update cells con Rich Text
+        #   Solo para las columnas existentes en esta hoja
+        row_cells = []
+        for i, h in enumerate(headers):
+            if h in cells_by_header:
+                row_cells.append(cells_by_header[h])
+            else:
+                # Dejar la celda tal cual quedó con append; no tocar
+                row_cells.append(None)
+
+        # Para minimizar, mandamos solo las celdas ricas, no toda la fila
+        # Creamos una request por cada celda rica
+        for h in rich_headers:
+            if h not in header_to_idx: continue
+            col_idx = header_to_idx[h]
+            cell = cells_by_header[h]
+            requests.append({
+                "updateCells": {
+                    "rows": [{
+                        "values": [cell]
+                    }],
+                    "fields": "userEnteredValue,textFormatRuns",
+                    "start": {
+                        "sheetId": sheet_id,
+                        "rowIndex": start_row_idx,
+                        "columnIndex": col_idx
+                    }
+                }
+            })
+
+        if requests:
             service.spreadsheets().batchUpdate(
                 spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
                 body={"requests": requests}
             ).execute()
+
     except Exception as fmt_err:
-        logging.warning("Could not apply per-row wrap: %s", fmt_err)
+        logging.warning("Could not apply rich text/wrap: %s", fmt_err)
+
 
     # (I) NO tocar la BD (requisito). Solo devolver info de la inserción.
     return jsonify({

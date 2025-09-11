@@ -2533,3 +2533,7 @@ input:checked + .slider::before {
   border-radius: 10px;
   box-shadow: 0 8px 20px rgba(0,0,0,.08);
 }
+/* CSS global */
+.rich-wrap { position: relative; overflow: visible; }
+.rich-wrap .popup-emoji { z-index: 99999 !important; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.small-toolbar { position: relative; z-index: 3; }
