@@ -3417,6 +3417,50 @@ import re, html as _html, logging
 def _a1_quote(sheet_name: str) -> str:
     safe = (sheet_name or "").replace("'", "''")
     return f"'{safe}'"
+import re
+
+# Mapas mínimos (1:1) según tu HTML y las opciones del Sheet
+CANON = {
+    "job_type": {
+        "full-time": "Full-time",
+        "part-time": "Part-time",
+    },
+    "seniority": {
+        "entry-level": "Entry-level",
+        "junior": "Junior",
+        "semi-senior": "Semi-senior",
+        "senior": "Senior",
+        "manager": "Manager",
+    },
+    "experience_level": {
+        "entry level job": "Entry-level Job",
+        "experienced": "Experienced",
+    },
+    "field": {
+        "accounting": "Accounting",
+        "it": "IT",
+        "legal": "Legal",
+        "marketing": "Marketing",
+        "virtual assistant": "Virtual Assistant",
+    },
+    "modality": {
+        "remote": "Remote",
+        "hybrid": "Hybrid",
+        "on site": "On-site",
+    },
+}
+
+def _canon(kind: str, value: str) -> str:
+    if not value:
+        return ""
+    v = value.strip().lower()
+    return CANON.get(kind, {}).get(v, value)  # si no está, deja lo que vino
+
+def _to_kebab(s: str) -> str:
+    # "Problem Solving" -> "problem-solving"
+    s = (s or "").strip().lower()
+    s = re.sub(r'[^a-z0-9]+', '-', s)
+    return s.strip('-')
 
 # --- Helper: HTML -> texto preservando \n para Google Sheets ---
 def _html_to_sheet_text(s: str) -> str:
@@ -3469,14 +3513,17 @@ def publish_career_to_sheet(opportunity_id):
 
     # (B) Normalización de campos
     job_id         = pick('career_job_id') or str(opportunity_id)
-    job            = pick('career_job') or db_opportunity.get('opp_position_name')
+    job            = pick('career_job') or db_opportunity.get('opp_position_name') or ''
     country        = (pick('career_country') or '').strip()
     city           = (pick('career_city') or '').strip()
-    job_type       = (pick('career_job_type') or '').strip()
-    seniority      = (pick('career_seniority') or '').strip()
-    exp_level      = (pick('career_experience_level') or '').strip()
-    field          = (pick('career_field') or '').strip()
-    modality       = (pick('career_modality') or '').strip()
+
+    # ← Mapea exactamente a las etiquetas del Sheet
+    job_type   = _canon('job_type',         pick('career_job_type') or '')
+    seniority  = _canon('seniority',        pick('career_seniority') or '')
+    exp_level  = _canon('experience_level', pick('career_experience_level') or '')
+    field      = _canon('field',            pick('career_field') or '')
+    modality   = _canon('modality',         pick('career_modality') or '')
+
     years_exp      = (pick('career_years_experience') or '').strip()
     tools_raw      = pick('career_tools') or []
 
@@ -3485,11 +3532,14 @@ def publish_career_to_sheet(opportunity_id):
     requirements   = _html_to_sheet_text(pick('career_requirements') or '')
     additional     = _html_to_sheet_text(pick('career_additional_info') or '')
 
-    # Tools formateado (fallback si no existe tu helper)
+    # Tools: al Sheet en kebab-case, separadas por coma (multi-select chips de Sheets)
     try:
-        tools_fmt = _tools_to_formatted(tools_raw)  # tu helper, si existe
-    except NameError:
-        tools_fmt = ", ".join([str(t).strip() for t in (tools_raw or []) if str(t).strip()])
+        # si te interesa conservar “bonito” también:
+        tools_pretty = ", ".join([str(t).strip() for t in (tools_raw or []) if str(t).strip()])
+        tools_kebab  = ", ".join([_to_kebab(str(t)) for t in (tools_raw or []) if str(t).strip()])
+    except Exception:
+        tools_pretty = ""
+        tools_kebab  = ""
 
     version_blank  = ""
 
@@ -3516,20 +3566,21 @@ def publish_career_to_sheet(opportunity_id):
         "Job": job,
         "Location Country": country,
         "Location City": city,
-        "Job Type": job_type,
-        "Seniority": seniority,
+        "Job Type": job_type,                    # ← canónico
+        "Seniority": seniority,                  # ← canónico
         "Years of Experience": years_exp,
-        "Experience Level": exp_level,
-        "Field": field,
-        "Remote Type": modality,
-        "Tools & Skills": tools_fmt,
-        "Tools & Skills Formatted": tools_fmt,
+        "Experience Level": exp_level,           # ← canónico
+        "Field": field,                          # ← canónico
+        "Remote Type": modality,                 # ← canónico
+        "Tools & Skills": tools_kebab,           # ← kebab-case (para el dropdown del Sheet)
+        "Tools & Skills Formatted": tools_pretty,# (opcional, por si quieres ver bonito)
         "Description": description,
         "Requirements": requirements,
         "Additional Information": additional,
         "Version": version_blank,
         "Item ID": item_id
     }
+
 
     # (F) Fila en el orden real de headers
     row = [mapped.get(h, "") for h in headers]
