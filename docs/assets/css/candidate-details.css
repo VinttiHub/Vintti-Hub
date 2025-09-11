@@ -1938,3 +1938,101 @@ html body .month-year .btn-clear:active{
 .rich-input ol { list-style: decimal; padding-left: 1.25rem; margin: .25rem 0 .5rem; }
 .rich-input li { margin-left: .25rem; }
 .rich-input p  { margin: .25rem 0; }
+/* === Salary Update Popup: inputs del mismo tamaño === */
+#salary-update-popup input[type="number"],
+#salary-update-popup input[type="date"] {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d8c4b4;
+  font-size: 14px;
+  box-sizing: border-box;
+  line-height: 1.2;
+}
+
+/* Quitar spinners de number */
+#salary-update-popup input[type="number"]::-webkit-outer-spin-button,
+#salary-update-popup input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#salary-update-popup input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Safari tiende a inflar el date; fuerza altura consistente */
+@supports (-webkit-touch-callout: none) {
+  #salary-update-popup input[type="date"] {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* Botón de cierre clickeable siempre encima */
+#salary-update-popup .modal-close{
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  cursor: pointer;
+}
+/* === Salary Update Popup: inputs del mismo tamaño === */
+#salary-update-popup input[type="number"],
+#salary-update-popup input[type="date"] {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d8c4b4;
+  font-size: 14px;
+  box-sizing: border-box;
+  line-height: 1.2;
+}
+
+/* Quitar spinners de number */
+#salary-update-popup input[type="number"]::-webkit-outer-spin-button,
+#salary-update-popup input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#salary-update-popup input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Safari tiende a inflar el date; fuerza altura consistente */
+@supports (-webkit-touch-callout: none) {
+  #salary-update-popup input[type="date"] {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* Botón de cierre clickeable siempre encima */
+#salary-update-popup .modal-close{
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  cursor: pointer;
+}
+/* Hire: que todos los inputs (incluyendo number) llenen el ancho y tengan misma altura */
+#hire .field { align-items: stretch; }          /* el contenedor deja estirar al input */
+
+#hire input,
+#hire select {
+  width: 100%;               /* ← asegura ancho completo */
+  height: 44px;              /* ← altura consistente */
+  box-sizing: border-box;
+}
+
+#hire input[type="number"]{
+  -webkit-appearance: none;  /* Safari */
+  appearance: textfield;
+}
+
+/* por si Safari infla el date: */
+@supports (-webkit-touch-callout: none){
+  #hire input[type="number"],
+  #hire input[type="date"]{ height: 44px; }
+}

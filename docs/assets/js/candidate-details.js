@@ -690,85 +690,136 @@ if (gate) {
   }
 
   // --- Salary Updates (Hire) ---
-  const salaryUpdatesBox = document.getElementById('salary-updates-box');
-  const addSalaryUpdateBtn = document.getElementById('add-salary-update');
-  const popup = document.getElementById('salary-update-popup');
-  const saveUpdateBtn = document.getElementById('save-salary-update');
-  const salaryInput = document.getElementById('update-salary');
-  const feeInput = document.getElementById('update-fee');
+(function salaryUpdatesSection(){
+  const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const cid = new URLSearchParams(location.search).get('id');
 
-  async function loadSalaryUpdates() {
-    if (!salaryUpdatesBox) return;
-    const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`);
+  const box   = document.getElementById('salary-updates-box');
+  const open  = document.getElementById('add-salary-update');
+  const popup = document.getElementById('salary-update-popup');
+  const save  = document.getElementById('save-salary-update');
+  const close = document.getElementById('close-salary-update');
+  const salIn = document.getElementById('update-salary');
+  const feeIn = document.getElementById('update-fee');
+  const dateIn= document.getElementById('update-date');
+
+  if (!cid) return;
+
+  // —— helper: formatea "YYYY-MM-DD" sin usar new Date() (evita TZ shi
+function formatDateHumanES(isoLike){
+  if (!isoLike) return '';
+  const ymd = String(isoLike).slice(0, 10); // "YYYY-MM-DD"
+  const [y, m, d] = ymd.split('-').map(n => Number(n));
+  if (!y || !m || !d) return ymd;
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${String(d).padStart(2,'0')} ${meses[m - 1]} ${y}`;
+}
+
+
+
+  async function loadSalaryUpdates(){
+    if (!box) return;
+    const r = await fetch(`${API}/candidates/${cid}/salary_updates`);
     const data = await r.json();
-    salaryUpdatesBox.innerHTML = '';
+
+    box.innerHTML = '';
     const header = document.createElement('div');
     header.className = 'salary-entry';
     header.style.fontWeight = 'bold';
     header.innerHTML = `<span>Salary</span><span>Fee</span><span>Date</span><span></span>`;
-    salaryUpdatesBox.appendChild(header);
-    (data || []).forEach(update => {
-      const div = document.createElement('div');
-      div.className = 'salary-entry';
-      div.innerHTML = `
-        <span>$${update.salary}</span>
-        <span>$${update.fee ?? ''}</span>
-        <span>${new Date(update.date).toLocaleDateString()}</span>
-        <button data-id="${update.update_id}" class="delete-salary-update">🗑️</button>
+    box.appendChild(header);
+
+    (data || []).forEach(up => {
+      const row = document.createElement('div');
+      row.className = 'salary-entry';
+      const d = (window.formatDateHumanES ? window.formatDateHumanES(up.date) : formatDateHumanES(up.date));
+      row.innerHTML = `
+        <span>$${up.salary}</span>
+        <span>${up.fee != null ? '$'+up.fee : ''}</span>
+        <span>${d}</span>
+        <button class="delete-salary-update" data-id="${up.update_id}">🗑️</button>
       `;
-      salaryUpdatesBox.appendChild(div);
+      box.appendChild(row);
     });
-    document.querySelectorAll('.delete-salary-update').forEach(btn => {
-      btn.addEventListener('click', () => {
+
+    // borrar
+    box.querySelectorAll('.delete-salary-update').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
         const id = btn.dataset.id;
-        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/salary_updates/${id}`, { method: 'DELETE' })
-          .then(loadSalaryUpdates);
+        await fetch(`${API}/salary_updates/${id}`, { method:'DELETE' });
+        loadSalaryUpdates();
       });
     });
   }
   window.loadSalaryUpdates = loadSalaryUpdates;
 
-  if (addSalaryUpdateBtn && popup) {
-    addSalaryUpdateBtn.addEventListener('click', () => {
+  // abrir
+  if (open && popup){
+    open.addEventListener('click', () => {
       popup.classList.remove('hidden');
-      // ocultar fee si modelo es Recruiting
-      const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-      const feeLabel = popup.querySelector('label[for="update-fee"]') || popup.querySelectorAll('label')[1];
-      const feeIn = document.getElementById('update-fee');
-      const isRecruiting = modelText?.includes('recruiting');
-      if (feeLabel && feeIn) {
+
+      // ocultar Fee si el modelo es Recruiting
+      const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase() || '';
+      const isRecruiting = modelText.includes('recruiting');
+      const labels = popup.querySelectorAll('label');
+      const feeLabel = labels[1]; // 2° label es "Fee ($)" en tu HTML
+      if (feeLabel && feeIn){
         feeLabel.style.display = isRecruiting ? 'none' : '';
         feeIn.style.display    = isRecruiting ? 'none' : '';
       }
     });
   }
 
-  if (saveUpdateBtn) {
-    saveUpdateBtn.addEventListener('click', () => {
-      const sal = parseFloat(salaryInput?.value || '');
-      const fee = parseFloat(feeInput?.value || '');
-      const date = document.getElementById('update-date')?.value;
-
-      const modelText = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-      const isRecruiting = modelText?.includes('recruiting');
-
-      if (!date || isNaN(sal) || (!isRecruiting && (feeInput?.value === '' || isNaN(fee)))) {
-        return alert('Please fill all required fields');
+  // ❌ cerrar con la X
+  function wireSalaryPopupClose(){
+    if (!close || !popup) return;
+    close.addEventListener('click', ()=> popup.classList.add('hidden'));
+    // opcional: Esc para cerrar
+    document.addEventListener('keydown', (e)=>{
+      if (!popup.classList.contains('hidden') && e.key === 'Escape'){
+        popup.classList.add('hidden');
       }
-      const body = { salary: sal, date };
-      if (!isRecruiting) body.fee = fee;
-
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/salary_updates`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      }).then(() => {
-        popup?.classList.add('hidden');
-        if (salaryInput) salaryInput.value = '';
-        if (feeInput) feeInput.value = '';
-        const d = document.getElementById('update-date'); if (d) d.value = '';
-        loadSalaryUpdates();
-      });
     });
   }
+  wireSalaryPopupClose();
+
+  // guardar
+  if (save){
+    save.addEventListener('click', async () => {
+      const salary = parseFloat(salIn?.value || '');
+      const fee    = parseFloat(feeIn?.value || '');
+      const date   = dateIn?.value;           // 👈 "YYYY-MM-DD" plano
+
+      const isRecruiting = (document.getElementById('opp-model-pill')?.textContent || '')
+                            .toLowerCase().includes('recruiting');
+
+      if (!date || isNaN(salary) || (!isRecruiting && (feeIn?.value === '' || isNaN(fee)))){
+        return alert('Please fill all required fields');
+      }
+
+      const body = { salary, date };          // 👈 NO convertir a Date()
+      if (!isRecruiting) body.fee = fee;
+
+      await fetch(`${API}/candidates/${cid}/salary_updates`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+
+      // reset + refresco
+      popup?.classList.add('hidden');
+      if (salIn)  salIn.value  = '';
+      if (feeIn)  feeIn.value  = '';
+      if (dateIn) dateIn.value = '';
+      loadSalaryUpdates();
+    });
+  }
+
+  // primera carga si estás en Hire, o deja expuesto window.loadSalaryUpdates()
+  if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
+    loadSalaryUpdates();
+  }
+})(); 
 
   // Si llegaste con #hire desde Close Win → mensaje
   if (window.location.hash === '#hire') {
@@ -1124,3 +1175,102 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
 }
 
 });
+/* === Normalizador global de fechas → "dd mmm yyyy" (es) ================== */
+// Mapea "Sep", "Sept", "Set" → 9, etc (acepta esp/eng abreviado)
+const _MES_IDX = {
+  ene:1, jan:1,
+  feb:2,
+  mar:3,
+  abr:4, apr:4,
+  may:5, may_:5, // por si acaso
+  jun:6,
+  jul:7,
+  ago:8, aug:8,
+  sep:9, set:9, sept:9, sep_:9,
+  oct:10,
+  nov:11,
+  dic:12, dec:12
+};
+const _MES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+function formatDateHumanES(isoLikeOrPretty){
+  if (!isoLikeOrPretty) return '';
+  const s = String(isoLikeOrPretty).trim();
+
+  // 1) ISO: YYYY-MM-DD o YYYY-MM-DDTHH:mm...
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const y = +m[1], mm = +m[2], dd = +m[3];
+    if (y && mm && dd) return `${String(dd).padStart(2,'0')} ${_MES_ES[mm-1]} ${y}`;
+  }
+
+  // 2) “Mon, 01 Sep 2025” | “Lun, 01 Sep 2025” | “Mon 01 Sep 2025” | “01 Sep 2025” | “01 Sep”
+  m = s.match(/(?:[A-Za-zÀ-ÿ]{2,3},?\s*)?(\d{1,2})[\s\/\-\.]+([A-Za-zÀ-ÿ\.]{3,5})\.?(?:[\s\/\-\.]+(\d{4}))?/);
+  if (m) {
+    const dd = +m[1];
+    const monKey = m[2].toLowerCase().replace(/\./g,'').slice(0,4); // 'sept' → 'sept'
+    const mm = _MES_IDX[monKey] || _MES_IDX[monKey.slice(0,3)];
+    const y  = m[3] ? +m[3] : new Date().getFullYear();
+    if (dd && mm) return `${String(dd).padStart(2,'0')} ${_MES_ES[mm-1]} ${y}`;
+  }
+
+  // 3) Si viene algo como “01/09/2025”
+  m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (m) {
+    const dd = +m[1], mm = +m[2], y = +m[3];
+    if (dd && mm && y) return `${String(dd).padStart(2,'0')} ${_MES_ES[mm-1]} ${y}`;
+  }
+
+  return s; // no se pudo parsear, deja tal cual
+}
+
+// Reemplaza texto en nodos que ya están pintados
+function _replaceDateText(node){
+  if (!node) return;
+  const raw = (node.textContent || '').trim();
+  const pretty = formatDateHumanES(raw);
+  if (pretty && pretty !== raw) node.textContent = pretty;
+}
+
+// ➊ Normaliza las fechas de la lista de salary updates (3ra columna)
+(function forceSalaryListDates(){
+  const box = document.getElementById('salary-updates-box');
+  if (!box) return;
+
+  const run = () => {
+    box.querySelectorAll('.salary-entry').forEach((row, i) => {
+      if (i === 0) return; // header
+      const dateCell = row.querySelector('span:nth-child(3)');
+      if (dateCell) _replaceDateText(dateCell);
+    });
+  };
+
+  // correr ahora y observar cambios futuros
+  run();
+  const mo = new MutationObserver(run);
+  mo.observe(box, { childList:true, subtree:true });
+})();
+
+// ➋ Normaliza cualquier “campo Date” en el tab Hire con layout Label arriba / valor abajo
+(function normalizeGenericHireDates(){
+  const hire = document.getElementById('hire');
+  if (!hire) return;
+
+  const run = () => {
+    hire.querySelectorAll('.field').forEach(f => {
+      const lab = f.querySelector('label');
+      if (!lab) return;
+      const txt = (lab.textContent || '').trim().toLowerCase();
+      if (txt === 'date' || txt === 'fecha') {
+        // valor suele estar en el primer elemento no-label dentro del field (evitamos inputs)
+        const val = Array.from(f.children).find(el => el !== lab && el.tagName !== 'INPUT' && el.tagName !== 'SELECT' && el.tagName !== 'TEXTAREA');
+        if (val) _replaceDateText(val);
+      }
+    });
+  };
+
+  // correr ahora y observar cambios en todo el tab
+  run();
+  const mo = new MutationObserver(run);
+  mo.observe(hire, { childList:true, subtree:true });
+})();
