@@ -1635,39 +1635,37 @@ function htmlToPlainWithNewlines(html) {
   if (!html) return '';
   let s = String(html);
 
-  // Normaliza <br>
+  // <br> → \n
   s = s.replace(/<\s*br\s*\/?>/gi, '\n');
 
-  // Caso común que tienes: <div>- algo</div> → "\n- algo"
-  s = s.replace(/<\s*div[^>]*>\s*-\s*/gi, '\n- ').replace(/<\s*\/\s*div\s*>/gi, '\n');
-
-  // Bloques que implican salto de línea
+  // Bloques que implican salto
   const blocks = ['p','section','article','header','footer','aside','h1','h2','h3','h4','h5','h6','table','tr','ul','ol','li','div'];
   blocks.forEach(tag => {
-    const reOpen = new RegExp(`<\\s*${tag}[^>]*>`, 'gi');
+    const reOpen  = new RegExp(`<\\s*${tag}[^>]*>`, 'gi');
     const reClose = new RegExp(`<\\/\\s*${tag}\\s*>`, 'gi');
     s = s.replace(reOpen, '\n').replace(reClose, '\n');
   });
 
-  // Listas semánticas
+  // Listas
   s = s.replace(/<\s*li[^>]*>\s*/gi, '\n• ').replace(/<\s*\/\s*li\s*>/gi, '');
 
-  // Quitar el resto de etiquetas
+  // Quitar etiquetas restantes
   s = s.replace(/<[^>]+>/g, '');
 
-  // Decodifica entidades HTML (&nbsp;, etc.)
+  // Decodificar entidades
   const tmp = document.createElement('textarea');
   tmp.innerHTML = s;
   s = tmp.value;
 
-  // Limpieza
+  // Normalizaciones
   s = s
-    .replace(/\u00A0/g, ' ')   // &nbsp; → espacio
+    .replace(/\u00A0/g, ' ')     // &nbsp; → espacio normal
     .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .replace(/[ \t]+\n/g, '\n')  // espacios antes del salto
+    .replace(/\n{3,}/g, '\n\n'); // máximo 2 saltos seguidos
 
+  // ❗️ NO quites el salto inicial: solo recorta al final
+  s = s.replace(/[ \t]+$/gm, '').replace(/\s+$/,'');
   return s;
 }
 
@@ -1752,6 +1750,49 @@ async function publishCareerNow() {
     btn.textContent = 'Publish';
   }
 }
+// ✅ Delegación global para TODAS las toolbars
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.toolbar button');
+  if (!btn) return;
+
+  // Soporta data-command y data-cmd (ambos los usas en distintos lugares)
+  const cmd = btn.getAttribute('data-command') || btn.getAttribute('data-cmd');
+  if (!cmd) return;
+
+  // Encuentra el editor más cercano: primero el rich editor de la popup,
+  // si no, cae al Job Description principal
+  const wrap = btn.closest('.rich-wrap');
+  const editor = wrap?.querySelector('.job-description-editor') ||
+                 document.getElementById('job-description-textarea');
+
+  if (!editor) return;
+  editor.focus();
+
+  // Normaliza comandos
+  if (cmd === 'ul' || cmd === 'insertUnorderedList') {
+    document.execCommand('insertUnorderedList', false, null);
+  } else {
+    document.execCommand(cmd, false, null);
+  }
+
+  // Feedback visual opcional
+  btn.classList.toggle('active');
+  e.preventDefault();
+});
+
+// ✅ Mantiene botones “activos” acorde a la selección del usuario
+document.addEventListener('mouseup', () => {
+  const editor = document.querySelector('.job-description-editor') || document.getElementById('job-description-textarea');
+  if (!editor) return;
+  document.querySelectorAll('.toolbar button').forEach(btn => {
+    const cmd = btn.getAttribute('data-command') || btn.getAttribute('data-cmd');
+    if (!cmd) return;
+    try {
+      const state = document.queryCommandState(cmd === 'ul' ? 'insertUnorderedList' : cmd);
+      btn.classList.toggle('active', !!state);
+    } catch {}
+  });
+});
 
 
 

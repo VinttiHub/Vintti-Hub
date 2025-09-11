@@ -3466,15 +3466,19 @@ def _to_kebab(s: str) -> str:
 def _html_to_sheet_text(s: str) -> str:
     if not s:
         return ""
-    s = re.sub(r'(?i)<br\s*/?>', '\n', s)                        # <br> -> \n
-    s = re.sub(r'(?i)<\s*li[^>]*>\s*', '• ', s)                  # <li> -> "• "
+    s = re.sub(r'(?i)<br\s*/?>', '\n', s)
+    s = re.sub(r'(?i)<\s*li[^>]*>\s*', '• ', s)
     s = re.sub(r'(?i)</\s*(p|div|section|article|header|footer|aside|h[1-6]|tr)\s*>', '\n', s)
-    s = re.sub(r'<[^>]+>', '', s)                                # quita etiquetas restantes
-    s = _html.unescape(s)                                        # &nbsp; -> espacio normal
+    s = re.sub(r'<[^>]+>', '', s)
+    s = _html.unescape(s)  # &nbsp; -> espacio normal
     s = s.replace('\r\n', '\n').replace('\r', '\n')
-    s = re.sub(r'[ \t]+\n', '\n', s)                             # quita espacios antes del salto
-    s = re.sub(r'\n{3,}', '\n\n', s)                             # máx 2 saltos seguidos
-    return s.strip()
+    s = re.sub(r'[ \t]+\n', '\n', s)
+    s = re.sub(r'\n{3,}', '\n\n', s)
+    # ❗️ NO hagas strip() total; solo “rstrip”
+    s = re.sub(r'[ \t]+$', '', s, flags=re.M)
+    s = re.sub(r'\s+$', '', s)
+    return s
+
 
 @app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
 def publish_career_to_sheet(opportunity_id):
@@ -3512,10 +3516,27 @@ def publish_career_to_sheet(opportunity_id):
         return data.get(k) if k in data else db_opportunity.get(k)
 
     # (B) Normalización de campos
-    job_id         = pick('career_job_id') or str(opportunity_id)
-    job            = pick('career_job') or db_opportunity.get('opp_position_name') or ''
-    country        = (pick('career_country') or '').strip()
-    city           = (pick('career_city') or '').strip()
+    job_id_raw    = pick('career_job_id') or str(opportunity_id)
+    job           = pick('career_job') or db_opportunity.get('opp_position_name') or ''
+    country       = (pick('career_country') or '').strip()
+    city          = (pick('career_city') or '').strip()
+
+    # ... (canónicos iguales)
+
+    years_exp_raw = (pick('career_years_experience') or '').strip()
+
+    # Parse numéricos seguros
+    def _to_int_or_blank(v):
+        try:
+            v = str(v).strip()
+            if not v:
+                return ""
+            return int(float(v))
+        except Exception:
+            return ""
+
+    job_id_num    = _to_int_or_blank(job_id_raw)
+    years_exp_num = _to_int_or_blank(years_exp_raw)
 
     # ← Mapea exactamente a las etiquetas del Sheet
     job_type   = _canon('job_type',         pick('career_job_type') or '')
@@ -3562,23 +3583,24 @@ def publish_career_to_sheet(opportunity_id):
 
     # (E) Mapeo Header -> valor
     mapped = {
-        "Job ID": job_id,
+        "Job ID": job_id_num if job_id_num != "" else job_id_raw,  # num si se pudo
         "Job": job,
         "Location Country": country,
         "Location City": city,
-        "Job Type": job_type,                    # ← canónico
-        "Seniority": seniority,                  # ← canónico
-        "Years of Experience": years_exp,
-        "Experience Level": exp_level,           # ← canónico
-        "Field": field,                          # ← canónico
-        "Remote Type": modality,                 # ← canónico
-        "Tools & Skills": tools_kebab,           # ← kebab-case (para el dropdown del Sheet)
-        "Tools & Skills Formatted": tools_pretty,# (opcional, por si quieres ver bonito)
+        "Job Type": job_type,
+        "Seniority": seniority,
+        "Years of Experience": years_exp_num if years_exp_num != "" else years_exp_raw,
+        "Experience Level": exp_level,
+        "Field": field,
+        "Remote Type": modality,
+        "Tools & Skills": tools_kebab,
+        "Tools & Skills Formatted": tools_pretty,
         "Description": description,
         "Requirements": requirements,
         "Additional Information": additional,
-        "Version": version_blank,
-        "Item ID": item_id
+        "Version": "",
+        "Published": True,              # ✅ nueva columna marcada
+        "Item ID": item_id              # este ya es numérico
     }
 
 
