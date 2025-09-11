@@ -172,6 +172,24 @@ const saveCareerField = quickDebounce(async (field, value) => {
     }
   }
 }, AUTOSAVE_MS);
+// 💾 Guardado inmediato (sin debounce) de múltiples campos career_*
+async function saveCareerFieldsNow(patchObj) {
+  const oppId = getOpportunityId();
+  if (!oppId) throw new Error('Invalid Opportunity ID');
+
+  const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patchObj)
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(t || 'Failed to save career fields');
+  }
+
+  // Mantén el cache local coherente
+  window.currentOpportunityData = Object.assign({}, window.currentOpportunityData || {}, patchObj);
+}
 
 // Mini toast sutil (esquina inferior)
 function showTinyToast(msg){
@@ -1237,7 +1255,6 @@ const descEditor = createRichEditor('career-description', 'career_description', 
 const reqsEditor = createRichEditor('career-requirements', 'career_requirements', SIG.signal);
 const addiEditor = createRichEditor('career-additional', 'career_additional_info', SIG.signal);
 
-// Prefill desde DB como HTML (ya los inicializamos así en createRichEditor con el value del textarea),
 // pero si quieres forzar contenido de la última carga:
 if (descEditor) descEditor.innerHTML = (data.career_description || data.hr_job_description || '');
 if (reqsEditor) reqsEditor.innerHTML = (data.career_requirements || '');
@@ -1279,25 +1296,34 @@ if (aiStarBtn) {
       const out = await r.json();
 
       // 🔮 Rellenar los 3 editores ricos
-      const descEditor = document.getElementById('career-description')?.previousElementSibling?.querySelector('.job-description-editor');
-      const reqsEditor = document.getElementById('career-requirements')?.previousElementSibling?.querySelector('.job-description-editor');
-      const addiEditor = document.getElementById('career-additional')?.previousElementSibling?.querySelector('.job-description-editor');
+    const descEditor = document.getElementById('career-description')?.previousElementSibling?.querySelector('.job-description-editor');
+    const reqsEditor = document.getElementById('career-requirements')?.previousElementSibling?.querySelector('.job-description-editor');
+    const addiEditor = document.getElementById('career-additional')?.previousElementSibling?.querySelector('.job-description-editor');
 
-      if (descEditor) descEditor.innerHTML = out.career_description || '';
-      if (reqsEditor) reqsEditor.innerHTML = out.career_requirements || '';
-      if (addiEditor) addiEditor.innerHTML = out.career_additional_info || '';
+    if (descEditor) descEditor.innerHTML = out.career_description || '';
+    if (reqsEditor) reqsEditor.innerHTML = out.career_requirements || '';
+    if (addiEditor) addiEditor.innerHTML = out.career_additional_info || '';
 
-      // 💾 Persistir en la BD (guardamos el HTML de los editores)
-      await Promise.all([
-        saveCareerField('career_description', descEditor?.innerHTML || ''),
-        saveCareerField('career_requirements', reqsEditor?.innerHTML || ''),
-        saveCareerField('career_additional_info', addiEditor?.innerHTML || '')
-      ]);
+    // (opcional) sincroniza los <textarea> ocultos para evitar inconsistencias visuales
+    const descTA = document.getElementById('career-description');
+    const reqsTA = document.getElementById('career-requirements');
+    const addiTA = document.getElementById('career-additional');
+    if (descTA) descTA.value = descEditor?.innerHTML || '';
+    if (reqsTA) reqsTA.value = reqsEditor?.innerHTML || '';
+    if (addiTA) addiTA.value = addiEditor?.innerHTML || '';
 
-      if (aiStarStatus) aiStarStatus.textContent = '✅ Ready';
-      setTimeout(() => { if (aiStarStatus) aiStarStatus.style.display = 'none'; }, 900);
+    // 💾 Guarda inmediatamente en una sola llamada (sin debounce)
+    await saveCareerFieldsNow({
+      career_description: descEditor?.innerHTML || '',
+      career_requirements: reqsEditor?.innerHTML || '',
+      career_additional_info: addiEditor?.innerHTML || ''
+    });
 
-      alert('✅ Campos generados y guardados');
+    // feedback UI
+    if (aiStarStatus) aiStarStatus.textContent = '✅ Ready';
+    setTimeout(() => { if (aiStarStatus) aiStarStatus.style.display = 'none'; }, 900);
+    alert('✅ Campos generados y guardados');
+
     } catch (err) {
       console.error('❌ Error generating career fields:', err);
       if (aiStarStatus) { aiStarStatus.textContent = '❌ Error'; setTimeout(()=> aiStarStatus.style.display='none', 1200); }
@@ -1328,11 +1354,6 @@ if (aiStarBtn) {
   bind('#career-exp-level',         'career_experience_level', 'change');
   bind('#career-field',             'career_field', 'change');
   bind('#career-modality',          'career_modality', 'change');
-
-  // Textareas
-  bind('#career-description', 'career_description', 'input');
-  bind('#career-requirements','career_requirements','input');
-  bind('#career-additional',  'career_additional_info','input');
 
   // Si cambia el país, limpia city en DB (además de la UI)
   countryEl.addEventListener('change', () => {
@@ -1426,6 +1447,16 @@ function createRichEditor(textareaId, fieldName, acSignal) {
   wrap.appendChild(ed);
   return ed;
 }
+function getRichEditor(textareaId) {
+  const ta = document.getElementById(textareaId);
+  if (!ta) return null;
+  // cuando createRichEditor corre, inserta .rich-wrap ANTES del textarea
+  const wrap = ta.previousElementSibling;
+  if (wrap && wrap.classList && wrap.classList.contains('rich-wrap')) {
+    return wrap.querySelector('.job-description-editor');
+  }
+  return null;
+}
 
 
 function closePublishCareerPopup() {
@@ -1439,7 +1470,6 @@ function closePublishCareerPopup() {
 // 🔧 Evita doble submit en Publish (deja SOLO uno)
 const publishBtn = document.getElementById('publishCareerBtn');
 publishBtn.replaceWith(publishBtn.cloneNode(true));
-document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
 
 
 function mountToolsChips(initial=[]) {
@@ -1553,7 +1583,9 @@ async function saveCareerPayload(publish = false) {
   const toolsFromChips   = (window.__careerTools || []).filter(Boolean);
   const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
   const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
-
+const descEditorEl = getRichEditor('career-description');
+const reqsEditorEl = getRichEditor('career-requirements');
+const addiEditorEl = getRichEditor('career-additional');
   const payload = {
     career_job_id: document.getElementById('career-jobid').value || '',
     career_job: document.getElementById('career-job').value || '',
@@ -1565,11 +1597,10 @@ async function saveCareerPayload(publish = false) {
     career_experience_level: document.getElementById('career-exp-level').value || '',
     career_field: document.getElementById('career-field').value || '',
     career_modality: document.getElementById('career-modality').value || '',
-    career_tools: finalTools,
-career_description: (document.querySelector('#career-description ~ .rich-wrap .job-description-editor')?.innerHTML || ''),
-career_requirements: (document.querySelector('#career-requirements ~ .rich-wrap .job-description-editor')?.innerHTML || ''),
-career_additional_info: (document.querySelector('#career-additional ~ .rich-wrap .job-description-editor')?.innerHTML || '')
-
+  career_tools: finalTools,
+  career_description: (descEditorEl?.innerHTML ?? document.getElementById('career-description').value ?? ''),
+  career_requirements: (reqsEditorEl?.innerHTML ?? document.getElementById('career-requirements').value ?? ''),
+  career_additional_info: (addiEditorEl?.innerHTML ?? document.getElementById('career-additional').value ?? '')
   };
 
   if (publish) payload.career_published = true;
@@ -1600,17 +1631,73 @@ career_additional_info: (document.querySelector('#career-additional ~ .rich-wrap
 document.getElementById('saveDraftCareerBtn').addEventListener('click', () => saveCareerPayload(false));
 
 document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
+function htmlToPlainWithNewlines(html) {
+  if (!html) return '';
+  let s = String(html);
+
+  // Normaliza <br>
+  s = s.replace(/<\s*br\s*\/?>/gi, '\n');
+
+  // Caso común que tienes: <div>- algo</div> → "\n- algo"
+  s = s.replace(/<\s*div[^>]*>\s*-\s*/gi, '\n- ').replace(/<\s*\/\s*div\s*>/gi, '\n');
+
+  // Bloques que implican salto de línea
+  const blocks = ['p','section','article','header','footer','aside','h1','h2','h3','h4','h5','h6','table','tr','ul','ol','li','div'];
+  blocks.forEach(tag => {
+    const reOpen = new RegExp(`<\\s*${tag}[^>]*>`, 'gi');
+    const reClose = new RegExp(`<\\/\\s*${tag}\\s*>`, 'gi');
+    s = s.replace(reOpen, '\n').replace(reClose, '\n');
+  });
+
+  // Listas semánticas
+  s = s.replace(/<\s*li[^>]*>\s*/gi, '\n• ').replace(/<\s*\/\s*li\s*>/gi, '');
+
+  // Quitar el resto de etiquetas
+  s = s.replace(/<[^>]+>/g, '');
+
+  // Decodifica entidades HTML (&nbsp;, etc.)
+  const tmp = document.createElement('textarea');
+  tmp.innerHTML = s;
+  s = tmp.value;
+
+  // Limpieza
+  s = s
+    .replace(/\u00A0/g, ' ')   // &nbsp; → espacio
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return s;
+}
+
 
 async function publishCareerNow() {
   const oppId = getOpportunityId();
   if (!oppId) return alert('❌ Invalid Opportunity ID');
 
-  // Usa chips si existen, o fallback a Choices
-  const toolsFromChips = (window.__careerTools || []).filter(Boolean);
-  const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
   const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
 
+  // HTML crudo desde los editores ricos (NO tocar DB aquí)
+  const descHTML = getRichEditor('career-description')?.innerHTML
+                ?? document.getElementById('career-description').value
+                ?? '';
+  const reqsHTML = getRichEditor('career-requirements')?.innerHTML
+                ?? document.getElementById('career-requirements').value
+                ?? '';
+  const addiHTML = getRichEditor('career-additional')?.innerHTML
+                ?? document.getElementById('career-additional').value
+                ?? '';
+
+  // Para Sheets: versión texto preservando saltos
+  const descTXT = htmlToPlainWithNewlines(descHTML);
+  const reqsTXT = htmlToPlainWithNewlines(reqsHTML);
+  const addiTXT = htmlToPlainWithNewlines(addiHTML);
+
+  // ⛔️ Importante: NO incluir career_description / career_requirements / career_additional_info
+  // ✅ Enviar claves específicas para el sheet (text + html), y un modo explícito
   const payload = {
+    publish_mode: 'sheet_only',
     career_job_id: document.getElementById('career-jobid').value || oppId,
     career_job: document.getElementById('career-job').value || '',
     career_country: document.getElementById('career-country').value || '',
@@ -1621,13 +1708,19 @@ async function publishCareerNow() {
     career_experience_level: document.getElementById('career-exp-level').value || '',
     career_field: document.getElementById('career-field').value || '',
     career_modality: document.getElementById('career-modality').value || '',
-    career_tools: finalTools, // array → el backend formatea
-    career_description: document.getElementById('career-description').value || '',
-    career_requirements: document.getElementById('career-requirements').value || '',
-    career_additional_info: document.getElementById('career-additional').value || ''
+    career_tools: finalTools,
+
+    // 👉 Para el Sheet:
+    sheet_description_text: descTXT,
+    sheet_requirements_text: reqsTXT,
+    sheet_additional_text: addiTXT,
+
+    // 👉 Opcional (por si tu backend hace RichText en Sheets):
+    sheet_description_html: descHTML,
+    sheet_requirements_html: reqsHTML,
+    sheet_additional_html: addiHTML
   };
 
-  // UI feedback (opcional)
   const btn = document.getElementById('publishCareerBtn');
   btn.disabled = true;
   btn.textContent = 'Publishing…';
@@ -1645,7 +1738,7 @@ async function publishCareerNow() {
       alert('❌ Error publishing to Career Sheet');
     } else {
       showFriendlyPopup(`✅ Published! Item ID: ${data.career_id}`);
-      // Opcional: refresca datos locales
+      // marca localmente, pero sin tocar los campos ricos:
       window.currentOpportunityData = window.currentOpportunityData || {};
       window.currentOpportunityData.career_id = data.career_id;
       window.currentOpportunityData.career_published = true;
@@ -1659,6 +1752,7 @@ async function publishCareerNow() {
     btn.textContent = 'Publish';
   }
 }
+
 
 
 
