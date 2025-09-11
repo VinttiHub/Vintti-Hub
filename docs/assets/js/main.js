@@ -505,19 +505,31 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
 
   const selectToggle = document.createElement('button');
   selectToggle.className = 'select-toggle';
-  selectToggle.textContent = 'Deselect All';
   container.appendChild(selectToggle);
 
   const checkboxWrapper = document.createElement('div');
   checkboxWrapper.classList.add('checkbox-list');
   container.appendChild(checkboxWrapper);
 
+  // ⬇️ Excluir por defecto en Stage
+  const EXCLUDED_BY_DEFAULT = (containerId === 'filterStage')
+    ? new Set(['Close Win', 'Closed Lost'])
+    : null;
+
+  // Si hay excluidos, el botón debe empezar en "Select All" (hay algo desmarcado)
+  const anyUnchecked = !!EXCLUDED_BY_DEFAULT && options.some(v => EXCLUDED_BY_DEFAULT.has(v));
+  selectToggle.textContent = anyUnchecked ? 'Select All' : 'Deselect All';
+
   options.forEach(val => {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = val;
-    checkbox.checked = true; // ✅ todas seleccionadas por defecto (sin filtros)
+
+    // ✅ Por defecto: todo marcado, salvo Close Win / Closed Lost en Stage
+    const isExcluded = !!EXCLUDED_BY_DEFAULT && EXCLUDED_BY_DEFAULT.has(val);
+    checkbox.checked = !isExcluded;
+
     label.appendChild(checkbox);
     label.append(' ' + val);
     checkboxWrapper.appendChild(label);
@@ -545,6 +557,10 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     const pattern = selected.length ? pieces.join('|') : '';
     column.search(pattern, true, false).draw();
     setBadge(selected.length);
+
+    // Actualiza texto del toggle según estado actual
+    const allChecked = Array.from(cbs).every(c => c.checked);
+    selectToggle.textContent = allChecked ? 'Deselect All' : 'Select All';
   }
 
   checkboxWrapper.addEventListener('change', applyFilter);
@@ -553,10 +569,10 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     const all = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
     const isDeselecting = selectToggle.textContent === 'Deselect All';
     all.forEach(cb => cb.checked = !isDeselecting);
-    selectToggle.textContent = isDeselecting ? 'Select All' : 'Deselect All';
     applyFilter();
   });
 
+  // Aplica inmediatamente el filtro inicial (ya excluye Close Win / Closed Lost)
   applyFilter();
 }
 
