@@ -13,6 +13,52 @@ const CAREER_TOOL_OPTIONS = [
   "Interpersonal Skills",
   "Communication Skills"
 ];
+// --- HTML cleaner para Webflow (mantiene: ul/ol/li/p/br/b/strong/i/em/a) ---
+function cleanHtmlForWebflow(raw) {
+  if (!raw) return '';
+  let s = String(raw);
+
+  // normaliza NBSP
+  s = s.replace(/\u00A0|&nbsp;/g, ' ');
+
+  // quita spans y sus estilos inline
+  s = s.replace(/<\s*span[^>]*>/gi, '').replace(/<\s*\/\s*span\s*>/gi, '');
+
+  // elimina TODOS los atributos style="..."
+  s = s.replace(/\sstyle="[^"]*"/gi, '');
+
+  // elimina atributos event-handler (onClick, onMouseOver, etc) por seguridad
+  s = s.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '');
+
+  // permite solo tags whitelisted, removiendo otras etiquetas pero dejando su contenido
+  // (whitelist simple: ul,ol,li,p,br,b,strong,i,em,a)
+  s = s.replace(/<(?!\/?(ul|ol|li|p|br|b|strong|i|em|a)(\s|>|\/))/gi, '&lt;');
+
+  // limpia anchors peligrosos (javascript:) y deja solo href seguros
+  s = s.replace(/<a([^>]+)>/gi, (m, attrs) => {
+    // extrae href
+    const hrefMatch = attrs.match(/\shref="([^"]*)"/i);
+    const href = hrefMatch ? hrefMatch[1] : '';
+    if (!href || /^javascript:/i.test(href)) {
+      return '<a>';
+    }
+    // elimina todo atributo que no sea href/target/rel
+    const safeAttrs = [];
+    const hrefAttr   = ` href="${href}"`;
+    const targetAttr = /\starget="/i.test(attrs) ? attrs.match(/\starget="[^"]*"/i)[0] : ' target="_blank"';
+    const relAttr    = /\srel="/i.test(attrs) ? attrs.match(/\srel="[^"]*"/i)[0] : ' rel="noopener"';
+    safeAttrs.push(hrefAttr, targetAttr, relAttr);
+    return `<a${safeAttrs.join('')}>`;
+  });
+
+  // colapsa espacios múltiples
+  s = s.replace(/[ \t]{2,}/g, ' ').trim();
+
+  // micro-limpiezas de listas (opcional)
+  s = s.replace(/<li>\s+/g, '<li>').replace(/\s+<\/li>/g, '</li>');
+
+  return s;
+}
 
 // Monta Choices en #career-tools SIN permitir crear valores nuevos
 function mountToolsDropdown(selected = []) {
@@ -1674,28 +1720,23 @@ async function publishCareerNow() {
   const oppId = getOpportunityId();
   if (!oppId) return alert('❌ Invalid Opportunity ID');
 
+  const descHTML = getRichEditor('career-description')?.innerHTML
+                ?? document.getElementById('career-description').value ?? '';
+  const reqsHTML = getRichEditor('career-requirements')?.innerHTML
+                ?? document.getElementById('career-requirements').value ?? '';
+  const addiHTML = getRichEditor('career-additional')?.innerHTML
+                ?? document.getElementById('career-additional').value ?? '';
+
+  // 🔹 limpiamos para Webflow (sin <span>, sin styles)
+  const descHTML_CLEAN = cleanHtmlForWebflow(descHTML);
+  const reqsHTML_CLEAN = cleanHtmlForWebflow(reqsHTML);
+  const addiHTML_CLEAN = cleanHtmlForWebflow(addiHTML);
+
   const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
 
-  // HTML crudo desde los editores ricos (NO tocar DB aquí)
-  const descHTML = getRichEditor('career-description')?.innerHTML
-                ?? document.getElementById('career-description').value
-                ?? '';
-  const reqsHTML = getRichEditor('career-requirements')?.innerHTML
-                ?? document.getElementById('career-requirements').value
-                ?? '';
-  const addiHTML = getRichEditor('career-additional')?.innerHTML
-                ?? document.getElementById('career-additional').value
-                ?? '';
-
-  // Para Sheets: versión texto preservando saltos
-  const descTXT = htmlToPlainWithNewlines(descHTML);
-  const reqsTXT = htmlToPlainWithNewlines(reqsHTML);
-  const addiTXT = htmlToPlainWithNewlines(addiHTML);
-
-  // ⛔️ Importante: NO incluir career_description / career_requirements / career_additional_info
-  // ✅ Enviar claves específicas para el sheet (text + html), y un modo explícito
   const payload = {
     publish_mode: 'sheet_only',
+    // meta
     career_job_id: document.getElementById('career-jobid').value || oppId,
     career_job: document.getElementById('career-job').value || '',
     career_country: document.getElementById('career-country').value || '',
@@ -1708,15 +1749,10 @@ async function publishCareerNow() {
     career_modality: document.getElementById('career-modality').value || '',
     career_tools: finalTools,
 
-    // 👉 Para el Sheet:
-    sheet_description_text: descTXT,
-    sheet_requirements_text: reqsTXT,
-    sheet_additional_text: addiTXT,
-
-    // 👉 Opcional (por si tu backend hace RichText en Sheets):
-    sheet_description_html: descHTML,
-    sheet_requirements_html: reqsHTML,
-    sheet_additional_html: addiHTML
+    // 🔹 para el Sheet: **HTML limpio** (lo que Webflow necesita)
+    sheet_description_html: descHTML_CLEAN,
+    sheet_requirements_html: reqsHTML_CLEAN,
+    sheet_additional_html: addiHTML_CLEAN
   };
 
   const btn = document.getElementById('publishCareerBtn');
@@ -1730,26 +1766,22 @@ async function publishCareerNow() {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Publish failed');
 
-    if (!res.ok) {
-      console.error('❌ Publish error:', data);
-      alert('❌ Error publishing to Career Sheet');
-    } else {
-      showFriendlyPopup(`✅ Published! Item ID: ${data.career_id}`);
-      // marca localmente, pero sin tocar los campos ricos:
-      window.currentOpportunityData = window.currentOpportunityData || {};
-      window.currentOpportunityData.career_id = data.career_id;
-      window.currentOpportunityData.career_published = true;
-      closePublishCareerPopup();
-    }
+    showFriendlyPopup(`✅ Published! Item ID: ${data.career_id}`);
+    window.currentOpportunityData = Object.assign({}, window.currentOpportunityData || {}, {
+      career_id: data.career_id, career_published: true
+    });
+    closePublishCareerPopup();
   } catch (err) {
     console.error(err);
-    alert('❌ Network error publishing');
+    alert('❌ Error publishing to Sheet');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Publish';
   }
 }
+
 // ✅ Delegación global para TODAS las toolbars
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.toolbar button');

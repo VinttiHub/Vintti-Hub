@@ -24,7 +24,59 @@ from typing import List
 from coresignal_routes import bp as coresignal_bp
 import calendar
 import html as _html
+from flask import request, jsonify
+from googleapiclient.discovery import build
+from google.oauth2.service_account import Credentials
 
+# --- Helper: limpiar HTML para Webflow (quita <span>, styles y normaliza nbsp) ---
+import re, html as _html
+
+_ALLOWED_TAGS = ('ul','ol','li','p','br','b','strong','i','em','a')
+
+def _clean_html_for_webflow(s: str) -> str:
+    if not s:
+        return ""
+    s = str(s)
+
+    # normaliza NBSP
+    s = s.replace('\u00A0', ' ').replace('&nbsp;', ' ')
+
+    # quita <span ...> y </span>
+    s = re.sub(r'<\s*span[^>]*>', '', s, flags=re.I)
+    s = re.sub(r'</\s*span\s*>', '', s, flags=re.I)
+
+    # quita atributos style="..."
+    s = re.sub(r'\sstyle="[^"]*"', '', s, flags=re.I)
+
+    # quita on*="..." (onClick, onMouseOver, etc.)
+    s = re.sub(r'\son[a-z]+\s*=\s*"[^"]*"', '', s, flags=re.I)
+
+    # limpia <a> con javascript:
+    def _sanitize_a(m):
+        tag = m.group(0)
+        # si no hay href, deja <a>
+        href_m = re.search(r'href="([^"]*)"', tag, flags=re.I)
+        href = href_m.group(1) if href_m else ''
+        if not href or href.lower().startswith('javascript:'):
+            return '<a>'
+        # deja solo href/target/rel
+        safe = f'<a href="{href}" target="_blank" rel="noopener">'
+        return safe
+    s = re.sub(r'<a[^>]*>', _sanitize_a, s, flags=re.I)
+
+    # whitelist de etiquetas: reemplaza cualquier otra etiqueta por su contenido
+    def _whitelist_tags(m):
+        tag = m.group(1).lower()
+        if tag in _ALLOWED_TAGS:
+            return m.group(0)
+        # elimina etiqueta, deja contenido si es de cierre/apertura desconocida
+        return ''
+    s = re.sub(r'</?([a-z0-9]+)(\s[^>]*)?>', _whitelist_tags, s, flags=re.I)
+
+    # pequeños trims
+    s = re.sub(r'[ \t]{2,}', ' ', s).strip()
+    s = s.replace('<li> ', '<li>').replace(' </li>', '</li>')
+    return s
 
 
 # 👇 MOVER ARRIBA: cargar .env ANTES de leer cualquier variable
@@ -3518,12 +3570,6 @@ def accounts_status_bulk_update():
 from flask import request, jsonify
 import re, html as _html, logging
 
-# --- Helper: nombre de hoja seguro en A1 (comillas simples si hay espacios/caracteres raros) ---
-def _a1_quote(sheet_name: str) -> str:
-    safe = (sheet_name or "").replace("'", "''")
-    return f"'{safe}'"
-import re
-
 # Mapas mínimos (1:1) según tu HTML y las opciones del Sheet
 CANON = {
     "job_type": {
@@ -3555,305 +3601,154 @@ CANON = {
     },
 }
 
-def _canon(kind: str, value: str) -> str:
-    if not value:
-        return ""
-    v = value.strip().lower()
-    return CANON.get(kind, {}).get(v, value)  # si no está, deja lo que vino
 
-def _to_kebab(s: str) -> str:
-    # "Problem Solving" -> "problem-solving"
-    s = (s or "").strip().lower()
-    s = re.sub(r'[^a-z0-9]+', '-', s)
-    return s.strip('-')
+GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+GOOGLE_SHEETS_RANGE = os.getenv("GOOGLE_SHEETS_RANGE", "Careers!A:Z")  # hoja/cols destino
+GOOGLE_SA_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+GOOGLE_SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "{}")
 
-# --- Helper: HTML -> texto preservando \n para Google Sheets ---
-def _html_to_sheet_text(s: str) -> str:
-    if not s:
-        return ""
-    s = re.sub(r'(?i)<br\s*/?>', '\n', s)
-    s = re.sub(r'(?i)<\s*li[^>]*>\s*', '• ', s)
-    s = re.sub(r'(?i)</\s*(p|div|section|article|header|footer|aside|h[1-6]|tr)\s*>', '\n', s)
-    s = re.sub(r'<[^>]+>', '', s)
-    s = _html.unescape(s)  # &nbsp; -> espacio normal
-    s = s.replace('\r\n', '\n').replace('\r', '\n')
-    s = re.sub(r'[ \t]+\n', '\n', s)
-    s = re.sub(r'\n{3,}', '\n\n', s)
-    # ❗️ NO hagas strip() total; solo “rstrip”
-    s = re.sub(r'[ \t]+$', '', s, flags=re.M)
-    s = re.sub(r'\s+$', '', s)
-    return s
+def _gsheets_service():
+    creds = Credentials.from_service_account_info(
+        json.loads(GOOGLE_SA_JSON), scopes=GOOGLE_SA_SCOPES
+    )
+    return build("sheets", "v4", credentials=creds)
 
+def _get_headers(svc, spreadsheet_id, rng):
+    # lee primera fila para mapear columnas
+    res = svc.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=rng.split("!")[0] + "!1:1"
+    ).execute()
+    return (res.get("values") or [[]])[0]
 
 @app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
 def publish_career_to_sheet(opportunity_id):
     """
-    PUBLICAR EN SHEET (sin tocar BD):
-    - Lee payload (career_*) con fallback a la BD solo para leer (no persiste).
-    - Convierte HTML a texto con saltos de línea reales (\n) para columnas largas.
-    - Inserta **UNA** nueva fila en el Sheet con valueInputOption=RAW (preserva \n).
-    - Aplica wrapStrategy=WRAP **solo** a esa fila en columnas largas.
-    - Devuelve JSON con success, career_id (Item ID) y metadatos del append.
+    Inserta UNA fila en el Google Sheet con Description/Requirements/Additional en HTML limpio.
+    No modifica otras filas ni borra nada. (Opcional: persiste career_id/published en tu DB).
     """
     if not GOOGLE_SHEETS_SPREADSHEET_ID:
-        return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID env var"}), 500
+        return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
 
     data = request.get_json(silent=True) or {}
+    # HTML entrante (ya viene limpio del front; re-limpiamos por si acaso)
+    desc_html = _clean_html_for_webflow(data.get("sheet_description_html", ""))
+    reqs_html = _clean_html_for_webflow(data.get("sheet_requirements_html", ""))
+    addi_html = _clean_html_for_webflow(data.get("sheet_additional_html", ""))
 
-    # (A) Leer BD como fallback (solo lectura, NO se escribe nada)
-    db_opportunity = {}
-    try:
-        conn = get_connection(); cur = conn.cursor()
-        cur.execute("SELECT * FROM opportunity WHERE opportunity_id = %s LIMIT 1", (opportunity_id,))
-        row = cur.fetchone()
-        if row:
-            colnames = [d[0] for d in cur.description]
-            db_opportunity = dict(zip(colnames, row))
-    except Exception:
-        logging.exception("Error reading opportunity before publish (read-only)")
-    finally:
+    # otros campos (IDs, meta, etc.)
+    job_id     = str(data.get("career_job_id") or opportunity_id)
+    job_title  = data.get("career_job", "")
+    country    = data.get("career_country", "")
+    city       = data.get("career_city", "")
+    job_type   = data.get("career_job_type", "")
+    seniority  = data.get("career_seniority", "")
+    years_exp  = data.get("career_years_experience", "")
+    exp_level  = data.get("career_experience_level", "")
+    field_     = data.get("career_field", "")
+    modality   = data.get("career_modality", "")
+    tools      = ", ".join(data.get("career_tools") or [])
+
+    # === Google Sheets ===
+    svc = _gsheets_service()
+    headers = _get_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SHEETS_RANGE)
+
+    # helper para obtener el índice de una columna (o crear array más largo)
+    def idx(col_name):
         try:
-            cur.close(); conn.close()
-        except Exception:
-            pass
+            return headers.index(col_name)
+        except ValueError:
+            return -1  # si falta, no lo pondremos
 
-    def pick(k):  # payload > BD
-        return data.get(k) if k in data else db_opportunity.get(k)
+    # Construye la fila completa respetando posiciones por encabezado
+    # (agrega los que ya tengas en tu Sheet; ejemplos abajo)
+    row_len = max(
+        idx("Item ID"),
+        idx("Job"),
+        idx("Country"),
+        idx("City"),
+        idx("Job Type"),
+        idx("Seniority"),
+        idx("Years of Experience"),
+        idx("Experience Level"),
+        idx("Field"),
+        idx("Modality"),
+        idx("Tools"),
+        idx("Description"),
+        idx("Requirements"),
+        idx("Additional Information"),
+    ) + 1
 
-    # (B) Normalización de campos
-    job_id_raw    = pick('career_job_id') or str(opportunity_id)
-    job           = pick('career_job') or db_opportunity.get('opp_position_name') or ''
-    country       = (pick('career_country') or '').strip()
-    city          = (pick('career_city') or '').strip()
+    new_row = [""] * row_len
+    def put(col, val):
+        j = idx(col)
+        if j >= 0:
+            if j >= len(new_row):
+                new_row.extend([""] * (j - len(new_row) + 1))
+            new_row[j] = val
 
-    # ... (canónicos iguales)
+    put("Item ID", job_id)
+    put("Job", job_title)
+    put("Country", country)
+    put("City", city)
+    put("Job Type", job_type)
+    put("Seniority", seniority)
+    put("Years of Experience", years_exp)
+    put("Experience Level", exp_level)
+    put("Field", field_)
+    put("Modality", modality)
+    put("Tools", tools)
 
-    years_exp_raw = (pick('career_years_experience') or '').strip()
+    # 🔹 estas 3 van en **HTML**
+    put("Description", desc_html)
+    put("Requirements", reqs_html)
+    put("Additional Information", addi_html)
 
-    # Parse numéricos seguros
-    def _to_int_or_blank(v):
-        try:
-            v = str(v).strip()
-            if not v:
-                return ""
-            return int(float(v))
-        except Exception:
-            return ""
+    # append ONE row
+    append_res = svc.spreadsheets().values().append(
+        spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+        range=GOOGLE_SHEETS_RANGE,
+        valueInputOption="RAW",           # no evalúa como fórmula
+        insertDataOption="INSERT_ROWS",
+        body={"values": [new_row]}
+    ).execute()
 
-    job_id_num    = _to_int_or_blank(job_id_raw)
-    years_exp_num = _to_int_or_blank(years_exp_raw)
-
-    # ← Mapea exactamente a las etiquetas del Sheet
-    job_type   = _canon('job_type',         pick('career_job_type') or '')
-    seniority  = _canon('seniority',        pick('career_seniority') or '')
-    exp_level  = _canon('experience_level', pick('career_experience_level') or '')
-    field      = _canon('field',            pick('career_field') or '')
-    modality   = _canon('modality',         pick('career_modality') or '')
-
-    years_exp      = (pick('career_years_experience') or '').strip()
-    tools_raw      = pick('career_tools') or []
-
-    # HTML -> texto con saltos reales
-    description    = _html_to_sheet_text(pick('career_description') or db_opportunity.get('hr_job_description') or '')
-    requirements   = _html_to_sheet_text(pick('career_requirements') or '')
-    additional     = _html_to_sheet_text(pick('career_additional_info') or '')
-
-    # Tools: al Sheet en kebab-case, separadas por coma (multi-select chips de Sheets)
+    # row index recién insertado (A1) para aplicar WRAP solo allí (opcional)
+    updates = append_res.get("updates", {})
+    updated_range = updates.get("updatedRange")  # p.ej. "Careers!A123:Z123"
+    # Si quieres aplicar wrap solo a esa fila:
     try:
-        # si te interesa conservar “bonito” también:
-        tools_pretty = ", ".join([str(t).strip() for t in (tools_raw or []) if str(t).strip()])
-        tools_kebab  = ", ".join([_to_kebab(str(t)) for t in (tools_raw or []) if str(t).strip()])
+      sh_title, a1 = updated_range.split("!")
+      start_row = int(re.findall(r'(\d+):\w+(\d+)', a1)[0][0])
+      end_row   = int(re.findall(r'(\d+):\w+(\d+)', a1)[0][1])
+
+      # formatea wrap en toda la fila agregada
+      svc.spreadsheets().batchUpdate(
+          spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+          body={
+            "requests": [{
+              "repeatCell": {
+                "range": {
+                  "sheetId": None,  # None = usa title + find sheetId si lo necesitas
+                  "startRowIndex": start_row-1,
+                  "endRowIndex": end_row,
+                },
+                "cell": { "userEnteredFormat": { "wrapStrategy": "WRAP" } },
+                "fields": "userEnteredFormat.wrapStrategy"
+              }
+            }]
+          }
+      ).execute()
     except Exception:
-        tools_pretty = ""
-        tools_kebab  = ""
+      pass  # si falla el parse del rango, no rompas la publicación
 
-    version_blank  = ""
+    # ✅ (opcional) Persistir career_id/published en DB como ya hacías:
+    # conn = get_connection()
+    # with conn, conn.cursor() as cur:
+    #     cur.execute("UPDATE opportunity SET career_id = %s, career_published = TRUE WHERE opportunity_id = %s",
+    #                 (job_id, opportunity_id))
+    #     conn.commit()
 
-    # (C) Sheets: hoja y headers
-    try:
-        service    = _sheets_service()
-        sheet_name = _get_first_sheet_name(service, GOOGLE_SHEETS_SPREADSHEET_ID)
-        qsheet     = _a1_quote(sheet_name)
-        headers    = _get_sheet_headers(service, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_name)
-    except Exception as e:
-        logging.exception("Sheets metadata failed")
-        return jsonify({"error": "Sheets metadata failed", "detail": str(e)}), 502
-
-    # (D) Próximo Item ID
-    try:
-        item_id = _next_item_id(service, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_name)
-    except Exception as e:
-        logging.exception("Item ID calc failed")
-        return jsonify({"error": "Item ID calc failed", "detail": str(e)}), 502
-
-    # (E) Mapeo Header -> valor
-    mapped = {
-        "Job ID": job_id_num if job_id_num != "" else job_id_raw,  # num si se pudo
-        "Job": job,
-        "Location Country": country,
-        "Location City": city,
-        "Job Type": job_type,
-        "Seniority": seniority,
-        "Years of Experience": years_exp_num if years_exp_num != "" else years_exp_raw,
-        "Experience Level": exp_level,
-        "Field": field,
-        "Remote Type": modality,
-        "Tools & Skills": tools_kebab,
-        "Tools & Skills Formatted": tools_pretty,
-        "Description": description,
-        "Requirements": requirements,
-        "Additional Information": additional,
-        "Version": "",
-        "Published": True,              # ✅ nueva columna marcada
-        "Item ID": item_id              # este ya es numérico
-    }
-
-
-    # (F) Fila en el orden real de headers
-    row = [mapped.get(h, "") for h in headers]
-
-    # (G) Append UNA fila (RAW para respetar \n)
-    try:
-        append_resp = service.spreadsheets().values().append(
-            spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-            range=f"{qsheet}!A1",
-            valueInputOption="RAW",
-            insertDataOption="INSERT_ROWS",
-            body={"values": [row]}
-        ).execute()
-    except Exception as e:
-        logging.exception("Sheets append failed")
-        return jsonify({"error": "Sheets append failed", "detail": str(e)}), 502
-
-    # (H) Aplicar WRAP **solo a la fila insertada** en columnas largas
-    # (H) Aplicar WRAP **solo a la fila** y escribir Rich Text (bold/italic) en columnas largas
-    try:
-        updated = append_resp.get("updates", {}) or {}
-        updated_range = updated.get("updatedRange")  # ej: "'Open Positions'!A42:Q42"
-        if not updated_range:
-            raise RuntimeError("No updatedRange from append; cannot compute rowIndex")
-
-        right = updated_range.split("!", 1)[1]  # "A42:Q42"
-        start_a1 = right.split(":", 1)[0]       # "A42"
-
-        def _a1_to_row_col(a1: str):
-            m = re.match(r"([A-Za-z]+)(\d+)$", a1)
-            if not m: raise ValueError(f"Invalid A1: {a1}")
-            col_letters, row_num = m.group(1).upper(), int(m.group(2))
-            col = 0
-            for ch in col_letters:
-                col = col * 26 + (ord(ch) - ord('A') + 1)
-            return (row_num - 1, col - 1)  # 0-based
-
-        start_row_idx, _ = _a1_to_row_col(start_a1)
-
-        # Sheet meta
-        meta = service.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
-        target_sheet = next((st for st in meta.get("sheets", [])
-                             if st.get("properties", {}).get("title") == sheet_name),
-                            meta["sheets"][0])
-        sheet_id = target_sheet["properties"]["sheetId"]
-
-        header_to_idx = {h: i for i, h in enumerate(headers)}
-        rich_headers = ["Description", "Requirements", "Additional Information"]
-        rich_cols = [header_to_idx[h] for h in rich_headers if h in header_to_idx]
-
-        # Preferimos el HTML crudo del payload si vino; sino el plain que ya armamos.
-        html_desc = data.get('sheet_description_html') or pick('career_description') or db_opportunity.get('hr_job_description') or ''
-        html_reqs = data.get('sheet_requirements_html') or pick('career_requirements') or ''
-        html_addi = data.get('sheet_additional_html') or pick('career_additional_info') or ''
-
-        desc_text, desc_runs = _html_to_richtext_runs(html_desc)
-        reqs_text, reqs_runs = _html_to_richtext_runs(html_reqs)
-        addi_text, addi_runs = _html_to_richtext_runs(html_addi)
-
-        # Fallback: si por alguna razón no hay texto (o vació), usa el plain ya calculado
-        if not desc_text: desc_text = description
-        if not reqs_text: reqs_text = requirements
-        if not addi_text: addi_text = additional
-
-        # Construimos celdas específicas (en el orden de rich_headers)
-        cells_by_header = {
-            "Description": {
-                "userEnteredValue": {"stringValue": desc_text},
-                **({"textFormatRuns": desc_runs} if desc_runs else {})
-            },
-            "Requirements": {
-                "userEnteredValue": {"stringValue": reqs_text},
-                **({"textFormatRuns": reqs_runs} if reqs_runs else {})
-            },
-            "Additional Information": {
-                "userEnteredValue": {"stringValue": addi_text},
-                **({"textFormatRuns": addi_runs} if addi_runs else {})
-            },
-        }
-
-        # Peticiones: 1) Wrap solo en esa fila/columnas largas, 2) updateCells con RichText
-        requests = []
-
-        # 1) Wrap
-        for col_idx in rich_cols:
-            requests.append({
-                "repeatCell": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "startRowIndex": start_row_idx,
-                        "endRowIndex": start_row_idx + 1,
-                        "startColumnIndex": col_idx,
-                        "endColumnIndex": col_idx + 1
-                    },
-                    "cell": {"userEnteredFormat": {"wrapStrategy": "WRAP"}},
-                    "fields": "userEnteredFormat.wrapStrategy"
-                }
-            })
-
-        # 2) Update cells con Rich Text
-        #   Solo para las columnas existentes en esta hoja
-        row_cells = []
-        for i, h in enumerate(headers):
-            if h in cells_by_header:
-                row_cells.append(cells_by_header[h])
-            else:
-                # Dejar la celda tal cual quedó con append; no tocar
-                row_cells.append(None)
-
-        # Para minimizar, mandamos solo las celdas ricas, no toda la fila
-        # Creamos una request por cada celda rica
-        for h in rich_headers:
-            if h not in header_to_idx: continue
-            col_idx = header_to_idx[h]
-            cell = cells_by_header[h]
-            requests.append({
-                "updateCells": {
-                    "rows": [{
-                        "values": [cell]
-                    }],
-                    "fields": "userEnteredValue,textFormatRuns",
-                    "start": {
-                        "sheetId": sheet_id,
-                        "rowIndex": start_row_idx,
-                        "columnIndex": col_idx
-                    }
-                }
-            })
-
-        if requests:
-            service.spreadsheets().batchUpdate(
-                spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-                body={"requests": requests}
-            ).execute()
-
-    except Exception as fmt_err:
-        logging.warning("Could not apply rich text/wrap: %s", fmt_err)
-
-
-    # (I) NO tocar la BD (requisito). Solo devolver info de la inserción.
-    return jsonify({
-        "success": True,
-        "career_id": item_id,
-        "sheet": sheet_name,
-        "append": append_resp.get("updates", {})
-    }), 200
+    return jsonify({"career_id": job_id})
 
 
 @app.route('/opportunities/<opportunity_id>/batches', methods=['GET'])
