@@ -1,32 +1,33 @@
 from __future__ import annotations
-from flask import Flask, jsonify, request
+
 import os
-from dotenv import load_dotenv
-import boto3
-import uuid
-from botocore.exceptions import NoCredentialsError
-from affinda import AffindaAPI, TokenCredential
-import openai
-import traceback
-import logging
-import psycopg2
-import requests
-from datetime import datetime
-import json
-from ai_routes import register_ai_routes
-from db import get_connection 
 import re
-import psycopg2.extras
-from psycopg2.extras import RealDictCursor
-import json, re, uuid
+import json
+import uuid
+import calendar
+import logging
+import traceback
 from datetime import datetime
 from typing import List
-from coresignal_routes import bp as coresignal_bp
-import calendar
-import html as _html
-from flask import request, jsonify
-from googleapiclient.discovery import build
+
+from dotenv import load_dotenv
+from flask import Flask, jsonify, request
+from botocore.exceptions import NoCredentialsError
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+import boto3
+import openai
+import psycopg2
+import psycopg2.extras
+import requests
+import html as _html
+
+from ai_routes import register_ai_routes
+from db import get_connection
+from coresignal_routes import bp as coresignal_bp
+
+# Affinda (opcional)
+from affinda import AffindaAPI, TokenCredential
 
 # --- Helper: limpiar HTML para Webflow (quita <span>, styles y normaliza nbsp) ---
 import re, html as _html
@@ -3419,133 +3420,141 @@ def _get_sheet_headers(service, spreadsheet_id, sheet_name):
 def publish_career_to_sheet(opportunity_id):
     """
     Inserta UNA fila en el Google Sheet con Description/Requirements/Additional en HTML limpio.
-    No modifica otras filas ni borra nada. (Opcional: persiste career_id/published en tu DB).
+    No modifica otras filas ni borra nada. Aplica WRAP solo a la fila insertada.
     """
-    if not GOOGLE_SHEETS_SPREADSHEET_ID:
-        return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
-
-    data = request.get_json(silent=True) or {}
-    # HTML entrante (ya viene limpio del front; re-limpiamos por si acaso)
-    desc_html = _clean_html_for_webflow(data.get("sheet_description_html", ""))
-    reqs_html = _clean_html_for_webflow(data.get("sheet_requirements_html", ""))
-    addi_html = _clean_html_for_webflow(data.get("sheet_additional_html", ""))
-
-    # otros campos (IDs, meta, etc.)
-    job_id     = str(data.get("career_job_id") or opportunity_id)
-    job_title  = data.get("career_job", "")
-    country    = data.get("career_country", "")
-    city       = data.get("career_city", "")
-    job_type   = data.get("career_job_type", "")
-    seniority  = data.get("career_seniority", "")
-    years_exp  = data.get("career_years_experience", "")
-    exp_level  = data.get("career_experience_level", "")
-    field_     = data.get("career_field", "")
-    modality   = data.get("career_modality", "")
-    tools      = ", ".join(data.get("career_tools") or [])
-
-    # === Google Sheets ===
-    svc = _sheets_service()
-    sheet_name = GOOGLE_SHEETS_RANGE.split("!")[0]
-    headers = _get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_name)
-
-
-    # helper para obtener el índice de una columna (o crear array más largo)
-    def idx(col_name):
-        try:
-            return headers.index(col_name)
-        except ValueError:
-            return -1  # si falta, no lo pondremos
-
-    # Construye la fila completa respetando posiciones por encabezado
-    # (agrega los que ya tengas en tu Sheet; ejemplos abajo)
-    row_len = max(
-        idx("Item ID"),
-        idx("Job"),
-        idx("Country"),
-        idx("City"),
-        idx("Job Type"),
-        idx("Seniority"),
-        idx("Years of Experience"),
-        idx("Experience Level"),
-        idx("Field"),
-        idx("Modality"),
-        idx("Tools"),
-        idx("Description"),
-        idx("Requirements"),
-        idx("Additional Information"),
-    ) + 1
-
-    new_row = [""] * row_len
-    def put(col, val):
-        j = idx(col)
-        if j >= 0:
-            if j >= len(new_row):
-                new_row.extend([""] * (j - len(new_row) + 1))
-            new_row[j] = val
-
-    put("Item ID", job_id)
-    put("Job", job_title)
-    put("Country", country)
-    put("City", city)
-    put("Job Type", job_type)
-    put("Seniority", seniority)
-    put("Years of Experience", years_exp)
-    put("Experience Level", exp_level)
-    put("Field", field_)
-    put("Modality", modality)
-    put("Tools", tools)
-
-    # 🔹 estas 3 van en **HTML**
-    put("Description", desc_html)
-    put("Requirements", reqs_html)
-    put("Additional Information", addi_html)
-
-    # append ONE row
-    append_res = svc.spreadsheets().values().append(
-        spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-        range=GOOGLE_SHEETS_RANGE,
-        valueInputOption="RAW",           # no evalúa como fórmula
-        insertDataOption="INSERT_ROWS",
-        body={"values": [new_row]}
-    ).execute()
-
-    # row index recién insertado (A1) para aplicar WRAP solo allí (opcional)
-    updates = append_res.get("updates", {})
-    updated_range = updates.get("updatedRange")  # p.ej. "Careers!A123:Z123"
-    # Si quieres aplicar wrap solo a esa fila:
     try:
-      sh_title, a1 = updated_range.split("!")
-      start_row = int(re.findall(r'(\d+):\w+(\d+)', a1)[0][0])
-      end_row   = int(re.findall(r'(\d+):\w+(\d+)', a1)[0][1])
+        if not GOOGLE_SHEETS_SPREADSHEET_ID:
+            return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
 
-      # formatea wrap en toda la fila agregada
-      svc.spreadsheets().batchUpdate(
-          spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-          body={
-            "requests": [{
-              "repeatCell": {
-                "range": {
-                  "sheetId": None,  # None = usa title + find sheetId si lo necesitas
-                  "startRowIndex": start_row-1,
-                  "endRowIndex": end_row,
-                },
-                "cell": { "userEnteredFormat": { "wrapStrategy": "WRAP" } },
-                "fields": "userEnteredFormat.wrapStrategy"
-              }
-            }]
-          }
-      ).execute()
-    except Exception:
-      pass  # si falla el parse del rango, no rompas la publicación
+        data = request.get_json(silent=True) or {}
 
-    # ✅ (opcional) Persistir career_id/published en DB como ya hacías:
-    # conn = get_connection()
-    # with conn, conn.cursor() as cur:
-    #     cur.execute("UPDATE opportunity SET career_id = %s, career_published = TRUE WHERE opportunity_id = %s",
-    #                 (job_id, opportunity_id))
-    #     conn.commit()
+        # --- HTML limpio (quita spans/estilos/nbsp) ---
+        desc_html = _clean_html_for_webflow(data.get("sheet_description_html", ""))
+        reqs_html = _clean_html_for_webflow(data.get("sheet_requirements_html", ""))
+        addi_html = _clean_html_for_webflow(data.get("sheet_additional_html", ""))
 
-    return jsonify({"career_id": job_id})
+        # --- Otros campos (tal cual los recibes) ---
+        job_id     = str(data.get("career_job_id") or opportunity_id)
+        job_title  = data.get("career_job", "") or ""
+        country    = data.get("career_country", "") or ""
+        city       = data.get("career_city", "") or ""
+        job_type   = data.get("career_job_type", "") or ""
+        seniority  = data.get("career_seniority", "") or ""
+        years_exp  = data.get("career_years_experience", "") or ""
+        exp_level  = data.get("career_experience_level", "") or ""
+        field_     = data.get("career_field", "") or ""
+        modality   = data.get("career_modality", "") or ""
+        tools      = ", ".join(data.get("career_tools") or [])
+
+        svc = _sheets_service()
+        sheet_title = GOOGLE_SHEETS_RANGE.split("!")[0]
+
+        # --- Headers (fila 1) para ubicar columnas por nombre ---
+        headers = _get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_title)
+
+        def idx(col_name: str) -> int:
+            try:
+                return headers.index(col_name)
+            except ValueError:
+                return -1
+
+        cols_needed = [
+            "Item ID","Job","Country","City","Job Type","Seniority",
+            "Years of Experience","Experience Level","Field","Modality",
+            "Tools","Description","Requirements","Additional Information"
+        ]
+        row_len = max((idx(c) for c in cols_needed if idx(c) >= 0), default=-1) + 1
+        if row_len <= 0:
+            return jsonify({"error": "Sheet headers not found or misnamed"}), 500
+
+        new_row = [""] * row_len
+
+        def put(col: str, val: str):
+            j = idx(col)
+            if j >= 0:
+                if j >= len(new_row):
+                    new_row.extend([""] * (j - len(new_row) + 1))
+                new_row[j] = val
+
+        put("Item ID", job_id)
+        put("Job", job_title)
+        put("Country", country)
+        put("City", city)
+        put("Job Type", job_type)
+        put("Seniority", seniority)
+        put("Years of Experience", years_exp)
+        put("Experience Level", exp_level)
+        put("Field", field_)
+        put("Modality", modality)
+        put("Tools", tools)
+
+        # 🔹 Estas 3 van en HTML
+        put("Description", desc_html)
+        put("Requirements", reqs_html)
+        put("Additional Information", addi_html)
+
+        # --- Append UNA fila ---
+        append = svc.spreadsheets().values().append(
+            spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+            range=GOOGLE_SHEETS_RANGE,
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [new_row]}
+        ).execute()
+
+        # --- sheetId real (no None) para formatear WRAP a la fila insertada ---
+        meta = svc.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
+        sheet_id = None
+        for s in meta.get("sheets", []):
+            props = s.get("properties", {})
+            if props.get("title") == sheet_title:
+                sheet_id = props.get("sheetId")
+                break
+
+        # updatedRange ej: "Careers!A123:Z123"
+        updated_range = (append.get("updates", {}) or {}).get("updatedRange")
+        if sheet_id is not None and updated_range:
+            import re
+            # Extrae 123 y 123 de A123:Z123
+            m = re.search(r'!([A-Z]+)(\d+):([A-Z]+)(\d+)$', updated_range)
+            if m:
+                start_row = int(m.group(2)) - 1  # 0-based
+                end_row   = int(m.group(4))      # exclusivo
+                # Aplica WRAP sólo a esa fila
+                svc.spreadsheets().batchUpdate(
+                    spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+                    body={
+                        "requests": [{
+                            "repeatCell": {
+                                "range": {
+                                    "sheetId": sheet_id,
+                                    "startRowIndex": start_row,
+                                    "endRowIndex": end_row
+                                },
+                                "cell": {
+                                    "userEnteredFormat": { "wrapStrategy": "WRAP" }
+                                },
+                                "fields": "userEnteredFormat.wrapStrategy"
+                            }
+                        }]
+                    }
+                ).execute()
+
+        # (Opcional) Persistir flags en DB
+        # with get_connection() as conn, conn.cursor() as cur:
+        #     cur.execute(
+        #         "UPDATE opportunity SET career_id=%s, career_published=TRUE WHERE opportunity_id=%s",
+        #         (job_id, opportunity_id)
+        #     )
+        #     conn.commit()
+
+        return jsonify({"career_id": job_id}), 200
+
+    except Exception as e:
+        logging.exception("❌ publish_career_to_sheet failed")
+        # Devuelve mensaje controlado para ver el error exacto en el front
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/opportunities/<opportunity_id>/batches', methods=['GET'])
