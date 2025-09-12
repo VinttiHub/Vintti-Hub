@@ -2101,238 +2101,7 @@ def handle_candidate_hire_data(candidate_id):
     finally:
         cursor.close()
         conn.close()
-# === Google Sheets Helpers ===
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
 
-SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-
-def _sheets_credentials():
-    """
-    Crea credenciales desde:
-    - GOOGLE_SERVICE_ACCOUNT_JSON (contenido JSON inline), o
-    - GOOGLE_SERVICE_ACCOUNT_FILE (ruta a .json)
-    """
-    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    sa_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
-    if sa_json:
-        import json as _json, io as _io
-        info = _json.loads(sa_json)
-        return Credentials.from_service_account_info(info, scopes=SHEETS_SCOPES)
-    elif sa_file:
-        return Credentials.from_service_account_file(sa_file, scopes=SHEETS_SCOPES)
-    raise RuntimeError("Service Account credentials not configured")
-
-def _sheets_service():
-    creds = _sheets_credentials()
-    return build("sheets", "v4", credentials=creds, cache_discovery=False)
-
-# Reemplaza _strip_html por esto (o agrega este y úsalo en publish):
-import re, html as _html
-
-import html as _html
-from html.parser import HTMLParser
-
-# --- Parse HTML -> plain text con \n y bullets ---
-def _html_to_sheet_text_plain(s: str) -> str:
-    if not s:
-        return ""
-    # <br> -> \n
-    s = re.sub(r'(?i)<br\s*/?>', '\n', s)
-
-    # Abrir <li> -> "• " (sin salto previo); cerrar </li> -> "\n"
-    s = re.sub(r'(?is)<\s*li[^>]*>\s*', '• ', s)
-    s = re.sub(r'(?is)</\s*li\s*>', '\n', s)
-
-    # Cierres de bloques -> \n
-    s = re.sub(r'(?is)</\s*(p|div|section|article|header|footer|aside|h[1-6]|tr|ul|ol)\s*>', '\n', s)
-
-    # Quitar el resto de etiquetas
-    s = re.sub(r'(?is)<[^>]+>', '', s)
-
-    # Entidades/espacios
-    s = _html.unescape(s).replace('\u00A0', ' ')
-    s = s.replace('\r\n', '\n').replace('\r', '\n')
-    s = re.sub(r'[ \t]+\n', '\n', s)
-    s = re.sub(r'\n{3,}', '\n\n', s)
-    s = re.sub(r'[ \t]+$', '', s, flags=re.M)
-    s = s.lstrip()              # 👈 elimina espacios/saltos al inicio
-    s = re.sub(r'\s+$', '', s)
-    return s
-
-
-# --- Parse HTML -> (full_text, textFormatRuns[]) para Sheets ---
-class _RichRunsParser(HTMLParser):
-
-    def __init__(self):
-        super().__init__()
-        self.buf = []
-        self.stack = []  # [{'bold':bool, 'italic':bool}]
-        self.runs = []   # [{'startIndex':int, 'format':{...}}]
-        self._last_fmt = {}
-        self._ensure_run(0, {})
-
-    def _current_fmt(self):
-        fmt = {}
-        for st in self.stack:
-            if st.get('bold'): fmt['bold'] = True
-            if st.get('italic'): fmt['italic'] = True
-        return fmt
-
-    def _ensure_run(self, start, fmt):
-        # Inicia un run si cambia el formato
-        if not self.runs:
-            if fmt:
-                self.runs.append({'startIndex': start, 'format': fmt})
-            return
-        if (self._last_fmt or {}) != (fmt or {}):
-            if fmt:
-                self.runs.append({'startIndex': start, 'format': fmt})
-            else:
-                # formato "limpio"
-                self.runs.append({'startIndex': start})
-        self._last_fmt = fmt or {}
-
-    def handle_starttag(self, tag, attrs):
-        t = tag.lower()
-        # bloques que fuerzan salto antes
-        if t in ('p','div','section','article','header','footer','aside','tr','h1','h2','h3','h4','h5','h6'):
-            self._append('\n')
-        if t == 'br':
-            self._append('\n')
-            return
-        if t in ('ul','ol'):
-            # salto para separar lista
-            if self.buf and not self.buf[-1].endswith('\n'):
-                self._append('\n')
-        st = {}
-        if t in ('b','strong'):
-            st['bold'] = True
-        if t in ('i','em'):
-            st['italic'] = True
-        self.stack.append(st)
-        self._ensure_run(len(self._text()), self._current_fmt())
-
-        if t == 'li':
-            # Nueva línea con viñeta
-            if not self._text().endswith('\n'):
-                self._append('\n')
-            self._append('• ')
-            self._ensure_run(len(self._text()), self._current_fmt())
-
-    def handle_endtag(self, tag):
-        t = tag.lower()
-        if self.stack:
-            self.stack.pop()
-        if t in ('p','div','section','article','header','footer','aside','tr','ul','ol','h1','h2','h3','h4','h5','h6'):
-            self._append('\n')
-        self._ensure_run(len(self._text()), self._current_fmt())
-
-    def handle_data(self, data):
-        if not data: return
-        txt = _html.unescape(data).replace('\u00A0', ' ')
-        self._append(txt)
-
-    def _append(self, s):
-        if s:
-            self.buf.append(s)
-
-    def _text(self):
-        return ''.join(self.buf)
-
-def _html_to_richtext_runs(s: str):
-    """
-    Devuelve: (plain_text, text_format_runs_list)
-    """
-    if not s:
-        return "", []
-    p = _RichRunsParser()
-    p.feed(s)
-    text = p._text()
-    # Normaliza saltos y espacios como en plain
-    text = text.replace('\r\n','\n').replace('\r','\n')
-    text = re.sub(r'[ \t]+\n', '\n', text)
-    text = re.sub(r'\n{3,}', '\n\n', text)
-    text = re.sub(r'[ \t]+$', '', text, flags=re.M)
-    text = re.sub(r'\s+$', '', text)
-    # Limpia runs fuera de rango y fusiona duplicados consecutivos con mismo formato
-    runs = []
-    last_fmt = None
-    for r in p.runs:
-        idx = max(0, min(len(text), int(r.get('startIndex', 0))))
-        fmt = r.get('format', None)
-        if runs and runs[-1].get('startIndex') == idx and (runs[-1].get('format') or {}) == (fmt or {}):
-            continue
-        runs.append({'startIndex': idx, **({'format': fmt} if fmt else {})})
-        last_fmt = fmt
-    return text, runs
-
-
-def _get_sheet_headers(service, spreadsheet_id, sheet_name):
-    resp = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id,
-        range=f"{sheet_name}!1:1"
-    ).execute()
-    values = resp.get("values", [[]])
-    headers = values[0] if values else []
-    return [h.strip() for h in headers]
-
-def _get_first_sheet_name(service, spreadsheet_id):
-    meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-    sheets = meta.get("sheets", [])
-    if not sheets:
-        raise RuntimeError("Spreadsheet has no sheets")
-    return sheets[0]["properties"]["title"]
-
-def _next_item_id(service, spreadsheet_id, sheet_name, item_id_header="Item ID") -> int:
-    """
-    Lee la columna 'Item ID' y devuelve max+1. Si no hay, devuelve 1.
-    """
-    headers = _get_sheet_headers(service, spreadsheet_id, sheet_name)
-    try:
-        col_idx = headers.index(item_id_header)  # 0-based
-    except ValueError:
-        # si no existe el header, asumimos que el sheet viene con headers correctos.
-        # Puedes agregar lógica para crearlo si quieres.
-        col_idx = None
-
-    # Leer todo el sheet (solo la columna Item ID si la ubicamos)
-    if col_idx is not None:
-        # Convierte índice a letra(s) de columna (A=1)
-        import string
-        def col_letter(n):
-            res = ""
-            n += 1
-            while n:
-                n, rem = divmod(n - 1, 26)
-                res = string.ascii_uppercase[rem] + res
-            return res
-        col_letter_id = col_letter(col_idx)
-        rng = f"{sheet_name}!{col_letter_id}:{col_letter_id}"
-    else:
-        rng = f"{sheet_name}!A:Z"
-
-    resp = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id, range=rng
-    ).execute()
-    rows = resp.get("values", [])
-
-    # Primera fila es header
-    max_id = 0
-    for i, r in enumerate(rows):
-        if i == 0:
-            continue
-        if not r:
-            continue
-        val = r[0] if col_idx is None else r[0]  # ya pedimos solo esa col
-        try:
-            num = int(val)
-            if num > max_id:
-                max_id = num
-        except Exception:
-            continue
-    return max_id + 1 if max_id >= 0 else 1
 
 
 
@@ -3600,25 +3369,51 @@ CANON = {
         "on site": "On-site",
     },
 }
+# === Google Sheets: helpers unificados (JSON inline o archivo) ===
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
-
+SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-GOOGLE_SHEETS_RANGE = os.getenv("GOOGLE_SHEETS_RANGE", "Careers!A:Z")  # hoja/cols destino
-GOOGLE_SA_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-GOOGLE_SA_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "{}")
+GOOGLE_SHEETS_RANGE = os.getenv("GOOGLE_SHEETS_RANGE", "Careers!A:Z")
 
-def _gsheets_service():
-    creds = Credentials.from_service_account_info(
-        json.loads(GOOGLE_SA_JSON), scopes=GOOGLE_SA_SCOPES
-    )
-    return build("sheets", "v4", credentials=creds)
+def _sheets_credentials():
+    """
+    Crea credenciales desde:
+    - GOOGLE_SERVICE_ACCOUNT_JSON (contenido JSON inline; normaliza private_key),
+    - o GOOGLE_SERVICE_ACCOUNT_FILE (ruta a .json en disco).
+    """
+    sa_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    sa_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
 
-def _get_headers(svc, spreadsheet_id, rng):
-    # lee primera fila para mapear columnas
-    res = svc.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id, range=rng.split("!")[0] + "!1:1"
+    if sa_json:
+        import json as _json
+        info = _json.loads(sa_json)
+        # normaliza saltos en private_key si vienen escapados
+        pk = info.get("private_key")
+        if isinstance(pk, str) and "\\n" in pk:
+            info["private_key"] = pk.replace("\\n", "\n")
+        return Credentials.from_service_account_info(info, scopes=SHEETS_SCOPES)
+
+    if sa_file:
+        return Credentials.from_service_account_file(sa_file, scopes=SHEETS_SCOPES)
+
+    raise RuntimeError("Service Account credentials not configured (set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_SERVICE_ACCOUNT_FILE)")
+
+def _sheets_service():
+    creds = _sheets_credentials()
+    # cache_discovery=False evita warnings en serverless
+    return build("sheets", "v4", credentials=creds, cache_discovery=False)
+
+def _get_sheet_headers(service, spreadsheet_id, sheet_name):
+    """Lee la fila 1 para obtener encabezados limpios."""
+    resp = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"{sheet_name}!1:1"
     ).execute()
-    return (res.get("values") or [[]])[0]
+    values = resp.get("values", [[]])
+    headers = values[0] if values else []
+    return [h.strip() for h in headers]
 
 @app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
 def publish_career_to_sheet(opportunity_id):
@@ -3649,8 +3444,10 @@ def publish_career_to_sheet(opportunity_id):
     tools      = ", ".join(data.get("career_tools") or [])
 
     # === Google Sheets ===
-    svc = _gsheets_service()
-    headers = _get_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SHEETS_RANGE)
+    svc = _sheets_service()
+    sheet_name = GOOGLE_SHEETS_RANGE.split("!")[0]
+    headers = _get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_name)
+
 
     # helper para obtener el índice de una columna (o crear array más largo)
     def idx(col_name):
