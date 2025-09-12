@@ -3405,16 +3405,52 @@ def _sheets_service():
     creds = _sheets_credentials()
     # cache_discovery=False evita warnings en serverless
     return build("sheets", "v4", credentials=creds, cache_discovery=False)
+# --- A1 helpers seguros ---
+def _a1_quote(sheet_name: str) -> str:
+    """
+    Devuelve el nombre de pestaña en A1 correctamente citado:
+    - Envuelve con comillas simples.
+    - Escapa comillas simples internas (' -> '')
+    - Permite nombres con espacios, emojis, paréntesis, etc.
+    """
+    s = (sheet_name or "").strip()
+    # si ya viene citado ('...'), quita las comillas para normalizar
+    if len(s) >= 2 and s[0] == s[-1] == "'":
+        s = s[1:-1]
+    s = s.replace("'", "''")
+    return f"'{s}'"
 
 def _get_sheet_headers(service, spreadsheet_id, sheet_name):
-    """Lee la fila 1 para obtener encabezados limpios."""
-    resp = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id,
-        range=f"{sheet_name}!1:1"
-    ).execute()
-    values = resp.get("values", [[]])
-    headers = values[0] if values else []
-    return [h.strip() for h in headers]
+    """
+    Lee la fila 1 de la pestaña `sheet_name` (citado en A1) y devuelve los encabezados.
+    Si la pestaña no existe, intenta con la primera del libro.
+    """
+    # 1) normaliza y cita el nombre
+    quoted = _a1_quote(sheet_name)
+
+    try:
+        resp = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"{quoted}!1:1"
+        ).execute()
+        values = resp.get("values", [[]])
+        headers = values[0] if values else []
+        return [h.strip() for h in headers]
+    except Exception:
+        # Fallback: usa la primera pestaña disponible
+        meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        sheets = meta.get("sheets", [])
+        if not sheets:
+            raise
+        first_title = sheets[0]["properties"]["title"]
+        resp = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f"{_a1_quote(first_title)}!1:1"
+        ).execute()
+        values = resp.get("values", [[]])
+        headers = values[0] if values else []
+        return [h.strip() for h in headers]
+
 
 @app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
 def publish_career_to_sheet(opportunity_id):
@@ -3447,10 +3483,16 @@ def publish_career_to_sheet(opportunity_id):
         tools      = ", ".join(data.get("career_tools") or [])
 
         svc = _sheets_service()
-        sheet_title = GOOGLE_SHEETS_RANGE.split("!")[0]
 
-        # --- Headers (fila 1) para ubicar columnas por nombre ---
+        # Título de pestaña a partir del RANGE (sin comillas, sin espacios extras)
+        _sheet_part = (GOOGLE_SHEETS_RANGE or "Careers!A:Z").split("!")[0].strip()
+        # si venía citado, quítale las comillas para pasarlo a _get_sheet_headers
+        if len(_sheet_part) >= 2 and _sheet_part[0] == _sheet_part[-1] == "'":
+            _sheet_part = _sheet_part[1:-1]
+        sheet_title = _sheet_part
+
         headers = _get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_title)
+
 
         def idx(col_name: str) -> int:
             try:
