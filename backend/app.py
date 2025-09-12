@@ -145,24 +145,6 @@ _CANON = {
     },
 }
 
-def _titlecase_city(s: str) -> str:
-    if not s: return ""
-    return " ".join(p.capitalize() for p in s.strip().split())
-
-def _canon_enum(field: str, val: str) -> str:
-    if not val: return ""
-    v = val.strip().lower()
-    m = _CANON.get(field, {})
-    return m.get(v, val.strip().capitalize() if field!="career_field" else val.strip())
-
-def _canon_country(s: str) -> str:
-    if not s: return ""
-    # casos típicos
-    if s.strip().lower() in ("any country","anycountry","any"):
-        return "Any Country"
-    # title case genérico (respetando acrónimos como "USA" si quieres extenderlo)
-    return " ".join(p.capitalize() for p in s.strip().split())
-
 def fetch_data_from_table(table_name):
     try:
         conn = get_connection()
@@ -3455,118 +3437,163 @@ def _get_sheet_headers(service, spreadsheet_id, sheet_name):
 @app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
 def publish_career_to_sheet(opportunity_id):
     """
-    Inserta UNA fila en el Google Sheet con Description/Requirements/Additional en HTML limpio.
-    No modifica otras filas ni borra nada. Aplica WRAP solo a la fila insertada.
+    Inserta UNA fila en el Google Sheet usando los encabezados reales del sheet:
+    - 'Job ID'
+    - 'Location Country', 'Location City'
+    - 'Job Type', 'Seniority', 'Years of Experience', 'Experience Level', 'Field'
+    - 'Remote Type'
+    - 'Tools & Skills'
+    - 'Description', 'Requirements', 'Additional Information' (HTML limpio)
+    Aplica WRAP solo a la fila insertada. No toca otras filas.
     """
     try:
         if not GOOGLE_SHEETS_SPREADSHEET_ID:
             return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
 
+        svc = _sheets_service()
         data = request.get_json(silent=True) or {}
 
-        # --- HTML limpio (quita spans/estilos/nbsp) ---
+        # --------- Normalizadores / mapeos (usa tu dict CANON ya cargado) ----------
+        def _norm(s):
+            return (s or '').strip()
+
+        def _canon(kind, val):
+            v = _norm(val)
+            table = CANON.get(kind, {})
+            # comparación case-insensitive en keys
+            for k, tgt in table.items():
+                if k.lower() == v.lower():
+                    return tgt
+            return v  # si no matchea, deja tal cual
+
+        job_id     = str(data.get("career_job_id") or opportunity_id)
+
+        country    = _norm(data.get("career_country"))
+        city       = _norm(data.get("career_city"))
+
+        job_type   = _canon("job_type", data.get("career_job_type"))
+        seniority  = _canon("seniority", data.get("career_seniority"))
+        years_exp  = _norm(data.get("career_years_experience"))
+        exp_level  = _canon("experience_level", data.get("career_experience_level"))
+        field_     = _canon("field", data.get("career_field"))
+        remote     = _canon("modality", data.get("career_modality"))  # en sheet se llama "Remote Type"
+        tools_arr  = data.get("career_tools") or []
+        tools_txt  = ", ".join([str(t).strip() for t in tools_arr if str(t).strip()])
+
+        job_title  = _norm(data.get("career_job"))
+
+        # HTML limpio (para Webflow) -> se envía como HTML
         desc_html = _clean_html_for_webflow(data.get("sheet_description_html", ""))
         reqs_html = _clean_html_for_webflow(data.get("sheet_requirements_html", ""))
         addi_html = _clean_html_for_webflow(data.get("sheet_additional_html", ""))
 
-        # --- Otros campos (tal cual los recibes) ---
-        job_id     = str(data.get("career_job_id") or opportunity_id)
-        job_title  = data.get("career_job", "") or ""
-        country    = data.get("career_country", "") or ""
-        city       = data.get("career_city", "") or ""
-        job_type   = data.get("career_job_type", "") or ""
-        seniority  = data.get("career_seniority", "") or ""
-        years_exp  = data.get("career_years_experience", "") or ""
-        exp_level  = data.get("career_experience_level", "") or ""
-        field_     = data.get("career_field", "") or ""
-        modality   = data.get("career_modality", "") or ""
-        tools      = ", ".join(data.get("career_tools") or [])
-
-        svc = _sheets_service()
-
-        # Título de pestaña a partir del RANGE (sin comillas, sin espacios extras)
-        _sheet_part = (GOOGLE_SHEETS_RANGE or "Careers!A:Z").split("!")[0].strip()
-        # si venía citado, quítale las comillas para pasarlo a _get_sheet_headers
+        # --------- Resuelve sheet y headers reales ----------
+        _sheet_part = (GOOGLE_SHEETS_RANGE or "Open Positions!A:Z").split("!")[0].strip()
         if len(_sheet_part) >= 2 and _sheet_part[0] == _sheet_part[-1] == "'":
             _sheet_part = _sheet_part[1:-1]
         sheet_title = _sheet_part
 
         headers = _get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_title)
 
+        # Alias por si el sheet tiene variantes mínimas de nombre
+        HDR = {
+            "JOB_ID":            ["Job ID", "Item ID"],
+            "JOB":               ["Job", "Position", "Role"],
+            "COUNTRY":           ["Location Country", "Country"],
+            "CITY":              ["Location City", "City"],
+            "JOB_TYPE":          ["Job Type"],
+            "SENIORITY":         ["Seniority"],
+            "YOE":               ["Years of Experience"],
+            "EXP_LEVEL":         ["Experience Level"],
+            "FIELD":             ["Field"],
+            "REMOTE":            ["Remote Type", "Modality"],
+            "TOOLS":             ["Tools & Skills", "Tools"],
+            "DESC":              ["Description"],
+            "REQS":              ["Requirements"],
+            "ADDI":              ["Additional Information"],
+        }
 
-        def idx(col_name: str) -> int:
-            try:
-                return headers.index(col_name)
-            except ValueError:
-                return -1
+        def find_col(names):
+            for n in names:
+                try:
+                    return headers.index(n)
+                except ValueError:
+                    continue
+            return -1
 
-        cols_needed = [
-            "Item ID","Job","Country","City","Job Type","Seniority",
-            "Years of Experience","Experience Level","Field","Modality",
-            "Tools","Description","Requirements","Additional Information"
-        ]
-        row_len = max((idx(c) for c in cols_needed if idx(c) >= 0), default=-1) + 1
-        if row_len <= 0:
+        # Calcula longitud de la fila a partir del mayor índice usado
+        targets = {
+            "JOB_ID": find_col(HDR["JOB_ID"]),
+            "JOB":    find_col(HDR["JOB"]),
+            "COUNTRY":find_col(HDR["COUNTRY"]),
+            "CITY":   find_col(HDR["CITY"]),
+            "JOB_TYPE":find_col(HDR["JOB_TYPE"]),
+            "SENIORITY":find_col(HDR["SENIORITY"]),
+            "YOE":    find_col(HDR["YOE"]),
+            "EXP_LEVEL":find_col(HDR["EXP_LEVEL"]),
+            "FIELD":  find_col(HDR["FIELD"]),
+            "REMOTE": find_col(HDR["REMOTE"]),
+            "TOOLS":  find_col(HDR["TOOLS"]),
+            "DESC":   find_col(HDR["DESC"]),
+            "REQS":   find_col(HDR["REQS"]),
+            "ADDI":   find_col(HDR["ADDI"]),
+        }
+
+        if all(v < 0 for v in targets.values()):
             return jsonify({"error": "Sheet headers not found or misnamed"}), 500
 
+        row_len = max([i for i in targets.values() if i >= 0]) + 1
         new_row = [""] * row_len
 
-        def put(col: str, val: str):
-            j = idx(col)
+        def put(key, value):
+            j = targets.get(key, -1)
             if j >= 0:
                 if j >= len(new_row):
                     new_row.extend([""] * (j - len(new_row) + 1))
-                new_row[j] = val
+                new_row[j] = value
 
-        put("Item ID", job_id)
-        put("Job", job_title)
-        put("Country", country)
-        put("City", city)
-        put("Job Type", job_type)
-        put("Seniority", seniority)
-        put("Years of Experience", years_exp)
-        put("Experience Level", exp_level)
-        put("Field", field_)
-        put("Modality", modality)
-        put("Tools", tools)
+        # ---- Escribe TODOS los campos con los nombres correctos del sheet ----
+        put("JOB_ID", job_id)
+        put("JOB", job_title)
+        put("COUNTRY", country)
+        put("CITY", city)
+        put("JOB_TYPE", job_type)
+        put("SENIORITY", seniority)
+        put("YOE", years_exp)        # se enviará como USER_ENTERED (lo verá como número si aplica)
+        put("EXP_LEVEL", exp_level)
+        put("FIELD", field_)
+        put("REMOTE", remote)        # <- coincide con dropdown “Remote Type”
+        put("TOOLS", tools_txt)      # <- “Tools & Skills”
+        put("DESC", desc_html)
+        put("REQS", reqs_html)
+        put("ADDI", addi_html)
 
-        # 🔹 Estas 3 van en HTML
-        put("Description", desc_html)
-        put("Requirements", reqs_html)
-        put("Additional Information", addi_html)
-
-        # --- Construye SIEMPRE el rango con el sheet_title resuelto y citado ---
-        quoted_title = _a1_quote(sheet_title)  # p.ej. "'Open Positions'"
+        quoted_title = _a1_quote(sheet_title)
         target_range = f"{quoted_title}!A:Z"
 
         append = svc.spreadsheets().values().append(
             spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
             range=target_range,
-            valueInputOption="RAW",
+            valueInputOption="USER_ENTERED",      # ← importante para números/dropdowns
             insertDataOption="INSERT_ROWS",
             body={"values": [new_row]}
         ).execute()
 
-
-        # --- sheetId real (no None) para formatear WRAP a la fila insertada ---
+        # ---- Aplica WRAP SOLO a la fila insertada ----
         meta = svc.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
         sheet_id = None
         for s in meta.get("sheets", []):
-            props = s.get("properties", {})
-            if props.get("title") == sheet_title:
-                sheet_id = props.get("sheetId")
+            if s.get("properties", {}).get("title") == sheet_title:
+                sheet_id = s.get("properties", {}).get("sheetId")
                 break
 
-        # updatedRange ej: "Careers!A123:Z123"
         updated_range = (append.get("updates", {}) or {}).get("updatedRange")
         if sheet_id is not None and updated_range:
             import re
-            # Extrae 123 y 123 de A123:Z123
             m = re.search(r'!([A-Z]+)(\d+):([A-Z]+)(\d+)$', updated_range)
             if m:
-                start_row = int(m.group(2)) - 1  # 0-based
-                end_row   = int(m.group(4))      # exclusivo
-                # Aplica WRAP sólo a esa fila
+                start_row = int(m.group(2)) - 1
+                end_row   = int(m.group(4))
                 svc.spreadsheets().batchUpdate(
                     spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
                     body={
@@ -3577,28 +3604,17 @@ def publish_career_to_sheet(opportunity_id):
                                     "startRowIndex": start_row,
                                     "endRowIndex": end_row
                                 },
-                                "cell": {
-                                    "userEnteredFormat": { "wrapStrategy": "WRAP" }
-                                },
+                                "cell": { "userEnteredFormat": { "wrapStrategy": "WRAP" } },
                                 "fields": "userEnteredFormat.wrapStrategy"
                             }
                         }]
                     }
                 ).execute()
 
-        # (Opcional) Persistir flags en DB
-        # with get_connection() as conn, conn.cursor() as cur:
-        #     cur.execute(
-        #         "UPDATE opportunity SET career_id=%s, career_published=TRUE WHERE opportunity_id=%s",
-        #         (job_id, opportunity_id)
-        #     )
-        #     conn.commit()
-
         return jsonify({"career_id": job_id}), 200
 
     except Exception as e:
         logging.exception("❌ publish_career_to_sheet failed")
-        # Devuelve mensaje controlado para ver el error exacto en el front
         return jsonify({"error": str(e)}), 500
 
 
