@@ -3376,7 +3376,7 @@ from googleapiclient.discovery import build
 
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-GOOGLE_SHEETS_RANGE = os.getenv("GOOGLE_SHEETS_RANGE", "Careers!A:Z")
+GOOGLE_SHEETS_RANGE = os.getenv("GOOGLE_SHEETS_RANGE") or "Open Positions!A:Z"
 
 def _sheets_credentials():
     """
@@ -3535,14 +3535,18 @@ def publish_career_to_sheet(opportunity_id):
         put("Requirements", reqs_html)
         put("Additional Information", addi_html)
 
-        # --- Append UNA fila ---
+        # --- Construye SIEMPRE el rango con el sheet_title resuelto y citado ---
+        quoted_title = _a1_quote(sheet_title)  # p.ej. "'Open Positions'"
+        target_range = f"{quoted_title}!A:Z"
+
         append = svc.spreadsheets().values().append(
             spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-            range=GOOGLE_SHEETS_RANGE,
+            range=target_range,
             valueInputOption="RAW",
             insertDataOption="INSERT_ROWS",
             body={"values": [new_row]}
         ).execute()
+
 
         # --- sheetId real (no None) para formatear WRAP a la fila insertada ---
         meta = svc.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
