@@ -3321,6 +3321,19 @@ def accounts_status_bulk_update():
         return jsonify({"updated": 0, "persisted": False, "note": str(e)}), 200
 from flask import request, jsonify
 import re, html as _html, logging
+# === Lista oficial de slugs para Tools & Skills (para Dropdown chips) ===
+CAREER_TOOL_SLUGS = [
+    "problem-solving",
+    "teamwork",
+    "time-management",
+    "adaptability",
+    "critical-thinking",
+    "leadership",
+    "creativity",
+    "technical-skills",
+    "interpersonal-skills",
+    "communication-skills",
+]
 
 # Mapas mínimos (1:1) según tu HTML y las opciones del Sheet
 CANON = {
@@ -3592,24 +3605,54 @@ def publish_career_to_sheet(opportunity_id):
             import re
             m = re.search(r'!([A-Z]+)(\d+):([A-Z]+)(\d+)$', updated_range)
             if m:
-                start_row = int(m.group(2)) - 1
-                end_row   = int(m.group(4))
-                svc.spreadsheets().batchUpdate(
-                    spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-                    body={
-                        "requests": [{
-                            "repeatCell": {
-                                "range": {
-                                    "sheetId": sheet_id,
-                                    "startRowIndex": start_row,
-                                    "endRowIndex": end_row
-                                },
-                                "cell": { "userEnteredFormat": { "wrapStrategy": "WRAP" } },
-                                "fields": "userEnteredFormat.wrapStrategy"
-                            }
-                        }]
+                start_row = int(m.group(2)) - 1  # 0-based
+                end_row   = int(m.group(4))      # exclusivo
+
+                requests = []
+
+                # 1) WRAP a toda la fila insertada
+                requests.append({
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": start_row,
+                            "endRowIndex": end_row
+                        },
+                        "cell": { "userEnteredFormat": { "wrapStrategy": "WRAP" } },
+                        "fields": "userEnteredFormat.wrapStrategy"
                     }
-                ).execute()
+                })
+
+                # 2) Data validation tipo Dropdown (chips) SOLO para la celda de Tools
+                tools_col = targets.get("TOOLS", -1)
+                if tools_col >= 0:
+                    requests.append({
+                        "setDataValidation": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": start_row,
+                                "endRowIndex": end_row,
+                                "startColumnIndex": tools_col,
+                                "endColumnIndex": tools_col + 1
+                            },
+                            "rule": {
+                                "condition": {
+                                    "type": "ONE_OF_LIST",
+                                    "values": [{"userEnteredValue": v} for v in CAREER_TOOL_SLUGS]
+                                },
+                                "strict": True,
+                                # Muy importante para “Dropdown (chips)”
+                                "showCustomUi": True
+                            }
+                        }
+                    })
+
+                if requests:
+                    svc.spreadsheets().batchUpdate(
+                        spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+                        body={ "requests": requests }
+                    ).execute()
+
 
         return jsonify({"career_id": job_id}), 200
 
