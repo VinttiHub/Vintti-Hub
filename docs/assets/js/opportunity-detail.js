@@ -1,6 +1,30 @@
 let emailToChoices = null;
 let emailCcChoices = null;
-// 🔧 Opciones fijas para Tools & Skills (sin escritura libre)
+// === Emoji Picker boot + helpers ===
+async function ensureEmojiPickerLoaded() {
+  if (customElements.get('emoji-picker')) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.type = 'module';
+    s.src = 'https://unpkg.com/emoji-picker-element@^1/dist/index.js';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// Cierra pickers al hacer click fuera o con ESC
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('.popup-emoji').forEach(p => {
+    if (!p.closest('.emoji-anchor')?.contains(e.target)) p.style.display = 'none';
+  });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.popup-emoji').forEach(p => p.style.display = 'none');
+  }
+});
+
 const CAREER_TOOLS = [
   { label: "Problem Solving",      value: "problem-solving" },
   { label: "Teamwork",             value: "teamwork" },
@@ -1463,11 +1487,17 @@ function createRichEditor(textareaId, fieldName, acSignal) {
     <button type="button" data-cmd="bold"><b>B</b></button>
     <button type="button" data-cmd="italic"><i>I</i></button>
     <button type="button" data-cmd="ul">• List</button>
-    <div style="display:inline-block; position:relative;">
-      <button type="button" data-emoji>😊</button>
-      <emoji-picker class="popup-emoji" style="display:none; position:absolute; top:100%; left:0;"></emoji-picker>
+
+    <div class="emoji-anchor" style="display:inline-block; position:relative;">
+      <button type="button" data-emoji id="emoji-toggle-btn" aria-label="Insert emoji">😊</button>
+      <emoji-picker class="popup-emoji" style="
+        display:none; position:absolute; z-index:100000;
+        top:0; right:calc(100% + 8px); /* 👈 abre hacia la IZQUIERDA del botón */
+        width:320px; max-height:340px; overflow:auto; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.12);
+      "></emoji-picker>
     </div>
   `;
+
 
   // editor
   const ed = document.createElement('div');
@@ -1481,20 +1511,53 @@ function createRichEditor(textareaId, fieldName, acSignal) {
   ed.innerHTML = ta.value || '';
 
   // wire toolbar (un solo handler, delegación)
-  bar.addEventListener('click', (e) => {
+  bar.addEventListener('click', async (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
+
     const cmd = btn.dataset.cmd;
-    if (cmd === 'bold') document.execCommand('bold');
-    if (cmd === 'italic') document.execCommand('italic');
-    if (cmd === 'ul') document.execCommand('insertUnorderedList');
+    if (cmd) {
+      // comandos de formato
+      if (cmd === 'ul') document.execCommand('insertUnorderedList', false, null);
+      else document.execCommand(cmd, false, null);
+      btn.classList.toggle('active');
+      return;
+    }
+
     if (btn.hasAttribute('data-emoji')) {
+      // ⚙️ asegura que el custom element esté cargado
+      try { await ensureEmojiPickerLoaded(); } catch {}
       const picker = bar.querySelector('.popup-emoji');
-      picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+      const anchor = btn.closest('.emoji-anchor');
+
+      // toggle
+      const willShow = picker.style.display !== 'block';
+      // cierra otros pickers visibles
+      document.querySelectorAll('.popup-emoji').forEach(p => p.style.display = 'none');
+
+      if (willShow) {
+        // Posiciona hacia la izquierda del botón y CLAMPEA dentro del modal
+        picker.style.display = 'block';
+
+        // Ajuste anti-desborde horizontal dentro de .popup-content
+        const popup = btn.closest('.popup-content') || document.body;
+        const popupRect = popup.getBoundingClientRect();
+        const pickRect  = picker.getBoundingClientRect();
+        const btnRect   = btn.getBoundingClientRect();
+
+        // si aun así se sale por la izquierda, cae a abrir debajo del botón (anclado al borde derecho)
+        if (pickRect.left < popupRect.left + 8) {
+          picker.style.top = '100%';
+          picker.style.right = '0';
+        } else {
+          picker.style.top = '0';
+          picker.style.right = 'calc(100% + 8px)';
+        }
+      }
     }
   }, { signal: acSignal });
 
-  // emojis (un solo listener)
+  // 🎯 Inserción del emoji dentro del editor rico (una sola vez)
   const picker = bar.querySelector('emoji-picker');
   picker.addEventListener('emoji-click', (ev) => {
     ed.focus();

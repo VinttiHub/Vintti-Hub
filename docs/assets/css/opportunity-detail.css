@@ -2537,3 +2537,15 @@ input:checked + .slider::before {
 .rich-wrap { position: relative; overflow: visible; }
 .rich-wrap .popup-emoji { z-index: 99999 !important; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
 .small-toolbar { position: relative; z-index: 3; }
+/* Emoji picker dentro de popups */
+.popup { z-index: 99999; }
+.popup .popup-content { position: relative; overflow: visible; } /* permite que el picker se vea fuera del flujo interno */
+
+.popup-emoji {
+  /* redundante con inline styles por seguridad de cascada */
+  z-index: 100000;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+}
