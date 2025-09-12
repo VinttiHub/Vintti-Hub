@@ -2539,8 +2539,10 @@ input:checked + .slider::before {
 .small-toolbar { position: relative; z-index: 3; }
 /* Emoji picker dentro de popups */
 .popup { z-index: 99999; }
-.popup .popup-content { position: relative; overflow: visible; } /* permite que el picker se vea fuera del flujo interno */
-
+#publishCareerPopup .popup-content { 
+  position: relative; 
+  overflow: visible; 
+}
 .popup-emoji {
   /* redundante con inline styles por seguridad de cascada */
   z-index: 100000;
