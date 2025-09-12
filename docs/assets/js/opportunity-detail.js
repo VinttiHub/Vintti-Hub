@@ -1,18 +1,46 @@
 let emailToChoices = null;
 let emailCcChoices = null;
 // 🔧 Opciones fijas para Tools & Skills (sin escritura libre)
-const CAREER_TOOL_OPTIONS = [
-  "Problem Solving",
-  "Teamwork",
-  "Time Management",
-  "Adaptability",
-  "Critical Thinking",
-  "Leadership",
-  "Creativity",
-  "Technical Skills",
-  "Interpersonal Skills",
-  "Communication Skills"
+const CAREER_TOOLS = [
+  { label: "Problem Solving",      value: "problem-solving" },
+  { label: "Teamwork",             value: "teamwork" },
+  { label: "Time Management",      value: "time-management" },
+  { label: "Adaptability",         value: "adaptability" },
+  { label: "Critical Thinking",    value: "critical-thinking" },
+  { label: "Leadership",           value: "leadership" },
+  { label: "Creativity",           value: "creativity" },
+  { label: "Technical Skills",     value: "technical-skills" },
+  { label: "Interpersonal Skills", value: "interpersonal-skills" },
+  { label: "Communication Skills", value: "communication-skills" }
 ];
+
+// Helpers de normalización
+const _toKey = s => (s||'').toString().trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+const LABEL_BY_SLUG = CAREER_TOOLS.reduce((m,o)=> (m[o.value]=o.label, m), {});
+const SLUG_BY_LABEL = CAREER_TOOLS.reduce((m,o)=> (m[_toKey(o.label)]=o.value, m), {});
+
+// Convierte entrada diversa → slug del Sheet
+function toToolSlug(v){
+  if (!v) return '';
+  const s = String(v).trim();
+  const asIs = LABEL_BY_SLUG[s] ? s : null;              // ya es slug válido
+  if (asIs) return s;
+  // ¿vino con label bonito?
+  const fromLabel = SLUG_BY_LABEL[_toKey(s)];
+  if (fromLabel) return fromLabel;
+  // ¿vino algo libre? lo “slugificamos” para no romper:
+  return _toKey(s);
+}
+
+// Prefill tolerante: acepta ['Problem Solving','problem-solving', ...]
+function normalizeToolsArray(arr){
+  if (!arr) return [];
+  const raw = Array.isArray(arr) ? arr : parseToolsValue(arr);
+  const slugs = raw.map(toToolSlug).filter(Boolean);
+  // quita duplicados conservando orden
+  return [...new Set(slugs)];
+}
+
 // --- HTML cleaner para Webflow (mantiene: ul/ol/li/p/br/b/strong/i/em/a) ---
 function cleanHtmlForWebflow(raw) {
   if (!raw) return '';
@@ -65,42 +93,33 @@ function mountToolsDropdown(selected = []) {
   const sel = document.getElementById('career-tools');
   if (!sel) return;
 
-  // limpiar opciones y poblar
-  sel.innerHTML = CAREER_TOOL_OPTIONS
-    .map(v => `<option value="${v}">${v}</option>`)
-    .join('');
+  // opciones (value = slug, texto = label)
+  sel.innerHTML = CAREER_TOOLS.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
 
-  // destruir instancia anterior si existe
   if (window.toolsChoices) {
     try { window.toolsChoices.destroy(); } catch {}
   }
 
-  // Instancia Choices (chips) SOLO con opciones existentes
   window.toolsChoices = new Choices(sel, {
     removeItemButton: true,
     shouldSort: false,
-    searchPlaceholderValue: 'Search skill…',
     searchEnabled: true,
-    allowHTML: true,      // render safe; el texto viene fijo de nuestra lista
-    duplicateItemsAllowed: false,
-    addItems: true,       // permite seleccionar del dropdown
-    addItemFilter: () => true,
-    // ⚠️ clave: en <select> Choices NO permite crear valores inexistentes
-    // (solo en <input type="text">). Así que no hay "free typing".
+    allowHTML: true,
+    duplicateItemsAllowed: false
   });
 
-  // Seleccionar las que ya vienen de BD (tolerante)
-  (Array.isArray(selected) ? selected : parseToolsValue(selected)).forEach(v => {
-    const opt = CAREER_TOOL_OPTIONS.find(o => o.toLowerCase() === String(v).toLowerCase());
-    if (opt) window.toolsChoices.setChoiceByValue(opt);
+  // preselección (normaliza a slugs)
+  normalizeToolsArray(selected).forEach(slug => {
+    try { window.toolsChoices.setChoiceByValue(slug); } catch {}
   });
 
-  // Autosave en cada cambio
+  // autosave siempre en SLUGS
   sel.addEventListener('change', () => {
-    const vals = window.toolsChoices.getValue(true); // array de strings
-    saveCareerField('career_tools', vals);
+    const slugs = window.toolsChoices.getValue(true); // ya son slugs (values del <option>)
+    saveCareerField('career_tools', slugs);
   }, { signal: (window.__publishCareerAC || {}).signal });
 }
+
 
 async function refreshOpportunityData() {
   const oppId = getOpportunityId();
@@ -1628,7 +1647,11 @@ async function saveCareerPayload(publish = false) {
 
   const toolsFromChips   = (window.__careerTools || []).filter(Boolean);
   const toolsFromChoices = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
-  const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
+  // Siempre envía slugs exactos para que el Sheet pinte chips
+const finalTools = normalizeToolsArray(
+  window.toolsChoices ? window.toolsChoices.getValue(true) : []
+);
+
 const descEditorEl = getRichEditor('career-description');
 const reqsEditorEl = getRichEditor('career-requirements');
 const addiEditorEl = getRichEditor('career-additional');
