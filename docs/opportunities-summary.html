@@ -17,7 +17,7 @@
     </header>
 
     <div class="opportunity-summary-table">
-      <table id="summaryTable">
+    <table id="summaryTable">
       <thead>
         <tr>
           <th>HR Lead</th>
@@ -29,13 +29,26 @@
           <th class="total-title">Total</th>
         </tr>
       </thead>
-        <tbody>
-          <tr data-email="pilar@vintti.com"><td>Pilar</td></tr>
-          <tr data-email="agostina@vintti.com"><td>Agostina</td></tr>
-          <tr data-email="jazmin@vintti.com"><td>Jazmín</td></tr>
-          <tr data-email="agustina.barbero@vintti.com"><td>Agustina</td></tr>
-        </tbody>
-      </table>
+      <tbody>
+        <tr data-email="pilar@vintti.com"><td>Pilar</td></tr>
+        <tr data-email="agostina@vintti.com"><td>Agostina</td></tr>
+        <tr data-email="jazmin@vintti.com"><td>Jazmín</td></tr>
+        <tr data-email="agustina.barbero@vintti.com"><td>Agustina</td></tr>
+      </tbody>
+
+      <!-- NUEVO: fila de totales por columna (suma de columnas) -->
+      <tfoot>
+        <tr class="totals-row">
+          <th class="totals-title">Total </th>
+          <th class="total-col total-col-1">0</th>
+          <th class="total-col total-col-2">0</th>
+          <th class="total-col total-col-3">0</th>
+          <th class="total-col total-col-4">0</th>
+          <th class="total-col total-col-5">0</th>
+          <th class="total-cell grand-total">0</th>
+        </tr>
+      </tfoot>
+    </table>
     </div>
     <!-- Drilldown de oportunidades por HR Lead + Stage -->
 <section id="drilldownWrapper" class="drilldown hidden">

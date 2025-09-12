@@ -78,6 +78,10 @@ opportunities.forEach((opp) => {
     totalTd.className = "total-cell";
     totalTd.textContent = String(rowTotal);
     row.appendChild(totalTd);
+    // ...después de renderizar todas las filas y su Total por fila:
+    const tableEl = document.getElementById("summaryTable");
+    updateColumnTotals(stages, tableEl);
+
   });
   } catch (err) {
     console.error("❌ Error al cargar oportunidades:", err);
@@ -289,3 +293,33 @@ f
     cell.addEventListener("mouseleave", () => setHoverCol(""));
   });
 });
+function updateColumnTotals(stages, table) {
+  // tfoot cells: cada stage tiene su <th.total-col-idx>
+  const tfoot = table.querySelector('tfoot');
+  if (!tfoot) return;
+
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+  const colTotals = new Array(stages.length).fill(0);
+
+  // Recorremos filas y sumamos cada columna de stage (td 2..6)
+  rows.forEach(row => {
+    // td[0] = HR Lead, luego vienen las 5 de stage y la última es Total de fila
+    stages.forEach((_, idx) => {
+      const td = row.children[idx + 1]; // +1 por la 1ª columna (HR Lead)
+      const val = Number(td?.textContent || 0);
+      if (!Number.isNaN(val)) colTotals[idx] += val;
+    });
+  });
+
+  // Pintar totales por columna en el tfoot
+  let grand = 0;
+  colTotals.forEach((sum, idx) => {
+    const cell = tfoot.querySelector(`.total-col-${idx + 1}`);
+    if (cell) cell.textContent = String(sum);
+    grand += sum;
+  });
+
+  // Gran total (suma de todos los stages)
+  const grandCell = tfoot.querySelector('.grand-total');
+  if (grandCell) grandCell.textContent = String(grand);
+}
