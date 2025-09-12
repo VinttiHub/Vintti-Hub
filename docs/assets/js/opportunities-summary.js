@@ -58,17 +58,27 @@ opportunities.forEach((opp) => {
 
 
     // Render tabla
-    document.querySelectorAll("#summaryTable tbody tr").forEach((row) => {
-      const email = row.getAttribute("data-email");
-      // Vaciar la fila excepto primera col (HR Lead)
-      while (row.children.length > 1) row.removeChild(row.lastChild);
+  document.querySelectorAll("#summaryTable tbody tr").forEach((row) => {
+    const email = row.getAttribute("data-email");
+    // Vaciar la fila excepto primera col (HR Lead)
+    while (row.children.length > 1) row.removeChild(row.lastChild);
 
-      stages.forEach((stage) => {
-        const cell = document.createElement("td");
-        cell.textContent = String(summaryCounts[email][stage] || 0);
-        row.appendChild(cell);
-      });
+    let rowTotal = 0;
+
+    stages.forEach((stage) => {
+      const val = Number(summaryCounts[email][stage] || 0);
+      rowTotal += val;
+      const cell = document.createElement("td");
+      cell.textContent = String(val);
+      row.appendChild(cell);
     });
+
+    // --- Columna Total (última) ---
+    const totalTd = document.createElement("td");
+    totalTd.className = "total-cell";
+    totalTd.textContent = String(rowTotal);
+    row.appendChild(totalTd);
+  });
   } catch (err) {
     console.error("❌ Error al cargar oportunidades:", err);
   }
@@ -193,6 +203,10 @@ table.addEventListener("click", async (evt) => {
   const isFirstCol = cell.cellIndex === 0;
   const isNumber = !isNaN(parseInt(cell.textContent, 10));
 
+  // Evitar clic en la columna Total (última)
+  const isLastCol = cell.cellIndex === (stages.length /*5*/ + 1);
+  if (isFirstCol || isLastCol || !isNumber) return;
+
   // Solo números, no la primera columna
   if (isFirstCol || !isNumber) return;
 
@@ -255,14 +269,16 @@ const filteredOpps = (oppsCache || []).filter((o) =>
   // ——— Cursor “mano” solo para números (no primera col)
   setTimeout(() => {
     document.querySelectorAll("#summaryTable tbody tr").forEach((row) => {
-      row.querySelectorAll("td:not(:first-child)").forEach((cell) => {
+      // antes: row.querySelectorAll("td:not(:first-child)")
+      // ahora: excluimos también la última columna (Total)
+      row.querySelectorAll("td:not(:first-child):not(:last-child)").forEach((cell) => {
         if (!isNaN(parseInt(cell.textContent, 10))) {
           cell.classList.add("is-clickable");
         }
       });
     });
   }, 100);
-
+f
   // ——— Hover de columna con velo del color del stage
   // Seteamos un data-atributo en la tabla con el índice de columna
   function setHoverCol(colIndex) {
