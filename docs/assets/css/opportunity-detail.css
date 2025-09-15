@@ -612,29 +612,80 @@ body {
     transform: translateY(-1px);
   }
   
-  .pipeline-columns {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 1.5rem;
-    overflow-x: auto;
-    padding-bottom: 1rem;
-    scroll-behavior: smooth;
-    white-space: nowrap; /* 👈 esto es clave */
-  }
-  
-  .column {
-    flex: 0 0 auto; /* 👈 NO crecer, NO encoger */
-    width: 220px;
-    min-width: 250px;
-    padding: 0 0.5rem;
-    border-right: 1px solid #e4d4f5;
-    position: static;
-  }
-  
-  .column:last-child {
-    border-right: none;
-  }
-  
+/* ---- PIPELINE LAYOUT SIN OVERFLOW ---- */
+.pipeline-columns{
+  display: flex;
+  gap: 12px;
+  flex-wrap: nowrap;      /* 1 sola fila */
+  overflow-x: hidden;     /* nada de scroll horizontal */
+  padding-bottom: 8px;
+}
+
+/* cada columna reparte el ancho disponible y puede encogerse “a cero” */
+.column{
+  flex: 1 1 0;            /* crecer y encoger a partes iguales */
+  min-width: 0;           /* importantísimo: permite que colapse */
+  padding: 0 .25rem;
+  border-right: 1px solid #e4d4f5;
+  position: relative;
+}
+
+/* quita el borde al último para que no corte */
+.column:last-child{ border-right: 0; }
+
+/* título más compacto para que no robe ancho */
+.column-title{
+  padding: .45rem .6rem;
+  font-size: .6rem;
+}
+
+/* el contenedor acepta el ancho de la columna */
+.card-container{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;   /* <- las cards se estiran a 100% */
+  min-height: 420px;      /* ajusta a gusto */
+  padding: 8px 6px;
+}
+
+/* ===== SOLO PIPELINE ===== */
+.pipeline-section .pipeline-card .card-header{
+  align-items: flex-start;          /* nombres en 2 líneas no desalinean */
+}
+
+.pipeline-section .pipeline-card .candidate-info{
+  flex: 1 1 auto;
+  min-width: 0;                     /* 🔑 permite que el texto colapse en flex */
+}
+
+.pipeline-section .pipeline-card .signoff-toggle,
+.pipeline-section .pipeline-card .delete-icon{
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+
+/* Nombre: envuelve y clampa a 2 líneas con elipsis */
+.pipeline-section .pipeline-card .candidate-name{
+  font-size: .8rem;
+  line-height: 1.2;
+  white-space: normal !important;
+  word-break: break-word;
+  hyphens: auto;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;            /* máx. 2 líneas */
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Meta más discreta y compacta solo en pipeline */
+.pipeline-section .pipeline-card .candidate-meta{
+  font-size: .8rem;
+  opacity: .9;
+}
+
 .column h3 {
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
@@ -1899,7 +1950,8 @@ input:checked + .slider::before {
 .pipeline-card {
   padding: 0.6rem 0.8rem 1.4rem;
   font-size: 0.75rem;
-  width: 250px !important;
+  width: 100% !important;     /* llenan el ancho de la columna */
+  box-sizing: border-box; 
   border-radius: 14px;
   background-color: #ffffff; 
   border: 1px solid #d4d9d6;
@@ -1908,6 +1960,11 @@ input:checked + .slider::before {
   margin-right: 12px;
 
 }
+@media (max-width: 1200px){
+  .column-title{ font-size: .85rem; padding: .4rem .5rem; }
+  .candidate-card{ padding: .6rem .7rem; }
+}
+
 .candidate-card:not(.pipeline-card) .candidate-name {
   font-size: 0.85rem;
   font-weight: 500;
@@ -2550,4 +2607,8 @@ input:checked + .slider::before {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0,0,0,.12);
+}
+
+@media (min-width: 1440px){
+  :root{ --col-w: clamp(340px, 32vw, 520px); }
 }

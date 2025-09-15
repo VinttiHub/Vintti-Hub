@@ -4,7 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
       'contacted': 'Contactado',
       'no-advance': 'No avanza primera',
       'first-interview': 'Primera entrevista',
-      'client-process': 'En proceso con Cliente'
+      'client-process': 'En proceso con Cliente',
+      'applicant': 'Applicant'  
     };
 
     let draggedCard = null;
@@ -199,6 +200,7 @@ function loadPipelineCandidates() {
     .then(candidates => {
       console.log('🔵 Candidates:', candidates);
               const counters = {
+                'applicant': 0, 
         'contacted': 0,
         'no-advance': 0,
         'first-interview': 0,
@@ -220,7 +222,7 @@ candidates.forEach(candidate => {
 card.innerHTML = `
   <div class="card-header">
     <div class="candidate-info">
-      <strong class="candidate-name">${candidate.name}</strong>
+      <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
       <div class="candidate-meta">
         <span class="country">${getFlagEmoji(candidate.country || '')}</span>
         <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
@@ -327,25 +329,31 @@ card.querySelector(".star-icon").addEventListener("click", async (e) => {
 
 
 
-  // Mapeo del stage → columna id
-  let columnId = '';
-  switch (candidate.stage?.trim()) {
-      case 'Contactado':
-        columnId = 'contacted';
-        break;
-      case 'No avanza primera':
-        columnId = 'no-advance';
-        break;
-      case 'Primera entrevista':
-        columnId = 'first-interview';
-        break;
-      case 'En proceso con Cliente':
-        columnId = 'client-process';
-        break;
-      default:
-        console.warn(`Stage desconocido: ${candidate.stage}`);
-        columnId = 'contacted'; // fallback
-    }
+// Mapeo del stage → columna id
+const stageVal = (candidate.stage_pipeline || candidate.stage || '').trim();
+
+let columnId = '';
+switch (stageVal) {
+  case 'Applicant':
+    columnId = 'applicant';
+    break;
+  case 'Contactado':
+    columnId = 'contacted';
+    break;
+  case 'No avanza primera':
+    columnId = 'no-advance';
+    break;
+  case 'Primera entrevista':
+    columnId = 'first-interview';
+    break;
+  case 'En proceso con Cliente':
+    columnId = 'client-process';
+    break;
+  default:
+    console.warn(`Stage desconocido: ${stageVal}`);
+    columnId = 'contacted'; // fallback amigable
+}
+
 
   const container = document.getElementById(columnId);
   if (container) {
