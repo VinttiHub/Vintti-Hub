@@ -25,6 +25,7 @@ import html as _html
 from ai_routes import register_ai_routes
 from db import get_connection
 from coresignal_routes import bp as coresignal_bp
+from psycopg2.extras import RealDictCursor  # 👈 necesario para cursor_factory=RealDictCursor
 
 # Affinda (opcional)
 from affinda import AffindaAPI, TokenCredential

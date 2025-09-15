@@ -21,7 +21,7 @@ def register_send_email_route(app):
         if request.method == "OPTIONS":
             logging.info("🟡 OPTIONS request recibida")
             response = make_response('', 204)
-            response.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            response.headers['Access-Control-Allow-Origin'] = 'https://vintti-hub.com'
             response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
             response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -90,7 +90,7 @@ def register_send_email_route(app):
             logging.info("📨 Headers de SendGrid: %s", dict(response.headers))
 
             resp = jsonify({"status": "Email sent", "code": response.status_code})
-            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vintti-hub.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
             return resp
 
@@ -98,6 +98,6 @@ def register_send_email_route(app):
             logging.error("🧨 Excepción durante el envío")
             traceback.print_exc()
             resp = jsonify({"error": "Email sending failed", "detail": str(e)})
-            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vintti-hub.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
             return resp, 500
