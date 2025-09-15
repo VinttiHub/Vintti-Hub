@@ -145,7 +145,6 @@
 
 
 <!-- ENGLISH LEVEL -->
-<!-- ENGLISH LEVEL (Dropdown) -->
 <div class="field">
   <label>
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -245,6 +244,25 @@
     <label for="comments">Comments</label>
     <textarea id="comments" placeholder="No comments">—</textarea>
   </div>
+
+</div>
+ <!-- CANDIDATE SUCCESS -->
+<div class="field textarea">
+  <label>Candidate success</label>
+  <div class="rich-toolbar" id="candidate-succes-toolbar">
+    <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
+    <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
+    <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
+  </div>
+  <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
+</div>
+  <!-- EQUIPMENTS -->
+<div class="field">
+  <label style="display:flex; align-items:center; justify-content:space-between;">
+    <span>Equipments</span>
+    <a id="equipments-details-link" class="pill pill-link" href="#" target="_blank" rel="noopener">Details →</a>
+  </label>
+  <div id="equipments-chips" class="chips-row">—</div>
 </div>
       </div>
     </div>

@@ -1112,7 +1112,8 @@ def get_candidate_by_id(candidate_id):
                 discount_dolar,
                 discount_daterange,
                 affinda_scrapper,
-                coresignal_scrapper
+                coresignal_scrapper,
+                candidate_succes
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))
@@ -1583,6 +1584,53 @@ def create_batch(opportunity_id):
         print("Error creating batch:", e)
         return jsonify({"error": str(e)}), 500
 
+@app.route('/candidates/<int:candidate_id>/equipments')
+def get_candidate_equipments(candidate_id):
+    """
+    Devuelve los equipos del candidato como array de strings.
+    Lee de la tabla 'equipments' la columna 'equipos' que puede venir:
+      - como texto "Laptop"
+      - como JSON texto '["Laptop","Chair"]'
+    Si hay varias filas para el candidato, toma la más reciente (por id/fecha si existiera),
+    si no, la primera que encuentre.
+    """
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # Ajusta el ORDER BY si tienes un campo 'updated_at' o similar
+        cur.execute("""
+            SELECT equipos
+            FROM equipments
+            WHERE candidate_id = %s
+            ORDER BY equipment_id DESC
+            LIMIT 1
+        """, (candidate_id,))
+
+        row = cur.fetchone()
+        cur.close(); conn.close()
+
+        if not row or row[0] is None:
+            return jsonify([])
+
+        raw = row[0]
+        items = []
+
+        # Normaliza: si ya es lista, devuélvela; si es string JSON, parsea; si es string plano, envuélvelo.
+        try:
+            parsed = raw if isinstance(raw, list) else json.loads(raw)
+            if isinstance(parsed, list):
+                items = [str(x) for x in parsed]
+            elif isinstance(parsed, str) and parsed.strip():
+                items = [parsed.strip()]
+        except Exception:
+            # No era JSON válido: tratamos como string plano
+            if isinstance(raw, str) and raw.strip():
+                items = [raw.strip()]
+
+        return jsonify(items)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/candidates/<int:candidate_id>', methods=['PATCH'])
 def update_candidate_fields(candidate_id):
@@ -1603,7 +1651,8 @@ def update_candidate_fields(candidate_id):
         'linkedin_scrapper',
         'cv_pdf_scrapper',
         'discount_dolar', 
-        'discount_daterange'
+        'discount_daterange',
+        'candidate_succes'
     ]
 
     updates = []

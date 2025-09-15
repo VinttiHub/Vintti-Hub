@@ -1,3 +1,20 @@
+const EQUIPMENT_OPTIONS = [
+  { value: "Laptop",     emoji: "💻" },
+  { value: "Monitor",    emoji: "🖥️" },
+  { value: "Mouse",      emoji: "🖱️" },
+  { value: "Keyboard",   emoji: "⌨️" },
+  { value: "Headphones", emoji: "🎧" },
+  { value: "Dock",       emoji: "🧩" },
+  { value: "Phone",      emoji: "📱" },
+  { value: "Tablet",     emoji: "📱" },
+  { value: "Router",     emoji: "📶" },
+  { value: "Chair",      emoji: "💺" }
+];
+const EQUIP_EMOJI = Object.fromEntries(EQUIPMENT_OPTIONS.map(o => [o.value.toLowerCase(), o.emoji]));
+function equipmentEmoji(name){
+  if (!name) return '📦';
+  return EQUIP_EMOJI[String(name).toLowerCase()] || '📦';
+}
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -663,6 +680,73 @@ if (gate) {
     window.__coreSyncInFlight = false;
     try { localStorage.setItem(gate.storeKey, String(Date.now())); } catch {}
   });
+}
+function renderEquipmentChips(items){
+  const host = document.getElementById('equipments-chips');
+  if (!host) return;
+  host.innerHTML = '';
+  const arr = Array.isArray(items) ? items : (items ? [items] : []);
+  if (!arr.length) { host.textContent = '—'; return; }
+
+  arr.forEach(val => {
+    const chip = document.createElement('span');
+    chip.className = 'chip equip-chip';
+    const emoji = equipmentEmoji(val);
+    chip.textContent = `${emoji} ${val}`;
+    host.appendChild(chip);
+  });
+}
+
+async function loadEquipmentsForCandidate(cid){
+  try{
+    const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${cid}/equipments`);
+    const data = await r.json();
+    renderEquipmentChips(data);
+  } catch(e){
+    console.warn('equipments load failed', e);
+  }
+}
+// Equipments: chips + link "Details"
+loadEquipmentsForCandidate(candidateId);
+const eqLink = document.getElementById('equipments-details-link');
+if (eqLink) eqLink.href = `equipments.html?candidate_id=${encodeURIComponent(candidateId)}`;
+function wireRichToolbar(toolbarId){
+  const tb = document.getElementById(toolbarId);
+  if (!tb) return;
+  tb.querySelectorAll('button[data-command]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const targetId = btn.getAttribute('data-target');
+      const cmd = btn.getAttribute('data-command');
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      target.focus();
+      document.execCommand(cmd, false, null);
+    });
+  });
+}
+// === Candidate success: cargar, toolbar, guardar ===
+wireRichToolbar('candidate-succes-toolbar');
+
+const successDiv = document.getElementById('candidate-succes');
+if (successDiv) {
+  // Cargar valor (viene en el GET /candidates/<id>)
+  // Este bloque debe ir dentro del .then(data => { ... }) donde ya setéas overviewFields
+  // Si estás fuera, asegura que 'data' se tenga a mano o mueve estas dos líneas adentro.
+  // Aquí asumo que estás todavía dentro del .then(data => { ... }).
+  successDiv.innerHTML = (data.candidate_succes || '');
+
+  // Guardar al salir de foco
+  successDiv.addEventListener('blur', () => {
+    const html = successDiv.innerHTML.trim();
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ candidate_succes: html })
+    });
+  });
+
+  // Sanea estilos pegados: ya tienes un listener global para contenteditable;
+  // con eso alcanzaría. Si quieres, re-aplicas el mismo estilo aquí.
 }
 
     })
