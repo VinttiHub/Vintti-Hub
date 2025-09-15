@@ -3495,6 +3495,140 @@ def _get_sheet_headers(service, spreadsheet_id, sheet_name):
         values = resp.get("values", [[]])
         headers = values[0] if values else []
         return [h.strip() for h in headers]
+# === Import de librerías que ya usas arriba ===
+# from googleapiclient.discovery import build  # ya importado
+# from google.oauth2.service_account import Credentials  # ya importado
+import hashlib
+
+# === Config import Sheet (con defaults al sheet que pasaste) ===
+IMPORT_SPREADSHEET_ID = os.getenv("IMPORT_SPREADSHEET_ID") or "1Jn9xDhu08-eEL2zn9mg_VCXqCdYBdYWiy2FenU2Lmf8"
+IMPORT_SHEET_GID      = os.getenv("IMPORT_SHEET_GID") or "0"
+IMPORT_SHEET_TITLE    = os.getenv("IMPORT_SHEET_TITLE") or ""
+
+_IMPORT_HEADERS = [
+    # Excel (izquierda) -> DB (derecha)
+    # job_id -> opportunity_candidates.opportunity_id (vía tabla opportunity)
+    "job_id",
+    "first_name",
+    "last_name",
+    "email_address",
+    "phone_number",
+    "location",
+    "role",
+    "area",
+    "linkedin_url",
+    "english_level",
+]
+
+def _norm_phone_digits(s: str | None) -> str:
+    if not s: return ""
+    return "".join(ch for ch in str(s) if ch.isdigit())
+
+def _norm_linkedin(s: str | None) -> str:
+    if not s: return ""
+    s = s.strip()
+    # normaliza eliminando trailing slashes y query
+    s = s.split("?")[0].rstrip("/")
+    return s.lower()
+
+def _norm_email(s: str | None) -> str:
+    return (s or "").strip().lower()
+
+def _row_fingerprint(row: dict) -> str:
+    """
+    Hash estable por fila basándonos en columnas clave.
+    """
+    parts = [
+        str(row.get("job_id") or "").strip(),
+        _norm_email(row.get("email_address")),
+        _norm_linkedin(row.get("linkedin_url")),
+        _norm_phone_digits(row.get("phone_number")),
+        (str(row.get("first_name") or "").strip() + " " + str(row.get("last_name") or "").strip()).strip(),
+    ]
+    base = "||".join(parts)
+    return hashlib.sha256(base.encode("utf-8")).hexdigest()
+
+def _get_sheet_title_by_gid(service, spreadsheet_id: str, gid: str) -> str:
+    """
+    Si no viene IMPORT_SHEET_TITLE, resuelve el nombre de la pestaña por GID.
+    """
+    meta = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    for s in meta.get("sheets", []):
+        props = s.get("properties", {})
+        if str(props.get("sheetId")) == str(gid):
+            return props.get("title")
+    # fallback: primera pestaña
+    return meta.get("sheets", [])[0].get("properties", {}).get("title")
+
+def _get_rows_with_headers(service, spreadsheet_id: str, sheet_title: str) -> list[dict]:
+    """
+    Devuelve una lista de dicts por fila con keys = headers normalizados (snake_case).
+    Asume fila 1 = encabezados.
+    """
+    quoted = _a1_quote(sheet_title)
+    resp = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=f"{quoted}!A:Z"
+    ).execute()
+    values = resp.get("values", [])
+    if not values:
+        return []
+
+    headers = [ (h or "").strip() for h in values[0] ]
+    # normaliza headers del sheet a snake_case simple para mapear
+    def _to_key(h):
+        return re.sub(r'[^a-z0-9]+', '_', h.strip().lower()).strip('_')
+
+    head_norm = [_to_key(h) for h in headers]
+
+    out = []
+    for idx, row in enumerate(values[1:], start=2):  # data desde fila 2
+        d = {}
+        for j, v in enumerate(row):
+            key = head_norm[j] if j < len(head_norm) else f"col_{j+1}"
+            d[key] = v
+        d["_row_number"] = idx  # útil para logs
+        out.append(d)
+    return out
+
+def _find_opportunity_id(cursor, job_id: str | None) -> int | None:
+    if not job_id:
+        return None
+    cursor.execute("SELECT opportunity_id FROM opportunity WHERE CAST(opportunity_id AS TEXT) = %s OR CAST(career_job_id AS TEXT) = %s LIMIT 1",
+                   (str(job_id), str(job_id)))
+    r = cursor.fetchone()
+    return r[0] if r else None
+
+def _find_existing_candidate(cursor, email: str, linkedin: str, phone_norm: str) -> int | None:
+    """
+    Busca por email OR linkedin OR phone normalizado (solo dígitos).
+    """
+    # 1) email
+    if email:
+        cursor.execute("SELECT candidate_id FROM candidates WHERE lower(email) = %s LIMIT 1", (email,))
+        r = cursor.fetchone()
+        if r: return r[0]
+    # 2) linkedin (comparación normalizada)
+    if linkedin:
+        cursor.execute("""
+            SELECT candidate_id
+            FROM candidates
+            WHERE lower(regexp_replace(COALESCE(linkedin,''), '/+$', '')) = %s
+            LIMIT 1
+        """, (linkedin.rstrip('/'),))
+        r = cursor.fetchone()
+        if r: return r[0]
+    # 3) teléfono (solo dígitos)
+    if phone_norm:
+        cursor.execute("""
+            SELECT candidate_id
+            FROM candidates
+            WHERE regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g') = %s
+            LIMIT 1
+        """, (phone_norm,))
+        r = cursor.fetchone()
+        if r: return r[0]
+    return None
 
 
 @app.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
@@ -3711,6 +3845,179 @@ def publish_career_to_sheet(opportunity_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/sheets/candidates/import', methods=['POST'])
+def import_candidates_from_sheet():
+    """
+    Lee el Sheet de candidatos y crea/relaciona filas nuevas.
+    Reglas:
+      - Si ya existe (email OR linkedin OR phone) => skip creación de candidato, pero si corresponde, relaciona con la opp si no estaba.
+      - Si job_id no matchea con opportunity => skip.
+      - Loggea cada fila insertada en sheet_import_log con fingerprint para idempotencia.
+    Body opcional:
+      {
+        "spreadsheet_id": "...",  # si no, usa IMPORT_SPREADSHEET_ID
+        "sheet_gid": "0",         # si no, usa IMPORT_SHEET_GID
+        "sheet_title": "Candidates",  # si no, se resuelve por GID
+        "dry_run": false          # si true, no hace writes en DB, solo preview
+      }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        spreadsheet_id = payload.get("spreadsheet_id") or IMPORT_SPREADSHEET_ID
+        sheet_gid      = str(payload.get("sheet_gid") or IMPORT_SHEET_GID)
+        sheet_title    = (payload.get("sheet_title") or IMPORT_SHEET_TITLE).strip()
+        dry_run        = bool(payload.get("dry_run", False))
+
+        svc = _sheets_service()
+        if not sheet_title:
+            sheet_title = _get_sheet_title_by_gid(svc, spreadsheet_id, sheet_gid)
+
+        rows = _get_rows_with_headers(svc, spreadsheet_id, sheet_title)
+
+        # Mapea headers del sheet a los que esperamos (tolerante a variaciones)
+        def getv(r, *aliases):
+            # intenta por varias llaves (snake_case) habituales
+            for k in aliases:
+                if k in r and r[k] != "":
+                    return r[k]
+            return ""
+
+        to_process = []
+        for r in rows:
+            rec = {
+                "job_id":        getv(r, "job_id", "job", "opportunity_id"),
+                "first_name":    getv(r, "first_name", "name", "nombre"),
+                "last_name":     getv(r, "last_name", "apellido"),
+                "email_address": getv(r, "email_address", "email"),
+                "phone_number":  getv(r, "phone_number", "phone", "telefono"),
+                "location":      getv(r, "location", "country", "pais"),
+                "role":          getv(r, "role"),
+                "area":          getv(r, "area"),
+                "linkedin_url":  getv(r, "linkedin_url", "linkedin"),
+                "english_level": getv(r, "english_level", "englishlevel", "ingles"),
+                "_row_number":   r.get("_row_number"),
+            }
+            # solo consideramos filas con al menos job_id y (email o linkedin o phone)
+            has_contact = any([rec["email_address"], rec["linkedin_url"], rec["phone_number"]])
+            if rec["job_id"] and has_contact:
+                to_process.append(rec)
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        report = {
+            "sheet": {"spreadsheet_id": spreadsheet_id, "sheet_title": sheet_title, "gid": sheet_gid},
+            "checked": len(to_process),
+            "created_candidates": 0,
+            "linked_existing": 0,
+            "skipped_no_opportunity": 0,
+            "skipped_already_logged": 0,
+            "skipped_missing_contact": 0,
+            "details": []
+        }
+
+        for rec in to_process:
+            email_norm   = _norm_email(rec["email_address"])
+            phone_norm   = _norm_phone_digits(rec["phone_number"])
+            linkedin_norm= _norm_linkedin(rec["linkedin_url"])
+            fp           = _row_fingerprint(rec)
+
+            # ¿ya importamos esta fila?
+            cur.execute("""
+                SELECT 1 FROM sheet_import_log
+                WHERE spreadsheet_id = %s AND sheet_gid = %s AND fingerprint = %s
+                LIMIT 1
+            """, (spreadsheet_id, sheet_gid, fp))
+            if cur.fetchone():
+                report["skipped_already_logged"] += 1
+                report["details"].append({"row": rec["_row_number"], "result": "already-logged"})
+                continue
+
+            # ¿existe opportunity?
+            opp_id = _find_opportunity_id(cur, rec["job_id"])
+            if not opp_id:
+                report["skipped_no_opportunity"] += 1
+                report["details"].append({"row": rec["_row_number"], "result": "no-opportunity", "job_id": rec["job_id"]})
+                continue
+
+            # ¿existe candidato?
+            existing_id = _find_existing_candidate(cur, email_norm, linkedin_norm, phone_norm)
+
+            # Construye nombre y mapea location -> country
+            name = (f"{rec['first_name'].strip()} {rec['last_name'].strip()}").strip() or (email_norm or linkedin_norm or "Unknown")
+            country = (rec["location"] or "").strip() or None
+            english_level = (rec["english_level"] or "").strip() or None
+
+            if dry_run:
+                # solo reporte
+                action = "link-existing" if existing_id else "create-and-link"
+                report["details"].append({"row": rec["_row_number"], "result": f"dry-run:{action}", "opportunity_id": opp_id, "candidate_id": existing_id})
+                continue
+
+            # Si no existe => crear
+            if not existing_id:
+                # siguiente candidate_id
+                cur.execute("SELECT COALESCE(MAX(candidate_id), 0) FROM candidates")
+                new_id = (cur.fetchone()[0] or 0) + 1
+
+                cur.execute("""
+                    INSERT INTO candidates (
+                        candidate_id, name, email, phone, linkedin, english_level, country, stage, created_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s,
+                        NOW()
+                    )
+                """, (
+                    new_id, name, email_norm or None, rec["phone_number"] or None, linkedin_norm or rec["linkedin_url"] or None,
+                    english_level, country, 'Contactado'  # tu default actual
+                ))
+                candidate_id = new_id
+                report["created_candidates"] += 1
+                action = "created"
+            else:
+                candidate_id = existing_id
+                action = "found-existing"
+
+            # Relacionar en opportunity_candidates si no estaba
+            cur.execute("""
+                SELECT 1 FROM opportunity_candidates
+                WHERE opportunity_id = %s AND candidate_id = %s
+                LIMIT 1
+            """, (opp_id, candidate_id))
+            if not cur.fetchone():
+                cur.execute("""
+                    INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
+                    VALUES (%s, %s, %s)
+                """, (opp_id, candidate_id, 'Applicant'))
+                if action == "found-existing":
+                    report["linked_existing"] += 1
+
+            # Log de import
+            cur.execute("""
+                INSERT INTO sheet_import_log (
+                    spreadsheet_id, sheet_gid, row_number, job_id, email, linkedin, phone_norm, fingerprint
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT DO NOTHING
+            """, (
+                spreadsheet_id, sheet_gid, rec["_row_number"], str(rec["job_id"]),
+                email_norm or None, linkedin_norm or None, phone_norm or None, fp
+            ))
+
+            report["details"].append({
+                "row": rec["_row_number"],
+                "result": action + "+linked",
+                "opportunity_id": opp_id,
+                "candidate_id": candidate_id
+            })
+
+        if not dry_run:
+            conn.commit()
+        cur.close(); conn.close()
+        return jsonify(report), 200
+
+    except Exception as e:
+        logging.exception("❌ import_candidates_from_sheet failed")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/opportunities/<opportunity_id>/batches', methods=['GET'])
 def get_batches(opportunity_id):
