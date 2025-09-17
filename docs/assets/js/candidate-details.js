@@ -16,6 +16,12 @@ function equipmentEmoji(name){
   return EQUIP_EMOJI[String(name).toLowerCase()] || '📦';
 }
 
+function normalizeDateForAPI(ymd) {
+  const s = String(ymd || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; 
+  return `${s}T12:00:00`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
   // --- URL / Candidate id ---
@@ -523,8 +529,14 @@ function updateLinkedInUI(raw) {
     }
     const startInp = document.getElementById('hire-start-date');
     const endInp   = document.getElementById('hire-end-date');
-    if (startInp) startInp.addEventListener('change', () => updateHireField('start_date', startInp.value || ''));
-    if (endInp)   endInp.addEventListener('change', () => updateHireField('end_date',   endInp.value   || ''));
+   if (startInp) startInp.addEventListener('change', () => {
+     const ymd = startInp.value || '';
+     updateHireField('start_date', ymd ? normalizeDateForAPI(ymd) : '');
+  });
+   if (endInp) endInp.addEventListener('change', () => {
+     const ymd = endInp.value || '';
+     updateHireField('end_date', ymd ? normalizeDateForAPI(ymd) : '');
+   });
   })();
 
   // --- Overview: cargar datos del candidato ---
