@@ -1,3 +1,21 @@
+// === GLOBALS para Sales Lead ===
+window.allowedSalesUsers = window.allowedSalesUsers || [];
+
+window.generateSalesOptions = function generateSalesOptions(currentValue) {
+  const allowedEmails = new Set((window.allowedSalesUsers || []).map(u => (u.email_vintti || '').toLowerCase()));
+  const isKnown = !!currentValue && allowedEmails.has(String(currentValue).toLowerCase());
+
+  let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign Sales Lead</option>`;
+  (window.allowedSalesUsers || [])
+    .sort((a,b) => a.user_name.localeCompare(b.user_name))
+    .forEach(user => {
+      const email = (user.email_vintti || '').toLowerCase();
+      const selected = (isKnown && email === String(currentValue).toLowerCase()) ? 'selected' : '';
+      html += `<option value="${email}" ${selected}>${user.user_name}</option>`;
+    });
+  return html;
+};
+
 // === GLOBALS para HR Lead ===
 window.allowedHRUsers = window.allowedHRUsers || [];
 
@@ -108,29 +126,26 @@ document.querySelectorAll('.filter-header button').forEach(button => {
 window.allowedHRUsers = window.allowedHRUsers || [];
 
 
-  fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
-    .then(response => response.json())
-    .then(users => {
-      const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Agustina'];
-      window.allowedHRUsers = users.filter(user =>
-        allowedSubstrings.some(name => user.user_name.includes(name))
-      );
-    })
-    .catch(err => console.error('Error loading HR Leads:', err));
-function generateHROptions(currentValue) {
-  // emails válidos que sí pueden seleccionarse
-  const allowedEmails = new Set(window.allowedHRUsers.map(u => u.email_vintti));
-  const isKnown = !!currentValue && allowedEmails.has(currentValue);
+fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
+  .then(response => response.json())
+  .then(users => {
+    // HR permitidos por nombre (como ya lo tenías)
+    const allowedHRNames = ['Pilar', 'Jazmin', 'Agostina', 'Agustina'];
+    window.allowedHRUsers = users.filter(user =>
+      allowedHRNames.some(name => user.user_name.includes(name))
+    );
 
-  // si el valor actual NO está en la lista (ej. 'sol@...'), dejamos seleccionado el placeholder
-  let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign HR Lead</option>`;
-
-  allowedHRUsers.forEach(user => {
-    const selected = (isKnown && user.email_vintti === currentValue) ? 'selected' : '';
-    html += `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
-  });
-  return html;
-}
+    // SALES permitidos por email (exacto)
+    const allowedSalesEmails = new Set([
+      'agustin@vintti.com',
+      'bahia@vintti.com',
+      'lara@vintti.com'
+    ]);
+    window.allowedSalesUsers = users.filter(u =>
+      allowedSalesEmails.has((u.email_vintti || '').toLowerCase())
+    );
+  })
+  .catch(err => console.error('Error loading users:', err));
 
   if (toggleButton && filtersCard) {
     toggleButton.addEventListener('click', () => {
@@ -324,7 +339,7 @@ function generateHROptions(currentValue) {
             const td = e.target.closest('td');
             if (!td) return;
             const cellIndex = parseInt(td.getAttribute('data-col-index'), 10);
-            if ([0, 6, 7].includes(cellIndex)) return;
+            if ([0, 5, 6, 7].includes(cellIndex)) return; // 5 = Sales Lead
             openOpportunity(opp.opportunity_id);
           });
 
@@ -656,6 +671,43 @@ document.addEventListener('change', async e => {
     }
   }
 });
+document.addEventListener('change', async e => {
+  const el = e.target;
+  if (!el.classList.contains('sales-lead-dropdown')) return;
+
+  const oppId   = el.dataset.id;
+  const newLead = (el.value || '').toLowerCase();
+
+  try {
+    // 1) Persistir en backend
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opp_sales_lead: newLead })
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`PATCH sales_lead failed ${res.status}: ${t}`);
+    }
+
+    // 2) Refrescar display en la misma celda (iniciales + avatar)
+    const wrap = el.closest('.sales-lead-cell-wrap');
+    if (wrap) {
+      const current = wrap.querySelector('.sales-lead');
+      if (current) current.outerHTML = salesDisplayHTML(newLead);
+    }
+  } catch (err) {
+    console.error('❌ Error updating sales lead:', err);
+    alert('Error updating Sales Lead. Please try again.');
+  }
+});
+
+// Evita que el click en el select burbujee y dispare la redirección por fila
+document.addEventListener('click', e => {
+  if (e.target.closest('.sales-lead-dropdown')) {
+    e.stopPropagation();
+  }
+}, true);
 
 document.addEventListener('blur', async e => {
   if (e.target.classList.contains('comment-input')) {
@@ -1359,6 +1411,19 @@ function hrDisplayHTML(email) {
     </div>
   `;
 }
+function salesDisplayHTML(emailOrName) {
+  const key = String(emailOrName || '').toLowerCase();
+  const initials = initialsForSalesLead(key);
+  const bubbleCl = badgeClassForSalesLead(key);
+  const avatar   = resolveAvatar(key);
+  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
+  return `
+    <div class="sales-lead" style="display:flex;align-items:center;gap:6px;">
+      <span class="lead-bubble ${bubbleCl}">${initials}</span>
+      ${img}
+    </div>
+  `;
+}
 
 // Celda completa: display visible + <select> (opciones con nombres completos)
 function getHRLeadCell(opp) {
@@ -1463,22 +1528,23 @@ function badgeClassForSalesLead(key) {
 }
 
 function getSalesLeadCell(opp) {
-  const email = emailForSalesLead(opp);
-  const key   = (email || opp.sales_lead_name || '').toLowerCase();
-  const initials = initialsForSalesLead(key);
-  const bubbleCl = badgeClassForSalesLead(key);
-  const avatar = resolveAvatar(email);
-  const fullName = opp.sales_lead_name || ''; // escondido para filtro/orden
+  // email guardado o inferido
+  const email = (opp.sales_lead || emailForSalesLead(opp) || '').toLowerCase();
+  const fullName = opp.sales_lead_name || ''; // para filtros
 
-  const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
   return `
-    <div class="sales-lead">
-      <span class="lead-bubble ${bubbleCl}">${initials}</span>
-      ${img}
+    <div class="sales-lead-cell-wrap" style="position:relative;min-height:28px;">
+      ${salesDisplayHTML(email || fullName)}
       <span class="sr-only" style="display:none">${fullName}</span>
+      <select class="sales-lead-dropdown"
+              data-id="${opp.opportunity_id}"
+              style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;">
+        ${window.generateSalesOptions(email)}
+      </select>
     </div>
   `;
 }
+
 
 function getTypeBadge(type) {
   const t = String(type || '').toLowerCase();
