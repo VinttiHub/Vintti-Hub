@@ -31,54 +31,124 @@ from psycopg2.extras import RealDictCursor  # 👈 necesario para cursor_factory
 from affinda import AffindaAPI, TokenCredential
 
 # --- Helper: limpiar HTML para Webflow (quita <span>, styles y normaliza nbsp) ---
+# --- Helper: limpiar HTML para Webflow/Sheets (quita ruido y normaliza a etiquetas simples) ---
 import re, html as _html
 
-_ALLOWED_TAGS = ('ul','ol','li','p','br','b','strong','i','em','a')
+_ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
-def _clean_html_for_webflow(s: str) -> str:
+def _strip_attrs_keep_href(tag_html: str) -> str:
+    """
+    Devuelve la misma etiqueta pero sin atributos, salvo <a href="..."> (solo http/https/mailto).
+    """
+    tag = tag_html
+    m = re.match(r'<\s*([a-z0-9]+)(\s[^>]*)?>', tag, flags=re.I)
+    if not m:
+        return tag
+
+    name = m.group(1).lower()
+    if name == 'a':
+        href_m = re.search(r'href="([^"]*)"', tag, flags=re.I)
+        href = href_m.group(1).strip() if href_m else ''
+        if href and (href.lower().startswith(('http://','https://','mailto:'))):
+            return f'<a href="{href}">'
+        return '<a>'
+    if name in _ALLOWED_TAGS:
+        return f'<{name}>'
+    return tag
+
+def _clean_html_for_webflow(s: str, output: str = 'html') -> str:
+    """
+    Limpia HTML ruidoso de editores (Webflow/Greenhouse/Notion/etc.) y lo deja
+    en un subset seguro:
+      - allowed: p, ul, ol, li, br, b/strong, i/em, a[href]
+      - convierte <div> en <p>
+      - elimina spans, estilos inline, data-*, on*, clases raras
+      - normaliza listas 'custom' a <ul><li>
+      - elimina etiquetas vacías
+    output:
+      - 'html'  -> HTML limpio (para Webflow/tu site)
+      - 'text'  -> texto plano con saltos de línea (para Sheets si prefieres)
+    """
     if not s:
         return ""
-    s = str(s)
 
-    # normaliza NBSP
+    # Asegura str y desescapa entidades comunes
+    s = _html.unescape(str(s))
+
+    # Normaliza NBSP
     s = s.replace('\u00A0', ' ').replace('&nbsp;', ' ')
 
-    # quita <span ...> y </span>
+    # Quita <script>/<style> completos
+    s = re.sub(r'<\s*(script|style)[^>]*>.*?</\s*\1\s*>', '', s, flags=re.I|re.S)
+
+    # Greenhouse/Webflow meten listas custom: ul/li anidados en contenedores con clases raras.
+    # Convierte cualquier "list---xxxxx" o "discList---xxxxx" en <ul> básico
+    s = re.sub(r'<ul[^>]*class="[^"]*(?:list---|discList---)[^"]*"[^>]*>', '<ul>', s, flags=re.I)
+    s = re.sub(r'<ol[^>]*class="[^"]*list---[^"]*"[^>]*>', '<ol>', s, flags=re.I)
+    s = re.sub(r'<li[^>]*class="[^"]*"[^>]*>', '<li>', s, flags=re.I)
+
+    # Convierte <div> en <p> (bloques de párrafo)
+    s = re.sub(r'<\s*div[^>]*>', '<p>', s, flags=re.I)
+    s = re.sub(r'</\s*div\s*>', '</p>', s, flags=re.I)
+
+    # Quita <span ...> y </span>
     s = re.sub(r'<\s*span[^>]*>', '', s, flags=re.I)
     s = re.sub(r'</\s*span\s*>', '', s, flags=re.I)
 
-    # quita atributos style="..."
+    # Quita atributos style=..., class=..., id=..., data-..., y on*=
     s = re.sub(r'\sstyle="[^"]*"', '', s, flags=re.I)
-
-    # quita on*="..." (onClick, onMouseOver, etc.)
+    s = re.sub(r'\sclass="[^"]*"', '', s, flags=re.I)
+    s = re.sub(r'\sid="[^"]*"', '', s, flags=re.I)
+    s = re.sub(r'\sdata-[a-z0-9_-]+="[^"]*"', '', s, flags=re.I)
     s = re.sub(r'\son[a-z]+\s*=\s*"[^"]*"', '', s, flags=re.I)
 
-    # limpia <a> con javascript:
-    def _sanitize_a(m):
-        tag = m.group(0)
-        # si no hay href, deja <a>
-        href_m = re.search(r'href="([^"]*)"', tag, flags=re.I)
-        href = href_m.group(1) if href_m else ''
-        if not href or href.lower().startswith('javascript:'):
-            return '<a>'
-        # deja solo href/target/rel
-        safe = f'<a href="{href}" target="_blank" rel="noopener">'
-        return safe
-    s = re.sub(r'<a[^>]*>', _sanitize_a, s, flags=re.I)
+    # Limpia <a> conservando solo href válido
+    s = re.sub(r'<a[^>]*>', _strip_attrs_keep_href, s, flags=re.I)
 
-    # whitelist de etiquetas: reemplaza cualquier otra etiqueta por su contenido
+    # Whitelist: permite solo _ALLOWED_TAGS (deja su contenido si la etiqueta no está permitida)
     def _whitelist_tags(m):
         tag = m.group(1).lower()
         if tag in _ALLOWED_TAGS:
-            return m.group(0)
-        # elimina etiqueta, deja contenido si es de cierre/apertura desconocida
+            # reinyecta etiqueta sin atributos
+            full = m.group(0)
+            # Apertura o cierre
+            if full.strip().startswith('</'):
+                return f'</{tag}>'
+            # apertura: ya saneada arriba, pero por si acaso…
+            return _strip_attrs_keep_href(f'<{tag}>')
         return ''
     s = re.sub(r'</?([a-z0-9]+)(\s[^>]*)?>', _whitelist_tags, s, flags=re.I)
 
-    # pequeños trims
+    # Quita párrafos vacíos y <li> vacíos
+    s = re.sub(r'<p>\s*(<br\s*/?>)?\s*</p>', '', s, flags=re.I)
+    s = re.sub(r'<li>\s*</li>', '', s, flags=re.I)
+
+    # Junta <br> duplicados y corrige espacios
+    s = re.sub(r'(<br\s*/?>\s*){2,}', '<br>', s, flags=re.I)
     s = re.sub(r'[ \t]{2,}', ' ', s).strip()
-    s = s.replace('<li> ', '<li>').replace(' </li>', '</li>')
+
+    # Si quedaron <p> consecutivos sin nada entre medio, déjalos
+    # (opcional) añade salto de línea tras </p> para texto plano
+    if output == 'text':
+        tmp = s
+        # reemplaza <li> por "- " al inicio de línea
+        tmp = re.sub(r'\s*<li>\s*', '- ', tmp, flags=re.I)
+        tmp = re.sub(r'\s*</li>\s*', '\n', tmp, flags=re.I)
+        # reemplaza cierres de párrafo y <br> por saltos
+        tmp = re.sub(r'\s*</p>\s*', '\n', tmp, flags=re.I)
+        tmp = re.sub(r'\s*<br\s*/?>\s*', '\n', tmp, flags=re.I)
+        # elimina el resto de etiquetas permitidas dejando su texto
+        tmp = re.sub(r'</?(p|ul|ol|strong|b|em|i)>', '', tmp, flags=re.I)
+        # enlaces: deja "texto (url)" si hubiera
+        tmp = re.sub(r'<a href="([^"]*)">([^<]*)</a>', r'\2 (\1)', tmp, flags=re.I)
+        # elimina cualquier otra etiqueta residual por seguridad
+        tmp = re.sub(r'</?[^>]+>', '', tmp)
+        # normaliza saltos y espacios
+        lines = [ln.strip() for ln in tmp.splitlines()]
+        return '\n'.join([ln for ln in lines if ln])
+
     return s
+
 
 
 # 👇 MOVER ARRIBA: cargar .env ANTES de leer cualquier variable
@@ -1180,7 +1250,13 @@ def update_opportunity_fields(opportunity_id):
         'career_additional_info',
         'career_published'  # boolean/text
     ]
-
+    # 🔹 Normaliza HTML ruidoso de Career Site / Webflow antes de persistir
+    for key in ('career_description', 'career_requirements', 'career_additional_info'):
+        if key in data and isinstance(data[key], str):
+            # Si tu destino es Webflow/tu site en HTML:
+            data[key] = _clean_html_for_webflow(data[key], output='html')
+            # Si prefieres texto plano para Google Sheets, cambia a:
+            # data[key] = _clean_html_for_webflow(data[key], output='text')
 
     updates, values = [], []
     for field in updatable_fields:

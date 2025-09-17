@@ -973,68 +973,68 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
 });
 async function loadPresentationTable(opportunityId) {
   const tableBody = document.getElementById("presentation-batch-table-body");
+  if (!tableBody) return;
   tableBody.innerHTML = '';
 
   try {
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const batches = await res.json();
 
-    batches.forEach(batch => {
-      // Solo mostrar si hay presentation_date
-      if (!batch.presentation_date) return;
+    batches
+      .filter(b => b.presentation_date)
+      .forEach(batch => {
+        const tr = document.createElement("tr");
 
-      const tr = document.createElement("tr");
+        // Batch #
+        const tdBatch = document.createElement("td");
+        tdBatch.className = "col-narrow";
+        tdBatch.textContent = `#${batch.batch_number}`;
 
-      // Batch #
-      const tdBatch = document.createElement("td");
-      tdBatch.textContent = `#${batch.batch_number}`;
-
-      // Presentation Date
-      const tdDate = document.createElement("td");
-      const inputDate = document.createElement("input");
-      inputDate.type = "date";
-      inputDate.value = formatDate(batch.presentation_date);
-      inputDate.addEventListener("blur", async () => {
-        const updated = { presentation_date: inputDate.value };
-        await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updated)
+        // Presentation Date
+        const tdDate = document.createElement("td");
+        const inputDate = document.createElement("input");
+        inputDate.type = "date";
+        inputDate.value = formatDate(batch.presentation_date); // usa tu helper
+        inputDate.addEventListener("blur", async () => {
+          const updated = { presentation_date: inputDate.value || null };
+          await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updated)
+          });
+          // recalcula días tras editar
+          const daysCell = tr.querySelector('td.time-col');
+          daysCell.textContent = calcDaysSince(inputDate.value);
         });
+        tdDate.appendChild(inputDate);
+
+        // Time (days)
+        const tdTime = document.createElement("td");
+        tdTime.className = "time-col";
+        tdTime.textContent = calcDaysSince(batch.presentation_date);
+
+        tr.appendChild(tdBatch);
+        tr.appendChild(tdDate);
+        tr.appendChild(tdTime);
+        tableBody.appendChild(tr);
       });
-      tdDate.appendChild(inputDate);
-
-      // Time (días desde presentation_date hasta hoy)
-      const tdTime = document.createElement("td");
-      if (batch.presentation_date) {
-        const today = new Date();
-        const presentation = new Date(batch.presentation_date);
-        const diffMs = today - presentation;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        tdTime.textContent = diffDays;
-      } else {
-        tdTime.textContent = '—';
-      }
-
-      // View button
-      const tdView = document.createElement("td");
-      const viewBtn = document.createElement("button");
-      viewBtn.textContent = "View";
-      viewBtn.classList.add("view-btn");
-      // Agrega acción si necesitas
-      tdView.appendChild(viewBtn);
-
-      tr.appendChild(tdBatch);
-      tr.appendChild(tdDate);
-      tr.appendChild(tdTime);
-      tr.appendChild(tdView);
-      tableBody.appendChild(tr);
-    });
 
   } catch (err) {
     console.error("❌ Error loading batches for presentation table:", err);
   }
+
+  function calcDaysSince(iso) {
+    if (!iso) return '—';
+    const now = new Date();                   // 👈 FIX: “hoy” dentro de la función
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    const diffMs = now.getTime() - d.getTime();
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return Number.isFinite(days) ? String(days) : '—';
+  }
 }
+
+
 
 // Marcar activo si el estilo está aplicado al soltar selección
 document.getElementById('job-description-textarea').addEventListener('mouseup', () => {
