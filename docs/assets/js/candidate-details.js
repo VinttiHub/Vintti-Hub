@@ -15,6 +15,258 @@ function equipmentEmoji(name){
   if (!name) return '📦';
   return EQUIP_EMOJI[String(name).toLowerCase()] || '📦';
 }
+// === Helpers para crear salary_update desde inputs ==========================
+async function fetchHire(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  const r = await fetch(`${apiBase}/candidates/${candidateId}/hire`);
+  if (!r.ok) throw new Error(`GET hire failed ${r.status}`);
+  return r.json();
+}
+function todayYmd(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function coerceNum(x){
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Crea un salary_update con:
+ *  - date = start_date del Hire (YYYY-MM-DD) si existe, sino HOY
+ *  - salary y/o fee según el modelo y el campo editado
+ *  - luego sincroniza el Hire tomando el update con fecha más reciente
+ *
+ * source: 'salary' | 'fee' | 'revenue'
+ */
+async function createSalaryUpdateFromInputs(source, candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  const modelTxt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase();
+  const isRecruiting = modelTxt.includes('recruiting');
+  const isStaffing   = modelTxt.includes('staffing');
+
+  // leer inputs actuales
+  const salIn = document.getElementById('hire-salary');
+  const feeIn = document.getElementById('hire-fee');
+  const revIn = document.getElementById('hire-revenue');
+
+  const uiSalary  = coerceNum(salIn?.value);
+  const uiFee     = coerceNum(feeIn?.value);
+  const uiRevenue = coerceNum(revIn?.value);
+
+  // obtener start_date del hire (fallback a hoy)
+  let startYmd = null;
+  try {
+    const hire = await fetchHire(candidateId, apiBase);
+    startYmd = (hire.start_date || '').slice(0,10) || null;
+  } catch {}
+  const dateYmd = startYmd || todayYmd();
+
+  // armar body de salary_update (tabla salary_updates tiene salary, fee, date)
+  const body = { date: dateYmd };
+
+  if (isStaffing){
+    // En Staffing: revenue = salary + fee. Si el usuario edita revenue,
+    // derivamos fee = revenue - salary (si hay salary válido).
+    if (source === 'revenue'){
+      // si hay salary válido, calculamos fee; si no, no podemos inferir.
+      if (uiSalary != null && uiRevenue != null){
+        body.salary = uiSalary;
+        body.fee    = uiRevenue - uiSalary;
+      } else {
+        // si faltan datos, intentamos al menos persistir salary/fee existentes
+        if (uiSalary != null) body.salary = uiSalary;
+        if (uiFee != null)    body.fee    = uiFee;
+      }
+    } else {
+      if (uiSalary != null) body.salary = uiSalary;
+      if (uiFee != null)    body.fee    = uiFee;
+    }
+  } else {
+    // En Recruiting: salary_update sólo impacta SALARY (fee se oculta).
+    // Si el usuario tocó salary, lo guardamos; revenue recruiting va por otro campo.
+    if (uiSalary != null) body.salary = uiSalary;
+    // Ignoramos fee/revenue para la tabla salary_updates en Recruiting.
+  }
+
+  // si no hay nada que guardar, salimos silenciosamente
+  if (body.salary == null && body.fee == null) return;
+
+  // POST salary_update
+  const resp = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok){
+    const t = await resp.text().catch(()=> '');
+    throw new Error(`POST salary_update failed ${resp.status}: ${t}`);
+  }
+
+  // refrescar la lista visual
+  if (typeof window.loadSalaryUpdates === 'function'){
+    await window.loadSalaryUpdates();
+  }
+  // sincronizar HIRE con el update de fecha más reciente
+  await syncHireFromLatestSalaryUpdate(candidateId, apiBase);
+}
+
+// Devuelve 'staffing' | 'recruiting' | '' leyendo el pill (o '' si no hay)
+function getOppModelLower(){
+  const txt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase();
+  if (txt.includes('staffing')) return 'staffing';
+  if (txt.includes('recruiting')) return 'recruiting';
+  return '';
+}
+
+// --- FECHAS ROBUSTAS PARA SALARY UPDATES ----------------------------------
+// Convierte "YYYY-MM-DD", "YYYY/MM/DD", "YYYY-MM-DDTHH:mm..." a una clave numérica YYYYMMDD
+function ymdKey(dateLike){
+  const s = String(dateLike || '').trim();
+  // Busca 3 grupos numéricos en formato Y-M-D con separador '-' o '/'
+  const m = s.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if (!m) return -Infinity;
+  const y = Number(m[1]), mm = Number(m[2]), dd = Number(m[3]);
+  if (!y || !mm || !dd) return -Infinity;
+  return y * 10000 + mm * 100 + dd; // p.ej. 2025-09-04 → 20250904
+}
+
+// Devuelve timestamp ms (o 0)
+function ts(x){
+  const t = Date.parse(x || '');
+  return Number.isFinite(t) ? t : 0;
+}
+
+// ⬇️ Reemplaza compareYmd, _latestSortKey y pickLatestSalaryUpdate por esto:
+function pickLatestSalaryUpdate(updates){
+  const arr = Array.isArray(updates) ? updates.filter(u => u && u.date) : [];
+  if (!arr.length) return null;
+
+  // Ordena DESC por fecha efectiva; desempata por created_at DESC y update_id DESC
+  arr.sort((a, b) => {
+    const ka = ymdKey(a.date);
+    const kb = ymdKey(b.date);
+    if (ka !== kb) return kb - ka;
+    const ca = ts(a.created_at);
+    const cb = ts(b.created_at);
+    if (ca !== cb) return cb - ca;
+    const ua = Number(a.update_id) || 0;
+    const ub = Number(b.update_id) || 0;
+    return ub - ua;
+  });
+
+  return arr[0] || null;
+}
+
+
+
+// Calcula revenue sólo para Staffing (recruiting no se toca aquí)
+function calcRevenueForStaffing(salary, fee){
+  const s = Number(salary); const f = Number(fee);
+  if (!Number.isFinite(s)) return null;
+  if (!Number.isFinite(f)) return null;
+  return s + f;
+}
+
+// Aplica un salary update al HIRE vía PATCH (respeta el modelo)
+async function patchHireFromUpdate(candidateId, update, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  if (!candidateId || !update) return;
+
+  const model = getOppModelLower();
+
+  // Base: salary y fee (fee puede venir vacío en Recruiting)
+  const payload = {};
+  if (update.salary != null && update.salary !== '') payload.employee_salary = Number(update.salary);
+  if (model === 'staffing' && update.fee != null && update.fee !== '') {
+    payload.employee_fee = Number(update.fee);
+    const rev = calcRevenueForStaffing(update.salary, update.fee);
+    if (rev != null) payload.employee_revenue = rev;
+  }
+
+  // En recruiting no tocamos employee_revenue_recruiting (es editable manualmente)
+
+  if (Object.keys(payload).length === 0) return;
+
+  await fetch(`${apiBase}/candidates/${candidateId}/hire`, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+}
+
+// Trae todos los salary_updates, elige el más reciente y lo aplica al Hire
+// Trae todos los salary_updates, elige el más reciente y lo aplica al Hire
+async function syncHireFromLatestSalaryUpdate(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  if (!candidateId) return;
+  try {
+    // 1) updates y último
+    const list   = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`).then(r=>r.json());
+    const latest = pickLatestSalaryUpdate(list);
+    if (!latest) return;
+
+    // 2) hire actual
+    const hire  = await fetch(`${apiBase}/candidates/${candidateId}/hire`).then(x=>x.json());
+
+    // 3) modelo desde la API (fallback al pill si algo falla)
+    let modelLower = '';
+    try {
+      const ho = await fetch(`${apiBase}/candidates/${candidateId}/hire_opportunity`).then(r=>r.json());
+      modelLower = String(ho?.opp_model || '').toLowerCase();
+    } catch {}
+    if (!modelLower) {
+      const txt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase();
+      if (txt.includes('staffing')) modelLower = 'staffing';
+      else if (txt.includes('recruiting')) modelLower = 'recruiting';
+    }
+
+    // 4) números
+    const latestSalary = Number(latest.salary);
+    const latestFee    = Number(latest.fee);
+    const hasLatestSalary = Number.isFinite(latestSalary);
+    const hasLatestFee    = Number.isFinite(latestFee);
+
+    const hireSalary   = Number(hire.employee_salary);
+    const hireFee      = Number(hire.employee_fee);
+    const hireRev      = Number(hire.employee_revenue);
+
+    // 5) decidir qué setear
+    const shouldSetSalary = hasLatestSalary && latestSalary !== hireSalary;
+
+    // fee/revenue sólo para staffing; si no sabemos el modelo pero hay fee válido, lo aplicamos igual
+    const isStaffing = (modelLower === 'staffing') || (!modelLower && hasLatestFee);
+
+    let shouldSetFee = false, shouldSetRev = false, newRev = null;
+    if (isStaffing) {
+      if (hasLatestFee) shouldSetFee = latestFee !== hireFee;
+      if (hasLatestSalary && hasLatestFee) {
+        newRev = latestSalary + latestFee;
+        if (Number.isFinite(newRev)) shouldSetRev = newRev !== hireRev;
+      }
+    }
+
+    // 6) PATCH si hay algo por cambiar
+    if (shouldSetSalary || shouldSetFee || shouldSetRev) {
+      const payload = {};
+      if (shouldSetSalary) payload.employee_salary = latestSalary;
+      if (isStaffing) {
+        if (shouldSetFee) payload.employee_fee = latestFee;
+        if (shouldSetRev && newRev != null) payload.employee_revenue = newRev;
+      }
+      await fetch(`${apiBase}/candidates/${candidateId}/hire`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+    }
+
+    // 7) refrescar UI si existe
+    if (typeof window.loadHireData === 'function') window.loadHireData();
+  } catch(e){
+    console.warn('syncHireFromLatestSalaryUpdate failed', e);
+  }
+}
+
+
 
 function normalizeDateForAPI(ymd) {
   const s = String(ymd || '').trim();
@@ -767,14 +1019,18 @@ if (successDiv) {
   // Ocultar pestaña Hire si no está contratado
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/is_hired`)
     .then(res => res.json())
-    .then(d => {
-      if (!d.is_hired) {
-        const hireTab = document.querySelector('.tab[data-tab="hire"]');
-        const hireContent = document.getElementById('hire');
-        if (hireTab) hireTab.style.display = 'none';
-        if (hireContent) hireContent.style.display = 'none';
-      }
-    });
+  .then(d => {
+    const hireTab = document.querySelector('.tab[data-tab="hire"]');
+    const hireContent = document.getElementById('hire');
+    if (!d.is_hired) {
+      if (hireTab) hireTab.style.display = 'none';
+      if (hireContent) hireContent.style.display = 'none';
+    } else {
+      // si está contratado, sincroniza desde Salary Updates
+      syncHireFromLatestSalaryUpdate(candidateId);
+    }
+  });
+
 
   // Go Back
   const goBackButton = document.getElementById('goBackButton');
@@ -839,13 +1095,15 @@ function formatDateHumanES(isoLike){
     });
 
     // borrar
-    box.querySelectorAll('.delete-salary-update').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const id = btn.dataset.id;
-        await fetch(`${API}/salary_updates/${id}`, { method:'DELETE' });
-        loadSalaryUpdates();
-      });
-    });
+box.querySelectorAll('.delete-salary-update').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const id = btn.dataset.id;
+    await fetch(`${API}/salary_updates/${id}`, { method:'DELETE' });
+    await loadSalaryUpdates();
+    await syncHireFromLatestSalaryUpdate(cid, API); // <-- asegura que el HIRE refleje el nuevo “último”
+  });
+});
+
   }
   window.loadSalaryUpdates = loadSalaryUpdates;
 
@@ -880,36 +1138,40 @@ function formatDateHumanES(isoLike){
   wireSalaryPopupClose();
 
   // guardar
-  if (save){
-    save.addEventListener('click', async () => {
-      const salary = parseFloat(salIn?.value || '');
-      const fee    = parseFloat(feeIn?.value || '');
-      const date   = dateIn?.value;           // 👈 "YYYY-MM-DD" plano
+// guardar
+if (save){
+  save.addEventListener('click', async () => {
+    const salary = parseFloat(salIn?.value || '');
+    const fee    = parseFloat(feeIn?.value || '');
+    const date   = dateIn?.value; // "YYYY-MM-DD"
 
-      const isRecruiting = (document.getElementById('opp-model-pill')?.textContent || '')
-                            .toLowerCase().includes('recruiting');
+    const isRecruiting = (document.getElementById('opp-model-pill')?.textContent || '')
+                          .toLowerCase().includes('recruiting');
 
-      if (!date || isNaN(salary) || (!isRecruiting && (feeIn?.value === '' || isNaN(fee)))){
-        return alert('Please fill all required fields');
-      }
+    if (!date || isNaN(salary) || (!isRecruiting && (feeIn?.value === '' || isNaN(fee)))){
+      return alert('Please fill all required fields');
+    }
 
-      const body = { salary, date };          // 👈 NO convertir a Date()
-      if (!isRecruiting) body.fee = fee;
+    const body = { salary, date };
+    if (!isRecruiting) body.fee = fee;
 
-      await fetch(`${API}/candidates/${cid}/salary_updates`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-      });
-
-      // reset + refresco
-      popup?.classList.add('hidden');
-      if (salIn)  salIn.value  = '';
-      if (feeIn)  feeIn.value  = '';
-      if (dateIn) dateIn.value = '';
-      loadSalaryUpdates();
+    await fetch(`${API}/candidates/${cid}/salary_updates`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
     });
-  }
+
+    // reset + refresco de la lista
+    popup?.classList.add('hidden');
+    if (salIn)  salIn.value  = '';
+    if (feeIn)  feeIn.value  = '';
+    if (dateIn) dateIn.value = '';
+    await loadSalaryUpdates();
+
+    // ⬇️ NUEVO: sincroniza Hire con el último update y refresca UI
+    await syncHireFromLatestSalaryUpdate(cid, API);
+  });
+}
 
   // primera carga si estás en Hire, o deja expuesto window.loadSalaryUpdates()
   if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
@@ -932,55 +1194,78 @@ function formatDateHumanES(isoLike){
   }
 
   // --- Wire Hire inputs básicos ---
-  const hireWorkingSchedule = document.getElementById('hire-working-schedule');
-  const hirePTO = document.getElementById('hire-pto');
-  const hireComputer = document.getElementById('hire-computer');
-  const hirePerks = document.getElementById('hire-extraperks');
-  const hireSalary = document.getElementById('hire-salary');
-  const hireFee = document.getElementById('hire-fee');
-  const hireRevenue = document.getElementById('hire-revenue');
-  const hireSetupFee = document.getElementById('hire-setup-fee');
-  const referencesDiv = document.getElementById('hire-references');
+// --- Wire Hire inputs básicos (actualizado para crear salary_update) ---
+const hireWorkingSchedule = document.getElementById('hire-working-schedule');
+const hirePTO = document.getElementById('hire-pto');
+const hireComputer = document.getElementById('hire-computer');
+const hirePerks = document.getElementById('hire-extraperks');
+const hireSalary = document.getElementById('hire-salary');
+const hireFee = document.getElementById('hire-fee');
+const hireRevenue = document.getElementById('hire-revenue');
+const hireSetupFee = document.getElementById('hire-setup-fee');
+const referencesDiv = document.getElementById('hire-references');
 
-  if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
-  if (hirePTO) hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
-  if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
-  if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
-  if (hireSetupFee) hireSetupFee.addEventListener('blur', () => { const v = parseFloat(hireSetupFee.value); if (!isNaN(v)) updateHireField('setup_fee', v); });
+if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
+if (hirePTO) hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
+if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
+if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
+if (hireSetupFee) hireSetupFee.addEventListener('blur', () => { const v = parseFloat(hireSetupFee.value); if (!isNaN(v)) updateHireField('setup_fee', v); });
+if (referencesDiv) referencesDiv.addEventListener('blur', () => updateHireField('references_notes', referencesDiv.innerHTML));
 
-  if (referencesDiv) {
-    referencesDiv.addEventListener('blur', () => updateHireField('references_notes', referencesDiv.innerHTML));
-  }
-
-  // Autocálculo revenue para Staffing
-  if (hireSalary) hireSalary.addEventListener('blur', async () => {
-    const salary = parseFloat(hireSalary.value);
-    if (!salary || isNaN(salary)) return;
-    await updateHireField('employee_salary', salary);
-    const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-    if (model?.includes('staffing')) {
-      const fee = parseFloat(hireFee?.value || '');
-      if (!isNaN(fee)) {
-        const revenue = salary + fee;
-        if (hireRevenue) hireRevenue.value = revenue;
-        await updateHireField('employee_revenue', revenue);
-      }
+/**
+ * NUEVO COMPORTAMIENTO:
+ * - Editar Salary/Fee/Revenue crea un salary_update con date = start_date del Hire (o hoy)
+ * - Luego sincroniza el Hire tomando el update más reciente
+ * - Recruiting: revenue_recruiting sigue siendo manual y se guarda directo en Hire
+ */
+if (hireSalary){
+  hireSalary.addEventListener('blur', async () => {
+    const v = hireSalary.value.trim();
+    if (!v) return;
+    try {
+      await createSalaryUpdateFromInputs('salary', candidateId);
+    } catch(e){
+      console.error('❌ salary→salary_update failed', e);
+      alert('Error saving salary update from Salary field.');
     }
   });
-  if (hireFee) hireFee.addEventListener('blur', async () => {
-    const fee = parseFloat(hireFee.value);
-    if (!fee || isNaN(fee)) return;
-    await updateHireField('employee_fee', fee);
-    const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
-    if (model?.includes('staffing')) {
-      const salary = parseFloat(hireSalary?.value || '');
-      if (!isNaN(salary)) {
-        const revenue = salary + fee;
-        if (hireRevenue) hireRevenue.value = revenue;
-        await updateHireField('employee_revenue', revenue);
-      }
+}
+
+if (hireFee){
+  hireFee.addEventListener('blur', async () => {
+    const modelTxt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase();
+    if (!modelTxt.includes('staffing')) return; // fee sólo aplica en Staffing
+    const v = hireFee.value.trim();
+    if (!v) return;
+    try {
+      await createSalaryUpdateFromInputs('fee', candidateId);
+    } catch(e){
+      console.error('❌ fee→salary_update failed', e);
+      alert('Error saving salary update from Fee field.');
     }
   });
+}
+
+if (hireRevenue){
+  hireRevenue.addEventListener('blur', async () => {
+    const modelTxt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase();
+    // Recruiting: revenue_recruiting se guarda directo y NO crea salary_update
+    if (modelTxt.includes('recruiting')){
+      await updateHireField('employee_revenue_recruiting', hireRevenue.value);
+      return;
+    }
+
+    // Staffing: revenue deriva fee y crea salary_update
+    const v = hireRevenue.value.trim();
+    if (!v) return;
+    try {
+      await createSalaryUpdateFromInputs('revenue', candidateId);
+    } catch(e){
+      console.error('❌ revenue→salary_update failed', e);
+      alert('Error saving salary update from Revenue field.');
+    }
+  });
+}
 
   // Cargar Hire + Opportunity model
   function adaptHireFieldsByModel(model) {
