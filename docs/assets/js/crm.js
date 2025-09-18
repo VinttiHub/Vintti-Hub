@@ -5,6 +5,35 @@ function managerEmailForStatus(statusText='') {
   if (s === 'lead in process') return 'bahia@vintti.com';
   return null; // otros -> no cambiar
 }
+// === Referral source UI ===
+async function loadReferralClients() {
+  try {
+    const r = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts');
+    const arr = await r.json();
+    // Endpoint devuelve [{ account_name: '...' }]
+    const names = [...new Set((arr || [])
+      .map(x => (x.account_name || x.client_name || '').trim())
+      .filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b));
+    const referralListEl = document.getElementById('referralList');
+    if (referralListEl) {
+      referralListEl.innerHTML = names.map(n => `<option value="${n}"></option>`).join('');
+    }
+  } catch (e) {
+    console.warn('⚠️ Could not load referral clients list:', e);
+  }
+}
+
+function updateReferralVisibility(sourceSelect) {
+  const wrap  = document.getElementById('referralSourceWrapper');
+  const input = document.getElementById('referralSourceInput');
+  if (!wrap || !input || !sourceSelect) return;
+
+  const isReferral = String(sourceSelect.value || '').toLowerCase() === 'referral';
+  wrap.style.display = isReferral ? '' : 'none';
+  input.required = isReferral;
+  if (!isReferral) input.value = '';
+}
 
 // ——— PATCH a /accounts/<id> con el account_manager ———
 async function patchAccountManager(accountId, email) {
@@ -345,6 +374,15 @@ await (async function assignManagersFromStatus() {
 
 // 🆕 Crear nuevo account desde el formulario
 const form = document.querySelector('.popup-form');
+// Cargar lista de clientes para referral y manejar visibilidad
+if (form) {
+  const sourceSelect = form.querySelector('select[name="where_come_from"]');
+  loadReferralClients();
+  if (sourceSelect) {
+    updateReferralVisibility(sourceSelect); // estado inicial oculto
+    sourceSelect.addEventListener('change', () => updateReferralVisibility(sourceSelect));
+  }
+}
 
 if (form) {
   // Referencia al dropdown nuevo (debe existir en el HTML con name="where_come_from")
@@ -369,6 +407,17 @@ if (form) {
 
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+// Normaliza lead source y referal_source
+if (data.where_come_from != null) {
+  data.where_come_from = String(data.where_come_from).trim();
+}
+const isReferral = (data.where_come_from || '').toLowerCase() === 'referral';
+if (isReferral) {
+  data.referal_source = (data.referal_source || '').trim() || null;
+} else {
+  // si no es Referral, no mandamos el campo
+  delete data.referal_source;
+}
 
     // Asegurar string limpio
     if (data.where_come_from != null) {

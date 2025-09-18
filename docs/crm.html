@@ -177,6 +177,20 @@
           <option>Internet</option>
         </select>
       </div>
+      <!-- Referral selector (solo se muestra si Lead source = Referral) -->
+      <div class="popup-field" id="referralSourceWrapper" style="display:none">
+        <label>Referral – Client</label>
+        <input
+          type="text"
+          name="referal_source"
+          id="referralSourceInput"
+          placeholder="Type to search clients…"
+          list="referralList"
+          autocomplete="off"
+        />
+        <datalist id="referralList"></datalist>
+        <small class="muted">Choose the client who referred this account.</small>
+      </div>
       <div class="popup-field full">
         <label>About</label>
         <textarea name="about" placeholder="Write a description..."></textarea>

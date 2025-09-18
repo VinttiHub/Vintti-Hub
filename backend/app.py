@@ -1012,8 +1012,8 @@ def accounts():
                 INSERT INTO account (
                     client_name, Size, timezone, state,
                     website, linkedin, comments, mail,
-                    where_come_from
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    where_come_from, referal_source
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             cursor.execute(query, (
@@ -1025,8 +1025,10 @@ def accounts():
                 data.get("linkedin"),
                 data.get("about"),
                 data.get("mail"),
-                data.get("where_come_from")  # ✅ nuevo
+                data.get("where_come_from"),
+                data.get("referal_source")    # 👈 NUEVO
             ))
+
 
             conn.commit()
             cursor.close()
@@ -1338,8 +1340,10 @@ def update_account_fields(account_id):
         'contract',
         'where_come_from',
         'calculated_status',
-        'account_manager' 
+        'account_manager',
+        'referal_source'   # 👈 NUEVO
     ]
+
 
     updates = []
     values = []
