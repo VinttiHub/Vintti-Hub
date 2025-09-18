@@ -1191,13 +1191,13 @@ body {
 .stage-dot[title]{ cursor: help; }
 
 /* Colores por stage */
-.stage-dot--negotiating { background: #fff3cc; }
-.stage-dot--interviewing{ background: #edf5ff; }
-.stage-dot--sourcing    { background: #e6fff5; }
-.stage-dot--nda         { background: #fff4e6; }
-.stage-dot--deep-dive   { background: #f3e6ff; }
-.stage-dot--close-win   { background: #e1ffe1; }
-.stage-dot--closed-lost { background: #ffe6e6; }
+.stage-dot--negotiating { background: #ffe39a; }
+.stage-dot--interviewing{ background: #d7e9ff; }
+.stage-dot--sourcing    { background: #c8f5e6; }
+.stage-dot--nda         { background: #ffdfc2; }
+.stage-dot--deep-dive   { background: #e0ccff; }
+.stage-dot--close-win   { background: #c8f7c8; }
+.stage-dot--closed-lost { background: #ffcccc; }
 
 /* Fallback gris si llega un stage no mapeado */
 .stage-dot--default     { background: #d1d5db; }
