@@ -37,13 +37,16 @@
     <div class="filters-top-bar">
       <div class="dataTables-length-wrapper" id="dataTablesLengthTarget"></div>
 
-      <div class="multi-filter" id="filterStageContainer">
-        <div class="filter-header filter-toggle" data-target="filterStage">
-          <label>Stage</label>
-          <button class="filter-toggle" data-target="filterStage"><i class="fa-solid fa-angle-down"></i></button>
-        </div>
-        <div class="multi-select hidden" id="filterStage"></div>
-      </div>
+  <div class="multi-filter" id="filterStageContainer">
+    <div class="filter-header filter-toggle" data-target="filterStage">
+      <label>Stage</label>
+      <span class="stage-dot-bar" id="stageDotBar"></span>
+      <button class="filter-toggle" data-target="filterStage">
+        <i class="fa-solid fa-angle-down"></i>
+      </button>
+    </div>
+    <div class="multi-select hidden" id="filterStage"></div>
+  </div>
 
 <div class="multi-filter" id="filterSalesLeadContainer">
   <div class="filter-header filter-toggle" data-target="filterSalesLead">

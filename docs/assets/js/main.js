@@ -511,59 +511,99 @@ if (dtLength && dtTarget) dtTarget.appendChild(dtLength);
 
 
 
+// Mapa de clases CSS para cada Stage → puntito
+const STAGE_DOT_CLASS = {
+  'Negotiating': 'stage-dot--negotiating',
+  'Interviewing': 'stage-dot--interviewing',
+  'Sourcing': 'stage-dot--sourcing',
+  'NDA Sent': 'stage-dot--nda',
+  'Deep Dive': 'stage-dot--deep-dive',
+  'Close Win': 'stage-dot--close-win',
+  'Closed Lost': 'stage-dot--closed-lost'
+};
+
 function buildMultiFilter(containerId, options, columnIndex, displayName, filterKey, dataTable) {
+  const DOT_CLASS = {
+    'Negotiating': 'stage-dot--negotiating',
+    'Interviewing': 'stage-dot--interviewing',
+    'Sourcing': 'stage-dot--sourcing',
+    'NDA Sent': 'stage-dot--nda',
+    'Deep Dive': 'stage-dot--deep-dive',
+    'Close Win': 'stage-dot--close-win',
+    'Closed Lost': 'stage-dot--closed-lost'
+  };
+
   const container = document.getElementById(containerId);
-  if (!container) return; // guard clause
+  if (!container) return;
 
   const column = dataTable.column(columnIndex);
-  filterRegistry.push({ containerId, columnIndex });
+  if (typeof filterRegistry !== 'undefined' && Array.isArray(filterRegistry)) {
+    filterRegistry.push({ containerId, columnIndex });
+  }
 
+  // 🧭 Localiza de forma robusta el header del filtro
+  const headerWrap =
+    document.querySelector(`#${containerId}Container .filter-header`) ||
+    document.querySelector(`.filter-header[data-target="${containerId}"]`);
+
+  // Crea/recupera la barra de puntitos en el header de Stage
+  const IS_STAGE = (containerId === 'filterStage');
+  let dotBar = null;
+  if (IS_STAGE && headerWrap) {
+    dotBar = headerWrap.querySelector('.stage-dot-bar');
+    if (!dotBar) {
+      dotBar = document.createElement('span');
+      dotBar.className = 'stage-dot-bar';
+      headerWrap.insertBefore(dotBar, headerWrap.querySelector('button') || null);
+    }
+  }
+
+  // Botón select all / deselect all
   const selectToggle = document.createElement('button');
   selectToggle.className = 'select-toggle';
   container.appendChild(selectToggle);
 
+  // Lista de checkboxes
   const checkboxWrapper = document.createElement('div');
   checkboxWrapper.classList.add('checkbox-list');
   container.appendChild(checkboxWrapper);
 
-  // ⬇️ Excluir por defecto en Stage
-  const EXCLUDED_BY_DEFAULT = (containerId === 'filterStage')
-    ? new Set(['Close Win', 'Closed Lost'])
-    : null;
-
-  // Si hay excluidos, el botón debe empezar en "Select All" (hay algo desmarcado)
+  // Por defecto en Stage: excluir Close Win / Closed Lost
+  const EXCLUDED_BY_DEFAULT = IS_STAGE ? new Set(['Close Win', 'Closed Lost']) : null;
   const anyUnchecked = !!EXCLUDED_BY_DEFAULT && options.some(v => EXCLUDED_BY_DEFAULT.has(v));
   selectToggle.textContent = anyUnchecked ? 'Select All' : 'Deselect All';
 
+  // Render checkboxes
   options.forEach(val => {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = val;
-
-    // ✅ Por defecto: todo marcado, salvo Close Win / Closed Lost en Stage
-    const isExcluded = !!EXCLUDED_BY_DEFAULT && EXCLUDED_BY_DEFAULT.has(val);
-    checkbox.checked = !isExcluded;
-
+    checkbox.checked = !(EXCLUDED_BY_DEFAULT && EXCLUDED_BY_DEFAULT.has(val));
     label.appendChild(checkbox);
     label.append(' ' + val);
     checkboxWrapper.appendChild(label);
   });
 
-  const header = container.parentElement?.querySelector('.filter-header label');
-  function setBadge(n){
-    if (!header) return;
-    let badge = header.querySelector('.filter-count');
-    if(!badge){
-      badge = document.createElement('span');
-      badge.className = 'filter-count';
-      header.appendChild(badge);
-    }
-    if (!n) badge.style.display = 'none';
-    else { badge.style.display = 'inline-flex'; badge.textContent = n; }
+  function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  function paintStageDots(selectedList) {
+    if (!IS_STAGE || !dotBar) return;
+    dotBar.innerHTML = '';
+    if (!selectedList.length) return;
+
+    selectedList.forEach(stage => {
+      const span = document.createElement('span');
+      span.className = 'stage-dot ' + (DOT_CLASS[stage] || 'stage-dot--default');
+      // texto del tooltip custom + accesibilidad
+      span.setAttribute('data-tip', stage);
+      span.setAttribute('aria-label', stage);
+      span.setAttribute('tabindex', '0'); // permite ver el tooltip con teclado (focus-visible)
+      // importante: NO usar title para que no aparezca el tooltip del navegador
+      dotBar.appendChild(span);
+    });
   }
 
-  function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   function applyFilter() {
     const cbs = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
@@ -571,15 +611,15 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     const pieces = selected.map(v => (v === 'Unassigned') ? '^$' : escapeRegex(v));
     const pattern = selected.length ? pieces.join('|') : '';
     column.search(pattern, true, false).draw();
-    setBadge(selected.length);
 
-    // Actualiza texto del toggle según estado actual
+    // puntitos para Stage
+    paintStageDots(selected);
+
     const allChecked = Array.from(cbs).every(c => c.checked);
     selectToggle.textContent = allChecked ? 'Deselect All' : 'Select All';
   }
 
   checkboxWrapper.addEventListener('change', applyFilter);
-
   selectToggle.addEventListener('click', () => {
     const all = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
     const isDeselecting = selectToggle.textContent === 'Deselect All';
@@ -587,7 +627,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     applyFilter();
   });
 
-  // Aplica inmediatamente el filtro inicial (ya excluye Close Win / Closed Lost)
+  // Aplica inmediatamente (con CW/CL desmarcados si es Stage)
   applyFilter();
 }
 
