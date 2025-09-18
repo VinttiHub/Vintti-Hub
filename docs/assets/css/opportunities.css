@@ -1191,7 +1191,7 @@ body {
 .stage-dot[title]{ cursor: help; }
 
 /* Colores por stage */
-.stage-dot--negotiating { background: #fce3ec; }
+.stage-dot--negotiating { background: #f9c6d0; }
 .stage-dot--interviewing{ background: #edf5ff; }
 .stage-dot--sourcing    { background: #e6fff5; }
 .stage-dot--nda         { background: #fff4e6; }
