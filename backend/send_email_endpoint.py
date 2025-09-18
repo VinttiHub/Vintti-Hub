@@ -8,9 +8,28 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
 import requests
 import logging
+import re
+from html import unescape, escape
 
-# ⚠️ IMPORTANTE: Quitar esto en producción, solo para pruebas de certificados locales
-ssl._create_default_https_context = ssl._create_unverified_context
+def _looks_like_html(s: str) -> bool:
+    # Heurística simple para detectar si ya viene con etiquetas
+    return bool(s and '<' in s and '>' in s)
+
+def _text_to_html(text: str) -> str:
+    # Escapa y respeta saltos de línea básicos
+    safe = escape(text or '')
+    return safe.replace('\r\n', '\n').replace('\r', '\n').replace('\n', '<br>')
+
+def _html_to_plain(html: str) -> str:
+    s = html or ''
+    s = re.sub(r'(?i)<br\s*/?>', '\n', s)
+    s = re.sub(r'(?i)</(p|div|li|h[1-6]|tr|section|article|header|footer)>', '\n', s)
+    s = re.sub(r'<[^>]+>', '', s)
+    s = unescape(s)
+    # normaliza saltos
+    s = re.sub(r'[ \t]+\n', '\n', s)
+    s = re.sub(r'\n{3,}', '\n\n', s)
+    return s.strip()
 
 def register_send_email_route(app):
     @app.route("/send_email", methods=["POST", "OPTIONS"])
@@ -58,15 +77,25 @@ def register_send_email_route(app):
 
         try:
             logging.info("✉️ Construyendo mensaje...")
+
+            # Asegura HTML aunque te envíen texto plano (e.g., desde <textarea>)
+            if _looks_like_html(body):
+                html_body = body
+            else:
+                html_body = _text_to_html(body)
+
+            plain_body = _html_to_plain(html_body)
+
             message = Mail(
-                from_email=Email('notifications@vintti-hub.com', name='Vintti HUB'),
+                from_email=Email('hub@vintti-hub.com', name='Vintti HUB'),
                 to_emails=to_emails,
                 subject=subject,
-                html_content=body
+                plain_text_content=plain_body,  # 👈 versión texto (mejora entregabilidad y preview)
+                html_content=html_body          # 👈 versión HTML con saltos y formato
             )
+
             for email in cc_emails:
-                message.add_cc(email)
-            logging.info("📬 Mensaje construido correctamente")
+                message.add_cc(Email(email))  
 
             api_key = os.environ.get('SENDGRID_API_KEY')
             if not api_key:

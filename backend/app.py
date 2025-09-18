@@ -30,8 +30,6 @@ from psycopg2.extras import RealDictCursor  # 👈 necesario para cursor_factory
 # Affinda (opcional)
 from affinda import AffindaAPI, TokenCredential
 
-# --- Helper: limpiar HTML para Webflow (quita <span>, styles y normaliza nbsp) ---
-# --- Helper: limpiar HTML para Webflow/Sheets (quita ruido y normaliza a etiquetas simples) ---
 import re, html as _html
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')

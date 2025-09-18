@@ -545,12 +545,12 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
   document.getElementById('emailPopup').classList.remove('hidden');
 
-  const jobDesc = document.getElementById('job-description-textarea').innerText || '—';
   const clientName = document.getElementById('client-name-input').value || '—';
   const positionName = document.getElementById('details-opportunity-name').value || '—';
 
   // 📩 Mensaje
-  const message = `Hi<br><br>Job description ready, please review:<br><br>${jobDesc}`;
+  const jdHtml = document.getElementById('job-description-textarea').innerHTML || '—';
+  const message = `Hi<br><br>Job description ready, please review:<br><br>${jdHtml}`;
   document.getElementById('email-message').innerHTML = message;
 
   // 📝 Asunto
