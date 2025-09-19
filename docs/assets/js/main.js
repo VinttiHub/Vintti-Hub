@@ -533,6 +533,10 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     'Closed Lost': 'stage-dot--closed-lost'
   };
 
+  const IS_STAGE = (containerId === 'filterStage');
+  const IS_SALES = (containerId === 'filterSalesLead');
+  const IS_HR    = (containerId === 'filterHRLead');
+
   const container = document.getElementById(containerId);
   if (!container) return;
 
@@ -541,24 +545,36 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     filterRegistry.push({ containerId, columnIndex });
   }
 
-  // 🧭 Localiza de forma robusta el header del filtro
+  // Header del filtro
   const headerWrap =
     document.querySelector(`#${containerId}Container .filter-header`) ||
     document.querySelector(`.filter-header[data-target="${containerId}"]`);
 
-  // Crea/recupera la barra de puntitos en el header de Stage
-  const IS_STAGE = (containerId === 'filterStage');
-  let dotBar = null;
+  // Barras de puntitos en el header:
+  // - Stage usa .stage-dot-bar (ya la tienes en el HTML; si no, la creo)
+  // - HR y Sales usan .lead-dot-bar (creadas aquí)
+  let stageDotBar = null;
   if (IS_STAGE && headerWrap) {
-    dotBar = headerWrap.querySelector('.stage-dot-bar');
-    if (!dotBar) {
-      dotBar = document.createElement('span');
-      dotBar.className = 'stage-dot-bar';
-      headerWrap.insertBefore(dotBar, headerWrap.querySelector('button') || null);
+    stageDotBar = headerWrap.querySelector('.stage-dot-bar');
+    if (!stageDotBar) {
+      stageDotBar = document.createElement('span');
+      stageDotBar.className = 'stage-dot-bar';
+      headerWrap.insertBefore(stageDotBar, headerWrap.querySelector('button') || null);
     }
   }
 
-  // Botón select all / deselect all
+  let leadDotBar = null;
+  if ((IS_SALES || IS_HR) && headerWrap) {
+    leadDotBar = headerWrap.querySelector('.lead-dot-bar');
+    if (!leadDotBar) {
+      leadDotBar = document.createElement('span');
+      leadDotBar.className = 'lead-dot-bar';
+      leadDotBar.id = containerId + 'DotBar';
+      headerWrap.insertBefore(leadDotBar, headerWrap.querySelector('button') || null);
+    }
+  }
+
+  // Botón select/deselect all
   const selectToggle = document.createElement('button');
   selectToggle.className = 'select-toggle';
   container.appendChild(selectToggle);
@@ -568,7 +584,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
   checkboxWrapper.classList.add('checkbox-list');
   container.appendChild(checkboxWrapper);
 
-  // Por defecto en Stage: excluir Close Win / Closed Lost
+  // Por defecto, en Stage desmarcamos Close Win / Closed Lost
   const EXCLUDED_BY_DEFAULT = IS_STAGE ? new Set(['Close Win', 'Closed Lost']) : null;
   const anyUnchecked = !!EXCLUDED_BY_DEFAULT && options.some(v => EXCLUDED_BY_DEFAULT.has(v));
   selectToggle.textContent = anyUnchecked ? 'Select All' : 'Deselect All';
@@ -587,24 +603,80 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
 
   function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
+  // Helpers para HR/Sales avatar-dots
+  function computeInitials(name){
+    return (String(name||'')
+      .trim()
+      .split(/\s+/)
+      .map(w => w[0] || '')
+      .join('')
+      .slice(0,2) || '—').toUpperCase();
+  }
+  function nameToEmail(label, isHR){
+    const lower = String(label||'').toLowerCase();
+    // Heurística por nombre (fallback si aún no cargaron allowed*Users)
+    if (isHR) {
+      if (lower.includes('pilar'))    return 'pilar@vintti.com';
+      if (lower.includes('jazmin'))   return 'jazmin@vintti.com';
+      if (lower.includes('agostina')) return 'agostina@vintti.com';
+      if (lower.includes('agustina')) return 'agustina.barbero@vintti.com';
+    } else {
+      if (lower.includes('bahia'))    return 'bahia@vintti.com';
+      if (lower.includes('lara'))     return 'lara@vintti.com';
+      if (lower.includes('agustin'))  return 'agustin@vintti.com';
+    }
+    // Búsqueda exacta si los usuarios ya están cargados
+    const arr = isHR ? (window.allowedHRUsers||[]) : (window.allowedSalesUsers||[]);
+    const u = arr.find(u => String(u.user_name||'').toLowerCase() === lower);
+    return u?.email_vintti || '';
+  }
+
+  // Pintar puntitos de Stage (colores)
   function paintStageDots(selectedList) {
-    if (!IS_STAGE || !dotBar) return;
-    dotBar.innerHTML = '';
+    if (!IS_STAGE || !stageDotBar) return;
+    stageDotBar.innerHTML = '';
     if (!selectedList.length) return;
 
     selectedList.forEach(stage => {
       const span = document.createElement('span');
       span.className = 'stage-dot ' + (DOT_CLASS[stage] || 'stage-dot--default');
-      // texto del tooltip custom + accesibilidad
       span.setAttribute('data-tip', stage);
       span.setAttribute('aria-label', stage);
-      span.setAttribute('tabindex', '0'); // permite ver el tooltip con teclado (focus-visible)
-      // importante: NO usar title para que no aparezca el tooltip del navegador
-      dotBar.appendChild(span);
+      span.setAttribute('tabindex', '0');
+      stageDotBar.appendChild(span);
     });
   }
 
+  // Pintar avatar-dots para HR & Sales
+  function paintLeadDots(selectedList) {
+    if (!(IS_SALES || IS_HR) || !leadDotBar) return;
+    leadDotBar.innerHTML = '';
+    if (!selectedList.length) return;
 
+    selectedList.forEach(label => {
+      const span = document.createElement('span');
+      span.className = 'lead-dot';
+      span.setAttribute('data-tip', label);
+      span.setAttribute('aria-label', label);
+      span.setAttribute('tabindex', '0');
+
+      const isPlaceholder = /^(Unassigned|Assign HR Lead|Assign Sales Lead)$/i.test(label);
+      if (!isPlaceholder) {
+        const email  = nameToEmail(label, IS_HR);
+        const avatar = email ? resolveAvatar(email) : null;
+        if (avatar) {
+          span.innerHTML = `<img src="${avatar}" alt="">`;
+        } else {
+          span.textContent = computeInitials(label);
+        }
+      } else {
+        span.textContent = '—';
+      }
+      leadDotBar.appendChild(span);
+    });
+  }
+
+  // Aplicar filtro + refrescar barras
   function applyFilter() {
     const cbs = checkboxWrapper.querySelectorAll('input[type="checkbox"]');
     const selected = Array.from(cbs).filter(c => c.checked).map(c => c.value);
@@ -612,8 +684,8 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     const pattern = selected.length ? pieces.join('|') : '';
     column.search(pattern, true, false).draw();
 
-    // puntitos para Stage
-    paintStageDots(selected);
+    if (IS_STAGE) paintStageDots(selected);
+    if (IS_HR || IS_SALES) paintLeadDots(selected);
 
     const allChecked = Array.from(cbs).every(c => c.checked);
     selectToggle.textContent = allChecked ? 'Deselect All' : 'Select All';
@@ -627,7 +699,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     applyFilter();
   });
 
-  // Aplica inmediatamente (con CW/CL desmarcados si es Stage)
+  // Aplica inmediatamente (Stage mantiene CW/CL desmarcados por defecto)
   applyFilter();
 }
 

@@ -1258,3 +1258,85 @@ body {
 
 /* Cursor de ayuda sobre los dots con etiqueta accesible */
 .stage-dot[aria-label]{ cursor: help; }
+/* ——— HR & Sales: avatar dots en el header del filtro ——— */
+.filter-header .lead-dot-bar{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-left:8px;
+  flex-wrap:wrap;
+}
+
+/* Puntito-Avatar (más grande que el de stage) */
+.lead-dot{
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  overflow: hidden;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#f1f1f1;
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,.04),
+    0 1px 2px rgba(0,0,0,.10);
+  font-size:10px;         /* para iniciales cuando no hay avatar */
+  font-weight:700;
+  color:#666;
+}
+.lead-dot img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+/* Tooltip (mismo estilo que los stage-dots) */
+@media (hover: hover) {
+  .lead-dot{ position: relative; }
+  .lead-dot::after{
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #333;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 20;
+  }
+  .lead-dot::before{
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: rgba(255,255,255,.95);
+    border-left: 1px solid rgba(0,0,0,.06);
+    border-top: 1px solid rgba(0,0,0,.06);
+    opacity: 0;
+    transition: opacity .15s ease;
+    z-index: 19;
+  }
+  .lead-dot:hover::after,
+  .lead-dot:focus-visible::after{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .lead-dot:hover::before,
+  .lead-dot:focus-visible::before{
+    opacity: 1;
+  }
+}
+.lead-dot[aria-label]{ cursor: help; }
