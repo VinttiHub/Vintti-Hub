@@ -1142,6 +1142,21 @@ const CITIES_BY_COUNTRY = {
   "Uruguay": ["Montevideo","Punta del Este","Salto"],
   "Venezuela": ["Caracas","Maracaibo","Valencia","Barquisimeto"]
 };
+function toArray(val){
+  if (Array.isArray(val)) return val;
+  if (val == null) return [];
+  const s = String(val).trim();
+  if (!s) return [];
+  // Permite que si quedó en la DB como "Argentina, Mexico"
+  if (s.startsWith('[')) { try { const a = JSON.parse(s); return Array.isArray(a)? a: []; } catch{} }
+  return s.split(',').map(x=>x.trim()).filter(Boolean);
+}
+
+function arraysEqualShallow(a,b){
+  if (a.length !== b.length) return false;
+  const A = [...a].sort(), B=[...b].sort();
+  return A.every((v,i)=>v===B[i]);
+}
 
 async function openPublishCareerPopup() {
   const pop = document.getElementById('publishCareerPopup');
@@ -1260,75 +1275,128 @@ setSelectByApproxValue(document.getElementById('career-modality'),  data.career_
 
   document.getElementById('career-years').value     = data.career_years_experience || '';
 
-  // ===== Country (Choices) =====
-  countryEl.innerHTML =
-    '<option value="">Select country...</option>' +
-    LATAM_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('');
+// ===== Country (Choices MULTI) =====
+countryEl.innerHTML =
+  LATAM_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('');
 
-  if (savedCountry && !LATAM_COUNTRIES.includes(savedCountry)) {
-    countryEl.insertAdjacentHTML('beforeend', `<option value="${savedCountry}">${savedCountry}</option>`);
+// Lee lo guardado (string, json o array) y normaliza
+const savedCountries = toArray(data.career_country);
+
+// Si hay países guardados que no están en la lista base, los agregamos
+savedCountries.forEach(c=>{
+  if (!LATAM_COUNTRIES.includes(c)) {
+    countryEl.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`);
   }
-  countryEl.value = savedCountry || '';
+});
 
-  if (window.countryChoices) window.countryChoices.destroy();
-  window.countryChoices = new Choices(countryEl, {
-    searchEnabled: true,
-    shouldSort: true,
-    removeItemButton: false,
-    searchPlaceholderValue: 'Search country…'
-  });
-  // 👇 Fuerza el valor seleccionado en Choices (evita que quede el anterior)
-  try { window.countryChoices.setChoiceByValue(savedCountry || ''); } catch {}
+if (window.countryChoices) window.countryChoices.destroy();
+window.countryChoices = new Choices(countryEl, {
+  removeItemButton: true,
+  searchEnabled: true,
+  shouldSort: true,
+  searchPlaceholderValue: 'Search country…',
+  duplicateItemsAllowed: false
+});
 
-  // Helper para poblar ciudades
-  const buildCityChoices = (country, presetCity='') => {
-      if (country === 'Latin America') {
-    if (window.cityChoices) window.cityChoices.destroy();
-    cityEl.disabled = false;
-    cityEl.innerHTML = `<option value="Any Country">Any Country</option>`;
-    window.cityChoices = new Choices(cityEl, { searchEnabled: false, shouldSort: false });
-    try { window.cityChoices.setChoiceByValue('Any Country'); } catch {}
-    saveCareerField('career_city', 'Any Country');
+// Preselección
+savedCountries.forEach(c=>{
+  try { window.countryChoices.setChoiceByValue(c); } catch{}
+});
+
+// === City builder según países seleccionados ===
+const cityGroupEl = document.getElementById('career-city')?.closest('.input-group');
+
+const buildCityChoices = (countries, presetCity='') => {
+  const cityEl = document.getElementById('career-city');
+
+  // limpia instancia previa
+  if (window.cityChoices) window.cityChoices.destroy();
+
+  // ✅ 2 o más países: City visible, vacío y deshabilitado
+  if (countries.length >= 2) {
+    if (cityGroupEl) cityGroupEl.style.display = '';   // siempre visible
+    cityEl.disabled = true;
+    cityEl.innerHTML = `<option value="">—</option>`;   // muestra vacío
+    window.cityChoices = new Choices(cityEl, { searchEnabled:false, shouldSort:false });
+    try { window.cityChoices.setChoiceByValue(''); } catch {}
+    // guarda vacío
+    saveCareerField('career_city', '');
+    window.currentOpportunityData = window.currentOpportunityData || {};
+    window.currentOpportunityData.career_city = '';
     return;
   }
-    const cities = CITIES_BY_COUNTRY[country] || [];
-    if (window.cityChoices) window.cityChoices.destroy();
-    cityEl.innerHTML = '';
-    if (cities.length) {
-      cityEl.disabled = false;
-      const list = [...cities];
-      if (presetCity && !list.includes(presetCity)) list.unshift(presetCity);
 
-      cityEl.insertAdjacentHTML('beforeend',
-        `<option value="">Select city…</option>` +
-        list.map(ct => `<option value="${ct}">${ct}</option>`).join('')
-      );
-      cityEl.value = presetCity || '';
-      window.cityChoices = new Choices(cityEl, {
-        searchEnabled: true,
-        shouldSort: true,
-        removeItemButton: false,
-        searchPlaceholderValue: 'Search city…'
-      });
-      // 👇 Igual que arriba: asegura selección real
-      try { window.cityChoices.setChoiceByValue(presetCity || ''); } catch {}
-    } else {
-      cityEl.disabled = true;
-      cityEl.insertAdjacentHTML('beforeend', `<option value="">Select a country first</option>`);
-      window.cityChoices = new Choices(cityEl, { searchEnabled: true, shouldSort: true, removeItemButton: false });
-      window.cityChoices.disable();
-    }
-  };
+  // 0 países: visible, hint y deshabilitado
+  if (countries.length === 0) {
+    if (cityGroupEl) cityGroupEl.style.display = '';
+    cityEl.disabled = true;
+    cityEl.innerHTML = `<option value="">Select a country first</option>`;
+    window.cityChoices = new Choices(cityEl, { searchEnabled:true, shouldSort:true });
+    window.cityChoices.disable();
+    saveCareerField('career_city', '');
+    window.currentOpportunityData = window.currentOpportunityData || {};
+    window.currentOpportunityData.career_city = '';
+    return;
+  }
 
-  // Construir ciudades con el país guardado
-  buildCityChoices(savedCountry, savedCity);
+  // 1 país
+  if (cityGroupEl) cityGroupEl.style.display = '';
+  const country = countries[0];
 
-  // Cambio de país → reconstruye ciudades
-  countryEl.addEventListener('change', () => {
-    const country = countryEl.value;
-    buildCityChoices(country, '');
-    saveCareerField('career_city', ''); // limpia en DB
-  }, { signal: (window.__publishCareerAC || {}).signal });
+  // 1 país = "Latin America" → City fijo en "Any Country"
+  if (country === 'Latin America') {
+    cityEl.disabled = false;
+    cityEl.innerHTML = `<option value="Any Country">Any Country</option>`;
+    window.cityChoices = new Choices(cityEl, { searchEnabled:false, shouldSort:false });
+    try { window.cityChoices.setChoiceByValue('Any Country'); } catch {}
+    saveCareerField('career_city', 'Any Country');
+    window.currentOpportunityData.career_city = 'Any Country';
+    return;
+  }
+
+  // 1 país normal → poblar ciudades
+  const cities = CITIES_BY_COUNTRY[country] || [];
+  cityEl.innerHTML = '';
+  if (cities.length) {
+    cityEl.disabled = false;
+    const list = [...cities];
+    if (presetCity && !list.includes(presetCity)) list.unshift(presetCity);
+
+    cityEl.insertAdjacentHTML('beforeend',
+      `<option value="">Select city…</option>` +
+      list.map(ct => `<option value="${ct}">${ct}</option>`).join('')
+    );
+
+    window.cityChoices = new Choices(cityEl, {
+      searchEnabled: true,
+      shouldSort: true,
+      removeItemButton: false,
+      searchPlaceholderValue: 'Search city…'
+    });
+
+    try { window.cityChoices.setChoiceByValue(presetCity || ''); } catch {}
+  } else {
+    cityEl.disabled = true;
+    cityEl.insertAdjacentHTML('beforeend', `<option value="">Select a country first</option>`);
+    window.cityChoices = new Choices(cityEl, { searchEnabled:true, shouldSort:true });
+    window.cityChoices.disable();
+  }
+};
+
+// construir con lo guardado
+buildCityChoices(savedCountries, savedCity);
+
+// on change → reconstruir y guardar
+countryEl.addEventListener('change', () => {
+  const countries = window.countryChoices ? window.countryChoices.getValue(true) : [];
+  if (!arraysEqualShallow(countries, toArray(window.currentOpportunityData?.career_country))) {
+    saveCareerField('career_country', countries);
+    window.currentOpportunityData = window.currentOpportunityData || {};
+    window.currentOpportunityData.career_country = countries;
+  }
+  buildCityChoices(countries, '');
+}, { signal: (window.__publishCareerAC || {}).signal });
+
 
   // ===== Tools & Skills con chips =====
   mountToolsDropdown(savedTools);
@@ -1459,6 +1527,53 @@ if (grid && actions && descAnchor && actions.nextElementSibling !== descAnchor) 
 }
 
 }
+// 🧠 Memoria de selección cross-browser para editores contentEditable
+function wireSelectionMemory(editorEl, toolbarEl, acSignal){
+  let savedRange = null;
+
+  const within = (n) => n && (n === editorEl || editorEl.contains(n));
+
+  const save = () => {
+    const sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    if (!within(sel.anchorNode) || !within(sel.focusNode)) return;
+    // Safari: usa cloneRange() para evitar ranges "stale"
+    savedRange = sel.getRangeAt(0).cloneRange();
+  };
+
+  // Guardar cada vez que cambia la selección
+  document.addEventListener('selectionchange', save, { signal: acSignal });
+  editorEl.addEventListener('keyup',  save, { signal: acSignal, passive:true });
+  editorEl.addEventListener('mouseup',save, { signal: acSignal, passive:true });
+  editorEl.addEventListener('blur',   save, { signal: acSignal, passive:true });
+
+  const restore = () => {
+    editorEl.focus();
+    if (savedRange) {
+      const sel = document.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedRange);
+    }
+  };
+
+  // Evita que la toolbar robe el foco y restaura ANTES del click
+  const downOpts = { signal: acSignal, capture: true };
+  toolbarEl.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('button')) return;
+    e.preventDefault(); // no muevas el foco
+    restore();
+  }, downOpts);
+
+  // Fallback para navegadores viejos sin Pointer Events
+  toolbarEl.addEventListener('mousedown', (e) => {
+    if (!e.target.closest('button')) return;
+    e.preventDefault();
+    restore();
+  }, downOpts);
+
+  return { restore };
+}
+
 // 🧰 Crea un editor rico desde un <textarea> existente
 function createRichEditor(textareaId, fieldName, acSignal) {
   const ta = document.getElementById(textareaId);
@@ -1509,53 +1624,41 @@ function createRichEditor(textareaId, fieldName, acSignal) {
   ed.style.padding = '10px';
   ed.style.background = '#fff';
   ed.innerHTML = ta.value || '';
+const selMem = wireSelectionMemory(ed, bar, acSignal);
 
-  // wire toolbar (un solo handler, delegación)
-  bar.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
+const IS_SAFARI = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    const cmd = btn.dataset.cmd;
-    if (cmd) {
-      // comandos de formato
-      if (cmd === 'ul') document.execCommand('insertUnorderedList', false, null);
-      else document.execCommand(cmd, false, null);
+bar.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+
+  const cmd = btn.dataset.cmd; // 'bold' | 'italic' | 'ul'
+  if (cmd) {
+    // Asegura foco + selección restaurada
+    selMem.restore();
+
+    const run = () => {
+      document.execCommand(cmd === 'ul' ? 'insertUnorderedList' : cmd, false, null);
       btn.classList.toggle('active');
-      return;
-    }
+    };
 
-    if (btn.hasAttribute('data-emoji')) {
-      // ⚙️ asegura que el custom element esté cargado
-      try { await ensureEmojiPickerLoaded(); } catch {}
-      const picker = bar.querySelector('.popup-emoji');
-      const anchor = btn.closest('.emoji-anchor');
+    // Safari a veces necesita un tick para aplicar tras restaurar selección
+    IS_SAFARI ? requestAnimationFrame(run) : run();
+    return;
+  }
 
-      // toggle
-      const willShow = picker.style.display !== 'block';
-      // cierra otros pickers visibles
-      document.querySelectorAll('.popup-emoji').forEach(p => p.style.display = 'none');
+  // Emoji
+  if (btn.hasAttribute('data-emoji')) {
+    try { await ensureEmojiPickerLoaded(); } catch {}
+    const picker = bar.querySelector('.popup-emoji');
+    document.querySelectorAll('.popup-emoji').forEach(p => p.style.display = 'none');
+    picker.style.display = (picker.style.display === 'block') ? 'none' : 'block';
+  }
+}, { signal: acSignal });
 
-      if (willShow) {
-        // Posiciona hacia la izquierda del botón y CLAMPEA dentro del modal
-        picker.style.display = 'block';
+// Calidad de vida
+ed.style.whiteSpace = 'pre-wrap';
 
-        // Ajuste anti-desborde horizontal dentro de .popup-content
-        const popup = btn.closest('.popup-content') || document.body;
-        const popupRect = popup.getBoundingClientRect();
-        const pickRect  = picker.getBoundingClientRect();
-        const btnRect   = btn.getBoundingClientRect();
-
-        // si aun así se sale por la izquierda, cae a abrir debajo del botón (anclado al borde derecho)
-        if (pickRect.left < popupRect.left + 8) {
-          picker.style.top = '100%';
-          picker.style.right = '0';
-        } else {
-          picker.style.top = '0';
-          picker.style.right = 'calc(100% + 8px)';
-        }
-      }
-    }
-  }, { signal: acSignal });
 
   // 🎯 Inserción del emoji dentro del editor rico (una sola vez)
   const picker = bar.querySelector('emoji-picker');
@@ -1718,24 +1821,26 @@ const finalTools = normalizeToolsArray(
 const descEditorEl = getRichEditor('career-description');
 const reqsEditorEl = getRichEditor('career-requirements');
 const addiEditorEl = getRichEditor('career-additional');
-  const payload = {
-    career_job_id: document.getElementById('career-jobid').value || '',
-    career_job: document.getElementById('career-job').value || '',
-    career_country: document.getElementById('career-country').value || '',
-    career_city: document.getElementById('career-city').value || '',
-    career_job_type: document.getElementById('career-jobtype').value || '',
-    career_seniority: document.getElementById('career-seniority').value || '',
-    career_years_experience: document.getElementById('career-years').value || '',
-    career_experience_level: document.getElementById('career-exp-level').value || '',
-    career_field: document.getElementById('career-field').value || '',
-    career_modality: document.getElementById('career-modality').value || '',
+const countries = window.countryChoices ? window.countryChoices.getValue(true) : toArray(document.getElementById('career-country')?.value);
+const oneCountry = countries.length === 1 && !countries.includes('Latin America');
+
+const payload = {
+  career_job_id: document.getElementById('career-jobid').value || '',
+  career_job: document.getElementById('career-job').value || '',
+  career_country: countries,                                     // ← ahora array
+  career_city: oneCountry ? (document.getElementById('career-city').value || '') : 'Any Country',
+  career_job_type: document.getElementById('career-jobtype').value || '',
+  career_seniority: document.getElementById('career-seniority').value || '',
+  career_years_experience: document.getElementById('career-years').value || '',
+  career_experience_level: document.getElementById('career-exp-level').value || '',
+  career_field: document.getElementById('career-field').value || '',
+  career_modality: document.getElementById('career-modality').value || '',
   career_tools: finalTools,
   career_description: (descEditorEl?.innerHTML ?? document.getElementById('career-description').value ?? ''),
   career_requirements: (reqsEditorEl?.innerHTML ?? document.getElementById('career-requirements').value ?? ''),
   career_additional_info: (addiEditorEl?.innerHTML ?? document.getElementById('career-additional').value ?? '')
-  };
-
-  if (publish) payload.career_published = true;
+};
+if (publish) payload.career_published = true;
 
   try {
     const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
@@ -1820,26 +1925,27 @@ async function publishCareerNow() {
 
   const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
 
-  const payload = {
-    publish_mode: 'sheet_only',
-    // meta
-    career_job_id: document.getElementById('career-jobid').value || oppId,
-    career_job: document.getElementById('career-job').value || '',
-    career_country: document.getElementById('career-country').value || '',
-    career_city: document.getElementById('career-city').value || '',
-    career_job_type: document.getElementById('career-jobtype').value || '',
-    career_seniority: document.getElementById('career-seniority').value || '',
-    career_years_experience: document.getElementById('career-years').value || '',
-    career_experience_level: document.getElementById('career-exp-level').value || '',
-    career_field: document.getElementById('career-field').value || '',
-    career_modality: document.getElementById('career-modality').value || '',
-    career_tools: finalTools,
+const countries = window.countryChoices ? window.countryChoices.getValue(true) : toArray(document.getElementById('career-country')?.value);
+const oneCountry = countries.length === 1 && !countries.includes('Latin America');
 
-    // 🔹 para el Sheet: **HTML limpio** (lo que Webflow necesita)
-    sheet_description_html: descHTML_CLEAN,
-    sheet_requirements_html: reqsHTML_CLEAN,
-    sheet_additional_html: addiHTML_CLEAN
-  };
+const payload = {
+  publish_mode: 'sheet_only',
+  career_job_id: document.getElementById('career-jobid').value || oppId,
+  career_job: document.getElementById('career-job').value || '',
+  career_country: countries,                                      // ← array
+  career_city: oneCountry ? (document.getElementById('career-city').value || '') : 'Any Country',
+  career_job_type: document.getElementById('career-jobtype').value || '',
+  career_seniority: document.getElementById('career-seniority').value || '',
+  career_years_experience: document.getElementById('career-years').value || '',
+  career_experience_level: document.getElementById('career-exp-level').value || '',
+  career_field: document.getElementById('career-field').value || '',
+  career_modality: document.getElementById('career-modality').value || '',
+  career_tools: finalTools,
+  sheet_description_html: descHTML_CLEAN,
+  sheet_requirements_html: reqsHTML_CLEAN,
+  sheet_additional_html: addiHTML_CLEAN
+};
+
 
   const btn = document.getElementById('publishCareerBtn');
   btn.disabled = true;
@@ -1867,50 +1973,6 @@ async function publishCareerNow() {
     btn.textContent = 'Publish';
   }
 }
-
-// ✅ Delegación global para TODAS las toolbars
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.toolbar button');
-  if (!btn) return;
-
-  // Soporta data-command y data-cmd (ambos los usas en distintos lugares)
-  const cmd = btn.getAttribute('data-command') || btn.getAttribute('data-cmd');
-  if (!cmd) return;
-
-  // Encuentra el editor más cercano: primero el rich editor de la popup,
-  // si no, cae al Job Description principal
-  const wrap = btn.closest('.rich-wrap');
-  const editor = wrap?.querySelector('.job-description-editor') ||
-                 document.getElementById('job-description-textarea');
-
-  if (!editor) return;
-  editor.focus();
-
-  // Normaliza comandos
-  if (cmd === 'ul' || cmd === 'insertUnorderedList') {
-    document.execCommand('insertUnorderedList', false, null);
-  } else {
-    document.execCommand(cmd, false, null);
-  }
-
-  // Feedback visual opcional
-  btn.classList.toggle('active');
-  e.preventDefault();
-});
-
-// ✅ Mantiene botones “activos” acorde a la selección del usuario
-document.addEventListener('mouseup', () => {
-  const editor = document.querySelector('.job-description-editor') || document.getElementById('job-description-textarea');
-  if (!editor) return;
-  document.querySelectorAll('.toolbar button').forEach(btn => {
-    const cmd = btn.getAttribute('data-command') || btn.getAttribute('data-cmd');
-    if (!cmd) return;
-    try {
-      const state = document.queryCommandState(cmd === 'ul' ? 'insertUnorderedList' : cmd);
-      btn.classList.toggle('active', !!state);
-    } catch {}
-  });
-});
 
 
 

@@ -2718,3 +2718,15 @@ input:checked + .slider::before {
   overflow-x: auto;
   border-radius: 14px;
 }
+/* Solo dentro del editor rico */
+.job-description-editor b,
+.job-description-editor strong { font-weight: 600; }
+
+.job-description-editor i,
+.job-description-editor em { font-style: italic; }
+
+.job-description-editor ul { list-style: disc; padding-left: 1.25rem; margin: .5rem 0; }
+.job-description-editor ol { list-style: decimal; padding-left: 1.25rem; margin: .5rem 0; }
+.job-description-editor li { margin: .25rem 0; }
+.lead-dot[aria-label]{ cursor: help; }
+.lead-dot img{ pointer-events: none; } /* el hover sigue “pegando” en el span */

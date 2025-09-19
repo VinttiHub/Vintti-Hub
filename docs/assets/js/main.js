@@ -1,3 +1,34 @@
+// ——— Helpers de nombre/escape ———
+function escapeHtml(s){
+  return String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+}
+
+function displayNameForHR(email){
+  const key = String(email||'').toLowerCase();
+  if (!key) return 'Assign HR Lead';
+  const u = (window.allowedHRUsers||[]).find(x => String(x.email_vintti||'').toLowerCase() === key);
+  return u?.user_name || 'Assign HR Lead';
+}
+
+function displayNameForSales(value){
+  const key = String(value||'').toLowerCase();
+
+  // 1) Si viene email -> busca por email
+  let u = (window.allowedSalesUsers||[]).find(x => String(x.email_vintti||'').toLowerCase() === key);
+  if (u?.user_name) return u.user_name;
+
+  // 2) Si viene nombre -> busca por nombre
+  u = (window.allowedSalesUsers||[]).find(x => String(x.user_name||'').toLowerCase() === key);
+  if (u?.user_name) return u.user_name;
+
+  // 3) Fallback heurístico
+  if (key.includes('bahia'))   return 'Bahía';
+  if (key.includes('lara'))    return 'Lara';
+  if (key.includes('agustin')) return 'Agustín';
+
+  // 4) Último recurso
+  return String(value||'Unassigned');
+}
 // === GLOBALS para Sales Lead ===
 window.allowedSalesUsers = window.allowedSalesUsers || [];
 
@@ -648,33 +679,45 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
   }
 
   // Pintar avatar-dots para HR & Sales
-  function paintLeadDots(selectedList) {
-    if (!(IS_SALES || IS_HR) || !leadDotBar) return;
-    leadDotBar.innerHTML = '';
-    if (!selectedList.length) return;
+function paintLeadDots(selectedList) {
+  if (!(IS_SALES || IS_HR) || !leadDotBar) return;
+  leadDotBar.innerHTML = '';
+  if (!selectedList.length) return;
 
-    selectedList.forEach(label => {
-      const span = document.createElement('span');
-      span.className = 'lead-dot';
-      span.setAttribute('data-tip', label);
-      span.setAttribute('aria-label', label);
-      span.setAttribute('tabindex', '0');
+  selectedList.forEach(label => {
+    const span = document.createElement('span');
+    span.className = 'lead-dot';
 
-      const isPlaceholder = /^(Unassigned|Assign HR Lead|Assign Sales Lead)$/i.test(label);
-      if (!isPlaceholder) {
-        const email  = nameToEmail(label, IS_HR);
-        const avatar = email ? resolveAvatar(email) : null;
-        if (avatar) {
-          span.innerHTML = `<img src="${avatar}" alt="">`;
-        } else {
-          span.textContent = computeInitials(label);
-        }
+    const isPlaceholder = /^(Unassigned|Assign HR Lead|Assign Sales Lead)$/i.test(label);
+
+    // email (para avatar) y nombre bonito (para tooltip)
+    const email   = isPlaceholder ? '' : nameToEmail(label, IS_HR);
+    const tipText = isPlaceholder
+      ? label
+      : (IS_HR ? displayNameForHR(email) : displayNameForSales(label));
+
+    // ✅ tooltip + accesibilidad + foco por teclado
+    span.setAttribute('data-tip', escapeHtml(tipText));
+    span.setAttribute('title',     tipText);         // fallback nativo
+    span.setAttribute('aria-label',tipText);
+    span.setAttribute('tabindex',  '0');
+
+    if (!isPlaceholder) {
+      const avatar = email ? resolveAvatar(email) : null;
+      if (avatar) {
+        span.innerHTML = `<img src="${avatar}" alt="${escapeHtml(tipText)}">`;
       } else {
-        span.textContent = '—';
+        // iniciales si no hay avatar
+        span.textContent = (tipText || '')
+          .trim().split(/\s+/).map(w => w[0]||'').join('').slice(0,2).toUpperCase() || '—';
       }
-      leadDotBar.appendChild(span);
-    });
-  }
+    } else {
+      span.textContent = '—';
+    }
+
+    leadDotBar.appendChild(span);
+  });
+}
 
   // Aplicar filtro + refrescar barras
   function applyFilter() {
@@ -1515,22 +1558,27 @@ function initialsForHRLead(emailOrName) {
 function hrDisplayHTML(email) {
   const initials = initialsForHRLead(email);
   const avatar   = resolveAvatar(email);
+  const nameTip  = displayNameForHR(email);
+
   const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
   return `
-    <div class="hr-lead" style="display:flex;align-items:center;gap:6px;">
+    <div class="hr-lead lead-tip" data-tip="${escapeHtml(nameTip)}">
       <span class="lead-bubble">${initials}</span>
       ${img}
     </div>
   `;
 }
+
 function salesDisplayHTML(emailOrName) {
-  const key = String(emailOrName || '').toLowerCase();
+  const key      = String(emailOrName || '').toLowerCase();
   const initials = initialsForSalesLead(key);
   const bubbleCl = badgeClassForSalesLead(key);
   const avatar   = resolveAvatar(key);
+  const nameTip  = displayNameForSales(emailOrName);
+
   const img = avatar ? `<img class="lead-avatar" src="${avatar}" alt="">` : '';
   return `
-    <div class="sales-lead" style="display:flex;align-items:center;gap:6px;">
+    <div class="sales-lead lead-tip" data-tip="${escapeHtml(nameTip)}">
       <span class="lead-bubble ${bubbleCl}">${initials}</span>
       ${img}
     </div>

@@ -1340,3 +1340,48 @@ body {
   }
 }
 .lead-dot[aria-label]{ cursor: help; }
+/* ——— Tooltip para avatares dentro de la tabla (HR/Sales) ——— */
+.lead-tip { position: relative; display:inline-flex; align-items:center; gap:6px; }
+
+@media (hover:hover){
+  .lead-tip::after{
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #333;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 20;
+  }
+  .lead-tip::before{
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: rgba(255,255,255,.95);
+    border-left: 1px solid rgba(0,0,0,.06);
+    border-top: 1px solid rgba(0,0,0,.06);
+    opacity: 0;
+    transition: opacity .15s ease;
+    z-index: 19;
+  }
+  .lead-tip:hover::after,
+  .lead-tip:focus-visible::after{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .lead-tip:hover::before,
+  .lead-tip:focus-visible::before{ opacity:1; }
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vintti HUB · Tablero</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/css/dashboard.css">
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <h1>📊 Tablero de Control</h1>
+      <div class="topbar-actions">
+        <button id="refreshBtn" class="btn-refresh" title="Actualizar datos">↻ Actualizar</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <!-- ====== CARD: Oportunidades por modelo y tipo ====== -->
+      <section class="card glass" id="oppsCard">
+        <div class="card-head">
+          <h2>Oportunidades (Pipeline)</h2>
+          <div class="muted">Excluye: Deep Dive, NDA Sent, Close Win, Close Lost</div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="v-table" id="oppsTable" aria-describedby="Tabla de oportunidades por modelo y tipo">
+            <thead>
+              <tr>
+                <th class="sticky-col">Modelo \\ Tipo</th>
+                <th>New</th>
+                <th>Replacement</th>
+                <th class="total-col">Total</th>
+              </tr>
+            </thead>
+            <tbody id="oppsTbody">
+              <!-- se llena por JS -->
+            </tbody>
+            <tfoot>
+              <tr class="row-total">
+                <th class="sticky-col">Total</th>
+                <th id="colTotalNew">0</th>
+                <th id="colTotalReplacement">0</th>
+                <th id="grandTotal" class="total-col">0</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <!-- ====== CARD: MRR (solo Staffing) ====== -->
+      <section class="card money glass" id="mrrCard">
+        <div class="card-head money-head">
+          <div class="money-visual">
+            <div class="piggy" aria-hidden="true"></div>
+            <div class="cart" aria-hidden="true">
+              <div class="wheel w1"></div>
+              <div class="wheel w2"></div>
+              <div class="stack s1"></div>
+              <div class="stack s2"></div>
+              <div class="stack s3"></div>
+            </div>
+          </div>
+          <div>
+            <h2>MRR · Solo Staffing</h2>
+            <div class="muted">Basado en hires (Closed Win) de Staffing</div>
+          </div>
+        </div>
+
+        <div class="money-grid">
+          <div class="kpi">
+            <div class="kpi-label">Por revenue (TSR)</div>
+            <div class="kpi-value" id="kpiTSR">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Por fee (TSF)</div>
+            <div class="kpi-value" id="kpiTSF">—</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <template id="rowTemplate">
+    <tr>
+      <th class="sticky-col row-head"></th>
+      <td class="cell" data-key="new" data-label="New">0</td>
+      <td class="cell" data-key="replacement" data-label="Replacement">0</td>
+      <td class="cell total-col row-total-val">0</td>
+    </tr>
+  </template>
+
+  <script src="./assets/js/dashboard.js"></script>
+</body>
+</html>
