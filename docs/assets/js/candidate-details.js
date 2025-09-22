@@ -28,22 +28,23 @@ function todayYmd(){
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 function coerceNum(x){
-  const n = Number(x);
+  if (x === undefined || x === null) return null;
+  const s = String(x).trim();
+  if (s === '') return null;
+  let cleaned = s.replace(/[^\d.-]/g, '');
+
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * Crea un salary_update con:
- *  - date = start_date del Hire (YYYY-MM-DD) si existe, sino HOY
- *  - salary y/o fee según el modelo y el campo editado
- *  - luego sincroniza el Hire tomando el update con fecha más reciente
- *
- * source: 'salary' | 'fee' | 'revenue'
- */
+
+function isValidNum(n){ return typeof n === 'number' && Number.isFinite(n); }
+
 async function createSalaryUpdateFromInputs(source, candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
-  const modelTxt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase();
-  const isRecruiting = modelTxt.includes('recruiting');
-  const isStaffing   = modelTxt.includes('staffing');
+  // Modelo confiable (API/caché), NO del pill crudo
+  const modelLower = await ensureOppModelLower(candidateId, apiBase);
+  const isRecruiting = (modelLower === 'recruiting');
+  const isStaffing   = (modelLower === 'staffing');
 
   // leer inputs actuales
   const salIn = document.getElementById('hire-salary');
@@ -62,46 +63,49 @@ async function createSalaryUpdateFromInputs(source, candidateId, apiBase='https:
   } catch {}
   const dateYmd = startYmd || todayYmd();
 
-  // armar body de salary_update (tabla salary_updates tiene salary, fee, date)
-  const body = { date: dateYmd };
+const body = { date: dateYmd };
 
-  if (isStaffing){
-    // En Staffing: revenue = salary + fee. Si el usuario edita revenue,
-    // derivamos fee = revenue - salary (si hay salary válido).
-    if (source === 'revenue'){
-      // si hay salary válido, calculamos fee; si no, no podemos inferir.
-      if (uiSalary != null && uiRevenue != null){
-        body.salary = uiSalary;
-        body.fee    = uiRevenue - uiSalary;
-      } else {
-        // si faltan datos, intentamos al menos persistir salary/fee existentes
-        if (uiSalary != null) body.salary = uiSalary;
-        if (uiFee != null)    body.fee    = uiFee;
-      }
+if (isStaffing){
+  if (source === 'revenue'){
+    if (isValidNum(uiSalary) && isValidNum(uiRevenue)){
+      body.salary = uiSalary;
+      body.fee    = uiRevenue - uiSalary;
     } else {
-      if (uiSalary != null) body.salary = uiSalary;
-      if (uiFee != null)    body.fee    = uiFee;
+      if (isValidNum(uiSalary)) body.salary = uiSalary;
+      if (isValidNum(uiFee))    body.fee    = uiFee;
     }
   } else {
-    // En Recruiting: salary_update sólo impacta SALARY (fee se oculta).
-    // Si el usuario tocó salary, lo guardamos; revenue recruiting va por otro campo.
-    if (uiSalary != null) body.salary = uiSalary;
-    // Ignoramos fee/revenue para la tabla salary_updates en Recruiting.
+    if (isValidNum(uiSalary)) body.salary = uiSalary;
+    if (isValidNum(uiFee))    body.fee    = uiFee;
   }
+} else {
+  // Recruiting
+  if (isValidNum(uiSalary)) body.salary = uiSalary;
+
+  // 🔒 Anti-400: algunos backends esperan ver al menos UNO; manda fee=0 explícito
+  if (!isValidNum(body.fee)) body.fee = 0;
+}
+
+// ⛔️ Si NO hay nada real que guardar (salary ni fee numéricos), no postees
+if (!isValidNum(body.salary) && !isValidNum(body.fee)) return;
+
+// Depura lo que vas a enviar (te salva la vida si vuelve a pasar)
+console.debug('POST /salary_updates payload →', body);
+
+// POST salary_update
+const resp = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`, {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body: JSON.stringify(body)
+});
+if (!resp.ok){
+  const t = await resp.text().catch(()=> '');
+  throw new Error(`POST salary_update failed ${resp.status}: ${t}`);
+}
+
 
   // si no hay nada que guardar, salimos silenciosamente
   if (body.salary == null && body.fee == null) return;
-
-  // POST salary_update
-  const resp = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(body)
-  });
-  if (!resp.ok){
-    const t = await resp.text().catch(()=> '');
-    throw new Error(`POST salary_update failed ${resp.status}: ${t}`);
-  }
 
   // refrescar la lista visual
   if (typeof window.loadSalaryUpdates === 'function'){
@@ -109,6 +113,28 @@ async function createSalaryUpdateFromInputs(source, candidateId, apiBase='https:
   }
   // sincronizar HIRE con el update de fecha más reciente
   await syncHireFromLatestSalaryUpdate(candidateId, apiBase);
+}
+// Modelo cacheado global para no depender del texto del pill
+window.__oppModelLower = ''; // 'staffing' | 'recruiting' | ''
+
+async function ensureOppModelLower(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  if (window.__oppModelLower) return window.__oppModelLower;
+  try{
+    const ho = await fetch(`${apiBase}/candidates/${candidateId}/hire_opportunity`).then(r=>r.json());
+    const raw = String(ho?.opp_model||'').toLowerCase().trim();
+    // normaliza valores comunes
+    if (raw.startsWith('staff')) window.__oppModelLower = 'staffing';
+    else if (raw.startsWith('recr')) window.__oppModelLower = 'recruiting';
+    else window.__oppModelLower = '';
+  }catch{ /* ignore */ }
+
+  // Fallback muy estricto al pill: solo si empieza por la palabra
+  if (!window.__oppModelLower){
+    const txt = (document.getElementById('opp-model-pill')?.textContent || '').toLowerCase().trim();
+    if (/^\s*staffing\b/.test(txt)) window.__oppModelLower = 'staffing';
+    else if (/^\s*recruiting\b/.test(txt)) window.__oppModelLower = 'recruiting';
+  }
+  return window.__oppModelLower;
 }
 
 // Devuelve 'staffing' | 'recruiting' | '' leyendo el pill (o '' si no hay)
@@ -1269,6 +1295,10 @@ if (hireRevenue){
 
   // Cargar Hire + Opportunity model
   function adaptHireFieldsByModel(model) {
+    window.__oppModelLower = String(model||'').toLowerCase().startsWith('recr') ? 'recruiting'
+                        : String(model||'').toLowerCase().startsWith('staff') ? 'staffing'
+                        : '';
+
     const feeField = document.getElementById('hire-fee')?.closest('.field');
     const revenueInput = document.getElementById('hire-revenue');
     const setupField = document.getElementById('setup-fee-field');

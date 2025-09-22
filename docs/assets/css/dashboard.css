@@ -30,17 +30,30 @@ body{
 
 .page{max-width:1200px; margin:0 auto; padding:28px 20px 60px;}
 
+/* ——— Topbar: título centrado con degradé ——— */
 .topbar{
   position: sticky; top:0; z-index: 5;
-  display:flex; justify-content:space-between; align-items:center;
-  padding:18px 12px; margin:-18px -12px 24px;
-  background: linear-gradient( to bottom, rgba(255,255,255,.90), rgba(255,255,255,.65) );
-  backdrop-filter: blur(8px);
-  border-bottom:1px solid #ece8ff;
+  display:grid; grid-template-columns: 1fr auto 1fr; align-items:center;
+  padding:16px 0;                  /* menos padding */
+  margin:0 0 24px;                 /* ya sin márgenes negativos */
+  background: transparent;         /* <— sin fondo blanco */
+  backdrop-filter: none;           /* <— sin blur lechoso */
+  border-bottom: none;             /* <— sin línea inferior */
 }
-.topbar h1{margin:0; font-size:1.35rem; font-weight:800; letter-spacing:.2px}
+.topbar h1{
+  margin:0; 
+  justify-self:center; 
+  text-align:center;
+  font-size:2.4rem;                 /* antes 1.75rem */
+  font-weight:800; 
+  letter-spacing:.2px;
+  background: linear-gradient(90deg, #6d28d9, #6366f1, #22c55e);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.topbar .spacer{width:100%; height:1px; visibility:hidden;} /* para centrar */
 .btn-refresh{
-  background: #fff; border:1px solid #e8e6ff; border-radius:14px; padding:10px 14px;
+  justify-self:end;
+  background:#fff; border:1px solid #e8e6ff; border-radius:14px; padding:10px 14px;
   font-weight:600; cursor:pointer; transition: transform .15s ease, box-shadow .2s ease;
   box-shadow: 0 6px 18px rgba(124,58,237,.08);
 }
@@ -65,41 +78,50 @@ body{
 
 .table-wrap{ padding:16px 20px 22px; overflow:auto; }
 .v-table{ width:100%; border-collapse:separate; border-spacing:0; min-width:680px; }
+/* Encabezado tabla */
 .v-table thead th{
-  text-align:left; padding:12px 14px; font-weight:800; background:var(--thead-bg);
-  border-bottom:1px solid #eaecff; position:sticky; top:0; z-index:1;
+  padding:14px 16px;
+  font-weight:800;
+  background: var(--thead-bg);
+  border-bottom:1px solid #eaecff;
+  position:sticky; top:0; z-index:1;
+  text-align:center;                /* centrado */
 }
-.v-table td, .v-table th{ padding:12px 14px; }
-.v-table td{ font-weight:600; }
-.v-table tbody tr:nth-child(odd){ background:var(--row-alt); }
-.v-table .sticky-col{ position:sticky; left:0; background:var(--thead-bg); z-index:2; border-right:1px solid #eaecff;}
-.v-table .row-head{ background:linear-gradient(180deg, #fbfbff, #f6f6ff);}
-.v-table .total-col{ background: var(--total-bg); font-weight:800;}
-.v-table tfoot .row-total th,
-.v-table tfoot .row-total td{ border-top:2px solid #dde6ff; }
 
-.cell{
-  border-radius:12px;
-  transition: transform .08s ease, box-shadow .2s ease, background .2s ease;
-  position:relative;
+/* Primera columna fija también centrada */
+.v-table th.sticky-col{
+  position:sticky; left:0; z-index:2;
+  background: var(--thead-bg);
+  border-right:1px solid #eaecff;
+  text-align:center;                /* antes estaba a la izquierda */
 }
-.cell:hover{
-  background: #f0f5ff;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(99,102,241,.12);
+
+/* Celdas: todo centrado, sin hover */
+.v-table td, .v-table th.row-head { 
+  padding:14px 16px; 
+  font-weight:600; 
+  text-align:center; 
 }
-.cell::after{
-  content: attr(data-label);
-  position:absolute; left:12px; top:-8px;
-  font-size:.70rem; color:#8a93b3; opacity:0; transform: translateY(-4px);
-  transition: all .12s ease;
+
+/* Quitar zebra */
+.v-table tbody tr:nth-child(odd){ background: transparent; }
+
+/* Fila total y columna total, con look más limpio */
+.v-table .total-col{ 
+  background: var(--total-bg);
+  font-weight:800;
 }
-.cell:hover::after{ opacity:1; transform: translateY(0); }
+.v-table tfoot .row-total th,
+.v-table tfoot .row-total td{ 
+  border-top:2px solid #dde6ff; 
+  background: linear-gradient(180deg, #fafcff, #f3f7ff);
+}
+
+/* Sin hover en celdas */
+.cell{ border-radius:12px; }
 
 /* ===== MONEY CARD ===== */
-.money-head{
-  display:flex; gap:16px; align-items:center;
-}
+.money-head{ display:flex; gap:16px; align-items:center; }
 .money{ background:
   radial-gradient(600px 260px at 10% -60%, var(--money-1), transparent 60%),
   var(--glass-bg);
@@ -120,46 +142,150 @@ body{
 }
 .kpi-label{ color:#0b5f2b; font-weight:700; letter-spacing:.2px; margin-bottom:6px;}
 .kpi-value{ font-size:2rem; font-weight:800; color:var(--money-2); }
-
-/* Piggy bank + Cart animations */
-.money-visual{ position:relative; width:144px; height:72px; }
-.piggy{
-  position:absolute; right:0; bottom:2px; width:60px; height:42px; border-radius:20px 20px 14px 14px;
-  background:linear-gradient(180deg, #e1ffe9, #c8ffd7);
-  box-shadow: inset 0 -6px 18px rgba(22,163,74,.2), 0 8px 18px rgba(22,163,74,.12);
+.money-visual { position: relative; width: 170px; height: 90px; display:flex; align-items:center; }
+.money-gif { max-height: 80px; width: auto; display:block; filter: drop-shadow(0 8px 18px rgba(16,185,129,.18)); }
+/* ——— Encabezado tabla, más limpio ——— */
+.card-head h2{
+  margin:0;
+  font-size:1.06rem;
+  font-weight:800;
+  letter-spacing:.2px;
 }
-.piggy::before{
-  content:''; position:absolute; top:-8px; left:12px; width:34px; height:8px; border-radius:3px;
-  background:#0c7a36; opacity:.35;
-}
-.cart{
-  position:absolute; left:0; bottom:0; width:90px; height:50px; border:2px solid #0f7a3b; border-radius:8px;
-  animation: drive 6s cubic-bezier(.2,.9,.2,1) infinite;
-  background:linear-gradient(180deg, rgba(22,163,74,.10), rgba(22,163,74,.04));
-}
-.wheel{
-  position:absolute; bottom:-8px; width:16px; height:16px; border-radius:50%;
-  background:#0c7a36; box-shadow:inset 0 0 0 3px #fff; animation: spin 1.2s linear infinite;
-}
-.w1{ left:8px } .w2{ right:8px }
-.stack{
-  position:absolute; bottom:12px; width:16px; height:10px; background:#16a34a; border-radius:4px;
-  box-shadow: 0 2px 0 #0b5f2b inset;
-}
-.s1{ left:36px; animation: bounce 1.2s ease-in-out infinite .1s }
-.s2{ left:54px; animation: bounce 1.2s ease-in-out infinite .22s }
-.s3{ left:18px; animation: bounce 1.2s ease-in-out infinite .34s }
-
-@keyframes spin { to{ transform: rotate(360deg);} }
-@keyframes bounce { 0%,100%{ transform: translateY(0)} 50%{ transform: translateY(-6px)} }
-@keyframes drive {
-  0%{ transform: translateX(-6px) }
-  50%{ transform: translateX(10px) }
-  100%{ transform: translateX(-6px) }
+.card-head .muted{
+  margin-left:auto;
+  font-size:.9rem;
 }
 
-/* Small screens */
-@media (max-width: 720px){
-  .money-grid{ grid-template-columns: 1fr; }
-  .money-visual{ display:none; }
+/* ——— Tabla “glass cards” ——— */
+.table-wrap{ padding:18px 20px 24px; }
+.v-table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing: 0 10px;            /* separa filas como cards */
+  min-width:680px;
+}
+
+/* Header */
+.v-table thead th{
+  padding:12px 14px;
+  font-weight:800;
+  background: transparent;           /* sin bloque pesado */
+  border:0;
+  text-align:center;
+  color:#2a2f45;
+}
+
+/* Primera columna sticky, con chip */
+.v-table th.sticky-col{
+  position: sticky; left: 0; z-index: 2;
+  background: transparent;
+  border: 0;
+  text-align: left;                  /* texto a la izq. pero lo “chip” da coherencia */
+  padding-left: 8px;
+}
+.v-table .row-head{
+  font-weight:800;
+}
+.v-table .row-head::before{
+  content: attr(data-label);
+}
+.v-table tbody .row-head{
+  display:inline-block;
+  padding:8px 12px;
+  background: #f5f6ff;
+  border:1px solid #e5e8ff;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(99,102,241,.06) inset;
+}
+
+/* Celdas como pills */
+.v-table tbody td,
+.v-table tfoot th,
+.v-table tfoot td{
+  text-align:center;
+  padding:0;                          /* el padding lo ponemos en .pill */
+  border:0;
+}
+.v-table tbody tr > *:not(.sticky-col){
+  /* crea “cards” por fila: borde suave + sombra */
+  background: transparent;
+}
+
+/* Píldora base */
+.v-table .pill{
+  display:inline-block;
+  min-width: 78px;
+  padding:10px 14px;
+  font-weight:700;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fff, #f7f9ff);
+  border: 1px solid #e8ebff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.7),
+    0 6px 16px rgba(15,23,42,.06);
+}
+
+/* Variantes por columna */
+.v-table td[data-key="new"] .pill{
+  background: linear-gradient(180deg, #f9fbff, #f1f5ff);
+  border-color:#e3e8ff;
+}
+.v-table td[data-key="replacement"] .pill{
+  background: linear-gradient(180deg, #f8fffb, #eefcf4);
+  border-color:#dff3e6;
+}
+
+/* Total: acento */
+.v-table .total-col .pill{
+  background: linear-gradient(180deg, #f0f5ff, #e8f1ff);
+  border-color:#d9e7ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.8),
+    0 8px 20px rgba(99,102,241,.12);
+}
+
+/* Tfoot total general */
+.v-table tfoot .row-total th.sticky-col{
+  background: transparent;
+}
+.v-table tfoot .row-total .pill{
+  background: linear-gradient(180deg, #f6f9ff, #ecf2ff);
+  border-color:#dbe6ff;
+  font-size:1rem;
+}
+
+/* Ajuste de alto de fila para que se vean como tarjetas separadas */
+.v-table tbody tr,
+.v-table tfoot tr{
+  height: 56px;
+}
+
+/* ——— Adaptar celdas existentes a .pill sin tocar HTML ——— */
+.v-table tbody td,
+.v-table tfoot td,
+.v-table tfoot th:not(.sticky-col){
+  /* envolvemos el contenido en una pill via pseudo-element? mejor con JS, pero podemos usar display grid */
+  display:grid; place-items:center;
+}
+.v-table tbody td > *,
+.v-table tfoot td > *,
+.v-table tfoot th:not(.sticky-col) > *{ pointer-events:none; }
+
+/* ——— GIF en círculo ——— */
+.gif-circle{
+  width: 86px; height: 86px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(22,163,74,.18);
+  box-shadow:
+    0 8px 24px rgba(16,185,129,.18),
+    inset 0 1px 0 rgba(255,255,255,.8);
+  display:flex; align-items:center; justify-content:center;
+}
+.money-gif{
+  width:100%; height:100%;
+  object-fit: cover;                 /* mantiene el círculo aunque el GIF sea rectangular */
+  display:block;
+  filter:none;                       /* ya no necesitamos drop-shadow aquí */
 }

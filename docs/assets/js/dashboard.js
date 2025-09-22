@@ -79,7 +79,6 @@ function renderTable(matrix){
 
   tbody.innerHTML = '';
 
-  // filas en orden
   const rows = [
     ['Staffing', 'staffing'],
     ['Recruiting', 'recruiting']
@@ -100,10 +99,13 @@ function renderTable(matrix){
     tr.querySelector('[data-key="new"]').textContent = newVal;
     tr.querySelector('[data-key="replacement"]').textContent = repVal;
     tr.querySelector('.row-total-val').textContent = rowTotal;
-
-    // tooltips accesibles
-    tr.querySelector('[data-key="new"]').title = `${label} · New`;
-    tr.querySelector('[data-key="replacement"]').title = `${label} · Replacement`;
+// envolver valores en <span class="pill"> sin tocar el HTML base
+['new','replacement'].forEach(k => {
+  const td = tr.querySelector(`[data-key="${k}"]`);
+  td.innerHTML = `<span class="pill">${td.textContent}</span>`;
+});
+const totalCell = tr.querySelector('.row-total-val');
+totalCell.innerHTML = `<span class="pill">${totalCell.textContent}</span>`;
 
     tbody.appendChild(tr);
 
@@ -112,10 +114,17 @@ function renderTable(matrix){
     grand += rowTotal;
   }
 
-  // totales
   document.getElementById('colTotalNew').textContent = colNew;
   document.getElementById('colTotalReplacement').textContent = colRep;
   document.getElementById('grandTotal').textContent = grand;
+  // aplicar pill a totales de columnas del tfoot
+['colTotalNew','colTotalReplacement','grandTotal'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el && !el.querySelector('.pill')) {
+    el.innerHTML = `<span class="pill">${el.textContent}</span>`;
+  }
+});
+
 }
 
 // ===== Render MRR (Solo Staffing) =====
