@@ -936,3 +936,83 @@ function hideSortToast() {
     try { location.replace(fallback); } catch { location.href = fallback; }
   }
 })();
+// ——— Dashboard + Management Metrics (cross-pages) ———
+(() => {
+  // 1) Resolver anclas disponibles en el sidebar
+  const summary = document.getElementById('summaryLink')
+    || document.querySelector('.sidebar a[href*="opportunities-summary"]')
+    || document.querySelector('.sidebar a[href*="summary"]');
+
+  const opportunities = document.getElementById('opportunitiesLink')
+    || document.querySelector('.sidebar a[href*="opportunities.html"]');
+
+  // Equipments puede ser creado dinámicamente en algunas páginas
+  let equipments = document.getElementById('equipmentsLink')
+    || document.querySelector('.sidebar a[href*="equipments.html"]');
+
+  // Punto de inserción preferido
+  const anchor = equipments || summary || opportunities
+    || document.querySelector('.sidebar a, nav a, .menu a'); // último fallback
+
+  if (!anchor) return; // no hay dónde insertar, salimos silenciosamente
+
+  // 2) Base de estilos (hereda del Summary si existe, si no "menu-item")
+  const baseClass = (document.getElementById('summaryLink')?.className) || anchor.className || 'menu-item';
+
+  // 3) Evitar duplicados si ya existen
+  if (!document.getElementById('dashboardLink')) {
+    const a = document.createElement('a');
+    a.id = 'dashboardLink';
+    a.className = baseClass;
+    a.textContent = 'Dashboard';
+    a.href = 'https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    anchor.insertAdjacentElement('afterend', a);
+  }
+
+  if (!document.getElementById('managementMetricsLink')) {
+    const a = document.createElement('a');
+    a.id = 'managementMetricsLink';
+    a.className = baseClass;
+    a.textContent = 'Management Metrics';
+    a.href = 'control-dashboard.html';
+    // lo insertamos debajo de Dashboard si existe; si no, debajo del anchor
+    const dash = document.getElementById('dashboardLink');
+    (dash || anchor).insertAdjacentElement('afterend', a);
+  }
+
+  // 4) Visibilidad por email (opcional, misma lista que usas en otras páginas)
+  const email = (localStorage.getItem('user_email') || '').toLowerCase();
+  const canSee = [
+    'agustin@vintti.com',
+    'bahia@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com',
+    'agostina@vintti.com'
+  ];
+  const dash = document.getElementById('dashboardLink');
+  const mgmt = document.getElementById('managementMetricsLink');
+  if (dash) dash.style.display = canSee.includes(email) ? '' : 'none';
+  if (mgmt) mgmt.style.display = canSee.includes(email) ? '' : 'none';
+
+  // 5) Si el sidebar se monta tarde, observa y reintenta una vez
+  if (!equipments && !summary && !opportunities) {
+    const obs = new MutationObserver((muts, o) => {
+      const again = document.getElementById('summaryLink')
+        || document.querySelector('.sidebar a[href*="opportunities.html"]');
+      if (again) {
+        o.disconnect();
+        // re-ejecuta el bloque rápidamente
+        setTimeout(() => {
+          try { (window.__injectDashMgmtOnce || (() => { window.__injectDashMgmtOnce = true; eval(arguments.callee.src); }))(); }
+          catch { /* no-op */ }
+        }, 0);
+      }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+  document.getElementById('dashboardLink')?.setAttribute('aria-hidden','true');
+document.getElementById('managementMetricsLink')?.setAttribute('aria-hidden','true');
+
+})();
