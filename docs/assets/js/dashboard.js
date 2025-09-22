@@ -100,10 +100,6 @@ function renderTable(matrix){
     tr.querySelector('[data-key="replacement"]').textContent = repVal;
     tr.querySelector('.row-total-val').textContent = rowTotal;
 // envolver valores en <span class="pill"> sin tocar el HTML base
-['new','replacement'].forEach(k => {
-  const td = tr.querySelector(`[data-key="${k}"]`);
-  td.innerHTML = `<span class="pill">${td.textContent}</span>`;
-});
 const totalCell = tr.querySelector('.row-total-val');
 totalCell.innerHTML = `<span class="pill">${totalCell.textContent}</span>`;
 

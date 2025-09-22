@@ -77,45 +77,7 @@ body{
 .muted{ color: var(--muted); font-size:.92rem }
 
 .table-wrap{ padding:16px 20px 22px; overflow:auto; }
-.v-table{ width:100%; border-collapse:separate; border-spacing:0; min-width:680px; }
-/* Encabezado tabla */
-.v-table thead th{
-  padding:14px 16px;
-  font-weight:800;
-  background: var(--thead-bg);
-  border-bottom:1px solid #eaecff;
-  position:sticky; top:0; z-index:1;
-  text-align:center;                /* centrado */
-}
 
-/* Primera columna fija también centrada */
-.v-table th.sticky-col{
-  position:sticky; left:0; z-index:2;
-  background: var(--thead-bg);
-  border-right:1px solid #eaecff;
-  text-align:center;                /* antes estaba a la izquierda */
-}
-
-/* Celdas: todo centrado, sin hover */
-.v-table td, .v-table th.row-head { 
-  padding:14px 16px; 
-  font-weight:600; 
-  text-align:center; 
-}
-
-/* Quitar zebra */
-.v-table tbody tr:nth-child(odd){ background: transparent; }
-
-/* Fila total y columna total, con look más limpio */
-.v-table .total-col{ 
-  background: var(--total-bg);
-  font-weight:800;
-}
-.v-table tfoot .row-total th,
-.v-table tfoot .row-total td{ 
-  border-top:2px solid #dde6ff; 
-  background: linear-gradient(180deg, #fafcff, #f3f7ff);
-}
 
 /* Sin hover en celdas */
 .cell{ border-radius:12px; }
@@ -143,149 +105,185 @@ body{
 .kpi-label{ color:#0b5f2b; font-weight:700; letter-spacing:.2px; margin-bottom:6px;}
 .kpi-value{ font-size:2rem; font-weight:800; color:var(--money-2); }
 .money-visual { position: relative; width: 170px; height: 90px; display:flex; align-items:center; }
-.money-gif { max-height: 80px; width: auto; display:block; filter: drop-shadow(0 8px 18px rgba(16,185,129,.18)); }
-/* ——— Encabezado tabla, más limpio ——— */
-.card-head h2{
-  margin:0;
-  font-size:1.06rem;
-  font-weight:800;
-  letter-spacing:.2px;
-}
-.card-head .muted{
-  margin-left:auto;
-  font-size:.9rem;
-}
-
-/* ——— Tabla “glass cards” ——— */
-.table-wrap{ padding:18px 20px 24px; }
-.v-table{
-  width:100%;
-  border-collapse:separate;
-  border-spacing: 0 10px;            /* separa filas como cards */
-  min-width:680px;
-}
-
-/* Header */
-.v-table thead th{
-  padding:12px 14px;
-  font-weight:800;
-  background: transparent;           /* sin bloque pesado */
-  border:0;
-  text-align:center;
-  color:#2a2f45;
-}
-
-/* Primera columna sticky, con chip */
-.v-table th.sticky-col{
-  position: sticky; left: 0; z-index: 2;
-  background: transparent;
-  border: 0;
-  text-align: left;                  /* texto a la izq. pero lo “chip” da coherencia */
-  padding-left: 8px;
-}
-.v-table .row-head{
-  font-weight:800;
-}
-.v-table .row-head::before{
-  content: attr(data-label);
-}
-.v-table tbody .row-head{
-  display:inline-block;
-  padding:8px 12px;
-  background: #f5f6ff;
-  border:1px solid #e5e8ff;
-  border-radius: 999px;
-  box-shadow: 0 4px 12px rgba(99,102,241,.06) inset;
-}
-
-/* Celdas como pills */
-.v-table tbody td,
-.v-table tfoot th,
-.v-table tfoot td{
-  text-align:center;
-  padding:0;                          /* el padding lo ponemos en .pill */
-  border:0;
-}
-.v-table tbody tr > *:not(.sticky-col){
-  /* crea “cards” por fila: borde suave + sombra */
-  background: transparent;
-}
-
-/* Píldora base */
-.v-table .pill{
-  display:inline-block;
-  min-width: 78px;
-  padding:10px 14px;
-  font-weight:700;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #fff, #f7f9ff);
-  border: 1px solid #e8ebff;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.7),
-    0 6px 16px rgba(15,23,42,.06);
-}
-
-/* Variantes por columna */
-.v-table td[data-key="new"] .pill{
-  background: linear-gradient(180deg, #f9fbff, #f1f5ff);
-  border-color:#e3e8ff;
-}
-.v-table td[data-key="replacement"] .pill{
-  background: linear-gradient(180deg, #f8fffb, #eefcf4);
-  border-color:#dff3e6;
-}
-
-/* Total: acento */
-.v-table .total-col .pill{
-  background: linear-gradient(180deg, #f0f5ff, #e8f1ff);
-  border-color:#d9e7ff;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.8),
-    0 8px 20px rgba(99,102,241,.12);
-}
-
-/* Tfoot total general */
-.v-table tfoot .row-total th.sticky-col{
-  background: transparent;
-}
-.v-table tfoot .row-total .pill{
-  background: linear-gradient(180deg, #f6f9ff, #ecf2ff);
-  border-color:#dbe6ff;
-  font-size:1rem;
-}
-
-/* Ajuste de alto de fila para que se vean como tarjetas separadas */
-.v-table tbody tr,
-.v-table tfoot tr{
-  height: 56px;
-}
-
-/* ——— Adaptar celdas existentes a .pill sin tocar HTML ——— */
-.v-table tbody td,
-.v-table tfoot td,
-.v-table tfoot th:not(.sticky-col){
-  /* envolvemos el contenido en una pill via pseudo-element? mejor con JS, pero podemos usar display grid */
-  display:grid; place-items:center;
-}
-.v-table tbody td > *,
-.v-table tfoot td > *,
-.v-table tfoot th:not(.sticky-col) > *{ pointer-events:none; }
-
-/* ——— GIF en círculo ——— */
 .gif-circle{
-  width: 86px; height: 86px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid rgba(22,163,74,.18);
-  box-shadow:
-    0 8px 24px rgba(16,185,129,.18),
-    inset 0 1px 0 rgba(255,255,255,.8);
+  width: 92px; height: 92px;
+  border-radius: 999px; overflow: hidden; background:#fff;
+  border:1px solid rgba(22,163,74,.18);
+  box-shadow: 0 8px 24px rgba(16,185,129,.18), inset 0 1px 0 rgba(255,255,255,.85);
   display:flex; align-items:center; justify-content:center;
 }
-.money-gif{
-  width:100%; height:100%;
-  object-fit: cover;                 /* mantiene el círculo aunque el GIF sea rectangular */
-  display:block;
-  filter:none;                       /* ya no necesitamos drop-shadow aquí */
+.money-gif{ width:100%; height:100%; object-fit:cover; display:block; }
+/* ===== Crystal Cards table ===== */
+.v-table{
+  width:100%;
+  border-collapse: separate;         /* permite espacio entre filas */
+  border-spacing: 0 10px;            /* filas separadas = look de “card” */
+  font-variant-numeric: tabular-nums;
+}
+
+.v-table thead th{
+  background: var(--thead-bg);
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: inset 0 -1px 0 rgba(99,102,241,.08);
+  position: relative;
+}
+
+/* Columna fija (Model) con leve sombra a la derecha */
+.v-table .sticky-col{
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.68));
+  backdrop-filter: blur(6px);
+  box-shadow: 6px 0 12px -6px rgba(15,23,42,.10); /* separador lateral por sombra */
+}
+
+/* Fila como tarjeta translúcida */
+.v-table tbody tr{
+  background: linear-gradient(180deg, rgba(255,255,255,.66), rgba(255,255,255,.58));
+  border: 1px solid var(--glass-brd);
+  border-radius: 16px;
+  overflow: hidden;                   /* para que el radio recorte */
+  box-shadow: 0 14px 36px rgba(15,23,42,.06);
+}
+.v-table tbody tr:hover{
+  box-shadow: 0 18px 48px rgba(15,23,42,.10);
+}
+
+/* Celdas */
+.v-table tbody th.row-head{
+  text-align: left;
+  font-weight: 800;
+  padding: 14px 14px;
+}
+.v-table tbody td{
+  padding: 14px 12px;
+  text-align: center;                 /* números y textos centrados */
+  background:
+    linear-gradient(to right, rgba(99,102,241,.08), rgba(99,102,241,0)) 0 0/1px 100% no-repeat; /* “separador” por sombra a la izquierda */
+}
+.v-table tbody td:first-of-type{ background: none; } /* evita sombra fantasma */
+
+/* Columna Total más legible pero sutil */
+.v-table .total-col{
+  font-weight: 800;
+}
+
+/* ===== TFOOT → “Total” con jerarquía: más luminoso + doble borde sutil ===== */
+.v-table tfoot .row-total{
+  background: linear-gradient(180deg, rgba(246,249,255,.9), rgba(245,248,255,.9));
+  border: 1px solid rgba(99,102,241,.16);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 0 0 1px rgba(99,102,241,.10),  /* primera línea */
+    inset 0 0 0 2px rgba(124,58,237,.06),  /* “doble borde” apenas visible */
+    0 18px 48px rgba(15,23,42,.08);
+}
+.v-table tfoot th,
+.v-table tfoot td{
+  padding: 14px 12px;
+  text-align: center;
+}
+.v-table tfoot th.sticky-col{
+  background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.75));
+  box-shadow: 6px 0 12px -6px rgba(15,23,42,.10);
+}
+
+/* Ajustes de columnas (opcionales, discretos) */
+.col-model{ width: 34%; }
+.col-new, .col-repl{ width: 22%; }
+.col-total{ width: 22%; }
+
+/* ===== M O B I L E  (fila → card apilada) ===== */
+@media (max-width: 720px){
+  .v-table thead{ display:none; }
+
+  .v-table, .v-table tbody, .v-table tr, .v-table th, .v-table td{ display:block; width:100%; }
+
+  .v-table tbody tr{
+    padding: 10px 12px;               /* card padding */
+    border-radius: 18px;
+  }
+
+  /* Título de la fila (Model) arriba como encabezado del card */
+  .v-table tbody th.row-head{
+    padding: 6px 2px 10px;
+    font-size: 1rem;
+  }
+
+  /* Cada métrica en su “línea”, con etiqueta encima */
+  .v-table tbody td{
+    position: relative;
+    padding: 10px 2px 14px;
+    margin-top: 6px;
+    background: none;                  /* sin sombra de columna en mobile */
+    text-align: left;                  /* número alineado con su etiqueta */
+    font-weight: 700;
+  }
+  .v-table tbody td::before{
+    content: attr(data-label);         /* etiqueta “New / Replacement / Total” */
+    display:block;
+    font-size: .82rem;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  /* Total dentro del card con leve realce */
+  .v-table tbody td.total-col{
+    border-top: 1px dashed rgba(99,102,241,.18);
+    padding-top: 12px;
+    margin-top: 10px;
+    font-weight: 800;
+  }
+
+  /* TFOOT estilizado como card independiente */
+  .v-table tfoot .row-total{
+    padding: 10px 12px;
+  }
+}
+/* Centrar los títulos de fila: Staffing / Recruiting */
+.v-table tbody th.row-head{
+  text-align: center;
+}
+
+/* (opcional) si también quieres centrar el "Total" del tfoot */
+.v-table tfoot th.sticky-col{
+  text-align: center;
+}
+.title-with-info{ display:flex; align-items:center; gap:8px; margin:0; }
+.card-head--center{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+.card-head--center h2{ margin:0; text-align:center; font-weight:600; letter-spacing:.2px; }
+
+/* — título con degradé azul, sin subrayado — */
+.h2--bluegrad{
+  --title-grad: linear-gradient(90deg,#0b1f44 0%, #3347d8 45%, #3aa0ff 100%);
+  background: var(--title-grad);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter: saturate(.95) brightness(.98);
+}
+
+/* ícono info más discreto */
+.title-with-info{ display:inline-flex; align-items:center; gap:8px; }
+.info-ghost{
+  border:none; background:transparent; padding:0 6px; line-height:1;
+  color:#5b6aa6; font-weight:700; border-radius:999px; cursor:help;
+  box-shadow: inset 0 0 0 1px rgba(99,102,241,.18);
+  opacity:.7; transition: opacity .15s, box-shadow .15s;
+}
+.info-ghost:hover{ opacity:1; box-shadow: inset 0 0 0 1px rgba(99,102,241,.28); }
+
+/* (opcional) animación muy sutil del degradé; quítala si no la quieres */
+@media (prefers-reduced-motion: no-preference){
+  .h2--bluegrad{
+    background-size: 180% 100%;
+    animation: gradSlide 12s ease-in-out infinite alternate;
+  }
+  @keyframes gradSlide{
+    from{ background-position: 0% 50%; }
+    to  { background-position: 100% 50%; }
+  }
 }

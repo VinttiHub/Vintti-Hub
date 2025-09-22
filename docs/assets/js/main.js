@@ -1554,6 +1554,48 @@ async function patchOppFields(oppId, payload) {
   // Mostrar solo para emails permitidos
   eq.style.display = equipmentsAllowed.includes(currentUserEmail) ? '' : 'none';
 })();
+// --- Dashboard + Management Metrics (después de Equipments) ---
+(() => {
+  // Referencias en el sidebar
+  const summary = document.getElementById('summaryLink');               // 📊 Opportunities Summary
+  const opps    = document.getElementById('opportunitiesLink')          // (si existiera con id)
+                || document.querySelector('.sidebar a[href*="opportunities.html"]');
+
+  // Asegúrate de tener/crear el equipmentsLink primero (ya lo haces arriba)
+  let eq = document.getElementById('equipmentsLink');
+
+  // Punto de inserción: preferimos después de Equipments; si no existe, después de Summary; si no, después de Opportunities.
+  const anchor = eq || summary || opps;
+  if (!anchor) return; // no hay menú destino
+
+  // Plantilla para crear enlaces con mismo estilo que el Summary
+  const baseClass = (summary && summary.className) || 'menu-item';
+
+  // 1) Dashboard (abre en nueva pestaña)
+  let dash = document.getElementById('dashboardLink');
+  if (!dash) {
+    dash = document.createElement('a');
+    dash.id = 'dashboardLink';
+    dash.className = baseClass;
+    dash.textContent = 'Dashboard';
+    dash.href = 'https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue';
+    dash.target = '_blank';
+    dash.rel = 'noopener'; // por seguridad
+    anchor.insertAdjacentElement('afterend', dash);
+  }
+
+  // 2) Management Metrics (misma pestaña)
+  let mgmt = document.getElementById('managementMetricsLink');
+  if (!mgmt) {
+    mgmt = document.createElement('a');
+    mgmt.id = 'managementMetricsLink';
+    mgmt.className = baseClass;
+    mgmt.textContent = 'Management Metrics';
+    mgmt.href = 'control-dashboard.html';
+    dash.insertAdjacentElement('afterend', mgmt);
+  }
+})();
+
 window.addEventListener('pageshow', () => {
   const tableCard = document.querySelector('.table-card');
   if (!tableCard) return;                 // ⬅️ evita el error en index

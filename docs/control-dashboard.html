@@ -20,32 +20,44 @@
     <main class="content">
       <!-- ====== CARD: Opportunities by model & type ====== -->
       <section class="card glass" id="oppsCard">
-        <div class="card-head">
-          <h2>Opportunities (Pipeline)</h2>
-          <div class="muted">Excludes: Deep Dive, NDA Sent, Close Win, Close Lost</div>
+      <div class="card-head card-head--center">
+        <h2 class="h2--centergrad title-with-info">
+          Opportunities — Pipeline
+          <button class="info-ghost" aria-label="Excluded stages"
+                  data-tip="Deep Dive, NDA Sent, Close Won/Lost">i</button>
+        </h2>
         </div>
 
-        <div class="table-wrap">
-          <table class="v-table" id="oppsTable" aria-describedby="Opportunities by model and type">
-            <thead>
-              <tr>
-                <th class="sticky-col">Model - Type</th>
-                <th>New</th>
-                <th>Replacement</th>
-                <th class="total-col">Total</th>
-              </tr>
-            </thead>
-            <tbody id="oppsTbody"></tbody>
-            <tfoot>
-              <tr class="row-total">
-                <th class="sticky-col">Total</th>
-                <th id="colTotalNew">0</th>
-                <th id="colTotalReplacement">0</th>
-                <th id="grandTotal" class="total-col">0</th>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+      <div class="table-wrap">
+        <table class="v-table" id="oppsTable" aria-describedby="Opportunities by model and type">
+          <colgroup>
+            <col class="col-model">
+            <col class="col-new">
+            <col class="col-repl">
+            <col class="col-total">
+          </colgroup>
+
+          <thead>
+            <tr>
+              <th class="sticky-col">Model</th>
+              <th>New</th>
+              <th>Replacement</th>
+              <th class="total-col">Total</th>
+            </tr>
+          </thead>
+
+          <tbody id="oppsTbody"></tbody>
+
+          <tfoot>
+            <tr class="row-total">
+              <th class="sticky-col">Total</th>
+              <th id="colTotalNew">0</th>
+              <th id="colTotalReplacement">0</th>
+              <th id="grandTotal" class="total-col">0</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
       </section>
 
       <!-- ====== CARD: MRR (Staffing only) ====== -->
