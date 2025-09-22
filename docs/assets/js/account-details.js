@@ -323,7 +323,7 @@ function fillEmployeesTables(candidates) {
           </a>
         </td>
         <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${fmtISODate(candidate.end_date)}</td>
+        <td>${formatAnyDate(candidate.end_date)}</td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>$${candidate.employee_fee ?? '—'}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -640,7 +640,7 @@ function fillEmployeesTables(candidates) {
           </a>
         </td>
         <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${candidate.end_date ? new Date(candidate.end_date).toLocaleDateString('en-US') : '—'}</td>
+        <td>${formatAnyDate(candidate.end_date)}</td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -1168,12 +1168,29 @@ function renderStatusChip(status) {
   const label = cls.charAt(0).toUpperCase() + cls.slice(1);
   return `<span class="status-chip ${cls}">${label}</span>`;
 }
-function isRealISODate(v) {
-  if (!v) return false;
+// Acepta: "YYYY-MM-DD", "YYYY-MM-DDTHH:mm:ss", timestamps numéricos, etc.
+function formatAnyDate(v, locale='en-US') {
+  if (v == null) return '—';
   const s = String(v).trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
-function fmtISODate(v) {
-  // devuelve vacío si no hay fecha real
-  return isRealISODate(v) ? new Date(v).toLocaleDateString('en-US') : '';
+  if (!s || /^(-{2,}|null|undefined)$/i.test(s)) return '—';
+
+  // Caso común: "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm:ss"
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})?)?$/);
+  if (m) {
+    const [, y, mo, d] = m;
+    // Construimos la fecha en hora local para evitar “off-by-one” por zona horaria
+    const dt = new Date(Number(y), Number(mo) - 1, Number(d));
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(locale);
+  }
+
+  // Timestamp numérico (ms o s)
+  if (/^\d+$/.test(s)) {
+    const n = Number(s);
+    const dt = new Date(n > 1e12 ? n : n * 1000);
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(locale);
+  }
+
+  // Fallback: que lo intente el parser nativo
+  const dt = new Date(s);
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(locale);
 }
