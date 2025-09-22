@@ -4,7 +4,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "pilar@vintti.com": "Pilar",
     "agostina@vintti.com": "Agostina",
     "jazmin@vintti.com": "Jazmín",
-    "agustina.barbero@vintti.com": "Agustina"
+    "agustina.barbero@vintti.com": "Agustina Barbero",
+    "agustina.ferrari@vintti.com": "Agustina Ferrari"
   };
 // --- Construir tbody dinámicamente desde `emails`
 const tbody = document.querySelector('#summaryTable tbody');
