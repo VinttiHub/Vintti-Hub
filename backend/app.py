@@ -4192,8 +4192,7 @@ def ts_history():
                 h.end_date::date
               FROM hire_opportunity h
               JOIN opportunity o ON o.opportunity_id = h.opportunity_id
-              WHERE lower(o.opp_model) LIKE 'staffing%%'
-                AND lower(o.opp_stage) LIKE '%%win%%'    -- solo Close Win
+            WHERE lower(o.opp_model) LIKE 'staffing%%'
                 AND h.start_date IS NOT NULL
             )
             SELECT
