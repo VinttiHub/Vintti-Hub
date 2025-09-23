@@ -389,7 +389,7 @@ def get_accounts():
                     trr += (revenue or 0)
                 elif model == 'Staffing':
                     tsf += (fee or 0)
-                    tsr += (salary or 0)
+                    tsr += ((salary or 0) + (fee or 0))  # TSR = salary + fee
 
 
             # Guardar los valores en la tabla account
@@ -814,19 +814,22 @@ def get_account_by_id(account_id):
         cursor = conn.cursor()
         cursor.execute("""
             WITH h_active AS (
-              SELECT DISTINCT ON (opportunity_id, candidate_id)
-                     opportunity_id, candidate_id, salary, fee, revenue, start_date
-              FROM hire_opportunity
-              WHERE end_date IS NULL
-              ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
+            SELECT DISTINCT ON (opportunity_id, candidate_id)
+                    opportunity_id, candidate_id, salary, fee, revenue, start_date
+            FROM hire_opportunity
+            WHERE end_date IS NULL          -- activos
+            ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
             )
             SELECT
-              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue, 0) END), 0) AS trr,
-              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,     0) END), 0) AS tsf,
-              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary,  0) END), 0) AS tsr
+            COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting'
+                                THEN COALESCE(h.revenue,0) END), 0) AS trr,
+            COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'
+                                THEN COALESCE(h.fee,0) END), 0)     AS tsf,
+            COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'
+                                THEN COALESCE(h.salary,0)+COALESCE(h.fee,0) END), 0) AS tsr
             FROM opportunity o
             LEFT JOIN h_active h ON h.opportunity_id = o.opportunity_id
-            WHERE o.account_id = %s
+            WHERE o.account_id = %s;
         """, (account_id,))
         trr, tsf, tsr = cursor.fetchone() or (0,0,0)
 
@@ -4152,7 +4155,7 @@ def ts_history():
 
         # Resuelve límites por defecto
         # from_default: primer start_date registrado
-        cur.execute("SELECT date_trunc('month', MIN(start_date))::date FROM hire_opportunity WHERE start_date IS NOT NULL")
+        cur.execute("SELECT date_trunc('month', MIN(start_date::timestamp))::date FROM hire_opportunity WHERE start_date IS NOT NULL;")
         min_month = cur.fetchone()[0]
 
         # to_default: último mes completo

@@ -284,5 +284,9 @@ async function loadDashboard(){
 
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
-  document.getElementById('refreshBtn')?.addEventListener('click', loadDashboard);
+  loadTSHistorySection(); // ← ¡esta faltaba!
+  document.getElementById('refreshBtn')?.addEventListener('click', () => {
+    loadDashboard();
+    loadTSHistorySection(); // opcional: refrescar también el histórico
+  });
 });
