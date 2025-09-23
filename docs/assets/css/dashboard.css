@@ -287,3 +287,7 @@ body{
     to  { background-position: 100% 50%; }
   }
 }
+#tsHistoryCard .chart-wrap{ padding: 12px 8px 0; }
+#tsHistoryChart { width: 100%; height: auto; display: block; color: var(--ink); }
+.v-table.compact td, .v-table.compact th { padding: 8px 10px; }
+.v-table .num { text-align: right; font-variant-numeric: tabular-nums; }

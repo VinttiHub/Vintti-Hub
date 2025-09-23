@@ -85,6 +85,32 @@
           </div>
         </div>
       </section>
+      <!-- ====== CARD: TSR/TSF History (Staffing) ====== -->
+      <section class="card glass" id="tsHistoryCard">
+        <div class="card-head card-head--center">
+          <h2 class="h2--centergrad">TSR/TSF History · Staffing (Close Win)</h2>
+          <div class="muted">Cada punto = corte al fin de mes con hires activos (start ≤ fin_de_mes &amp; (end NULL o &gt; fin_de_mes)).</div>
+        </div>
+
+        <div id="tsHistoryWrap" class="chart-wrap">
+          <svg id="tsHistoryChart" viewBox="0 0 640 180" role="img" aria-label="TSR vs TSF over time"></svg>
+        </div>
+
+        <div class="table-wrap">
+          <table class="v-table compact">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>TSR (salary)</th>
+                <th>TSF (fee)</th>
+                <th>Active Hires</th>
+              </tr>
+            </thead>
+            <tbody id="tsHistoryTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
     </main>
   </div>
 

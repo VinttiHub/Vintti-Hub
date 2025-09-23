@@ -4130,6 +4130,105 @@ def update_batch(batch_id):
         return jsonify(dict(zip(cols, row)))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/metrics/ts_history', methods=['GET'])
+def ts_history():
+    """
+    Serie mensual de TSR (salary) y TSF (fee) para Staffing (Close Win),
+    contando SOLO hires activos al final de cada mes.
+    Params opcionales:
+      - from: 'YYYY-MM'  (inclusive, mes calendario)
+      - to:   'YYYY-MM'  (inclusive, mes calendario; por defecto último mes completo)
+    Respuesta: [{ month: 'YYYY-MM', tsr: 0, tsf: 0, active_count: 0 }]
+    """
+    try:
+        import datetime as _dt
+        from flask import request, jsonify
+
+        qs_from = (request.args.get('from') or '').strip()
+        qs_to   = (request.args.get('to') or '').strip()
+
+        conn = get_connection()
+        cur = conn.cursor()
+
+        # Resuelve límites por defecto
+        # from_default: primer start_date registrado
+        cur.execute("SELECT date_trunc('month', MIN(start_date))::date FROM hire_opportunity WHERE start_date IS NOT NULL")
+        min_month = cur.fetchone()[0]
+
+        # to_default: último mes completo
+        today = _dt.date.today().replace(day=1)  # primer día mes actual
+        last_full_month = (today - _dt.timedelta(days=1)).replace(day=1)  # 1er día del último mes completo
+
+        # Normaliza params a YYYY-MM-01
+        def _ym_to_date(s):
+            if not s: return None
+            y, m = s.split('-')[:2]
+            return _dt.date(int(y), int(m), 1)
+
+        from_month = _ym_to_date(qs_from) or (min_month or last_full_month)
+        to_month   = _ym_to_date(qs_to)   or last_full_month
+
+        # Evita rangos vacíos
+        if to_month < from_month:
+            cur.close(); conn.close()
+            return jsonify([])
+
+        cur.execute("""
+            WITH params AS (
+              SELECT %s::date AS from_month, %s::date AS to_month
+            ),
+            months AS (
+              SELECT date_trunc('month', gs)::date AS month
+              FROM params p,
+                   generate_series(p.from_month, p.to_month, interval '1 month') gs
+            ),
+            staffing_wins AS (
+              SELECT
+                h.candidate_id,
+                h.opportunity_id,
+                COALESCE(h.salary, 0)::numeric AS salary,
+                COALESCE(h.fee, 0)::numeric    AS fee,
+                h.start_date::date,
+                h.end_date::date
+              FROM hire_opportunity h
+              JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+              WHERE lower(o.opp_model) LIKE 'staffing%%'
+                AND lower(o.opp_stage) LIKE '%%win%%'    -- solo Close Win
+                AND h.start_date IS NOT NULL
+            )
+            SELECT
+              to_char(m.month, 'YYYY-MM') AS month,
+              COALESCE(SUM(CASE
+                WHEN s.start_date <= (m.month + INTERVAL '1 month' - INTERVAL '1 day')::date
+                 AND (s.end_date IS NULL OR s.end_date > (m.month + INTERVAL '1 month' - INTERVAL '1 day')::date)
+                THEN s.salary END), 0)::bigint AS tsr,
+              COALESCE(SUM(CASE
+                WHEN s.start_date <= (m.month + INTERVAL '1 month' - INTERVAL '1 day')::date
+                 AND (s.end_date IS NULL OR s.end_date > (m.month + INTERVAL '1 month' - INTERVAL '1 day')::date)
+                THEN s.fee END), 0)::bigint AS tsf,
+              COALESCE(COUNT(*) FILTER (WHERE
+                s.start_date <= (m.month + INTERVAL '1 month' - INTERVAL '1 day')::date
+                AND (s.end_date IS NULL OR s.end_date > (m.month + INTERVAL '1 month' - INTERVAL '1 day')::date)
+              ), 0) AS active_count
+            FROM months m
+            LEFT JOIN staffing_wins s ON TRUE
+            GROUP BY m.month
+            ORDER BY m.month;
+        """, (from_month, to_month))
+
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+
+        out = [
+            {"month": r[0], "tsr": int(r[1]), "tsf": int(r[2]), "active_count": int(r[3])}
+            for r in rows
+        ]
+        return jsonify(out)
+
+    except Exception as e:
+        import traceback, logging
+        logging.error("❌ ts_history failed: %s\n%s", e, traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':

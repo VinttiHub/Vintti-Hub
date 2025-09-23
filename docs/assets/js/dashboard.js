@@ -1,5 +1,127 @@
 // ===== Helpers =====
 const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+// ======= TSR/TSF History (Staffing) =======
+async function fetchTSHistory({ fromYM = null, toYM = null } = {}) {
+  const params = new URLSearchParams();
+  if (fromYM) params.set('from', fromYM);
+  if (toYM) params.set('to', toYM);
+
+  // Por defecto: últimos 12 meses completos (hasta último mes completo)
+  if (!fromYM || !toYM) {
+    const today = new Date();
+    const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastFullMonth = new Date(firstOfThisMonth - 1); // último día del mes pasado
+    const toY = lastFullMonth.getFullYear();
+    const toM = String(lastFullMonth.getMonth() + 1).padStart(2, '0');
+    const toDefault = `${toY}-${toM}`;
+
+    const fromAnchor = new Date(lastFullMonth);
+    fromAnchor.setMonth(fromAnchor.getMonth() - 11); // 12 meses
+    const fromY = fromAnchor.getFullYear();
+    const fromM = String(fromAnchor.getMonth() + 1).padStart(2, '0');
+    const fromDefault = `${fromY}-${fromM}`;
+
+    if (!fromYM) params.set('from', fromDefault);
+    if (!toYM) params.set('to', toDefault);
+  }
+
+  const url = `${API}/metrics/ts_history?${params.toString()}`;
+  const r = await fetch(url, { credentials: 'include' });
+  const arr = await r.json();
+  return Array.isArray(arr) ? arr : [];
+}
+
+function renderTSHistory(data){
+  const wrap = document.getElementById('tsHistoryWrap');
+  const tbl  = document.getElementById('tsHistoryTableBody');
+  if (!wrap || !tbl) return;
+
+  // -------- Tabla --------
+  tbl.innerHTML = '';
+  for (const it of data){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${it.month}</td>
+      <td class="num">$${Number(it.tsr || 0).toLocaleString('en-US')}</td>
+      <td class="num">$${Number(it.tsf || 0).toLocaleString('en-US')}</td>
+      <td class="num">${it.active_count || 0}</td>
+    `;
+    tbl.appendChild(tr);
+  }
+
+  // -------- Mini chart (SVG doble línea TSR/TSF) --------
+  const svg = document.getElementById('tsHistoryChart');
+  if (!svg) return;
+  // limpia
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const W = svg.viewBox.baseVal.width || 640;
+  const H = svg.viewBox.baseVal.height || 180;
+  const PAD = 24;
+
+  const xs = data.map((_, i) => i);
+  const tsr = data.map(d => Number(d.tsr || 0));
+  const tsf = data.map(d => Number(d.tsf || 0));
+  const maxY = Math.max(1, ...tsr, ...tsf);
+
+  const x = i => PAD + (i * (W - 2*PAD)) / Math.max(1, data.length - 1);
+  const y = v => H - PAD - (v * (H - 2*PAD)) / maxY;
+
+  function makePath(values){
+    return values.map((v,i) => `${i ? 'L' : 'M'} ${x(i)} ${y(v)}`).join(' ');
+  }
+
+  // grid horizontal (3 líneas)
+  for (let g=0; g<=3; g++){
+    const gy = PAD + g * (H - 2*PAD) / 3;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', PAD); line.setAttribute('x2', W-PAD);
+    line.setAttribute('y1', gy);  line.setAttribute('y2', gy);
+    line.setAttribute('stroke', 'rgba(0,0,0,.08)');
+    line.setAttribute('stroke-width', '1');
+    svg.appendChild(line);
+  }
+
+  // TSR line
+  const p1 = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p1.setAttribute('d', makePath(tsr));
+  p1.setAttribute('fill', 'none');
+  p1.setAttribute('stroke-width', '2.5');
+  p1.setAttribute('stroke', 'currentColor'); // usa color actual del texto
+  svg.appendChild(p1);
+
+  // TSF line (misma técnica, distinto grupo con opacidad)
+  const p2 = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p2.setAttribute('d', makePath(tsf));
+  p2.setAttribute('fill', 'none');
+  p2.setAttribute('stroke-width', '2.5');
+  p2.setAttribute('stroke', 'currentColor');
+  p2.setAttribute('opacity', '0.55');
+  svg.appendChild(p2);
+
+  // labels extremos (mes inicial y final)
+  const mkText = (txt, px, py, anchor='middle') => {
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x', px); t.setAttribute('y', py);
+    t.setAttribute('font-size', '10');
+    t.setAttribute('text-anchor', anchor);
+    t.textContent = txt;
+    return t;
+  };
+  if (data.length){
+    svg.appendChild(mkText(data[0].month, x(0), H-6));
+    svg.appendChild(mkText(data[data.length-1].month, x(data.length-1), H-6));
+  }
+}
+
+async function loadTSHistorySection(){
+  try {
+    const data = await fetchTSHistory(); // últimos 12 meses completos
+    renderTSHistory(data);
+  } catch (e){
+    console.warn('TS history error:', e);
+  }
+}
 
 function norm(s){ return String(s || '').toLowerCase().trim(); }
 
