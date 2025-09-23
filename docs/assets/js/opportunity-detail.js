@@ -1868,44 +1868,11 @@ if (publish) payload.career_published = true;
 document.getElementById('saveDraftCareerBtn').addEventListener('click', () => saveCareerPayload(false));
 
 document.getElementById('publishCareerBtn').addEventListener('click', () => publishCareerNow());
-function htmlToPlainWithNewlines(html) {
-  if (!html) return '';
-  let s = String(html);
-
-  // <br> → \n
-  s = s.replace(/<\s*br\s*\/?>/gi, '\n');
-
-  // Bloques que implican salto
-  const blocks = ['p','section','article','header','footer','aside','h1','h2','h3','h4','h5','h6','table','tr','ul','ol','li','div'];
-  blocks.forEach(tag => {
-    const reOpen  = new RegExp(`<\\s*${tag}[^>]*>`, 'gi');
-    const reClose = new RegExp(`<\\/\\s*${tag}\\s*>`, 'gi');
-    s = s.replace(reOpen, '\n').replace(reClose, '\n');
-  });
-
-  // Listas
-  s = s.replace(/<\s*li[^>]*>\s*/gi, '\n• ').replace(/<\s*\/\s*li\s*>/gi, '');
-
-  // Quitar etiquetas restantes
-  s = s.replace(/<[^>]+>/g, '');
-
-  // Decodificar entidades
-  const tmp = document.createElement('textarea');
-  tmp.innerHTML = s;
-  s = tmp.value;
-
-  // Normalizaciones
-  s = s
-    .replace(/\u00A0/g, ' ')     // &nbsp; → espacio normal
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')  // espacios antes del salto
-    .replace(/\n{3,}/g, '\n\n'); // máximo 2 saltos seguidos
-
-  // ❗️ NO quites el salto inicial: solo recorta al final
-  s = s.replace(/[ \t]+$/gm, '').replace(/\s+$/,'');
-  return s;
+function toCSV(v){
+  if (!v) return '';
+  if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean).join(', ');
+  return String(v).trim();
 }
-
 
 async function publishCareerNow() {
   const oppId = getOpportunityId();
@@ -1918,34 +1885,38 @@ async function publishCareerNow() {
   const addiHTML = getRichEditor('career-additional')?.innerHTML
                 ?? document.getElementById('career-additional').value ?? '';
 
-  // 🔹 limpiamos para Webflow (sin <span>, sin styles)
   const descHTML_CLEAN = cleanHtmlForWebflow(descHTML);
   const reqsHTML_CLEAN = cleanHtmlForWebflow(reqsHTML);
   const addiHTML_CLEAN = cleanHtmlForWebflow(addiHTML);
 
-  const finalTools = (window.toolsChoices ? window.toolsChoices.getValue(true) : []).filter(Boolean);
+  // 👉 recoge arrays desde Choices (o fallback)
+  const countriesArr = window.countryChoices ? window.countryChoices.getValue(true)
+                     : toArray(document.getElementById('career-country')?.value);
+  const oneCountry   = countriesArr.length === 1 && !countriesArr.includes('Latin America');
 
-const countries = window.countryChoices ? window.countryChoices.getValue(true) : toArray(document.getElementById('career-country')?.value);
-const oneCountry = countries.length === 1 && !countries.includes('Latin America');
+  const toolsArr = window.toolsChoices ? window.toolsChoices.getValue(true) : [];
 
-const payload = {
-  publish_mode: 'sheet_only',
-  career_job_id: document.getElementById('career-jobid').value || oppId,
-  career_job: document.getElementById('career-job').value || '',
-  career_country: countries,                                      // ← array
-  career_city: oneCountry ? (document.getElementById('career-city').value || '') : 'Any Country',
-  career_job_type: document.getElementById('career-jobtype').value || '',
-  career_seniority: document.getElementById('career-seniority').value || '',
-  career_years_experience: document.getElementById('career-years').value || '',
-  career_experience_level: document.getElementById('career-exp-level').value || '',
-  career_field: document.getElementById('career-field').value || '',
-  career_modality: document.getElementById('career-modality').value || '',
-  career_tools: finalTools,
-  sheet_description_html: descHTML_CLEAN,
-  sheet_requirements_html: reqsHTML_CLEAN,
-  sheet_additional_html: addiHTML_CLEAN
-};
+  // 👉 convierte SOLO para publicar
+  const countriesCSV = toCSV(countriesArr);
+  const toolsCSV     = toCSV(toolsArr);
 
+  const payload = {
+    publish_mode: 'sheet_only',
+    career_job_id: document.getElementById('career-jobid').value || oppId,
+    career_job: document.getElementById('career-job').value || '',
+    career_country: countriesCSV,                                   // ✅ CSV
+    career_city: oneCountry ? (document.getElementById('career-city').value || '') : 'Any Country',
+    career_job_type: document.getElementById('career-jobtype').value || '',
+    career_seniority: document.getElementById('career-seniority').value || '',
+    career_years_experience: document.getElementById('career-years').value || '',
+    career_experience_level: document.getElementById('career-exp-level').value || '',
+    career_field: document.getElementById('career-field').value || '',
+    career_modality: document.getElementById('career-modality').value || '',
+    career_tools: toolsCSV,                                         // ✅ CSV
+    sheet_description_html: descHTML_CLEAN,
+    sheet_requirements_html: reqsHTML_CLEAN,
+    sheet_additional_html: addiHTML_CLEAN
+  };
 
   const btn = document.getElementById('publishCareerBtn');
   btn.disabled = true;
@@ -1973,6 +1944,7 @@ const payload = {
     btn.textContent = 'Publish';
   }
 }
+
 
 
 
