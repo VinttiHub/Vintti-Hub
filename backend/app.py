@@ -264,62 +264,57 @@ def get_candidates_light():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/data/light')
-def get_accounts_light():
+@app.route('/data/light', methods=['GET'])
+def data_light():
+    """
+    Devuelve un resumen ligero por cuenta:
+      - trr: Recruiting revenue (solo hires activos)
+      - tsf: Staffing fee       (solo hires activos)
+      - tsr: Staffing salary    (solo hires activos)
+
+    Nota: 'activo' = hire_opportunity.end_date IS NULL
+    (no dependemos del campo 'status' por seguridad).
+    """
     try:
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
+        cur = conn.cursor()
+
+        cur.execute("""
+            WITH h_active AS (
+              SELECT DISTINCT ON (opportunity_id, candidate_id)
+                     opportunity_id,
+                     candidate_id,
+                     salary,
+                     fee,
+                     revenue,
+                     start_date
+              FROM hire_opportunity
+              WHERE end_date IS NULL           -- 👈 solo activos
+              ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
+            )
             SELECT
-                a.account_id,
-                a.client_name,
-                COALESCE(u.user_name, a.account_manager) AS account_manager_name,
-                a.priority,
-
-                -- 🔵 contract (sin contar hires): basado SOLO en modelos de oportunidades
-                CASE
-                WHEN MAX(CASE WHEN o.opp_model = 'Staffing'   THEN 1 ELSE 0 END) = 1
-                AND MAX(CASE WHEN o.opp_model = 'Recruiting' THEN 1 ELSE 0 END) = 1
-                    THEN 'Mix'
-                WHEN MAX(CASE WHEN o.opp_model = 'Staffing'   THEN 1 ELSE 0 END) = 1
-                    THEN 'Staffing'
-                WHEN MAX(CASE WHEN o.opp_model = 'Recruiting' THEN 1 ELSE 0 END) = 1
-                    THEN 'Recruiting'
-                ELSE NULL
-                END AS contract,
-
-                -- 🔶 TRR/TSF/TSR ahora desde hire_opportunity (agregada por opp para evitar duplicados)
-                COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(h.revenue, 0) ELSE 0 END), 0) AS trr,
-                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.fee,     0) ELSE 0 END), 0) AS tsf,
-                COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.salary,  0) ELSE 0 END), 0) AS tsr
-
+              a.account_id,
+              a.client_name,
+              -- Recruiting (TRR)
+              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
+              -- Staffing (TSF / TSR)
+              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
+              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary, 0) END), 0) AS tsr
             FROM account a
-            LEFT JOIN users u ON a.account_manager = u.email_vintti
             LEFT JOIN opportunity o ON o.account_id = a.account_id
-            LEFT JOIN (
-                SELECT
-                    opportunity_id,
-                    -- solo activas (end_date NULL)
-                    MAX(CASE WHEN end_date IS NULL THEN salary  END) AS salary,
-                    MAX(CASE WHEN end_date IS NULL THEN fee     END) AS fee,
-                    MAX(CASE WHEN end_date IS NULL THEN revenue END) AS revenue
-                FROM hire_opportunity
-                GROUP BY opportunity_id
-            ) h ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name, u.user_name, a.account_manager, a.priority
-            ORDER BY a.client_name ASC
+            LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
+            GROUP BY a.account_id, a.client_name
+            ORDER BY LOWER(a.client_name) ASC;
         """)
 
+        rows = cur.fetchall()
+        cols = [c[0] for c in cur.description]
+        data = [dict(zip(cols, r)) for r in rows]
 
-
-        rows = cursor.fetchall()
-        colnames = [desc[0] for desc in cursor.description]
-        accounts = [dict(zip(colnames, row)) for row in rows]
-
-        cursor.close()
-        conn.close()
-        return jsonify(accounts)
+        cur.close(); conn.close()
+        return jsonify(data)
     except Exception as e:
+        import traceback; print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
     
 @app.route('/opportunities/light')
@@ -817,32 +812,25 @@ def get_account_by_id(account_id):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
-        # 1) Calcular TRR/TSF/TSR para ESTA cuenta (solo hires), en una sola query
         cursor.execute("""
-                SELECT
-                    COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(h.revenue, 0) ELSE 0 END), 0) AS trr,
-                    COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.fee,     0) ELSE 0 END), 0) AS tsf,
-                    COALESCE(SUM(CASE WHEN o.opp_model = 'Staffing'   THEN COALESCE(h.salary,  0) ELSE 0 END), 0) AS tsr
-                FROM opportunity o
-                LEFT JOIN (
-                    SELECT
-                        opportunity_id,
-                        MAX(CASE WHEN end_date IS NULL THEN salary  END) AS salary,
-                        MAX(CASE WHEN end_date IS NULL THEN fee     END) AS fee,
-                        MAX(CASE WHEN end_date IS NULL THEN revenue END) AS revenue
-                    FROM hire_opportunity
-                    GROUP BY opportunity_id
-                ) h ON h.opportunity_id = o.opportunity_id
-                WHERE o.account_id = %s
+            WITH h_active AS (
+              SELECT DISTINCT ON (opportunity_id, candidate_id)
+                     opportunity_id, candidate_id, salary, fee, revenue, start_date
+              FROM hire_opportunity
+              WHERE end_date IS NULL
+              ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
+            )
+            SELECT
+              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue, 0) END), 0) AS trr,
+              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,     0) END), 0) AS tsf,
+              COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary,  0) END), 0) AS tsr
+            FROM opportunity o
+            LEFT JOIN h_active h ON h.opportunity_id = o.opportunity_id
+            WHERE o.account_id = %s
         """, (account_id,))
+        trr, tsf, tsr = cursor.fetchone() or (0,0,0)
 
-        sums = cursor.fetchone()
-        trr = sums[0] or 0
-        tsf = sums[1] or 0
-        tsr = sums[2] or 0
-
-        # 2) Persistir en la tabla account
+        # persiste si querés mantener cacheado en 'account'
         cursor.execute("""
             UPDATE account
             SET trr = %s, tsf = %s, tsr = %s
@@ -850,20 +838,15 @@ def get_account_by_id(account_id):
         """, (trr, tsf, tsr, account_id))
         conn.commit()
 
-        # 3) Devolver la cuenta (ya con los valores actualizados)
         cursor.execute("SELECT * FROM account WHERE account_id = %s", (account_id,))
         row = cursor.fetchone()
         if not row:
-            cursor.close()
-            conn.close()
+            cursor.close(); conn.close()
             return jsonify({"error": "Account not found"}), 404
 
-        colnames = [desc[0] for desc in cursor.description]
+        colnames = [d[0] for d in cursor.description]
         account = dict(zip(colnames, row))
-
-        cursor.close()
-        conn.close()
-
+        cursor.close(); conn.close()
         return jsonify(account)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
