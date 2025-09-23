@@ -291,3 +291,69 @@ body{
 #tsHistoryChart { width: 100%; height: auto; display: block; color: var(--ink); }
 .v-table.compact td, .v-table.compact th { padding: 8px 10px; }
 .v-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* ===== TSR/TSF chart styling ===== */
+:root{
+  --tsr: #2563eb;   /* blue */
+  --tsr-fill: rgba(37, 99, 235, .10);
+  --tsf: #16a34a;   /* green */
+  --tsf-fill: rgba(22, 163, 74, .10);
+  --grid: rgba(0,0,0,.08);
+}
+
+#tsHistoryCard .chart-wrap{ padding: 12px 12px 6px; position: relative; }
+#tsHistoryChart { width: 100%; height: auto; display: block; color: var(--ink); }
+
+/* Legend */
+.chart-legend{
+  display:flex; gap:10px; align-items:center; justify-content:center;
+  padding: 6px 8px 10px;
+}
+.legend-item{
+  border:1px solid #e8e6ff; background:#fff; border-radius:999px;
+  padding:8px 10px; font-weight:600; cursor:pointer;
+  box-shadow: 0 8px 20px rgba(99,102,241,.08);
+  display:flex; align-items:center; gap:8px;
+  opacity:.95; transition: transform .15s ease, opacity .15s ease, box-shadow .2s ease;
+}
+.legend-item:hover{ transform: translateY(-1px); opacity:1; box-shadow:0 12px 24px rgba(99,102,241,.14); }
+.legend-item.off{ opacity:.45; }
+.legend-dot{ width:10px; height:10px; border-radius:999px; display:inline-block; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6); }
+.legend-dot--tsr{ background: var(--tsr); }
+.legend-dot--tsf{ background: var(--tsf); }
+
+/* Tooltip */
+.chart-tooltip{
+  position:absolute; pointer-events:none; transform: translate(-50%, -100%);
+  background:#fff; border:1px solid #e8e6ff; border-radius:12px; padding:10px 12px;
+  font-size:.9rem; box-shadow: 0 12px 32px rgba(15,23,42,.12);
+  display:none; min-width: 190px;
+}
+.chart-tooltip .tt-title{ font-weight:800; margin-bottom:6px; }
+.chart-tooltip .row{ display:flex; justify-content:space-between; gap:12px; }
+.chart-tooltip .badge{ display:inline-flex; align-items:center; gap:6px; font-weight:700; }
+.chart-tooltip .dot{ width:8px; height:8px; border-radius:999px; display:inline-block; }
+.chart-tooltip .dot.tsr{ background: var(--tsr); }
+.chart-tooltip .dot.tsf{ background: var(--tsf); }
+.chart-tooltip .muted{ font-size:.8rem; color: var(--muted); margin-top:6px; }
+
+/* Focus rings para accesibilidad (leyenda) */
+.legend-item:focus-visible{ outline: 3px solid #c7d2fe; outline-offset: 2px; }
+.chart-tooltip{
+  position:absolute;
+  pointer-events:none;
+  transform: translate(-50%, -110%); /* por defecto arriba del punto */
+  background:#fff;
+  border:1px solid #e8e6ff;
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:.9rem;
+  box-shadow: 0 12px 32px rgba(15,23,42,.12);
+  display:none;
+  min-width:190px;
+  z-index: 2; /* asegura que quede sobre el SVG */
+}
+
+/* Cuando no hay espacio arriba, muéstralo debajo del punto */
+.chart-tooltip.below{
+  transform: translate(-50%, 12%);
+}

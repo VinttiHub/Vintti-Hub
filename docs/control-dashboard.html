@@ -21,7 +21,7 @@
       <!-- ====== CARD: Opportunities by model & type ====== -->
       <section class="card glass" id="oppsCard">
       <div class="card-head card-head--center">
-        <h2 class="h2--centergrad title-with-info">
+        <h2 class="h2--bluegrad title-with-info">
           Opportunities — Pipeline
           <button class="info-ghost" aria-label="Excluded stages"
                   data-tip="Deep Dive, NDA Sent, Close Won/Lost">i</button>
@@ -88,20 +88,32 @@
       <!-- ====== CARD: TSR/TSF History (Staffing) ====== -->
       <section class="card glass" id="tsHistoryCard">
         <div class="card-head card-head--center">
-          <h2 class="h2--centergrad">TSR/TSF History · Staffing (Close Win)</h2>
-          <div class="muted">Cada punto = corte al fin de mes con hires activos (start ≤ fin_de_mes &amp; (end NULL o &gt; fin_de_mes)).</div>
+          <h2 class="h2--bluegrad">TSR/TSF History · Staffing (Closed Won)</h2>
+          <div class="muted">
+            Each point shows the value at the end of each month, counting only hires that were active at that time.
+          </div>
         </div>
 
         <div id="tsHistoryWrap" class="chart-wrap">
-          <svg id="tsHistoryChart" viewBox="0 0 640 180" role="img" aria-label="TSR vs TSF over time"></svg>
+          <div class="chart-legend" id="tsLegend" aria-label="Chart legend">
+            <button class="legend-item on" data-series="tsr">
+              <span class="legend-dot legend-dot--tsr" aria-hidden="true"></span> TSR (revenue)
+            </button>
+            <button class="legend-item on" data-series="tsf">
+              <span class="legend-dot legend-dot--tsf" aria-hidden="true"></span> TSF (fee)
+            </button>
+          </div>
+
+          <svg id="tsHistoryChart" viewBox="0 0 720 220" role="img" aria-label="TSR vs TSF over time"></svg>
+          <div id="tsTooltip" class="chart-tooltip" role="status" aria-live="polite"></div>
         </div>
 
         <div class="table-wrap">
-          <table class="v-table compact">
+          <table class="v-table compact" aria-describedby="Monthly TSR and TSF with active hires">
             <thead>
               <tr>
                 <th>Month</th>
-                <th>TSR (salary)</th>
+                <th>TSR (revenue)</th>
                 <th>TSF (fee)</th>
                 <th>Active Hires</th>
               </tr>
@@ -110,6 +122,7 @@
           </table>
         </div>
       </section>
+
 
     </main>
   </div>

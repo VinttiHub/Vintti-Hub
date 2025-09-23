@@ -34,9 +34,12 @@ async function fetchTSHistory({ fromYM = null, toYM = null } = {}) {
 function renderTSHistory(data){
   const wrap = document.getElementById('tsHistoryWrap');
   const tbl  = document.getElementById('tsHistoryTableBody');
-  if (!wrap || !tbl) return;
+  const svg  = document.getElementById('tsHistoryChart');
+  const tip  = document.getElementById('tsTooltip');
+  const legend = document.getElementById('tsLegend');
+  if (!wrap || !tbl || !svg) return;
 
-  // -------- Tabla --------
+  // ---- Tabla ----
   tbl.innerHTML = '';
   for (const it of data){
     const tr = document.createElement('tr');
@@ -49,68 +52,241 @@ function renderTSHistory(data){
     tbl.appendChild(tr);
   }
 
-  // -------- Mini chart (SVG doble línea TSR/TSF) --------
-  const svg = document.getElementById('tsHistoryChart');
-  if (!svg) return;
-  // limpia
+  // ---- SVG setup ----
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const W = svg.viewBox.baseVal.width || 720;
+  const H = svg.viewBox.baseVal.height || 220;
+  const PAD = 36;
 
-  const W = svg.viewBox.baseVal.width || 640;
-  const H = svg.viewBox.baseVal.height || 180;
-  const PAD = 24;
+  const months = data.map(d => d.month);
+  const tsrVals = data.map(d => Number(d.tsr || 0));
+  const tsfVals = data.map(d => Number(d.tsf || 0));
+  const hires   = data.map(d => Number(d.active_count || 0));
 
-  const xs = data.map((_, i) => i);
-  const tsr = data.map(d => Number(d.tsr || 0));
-  const tsf = data.map(d => Number(d.tsf || 0));
-  const maxY = Math.max(1, ...tsr, ...tsf);
-
-  const x = i => PAD + (i * (W - 2*PAD)) / Math.max(1, data.length - 1);
+  const maxY = Math.max(1, ...tsrVals, ...tsfVals);
+  const n = Math.max(1, data.length);
+  const x = i => PAD + (i * (W - 2*PAD)) / Math.max(1, n - 1);
   const y = v => H - PAD - (v * (H - 2*PAD)) / maxY;
 
-  function makePath(values){
-    return values.map((v,i) => `${i ? 'L' : 'M'} ${x(i)} ${y(v)}`).join(' ');
-  }
-
-  // grid horizontal (3 líneas)
-  for (let g=0; g<=3; g++){
-    const gy = PAD + g * (H - 2*PAD) / 3;
-    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-    line.setAttribute('x1', PAD); line.setAttribute('x2', W-PAD);
-    line.setAttribute('y1', gy);  line.setAttribute('y2', gy);
-    line.setAttribute('stroke', 'rgba(0,0,0,.08)');
-    line.setAttribute('stroke-width', '1');
-    svg.appendChild(line);
-  }
-
-  // TSR line
-  const p1 = document.createElementNS('http://www.w3.org/2000/svg','path');
-  p1.setAttribute('d', makePath(tsr));
-  p1.setAttribute('fill', 'none');
-  p1.setAttribute('stroke-width', '2.5');
-  p1.setAttribute('stroke', 'currentColor'); // usa color actual del texto
-  svg.appendChild(p1);
-
-  // TSF line (misma técnica, distinto grupo con opacidad)
-  const p2 = document.createElementNS('http://www.w3.org/2000/svg','path');
-  p2.setAttribute('d', makePath(tsf));
-  p2.setAttribute('fill', 'none');
-  p2.setAttribute('stroke-width', '2.5');
-  p2.setAttribute('stroke', 'currentColor');
-  p2.setAttribute('opacity', '0.55');
-  svg.appendChild(p2);
-
-  // labels extremos (mes inicial y final)
-  const mkText = (txt, px, py, anchor='middle') => {
-    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
-    t.setAttribute('x', px); t.setAttribute('y', py);
-    t.setAttribute('font-size', '10');
-    t.setAttribute('text-anchor', anchor);
-    t.textContent = txt;
-    return t;
+  const fmtMoneyShort = (v) => {
+    const num = Number(v) || 0;
+    if (num >= 1_000_000) return '$' + (num/1_000_000).toFixed(1).replace(/\.0$/,'') + 'M';
+    if (num >= 1_000) return '$' + (num/1_000).toFixed(1).replace(/\.0$/,'') + 'k';
+    return '$' + num.toLocaleString('en-US');
   };
+
+  const el = (tag, attrs={}) => {
+    const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k,v] of Object.entries(attrs)) n.setAttribute(k, v);
+    return n;
+  };
+
+  // --- Defs: gradients y filtros suaves ---
+  const defs = el('defs');
+  const gradTSR = el('linearGradient', { id:'gTSR', x1:'0', y1:'0', x2:'0', y2:'1' });
+  gradTSR.append(el('stop', { offset:'0%',  'stop-color':'var(--tsr)', 'stop-opacity': '0.25'}));
+  gradTSR.append(el('stop', { offset:'100%','stop-color':'var(--tsr)', 'stop-opacity': '0'}));
+  const gradTSF = el('linearGradient', { id:'gTSF', x1:'0', y1:'0', x2:'0', y2:'1' });
+  gradTSF.append(el('stop', { offset:'0%',  'stop-color':'var(--tsf)', 'stop-opacity': '0.25'}));
+  gradTSF.append(el('stop', { offset:'100%','stop-color':'var(--tsf)', 'stop-opacity': '0'}));
+  defs.append(gradTSR, gradTSF);
+  svg.append(defs);
+
+  // --- Grid Y (4 líneas) + ejes mínimos ---
+  for (let g=0; g<=4; g++){
+    const gy = PAD + g * (H - 2*PAD) / 4;
+    const line = el('line', { x1: PAD, x2: W-PAD, y1: gy, y2: gy, stroke: 'var(--grid)', 'stroke-width':'1' });
+    svg.append(line);
+    // etiquetas eje Y a la izquierda (0, 25%, 50%, 75%, 100%)
+    const val = Math.round((1 - g/4) * maxY);
+    const text = el('text', { x: 8, y: y(val) + 4, 'font-size':'10', fill:'var(--muted)' });
+    text.textContent = fmtMoneyShort(val);
+    svg.append(text);
+  }
+
+  // --- Helpers path ---
+  const pathFrom = (arr) => arr.map((v,i) => `${i?'L':'M'} ${x(i)} ${y(v)}`).join(' ');
+  const areaFrom = (arr) => `${pathFrom(arr)} L ${x(n-1)} ${y(0)} L ${x(0)} ${y(0)} Z`;
+
+  // --- Series visibles (toggle legend) ---
+  const visibility = { tsr: true, tsf: true };
+
+  // --- Draw function (idempotente) ---
+  const draw = () => {
+    // limpia todo excepto defs y grid/labels ya insertados (dejamos los primeros elementos hasta defs y 10 objetos aprox)
+    const keep = 1 + 5 + 5; // defs + grid lines + y labels (aprox) – por simplicidad, reconstruimos completo:
+    while (svg.childNodes.length > 0) svg.removeChild(svg.lastChild);
+    svg.append(defs);
+    // redibuja grid y labels Y
+    for (let g=0; g<=4; g++){
+      const gy = PAD + g * (H - 2*PAD) / 4;
+      svg.append(el('line', { x1: PAD, x2: W-PAD, y1: gy, y2: gy, stroke: 'var(--grid)', 'stroke-width':'1' }));
+      const val = Math.round((1 - g/4) * maxY);
+      const text = el('text', { x: 8, y: y(val) + 4, 'font-size':'10', fill:'var(--muted)' });
+      text.textContent = fmtMoneyShort(val);
+      svg.append(text);
+    }
+
+    // Áreas
+    if (visibility.tsr){
+      const a1 = el('path', { d: areaFrom(tsrVals), fill: 'url(#gTSR)' });
+      svg.append(a1);
+    }
+    if (visibility.tsf){
+      const a2 = el('path', { d: areaFrom(tsfVals), fill: 'url(#gTSF)' });
+      svg.append(a2);
+    }
+
+    // Líneas
+    if (visibility.tsr){
+      svg.append(el('path', { d: pathFrom(tsrVals), fill:'none', stroke:'var(--tsr)', 'stroke-width':'2.5' }));
+    }
+    if (visibility.tsf){
+      svg.append(el('path', { d: pathFrom(tsfVals), fill:'none', stroke:'var(--tsf)', 'stroke-width':'2.5' }));
+    }
+
+    // Puntos
+    const pts = el('g', { id:'points' });
+    for (let i=0;i<n;i++){
+      if (visibility.tsr){
+        pts.append(el('circle', { cx:x(i), cy:y(tsrVals[i]), r:'3.5', fill:'#fff', stroke:'var(--tsr)', 'stroke-width':'2' }));
+      }
+      if (visibility.tsf){
+        pts.append(el('circle', { cx:x(i), cy:y(tsfVals[i]), r:'3.5', fill:'#fff', stroke:'var(--tsf)', 'stroke-width':'2' }));
+      }
+    }
+    svg.append(pts);
+
+    // Guía vertical + hit-area
+    const guide = el('line', { id:'vGuide', x1:0, x2:0, y1:PAD-6, y2:H-PAD+6, stroke:'rgba(0,0,0,.25)', 'stroke-dasharray':'3 3', 'stroke-width':'1.2', opacity:'0' });
+    svg.append(guide);
+
+    const hit = el('rect', { x:PAD, y:0, width:(W-2*PAD), height:H, fill:'transparent', style:'cursor:crosshair' });
+    svg.append(hit);
+
+// reemplaza la función showTip por esta versión
+  const showTip = (i, clientX, clientY) => {
+    if (i < 0 || i >= n) return;
+
+    // 1) Actualiza la guía vertical
+    const gx = x(i);
+    guide.setAttribute('x1', gx);
+    guide.setAttribute('x2', gx);
+    guide.setAttribute('opacity', '1');
+
+    // 2) Contenido del tooltip
+    const m = months[i];
+    const tsr = tsrVals[i];
+    const tsf = tsfVals[i];
+    const act = hires[i];
+
+    tip.innerHTML = `
+      <div class="tt-title">${m}</div>
+      <div class="row"><span class="badge"><span class="dot tsr"></span>TSR</span><span>${fmtMoneyShort(tsr)}</span></div>
+      <div class="row"><span class="badge"><span class="dot tsf"></span>TSF</span><span>${fmtMoneyShort(tsf)}</span></div>
+      <div class="muted">Active hires: ${act}</div>
+    `;
+    tip.style.display = 'block';
+
+    // 3) Convertir coords del SVG (viewBox) a pixels reales
+    const svgRect  = svg.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const sx = svgRect.width  / W;
+    const sy = svgRect.height / H;
+
+    // x de ese índice
+    const px = x(i) * sx + (svgRect.left - wrapRect.left);
+
+    // y según las series visibles (tomamos el punto más “alto”, o sea menor y)
+    const ys = [];
+    if (visibility.tsr) ys.push(y(tsrVals[i]) * sy);
+    if (visibility.tsf) ys.push(y(tsfVals[i]) * sy);
+    // fallback por si ambas están ocultas
+    if (!ys.length) ys.push(y(0) * sy);
+
+    const pYsvg   = Math.min(...ys);
+    const py      = pYsvg + (svgRect.top - wrapRect.top);
+
+    // 4) Clamp dentro del card y decidir si va arriba o abajo del punto
+    const margin = 12;
+    const leftClamped = Math.max(margin, Math.min(px, wrapRect.width - margin));
+
+    // Si el punto está muy arriba, mostramos el tooltip por debajo
+    // medimos altura después de display:block para decidir
+    const willOverflowTop = (py - tip.offsetHeight - 16) < 0;
+    tip.classList.toggle('below', willOverflowTop);
+
+    // 5) Posicionar
+    tip.style.left = `${leftClamped}px`;
+    tip.style.top  = `${py}px`;
+  };
+
+  const hideTip = () => {
+    guide.setAttribute('opacity', '0');
+    tip.style.display = 'none';
+    tip.classList.remove('below');
+  };
+
+
+    // índice más cercano para un x dado
+    const nearestIndex = (px) => {
+      const rel = Math.max(PAD, Math.min(px, W-PAD));
+      const t = (rel - PAD) / Math.max(1, (W - 2*PAD));
+      return Math.round(t * (n - 1));
+    };
+
+    // Eventos hover
+    hit.addEventListener('mousemove', (e) => {
+      const rect = svg.getBoundingClientRect();
+      const i = nearestIndex(e.clientX - rect.left);
+      showTip(i, e.clientX, e.clientY);
+    });
+    hit.addEventListener('mouseleave', hideTip);
+    // también para touch
+    hit.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      const rect = svg.getBoundingClientRect();
+      const i = nearestIndex(t.clientX - rect.left);
+      showTip(i, t.clientX, t.clientY);
+    }, {passive:true});
+    hit.addEventListener('touchmove', (e) => {
+      const t = e.touches[0];
+      const rect = svg.getBoundingClientRect();
+      const i = nearestIndex(t.clientX - rect.left);
+      showTip(i, t.clientX, t.clientY);
+    }, {passive:true});
+    hit.addEventListener('touchend', hideTip);
+  };
+
+  // ---- Leyenda: toggle series ----
+  if (legend){
+    legend.querySelectorAll('.legend-item').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.getAttribute('data-series');
+        visibility[key] = !visibility[key];
+        btn.classList.toggle('off', !visibility[key]);
+        btn.classList.toggle('on',  visibility[key]);
+        draw();
+      };
+    });
+  }
+
+  // Dibuja inicial
+  draw();
+
+  // Etiquetas de extremos (mes inicial/final)
   if (data.length){
-    svg.appendChild(mkText(data[0].month, x(0), H-6));
-    svg.appendChild(mkText(data[data.length-1].month, x(data.length-1), H-6));
+    const mkText = (txt, px) => {
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x', px); t.setAttribute('y', H - 10);
+      t.setAttribute('font-size', '10');
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('fill', 'var(--muted)');
+      t.textContent = txt;
+      return t;
+    };
+    svg.append(mkText(data[0].month, x(0)));
+    svg.append(mkText(data[data.length-1].month, x(data.length-1)));
   }
 }
 
