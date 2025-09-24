@@ -2215,11 +2215,9 @@ async function loadOpportunityData() {
   console.error("❌ Error loading stage from opportunities/light:", err);
 }
 
-document.getElementById('expected-fee-input').value =
-  (data.expected_fee ?? '') === null ? '' : (data.expected_fee ?? '');
-
-document.getElementById('expected-revenue-input').value =
-  (data.expected_revenue ?? '') === null ? '' : (data.expected_revenue ?? '');
+ const d = window.currentOpportunityData || {};
+ document.getElementById('expected-fee-input').value = d.expected_fee ?? '';
+ document.getElementById('expected-revenue-input').value = d.expected_revenue ?? '';
 
       }
       function formatDate(dateStr) {
