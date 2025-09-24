@@ -10,3 +10,4 @@ sendgrid
 python-http-client
 google-api-python-client
 google-auth
+PyPDF2>=3.0.0
