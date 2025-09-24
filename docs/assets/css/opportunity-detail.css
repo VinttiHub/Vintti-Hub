@@ -2831,3 +2831,14 @@ input:checked + .slider::before {
 }
 
 /* Mantén el estilo del botón Publish (tu CSS existente aplica igual) */
+/* ↓ Solo afecta a Pause y Delete */
+#header-actions .bottom-actions .header-btn{
+  font-size: 11px;      /* tamaño del texto */
+  padding: 6px 8px;     /* más compactos */
+  line-height: 1.1;     
+}
+
+/* Si quieres achicar el emoji/icono también */
+#header-actions .bottom-actions .icon{
+  font-size: 12px;
+}
