@@ -26,57 +26,108 @@ from flask import jsonify, request
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# arriba de tu archivo (imports)
+from openai import OpenAI
+from PyPDF2 import PdfReader  # fallback local
+
 def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> str:
     """
-    Sube el PDF a OpenAI Files y lo pasa al modelo como `input_file`.
-    Devuelve el texto extraído en inglés, limpio y en formato plano.
+    Sube el PDF a OpenAI Files (purpose=assistants) y lo pasa al modelo como input_file.
+    Devuelve texto plano en inglés, limpio.
+    Si el modelo no lo procesa, hace fallback local con PyPDF2 y limpia con el modelo.
     """
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    # 1) Subir el PDF a Files (purpose=user_data)
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
-        tmp.write(pdf_bytes)
-        tmp.flush()
-        up = client.files.create(file=open(tmp.name, "rb"), purpose="user_data")
+    # --- 1) Subir PDF con purpose correcto ---
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
+            tmp.write(pdf_bytes)
+            tmp.flush()
+            up = client.files.create(
+                file=open(tmp.name, "rb"),
+                purpose="assistants"    # <-- importante (antes usabas "user_data")
+            )
+    except Exception as e:
+        logging.error(f"❌ Upload to OpenAI Files failed: {e}")
+        up = None
 
-    # 2) Pedir extracción de texto útil para CV
-    prompt = (
-        "Extract every resume-relevant fact from the attached PDF. "
-        "Return clean plain text in English, no markdown, no tables, no JSON. "
-        "Include: full name (if present), contacts, headline/summary, skills/tools, "
+    # --- prompt para extracción “vision”/file-aware ---
+    base_prompt = (
+        "You are a rigorous CV parser. Read the attached PDF and return ONLY clean plain text in English, "
+        "no markdown, no tables, no JSON. Include full name (if present), contacts, headline/summary, skills/tools, "
         "work experience with titles, companies, locations, date ranges, responsibilities, "
         "education (degrees, institutions, dates), certifications, languages. "
-        "Do not invent information. " + (prompt_hint or "")
-    )
+        "Do not invent information. "
+    ) + (prompt_hint or "")
 
-    resp = client.responses.create(
-        model="gpt-4o-mini",
-        input=[{
-            "role": "user",
-            "content": [
-                {"type": "input_file", "file_id": up.id},
-                {"type": "input_text", "text": prompt}
-            ]
-        }],
-        max_output_tokens=4000,
-    )
-
-    # SDK nuevo suele exponer .output_text; si no, armamos desde .output
-    text = getattr(resp, "output_text", None)
-    if not text:
-        parts = []
+    # --- 2) Intento con Responses + input_file ---
+    extracted = ""
+    if up is not None:
         try:
-            for item in (resp.output or []):
-                # Mensajes con contenido textual
-                for c in getattr(item, "content", []) or []:
-                    t = getattr(c, "text", None)
-                    if t:
-                        parts.append(t)
-        except Exception:
-            pass
-        text = "\n".join(p for p in parts if p)
+            resp = client.responses.create(
+                model="gpt-4.1-mini",   # alternativas: "gpt-4o" también funciona
+                input=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "input_file", "file_id": up.id},
+                        {"type": "input_text", "text": base_prompt}
+                    ]
+                }],
+                max_output_tokens=4000,
+            )
 
-    return (text or "").strip()
+            # Preferir .output_text cuando exista
+            extracted = getattr(resp, "output_text", "") or ""
+            if not extracted:
+                # reconstrucción manual por compatibilidad
+                parts = []
+                for item in getattr(resp, "output", []) or []:
+                    for c in getattr(item, "content", []) or []:
+                        t = getattr(c, "text", None)
+                        if t:
+                            parts.append(t)
+                extracted = "\n".join(p for p in parts if p).strip()
+
+        except Exception as e:
+            logging.error(f"❌ Responses extraction failed: {e}")
+
+    # A veces el modelo puede responder “I can't view…” si no recibió bien el file
+    if not extracted or "can't view or extract" in extracted.lower():
+        logging.warning("⚠️ Model did not read the PDF properly. Falling back to local text extraction (PyPDF2).")
+        try:
+            # --- 3) Fallback local: extraer texto crudo con PyPDF2 ---
+            with io.BytesIO(pdf_bytes) as bio:
+                reader = PdfReader(bio)
+                raw = []
+                for page in reader.pages:
+                    raw.append(page.extract_text() or "")
+                local_text = "\n".join(raw).strip()
+        except Exception as e:
+            logging.error(f"❌ Local PDF read failed: {e}")
+            local_text = ""
+
+        # Si logramos algo local, pedimos al modelo que lo limpie/normalice a texto CV útil
+        if local_text:
+            try:
+                clean_prompt = (
+                    "Clean and normalize the following raw PDF text into CV-relevant plain English text only. "
+                    "Remove duplicated headers/footers and layout noise. "
+                    "No markdown, no JSON, no bullet symbols, just readable plain text.\n\n"
+                    f"{local_text[:15000]}"
+                )
+                # Puedes usar el mismo cliente legacy de chat completions si prefieres:
+                cleaned = openai.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": clean_prompt}],
+                    temperature=0.0,
+                    max_tokens=2000
+                )
+                extracted = (cleaned.choices[0].message.content or "").strip()
+            except Exception as e:
+                logging.error(f"❌ Cleaning fallback failed: {e}")
+                extracted = local_text  # último recurso: texto crudo
+
+    return extracted.strip()
 
 def register_ai_routes(app):
     @app.route('/ai/jd_to_career_fields', methods=['POST', 'OPTIONS'])
