@@ -23,6 +23,8 @@ from db import get_connection
 import time
 import re
 from flask import jsonify, request
+from openai import OpenAI
+from PyPDF2 import PdfReader 
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
