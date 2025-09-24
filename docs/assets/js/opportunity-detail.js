@@ -392,9 +392,10 @@ async function setSheetActionForOpportunity(actionValue){
   const oppId = getOpportunityIdStrict();
   if (!oppId) { alert('❌ Invalid Opportunity ID'); return; }
 
-  const btnText = actionValue === 'Archived' ? 'Archiving…' : 'Deleting…';
-  const okText  = actionValue === 'Archived' ? '✅ Archived on Sheet' : '✅ Marked as Borrar';
-  const overlay = document.getElementById('email-overlay');        // ya tienes un overlay reutilizable
+  const isArchive = actionValue === 'Archived';
+  const btnText = isArchive ? 'Archiving…' : 'Deleting…';
+  const okText  = isArchive ? '✅ Archived on Sheet' : '✅ Marked as Borrar';
+  const overlay = document.getElementById('email-overlay');
   const overlayMsg = document.getElementById('email-overlay-message');
 
   try{
@@ -403,6 +404,7 @@ async function setSheetActionForOpportunity(actionValue){
       overlay.classList.remove('hidden');
     }
 
+    // 1) Actualiza el Sheet
     const res = await fetch(`${API_BASE}/careers/${encodeURIComponent(oppId)}/sheet_action`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -411,7 +413,40 @@ async function setSheetActionForOpportunity(actionValue){
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Sheet update failed');
 
-    showFriendlyPopup(`${okText} (${data.updated || 0} row(s))`);
+    // 2) Envía email a Angie
+    const accionHumana = isArchive ? 'archivar' : 'borrar';
+    const who = (localStorage.getItem('nickname') || 'Vintti HUB').trim();
+
+    const subject = `Estado actualizado en el Sheet — Job ID ${oppId}`;
+    const body = `
+      <p>Hola Cami 😊</p>
+      <p>La oportunidad con <strong>Job ID ${oppId}</strong> se cambió de estado a <strong>${accionHumana}</strong> en el sheet.</p>
+      <p>¿Podrías revisarla y actualizarlo en el career site si aplica? ¡Gracias! 🙏</p>
+      <p style="color:#666;font-size:12px;margin-top:12px;">Enviado automáticamente por ${who}</p>
+    `;
+
+    try {
+      const mailRes = await fetch(`${API_BASE}/send_email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: ['camila@vintti.com'],
+          cc: [],
+          subject,
+          body
+        })
+      });
+      if (!mailRes.ok) {
+        const err = await mailRes.text().catch(()=> '');
+        console.warn('⚠️ Email send failed:', err);
+        showFriendlyPopup(`${okText} — ⚠️ email no enviado`);
+      } else {
+        showFriendlyPopup(`${okText} — ✉️ email enviado a Cami`);
+      }
+    } catch (e) {
+      console.warn('⚠️ Email send error:', e);
+      showFriendlyPopup(`${okText} — ⚠️ email no enviado`);
+    }
   }catch(err){
     console.error(err);
     alert('❌ Error updating Google Sheet: ' + (err.message || 'Unknown'));
