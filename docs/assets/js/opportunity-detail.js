@@ -745,6 +745,26 @@ document.getElementById('deepdive-recording-input').addEventListener('blur', e =
 
 document.getElementById('timezone-input').addEventListener('blur', e =>
   updateAccountField('timezone', e.target.value));
+function toNumOrNull(v){
+  if (v === undefined || v === null) return null;
+  const s = String(v).replace(/[, ]/g,'').trim();
+  if (s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+document.getElementById('expected-fee-input').addEventListener('blur', e => {
+  const val = toNumOrNull(e.target.value);
+  // refleja normalizado en el input (opcional)
+  e.target.value = (val ?? '') === '' ? '' : String(val);
+  updateOpportunityField('expected_fee', val);
+});
+
+document.getElementById('expected-revenue-input').addEventListener('blur', e => {
+  const val = toNumOrNull(e.target.value);
+  e.target.value = (val ?? '') === '' ? '' : String(val);
+  updateOpportunityField('expected_revenue', val);
+});
 
 document.getElementById('details-sales-lead').addEventListener('change', async (e) => {
   const emailValue = e.target.value; // el value es el email
@@ -2130,6 +2150,13 @@ async function loadOpportunityData() {
 } catch (err) {
   console.error("❌ Error loading stage from opportunities/light:", err);
 }
+
+document.getElementById('expected-fee-input').value =
+  (data.expected_fee ?? '') === null ? '' : (data.expected_fee ?? '');
+
+document.getElementById('expected-revenue-input').value =
+  (data.expected_revenue ?? '') === null ? '' : (data.expected_revenue ?? '');
+
       }
       function formatDate(dateStr) {
         if (!dateStr) return '';

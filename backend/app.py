@@ -1234,7 +1234,9 @@ def update_opportunity_fields(opportunity_id):
         'career_description',
         'career_requirements',
         'career_additional_info',
-        'career_published'  # boolean/text
+        'career_published',
+        'expected_fee',
+        'expected_revenue'
     ]
     # 🔹 Normaliza HTML ruidoso de Career Site / Webflow antes de persistir
     for key in ('career_description', 'career_requirements', 'career_additional_info'):
