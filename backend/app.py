@@ -3910,6 +3910,95 @@ def publish_career_to_sheet(opportunity_id):
         logging.exception("❌ publish_career_to_sheet failed")
         return jsonify({"error": str(e)}), 500
 
+# === Quick actions para Career Sheet: setear Action = Archived / Borrar ===
+def _col_index_to_a1(col_idx_0based: int) -> str:
+    """0 -> A, 1 -> B, ..."""
+    n = col_idx_0based + 1
+    s = ""
+    while n:
+        n, r = divmod(n - 1, 26)
+        s = chr(65 + r) + s
+    return s
+
+@app.route('/careers/<int:opportunity_id>/sheet_action', methods=['POST'])
+def set_career_sheet_action(opportunity_id):
+    """
+    Body JSON: { "action": "Archived" | "Borrar" }
+    Cambia la columna 'Action' del Sheet para TODAS las filas cuyo 'Job ID'
+    (o 'Item ID') coincida con opportunity_id.
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        action = (payload.get('action') or '').strip()
+        if action not in ('Archived', 'Borrar'):
+            return jsonify({"error": "Invalid action. Use 'Archived' or 'Borrar'."}), 400
+
+        if not GOOGLE_SHEETS_SPREADSHEET_ID:
+            return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
+
+        svc = _sheets_service()
+
+        # Resolver pestaña desde GOOGLE_SHEETS_RANGE (misma que usas al publicar)
+        sheet_part = (GOOGLE_SHEETS_RANGE or "Open Positions!A:Z").split('!')[0].strip()
+        if len(sheet_part) >= 2 and sheet_part[0] == sheet_part[-1] == "'":
+            sheet_part = sheet_part[1:-1]
+        sheet_title = sheet_part
+        quoted_title = _a1_quote(sheet_title)
+
+        # Leer headers reales (fila 1)
+        headers = _get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_title)
+
+        # Toleramos variantes mínimas de nombres de columnas
+        def find_col(candidates):
+            for name in candidates:
+                try:
+                    return headers.index(name)
+                except ValueError:
+                    continue
+            return -1
+
+        job_col    = find_col(["Job ID", "Item ID", "JOB ID", "JobID"])
+        action_col = find_col(["Action", "Acción", "ACTION"])
+        if job_col < 0 or action_col < 0:
+            return jsonify({"error": "Sheet must contain 'Job ID' (o 'Item ID') y 'Action' headers"}), 500
+
+        # Traer todas las filas (A:Z) para localizar coincidencias por Job ID
+        get_resp = svc.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+            range=f"{quoted_title}!A:Z"
+        ).execute()
+        rows = get_resp.get('values', [])
+
+        if not rows or len(rows) < 2:
+            return jsonify({"updated": 0, "action": action})
+
+        # Preparar batchUpdate de valores a la columna Action en cada fila match
+        data_updates = []
+        opp_str = str(opportunity_id).strip()
+
+        for idx, row in enumerate(rows[1:], start=2):  # data desde fila 2
+            job_val = row[job_col].strip() if job_col < len(row) and isinstance(row[job_col], str) else str(row[job_col]) if job_col < len(row) else ""
+            if job_val == opp_str:
+                col_letter = _col_index_to_a1(action_col)
+                a1 = f"{quoted_title}!{col_letter}{idx}"
+                data_updates.append({"range": a1, "values": [[action]]})
+
+        updated = 0
+        if data_updates:
+            svc.spreadsheets().values().batchUpdate(
+                spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+                body={
+                    "valueInputOption": "USER_ENTERED",  # respeta el dropdown
+                    "data": data_updates
+                }
+            ).execute()
+            updated = len(data_updates)
+
+        return jsonify({"updated": updated, "action": action}), 200
+
+    except Exception as e:
+        logging.exception("❌ set_career_sheet_action failed")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/sheets/candidates/import', methods=['POST'])
 def import_candidates_from_sheet():

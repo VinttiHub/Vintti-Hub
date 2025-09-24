@@ -12,6 +12,22 @@ async function ensureEmojiPickerLoaded() {
     document.head.appendChild(s);
   });
 }
+(function syncBottomWithPublish(){
+  const publishBtn  = document.getElementById('publish-career-btn');
+  const headerWrap  = document.getElementById('header-actions');
+  if (!publishBtn || !headerWrap) return;
+
+  function applyWidth(){
+    const w = publishBtn.getBoundingClientRect().width;
+    if (w > 0) headerWrap.style.setProperty('--publish-w', `${w}px`);
+  }
+  // inicial
+  applyWidth();
+  // recalcula si cambia el tamaño de la ventana o fuentes
+  window.addEventListener('resize', applyWidth);
+  // por si hay fuentes web/estilos que cargan asíncrono
+  setTimeout(applyWidth, 250);
+})();
 
 // Cierra pickers al hacer click fuera o con ESC
 document.addEventListener('click', (e) => {
@@ -367,6 +383,54 @@ document.getElementById('openNewCandidatePopup').addEventListener('click', () =>
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
 });
+function getOpportunityIdStrict(){
+  // tu helper ya hace esto, pero dejo versión corta que se apoya en el mismo <span>
+  return (document.getElementById('opportunity-id-text')?.getAttribute('data-id') || '').trim();
+}
+
+async function setSheetActionForOpportunity(actionValue){
+  const oppId = getOpportunityIdStrict();
+  if (!oppId) { alert('❌ Invalid Opportunity ID'); return; }
+
+  const btnText = actionValue === 'Archived' ? 'Archiving…' : 'Deleting…';
+  const okText  = actionValue === 'Archived' ? '✅ Archived on Sheet' : '✅ Marked as Borrar';
+  const overlay = document.getElementById('email-overlay');        // ya tienes un overlay reutilizable
+  const overlayMsg = document.getElementById('email-overlay-message');
+
+  try{
+    if (overlay && overlayMsg){
+      overlayMsg.textContent = btnText;
+      overlay.classList.remove('hidden');
+    }
+
+    const res = await fetch(`${API_BASE}/careers/${encodeURIComponent(oppId)}/sheet_action`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action: actionValue })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sheet update failed');
+
+    showFriendlyPopup(`${okText} (${data.updated || 0} row(s))`);
+  }catch(err){
+    console.error(err);
+    alert('❌ Error updating Google Sheet: ' + (err.message || 'Unknown'));
+  }finally{
+    if (overlay) overlay.classList.add('hidden');
+  }
+}
+
+// wire buttons
+document.getElementById('pause-career-btn')?.addEventListener('click', () => {
+  setSheetActionForOpportunity('Archived');
+});
+document.getElementById('delete-career-btn')?.addEventListener('click', () => {
+  // si quieres confirmación adicional:
+  if (confirm('⚠️ Set Action = “Borrar” for all rows with this Job ID?')) {
+    setSheetActionForOpportunity('Borrar');
+  }
+});
+
 function openPreCreateModal() {
   document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
   document.getElementById('preCreateCheckPopup').classList.remove('hidden');

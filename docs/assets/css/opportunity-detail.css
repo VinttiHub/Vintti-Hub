@@ -2730,3 +2730,104 @@ input:checked + .slider::before {
 .job-description-editor li { margin: .25rem 0; }
 .lead-dot[aria-label]{ cursor: help; }
 .lead-dot img{ pointer-events: none; } /* el hover sigue “pegando” en el span */
+/* ===== Contenedor general: dos filas, alineadas a la derecha */
+#header-actions{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;   /* derecha */
+  gap:8px;
+  width:100%;
+  /* se setea --publish-w via JS para igualar anchos */
+}
+
+/* Fila superior: Send + Publish */
+#header-actions .top-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+/* Fila inferior: Pause + Delete */
+#header-actions .bottom-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+/* Botón base del header (compacto) */
+.header-btn{
+  flex:0 0 auto;
+  padding:8px 14px;
+  font-size:12px;
+  line-height:1;
+  border-radius:12px;
+  border:1px solid transparent;
+  white-space:nowrap;
+  backdrop-filter:saturate(1.1);
+}
+
+/* Publish (para medir ancho de referencia) */
+#publish-career-btn{
+  background:linear-gradient(180deg, #6ea8ff, #4f7bff);
+  color:#fff;
+  border-color:rgba(0,0,0,.12);
+  right: 50px;
+}
+
+/* ===== Hacer que Pause + Delete sumen el ancho de Publish =====
+   gap:8px entre ellos → cada uno ocupa (publish - 8px)/2 */
+#header-actions{
+  --publish-w: 160px; 
+}
+#header-actions .bottom-actions .header-btn{
+  width:calc((var(--publish-w) - 8px)/2);
+  text-align:center;
+  padding:7px 7px;         
+}
+
+/* Icono un pelín más chico */
+#header-actions .icon{ font-size:14px; }
+
+/* ====== COLORES que pisan ghost/danger existentes ====== */
+#header-actions #pause-career-btn{
+  background:#e5e7eb !important;     /* gray-200 */
+  border-color:#d1d5db !important;    /* gray-300 */
+  color:#111827 !important;           /* gray-900 */
+}
+#header-actions #pause-career-btn:hover{
+  background:#d1d5db !important;      /* gray-300 */
+  border-color:#c5cbd5 !important;     /* ~gray-350 */
+}
+
+/* DELETE (rojo) */
+#header-actions #delete-career-btn{
+  background:#ef4444 !important;      /* red-500 */
+  border-color:#dc2626 !important;    /* red-600 */
+  color:#ffffff !important;
+}
+#header-actions #delete-career-btn:hover{
+  background:#dc2626 !important;      /* red-600 */
+  border-color:#b91c1c !important;    /* red-700 */
+}
+/* Empuja todo el bloque de acciones a la derecha dentro del header */
+#job .job-header-right { margin-left: auto; }
+
+/* Asegura que la fila superior no haga wrap y quede pegada a la derecha */
+#header-actions .top-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap: nowrap;          /* ← clave para “uno al lado del otro” */
+  justify-content: flex-end;  /* ← alineado a la derecha */
+  width: 100%;
+}
+
+/* La fila inferior ya la tienes, la dejo por claridad */
+#header-actions .bottom-actions{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  justify-content: flex-end;  /* ← también a la derecha */
+}
+
+/* Mantén el estilo del botón Publish (tu CSS existente aplica igual) */

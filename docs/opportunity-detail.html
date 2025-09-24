@@ -185,11 +185,23 @@
           <p class="subtitle">Complete job description for this opportunity.</p>
         </div>
         <div class="job-header-right">
-          <button class="header-btn">Send</button>
-          <!-- 👇 NUEVO -->
-          <button id="publish-career-btn" class="header-btn" style="margin-left:8px;">
-            Publish to Career Site
-          </button>
+          <div id="header-actions">
+            <!-- fila superior: Send + Publish -->
+            <div class="top-actions">
+              <button id="send-btn" class="header-btn">Send</button>
+              <button id="publish-career-btn" class="header-btn">Publish to Career Site</button>
+            </div>
+
+            <!-- fila inferior: Pause + Delete -->
+            <div class="bottom-actions" id="sheet-quick-actions">
+              <button id="pause-career-btn" class="header-btn ghost-btn" title="Archive on Sheet">
+                <span class="icon">⏸️</span>
+              </button>
+              <button id="delete-career-btn" class="header-btn danger-ghost-btn" title="Delete on Sheet">
+                <span class="icon">🗑️</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="toolbar" id="job-toolbar">
