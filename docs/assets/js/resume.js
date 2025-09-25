@@ -844,44 +844,34 @@ if (videoEl){
 
 function escapeHtml(s){ const t=document.createElement('textarea'); t.textContent = s || ''; return t.innerHTML; }
 
-qsa('#resume [contenteditable="true"]').forEach(el=>{
-  el.addEventListener('paste', (e)=>{
+qsa('#resume [contenteditable="true"]:not(#videoLinkInput)').forEach(el => {
+  wireOnce(el, 'paste', (e) => {
     e.preventDefault();
-let text = (e.clipboardData||window.clipboardData).getData('text') || '';
-text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ').trim();
-// convierte 'ì ' (copiada de Word/Docs) a '- ' para bullets simples
-text = text.replace(/(^|\n)\s*ì\s+/g, '$1- ');
+    let text = (e.clipboardData || window.clipboardData).getData('text') || '';
+    text = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, ' ').trim();
+    text = text.replace(/(^|\n)\s*ì\s+/g, '$1- '); // bullets raros
 
-
-    const lines = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const escapeHtml = (s) => { const t=document.createElement('textarea'); t.textContent=s||''; return t.innerHTML; };
     let html = '';
 
-    // si detecta bullets estilo "- ", "* " o "• " → crea <ul><li>…</li></ul>
     if (lines.some(l => /^[-*•]\s+/.test(l))) {
       const items = lines.map(l => l.replace(/^[-*•]\s+/, '')).filter(Boolean);
       html = `<ul>${items.map(it => `<li>${escapeHtml(it)}</li>`).join('')}</ul>`;
     } else if (lines.length > 1) {
-      // varias líneas → párrafos
       html = lines.map(l => `<p>${escapeHtml(l)}</p>`).join('');
     } else {
-      // una sola línea
       html = escapeHtml(text);
     }
 
     document.execCommand('insertHTML', false, html);
-  });
+  }, 'resumePaste');
 
-  el.addEventListener('input', ()=>{
-    // limpia estilos inline
-    el.querySelectorAll('*').forEach(node=>node.removeAttribute('style'));
-  });
+  wireOnce(el, 'input', () => {
+    el.querySelectorAll('*').forEach(node => node.removeAttribute('style'));
+  }, 'resumeInputSanitize');
 });
 
-
-  // ---------- AI Generate (usa tus ids existentes) ----------
-/* =========================
-   CVs (upload/list/delete/open) + Auto-extract PDF → cv_pdf_scrapper
-   ========================= */
 (() => {
   const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const candidateId = new URLSearchParams(location.search).get('id');
@@ -1220,6 +1210,14 @@ function wireDescEditors(descEl, touchKey) {
     try { R.touch?.(touchKey); } catch {}
     setTimeout(() => { if (!flushIfEmpty()) R.saveNow?.(); }, 0);
   });
+}
+// Registra un listener sólo una vez por elemento + evento + clave
+function wireOnce(el, evt, handler, key = '') {
+  if (!el) return;
+  const mark = `__wired_${evt}${key ? '_' + key : ''}`;
+  if (el[mark]) return;
+  el.addEventListener(evt, handler);
+  el[mark] = true;
 }
 
 

@@ -1,3 +1,6 @@
+
+window.__VINTTI_WIRED = window.__VINTTI_WIRED || {};
+
 const EQUIPMENT_OPTIONS = [
   { value: "Laptop",     emoji: "💻" },
   { value: "Monitor",    emoji: "🖥️" },
@@ -1002,7 +1005,9 @@ const eqLink = document.getElementById('equipments-details-link');
 if (eqLink) eqLink.href = `equipments.html?candidate_id=${encodeURIComponent(candidateId)}`;
 function wireRichToolbar(toolbarId){
   const tb = document.getElementById(toolbarId);
-  if (!tb) return;
+  if (!tb || tb.__wired) return;
+  tb.__wired = true;
+
   tb.querySelectorAll('button[data-command]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const targetId = btn.getAttribute('data-target');
@@ -1439,33 +1444,77 @@ if (hireRevenue){
     });
   });
 
-  // --- Sanitizar pegado en contenteditable (sin estilos pegados) ---
-  document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-    el.addEventListener('paste', function(e) {
-      e.preventDefault();
-      const text = (e.clipboardData || window.clipboardData).getData('text');
-      document.execCommand('insertText', false, text);
-    });
-    el.addEventListener('input', function() {
-      this.querySelectorAll('*').forEach(child => {
-        child.removeAttribute('style');
-        child.style.fontFamily = 'Onest';
-        child.style.fontSize = '14px';
-        child.style.color = '#333';
-        child.style.fontWeight = '400';
-      });
-    });
+// ✅ Un solo sanitizador global de paste para TODOS los contenteditable
+if (!window.__VINTTI_WIRED) window.__VINTTI_WIRED = {};
+if (!window.__VINTTI_WIRED.globalPasteOnce) {
+  window.__VINTTI_WIRED.globalPasteOnce = true;
+
+  document.addEventListener('paste', (e) => {
+    const target = e.target?.closest?.('[contenteditable="true"]');
+    if (!target || target.id === 'videoLinkInput') return; // videoLinkInput ya maneja su propio paste
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text') || '';
+    document.execCommand('insertText', false, text);
+  }, true);
+}
+// ✅ Dedupe del campo de Video Link (blindado)
+function wireVideoLinkDedupe() {
+  const el = document.getElementById('videoLinkInput');
+  if (!el || el.__dedupeWired) return;
+  el.__dedupeWired = true;
+
+  // Si al pegar queda URL+URL (back-to-back), dejar solo una
+  const dedupe = () => {
+    const s = (el.textContent || '').trim();
+    const m = s.match(/https?:\/\/\S+/g);
+    if (m && m.length >= 2 && m[0] === m[1] && s === (m[0] + m[1])) {
+      el.textContent = m[0];
+    }
+  };
+
+  el.addEventListener('input', dedupe, { passive: true });
+  el.addEventListener('blur', dedupe);
+
+  // 👇 plus: si pega una URL, sustituimos TODO el contenido por UNA sola URL limpia
+  el.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const raw = (e.clipboardData || window.clipboardData).getData('text') || '';
+    const url = (raw.match(/https?:\/\/\S+/) || [raw.trim()])[0];
+    document.execCommand('insertText', false, url);
+    // forzamos dedupe por si el otro archivo también insertó
+    setTimeout(dedupe, 0);
   });
+}
+
+// ⚠️ Llamar de inmediato (ya estás dentro de un DOMContentLoaded más grande)
+wireVideoLinkDedupe();
+
+
   // ====== Candidate CVs (listar / subir / abrir) — sin AI ni extracción ======
 (() => {
+  // ✅ Flag global realmente compartido entre archivos
+  if (!window.__VINTTI_WIRED) window.__VINTTI_WIRED = {};
+  if (window.__VINTTI_WIRED.cvWidgetOnce) return;
+  window.__VINTTI_WIRED.cvWidgetOnce = true;
+
   const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const cid     = new URLSearchParams(window.location.search).get('id');
-  const drop        = document.getElementById('cv-drop');
-  const input       = document.getElementById('cv-input');
-  const browseBtn   = document.getElementById('cv-browse');
-  const refreshBtn  = document.getElementById('cv-refresh');
-  const list        = document.getElementById('cv-list');
-  if (!cid || !list) return; // si no existe el widget, salimos silenciosamente
+  const drop      = document.getElementById('cv-drop');
+  const input     = document.getElementById('cv-input');
+  const browseBtn = document.getElementById('cv-browse');
+  const refreshBtn= document.getElementById('cv-refresh');
+  const list      = document.getElementById('cv-list');
+  if (!cid || !list) return;
+
+  let inFlight = false;               // bloqueo duro por request
+  const BIND = (el, type, fn) => {    // helper para no duplicar listeners
+    if (!el) return;
+    el.__wired = el.__wired || {};
+    const key = `on:${type}`;
+    if (el.__wired[key]) return;
+    el.addEventListener(type, fn);
+    el.__wired[key] = true;
+  };
 
   function render(items = []) {
     list.innerHTML = '';
@@ -1483,7 +1532,9 @@ if (hireRevenue){
           <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
         </div>
       `;
-      row.querySelector('.danger').addEventListener('click', async (e) => {
+      // evitar doble binding por fila
+      const delBtn = row.querySelector('.danger');
+      BIND(delBtn, 'click', async (e) => {
         const key = e.currentTarget.getAttribute('data-key');
         if (!key) return;
         if (!confirm('Delete this file?')) return;
@@ -1494,6 +1545,7 @@ if (hireRevenue){
         });
         await loadCVs();
       });
+
       list.appendChild(row);
     });
   }
@@ -1508,15 +1560,18 @@ if (hireRevenue){
       render([]);
     }
   }
-  window.loadCVs = loadCVs; // por si lo llamas desde cambios de pestaña
+  window.loadCVs = loadCVs;
 
   async function uploadFile(file) {
+    if (inFlight) return;        // ⛔️ evita doble POST simultáneo
+    inFlight = true;
+
     const allowedMimes = new Set([
       'application/pdf','image/png','image/jpeg','image/webp','application/octet-stream',''
     ]);
     const extOk = /\.(pdf|png|jpe?g|webp)$/i.test(file?.name || '');
     const typeOk = allowedMimes.has(file?.type || '');
-    if (!extOk && !typeOk) { alert('Only PDF, PNG, JPG/JPEG or WEBP are allowed.'); return; }
+    if (!extOk && !typeOk) { alert('Only PDF, PNG, JPG/JPEG or WEBP are allowed.'); inFlight = false; return; }
 
     const fd = new FormData();
     fd.append('file', file);
@@ -1524,7 +1579,7 @@ if (hireRevenue){
     try {
       drop?.classList.add('dragover');
       const r = await fetch(`${apiBase}/candidates/${cid}/cvs`, { method: 'POST', body: fd });
-      if (!r.ok) throw new Error(await r.text().catch(()=>'Upload failed'));
+      if (!r.ok) throw new Error(await r.text().catch(()=> 'Upload failed'));
       const data = await r.json();
       render(data.items || []);
     } catch (e) {
@@ -1532,35 +1587,37 @@ if (hireRevenue){
     } finally {
       drop?.classList.remove('dragover');
       if (input) input.value = '';
+      // 👇 pequeño debounce para impedir doble disparo por wiring cruzado
+      setTimeout(() => { inFlight = false; }, 200);
     }
   }
 
-  // Drag & Drop
+  // Drag & Drop (con BIND para no repetir listeners)
   if (drop) {
-    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    ['dragenter','dragover'].forEach(ev => BIND(drop, ev, e => {
       e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover');
     }));
-    ['dragleave','dragend','drop'].forEach(ev => drop.addEventListener(ev, e => {
+    ['dragleave','dragend','drop'].forEach(ev => BIND(drop, ev, e => {
       e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover');
     }));
-    drop.addEventListener('drop', e => {
+    BIND(drop, 'drop', (e) => {
       const files = e.dataTransfer?.files;
       if (files?.length) uploadFile(files[0]);
     });
-    drop.addEventListener('click', (e) => {
+    BIND(drop, 'click', (e) => {
       if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
       input?.click();
     });
   }
 
   // Browse
-  browseBtn?.addEventListener('click', () => input?.click());
-  input?.addEventListener('change', () => { const f = input.files?.[0]; if (f) uploadFile(f); });
+  BIND(browseBtn, 'click', () => input?.click());
+  BIND(input, 'change', () => { const f = input.files?.[0]; if (f) uploadFile(f); });
 
   // Refresh
-  refreshBtn?.addEventListener('click', loadCVs);
+  BIND(refreshBtn, 'click', loadCVs);
 
-  // Carga inicial (también la haremos al entrar a Overview)
+  // Carga inicial
   loadCVs();
 })();
 
