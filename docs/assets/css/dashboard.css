@@ -171,6 +171,30 @@ body{
 .v-table .total-col{
   font-weight: 800;
 }
+/* ===== Overrides para EXPECTED (evitar verdes de MRR) ===== */
+.card.expected .kpi::before{
+  content: none !important;   /* quita el halo/gradiente verde heredado */
+  display: none !important;
+}
+
+.card.expected .kpi{
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.08) !important; /* sombra neutra */
+  border: 1px solid rgba(255,255,255,0.8) !important;
+  background-clip: padding-box;
+}
+
+.card.expected .kpi-label{
+  color: var(--exp-muted) !important;
+}
+
+.card.expected .kpi-value{
+  color: var(--exp-text-strong) !important;
+}
+
+/* Por si alguna regla global mete gradientes en el grid */
+.card.expected .expected-grid{
+  background: none !important;
+}
 
 /* ===== TFOOT → “Total” con jerarquía: más luminoso + doble borde sutil ===== */
 .v-table tfoot .row-total{
@@ -376,3 +400,155 @@ body{
   transition: opacity .15s, box-shadow .15s;
 }
 .info-ghost:hover{ opacity:1; box-shadow: inset 0 0 0 1px rgba(99,102,241,.28); }
+/* ========= EXPECTED CARD – look distinto a MRR ========= */
+:root{
+  /* puedes ajustar estos tonos rápido sin tocar más reglas */
+  --exp-border-1: #ffd66b;   /* amarillo suave */
+  --exp-border-2: #8fd3f4;   /* celeste pastel */
+  --exp-chip-fee: #ffe9b3;
+  --exp-chip-rev: #c8f3ff;
+  --exp-text-strong: #0a1f44;
+  --exp-muted: #6b7280;
+}
+
+.card.expected{
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.5);                 /* más “frosted” que MRR */
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(255, 214, 107, 0.10), /* sombra cálida */
+              0 6px 16px rgba(143, 211, 244, 0.12);  /* sombra fría */
+  border: 1px solid rgba(255,255,255,0.6);
+}
+
+/* Borde decorativo con gradiente fino (distinto al MRR) */
+.card.expected::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 1px; /* grosor del borde */
+  background: linear-gradient(135deg, var(--exp-border-1), var(--exp-border-2));
+  -webkit-mask: 
+     linear-gradient(#000 0 0) content-box, 
+     linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Head compacto, con icono circular suave */
+.expected-head{
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 6px;
+}
+
+.expected-icon{
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 22px;
+  background: radial-gradient(120% 120% at 20% 20%, #fff 0%, #fff6 60%, #fff0 100%),
+              linear-gradient(135deg, #fff8, #fff0);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7), 0 4px 10px rgba(0,0,0,0.06);
+}
+
+.expected-title{
+  margin: 0;
+  font-size: clamp(16px, 2.3vw, 18px);
+  font-weight: 800;
+  background: linear-gradient(90deg, #1f3a8a, #155e75);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent; /* título con gradiente (distinto al MRR) */
+}
+
+.card.expected .muted{
+  color: var(--exp-muted);
+  font-size: 12px;
+}
+
+/* Grid de KPIs: dos columnas, con tarjetas “chip” propias */
+.expected-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+  padding: 12px 18px 18px;
+}
+
+.expected-grid .kpi{
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.8);
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.05);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.expected-grid .kpi:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
+}
+/* que el grid no meta ningún gradiente transversal */
+.expected-grid{
+  background: none !important;
+}
+
+/* Píldoras de color sutiles y distintas entre Fee/Revenue */
+.kpi--fee{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.4)),
+    linear-gradient(135deg, var(--exp-chip-fee), #ffffff);
+}
+.kpi--rev{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.4)),
+    linear-gradient(135deg, var(--exp-chip-rev), #ffffff);
+}
+
+.expected-grid .kpi-label{
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--exp-muted);
+  margin-bottom: 4px;
+}
+
+.expected-grid .kpi-value{
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .2px;
+  color: var(--exp-text-strong);
+  font-weight: 900;
+  font-size: clamp(22px, 4vw, 30px);
+  line-height: 1.05;
+}
+
+/* Responsive: en pantallas pequeñas apila y agranda valores un pelo */
+@media (max-width: 720px){
+  .expected-grid{
+    grid-template-columns: 1fr;
+  }
+  .expected-head{
+    gap: 10px;
+    padding: 16px 14px 6px;
+  }
+  .expected-grid .kpi{
+    padding: 12px;
+  }
+}
+
+/* Antes: .kpi { ... }  y  .kpi::before { ... }  y .kpi-label / .kpi-value */
+.money .kpi{
+  border:1px solid #e6f4ea; background:#fbfffd; border-radius:18px; padding:18px 16px;
+  box-shadow: 0 14px 36px rgba(16,185,129,.10);
+  position:relative; overflow:hidden;
+}
+.money .kpi::before{
+  content:''; position:absolute; inset:-40px -60px auto auto; height:160px; width:160px;
+  background: conic-gradient(from 160deg, #dcfce7, #86efac, #bbf7d0, #dcfce7);
+  filter: blur(24px); opacity:.35; border-radius: 50%;
+}
+.money .kpi-label{ color:#0b5f2b; font-weight:700; letter-spacing:.2px; margin-bottom:6px;}
+.money .kpi-value{ font-size:2rem; font-weight:800; color:var(--money-2); }

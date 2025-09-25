@@ -331,6 +331,32 @@ function fmtMoney(v){
   const num = Number(v) || 0;
   return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
+// === Expected (Fee & Revenue) usando filtros del pipeline ===
+function computeExpectedTotals(opps){
+  let sumFee = 0;
+  let sumRevenue = 0;
+
+  for (const o of opps){
+    // mismo filtro que la tabla de pipeline
+    if (isStageExcluded(o.opp_stage)) continue;
+
+    const fee = Number(o.expected_fee);
+    const rev = Number(o.expected_revenue);
+
+    if (!Number.isNaN(fee)) sumFee += fee;
+    if (!Number.isNaN(rev)) sumRevenue += rev;
+  }
+  return { sumFee, sumRevenue };
+}
+
+function renderExpectedCard({ sumFee, sumRevenue }){
+  const elFee = document.getElementById('kpiExpectedFee');
+  const elRev = document.getElementById('kpiExpectedRevenue');
+  if (!elFee || !elRev) return;
+
+  elFee.textContent = fmtMoney(sumFee);
+  elRev.textContent = fmtMoney(sumRevenue);
+}
 
 // ===== Data =====
 async function fetchOpportunitiesLight(){
@@ -448,6 +474,10 @@ async function loadDashboard(){
     const matrix = computeMatrix(opps);
     renderTable(matrix);
 
+    // 1.b) Expected Fee / Expected Revenue (mismos filtros del pipeline)
+    const expectedTotals = computeExpectedTotals(opps);
+    renderExpectedCard(expectedTotals);
+
     // 2) MRR (desde data/light)
     const accounts = await fetchAccountsLight();
     renderMRRFromAccounts(accounts);
@@ -457,6 +487,7 @@ async function loadDashboard(){
     document.body.classList.remove('loading');
   }
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
