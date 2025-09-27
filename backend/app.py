@@ -332,7 +332,11 @@ def get_opportunities_light():
                 o.opp_hr_lead,
                 o.comments,
                 o.nda_signature_or_start_date,
-                o.opp_close_date,  -- <== agrega esta línea
+                o.opp_close_date,
+                -- 👇👇 AÑADIR ESTO
+                o.expected_fee,
+                o.expected_revenue,
+                -- 👆👆
                 u.user_name AS sales_lead_name,
                 a.client_name AS client_name
             FROM opportunity o
