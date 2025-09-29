@@ -122,8 +122,8 @@
       <div class="input-group"><label>HR Lead</label><select id="details-hr-lead"><option></option></select></div>
       <div class="input-group"><label>Model</label>
         <select id="details-model">
-          <option value="Staffing">Staffing</option>
-          <option value="Recruiting">Recruiting</option>
+          <option value="staffing">Staffing</option>
+          <option value="recruiting">Recruiting</option>
         </select>
       </div>
     </div>
@@ -679,6 +679,61 @@ the Vintti team</textarea>
 </div>
 
 <script src="./assets/js/opportunity-detail.js"></script>
+<script>
+// === FEES: mostrar solo en Staffing, ocultar en Recruiting ===
+// Busca el .input-group del input por id
+function __fee_findGroup(inputId){
+  const el = document.getElementById(inputId);
+  return el ? el.closest('.input-group') : null;
+}
+
+// Aplica/quita clase fuerte
+function __fee_setVisible(inputId, visible){
+  const group = __fee_findGroup(inputId);
+  if (!group) return;
+  group.classList.toggle('hide-fee-group', !visible);
+  const input = group.querySelector('input, select, textarea');
+  if (input) input.disabled = !visible;
+}
+
+// Lee modelo desde cualquiera de los selects (case-insensitive)
+function __fee_getModel(){
+  const a = document.getElementById('details-model')?.value || '';
+  const b = document.getElementById('model-select')?.value || '';
+  return (a || b).toString().trim().toLowerCase();
+}
+
+// Aplica la visibilidad
+function __fee_apply(){
+  const isStaffing = __fee_getModel().includes('staff'); // tolerante a "Staffing"
+  __fee_setVisible('fee-input',           isStaffing); // Set Up Fee
+  __fee_setVisible('expected-fee-input',  isStaffing); // Expected Fee
+}
+
+// Listeners sin colisiones
+function __fee_wire(){
+  ['details-model','model-select'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    // evita duplicados
+    if (el.__fee_wired) return;
+    el.addEventListener('change', __fee_apply, { passive:true });
+    el.__fee_wired = true;
+  });
+  __fee_apply();
+}
+
+// Corre al cargar
+document.addEventListener('DOMContentLoaded', () => {
+  __fee_wire();
+  // fallback: re-aplica tras cargas diferidas (por si setean el valor desde fetch)
+  setTimeout(__fee_apply, 100);
+  setTimeout(__fee_apply, 500);
+});
+
+// Si tu código cambia el modelo vía JS después, puedes llamar manualmente:
+// __fee_apply();
+</script>
 </body>
 </html>
 

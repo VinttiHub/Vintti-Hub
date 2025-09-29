@@ -2842,3 +2842,5 @@ input:checked + .slider::before {
 #header-actions .bottom-actions .icon{
   font-size: 12px;
 }
+/* fuerza ocultar los grupos de fee por encima de cualquier estilo previo */
+.hide-fee-group { display: none !important; }
