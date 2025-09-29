@@ -1556,19 +1556,33 @@ async function patchOppFields(oppId, payload) {
 })();
 // --- Dashboard + Management Metrics (después de Equipments) ---
 (() => {
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
+  const DASH_ALLOWED = new Set([
+    'agustin@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com'
+  ]);
+
+  // Si no está permitido, oculta si existieran y sal.
+  if (!DASH_ALLOWED.has(currentUserEmail)) {
+    document.getElementById('dashboardLink')?.style && (document.getElementById('dashboardLink').style.display = 'none');
+    document.getElementById('managementMetricsLink')?.style && (document.getElementById('managementMetricsLink').style.display = 'none');
+    return;
+  }
+
   // Referencias en el sidebar
   const summary = document.getElementById('summaryLink');               // 📊 Opportunities Summary
-  const opps    = document.getElementById('opportunitiesLink')          // (si existiera con id)
+  const opps    = document.getElementById('opportunitiesLink')
                 || document.querySelector('.sidebar a[href*="opportunities.html"]');
 
-  // Asegúrate de tener/crear el equipmentsLink primero (ya lo haces arriba)
+  // Asegúrate de tener/crear el equipmentsLink primero (arriba en tu código)
   let eq = document.getElementById('equipmentsLink');
 
-  // Punto de inserción: preferimos después de Equipments; si no existe, después de Summary; si no, después de Opportunities.
+  // Punto de inserción: después de Equipments; si no, después de Summary; si no, después de Opportunities.
   const anchor = eq || summary || opps;
-  if (!anchor) return; // no hay menú destino
+  if (!anchor) return;
 
-  // Plantilla para crear enlaces con mismo estilo que el Summary
+  // Plantilla de clase para que se vean igual que Summary
   const baseClass = (summary && summary.className) || 'menu-item';
 
   // 1) Dashboard (abre en nueva pestaña)
@@ -1580,9 +1594,10 @@ async function patchOppFields(oppId, payload) {
     dash.textContent = 'Dashboard';
     dash.href = 'https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue';
     dash.target = '_blank';
-    dash.rel = 'noopener'; // por seguridad
+    dash.rel = 'noopener';
     anchor.insertAdjacentElement('afterend', dash);
   }
+  dash.style.display = ''; // asegurar visibilidad para permitidos
 
   // 2) Management Metrics (misma pestaña)
   let mgmt = document.getElementById('managementMetricsLink');
@@ -1594,6 +1609,7 @@ async function patchOppFields(oppId, payload) {
     mgmt.href = 'control-dashboard.html';
     dash.insertAdjacentElement('afterend', mgmt);
   }
+  mgmt.style.display = ''; // asegurar visibilidad para permitidos
 })();
 
 window.addEventListener('pageshow', () => {

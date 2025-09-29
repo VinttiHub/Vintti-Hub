@@ -1,5 +1,44 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+// === Mostrar/ocultar fees según modelo (Staffing vs Recruiting) ===
+function setGroupVisibleByInputId(inputId, visible) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const group = input.closest('.input-group');
+  if (!group) return;
+
+  group.style.display = visible ? '' : 'none';
+  // Deshabilita el input si está oculto para evitar foco/edición accidental
+  input.disabled = !visible;
+  // Opcional: limpiar el valor al ocultar (descomenta si quieres forzar null en Recruiting)
+  // if (!visible) {
+  //   input.value = '';
+  //   if (inputId === 'fee-input') updateOpportunityField('fee', null);
+  //   if (inputId === 'expected-fee-input') updateOpportunityField('expected_fee', null);
+  // }
+}
+
+function updateBillingFieldsVisibility() {
+  // toma el valor de cualquiera de los dos selects que tengas en la página
+  const model1 = document.getElementById('model-select')?.value || '';
+  const model2 = document.getElementById('details-model')?.value || '';
+  const model = (model1 || model2 || '').trim().toLowerCase();
+
+  const isStaffing = model === 'Staffing';
+  // Solo estos dos campos cambian visibilidad
+  setGroupVisibleByInputId('fee-input', isStaffing);              // Set Up Fee
+  setGroupVisibleByInputId('expected-fee-input', isStaffing);     // Expected Fee
+}
+
+// Recalcula al cambiar el modelo en cualquiera de los selects
+['model-select','details-model'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', updateBillingFieldsVisibility, { passive: true });
+});
+
+// Recalcula en el primer paint
+document.addEventListener('DOMContentLoaded', updateBillingFieldsVisibility);
+
 // === Emoji Picker boot + helpers ===
 async function ensureEmojiPickerLoaded() {
   if (customElements.get('emoji-picker')) return;
@@ -2099,7 +2138,7 @@ async function loadOpportunityData() {
     document.getElementById('details-opportunity-name').value = data.opp_position_name || '';
     document.getElementById('details-account-name').value = data.account_name || '';
     document.getElementById('details-model').value = data.opp_model || '';
-    
+    updateBillingFieldsVisibility();
     // JOB DESCRIPTION
     document.getElementById('job-description-textarea').innerHTML = data.hr_job_description || '';
 
