@@ -1,5 +1,35 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+// === Date-only utils (sin TZ) ===
+function isYMD(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s||'')); }
+function pad2(n){ return String(n).padStart(2,'0'); }
+
+// Convierte cualquier valor a 'YYYY-MM-DD' sin desfasar.
+// - Si ya es 'YYYY-MM-DD' lo devuelve igual.
+// - Si viene ISO con hora, usa *UTC* para extraer año/mes/día.
+function toYMD(val){
+  if (!val) return '';
+  const s = String(val).trim();
+  if (isYMD(s)) return s;
+
+  const d = new Date(s);
+  if (isNaN(d)) return '';
+  const y = d.getUTCFullYear();
+  const m = pad2(d.getUTCMonth()+1);
+  const day = pad2(d.getUTCDate());
+  return `${y}-${m}-${day}`;
+}
+
+// Diferencia de días entre "hoy" y un 'YYYY-MM-DD' (todo en UTC, sin TZ)
+function daysSinceYMD(ymd){
+  if (!ymd || !isYMD(ymd)) return '—';
+  const [Y,M,D] = ymd.split('-').map(Number);
+  const today = new Date();
+  const utcToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const utcThat  = Date.UTC(Y, (M-1), D);
+  const diff = Math.floor((utcToday - utcThat) / 86400000);
+  return Number.isFinite(diff) ? String(diff) : '—';
+}
 
 // === Emoji Picker boot + helpers ===
 async function ensureEmojiPickerLoaded() {
@@ -1114,7 +1144,7 @@ async function loadPresentationTable(opportunityId) {
         const tdDate = document.createElement("td");
         const inputDate = document.createElement("input");
         inputDate.type = "date";
-        inputDate.value = formatDate(batch.presentation_date); // usa tu helper
+        inputDate.value = toYMD(batch.presentation_date);
         inputDate.addEventListener("blur", async () => {
           const updated = { presentation_date: inputDate.value || null };
           await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}`, {
@@ -1122,16 +1152,16 @@ async function loadPresentationTable(opportunityId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updated)
           });
-          // recalcula días tras editar
-          const daysCell = tr.querySelector('td.time-col');
-          daysCell.textContent = calcDaysSince(inputDate.value);
+        const ymd = toYMD(inputDate.value);
+        const daysCell = tr.querySelector('td.time-col');
+        daysCell.textContent = daysSinceYMD(ymd);
         });
         tdDate.appendChild(inputDate);
 
         // Time (days)
         const tdTime = document.createElement("td");
         tdTime.className = "time-col";
-        tdTime.textContent = calcDaysSince(batch.presentation_date);
+        tdTime.textContent = daysSinceYMD(toYMD(batch.presentation_date));
 
         tr.appendChild(tdBatch);
         tr.appendChild(tdDate);
@@ -2083,8 +2113,8 @@ async function loadOpportunityData() {
     // Overview section
     document.getElementById('opportunity-id-text').textContent = data.opportunity_id || '—';
     document.getElementById('opportunity-id-text').setAttribute('data-id', data.opportunity_id);
-    document.getElementById('start-date-input').value = formatDate(data.nda_signature_or_start_date);
-    document.getElementById('close-date-input').value = formatDate(data.opp_close_date);
+    document.getElementById('start-date-input').value = toYMD(data.nda_signature_or_start_date);
+    document.getElementById('close-date-input').value = toYMD(data.opp_close_date);
     document.getElementById('comments-overview-textarea').value = data.comments || '';
 
     // Client section
@@ -2256,30 +2286,15 @@ async function loadOpportunityData() {
  document.getElementById('expected-revenue-input').value = d.expected_revenue ?? '';
 
       }
-      function formatDate(dateStr) {
-        if (!dateStr) return '';
-        
-        const parsed = Date.parse(dateStr);
-        if (isNaN(parsed)) return '';
+function formatDate(dateStr) {
+  return toYMD(dateStr);
+}
 
-        const date = new Date(parsed);
-
-        // Aquí se usa getFullYear(), getMonth() + 1, getDate() → muestra la fecha tal como la tienes en el JSON
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-
-        return `${year}-${month}-${day}`;
-      }
 
 
 
 function calculateDaysAgo(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+  return daysSinceYMD(toYMD(dateStr));
 }
 async function updateOpportunityField(fieldName, fieldValue) {
   const opportunityId = getOpportunityId();
