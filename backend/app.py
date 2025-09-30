@@ -1966,7 +1966,6 @@ def handle_candidate_hire_data(candidate_id):
         opportunity_id, opp_model, account_id = opp
 
         if request.method == 'GET':
-            # 2) Traer datos desde hire_opportunity
             cursor.execute("""
                 SELECT
                     references_notes,
@@ -1986,39 +1985,19 @@ def handle_candidate_hire_data(candidate_id):
                     referral_dolar,
                     referral_daterange,
                     buyout_dolar,
-                    buyout_daterange
+                    buyout_daterange,
+                    carga_inactive           -- <--- AÑADIR
                 FROM hire_opportunity
                 WHERE candidate_id = %s AND opportunity_id = %s
                 LIMIT 1
             """, (candidate_id, opportunity_id))
             row = cursor.fetchone()
 
-            if not row:
-                return jsonify({
-                    'references_notes': '',
-                    'employee_salary': None,
-                    'employee_fee': None,
-                    'computer': '',
-                    'setup_fee': None,  
-                    'extraperks': '',
-                    'working_schedule': '',
-                    'pto': '',
-                    'discount_dolar': None,
-                    'discount_daterange': None,
-                    'start_date': None,
-                    'end_date': None,
-                    'employee_revenue': None,
-                    'employee_revenue_recruiting': None,
-                    # NUEVO 👇
-                    'referral_dolar': None,
-                    'referral_daterange': None,
-                    'buyout_dolar': None,
-                    'buyout_daterange': None
-                })
-            
+            # ...
             (references_notes, salary, fee, setup_fee, computer, extra_perks, working_schedule,
             pto, discount_dolar, discount_daterange, start_date, end_date, revenue,
-            referral_dolar, referral_daterange, buyout_dolar, buyout_daterange) = row
+            referral_dolar, referral_daterange, buyout_dolar, buyout_daterange,
+            carga_inactive) = row  # <--- AÑADIR VARIABLE
 
             return jsonify({
                 'references_notes': references_notes,
@@ -2026,7 +2005,7 @@ def handle_candidate_hire_data(candidate_id):
                 'employee_fee': fee,
                 'computer': computer,
                 'setup_fee': setup_fee,
-                'extraperks': extra_perks,  # <- tu key de front
+                'extraperks': extra_perks,
                 'working_schedule': working_schedule,
                 'pto': pto,
                 'discount_dolar': discount_dolar,
@@ -2038,9 +2017,9 @@ def handle_candidate_hire_data(candidate_id):
                 'referral_dolar': referral_dolar,
                 'referral_daterange': referral_daterange,
                 'buyout_dolar': buyout_dolar,
-                'buyout_daterange': buyout_daterange
+                'buyout_daterange': buyout_daterange,
+                'carga_inactive': carga_inactive   # <--- AÑADIR (opcional)
             })
-
 
 
         # PATCH -> asegurar/actualizar fila en hire_opportunity
@@ -2113,9 +2092,15 @@ def handle_candidate_hire_data(candidate_id):
                     WHERE candidate_id = %s AND opportunity_id = %s
                 """, set_vals)
                 updated = True
-                            # --- Sincronizar end_date con buyout_daterange cuando se edita buyout_* ---
-            # Regla: si viene buyout_dolar o buyout_daterange (y NO nos mandaron end_date manual),
-            # ponemos end_date = último día del mes indicado por buyout_daterange.
+
+            if ('end_date' in data) and data.get('end_date'):
+                cursor.execute("""
+                    UPDATE hire_opportunity
+                    SET carga_inactive = COALESCE(carga_inactive, CURRENT_DATE)
+                    WHERE candidate_id = %s AND opportunity_id = %s
+                    AND end_date IS NOT NULL
+                """, (candidate_id, opportunity_id))
+
             if ('buyout_dolar' in data or 'buyout_daterange' in data) and ('end_date' not in data):
                 def _end_date_from_buyout(val) -> str | None:
                     """
@@ -2164,6 +2149,13 @@ def handle_candidate_hire_data(candidate_id):
                         SET end_date = %s
                         WHERE candidate_id = %s AND opportunity_id = %s
                     """, (computed_end, candidate_id, opportunity_id))
+                    # ✅ Si el end_date fue inferido por buyout, fija carga_inactive si aún es NULL
+                    cursor.execute("""
+                        UPDATE hire_opportunity
+                        SET carga_inactive = COALESCE(carga_inactive, CURRENT_DATE)
+                        WHERE candidate_id = %s AND opportunity_id = %s
+                        AND end_date IS NOT NULL
+                    """, (candidate_id, opportunity_id))
 
             # 2.5) Marcar al candidato como "Client hired" en candidates_batches (vía batch)
             cursor.execute("""
