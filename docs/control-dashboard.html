@@ -59,23 +59,38 @@
         </table>
       </div>
       </section>
-<!-- ====== CARD: Expected Fee & Expected Revenue (Pipeline filters) ====== -->
+<!-- ====== CARD: Expected (Pipeline filters) ====== -->
 <section class="card expected glass" id="expectedCard">
   <div class="card-head expected-head">
     <div class="expected-icon" aria-hidden="true">💸</div>
     <div>
       <h2 class="expected-title">Expected · Pipeline</h2>
+      <div class="muted">Same filters as Opportunities — Pipeline (excludes Deep Dive, NDA Sent, Close Won/Lost)</div>
     </div>
   </div>
 
-  <div class="expected-grid">
-    <div class="kpi kpi--fee">
-      <div class="kpi-label">Expected Fee</div>
-      <div class="kpi-value" id="kpiExpectedFee">—</div>
+  <div class="expected-grid expected-grid--pretty">
+    <!-- Row 1 -->
+    <div class="kpi kpi--fee kpi--staff">
+      <div class="kpi-label">
+        <span class="badge-model badge-staff">Staffing</span> Fee
+      </div>
+      <div class="kpi-value" id="kpiExpectedFeeStaff">—</div>
     </div>
-    <div class="kpi kpi--rev">
-      <div class="kpi-label">Expected Revenue</div>
-      <div class="kpi-value" id="kpiExpectedRevenue">—</div>
+
+    <div class="kpi kpi--rev kpi--staff">
+      <div class="kpi-label">
+        <span class="badge-model badge-staff">Staffing</span> Revenue
+      </div>
+      <div class="kpi-value" id="kpiExpectedRevStaff">—</div>
+    </div>
+
+    <!-- Row 2 (spans both columns) -->
+    <div class="kpi kpi--rev kpi--rec kpi--span2">
+      <div class="kpi-label">
+        <span class="badge-model badge-rec">Recruiting</span> Revenue
+      </div>
+      <div class="kpi-value" id="kpiExpectedRevRec">—</div>
     </div>
   </div>
 </section>

@@ -1,6 +1,40 @@
 // ===== Helpers =====
 const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 // ======= TSR/TSF History (Staffing) =======
+// === Expected (Fee & Revenue) por modelo (Staffing / Recruiting) ===
+function computeExpectedByModel(opps){
+  const out = {
+    staffing:   { fee: 0, revenue: 0 },
+    recruiting: { fee: 0, revenue: 0 }
+  };
+
+  for (const o of opps){
+    // mismo filtro que la tabla de pipeline
+    if (isStageExcluded(o.opp_stage)) continue;
+
+    const m = normalizeModel(o.opp_model);
+    if (!m || !(m in out)) continue;
+
+    const fee = Number(o.expected_fee);
+    const rev = Number(o.expected_revenue);
+
+    if (!Number.isNaN(fee)) out[m].fee += fee;
+    if (!Number.isNaN(rev)) out[m].revenue += rev;
+  }
+  return out;
+}
+
+function renderExpectedByModel(modelTotals){
+  const map = [
+    ['kpiExpectedFeeStaff', modelTotals.staffing.fee],
+    ['kpiExpectedRevStaff', modelTotals.staffing.revenue],
+    ['kpiExpectedRevRec',   modelTotals.recruiting.revenue],
+  ];
+  for (const [id, val] of map){
+    const el = document.getElementById(id);
+    if (el) el.textContent = fmtMoney(val);
+  }
+}
 async function fetchTSHistory({ fromYM = null, toYM = null } = {}) {
   const params = new URLSearchParams();
   if (fromYM) params.set('from', fromYM);
@@ -475,8 +509,8 @@ async function loadDashboard(){
     renderTable(matrix);
 
     // 1.b) Expected Fee / Expected Revenue (mismos filtros del pipeline)
-    const expectedTotals = computeExpectedTotals(opps);
-    renderExpectedCard(expectedTotals);
+    const expectedByModel = computeExpectedByModel(opps);
+    renderExpectedByModel(expectedByModel);
 
     // 2) MRR (desde data/light)
     const accounts = await fetchAccountsLight();

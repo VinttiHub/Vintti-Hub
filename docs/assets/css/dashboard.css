@@ -552,3 +552,137 @@ body{
 }
 .money .kpi-label{ color:#0b5f2b; font-weight:700; letter-spacing:.2px; margin-bottom:6px;}
 .money .kpi-value{ font-size:2rem; font-weight:800; color:var(--money-2); }
+/* ===== Expected · Pretty layout ===== */
+.expected-grid--pretty{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 14px;
+  padding: 14px 18px 18px;
+}
+.kpi--span2{ grid-column: 1 / -1; }
+
+/* Paletas suaves diferenciadas */
+.kpi--staff.kpi--fee{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.55)),
+    radial-gradient(60% 80% at 0% 0%, #fff6d6 0%, #fff 60%); /* amarillos suaves */
+  border: 1px solid rgba(255, 214, 107, .55);
+  box-shadow: 0 10px 28px rgba(255, 214, 107, .15);
+}
+.kpi--staff.kpi--rev{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.55)),
+    radial-gradient(60% 80% at 100% 0%, #d6f3ff 0%, #fff 60%); /* celestes suaves */
+  border: 1px solid rgba(143, 211, 244, .55);
+  box-shadow: 0 10px 28px rgba(143, 211, 244, .15);
+}
+.kpi--rec.kpi--rev{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.62)),
+    radial-gradient(80% 90% at 50% -10%, #e8f2ff 0%, #ffffff 70%);
+  border: 1px solid rgba(99, 102, 241, .28);
+  box-shadow: 0 10px 28px rgba(99,102,241,.12);
+}
+
+/* Tipografías y badges */
+.expected-grid .kpi-label{
+  font-size: 12px; font-weight: 700; color: var(--exp-muted); margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.expected-grid .kpi-value{
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .2px;
+  color: var(--exp-text-strong);
+  font-weight: 900;
+  font-size: clamp(24px, 3.8vw, 34px);
+  line-height: 1.05;
+}
+
+.badge-model{
+  display:inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; line-height: 1.2;
+  border:1px solid rgba(255,255,255,.9); background:#fff;
+  box-shadow: 0 2px 8px rgba(16,24,40,.06);
+}
+.badge-staff{ color:#14532d; background:#dcfce7; } /* verde menta suave */
+.badge-rec{   color:#0c4a6e; background:#cff0ff; } /* celeste suave */
+
+/* Quitar herencias verdes del bloque MRR dentro de Expected */
+.card.expected .kpi::before{ content:none !important; display:none !important; }
+
+/* Responsive: stack bonito en móvil */
+@media (max-width: 720px){
+  .expected-grid--pretty{ grid-template-columns: 1fr; }
+  .kpi--span2{ grid-column: auto; }
+}
+/* ===== Fondo con gradiente azul para todas las KPIs de Expected ===== */
+.card.expected .kpi{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.58)),
+    linear-gradient(135deg, #eef6ff 0%, #e8f0ff 45%, #eaf7ff 100%);
+  border: 1px solid rgba(143, 211, 244, .45);
+  box-shadow: 0 10px 28px rgba(99,102,241,.10);
+}
+
+/* Elimina cualquier halo heredado */
+.card.expected .kpi::before{ content:none !important; display:none !important; }
+
+/* ===== Centrado elegante para la tarjeta de Recruiting (la que ocupa 2 columnas) ===== */
+.kpi--rec.kpi--span2{
+  display:flex; 
+  flex-direction:column; 
+  align-items:center; 
+  justify-content:center;
+  text-align:center;
+  min-height: 120px;                /* ajusta si la quieres más compacta */
+}
+
+/* Centra también la etiqueta y dale un poquito más de presencia */
+.kpi--rec.kpi--span2 .kpi-label{
+  justify-content: center;          /* centra el chip + texto */
+  text-align: center;
+  font-size: 13px;
+}
+
+/* Valor grande y centrado */
+.kpi--rec.kpi--span2 .kpi-value{
+  font-size: clamp(28px, 4.2vw, 38px);
+  line-height: 1.02;
+}
+
+/* Badge colores (si no los tenías ya) */
+.badge-rec{   color:#0c4a6e; background:#cff0ff; }
+.badge-staff{ color:#14532d; background:#dcfce7; }
+
+/* En móvil sigue centrado y ocupando ancho completo */
+@media (max-width: 720px){
+  .kpi--rec.kpi--span2{ min-height: 110px; }
+}
+/* ===== Center layout para todas las KPIs dentro de Expected ===== */
+.card.expected .kpi{
+  display: flex;
+  flex-direction: column;
+  align-items: center;      /* centra horizontal */
+  justify-content: center;  /* centra vertical */
+  text-align: center;
+  min-height: 120px;        /* ajusta si quieres más compactas */
+}
+
+/* Etiqueta y badge centrados */
+.card.expected .kpi .kpi-label{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+/* Un pelín de aire entre etiqueta y valor */
+.card.expected .kpi .kpi-value{
+  margin-top: 4px;
+}
+
+/* Mobile: un poco más bajas para que no ocupen tanto */
+@media (max-width: 720px){
+  .card.expected .kpi{ min-height: 106px; }
+}
