@@ -160,16 +160,14 @@ window.allowedHRUsers = window.allowedHRUsers || [];
 fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
   .then(response => response.json())
   .then(users => {
-    // HR permitidos por nombre (como ya lo tenías)
-// ✅ Reemplaza ambos bloques por esto:
-const ALLOWED_HR_EMAILS = new Set([
-  'pilar@vintti.com',
-  'jazmin@vintti.com',
-  'agostina@vintti.com',
-  'agustina.barbero@vintti.com',
-  // ➕ NUEVA:
-  'agustina.ferrari@vintti.com'
-]);
+  const ALLOWED_HR_EMAILS = new Set([
+    'pilar@vintti.com',
+    'pilar.fernandez@vintti.com', // ⬅️ NUEVA
+    'jazmin@vintti.com',
+    'agostina@vintti.com',
+    'agustina.barbero@vintti.com',
+    'agustina.ferrari@vintti.com'
+  ]);
 
 window.allowedHRUsers = users.filter(u =>
   ALLOWED_HR_EMAILS.has(String(u.email_vintti||'').toLowerCase())
@@ -490,6 +488,7 @@ if (!allowedHRUsers.length) {
     const users = await res.json();
     const ALLOWED_HR_EMAILS = new Set([
       'pilar@vintti.com',
+      'pilar.fernandez@vintti.com', // ⬅️ NUEVA
       'jazmin@vintti.com',
       'agostina@vintti.com',
       'agustina.barbero@vintti.com',
@@ -675,25 +674,22 @@ function nameToEmail(label, isHR){
   const lower = String(label||'').toLowerCase();
 
   if (isHR) {
-    // ➕ distinguir por apellidos
-    if (lower.includes('pilar'))                   return 'pilar@vintti.com';
-    if (lower.includes('jazmin'))                  return 'jazmin@vintti.com';
+    // ➕ primero casos específicos
+    if (lower.includes('pilar') && lower.includes('fernandez')) return 'pilar.fernandez@vintti.com'; // ⬅️ NUEVA
+    if (lower.includes('pilar'))                                 return 'pilar@vintti.com';
+
+    if (lower.includes('jazmin'))                                 return 'jazmin@vintti.com';
     if (lower.includes('agostina') && lower.includes('barbero'))  return 'agustina.barbero@vintti.com';
     if (lower.includes('agostina') && lower.includes('ferrari'))  return 'agustina.ferrari@vintti.com';
-
-    // soporte a nombres exactos (por si el label llega “bonito”)
-    if (lower === 'agustina barbero') return 'agustina.barbero@vintti.com';
-    if (lower === 'agustina ferrari') return 'agustina.ferrari@vintti.com';
-
-    // “Agostina” (otra persona)
-    if (lower.includes('agostina')) return 'agostina@vintti.com';
+    if (lower === 'agustina barbero')                             return 'agustina.barbero@vintti.com';
+    if (lower === 'agustina ferrari')                             return 'agustina.ferrari@vintti.com';
+    if (lower.includes('agostina'))                               return 'agostina@vintti.com';
   } else {
     if (lower.includes('bahia'))   return 'bahia@vintti.com';
     if (lower.includes('lara'))    return 'lara@vintti.com';
     if (lower.includes('agustin')) return 'agustin@vintti.com';
   }
 
-  // Búsqueda exacta si los usuarios ya están cargados
   const arr = isHR ? (window.allowedHRUsers||[]) : (window.allowedSalesUsers||[]);
   const u = arr.find(u => String(u.user_name||'').toLowerCase() === lower);
   return u?.email_vintti || '';
@@ -1624,37 +1620,42 @@ window.addEventListener('pageshow', () => {
  // === Avatares por email ===
 const AVATAR_BASE = './assets/img/'; // cambia si tus imágenes viven en otra ruta
 const AVATAR_BY_EMAIL = {
-  'agostina@vintti.com': 'agos.png',
-  'bahia@vintti.com':    'bahia.png',
-  'lara@vintti.com':     'lara.png',
-  'jazmin@vintti.com':   'jaz.png',
-  'pilar@vintti.com':    'pilar.png',
-  'agustin@vintti.com':  'agus.png',
-  'agustina.barbero@vintti.com': 'agustina.png',
-  'agustina.ferrari@vintti.com': 'agustina_ferrari.png'
+  'agostina@vintti.com':                'agos.png',
+  'bahia@vintti.com':                   'bahia.png',
+  'lara@vintti.com':                    'lara.png',
+  'jazmin@vintti.com':                  'jaz.png',
+  'pilar@vintti.com':                   'pilar.png',
+  'pilar.fernandez@vintti.com':         'pilar_fer.png', // ⬅️ NUEVO
+  'agustin@vintti.com':                 'agus.png',
+  'agustina.barbero@vintti.com':        'agustina.png',
+  'agustina.ferrari@vintti.com':        'agustina_ferrari.png'
 };
 
 // --- HR initials (dos letras) ---
 const HR_INITIALS_BY_EMAIL = {
   'agostina@vintti.com':                'AC',
   'jazmin@vintti.com':                  'JP',
-  'pilar@vintti.com':                   'PF',
+  'pilar@vintti.com':                   'PL', // ⬅️ antes PF, ahora PL
+  'pilar.fernandez@vintti.com':         'PF', // ⬅️ NUEVA
   'agustina.barbero@vintti.com':        'AB',
   'agustina.ferrari@vintti.com':        'AF'
 };
 
 function initialsForHRLead(emailOrName) {
   const s = String(emailOrName || '').trim().toLowerCase();
-  // Si viene email exacto:
+
   if (HR_INITIALS_BY_EMAIL[s]) return HR_INITIALS_BY_EMAIL[s];
 
-  // Si viene nombre, distinguimos por apellido cuando sea posible:
+  // Distinción por nombre
+  if (s.includes('pilar') && s.includes('fernandez')) return 'PF'; // nueva
+  if (s.includes('pilar') && s.includes('flores'))     return 'PL'; // si la Pilar anterior es López
+  // fallback histórico (si solo dice "Pilar", asumimos la de siempre)
+  if (s === 'pilar' || (s.includes('pilar') && !s.includes('fernandez'))) return 'PL';
+
   if (s.includes('agostina') && s.includes('barbero'))  return 'AB';
   if (s.includes('agostina') && s.includes('ferrari'))  return 'AF';
-
-  if (s.includes('agostina')) return 'AC';  // fallback histórico para "Agostina"
+  if (s.includes('agostina')) return 'AC';
   if (s.includes('jazmin'))   return 'JP';
-  if (s.includes('pilar'))    return 'PF';
 
   return '—';
 }
