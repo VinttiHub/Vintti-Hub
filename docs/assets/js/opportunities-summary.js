@@ -1,7 +1,8 @@
 document.addEventListener("DOMContentLoaded", async () => {
   const stages = ["Negotiating", "Interviewing", "Sourcing", "Deep Dive", "NDA Sent"];
   const emails = {
-    "pilar@vintti.com": "Pilar",
+    "pilar@vintti.com": "Pilar Levalle",
+    "pilar.fernandez@vintti.com": "Pilar Fernandez",
     "agostina@vintti.com": "Agostina",
     "jazmin@vintti.com": "Jazmín",
     "agustina.barbero@vintti.com": "Agustina Barbero",
@@ -283,7 +284,6 @@ const filteredOpps = (oppsCache || []).filter((o) =>
       });
     });
   }, 100);
-f
   // ——— Hover de columna con velo del color del stage
   // Seteamos un data-atributo en la tabla con el índice de columna
   function setHoverCol(colIndex) {
