@@ -1191,11 +1191,38 @@ def get_candidate_by_id(candidate_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-
 @app.route('/opportunities/<int:opportunity_id>/fields', methods=['PATCH'])
 def update_opportunity_fields(opportunity_id):
+    from datetime import date, datetime
+    import logging, json
+
+    def _to_date_or_none(v):
+        """Soporta 'YYYY-MM-DD' o cualquier string con 'T' (toma solo la fecha)."""
+        if v in (None, '', 'null'):
+            return None
+        if isinstance(v, date) and not isinstance(v, datetime):
+            return v  # ya es date
+        if isinstance(v, datetime):
+            return v.date()
+        if isinstance(v, str):
+            s = v.strip()
+            # caso ideal: 'YYYY-MM-DD'
+            try:
+                if len(s) == 10 and s[4] == '-' and s[7] == '-':
+                    return date.fromisoformat(s)
+            except Exception:
+                pass
+            # si vino como ISO con hora: 'YYYY-MM-DDTHH:MM:SSZ'
+            try:
+                # no usamos dateutil para no agregar dependencia: cortamos a 10
+                return date.fromisoformat(s[:10])
+            except Exception:
+                raise ValueError(f"Invalid date format for value: {v!r}")
+        raise ValueError(f"Unsupported date type for value: {type(v)}")
+
     data = request.get_json() or {}
-    logging.info("📥 PATCH /opportunities/%s/fields payload=%s", opportunity_id, json.dumps(data, default=str))
+    logging.info("📥 PATCH /opportunities/%s/fields payload=%s",
+                 opportunity_id, json.dumps(data, default=str))
 
     candidate_hired_id = data.get('candidato_contratado')
 
@@ -1220,10 +1247,10 @@ def update_opportunity_fields(opportunity_id):
         'motive_close_lost',
         'client_interviewing_process',
         'replacement_of',
-        'replacement_end_date',
+        'replacement_end_date',        # 👈 asegúrate de tratarla como DATE
         'candidato_contratado',
 
-        # 👇 NUEVOS (Career Site)
+        # 👇 Career Site
         'career_job_id',
         'career_job',
         'career_country',
@@ -1234,7 +1261,7 @@ def update_opportunity_fields(opportunity_id):
         'career_experience_level',
         'career_field',
         'career_modality',
-        'career_tools',  # JSON/text
+        'career_tools',   # JSON/text
         'career_description',
         'career_requirements',
         'career_additional_info',
@@ -1242,22 +1269,31 @@ def update_opportunity_fields(opportunity_id):
         'expected_fee',
         'expected_revenue'
     ]
+
     # 🔹 Normaliza HTML ruidoso de Career Site / Webflow antes de persistir
     for key in ('career_description', 'career_requirements', 'career_additional_info'):
         if key in data and isinstance(data[key], str):
-            # Si tu destino es Webflow/tu site en HTML:
             data[key] = _clean_html_for_webflow(data[key], output='html')
-            # Si prefieres texto plano para Google Sheets, cambia a:
-            # data[key] = _clean_html_for_webflow(data[key], output='text')
+
+    # 👉 Campos que deben guardarse como DATE puro (sin hora)
+    DATE_FIELDS = {
+        'opp_close_date',
+        'nda_signature_or_start_date',
+        'since_sourcing',
+        'replacement_end_date',
+    }
 
     updates, values = [], []
     for field in updatable_fields:
         if field in data:
-            if field in ('opp_close_date', 'nda_signature_or_start_date', 'since_sourcing'):
-                updates.append(f"{field} = %s::date")
-            else:
-                updates.append(f"{field} = %s")
-            values.append(data[field])
+            val = data[field]
+            if field in DATE_FIELDS:
+                try:
+                    val = _to_date_or_none(val)
+                except ValueError as e:
+                    return jsonify({'error': str(e), 'field': field}), 400
+            updates.append(f"{field} = %s")
+            values.append(val)
 
     if not updates and candidate_hired_id is None:
         logging.warning("⚠️ Nada que actualizar y sin candidato_contratado")
@@ -1267,14 +1303,14 @@ def update_opportunity_fields(opportunity_id):
         conn = get_connection()
         with conn:
             with conn.cursor() as cursor:
-                # 1) Update de opportunity
+                # 1) Update de opportunity (sin ::date — ya enviamos objetos date)
                 if updates:
                     logging.info("🛠 SET %s", ', '.join(updates))
                     values.append(opportunity_id)
                     cursor.execute(f"""
                         UPDATE opportunity
-                        SET {', '.join(updates)}
-                        WHERE opportunity_id = %s
+                           SET {', '.join(updates)}
+                         WHERE opportunity_id = %s
                     """, values)
                     logging.info("✅ UPDATE opportunity (%s filas)", cursor.rowcount)
 
@@ -1285,23 +1321,22 @@ def update_opportunity_fields(opportunity_id):
                     except (TypeError, ValueError):
                         return jsonify({'error': 'candidato_contratado must be an integer'}), 400
 
-                    # Marcar status "Client hired" en batches vinculados a esta opp
                     cursor.execute("""
                         UPDATE candidates_batches cb
-                        SET status = %s
-                        WHERE cb.candidate_id = %s
-                          AND EXISTS (
-                            SELECT 1
-                            FROM batch b
-                            WHERE b.batch_id = cb.batch_id
-                              AND b.opportunity_id = %s
-                          )
+                           SET status = %s
+                         WHERE cb.candidate_id = %s
+                           AND EXISTS (
+                                 SELECT 1
+                                   FROM batch b
+                                  WHERE b.batch_id = cb.batch_id
+                                    AND b.opportunity_id = %s
+                           )
                     """, ('Client hired', candidate_hired_id, opportunity_id))
                     if cursor.rowcount == 0:
                         cursor.execute("""
                             UPDATE candidates_batches
-                            SET status = %s
-                            WHERE candidate_id = %s
+                               SET status = %s
+                             WHERE candidate_id = %s
                         """, ('Client hired', candidate_hired_id))
                     logging.info("🟢 candidates_batches actualizado")
 

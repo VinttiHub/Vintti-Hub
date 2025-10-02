@@ -1385,3 +1385,157 @@ body {
   .lead-tip:hover::before,
   .lead-tip:focus-visible::before{ opacity:1; }
 }
+/* ===== Close Win popup: versión compacta real ===== */
+#closeWinPopup .popup-content{
+  max-width: 440px;              /* modal más angosto */
+  padding: 16px 18px 18px;       /* menos padding interno */
+}
+
+/* tamaño “S” consistente */
+:root{
+  --cw-h: 32px;                  /* altura final del campo */
+  --cw-fs: 13px;                 /* font-size pequeño */
+  --cw-px: 10px;                 /* padding horizontal */
+  --cw-radius: 8px;              /* borde redondo pero sutil */
+}
+
+/* inputs del modal (texto + fecha + selects si hubiese) */
+#closeWinPopup .popup-content input[type="text"],
+#closeWinPopup .popup-content input[type="date"],
+#closeWinPopup .popup-content select{
+  height: var(--cw-h);
+  font-size: var(--cw-fs);
+  line-height: var(--cw-h);      /* evita que “crezca” por line-height heredado */
+  padding: 0 var(--cw-px);
+  border-radius: var(--cw-radius);
+  border: 1.5px solid #e3e6ef;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* Safari/Chrome WebKit: el date-input suele inflarse */
+#closeWinPopup .popup-content input[type="date"]{
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 0.6rem;         /* deja espacio al icono del datepicker */
+}
+
+/* placeholder y labels más chicos */
+#closeWinPopup .popup-content ::placeholder{ font-size: var(--cw-fs); opacity:.7; }
+#closeWinPopup .popup-content label{
+  font-size: 12.5px;
+  margin: 4px 0 6px;
+  display: inline-block;
+}
+
+/* separaciones verticales compactas */
+#closeWinPopup .autocomplete,
+#closeWinPopup .popup-content input[type="date"]{ margin-bottom: 8px; }
+
+/* lista del autocomplete también mini */
+#closeWinPopup .autocomplete{ width:100%; }
+#closeWinPopup .autocomplete-list{
+  top: calc(100% + 4px);
+  border-radius: var(--cw-radius);
+  max-height: 200px;
+}
+#closeWinPopup .autocomplete-item{
+  padding: 6px 9px;
+  font-size: var(--cw-fs);
+}
+
+/* botón Save compacto */
+#closeWinPopup #saveCloseWin{
+  height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+#closeWinPopup .popup-content input,
+#closeWinPopup .popup-content select{ width: 100%; max-width: 400px; }
+/* —— Close Win autocomplete ———————————————— */
+.autocomplete {
+  position: relative;
+  width: 100%;
+}
+#closeWinHireInput,
+#closeWinDate,
+.popup-content select,
+.popup-content input[type="text"],
+.popup-content input[type="date"]{
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e6e6eb;
+  border-radius: 12px;            /* redondeado */
+  background: #fff;               /* fondo blanco */
+  font-size: 0.95rem;
+  outline: none;
+  transition: box-shadow .15s, border-color .15s;
+}
+#closeWinHireInput:focus,
+#closeWinDate:focus{
+  border-color: #bfc7ff;
+  box-shadow: 0 0 0 3px rgba(0,40,255,.08);
+}
+.autocomplete-list{
+  position: absolute;
+  left: 0; right: 0; top: calc(100% + 6px);
+  background: #fff;
+  border: 1px solid #ececf3;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+  z-index: 50;
+  max-height: 260px;
+  overflow-y: auto;
+  display: none;                  /* se muestra vía JS */
+}
+.autocomplete-item{
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: .95rem;
+}
+.autocomplete-item:hover,
+.autocomplete-item[aria-selected="true"]{
+  background: #f4f6ff;
+}
+.autocomplete-empty{
+  padding: 10px 12px;
+  color: #666;
+}
+/* ===== Close Win popup: aseguremos que el botón Save exista y se vea ===== */
+#closeWinPopup .popup-content{
+  display: flex;               /* columna para ordenar todo */
+  flex-direction: column;
+  gap: 8px;                    /* separaciones verticales */
+  max-height: 80vh;            /* por si hay scroll */
+  overflow: auto;
+}
+
+/* ===== Close Win popup: botón Save centrado ===== */
+#closeWinPopup #saveCloseWin{
+  display: inline-flex !important;
+  justify-content: center;
+  align-items: center;
+  margin: 12px auto 0;       /* auto en los lados lo centra */
+  height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+  border: 0;
+  background: #0028ff;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Si la lista del autocomplete se superpone, que no tape el botón */
+#closeWinPopup .autocomplete-list{
+  z-index: 1000;               /* suficiente para estar sobre inputs */
+}
+#closeWinPopup #saveCloseWin{
+  z-index: 1001;               /* botón por encima de la lista */
+}
+
+/* Un pelín de aire antes del botón */
+#closeWinPopup .popup-content label:last-of-type + input[type="date"]{
+  margin-bottom: 6px;
+}

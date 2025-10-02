@@ -1365,6 +1365,123 @@ function openSourcingPopup(opportunityId, dropdownElement) {
       }
     });
 }
+// —— Close Win: autocomplete rápido ——
+const CW_CACHE = new Map(); // término -> resultados [{id,name}]
+let cwAbort = null;
+let cwSelIndex = -1;
+let cwResults = [];
+let cwSelectedId = null;
+
+function renderCloseWinList(items){
+  const list = document.getElementById('closeWinHireList');
+  list.innerHTML = '';
+
+  if (!items.length){
+    list.innerHTML = `<div class="autocomplete-empty">No results…</div>`;
+  } else {
+    items.forEach((it, idx) => {
+      const row = document.createElement('div');
+      row.className = 'autocomplete-item';
+      row.setAttribute('role','option');
+      row.setAttribute('data-id', it.candidate_id);
+      row.textContent = `${it.candidate_id} - ${it.name}`;
+      row.addEventListener('mousedown', (e) => {
+        // mousedown para que no pierda foco el input antes de click
+        pickCloseWinCandidate(idx);
+        e.preventDefault();
+      });
+      list.appendChild(row);
+    });
+  }
+  list.style.display = 'block';
+}
+
+function highlightCloseWinItem(newIndex){
+  const list = document.getElementById('closeWinHireList');
+  const items = Array.from(list.querySelectorAll('.autocomplete-item'));
+  items.forEach((el,i)=> el.setAttribute('aria-selected', i===newIndex ? 'true':'false'));
+}
+
+function pickCloseWinCandidate(index){
+  const input = document.getElementById('closeWinHireInput');
+  const list  = document.getElementById('closeWinHireList');
+  const item  = cwResults[index];
+  if (!item) return;
+  input.value = `${item.candidate_id} - ${item.name}`;
+  cwSelectedId = item.candidate_id;
+  list.style.display = 'none';
+}
+
+async function queryCandidates(term){
+  const q = term.trim();
+  if (q.length < 2) return [];
+  if (CW_CACHE.has(q)) return CW_CACHE.get(q);
+
+  // cancela request anterior
+  if (cwAbort) cwAbort.abort();
+  cwAbort = new AbortController();
+
+  const url = `https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates?search=${encodeURIComponent(q)}`;
+  const res = await fetch(url, { signal: cwAbort.signal });
+  const data = await res.json();
+  CW_CACHE.set(q, data || []);
+  return data || [];
+}
+
+function setupCloseWinAutocomplete(){
+  const input = document.getElementById('closeWinHireInput');
+  const list  = document.getElementById('closeWinHireList');
+  if (!input || !list) return;
+
+  let t = null;
+  input.addEventListener('input', () => {
+    cwSelectedId = null;      // si cambia el texto, invalida selección previa
+    clearTimeout(t);
+    const term = input.value;
+    if (term.trim().length < 2){
+      list.style.display = 'none';
+      return;
+    }
+    t = setTimeout(async () => {
+      try{
+        cwResults = await queryCandidates(term);
+        cwSelIndex = -1;
+        renderCloseWinList(cwResults);
+      } catch(e){
+        if (e.name !== 'AbortError') {
+          console.error('CW search error:', e);
+        }
+      }
+    }, 220); // debounce
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (list.style.display !== 'block') return;
+    const max = cwResults.length - 1;
+    if (e.key === 'ArrowDown'){
+      e.preventDefault();
+      cwSelIndex = Math.min(max, cwSelIndex + 1);
+      highlightCloseWinItem(cwSelIndex);
+    } else if (e.key === 'ArrowUp'){
+      e.preventDefault();
+      cwSelIndex = Math.max(0, cwSelIndex - 1);
+      highlightCloseWinItem(cwSelIndex);
+    } else if (e.key === 'Enter'){
+      if (cwSelIndex >= 0){
+        e.preventDefault();
+        pickCloseWinCandidate(cwSelIndex);
+      }
+    } else if (e.key === 'Escape'){
+      list.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#closeWinHireBox')) {
+      list.style.display = 'none';
+    }
+  });
+}
 
 
 // Popup Close Win
@@ -1372,51 +1489,48 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
   const popup = document.getElementById('closeWinPopup');
   popup.style.display = 'flex';
 
-  loadCandidatesForCloseWin();
+  // inicializa autocomplete
+  setupCloseWinAutocomplete();
 
   const saveBtn = document.getElementById('saveCloseWin');
-saveBtn.onclick = async () => {
-  const date = document.getElementById('closeWinDate').value;
-  const hireInput = document.getElementById('closeWinHireInput').value;
-  const candidateId = parseInt(hireInput.split(' - ')[0], 10);
+  saveBtn.onclick = async () => {
+    const date = document.getElementById('closeWinDate').value;
 
-  if (!date || !candidateId) {
-    alert('Please select a hire and date.');
-    return;
-  }
+    // ✅ tomamos el ID “real” (no split de texto)
+    const candidateId = cwSelectedId;
 
-  try {
-    // 1) Guardar fecha + contratado en opportunity (con logs y errores claros)
-    await patchOppFields(opportunityId, {
-      opp_close_date: date,
-      candidato_contratado: candidateId
-    });
-
-    // 2) Asegurar la fila en hire_opportunity (tu endpoint ya es idempotente)
-    const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: Number(opportunityId) })
-    });
-    if (!res2.ok) {
-      const t = await res2.text();
-      console.error('❌ /candidates/{id}/hire PATCH failed:', res2.status, t);
-      throw new Error(`hire PATCH ${res2.status}: ${t}`);
+    if (!date || !candidateId) {
+      alert('Please select a hire and date.');
+      return;
     }
 
-    // 3) Cambiar stage
-    await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
+    try {
+      // 1) Guardar fecha + contratado en opportunity
+      await patchOppFields(opportunityId, {
+        opp_close_date: date,                // 'YYYY-MM-DD' exacto
+        candidato_contratado: candidateId
+      });
 
-    // 4) Cerrar y redirigir
-    popup.style.display = 'none';
-    localStorage.setItem('fromCloseWin', 'true');
-    window.location.href = `candidate-details.html?id=${candidateId}#hire`;
-  } catch (err) {
-    console.error('❌ Close Win flow failed:', err);
-    alert(`Close Win failed:\n${err.message}`);
-  }
-};
+      // 2) Asegurar hire_opportunity
+      const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opportunity_id: Number(opportunityId) })
+      });
+      if (!res2.ok) throw new Error(await res2.text());
 
+      // 3) Cambiar stage
+      await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
+
+      // 4) Cerrar y redirigir
+      popup.style.display = 'none';
+      localStorage.setItem('fromCloseWin', 'true');
+      window.location.href = `candidate-details.html?id=${candidateId}#hire`;
+    } catch (err) {
+      console.error('❌ Close Win flow failed:', err);
+      alert(`Close Win failed:\n${err.message}`);
+    }
+  };
 }
 
 function loadCandidatesForCloseWin() {

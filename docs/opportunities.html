@@ -175,11 +175,20 @@
   <div class="popup-content">
     <span class="close-btn" onclick="closeCloseWinPopup()">&times;</span>
     <h2>Set Close Win Info</h2>
+
     <label>Hire:</label>
-    <input type="text" id="closeWinHireInput" list="closeWinCandidates" placeholder="Search candidate by name..." />
-    <datalist id="closeWinCandidates"></datalist>
+    <div class="autocomplete" id="closeWinHireBox">
+      <input
+        type="text"
+        id="closeWinHireInput"
+        placeholder="Search candidate by name..."
+        autocomplete="off" />
+      <div class="autocomplete-list" id="closeWinHireList" role="listbox"></div>
+    </div>
+
     <label>Close Date:</label>
     <input type="date" id="closeWinDate" />
+
     <button id="saveCloseWin">Save</button>
   </div>
 </div>
