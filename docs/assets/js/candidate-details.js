@@ -1620,7 +1620,139 @@ wireVideoLinkDedupe();
   // Carga inicial
   loadCVs();
 })();
+(() => {
+  // Evita doble wiring
+  if (!window.__VINTTI_WIRED) window.__VINTTI_WIRED = {};
+  if (window.__VINTTI_WIRED.resigWidgetOnce) return;
+  window.__VINTTI_WIRED.resigWidgetOnce = true;
 
+  const apiBase   = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const cid       = new URLSearchParams(window.location.search).get('id');
+
+  const drop      = document.getElementById('resig-drop');
+  const input     = document.getElementById('resig-input');
+  const browseBtn = document.getElementById('resig-browse');
+  const refreshBtn= document.getElementById('resig-refresh');
+  const list      = document.getElementById('resig-list');
+
+  if (!cid || !list) return;
+
+  let inFlight = false;
+  const BIND = (el, type, fn) => {
+    if (!el) return;
+    el.__wired = el.__wired || {};
+    const key = `on:${type}`;
+    if (el.__wired[key]) return;
+    el.addEventListener(type, fn);
+    el.__wired[key] = true;
+  };
+
+  function render(items = []) {
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
+      return;
+    }
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'cv-item';
+      // Asumimos que _list_s3_with_prefix devuelve {name,url,key}
+      row.innerHTML = `
+        <span class="cv-name" title="${it.name}">${it.name}</span>
+        <div class="cv-actions">
+          <a class="btn" href="${it.url}" target="_blank" rel="noopener">Open</a>
+          <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
+        </div>
+      `;
+      const delBtn = row.querySelector('.danger');
+      BIND(delBtn, 'click', async (e) => {
+        const key = e.currentTarget.getAttribute('data-key');
+        if (!key) return;
+        if (!confirm('Delete this resignation letter?')) return;
+        await fetch(`${apiBase}/candidates/${cid}/resignations`, {
+          method: 'DELETE',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ key })
+        });
+        await loadResignations();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  async function loadResignations() {
+    try {
+      const r = await fetch(`${apiBase}/candidates/${cid}/resignations`);
+      const data = await r.json();
+      render(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.warn('Failed to load resignations', e);
+      render([]);
+    }
+  }
+  window.loadResignations = loadResignations;
+
+  async function uploadResignationFile(file) {
+    if (inFlight) return;
+    inFlight = true;
+
+    const isPdfByExt  = /\.(pdf)$/i.test(file?.name || '');
+    const isPdfByMime = (file?.type || '').toLowerCase().startsWith('application/pdf');
+
+    if (!isPdfByExt && !isPdfByMime) {
+      alert('Only PDF is allowed for resignation letters.');
+      inFlight = false;
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      drop?.classList.add('dragover');
+      const r = await fetch(`${apiBase}/candidates/${cid}/resignations`, { method: 'POST', body: fd });
+      const text = await r.text();
+      if (!r.ok) throw new Error(text || 'Upload failed');
+      // El backend devuelve {message, items}; podemos refrescar con loadResignations():
+      await loadResignations();
+    } catch (e) {
+      console.error('Resignation upload failed', e);
+      alert('Upload failed');
+    } finally {
+      drop?.classList.remove('dragover');
+      if (input) input.value = '';
+      setTimeout(() => { inFlight = false; }, 200);
+    }
+  }
+
+  // Drag & Drop
+  if (drop) {
+    ['dragenter','dragover'].forEach(ev => BIND(drop, ev, e => {
+      e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover');
+    }));
+    ['dragleave','dragend','drop'].forEach(ev => BIND(drop, ev, e => {
+      e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover');
+    }));
+    BIND(drop, 'drop', (e) => {
+      const files = e.dataTransfer?.files;
+      if (files?.length) uploadResignationFile(files[0]);
+    });
+    BIND(drop, 'click', (e) => {
+      if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
+      input?.click();
+    });
+  }
+
+  // Browse
+  BIND(browseBtn, 'click', () => input?.click());
+  BIND(input, 'change', () => { const f = input.files?.[0]; if (f) uploadResignationFile(f); });
+
+  // Refresh
+  BIND(refreshBtn, 'click', loadResignations);
+
+  // Carga inicial
+  loadResignations();
+})();
 // configura el link del client version (solo lectura)
 if (clientBtn && candidateId) {
   clientBtn.href = `resume-readonly.html?id=${candidateId}`;

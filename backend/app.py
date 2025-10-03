@@ -2806,7 +2806,7 @@ def candidates_light_fast():
     except Exception as e:
         import logging; logging.exception("Error in /candidates/light_fast")
         return jsonify({"error": str(e)}), 500
-# ---------- RESIGNATION LETTERS (PDF en S3, sin DB) ----------
+    
 @app.route('/candidates/<int:candidate_id>/resignations', methods=['GET'])
 def list_resignations(candidate_id):
     try:
@@ -2824,7 +2824,9 @@ def upload_resignation(candidate_id):
         return jsonify({"error": "Missing file"}), 400
 
     filename_orig = (f.filename or '').lower()
-    if not (filename_orig.endswith('.pdf') or f.mimetype == 'application/pdf'):
+    mime = (f.mimetype or '').lower()
+    is_pdf = filename_orig.endswith('.pdf') or mime.startswith('application/pdf') or mime == 'application/octet-stream'
+    if not is_pdf:
         return jsonify({"error": "Only PDF is allowed for resignation letters"}), 400
 
     try:
