@@ -2085,3 +2085,182 @@ html body .month-year .btn-clear:active{
   padding: 10px 12px;
   background: #fff;
 }
+/* ——— Reminders: full-width como References, pero compacta ——— */
+#hire .reminders-card {
+  grid-column: 1 / -1;           /* ← mismo ancho horizontal que References */
+  padding: 12px 16px;            /* menos padding para reducir altura */
+  gap: 8px;
+}
+
+/* Título más compacto */
+#hire .reminders-card > label {
+  margin-bottom: 2px;
+}
+
+/* Cuerpo en una sola línea: checks a la izquierda, botón a la derecha */
+#hire .reminders-body {
+  display: grid;
+  grid-template-columns: 1fr max-content;  /* lista | botón */
+  align-items: center;
+  gap: 10px 16px;
+}
+
+/* Lista de 3 checks en una fila, con wrap si no entra */
+#hire .reminders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* “Pills” muy bajitas */
+#hire .rem-chk {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+/* Checkbox visual pequeñito */
+#hire .rem-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+/* Texto compacto */
+#hire .rem-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Botón azul compacto */
+#hire #btn-send-reminders.btn-blue {
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Hint opcional (si lo usas), aún más chico y debajo en móviles */
+#hire .rem-hint {
+  grid-column: 1 / -1;
+  margin-top: -4px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* Responsive: en pantallas angostas, botón baja a la segunda fila */
+@media (max-width: 720px) {
+  #hire .reminders-body {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  #hire #btn-send-reminders.btn-blue {
+    justify-self: start;
+  }
+}
+/* Reminders card */
+.reminders-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reminders-card label {
+  letter-spacing: .3px;
+}
+
+.reminders-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reminders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.rem-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s ease, border-color .2s ease, transform .06s ease;
+}
+.rem-chk:hover { background: #f1f5f9; }
+.rem-chk:active { transform: scale(.99); }
+
+.rem-chk input {
+  appearance: none;
+  width: 0; height: 0;
+  position: absolute; left: -9999px;
+}
+
+.rem-box {
+  width: 18px; height: 18px;
+  border-radius: 6px;
+  border: 2px solid #9ca3af;
+  display: inline-block;
+  position: relative;
+  flex: 0 0 18px;
+  transition: border-color .2s ease, background-color .2s ease;
+}
+
+.rem-chk input:checked + .rem-box {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+.rem-chk input:checked + .rem-box::after {
+  content: "";
+  position: absolute;
+  left: 4px; top: 1px;
+  width: 6px; height: 10px;
+  border: 2px solid #fff;
+  border-top: 0; border-left: 0;
+  transform: rotate(45deg);
+}
+
+.rem-name { font-weight: 600; color: #1f2937; }
+
+.btn-blue {
+  border: 0;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  color: #fff;
+  border-radius: 999px;
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .25);
+  cursor: pointer;
+  transition: filter .2s ease, transform .06s ease;
+}
+.btn-blue:hover { filter: brightness(1.05); }
+.btn-blue:active { transform: translateY(1px); }
+
+.rem-hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Reminders: nombres en caso 'Capitalized' (primera mayúscula, resto minúscula) */
+#hire .reminders-card .rem-name {
+  font-weight: 400;          /* sin negrilla */
+  text-transform: lowercase; /* todo en minúscula... */
+  letter-spacing: 0.2px;
+}
+
+#hire .reminders-card .rem-name::first-letter {
+  text-transform: uppercase; /* ...y solo la primera va en mayúscula */
+}
