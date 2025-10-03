@@ -2823,21 +2823,35 @@ def upload_resignation(candidate_id):
     if not f:
         return jsonify({"error": "Missing file"}), 400
 
-    filename_orig = (f.filename or '').lower()
+    filename_orig = (f.filename or '')
     mime = (f.mimetype or '').lower()
-    is_pdf = filename_orig.endswith('.pdf') or mime.startswith('application/pdf') or mime == 'application/octet-stream'
-    if not is_pdf:
+
+    # --- Robustez Safari: valida por encabezado "%PDF-"
+    try:
+        head = f.stream.read(5)
+        f.stream.seek(0)
+    except Exception:
+        head = b''
+
+    looks_like_pdf = head.startswith(b'%PDF-')
+    has_pdf_ext    = filename_orig.lower().endswith('.pdf')
+    is_pdf_mime    = (mime.startswith('application/pdf') or mime == 'application/octet-stream')
+
+    if not (looks_like_pdf or has_pdf_ext or is_pdf_mime):
         return jsonify({"error": "Only PDF is allowed for resignation letters"}), 400
 
     try:
         s3_key = f"resignations/resignation-letter_{candidate_id}_{uuid.uuid4()}.pdf"
         s3_client.upload_fileobj(
             f, S3_BUCKET, s3_key,
-            ExtraArgs={'ContentType': 'application/pdf'}
+            ExtraArgs={
+                'ContentType': 'application/pdf',
+                # 👇 ayuda a que el navegador lo abra inline:
+                'ContentDisposition': 'inline; filename="resignation-letter.pdf"'
+            }
         )
-        # devolver lista actualizada
         prefix = f"resignations/resignation-letter_{candidate_id}_"
-        items = _list_s3_with_prefix(prefix)
+        items = _list_s3_with_prefix(prefix)  # asegúrate que devuelva name,url,key
         return jsonify({"message": "Resignation letter uploaded", "items": items})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2859,32 +2873,28 @@ def delete_resignation(candidate_id):
         return jsonify({"error": str(e)}), 500
 # --------------------------------------------------------------
 
-def _list_s3_with_prefix(prefix: str):
-    """Devuelve [{'key','url','name'}] para objetos bajo un prefijo S3."""
-    items = []
-    continuation = None
-    while True:
-        kw = {'Bucket': S3_BUCKET, 'Prefix': prefix}
-        if continuation:
-            kw['ContinuationToken'] = continuation
-        resp = s3_client.list_objects_v2(**kw)
-        for obj in resp.get('Contents', []):
-            key = obj['Key']
-            url = s3_client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': S3_BUCKET, 'Key': key},
-                ExpiresIn=604800  # 7 días
-            )
-            items.append({
-                'key': key,
-                'url': url,
-                'name': key.split('/')[-1]
-            })
-        if resp.get('IsTruncated'):
-            continuation = resp.get('NextContinuationToken')
-        else:
-            break
-    return items
+def _list_s3_with_prefix(prefix, expires=3600):
+    out = []
+    resp = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+    for obj in resp.get('Contents', []):
+        key = obj['Key']
+        # URL presignada con inline (Safari-friendly)
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': S3_BUCKET,
+                'Key': key,
+                'ResponseContentType': 'application/pdf',
+                'ResponseContentDisposition': 'inline; filename="resignation-letter.pdf"'
+            },
+            ExpiresIn=expires
+        )
+        out.append({
+            "name": key.split('/')[-1],
+            "key": key,
+            "url": url
+        })
+    return out
 
 # ---------- EQUIPMENTS (list, create, read, update, delete) ----------
 def _normalize_equipos(val):

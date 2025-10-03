@@ -1,3 +1,14 @@
+// —— Global DnD unlock (necesario para Safari) ——
+(function enableGlobalDnD(){
+  if (window.__DNDSAFARI_PATCH__) return;
+  window.__DNDSAFARI_PATCH__ = true;
+
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+  ['dragenter','dragover','dragleave','drop'].forEach(ev => {
+    window.addEventListener(ev, stop, false);
+    document.addEventListener(ev, stop, false);
+  });
+})();
 
 window.__VINTTI_WIRED = window.__VINTTI_WIRED || {};
 
@@ -1516,39 +1527,38 @@ wireVideoLinkDedupe();
     el.__wired[key] = true;
   };
 
-  function render(items = []) {
-    list.innerHTML = '';
-    if (!items.length) {
-      list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
-      return;
-    }
-    items.forEach(it => {
-      const row = document.createElement('div');
-      row.className = 'cv-item';
-      row.innerHTML = `
-        <span class="cv-name" title="${it.name}">${it.name}</span>
-        <div class="cv-actions">
-          <a class="btn" href="${it.url}" target="_blank" rel="noopener">Open</a>
-          <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
-        </div>
-      `;
-      // evitar doble binding por fila
-      const delBtn = row.querySelector('.danger');
-      BIND(delBtn, 'click', async (e) => {
-        const key = e.currentTarget.getAttribute('data-key');
-        if (!key) return;
-        if (!confirm('Delete this file?')) return;
-        await fetch(`${apiBase}/candidates/${cid}/cvs`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key })
-        });
-        await loadCVs();
-      });
-
-      list.appendChild(row);
-    });
+function render(items = []) {
+  list.innerHTML = '';
+  if (!items.length) {
+    list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
+    return;
   }
+  items.forEach(it => {
+    if (!it || !it.name || !it.url) { console.warn('item malformado:', it); return; }
+    const row = document.createElement('div');
+    row.className = 'cv-item';
+    row.innerHTML = `
+      <span class="cv-name" title="${it.name}">${it.name}</span>
+      <div class="cv-actions">
+        <a class="btn" href="${it.url}" target="_blank" rel="noopener">Open</a>
+        <button class="btn danger" data-key="${it.key}" type="button">Delete</button>
+      </div>
+    `;
+    const delBtn = row.querySelector('.danger');
+    BIND(delBtn, 'click', async (e) => {
+      const key = e.currentTarget.getAttribute('data-key');
+      if (!key) return;
+      if (!confirm('Delete this resignation letter?')) return;
+      await fetch(`${apiBase}/candidates/${cid}/resignations`, {
+        method: 'DELETE',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ key })
+      });
+      await loadResignations();
+    });
+    list.appendChild(row);
+  });
+}
 
   async function loadCVs() {
     try {
@@ -1680,16 +1690,20 @@ wireVideoLinkDedupe();
     });
   }
 
-  async function loadResignations() {
-    try {
-      const r = await fetch(`${apiBase}/candidates/${cid}/resignations`);
-      const data = await r.json();
-      render(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.warn('Failed to load resignations', e);
-      render([]);
-    }
+async function loadResignations() {
+  try {
+    const r = await fetch(`${apiBase}/candidates/${cid}/resignations`);
+    const data = await r.json();
+    console.debug('🔎 resignations GET →', data);
+    // Acepta {items:[...]} o lista directa
+    const items = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
+    render(items);
+  } catch (e) {
+    console.warn('Failed to load resignations', e);
+    render([]);
   }
+}
+
   window.loadResignations = loadResignations;
 
   async function uploadResignationFile(file) {
@@ -1752,6 +1766,41 @@ wireVideoLinkDedupe();
 
   // Carga inicial
   loadResignations();
+  // Drag & Drop (zona específica)
+if (drop) {
+  ['dragenter','dragover'].forEach(ev => BIND(drop, ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    drop.classList.add('dragover');
+  }));
+  ['dragleave','dragend'].forEach(ev => BIND(drop, ev, e => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.remove('dragover');
+  }));
+  BIND(drop, 'drop', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    drop.classList.remove('dragover');
+
+    // Safari: preferir items si existen
+    const dt = e.dataTransfer;
+    let file = null;
+    if (dt?.items && dt.items.length) {
+      for (const it of dt.items) {
+        if (it.kind === 'file') { file = it.getAsFile(); break; }
+      }
+    } else if (dt?.files && dt.files.length) {
+      file = dt.files[0];
+    }
+    if (file) uploadResignationFile(file);
+  });
+
+  // Click en la zona → abrir file picker
+  BIND(drop, 'click', (e) => {
+    if ((e.target instanceof HTMLElement) && e.target.closest('.cv-actions')) return;
+    input?.click();
+  });
+}
+
 })();
 // configura el link del client version (solo lectura)
 if (clientBtn && candidateId) {
