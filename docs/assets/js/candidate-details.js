@@ -1822,6 +1822,160 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
   if (aiButton)  aiButton.classList.remove('hidden');
   if (clientBtn) clientBtn.classList.remove('hidden');
 }
+(function wireHireReminders(){
+  const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const cid = new URLSearchParams(location.search).get('id');
+  if (!cid) return;
+
+  const btn   = document.getElementById('btn-send-reminders');
+  const cbLar = document.getElementById('rem-lara');
+  const cbJaz = document.getElementById('rem-jazmin');
+  const cbAgs = document.getElementById('rem-agustin');
+
+  const cdLar = document.getElementById('cd-lar');
+  const cdJaz = document.getElementById('cd-jaz');
+  const cdAgs = document.getElementById('cd-agus');
+
+  const msgLar = document.getElementById('msg-lar');
+  const msgJaz = document.getElementById('msg-jaz');
+  const msgAgs = document.getElementById('msg-agus');
+
+  let currentReminder = null;
+  let tickTimer = null;
+
+  function showFireworks(msg="Thanks for completing — Vintti Hub appreciates you! 🎆"){
+    const pop = document.createElement('div');
+    pop.className = 'fireworks-pop';
+    pop.innerHTML = `
+      <div class="bubble">
+        <img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa3JvZ2trdXZ0ZTNkdG1wdnBseG4xN3lqY2V3Z3g4cGZiaGd5bTNtZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3o6Zt6ML6BklcajjsA/giphy.gif" alt="fireworks"/>
+        <div style="font-weight:600; margin-top:6px">${msg}</div>
+      </div>`;
+    pop.addEventListener('click', ()=> pop.remove());
+    document.body.appendChild(pop);
+    setTimeout(()=> pop.remove(), 3500);
+  }
+
+  function fmtLeft(ms){
+    if (ms <= 0) return "now";
+    const s = Math.floor(ms/1000);
+    const d = Math.floor(s/86400);
+    const h = Math.floor((s%86400)/3600);
+    const m = Math.floor((s%3600)/60);
+    if (d>0) return `${d}d ${h}h`;
+    if (h>0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function nextDue(pressISO, lastISO){
+    // siguiente reminder = max(press_date, last_sent_at) + 24h
+    const base = new Date(lastISO || pressISO || Date.now());
+    return new Date(base.getTime() + 24*60*60*1000);
+  }
+
+  function paintCountdown(){
+    if (!currentReminder) return;
+    const press = currentReminder.press_date;
+    const now = Date.now();
+
+    const dueLar = nextDue(press, currentReminder.last_lar_sent_at);
+    const dueJaz = nextDue(press, currentReminder.last_jaz_sent_at);
+    const dueAgs = nextDue(press, currentReminder.last_agus_sent_at);
+
+    if (cdLar) cdLar.textContent = currentReminder.lar ? "✅ No more reminders" : `Next reminder in ${fmtLeft(dueLar - now)}`;
+    if (cdJaz) cdJaz.textContent = currentReminder.jaz ? "✅ No more reminders" : `Next reminder in ${fmtLeft(dueJaz - now)}`;
+    if (cdAgs) cdAgs.textContent = currentReminder.agus ? "✅ No more reminders" : `Next reminder in ${fmtLeft(dueAgs - now)}`;
+  }
+
+  function startTicker(){
+    if (tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(paintCountdown, 1000*30); // cada 30s es suficiente
+    paintCountdown();
+  }
+
+  async function loadReminder(){
+    const r = await fetch(`${API}/candidates/${cid}/hire_reminders`);
+    currentReminder = await r.json();
+    if (!currentReminder || !currentReminder.reminder_id){
+      // sin fila aún → desmarcados y sin countdown
+      [cbLar, cbJaz, cbAgs].forEach(cb=> cb && (cb.checked = false));
+      [cdLar, cdJaz, cdAgs].forEach(c=> c && (c.textContent = '—'));
+      return;
+    }
+    cbLar && (cbLar.checked = !!currentReminder.lar);
+    cbJaz && (cbJaz.checked = !!currentReminder.jaz);
+    cbAgs && (cbAgs.checked = !!currentReminder.agus);
+
+    // Mensajes graciosos al estar completos
+    msgLar.textContent = currentReminder.lar ? "Congrats — no more reminders 😎" : "";
+    msgJaz.textContent = currentReminder.jaz ? "Congrats — no more reminders 😎" : "";
+    msgAgs.textContent = currentReminder.agus ? "Congrats — no more reminders 😎" : "";
+
+    startTicker();
+  }
+
+  async function createAndSend(){
+    // necesitamos el opportunity_id en el que fue contratado
+    const ho = await fetch(`${API}/candidates/${cid}/hire_opportunity`).then(r=>r.json());
+    const opportunity_id = ho?.opportunity_id;
+    if (!opportunity_id) { alert('No hire_opportunity found'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try{
+      const r = await fetch(`${API}/candidates/${cid}/hire_reminders`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ opportunity_id })
+      });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out?.error || 'Failed');
+      currentReminder = out.row;
+      // checkboxes vuelven a false por definición de la nueva fila
+      [cbLar, cbJaz, cbAgs].forEach(cb=> cb && (cb.checked = false));
+      [msgLar, msgJaz, msgAgs].forEach(m=> m && (m.textContent = ''));
+      startTicker();
+      // Pop chiquito de éxito
+      showFireworks("Kickoff sent — Vintti Hub on it! 🎉");
+    }catch(e){
+      console.error(e);
+      alert('Failed to start reminders');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Information Complete — Send Reminders';
+    }
+  }
+
+  async function patchCheck(field, value){
+    if (!currentReminder?.reminder_id) return;
+    const r = await fetch(`${API}/hire_reminders/${currentReminder.reminder_id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ [field]: !!value })
+    });
+    const row = await r.json();
+    currentReminder = row;
+    // mensaje + fueguitos si quedó en true
+    if (value){
+      const who = field === 'lar' ? 'Lara' : field === 'jaz' ? 'Jazmin' : 'Agustin';
+      const el = field === 'lar' ? msgLar : field === 'jaz' ? msgJaz : msgAgs;
+      if (el) el.textContent = "Congrats — no more reminders 😎";
+      showFireworks(`Thanks ${who}! Vintti Hub loves completed checkboxes ✨`);
+    }
+    paintCountdown();
+  }
+
+  // wire
+  btn && btn.addEventListener('click', createAndSend);
+  cbLar && cbLar.addEventListener('change', ()=> patchCheck('lar', cbLar.checked));
+  cbJaz && cbJaz.addEventListener('change', ()=> patchCheck('jaz', cbJaz.checked));
+  cbAgs && cbAgs.addEventListener('change', ()=> patchCheck('agus', cbAgs.checked));
+
+  // primera carga
+  loadReminder();
+
+  // refresco suave cada 2 min (por si un reminder se envió desde el cron)
+  setInterval(loadReminder, 120000);
+})();
 
 });
 /* === Normalizador global de fechas → "dd mmm yyyy" (es) ================== */

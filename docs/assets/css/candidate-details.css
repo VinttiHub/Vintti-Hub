@@ -2264,3 +2264,16 @@ html body .month-year .btn-clear:active{
 #hire .reminders-card .rem-name::first-letter {
   text-transform: uppercase; /* ...y solo la primera va en mayúscula */
 }
+.reminders-card .reminders-list { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
+.rem-chk { display:flex; align-items:center; gap:10px; }
+.rem-countdown { font-size:12px; opacity:.8; margin-left:32px; }
+.rem-msg { font-size:12px; color:#2e7d32; margin-left:32px; }
+.fireworks-pop {
+  position: fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.35); z-index: 9999; backdrop-filter: blur(2px);
+}
+.fireworks-pop .bubble {
+  background:#fff; padding:18px 22px; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  text-align:center;
+}
+.fireworks-pop img { width:160px; height:auto; display:block; margin:8px auto 12px; }

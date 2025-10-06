@@ -31,6 +31,7 @@ from psycopg2.extras import RealDictCursor  # 👈 necesario para cursor_factory
 from affinda import AffindaAPI, TokenCredential
 
 import re, html as _html
+from reminders_routes import bp as reminders_bp
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
@@ -185,6 +186,7 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 register_ai_routes(app)
+app.register_blueprint(reminders_bp)
 app.register_blueprint(coresignal_bp)
 # --- enum canonicals para el Sheet ---
 _CANON = {
