@@ -59,7 +59,6 @@ def _fetch_client_email(opportunity_id:int, cur):
 
 def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
-    # 🎉 Email amigable en inglés
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close Win</b> 🎉</p>

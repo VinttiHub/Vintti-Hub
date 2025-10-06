@@ -1906,7 +1906,7 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
     cbJaz && (cbJaz.checked = !!currentReminder.jaz);
     cbAgs && (cbAgs.checked = !!currentReminder.agus);
 
-    // Mensajes graciosos al estar completos
+    // Mensajes al estar completos
     msgLar.textContent = currentReminder.lar ? "Congrats — no more reminders 😎" : "";
     msgJaz.textContent = currentReminder.jaz ? "Congrats — no more reminders 😎" : "";
     msgAgs.textContent = currentReminder.agus ? "Congrats — no more reminders 😎" : "";
