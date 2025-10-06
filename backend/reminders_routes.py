@@ -6,6 +6,7 @@ from psycopg2.extras import RealDictCursor
 from db import get_connection   # ya lo tienes
 import requests
 import html
+from typing import List
 
 bp = Blueprint("reminders", __name__)
 
@@ -20,13 +21,18 @@ def _anchor(text, url):
 def _candidate_link(candidate_id:int):
     return f"https://vinttihub.vintti.com/candidate-details.html?id={candidate_id}"
 
-def _send_email(subject:str, html_body:str, to:list[str]):
-    # usa tu endpoint que ya convierte a texto plano también
+
+def _send_email(subject: str, html_body: str, to: List[str]):
     payload = {"to": to, "subject": subject, "body": html_body}
-    r = requests.post("https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email", json=payload, timeout=30)
+    r = requests.post(
+        "https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email",
+        json=payload,
+        timeout=30
+    )
     if not r.ok:
         logging.error("Send email failed: %s %s", r.status_code, r.text)
     return r.ok
+
 
 def _fetch_hire_core(candidate_id:int, cur):
     # start_date, references_notes, setup_fee, salary, fee y opportunity_id (del hire en el que fue contratado)
