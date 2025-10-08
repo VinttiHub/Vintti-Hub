@@ -16,6 +16,19 @@ LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
 ANGIE_EMAIL = "angie@vintti.com"
 
+def _serialize_reminder(row: dict | None):
+    if not row:
+        return None
+    for k in ("press_date", "last_jaz_sent_at", "last_lar_sent_at", "last_agus_sent_at"):
+        v = row.get(k)
+        if v is not None:
+            # v puede ser datetime o date
+            try:
+                row[k] = v.isoformat()
+            except Exception:
+                row[k] = str(v)
+    return row
+
 def _anchor(text, url):
     return f'<a href="{html.escape(url)}" target="_blank" rel="noopener">{html.escape(text)}</a>'
 
@@ -103,40 +116,36 @@ def _reminder_email_html(candidate_id:int):
 def get_latest_reminder(candidate_id):
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
-           SELECT * FROM hire_reminders
-            WHERE candidate_id = %s
-            ORDER BY press_date DESC
-            LIMIT 1
+            SELECT * FROM hire_reminders
+             WHERE candidate_id = %s
+             ORDER BY press_date DESC
+             LIMIT 1
         """, (candidate_id,))
         row = cur.fetchone()
-        return jsonify(row or {})
+        return jsonify(_serialize_reminder(row) or {})
 
 @bp.route("/candidates/<int:candidate_id>/hire_reminders", methods=["POST"])
 def create_and_send_initial(candidate_id):
     data = request.get_json() or {}
     opportunity_id = int(data.get("opportunity_id", 0))
     if not opportunity_id:
-        return jsonify({"error": "opportunity_id is required"}), 400
+        return jsonify({"error":"opportunity_id is required"}), 400
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # 1) Verificar que exista hire y datos mínimos ANTES de insertar
-        hire = _fetch_hire_core(candidate_id, cur)
-        if not hire:
-            return jsonify({"error": "hire not found for candidate"}), 404
-
-        client_mail = _fetch_client_email(hire["opportunity_id"], cur) or ""
-
-        # 2) Insertar la fila (ya no habrá “huérfanas”)
+        # 💡 Si `press_date` es TIMESTAMPTZ en la base, lo mejor es guardar `now()`
         cur.execute("""
-          INSERT INTO hire_reminders
-            (candidate_id, opportunity_id, press_date, jaz, lar, agus)
-          VALUES
-            (%s, %s, (now() AT TIME ZONE 'America/Bogota')::timestamp, FALSE, FALSE, FALSE)
-          RETURNING *
+            INSERT INTO hire_reminders (candidate_id, opportunity_id, press_date, jaz, lar, agus)
+            VALUES (%s, %s, now(), FALSE, FALSE, FALSE)
+            RETURNING *
         """, (candidate_id, opportunity_id))
         row = cur.fetchone()
 
-        # 3) Armar y enviar correo (si falla el mail, la fila igual queda creada)
+        hire = _fetch_hire_core(candidate_id, cur)
+        if not hire:
+            conn.commit()  # la fila sí se creó, dejamos commit
+            return jsonify({"row": _serialize_reminder(row), "email_sent": False, "warning":"hire not found for candidate"}), 404
+
+        client_mail = _fetch_client_email(hire["opportunity_id"], cur) or ""
         html_body = _initial_email_html(
             candidate_id=candidate_id,
             start_date=hire.get("start_date"),
@@ -146,6 +155,7 @@ def create_and_send_initial(candidate_id):
             references=hire.get("references_notes") or "",
             client_mail=client_mail
         )
+
         ok = _send_email(
             subject="New Close-Win 🎉 — Action needed",
             html_body=html_body,
@@ -153,7 +163,7 @@ def create_and_send_initial(candidate_id):
         )
 
         conn.commit()
-        return jsonify({"row": row, "email_sent": bool(ok)}), 201
+        return jsonify({"row": _serialize_reminder(row), "email_sent": bool(ok)})
 
 @bp.route("/hire_reminders/<int:reminder_id>", methods=["PATCH"])
 def update_checks(reminder_id):
