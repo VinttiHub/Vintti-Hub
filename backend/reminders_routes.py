@@ -110,7 +110,7 @@ def _reminder_email_html(candidate_id:int):
       <p>Thank you! — Vintti Hub</p>
     </div>
     """
-@bp.route("/candidates/<int:candidate_id>/hire_reminders/ensure", methods=["POST"])
+@bp.route("/candidates/<int:candidate_id>/hire_reminders/ensure", methods=["POST","GET"])
 def ensure_reminder_row(candidate_id):
     """Crea una fila en hire_reminders si no existe todavía (por candidato).
        No envía correos. Deja press_date = NULL hasta que el usuario presione el botón."""
