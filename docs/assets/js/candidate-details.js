@@ -1893,58 +1893,68 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
     paintCountdown();
   }
 
-  async function loadReminder(){
-    const r = await fetch(`${API}/candidates/${cid}/hire_reminders`);
-    currentReminder = await r.json();
-    if (!currentReminder || !currentReminder.reminder_id){
-      // sin fila aún → desmarcados y sin countdown
-      [cbLar, cbJaz, cbAgs].forEach(cb=> cb && (cb.checked = false));
-      [cdLar, cdJaz, cdAgs].forEach(c=> c && (c.textContent = '—'));
-      return;
-    }
-    cbLar && (cbLar.checked = !!currentReminder.lar);
-    cbJaz && (cbJaz.checked = !!currentReminder.jaz);
-    cbAgs && (cbAgs.checked = !!currentReminder.agus);
+async function loadReminder(){
+  // 1) intenta cargar la fila actual
+  let r = await fetch(`${API}/candidates/${cid}/hire_reminders`);
+  let data = await r.json();
 
-    // Mensajes al estar completos
-    msgLar.textContent = currentReminder.lar ? "Congrats — no more reminders 😎" : "";
-    msgJaz.textContent = currentReminder.jaz ? "Congrats — no more reminders 😎" : "";
-    msgAgs.textContent = currentReminder.agus ? "Congrats — no more reminders 😎" : "";
+  // 2) si no existe, crea una (ensure) sin enviar mails
+  if (!data || !data.reminder_id){
+    const ens = await fetch(`${API}/candidates/${cid}/hire_reminders/ensure`, { method:'POST' });
+    const out = await ens.json();
+    // puede devolver created:false si ya existía
+    data = (out && out.row) ? out.row : data;
+  }
 
+  currentReminder = data && data.reminder_id ? data : null;
+
+  // 3) pinta UI
+  if (!currentReminder){
+    [cbLar, cbJaz, cbAgs].forEach(cb=> cb && (cb.checked = false));
+    [cdLar, cdJaz, cdAgs].forEach(c=> c && (c.textContent = '—'));
+    return;
+  }
+  cbLar && (cbLar.checked = !!currentReminder.lar);
+  cbJaz && (cbJaz.checked = !!currentReminder.jaz);
+  cbAgs && (cbAgs.checked = !!currentReminder.agus);
+
+  msgLar.textContent = currentReminder.lar ? "Congrats — no more reminders 😎" : "";
+  msgJaz.textContent = currentReminder.jaz ? "Congrats — no more reminders 😎" : "";
+  msgAgs.textContent = currentReminder.agus ? "Congrats — no more reminders 😎" : "";
+
+  startTicker();
+}
+
+async function createAndSend(){
+  if (!currentReminder || !currentReminder.reminder_id){
+    // por robustez, intenta ensure de nuevo
+    await fetch(`${API}/candidates/${cid}/hire_reminders/ensure`, { method:'POST' });
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  try{
+    const r = await fetch(`${API}/candidates/${cid}/hire_reminders/press`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'}
+      // ya no enviamos opportunity_id aquí
+    });
+    const out = await r.json();
+    if (!r.ok) throw new Error(out?.error || 'Failed');
+
+    currentReminder = out.row;
+    // Al “press”, los checks siguen como estén (no los reseteamos)
+    [msgLar, msgJaz, msgAgs].forEach(m=> m && (m.textContent = '')); // limpio mensajes
     startTicker();
+    showFireworks("Kickoff sent — Vintti Hub on it! 🎉"); // feedback UX
+  }catch(e){
+    console.error(e);
+    alert('Failed to send reminders');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Information Complete — Send Reminders';
   }
-
-  async function createAndSend(){
-    // necesitamos el opportunity_id en el que fue contratado
-    const ho = await fetch(`${API}/candidates/${cid}/hire_opportunity`).then(r=>r.json());
-    const opportunity_id = ho?.opportunity_id;
-    if (!opportunity_id) { alert('No hire_opportunity found'); return; }
-
-    btn.disabled = true;
-    btn.textContent = 'Sending...';
-    try{
-      const r = await fetch(`${API}/candidates/${cid}/hire_reminders`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ opportunity_id })
-      });
-      const out = await r.json();
-      if (!r.ok) throw new Error(out?.error || 'Failed');
-      currentReminder = out.row;
-      // checkboxes vuelven a false por definición de la nueva fila
-      [cbLar, cbJaz, cbAgs].forEach(cb=> cb && (cb.checked = false));
-      [msgLar, msgJaz, msgAgs].forEach(m=> m && (m.textContent = ''));
-      startTicker();
-      // Pop chiquito de éxito
-      showFireworks("Kickoff sent — Vintti Hub on it! 🎉");
-    }catch(e){
-      console.error(e);
-      alert('Failed to start reminders');
-    }finally{
-      btn.disabled = false;
-      btn.textContent = 'Information Complete — Send Reminders';
-    }
-  }
+}
 
   async function patchCheck(field, value){
     if (!currentReminder?.reminder_id) return;

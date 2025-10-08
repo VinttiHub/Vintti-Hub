@@ -110,6 +110,45 @@ def _reminder_email_html(candidate_id:int):
       <p>Thank you! — Vintti Hub</p>
     </div>
     """
+@bp.route("/candidates/<int:candidate_id>/hire_reminders/ensure", methods=["POST"])
+def ensure_reminder_row(candidate_id):
+    """Crea una fila en hire_reminders si no existe todavía (por candidato).
+       No envía correos. Deja press_date = NULL hasta que el usuario presione el botón."""
+    with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # ¿Ya existe alguna fila para este candidato?
+        cur.execute("""
+            SELECT * FROM hire_reminders
+             WHERE candidate_id = %s
+             ORDER BY reminder_id DESC
+             LIMIT 1
+        """, (candidate_id,))
+        row = cur.fetchone()
+        if row:
+            conn.commit()
+            return jsonify({"row": _serialize_reminder(row), "created": False})
+
+        # Necesitamos el opportunity_id en el que fue contratado
+        cur.execute("""
+            SELECT ho.opportunity_id
+              FROM hire_opportunity ho
+             WHERE ho.candidate_id = %s
+             ORDER BY ho.opportunity_id DESC
+             LIMIT 1
+        """, (candidate_id,))
+        ho = cur.fetchone()
+        opportunity_id = ho["opportunity_id"] if ho else None
+        if not opportunity_id:
+            conn.commit()
+            return jsonify({"error":"hire_opportunity not found for candidate"}), 404
+
+        # Crea la fila con press_date = NULL y flags en FALSE
+        cur.execute("""
+            INSERT INTO hire_reminders (candidate_id, opportunity_id, press_date, jaz, lar, agus)
+            VALUES (%s, %s, NULL, FALSE, FALSE, FALSE)
+            RETURNING *
+        """, (candidate_id, opportunity_id))
+        row = cur.fetchone()
+        conn.c
 
 @bp.route("/candidates/<int:candidate_id>/hire_reminders", methods=["GET"])
 def get_latest_reminder(candidate_id):
@@ -123,25 +162,39 @@ def get_latest_reminder(candidate_id):
         row = cur.fetchone()
         return jsonify(_serialize_reminder(row) or {})
 
-@bp.route("/candidates/<int:candidate_id>/hire_reminders", methods=["POST"])
-def create_and_send_initial(candidate_id):
+@bp.route("/candidates/<int:candidate_id>/hire_reminders/press", methods=["POST"])
+def press_and_send(candidate_id):
+    """Al presionar el botón: setea press_date=now() y envía el correo inicial.
+       No crea filas nuevas: asume que ya existen (ensure en el load)."""
     data = request.get_json() or {}
-    opportunity_id = int(data.get("opportunity_id", 0))
-    if not opportunity_id:
-        return jsonify({"error":"opportunity_id is required"}), 400
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # 💡 Si `press_date` es TIMESTAMPTZ en la base, lo mejor es guardar `now()`
+        # Tomamos la fila más reciente (la que creó el ensure)
         cur.execute("""
-            INSERT INTO hire_reminders (candidate_id, opportunity_id, press_date, jaz, lar, agus)
-            VALUES (%s, %s, now(), FALSE, FALSE, FALSE)
-            RETURNING *
-        """, (candidate_id, opportunity_id))
+            SELECT * FROM hire_reminders
+             WHERE candidate_id = %s
+             ORDER BY reminder_id DESC
+             LIMIT 1
+        """, (candidate_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error":"hire_reminder row not found for candidate"}), 404
+
+        reminder_id = row["reminder_id"]
+
+        # Actualizamos press_date a ahora (TIMESTAMPTZ)
+        cur.execute("""
+            UPDATE hire_reminders
+               SET press_date = now()
+             WHERE reminder_id = %s
+         RETURNING *
+        """, (reminder_id,))
         row = cur.fetchone()
 
+        # Datos para armar el correo
         hire = _fetch_hire_core(candidate_id, cur)
         if not hire:
-            conn.commit()  # la fila sí se creó, dejamos commit
+            conn.commit()
             return jsonify({"row": _serialize_reminder(row), "email_sent": False, "warning":"hire not found for candidate"}), 404
 
         client_mail = _fetch_client_email(hire["opportunity_id"], cur) or ""
