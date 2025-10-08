@@ -79,37 +79,67 @@ def _fetch_client_email(opportunity_id:int, cur):
     row = cur.fetchone()
     return (row or {}).get("mail") if row else None
 
-def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail):
+def _fetch_email_context(candidate_id:int, opportunity_id:int, cur):
+    """
+    Devuelve:
+      - candidate_name      (candidates.name)
+      - client_name         (account.client_name)
+      - client_mail         (account.mail)
+      - opp_position_name   (opportunity.opp_position_name)
+    """
+    cur.execute("""
+        SELECT
+            c.name                         AS candidate_name,
+            a.client_name                  AS client_name,
+            a.mail                         AS client_mail,
+            o.opp_position_name            AS opp_position_name
+        FROM opportunity o
+        JOIN account a   ON a.account_id = o.account_id
+        JOIN candidates c ON c.candidate_id = %s
+       WHERE o.opportunity_id = %s
+       LIMIT 1
+    """, (candidate_id, opportunity_id))
+    return cur.fetchone() or {}
+
+def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail,
+                        candidate_name:str, client_name:str, opp_position_name:str):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
+    # Copys en inglés, tono casual/fluido
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
-      <p>Hey team — new <b>Close Win</b> 🎉</p>
+      <p>Hey team — new <b>Close-Win</b> 🎉</p>
+      <p>We’ve just closed <b>{html.escape(client_name or 'Client')}</b>’s <b>{html.escape(opp_position_name or 'role')}</b> with
+         <b>{html.escape(candidate_name or 'the candidate')}</b>.</p>
+
       <ul>
         <li><b>Start date:</b> {html.escape(str(start_date or '—'))}</li>
         <li><b>Salary:</b> ${html.escape(f"{salary:,.0f}")}</li>
         <li><b>Fee:</b> ${html.escape(f"{fee:,.0f}")}</li>
-        <li><b>Set up fee:</b> ${html.escape(f"{setup_fee:,.0f}")}</li>
+        <li><b>Set-up fee:</b> ${html.escape(f"{setup_fee:,.0f}")}</li>
         <li><b>Client email:</b> {html.escape(client_mail or '—')}</li>
       </ul>
-      <p><b>References:</b><br>{references or '—'}</p>
 
-      <p>Please complete your Close-Win tasks and then tick your checkbox in this page:<br>
+      <p><b>References / notes:</b><br>{references or '—'}</p>
+
+      <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
         {link}
       </p>
 
-      <p>Also, don’t forget to request the necessary <b>equipment</b> for the new hire if applicable. 💻🖥️</p>
+      <p>Also, don’t forget to request any <b>equipment</b> needed for the new hire. 💻🖥️</p>
 
       <p>Thanks! — Vintti Hub</p>
     </div>
     """
 
-def _reminder_email_html(candidate_id:int):
+def _reminder_email_html(candidate_id:int, candidate_name:str, client_name:str, opp_position_name:str):
     link = _anchor("Complete your checkbox here", _candidate_link(candidate_id))
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Quick reminder ⏰</p>
-      <p>You still haven’t completed your checkbox for this Close-Win. When you finish your tasks, please mark it here:</p>
-      <p>{link}</p>
+      <p>You still haven’t checked your box for this Close-Win:
+         <b>{html.escape(client_name or 'Client')}</b> — <b>{html.escape(opp_position_name or 'role')}</b>
+         with <b>{html.escape(candidate_name or 'the candidate')}</b>.</p>
+      <p>When you’re done, please mark it here:<br>{link}</p>
       <p>Thank you! — Vintti Hub</p>
     </div>
     """
@@ -197,6 +227,11 @@ def press_and_send(candidate_id):
 
         # Datos para armar el correo
         hire = _fetch_hire_core(candidate_id, cur)
+        ctx = _fetch_email_context(candidate_id, hire["opportunity_id"], cur)
+        candidate_name    = ctx.get("candidate_name") or ""
+        client_name       = ctx.get("client_name") or ""
+        opp_position_name = ctx.get("opp_position_name") or ""
+        client_mail       = ctx.get("client_mail") or (_fetch_client_email(hire["opportunity_id"], cur) or "")
         if not hire:
             conn.commit()
             return jsonify({"row": _serialize_reminder(row), "email_sent": False, "warning":"hire not found for candidate"}), 404
@@ -209,7 +244,10 @@ def press_and_send(candidate_id):
             fee=float(hire.get("fee") or 0),
             setup_fee=float(hire.get("setup_fee") or 0),
             references=hire.get("references_notes") or "",
-            client_mail=client_mail
+            client_mail=client_mail,
+            candidate_name=candidate_name,
+            client_name=client_name,
+            opp_position_name=opp_position_name
         )
 
         ok = _send_email(
@@ -266,6 +304,11 @@ def send_due_reminders():
             cid = r["candidate_id"]
             rid = r["reminder_id"]
             press = r["press_date"].astimezone(BOGOTA_TZ) if r["press_date"] else now
+            opportunity_id = r.get("opportunity_id")
+            ctx = _fetch_email_context(cid, opportunity_id, cur) if opportunity_id else {}
+            candidate_name    = ctx.get("candidate_name") or ""
+            client_name       = ctx.get("client_name") or ""
+            opp_position_name = ctx.get("opp_position_name") or ""
 
             # por persona
             plan = []
@@ -276,7 +319,13 @@ def send_due_reminders():
             if not plan:
                 continue
 
-            html_body = _reminder_email_html(cid)
+            html_body = _reminder_email_html(
+                candidate_id=cid,
+                candidate_name=candidate_name,
+                client_name=client_name,
+                opp_position_name=opp_position_name
+            )
+
             for key, email in plan:
                 ok = _send_email(subject="Quick reminder — please tick your Close-Win checkbox",
                                  html_body=html_body, to=[email])
