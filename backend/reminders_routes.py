@@ -6,7 +6,7 @@ from psycopg2.extras import RealDictCursor
 from db import get_connection   # ya lo tienes
 import requests
 import html
-from typing import List
+from typing import List, Optional, Dict, Any
 
 bp = Blueprint("reminders", __name__)
 
@@ -16,13 +16,12 @@ LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
 ANGIE_EMAIL = "angie@vintti.com"
 
-def _serialize_reminder(row: dict | None):
+def _serialize_reminder(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     for k in ("press_date", "last_jaz_sent_at", "last_lar_sent_at", "last_agus_sent_at"):
         v = row.get(k)
         if v is not None:
-            # v puede ser datetime o date
             try:
                 row[k] = v.isoformat()
             except Exception:
