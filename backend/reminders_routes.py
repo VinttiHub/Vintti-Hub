@@ -47,20 +47,23 @@ def _send_email(subject: str, html_body: str, to: List[str]):
     return r.ok
 
 
-def _fetch_hire_core(candidate_id:int, cur):
-    # start_date, references_notes, setup_fee, salary, fee y opportunity_id (del hire en el que fue contratado)
+def _fetch_hire_core(candidate_id: int, cur):
+    """
+    Devuelve los datos del hire más reciente para el candidato desde hire_opportunity.
+    Campos esperados por el correo: start_date, references_notes, setup_fee, salary, fee, opportunity_id
+    """
     cur.execute("""
-      SELECT h.start_date::date                            AS start_date,
-             COALESCE(h.references_notes,'')               AS references_notes,
-             COALESCE(h.setup_fee,0)                       AS setup_fee,
-             COALESCE(h.employee_salary,0)                 AS salary,
-             COALESCE(h.employee_fee,0)                    AS fee,
-             ho.opportunity_id                             AS opportunity_id
-        FROM hire h
-        JOIN hire_opportunity ho ON ho.candidate_id = h.candidate_id
-       WHERE h.candidate_id = %s
-       ORDER BY h.start_date DESC NULLS LAST
-       LIMIT 1
+        SELECT
+            ho.start_date::date                           AS start_date,
+            COALESCE(ho.references_notes, '')             AS references_notes,
+            COALESCE(ho.setup_fee, 0)                     AS setup_fee,
+            COALESCE(ho.employee_salary, 0)               AS salary,
+            COALESCE(ho.employee_fee, 0)                  AS fee,
+            ho.opportunity_id                             AS opportunity_id
+        FROM hire_opportunity ho
+        WHERE ho.candidate_id = %s
+        ORDER BY ho.start_date DESC NULLS LAST, ho.opportunity_id DESC
+        LIMIT 1
     """, (candidate_id,))
     return cur.fetchone()
 
