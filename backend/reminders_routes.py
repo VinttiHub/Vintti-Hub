@@ -148,7 +148,8 @@ def ensure_reminder_row(candidate_id):
             RETURNING *
         """, (candidate_id, opportunity_id))
         row = cur.fetchone()
-        conn.c
+        conn.commit()
+        return jsonify({"row": _serialize_reminder(row), "created": True})
 
 @bp.route("/candidates/<int:candidate_id>/hire_reminders", methods=["GET"])
 def get_latest_reminder(candidate_id):
