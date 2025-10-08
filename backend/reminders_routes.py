@@ -167,7 +167,7 @@ def get_latest_reminder(candidate_id):
 def press_and_send(candidate_id):
     """Al presionar el botón: setea press_date=now() y envía el correo inicial.
        No crea filas nuevas: asume que ya existen (ensure en el load)."""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         # Tomamos la fila más reciente (la que creó el ensure)
