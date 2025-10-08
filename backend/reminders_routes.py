@@ -116,24 +116,27 @@ def create_and_send_initial(candidate_id):
     data = request.get_json() or {}
     opportunity_id = int(data.get("opportunity_id", 0))
     if not opportunity_id:
-        return jsonify({"error":"opportunity_id is required"}), 400
+        return jsonify({"error": "opportunity_id is required"}), 400
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # 1) crear fila
+        # 1) Verificar que exista hire y datos mínimos ANTES de insertar
+        hire = _fetch_hire_core(candidate_id, cur)
+        if not hire:
+            return jsonify({"error": "hire not found for candidate"}), 404
+
+        client_mail = _fetch_client_email(hire["opportunity_id"], cur) or ""
+
+        # 2) Insertar la fila (ya no habrá “huérfanas”)
         cur.execute("""
-          INSERT INTO hire_reminders (candidate_id, opportunity_id, press_date, jaz, lar, agus)
-          VALUES (%s, %s, (now() AT TIME ZONE 'America/Bogota'), FALSE, FALSE, FALSE)
+          INSERT INTO hire_reminders
+            (candidate_id, opportunity_id, press_date, jaz, lar, agus)
+          VALUES
+            (%s, %s, (now() AT TIME ZONE 'America/Bogota')::timestamp, FALSE, FALSE, FALSE)
           RETURNING *
         """, (candidate_id, opportunity_id))
         row = cur.fetchone()
 
-        # 2) datos para el correo
-        hire = _fetch_hire_core(candidate_id, cur)
-        if not hire:
-            return jsonify({"error":"hire not found for candidate"}), 404
-
-        client_mail = _fetch_client_email(hire["opportunity_id"], cur) or ""
-
+        # 3) Armar y enviar correo (si falla el mail, la fila igual queda creada)
         html_body = _initial_email_html(
             candidate_id=candidate_id,
             start_date=hire.get("start_date"),
@@ -143,8 +146,6 @@ def create_and_send_initial(candidate_id):
             references=hire.get("references_notes") or "",
             client_mail=client_mail
         )
-
-        # 3) enviar
         ok = _send_email(
             subject="New Close-Win 🎉 — Action needed",
             html_body=html_body,
@@ -152,7 +153,7 @@ def create_and_send_initial(candidate_id):
         )
 
         conn.commit()
-        return jsonify({"row": row, "email_sent": bool(ok)})
+        return jsonify({"row": row, "email_sent": bool(ok)}), 201
 
 @bp.route("/hire_reminders/<int:reminder_id>", methods=["PATCH"])
 def update_checks(reminder_id):
