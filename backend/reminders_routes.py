@@ -57,8 +57,8 @@ def _fetch_hire_core(candidate_id: int, cur):
             ho.start_date::date                           AS start_date,
             COALESCE(ho.references_notes, '')             AS references_notes,
             COALESCE(ho.setup_fee, 0)                     AS setup_fee,
-            COALESCE(ho.employee_salary, 0)               AS salary,
-            COALESCE(ho.employee_fee, 0)                  AS fee,
+            COALESCE(ho.salary, 0)               AS salary,
+            COALESCE(ho.fee, 0)                  AS fee,
             ho.opportunity_id                             AS opportunity_id
         FROM hire_opportunity ho
         WHERE ho.candidate_id = %s
