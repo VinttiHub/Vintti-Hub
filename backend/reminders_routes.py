@@ -14,6 +14,7 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 JAZ_EMAIL  = "jazmin@vintti.com"
 LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
+ANGIE_EMAIL = "angie@vintti.com"
 
 def _anchor(text, url):
     return f'<a href="{html.escape(url)}" target="_blank" rel="noopener">{html.escape(text)}</a>'
@@ -147,7 +148,7 @@ def create_and_send_initial(candidate_id):
         ok = _send_email(
             subject="New Close-Win 🎉 — Action needed",
             html_body=html_body,
-            to=[JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL]
+            to=[JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, ANGIE_EMAIL]
         )
 
         conn.commit()
