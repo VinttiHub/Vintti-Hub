@@ -1882,9 +1882,9 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
     const dueJaz = nextDue(press, currentReminder.last_jaz_sent_at);
     const dueAgs = nextDue(press, currentReminder.last_agus_sent_at);
 
-    if (cdLar) cdLar.textContent = currentReminder.lar ? "✅ No more reminders" : `Next reminder in ${fmtLeft(dueLar - now)}`;
-    if (cdJaz) cdJaz.textContent = currentReminder.jaz ? "✅ No more reminders" : `Next reminder in ${fmtLeft(dueJaz - now)}`;
-    if (cdAgs) cdAgs.textContent = currentReminder.agus ? "✅ No more reminders" : `Next reminder in ${fmtLeft(dueAgs - now)}`;
+    if (cdLar) cdLar.textContent = currentReminder.lar ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueLar - now)}`;
+    if (cdJaz) cdJaz.textContent = currentReminder.jaz ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueJaz - now)}`;
+    if (cdAgs) cdAgs.textContent = currentReminder.agus ? "Mission complete 🛸" : `Next reminder in ${fmtLeft(dueAgs - now)}`;
   }
 
   function startTicker(){
