@@ -1016,7 +1016,7 @@ async function initSidebarProfile() {
   const cs = window.getComputedStyle(tile);
   if (cs.display === 'none') tile.style.display = 'flex';
 }
-
+initSidebarProfile();
 
 
 
@@ -1133,7 +1133,7 @@ document.getElementById('login-form')?.addEventListener('submit', async function
     localStorage.setItem('user_email', email.toLowerCase());
     const avatarSrc = resolveAvatar(email);
     if (avatarSrc) localStorage.setItem('user_avatar', avatarSrc);
-
+initSidebarProfile();
     document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
     document.getElementById('login-container').style.display = 'none';
     document.getElementById('welcome-container').style.display = 'block';
