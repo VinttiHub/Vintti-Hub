@@ -1027,7 +1027,6 @@ async function initSidebarProfile() {
   if (cs.display === 'none') tile.style.display = 'flex';
 }
 
-document.addEventListener('DOMContentLoaded', initSidebarProfile);
 
 
 
@@ -1908,7 +1907,7 @@ function resolveAvatar(email) {
   const filename = AVATAR_BY_EMAIL[key];
   return filename ? (AVATAR_BASE + filename) : null;
 }
-
+initSidebarProfile();
 function showLoginAvatar(email) {
   const img = document.getElementById('login-avatar');
   if (!img) return;
