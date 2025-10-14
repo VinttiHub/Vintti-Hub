@@ -722,12 +722,17 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
   try {
     const updates = ids.map(id => ({
       account_id: id,
-      calculated_status: summary?.[id]?.status || '—'
+      status: summary?.[id]?.status || '—'
     }));
     const rb = await fetch(`${API}/accounts/status/bulk_update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ updates })
+      body: JSON.stringify({
+      updates: updates.map(u => ({
+        account_id: u.account_id,
+        status: u.calculated_status   // ← we rename key on the wire
+      }))
+    })
     });
     if (!rb.ok) throw new Error('bulk endpoint not available');
   } catch {
@@ -736,7 +741,7 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
         await fetch(`${API}/accounts/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ calculated_status: summary?.[id]?.status || '—' })
+          body: JSON.stringify({ account_status: summary?.[id]?.status || '—' })
         });
       } catch { /* noop */ }
     });

@@ -25,7 +25,7 @@ import html as _html
 from ai_routes import register_ai_routes
 from db import get_connection
 from coresignal_routes import bp as coresignal_bp
-from psycopg2.extras import RealDictCursor  # 👈 necesario para cursor_factory=RealDictCursor
+from psycopg2.extras import RealDictCursor, execute_values
 
 # Affinda (opcional)
 from affinda import AffindaAPI, TokenCredential
@@ -1348,6 +1348,56 @@ def update_opportunity_fields(opportunity_id):
         logging.exception("❌ Error updating opportunity fields (opp=%s)", opportunity_id)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/accounts/status/bulk_update', methods=['POST'])
+def bulk_update_account_status():
+    """
+    Body: { "updates": [ { "account_id": 123, "status": "Active Client" }, ... ] }
+    Persists to account.account_status and stamps account_status_updated_at.
+    Also clears status_needs_refresh for those accounts.
+    """
+    payload = request.get_json(silent=True) or {}
+    items = payload.get('updates') or []
+
+    rows = []
+    for it in items:
+        try:
+            acc_id = int(it.get('account_id') or it.get('id') or it.get('accountId'))
+        except (TypeError, ValueError):
+            continue
+        status = (it.get('status') or it.get('calculated_status') or it.get('value') or '').strip() or None
+        if acc_id:
+            rows.append((acc_id, status))
+
+    if not rows:
+        return jsonify({"updated": 0}), 200
+
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor() as cur:
+                # Faster than looping UPDATEs: one VALUES list + join
+                execute_values(cur, """
+                    CREATE TEMP TABLE _upd_status(account_id INT, status TEXT) ON COMMIT DROP;
+                    """, [])
+
+                execute_values(cur, "INSERT INTO _upd_status(account_id, status) VALUES %s", rows)
+
+                cur.execute("""
+                    UPDATE account a
+                       SET account_status = u.status,
+                           account_status_updated_at = NOW(),
+                           status_needs_refresh = FALSE
+                      FROM _upd_status u
+                     WHERE a.account_id = u.account_id;
+                """)
+                updated = cur.rowcount
+
+        return jsonify({"updated": updated}), 200
+
+    except Exception as e:
+        import traceback; print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/accounts/<account_id>', methods=['PATCH'])
 def update_account_fields(account_id):
@@ -1368,7 +1418,8 @@ def update_account_fields(account_id):
         'where_come_from',
         'calculated_status',
         'account_manager',
-        'referal_source'   # 👈 NUEVO
+        'account_status', 
+        'referal_source'  
     ]
 
 
