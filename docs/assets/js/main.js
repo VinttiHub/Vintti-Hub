@@ -1670,7 +1670,7 @@ async function patchOppFields(oppId, payload) {
   const DASH_ALLOWED = new Set([
     'agustin@vintti.com',
     'angie@vintti.com',
-    'lara@vintti.com'
+    'lara@vintti.com', 'bahia@vintti.com'
   ]);
 
   // Si no está permitido, oculta si existieran y sal.

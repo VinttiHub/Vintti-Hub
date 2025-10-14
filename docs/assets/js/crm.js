@@ -944,7 +944,7 @@ function hideSortToast() {
 // ——— Dashboard + Management Metrics (cross-pages) ———
 (() => {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com']);
+  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com','bahia@vintti.com']);
 
   // Si no está permitido: no insertes los botones y elimina si ya existieran
   if (!email || !MGMT_ALLOWED.has(email)) {
