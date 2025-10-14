@@ -947,6 +947,88 @@ const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.c
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
 }
+// —— Profile tile init (auto-crea el bloque si faltara y lo deja visible) ——
+async function initSidebarProfile() {
+  // 0) Si el sidebar está colapsado, no ocultes el tile en el primer render
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar && sidebar.classList.contains('custom-sidebar-hidden')) {
+    // no lo expandimos, solo evitamos esconder el tile
+    sidebar.classList.remove('custom-sidebar-hidden');
+    // si quieres volver a colapsar luego del render: setTimeout(()=> sidebar.classList.add('custom-sidebar-hidden'), 50);
+  }
+
+  // 1) Asegurar que el mount exista. Si no está, lo creamos al vuelo.
+  let tile = document.getElementById('sidebarProfile');
+  if (!tile && sidebar) {
+    sidebar.insertAdjacentHTML('beforeend', `
+      <a href="profile.html" class="profile-tile" id="sidebarProfile">
+        <span class="profile-avatar">
+          <img id="profileAvatarImg" alt="" />
+          <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
+        </span>
+        <span class="profile-meta">
+          <span id="profileName" class="profile-name">Loading…</span>
+          <span id="profileEmail" class="profile-email"></span>
+        </span>
+      </a>
+    `);
+    tile = document.getElementById('sidebarProfile');
+  }
+  if (!tile) return; // no hay sidebar
+
+  const $img     = document.getElementById('profileAvatarImg');
+  const $init    = document.getElementById('profileAvatarInitials');
+  const $name    = document.getElementById('profileName');
+  const $emailEl = document.getElementById('profileEmail');
+
+  // 2) Datos del usuario (pueden estar vacíos y no pasa nada)
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+  $emailEl.textContent = email || '';
+
+  let displayName = localStorage.getItem('user_name') || '';
+
+  if (!displayName && email) {
+    try {
+      const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
+      const users = await res.json();
+      const u = (users || []).find(x => String(x.email_vintti || '').toLowerCase() === email);
+      if (u?.user_name) {
+        displayName = u.user_name;
+        localStorage.setItem('user_name', displayName);
+      }
+    } catch { /* fallback abajo */ }
+  }
+
+  if (!displayName) {
+    displayName = email ? email.split('@')[0].replace(/[._]/g,' ') : 'My Profile';
+    displayName = displayName.replace(/\b\w/g, c => c.toUpperCase());
+  }
+  $name.textContent = displayName;
+
+  // 3) Avatar o iniciales
+  const avatarSrc = localStorage.getItem('user_avatar') || resolveAvatar?.(email);
+  if (avatarSrc) {
+    $img.src = avatarSrc;
+    $img.style.display = 'block';
+    $init.style.display = 'none';
+  } else {
+    const initials = (displayName||'').trim().split(/\s+/).slice(0,2).map(w => w[0]||'').join('').toUpperCase() || '—';
+    $init.textContent = initials;
+    $img.removeAttribute('src');
+    $img.style.display = 'none';
+    $init.style.display = 'grid';
+  }
+
+  // 4) Debug visible en consola (te dice si está oculto por CSS)
+  const cs = window.getComputedStyle(tile);
+  console.debug('[profile-tile] display:', cs.display, '| opacity:', cs.opacity, '| inFlow:', tile.offsetParent !== null, '| rect:', tile.getBoundingClientRect());
+
+  // 5) Fuerza visible por si alguna regla lo pisa
+  if (cs.display === 'none') tile.style.display = 'flex';
+}
+
+document.addEventListener('DOMContentLoaded', initSidebarProfile);
+
 
 
 
