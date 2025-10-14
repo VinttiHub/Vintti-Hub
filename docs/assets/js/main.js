@@ -948,16 +948,20 @@ if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
 }
 // —— Profile tile init (auto-crea el bloque si faltara y lo deja visible) ——
+// Helper robusto para leer el email actual (localStorage primero, luego sessionStorage)
+function getCurrentUserEmail(){
+  return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase()
+    .trim();
+}
+
 async function initSidebarProfile() {
-  // 0) Si el sidebar está colapsado, no ocultes el tile en el primer render
+  // 0) Asegura que el mount exista (igual que antes)
   const sidebar = document.querySelector('.sidebar');
   if (sidebar && sidebar.classList.contains('custom-sidebar-hidden')) {
-    // no lo expandimos, solo evitamos esconder el tile
     sidebar.classList.remove('custom-sidebar-hidden');
-    // si quieres volver a colapsar luego del render: setTimeout(()=> sidebar.classList.add('custom-sidebar-hidden'), 50);
   }
 
-  // 1) Asegurar que el mount exista. Si no está, lo creamos al vuelo.
   let tile = document.getElementById('sidebarProfile');
   if (!tile && sidebar) {
     sidebar.insertAdjacentHTML('beforeend', `
@@ -974,56 +978,42 @@ async function initSidebarProfile() {
     `);
     tile = document.getElementById('sidebarProfile');
   }
-  if (!tile) return; // no hay sidebar
+  if (!tile) return;
 
   const $img     = document.getElementById('profileAvatarImg');
   const $init    = document.getElementById('profileAvatarInitials');
   const $name    = document.getElementById('profileName');
   const $emailEl = document.getElementById('profileEmail');
 
-  // 2) Datos del usuario (pueden estar vacíos y no pasa nada)
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  $emailEl.textContent = email || '';
+  // 1) Texto fijo: solo "profile" (sin nombre de usuario)
+  $name.textContent = 'profile';
 
-  let displayName = localStorage.getItem('user_name') || '';
-
-  if (!displayName && email) {
-    try {
-      const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
-      const users = await res.json();
-      const u = (users || []).find(x => String(x.email_vintti || '').toLowerCase() === email);
-      if (u?.user_name) {
-        displayName = u.user_name;
-        localStorage.setItem('user_name', displayName);
-      }
-    } catch { /* fallback abajo */ }
+  // 2) Email oculto (no lo mostramos)
+  if ($emailEl) {
+    $emailEl.textContent = '';
+    $emailEl.style.display = 'none';
   }
 
-  if (!displayName) {
-    displayName = email ? email.split('@')[0].replace(/[._]/g,' ') : 'My Profile';
-    displayName = displayName.replace(/\b\w/g, c => c.toUpperCase());
-  }
-  $name.textContent = displayName;
+  // 3) Avatar deducido por email
+  const email = getCurrentUserEmail();
+  // Mantén compatibilidad con tu caché previa
+  const cachedAvatar = localStorage.getItem('user_avatar');
+  const avatarSrc = cachedAvatar || resolveAvatar?.(email);
 
-  // 3) Avatar o iniciales
-  const avatarSrc = localStorage.getItem('user_avatar') || resolveAvatar?.(email);
   if (avatarSrc) {
     $img.src = avatarSrc;
     $img.style.display = 'block';
     $init.style.display = 'none';
   } else {
-    const initials = (displayName||'').trim().split(/\s+/).slice(0,2).map(w => w[0]||'').join('').toUpperCase() || '—';
-    $init.textContent = initials;
+    // Fallback a iniciales: "PR" de "profile"
+    $init.textContent = 'PR';
     $img.removeAttribute('src');
     $img.style.display = 'none';
     $init.style.display = 'grid';
   }
 
-  // 4) Debug visible en consola (te dice si está oculto por CSS)
+  // Asegura visibilidad por si otro CSS lo pisa
   const cs = window.getComputedStyle(tile);
-  console.debug('[profile-tile] display:', cs.display, '| opacity:', cs.opacity, '| inFlow:', tile.offsetParent !== null, '| rect:', tile.getBoundingClientRect());
-
-  // 5) Fuerza visible por si alguna regla lo pisa
   if (cs.display === 'none') tile.style.display = 'flex';
 }
 
@@ -1907,7 +1897,7 @@ function resolveAvatar(email) {
   const filename = AVATAR_BY_EMAIL[key];
   return filename ? (AVATAR_BASE + filename) : null;
 }
-initSidebarProfile();
+
 function showLoginAvatar(email) {
   const img = document.getElementById('login-avatar');
   if (!img) return;
