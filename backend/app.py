@@ -190,8 +190,7 @@ app = Flask(__name__)
 register_ai_routes(app)
 app.register_blueprint(reminders_bp)
 app.register_blueprint(coresignal_bp)
-app.register_blueprint(profile_bp) 
-app.register_blueprint(reminders_bp)
+app.register_blueprint(profile_bp)
 app.register_blueprint(users_bp)
 # --- enum canonicals para el Sheet ---
 _CANON = {
