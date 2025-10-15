@@ -27,6 +27,7 @@ from ai_routes import register_ai_routes
 from db import get_connection
 from coresignal_routes import bp as coresignal_bp
 from psycopg2.extras import RealDictCursor, execute_values
+from flask_cors import CORS
 
 # Affinda (opcional)
 from affinda import AffindaAPI, TokenCredential
@@ -191,6 +192,8 @@ register_ai_routes(app)
 app.register_blueprint(reminders_bp)
 app.register_blueprint(coresignal_bp)
 app.register_blueprint(profile_bp)
+CORS(app, origins=["https://vinttihub.vintti.com"], supports_credentials=True,
+     allow_headers=["Content-Type", "X-User-Id"])
 # --- enum canonicals para el Sheet ---
 _CANON = {
     "career_job_type": {
