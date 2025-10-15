@@ -6,26 +6,40 @@ function getCurrentUserEmail(){
 }
 
 // Try to get user_id from storage; if missing, resolve by email and cache it
-async function getCurrentUserId() {
-  // 1) Cached?
+// Usa getCurrentUserId({force:true}) para ignorar cache.
+async function getCurrentUserId({ force = false } = {}) {
+  const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase()
+    .trim();
+
+  // invalida cache si cambió el email o si piden "force"
+  const cachedUid = localStorage.getItem('user_id');
+  const cachedOwner = localStorage.getItem('user_id_owner_email');
+  if (force || (cachedOwner && cachedOwner !== email)) {
+    localStorage.removeItem('user_id');
+  }
+
+  // 1) ¿Sigue habiendo cache válido?
   const cached = localStorage.getItem('user_id');
-  console.debug('[uid] cached:', cached);
+  console.debug('[uid] cached:', cached, '(owner:', localStorage.getItem('user_id_owner_email'), ')');
   if (cached) return Number(cached);
 
-  const email = getCurrentUserEmail();
-  console.debug('[uid] email:', email);
-  if (!email) return null;
+  if (!email) {
+    console.warn('[uid] No email available to resolve user_id');
+    return null;
+  }
 
-  // 2) Fast path: if you have a backend filter, prefer /users?email=
+  // 2) Fast path: /users?email=
   try {
     const fast = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users?email=${encodeURIComponent(email)}`);
     console.debug('[uid] /users?email status:', fast.status);
     if (fast.ok) {
-      const arr = await fast.json(); // expect [] or [{ user_id, email_vintti, ... }]
-      const hit = Array.isArray(arr) ? arr.find(u => (u.email_vintti||'').toLowerCase() === email) : null;
+      const arr = await fast.json(); // [] o [ { user_id, email_vintti, ... } ]
+      const hit = Array.isArray(arr) ? arr.find(u => (u.email_vintti || '').toLowerCase() === email) : null;
       console.debug('[uid] hit (by email):', hit?.user_id);
       if (hit?.user_id != null) {
         localStorage.setItem('user_id', String(hit.user_id));
+        localStorage.setItem('user_id_owner_email', email);
         return Number(hit.user_id);
       }
     }
@@ -33,15 +47,17 @@ async function getCurrentUserId() {
     console.debug('users?email lookup failed (will try full list):', e);
   }
 
-  // 3) Fallback: fetch all and match by email
+  // 3) Fallback: /users (full) y match por email
   try {
     const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
     console.debug('[uid] /users status:', res.status);
+    if (!res.ok) return null;
     const users = await res.json();
-    const me = (users || []).find(u => String(u.email_vintti||'').toLowerCase() === email);
+    const me = (users || []).find(u => String(u.email_vintti || '').toLowerCase() === email);
     console.debug('[uid] hit (by full list):', me?.user_id);
     if (me?.user_id != null) {
       localStorage.setItem('user_id', String(me.user_id));
+      localStorage.setItem('user_id_owner_email', email);
       return Number(me.user_id);
     }
   } catch (e) {
@@ -49,6 +65,7 @@ async function getCurrentUserId() {
   }
   return null;
 }
+window.getCurrentUserId = getCurrentUserId;
 // ——— API helper que SIEMPRE intenta enviar el usuario ———
 async function api(path, opts = {}) {
   // path ej: "/profile/me" o "/time_off_requests"
@@ -1217,6 +1234,19 @@ document.getElementById('login-form')?.addEventListener('submit', async function
     } else {
       getCurrentUserId().catch(()=>{});
     }
+    // Si el backend no mandó user_id, resuélvelo fresco (sin cache)
+const finalUid = typeof data.user_id === 'number'
+  ? Number(data.user_id)
+  : (await getCurrentUserId({ force: true })) ?? null;
+
+if (finalUid != null) {
+  localStorage.setItem('user_id', String(finalUid));
+  localStorage.setItem('user_id_owner_email', email.toLowerCase());
+  console.info('✅ [login] user_id (fresh):', finalUid);
+} else {
+  console.warn('⚠️ [login] Could not resolve user_id for', email);
+}
+
     const avatarSrc = resolveAvatar(email);
     if (avatarSrc) localStorage.setItem('user_avatar', avatarSrc);
     document.getElementById('personalized-greeting').textContent = `Hey ${nickname}, `;
