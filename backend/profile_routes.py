@@ -113,8 +113,15 @@ def update_user(user_id: int):
 
 @bp.get("/time_off_requests")
 def list_time_off():
-    user_id = request.args.get("user_id")
-    if not user_id or not user_id.isdigit():
+    # ✅ toma primero sesión/header/query (igual que /profile/me)
+    user_id = _current_user_id()
+    if not user_id:
+        # último recurso: query param legacy
+        q = request.args.get("user_id")
+        if q and q.isdigit():
+            user_id = int(q)
+
+    if not user_id:
         return jsonify({"error":"user_id required"}), 400
 
     conn = get_connection()

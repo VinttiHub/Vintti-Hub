@@ -5,6 +5,37 @@ function getUidFromQuery() {
   } catch { return null; }
 }
 
+async function ensureUserIdInURL() {
+  let uid = getUidFromQuery();
+
+  if (!uid) {
+    // 1) intenta cache
+    uid = Number(localStorage.getItem('user_id')) || null;
+  }
+  if (!uid && typeof window.getCurrentUserId === 'function') {
+    // 2) resuélvelo por email -> /users
+    try { uid = await window.getCurrentUserId(); } catch {}
+  }
+
+  if (!uid) {
+    console.warn("No user_id available (no URL, no cache, no resolver)");
+    alert("We couldn't identify your session. Please log in again.");
+    return null;
+  }
+
+  // cachea por si acaso
+  localStorage.setItem('user_id', String(uid));
+
+  // si la URL no lo tiene, la reescribimos sin recargar
+  const url = new URL(location.href);
+  if (url.searchParams.get('user_id') !== String(uid)) {
+    url.searchParams.set('user_id', String(uid));
+    history.replaceState(null, '', url.toString());
+  }
+
+  return uid;
+}
+
 // ===== Config =====
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com"; // your Flask API base
 
@@ -66,39 +97,19 @@ $all(".tab").forEach(btn=>{
 // ===== Profile Load/Save =====
 let CURRENT_USER_ID = null;
 
-async function loadMe(){
-  // 1) Resolver el user_id: URL ?user_id=  → localStorage → helper global
-  let uid = getUidFromQuery();
+async function loadMe(uid){
+  if (!uid) throw new Error("Missing uid for /profile/me");
 
-  if (!uid) uid = Number(localStorage.getItem('user_id')) || null;
-
-  if (!uid && typeof window.getCurrentUserId === 'function') {
-    try { uid = await window.getCurrentUserId(); } catch {}
-  }
-
-  if (!uid) {
-    // En vez de tirar error duro, mostramos mensaje amable y salimos
-    console.warn("No user_id available for /profile/me (no URL, no cache, no helper)");
-    alert("We couldn't identify your session. Please log in again.");
-    return; // evita que el init falle entero
-  }
-
-  // 2) Intento con header (lo que espera tu backend)
-  let r = await fetch(`${API_BASE}/profile/me`, {
-    headers: { "X-User-Id": String(uid) },
-    credentials: "include"
-  });
-
-  // 3) Fallback si algún proxy/CORS quita el header
+  // Primero intenta con header, tu helper api() ya lo hace
+  let r = await api(`/profile/me`, { headers: {} });
   if (r.status === 401) {
-    r = await fetch(`${API_BASE}/profile/me?user_id=${encodeURIComponent(uid)}`, {
-      credentials: "include"
-    });
+    // fallback query (api() ya lo hace también, pero por si acaso)
+    r = await fetch(`${API_BASE}/profile/me?user_id=${encodeURIComponent(uid)}`, { credentials: "include" });
   }
-
   if (!r.ok) throw new Error("Failed to load profile");
+
   const me = await r.json();
-  CURRENT_USER_ID = me.user_id;
+  CURRENT_USER_ID = me.user_id ?? uid;
 
   // Fill form
   $("#user_name").value = me.user_name || "";
@@ -109,6 +120,36 @@ async function loadMe(){
   $("#fecha_nacimiento").value = toInputDate(me.fecha_nacimiento);
 
   setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url });
+}
+
+async function loadMyRequests(uid){
+  const list = $("#timeoffList");
+  list.innerHTML = `<li>Loading…</li>`;
+  try{
+    // usa el helper api() para que envíe header y, si hace falta, agregue ?user_id=
+    const r = await api(`/time_off_requests`);
+    if (!r.ok) throw new Error(await r.text());
+    const arr = await r.json();
+    if (!arr.length){
+      list.innerHTML = `<li>No requests yet.</li>`;
+      return;
+    }
+    list.innerHTML = "";
+    arr.forEach(x=>{
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div>
+          <div><strong>${x.kind}</strong> • ${x.start_date} → ${x.end_date}</div>
+          <div style="color:#475569; font-size:12px">${x.reason ? x.reason : ""}</div>
+        </div>
+        <div><span class="badge ${x.status}">${x.status}</span></div>
+      `;
+      list.appendChild(li);
+    });
+  }catch(err){
+    console.error(err);
+    list.innerHTML = `<li>Could not load requests.</li>`;
+  }
 }
 
 $("#profileForm").addEventListener("submit", async (e)=>{
@@ -208,8 +249,12 @@ $("#timeoffForm").addEventListener("submit", async (e)=>{
 // ===== Init =====
 (async function init(){
   try{
-    await loadMe();
-    await loadMyRequests();
+    const uid = await ensureUserIdInURL();
+    if (!uid) return;                  // no seguimos sin id
+    CURRENT_USER_ID = uid;
+
+    await loadMe(uid);                 // pásalo explícito
+    await loadMyRequests(uid);         // pásalo explícito
   }catch(err){
     console.error(err);
     alert("Could not load your profile. Please refresh.");
