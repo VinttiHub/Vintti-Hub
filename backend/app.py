@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from botocore.exceptions import NoCredentialsError
 from google.oauth2.service_account import Credentials
+from psycopg2.extras import RealDictCursor
 from googleapiclient.discovery import build
 import boto3
 import openai
@@ -33,7 +34,7 @@ from affinda import AffindaAPI, TokenCredential
 import re, html as _html
 from reminders_routes import bp as reminders_bp
 from profile_routes import bp as profile_bp 
-from profile_routes import bp as users_bp
+from profile_routes import users_bp
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
@@ -925,17 +926,55 @@ def get_opportunity_by_id(opportunity_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route('/users')
-def get_users():
-    result = fetch_data_from_table("users")
-    if "error" in result:
-        return jsonify(result), 500
-    return jsonify([
-        {
-            "user_name": row["user_name"],
-            "email_vintti": row["email_vintti"]
-        }
-        for row in result
-    ])
+def users_list_or_by_email():
+    """
+    GET /users
+    - sin params -> lista usuarios (campos clave, incluye user_id)
+    - ?email=foo@bar.com -> filtra por email exacto (case-insensitive)
+    """
+    email = request.args.get("email")
+
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            base_select = """
+                SELECT
+                  user_id,
+                  user_name,
+                  email_vintti,
+                  role,
+                  emergency_contact,
+                  ingreso_vintti_date,
+                  fecha_nacimiento,
+                  avatar_url
+                FROM users
+            """
+
+            if email:
+                cur.execute(base_select + " WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
+            else:
+                cur.execute(base_select)
+
+            rows = cur.fetchall()
+
+        conn.close()
+
+        # normaliza fechas a 'YYYY-MM-DD'
+        def _normalize_dates(row):
+            for k in ("ingreso_vintti_date", "fecha_nacimiento"):
+                v = row.get(k)
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+                elif isinstance(v, str) and len(v) >= 10:
+                    row[k] = v[:10]  # fallback por si viene como string ISO con hora
+            return row
+
+        return jsonify([_normalize_dates(dict(r)) for r in rows])
+
+    except Exception as e:
+        import traceback; print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/opportunities', methods=['POST'])
