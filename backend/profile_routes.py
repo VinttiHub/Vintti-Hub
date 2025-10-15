@@ -138,6 +138,19 @@ def list_time_off():
 
     return jsonify([_row_to_json(r) for r in rows])
 
+@bp.get("/users")
+def list_users():
+    email = request.args.get("email")
+    conn = get_connection()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        if email:
+            cur.execute("SELECT * FROM users WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
+        else:
+            cur.execute("SELECT * FROM users")
+        rows = cur.fetchall()
+    conn.close()
+    return jsonify(rows)
+
 @bp.post("/time_off_requests")
 def create_time_off():
     data = request.get_json(silent=True) or {}
