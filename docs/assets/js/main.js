@@ -43,7 +43,35 @@ async function getCurrentUserId() {
   }
   return null;
 }
+// ——— API helper que SIEMPRE intenta enviar el usuario ———
+async function api(path, opts = {}) {
+  // path ej: "/profile/me" o "/time_off_requests"
+  const uid = await window.getCurrentUserId(); // puede ser null
+  const url = `${API_BASE}${path}`;
 
+  // 1) Intento con cookie + header X-User-Id si lo tengo
+  let headers = { ...(opts.headers || {}) };
+  if (uid != null) headers['X-User-Id'] = String(uid);
+
+  let r = await fetch(url, {
+    ...opts,
+    headers,
+    credentials: 'include'
+  });
+
+  // 2) Si el backend/proxy quitó headers o hay 401, reintenta con ?user_id=
+  if (r.status === 401 && uid != null) {
+    const sep = url.includes('?') ? '&' : '?';
+    const urlWithQuery = `${url}${sep}user_id=${encodeURIComponent(uid)}`;
+    r = await fetch(urlWithQuery, {
+      ...opts,
+      credentials: 'include'
+    });
+  }
+
+  return r;
+}
+window.api = api;
 // ——— Helpers de nombre/escape ———
 function escapeHtml(s){
   return String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
@@ -992,49 +1020,6 @@ const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.c
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
-}
-
-function getCurrentUserEmail(){
-  return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
-    .toLowerCase()
-    .trim();
-}
-// Try to get user_id from storage; if missing, resolve by email and cache it
-async function getCurrentUserId() {
-  const cached = localStorage.getItem('user_id');
-  if (cached) return Number(cached);
-
-  const email = getCurrentUserEmail();
-  if (!email) return null;
-
-  // Prefer a filtered lookup if available
-  try {
-    const fast = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users?email=${encodeURIComponent(email)}`);
-    if (fast.ok) {
-      const arr = await fast.json();
-      const hit = Array.isArray(arr) ? arr.find(u => (u.email_vintti||'').toLowerCase() === email) : null;
-      if (hit?.user_id != null) {
-        localStorage.setItem('user_id', String(hit.user_id));
-        return Number(hit.user_id);
-      }
-    }
-  } catch (e) {
-    console.debug('users?email lookup failed (will try full list):', e);
-  }
-
-  // Fallback: fetch all and match by email
-  try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
-    const users = await res.json();
-    const me = (users || []).find(u => String(u.email_vintti||'').toLowerCase() === email);
-    if (me?.user_id != null) {
-      localStorage.setItem('user_id', String(me.user_id));
-      return Number(me.user_id);
-    }
-  } catch (e) {
-    console.error('Could not resolve current user_id:', e);
-  }
-  return null;
 }
 
 async function initSidebarProfile() {
@@ -2174,32 +2159,4 @@ function getTypeBadge(type) {
 })();
 window.getCurrentUserEmail = getCurrentUserEmail;
 window.getCurrentUserId    = getCurrentUserId;
-// ——— API helper que SIEMPRE intenta enviar el usuario ———
-async function api(path, opts = {}) {
-  // path ej: "/profile/me" o "/time_off_requests"
-  const uid = await window.getCurrentUserId(); // puede ser null
-  const url = `${API_BASE}${path}`;
 
-  // 1) Intento con cookie + header X-User-Id si lo tengo
-  let headers = { ...(opts.headers || {}) };
-  if (uid != null) headers['X-User-Id'] = String(uid);
-
-  let r = await fetch(url, {
-    ...opts,
-    headers,
-    credentials: 'include'
-  });
-
-  // 2) Si el backend/proxy quitó headers o hay 401, reintenta con ?user_id=
-  if (r.status === 401 && uid != null) {
-    const sep = url.includes('?') ? '&' : '?';
-    const urlWithQuery = `${url}${sep}user_id=${encodeURIComponent(uid)}`;
-    r = await fetch(urlWithQuery, {
-      ...opts,
-      credentials: 'include'
-    });
-  }
-
-  return r;
-}
-window.api = api;
