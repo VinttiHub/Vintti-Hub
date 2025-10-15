@@ -14,12 +14,12 @@ async function ensureUserIdInURL() {
   }
   if (!uid && typeof window.getCurrentUserId === 'function') {
     // 2) resuélvelo por email -> /users
-    try { uid = await window.getCurrentUserId(); } catch {}
+    try { uid = await window.getCurrentUserId(); } catch { uid = null; }
   }
 
   if (!uid) {
     console.warn("No user_id available (no URL, no cache, no resolver)");
-    alert("We couldn't identify your session. Please log in again.");
+    console.info("Hint: inicia sesión para poblar user_email y poder resolver user_id.");
     return null;
   }
 

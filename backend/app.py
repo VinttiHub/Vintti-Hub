@@ -33,8 +33,7 @@ from affinda import AffindaAPI, TokenCredential
 
 import re, html as _html
 from reminders_routes import bp as reminders_bp
-from profile_routes import bp as profile_bp 
-from profile_routes import users_bp
+from profile_routes import bp as profile_bp
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
@@ -192,7 +191,6 @@ register_ai_routes(app)
 app.register_blueprint(reminders_bp)
 app.register_blueprint(coresignal_bp)
 app.register_blueprint(profile_bp)
-app.register_blueprint(users_bp)
 # --- enum canonicals para el Sheet ---
 _CANON = {
     "career_job_type": {

@@ -9,17 +9,21 @@ function getCurrentUserEmail(){
 async function getCurrentUserId() {
   // 1) Cached?
   const cached = localStorage.getItem('user_id');
+  console.debug('[uid] cached:', cached);
   if (cached) return Number(cached);
 
   const email = getCurrentUserEmail();
+  console.debug('[uid] email:', email);
   if (!email) return null;
 
   // 2) Fast path: if you have a backend filter, prefer /users?email=
   try {
     const fast = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users?email=${encodeURIComponent(email)}`);
+    console.debug('[uid] /users?email status:', fast.status);
     if (fast.ok) {
       const arr = await fast.json(); // expect [] or [{ user_id, email_vintti, ... }]
       const hit = Array.isArray(arr) ? arr.find(u => (u.email_vintti||'').toLowerCase() === email) : null;
+      console.debug('[uid] hit (by email):', hit?.user_id);
       if (hit?.user_id != null) {
         localStorage.setItem('user_id', String(hit.user_id));
         return Number(hit.user_id);
@@ -32,8 +36,10 @@ async function getCurrentUserId() {
   // 3) Fallback: fetch all and match by email
   try {
     const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
+    console.debug('[uid] /users status:', res.status);
     const users = await res.json();
     const me = (users || []).find(u => String(u.email_vintti||'').toLowerCase() === email);
+    console.debug('[uid] hit (by full list):', me?.user_id);
     if (me?.user_id != null) {
       localStorage.setItem('user_id', String(me.user_id));
       return Number(me.user_id);
