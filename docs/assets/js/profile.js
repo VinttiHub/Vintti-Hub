@@ -395,12 +395,11 @@ async function loadBalances(uid){
       <div class="cell" style="grid-column:1/-1; justify-content:center">Could not load balances.</div>`;
   }
 }
-
-$("#timeoffForm").addEventListener("submit", async (e)=>{
+async function onTimeoffSubmit(e){
   e.preventDefault();
   const toast = $("#timeoffToast");
   const start = $("#start_date").value;
-  const end = $("#end_date").value;
+  const end   = $("#end_date").value;
   if (end < start){
     showToast(toast, "End date must be after start date.", false);
     return;
@@ -410,7 +409,7 @@ $("#timeoffForm").addEventListener("submit", async (e)=>{
     kind: $("#kind").value,
     start_date: start,
     end_date: end,
-    reason: $("#reason").value.trim() || null
+    reason: ($("#reason").value || "").trim() || null
   };
   try{
     const r = await fetch(`${API_BASE}/time_off_requests`, {
@@ -422,12 +421,35 @@ $("#timeoffForm").addEventListener("submit", async (e)=>{
     if (!r.ok) throw new Error(await r.text());
     showToast(toast, "Request sent. You got it! ✅");
     $("#timeoffForm").reset();
-    await loadMyRequests();
+    await loadMyRequests(CURRENT_USER_ID);
   }catch(err){
     console.error(err);
     showToast(toast, "Could not submit request.", false);
   }
-});
+}
+
+// ===== Init =====
+(async function init(){
+  try{
+    const uid = await ensureUserIdInURL();
+    if (!uid) return;
+    CURRENT_USER_ID = uid;
+
+    await loadMe(uid);
+    await loadMyRequests(uid);
+    await loadBalances(uid);
+
+    // Engancha el submit AHORA (el DOM ya existe)
+    const form = document.getElementById("timeoffForm");
+    if (form && !form.dataset.bound){
+      form.addEventListener("submit", onTimeoffSubmit);
+      form.dataset.bound = "1"; // evita doble binding si recargas parciales
+    }
+  }catch(err){
+    console.error(err);
+    alert("Could not load your profile. Please refresh.");
+  }
+})();
 
 // ===== Init =====
 (async function init(){
