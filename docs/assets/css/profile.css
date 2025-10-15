@@ -87,3 +87,69 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
   .grid{ grid-template-columns: 1fr }
   .grid-compact{ grid-template-columns: 1fr }
 }
+/* ——— Time Off Balances ——— */
+.balances{
+  margin-bottom: 24px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 18px 10px;
+}
+
+.balances-head{
+  display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px;
+}
+.balances-title{ margin:0; font-size: clamp(18px, 2.6vw, 22px) }
+.balances-caption{ font-size:12px; color:var(--muted) }
+
+.balances-table{
+  display:grid; gap:8px;
+  grid-template-columns: 1fr 140px 140px;
+}
+.balances-table .th{
+  font-size:11px; text-transform:uppercase; letter-spacing:.35px; color:var(--muted);
+  padding:10px 12px;
+}
+.balances-table .cell{
+  background:white; border:1px solid var(--border); border-radius:12px;
+  padding:12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.metric{
+  display:flex; align-items:center; gap:10px; width:100%;
+}
+.metric .name{
+  font-weight:600; color:var(--text);
+}
+.metric .hint{
+  font-size:12px; color:var(--muted);
+}
+
+.kpi{
+  font-variant-numeric: tabular-nums; font-weight:800;
+}
+
+.badge-soft{
+  font-size:11px; font-weight:700; padding:6px 8px; border-radius:999px; border:1px solid var(--border);
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+
+.row{
+  display:contents;
+}
+
+/* Skeleton while loading */
+.skeleton-row{
+  grid-column: 1 / -1;
+  height:44px;
+  border-radius:12px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,255,255,0.9), rgba(255,255,255,0.55));
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer{ 0%{background-position:0 0} 100%{background-position:200% 0} }
+
+@media (max-width: 860px){
+  .balances-table{ grid-template-columns: 1fr 1fr; }
+  .balances-table .th.hide-m{ display:none }
+}

@@ -6,11 +6,39 @@ from typing import Optional, Dict, Any
 from flask import Blueprint, request, jsonify, g
 from psycopg2.extras import RealDictCursor
 
-from db import get_connection  # your existing helper
+from db import get_connection
+from flask import Blueprint, jsonify, request
+from psycopg2.extras import RealDictCursor
+from db import get_connection
 
 bp = Blueprint("profile", __name__, url_prefix="")
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
+users_bp = Blueprint("users", __name__)
+
+@users_bp.get("/users/<int:user_id>")
+def get_user(user_id: int):
+    q = """
+    SELECT
+      user_id, user_name, email_vintti, role, emergency_contact,
+      ingreso_vintti_date, fecha_nacimiento, avatar_url,
+      -- balances:
+      COALESCE(vacaciones_acumuladas, 0) AS vacaciones_acumuladas,
+      COALESCE(vacaciones_habiles, 0) AS vacaciones_habiles,
+      COALESCE(vacaciones_consumidas, 0) AS vacaciones_consumidas,
+      COALESCE(vintti_days, 0) AS vintti_days,
+      COALESCE(vintti_days_consumidos, 0) AS vintti_days_consumidos
+    FROM users
+    WHERE user_id = %s
+    """
+    conn = get_connection()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+      cur.execute(q, (user_id,))
+      row = cur.fetchone()
+    conn.close()
+    if not row:
+      return jsonify({"error":"user not found"}), 404
+    return jsonify(row)
 
 # --- helper: how we identify the current user ---
 def _current_user_id() -> Optional[int]:

@@ -212,6 +212,189 @@ async function loadMyRequests(){
     list.innerHTML = `<li>Could not load requests.</li>`;
   }
 }
+// ——— Time Off Balances (read-only) ———
+// Source columns in DB (table: users):
+// - vacaciones_acumuladas
+// - vacaciones_habiles
+// - vacaciones_consumidas
+// - vintti_days
+// - vintti_days_consumidos
+//
+// Display labels (EN):
+// Accrued Vacation (vacaciones_acumuladas)
+// Business-day Vacation (vacaciones_habiles)
+// Total Vacation (sum)
+// Vacation Used (vacaciones_consumidas)
+// Vacation Available (Total - Used)
+// Total Vintti Days (vintti_days)
+// Vintti Days Used (vintti_days_consumidos)
+// Vintti Days Available (Total - Used)
+
+function _toNum(v){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function _fmtDays(n){
+  const v = Math.max(0, n);
+  return `${v} day${v===1?'':'s'}`;
+}
+
+function renderBalances({
+  vacaciones_acumuladas = 0,
+  vacaciones_habiles = 0,
+  vacaciones_consumidas = 0,
+  vintti_days = 0,
+  vintti_days_consumidos = 0
+}){
+  const acc = _toNum(vacaciones_acumuladas);
+  const work = _toNum(vacaciones_habiles);
+  const usedVac = _toNum(vacaciones_consumidas);
+  const totalVac = Math.max(0, acc + work);
+  const availVac = Math.max(0, totalVac - usedVac);
+
+  const totalVD = _toNum(vintti_days);
+  const usedVD = _toNum(vintti_days_consumidos);
+  const availVD = Math.max(0, totalVD - usedVD);
+
+  const host = document.getElementById('balancesTable');
+  if (!host) return;
+
+  host.innerHTML = `
+    <div class="th">Metric</div>
+    <div class="th hide-m">Value</div>
+    <div class="th hide-m">Notes</div>
+
+    <!-- Vacation block -->
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vacation</span>
+          <span class="name">Accrued Vacation</span>
+        </div>
+        <span class="kpi">${_fmtDays(acc)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(acc)}</span></div>
+      <div class="cell hide-m"><span class="hint">DB: vacaciones_acumuladas</span></div>
+    </div>
+
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vacation</span>
+          <span class="name">Business-day Vacation</span>
+        </div>
+        <span class="kpi">${_fmtDays(work)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(work)}</span></div>
+      <div class="cell hide-m"><span class="hint">DB: vacaciones_habiles</span></div>
+    </div>
+
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vacation</span>
+          <span class="name">Total Vacation</span>
+        </div>
+        <span class="kpi">${_fmtDays(totalVac)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(totalVac)}</span></div>
+      <div class="cell hide-m"><span class="hint">Accrued + Business-day</span></div>
+    </div>
+
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vacation</span>
+          <span class="name">Vacation Used</span>
+        </div>
+        <span class="kpi">${_fmtDays(usedVac)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(usedVac)}</span></div>
+      <div class="cell hide-m"><span class="hint">DB: vacaciones_consumidas</span></div>
+    </div>
+
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vacation</span>
+          <span class="name">Vacation Available</span>
+        </div>
+        <span class="kpi">${_fmtDays(availVac)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(availVac)}</span></div>
+      <div class="cell hide-m"><span class="hint">Total - Used</span></div>
+    </div>
+
+    <!-- Vintti Days block -->
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vintti Days</span>
+          <span class="name">Total Vintti Days</span>
+        </div>
+        <span class="kpi">${_fmtDays(totalVD)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(totalVD)}</span></div>
+      <div class="cell hide-m"><span class="hint">DB: vintti_days</span></div>
+    </div>
+
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vintti Days</span>
+          <span class="name">Vintti Days Used</span>
+        </div>
+        <span class="kpi">${_fmtDays(usedVD)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(usedVD)}</span></div>
+      <div class="cell hide-m"><span class="hint">DB: vintti_days_consumidos</span></div>
+    </div>
+
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft">Vintti Days</span>
+          <span class="name">Vintti Days Available</span>
+        </div>
+        <span class="kpi">${_fmtDays(availVD)}</span>
+      </div>
+      <div class="cell hide-m"><span class="kpi">${_fmtDays(availVD)}</span></div>
+      <div class="cell hide-m"><span class="hint">Total - Used</span></div>
+    </div>
+  `;
+}
+
+async function loadBalances(uid){
+  const host = document.getElementById('balancesTable');
+  if (host) host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
+
+  try{
+    // Si tienes helper api(), úsalo para que pase X-User-Id y fallback ?user_id=
+    let r = typeof api === "function"
+      ? await api(`/users/${encodeURIComponent(uid)}`)
+      : await fetch(`${API_BASE}/users/${encodeURIComponent(uid)}`, { credentials: "include" });
+
+    if (!r.ok){
+      // fallback por query si el backend lo requiere
+      r = await fetch(`${API_BASE}/users/${encodeURIComponent(uid)}?user_id=${encodeURIComponent(uid)}`, { credentials: "include" });
+    }
+    if (!r.ok) throw new Error(await r.text());
+
+    const u = await r.json();
+    renderBalances({
+      vacaciones_acumuladas: u.vacaciones_acumuladas,
+      vacaciones_habiles: u.vacaciones_habiles,
+      vacaciones_consumidas: u.vacaciones_consumidas,
+      vintti_days: u.vintti_days,
+      vintti_days_consumidos: u.vintti_days_consumidos
+    });
+  }catch(err){
+    console.error('loadBalances error:', err);
+    if (host) host.innerHTML = `<div class="th">Metric</div><div class="th hide-m">Value</div><div class="th hide-m">Notes</div>
+      <div class="cell" style="grid-column:1/-1; justify-content:center">Could not load balances.</div>`;
+  }
+}
 
 $("#timeoffForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
@@ -255,6 +438,7 @@ $("#timeoffForm").addEventListener("submit", async (e)=>{
 
     await loadMe(uid);                 // pásalo explícito
     await loadMyRequests(uid);         // pásalo explícito
+    await loadBalances(uid);
   }catch(err){
     console.error(err);
     alert("Could not load your profile. Please refresh.");
