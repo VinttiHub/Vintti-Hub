@@ -60,7 +60,26 @@ $all(".tab").forEach(btn=>{
 let CURRENT_USER_ID = null;
 
 async function loadMe(){
-  const r = await fetch(`${API_BASE}/profile/me`, { credentials: "include" });
+  // 1) Resolver el user_id (de localStorage o de tu helper global si existe)
+  let uid = Number(localStorage.getItem('user_id')) || null;
+  if (!uid && typeof getCurrentUserId === 'function') {
+    try { uid = await getCurrentUserId(); } catch {}
+  }
+  if (!uid) throw new Error("No user_id available for /profile/me");
+
+  // 2) Intento con header (lo que espera tu backend)
+  let r = await fetch(`${API_BASE}/profile/me`, {
+    headers: { "X-User-Id": String(uid) },
+    credentials: "include"
+  });
+
+  // 3) Fallback si algún proxy/CORS quita el header
+  if (r.status === 401) {
+    r = await fetch(`${API_BASE}/profile/me?user_id=${encodeURIComponent(uid)}`, {
+      credentials: "include"
+    });
+  }
+
   if (!r.ok) throw new Error("Failed to load profile");
   const me = await r.json();
   CURRENT_USER_ID = me.user_id;
@@ -90,7 +109,10 @@ $("#profileForm").addEventListener("submit", async (e)=>{
   try{
     const r = await fetch(`${API_BASE}/users/${encodeURIComponent(CURRENT_USER_ID)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": String(CURRENT_USER_ID)
+      },
       credentials: "include",
       body: JSON.stringify(payload)
     });
