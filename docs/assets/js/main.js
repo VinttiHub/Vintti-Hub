@@ -2172,3 +2172,34 @@ function getTypeBadge(type) {
     try { location.replace(fallback); } catch { location.href = fallback; }
   }
 })();
+window.getCurrentUserEmail = getCurrentUserEmail;
+window.getCurrentUserId    = getCurrentUserId;
+// ——— API helper que SIEMPRE intenta enviar el usuario ———
+async function api(path, opts = {}) {
+  // path ej: "/profile/me" o "/time_off_requests"
+  const uid = await window.getCurrentUserId(); // puede ser null
+  const url = `${API_BASE}${path}`;
+
+  // 1) Intento con cookie + header X-User-Id si lo tengo
+  let headers = { ...(opts.headers || {}) };
+  if (uid != null) headers['X-User-Id'] = String(uid);
+
+  let r = await fetch(url, {
+    ...opts,
+    headers,
+    credentials: 'include'
+  });
+
+  // 2) Si el backend/proxy quitó headers o hay 401, reintenta con ?user_id=
+  if (r.status === 401 && uid != null) {
+    const sep = url.includes('?') ? '&' : '?';
+    const urlWithQuery = `${url}${sep}user_id=${encodeURIComponent(uid)}`;
+    r = await fetch(urlWithQuery, {
+      ...opts,
+      credentials: 'include'
+    });
+  }
+
+  return r;
+}
+window.api = api;

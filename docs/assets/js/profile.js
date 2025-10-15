@@ -1,3 +1,10 @@
+function getUidFromQuery() {
+  try {
+    const q = new URLSearchParams(location.search).get('user_id');
+    return q && /^\d+$/.test(q) ? Number(q) : null;
+  } catch { return null; }
+}
+
 // ===== Config =====
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com"; // your Flask API base
 
@@ -60,12 +67,21 @@ $all(".tab").forEach(btn=>{
 let CURRENT_USER_ID = null;
 
 async function loadMe(){
-  // 1) Resolver el user_id (de localStorage o de tu helper global si existe)
-  let uid = Number(localStorage.getItem('user_id')) || null;
-  if (!uid && typeof getCurrentUserId === 'function') {
-    try { uid = await getCurrentUserId(); } catch {}
+  // 1) Resolver el user_id: URL ?user_id=  → localStorage → helper global
+  let uid = getUidFromQuery();
+
+  if (!uid) uid = Number(localStorage.getItem('user_id')) || null;
+
+  if (!uid && typeof window.getCurrentUserId === 'function') {
+    try { uid = await window.getCurrentUserId(); } catch {}
   }
-  if (!uid) throw new Error("No user_id available for /profile/me");
+
+  if (!uid) {
+    // En vez de tirar error duro, mostramos mensaje amable y salimos
+    console.warn("No user_id available for /profile/me (no URL, no cache, no helper)");
+    alert("We couldn't identify your session. Please log in again.");
+    return; // evita que el init falle entero
+  }
 
   // 2) Intento con header (lo que espera tu backend)
   let r = await fetch(`${API_BASE}/profile/me`, {
