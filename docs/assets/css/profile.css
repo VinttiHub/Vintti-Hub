@@ -153,3 +153,70 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
   .balances-table{ grid-template-columns: 1fr 1fr; }
   .balances-table .th.hide-m{ display:none }
 }
+/* =============== Time Off Balances (refresh) =============== */
+.balances { margin-bottom: 20px; padding: 16px 16px 10px; }
+
+.balances-head { margin-bottom: 8px; }
+.balances-title { margin:0; font-weight:700; font-size: clamp(16px, 2.2vw, 20px); }
+.balances-caption { font-size: 11px; color: var(--muted); }
+
+/* two columns: metric | days */
+.balances-table{
+  display:grid; gap:6px;
+  grid-template-columns: 1fr 120px;
+}
+
+.balances-table .th{
+  font-size:10px; letter-spacing:.35px; text-transform:uppercase;
+  color:var(--muted); padding:8px 10px;
+}
+.t-right{ text-align:right; }
+
+.row{ display:contents; }
+
+.balances-table .cell{
+  background:white; border:1px solid var(--border); border-radius:12px;
+  padding:10px 12px; display:flex; align-items:center; gap:10px;
+  min-height:40px;
+}
+
+.metric{ display:flex; align-items:center; gap:10px; min-width:0; }
+.metric .name{
+  font-weight:600; font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Category badges (soft pastel) */
+.badge-soft{
+  font-size:10px; font-weight:700; padding:5px 8px; border-radius:999px; border:1px solid var(--border);
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+.badge--vac{
+  background: linear-gradient(180deg, #ecfdf5, #ffffff);
+  border-color: #bbf7d0;
+}
+.badge--vd{
+  background: linear-gradient(180deg, #eef2ff, #ffffff);
+  border-color: #c7d2fe;
+}
+
+/* KPI chip (single appearance on the right) */
+.kpi{
+  font-variant-numeric: tabular-nums; font-weight:800; font-size:13px;
+}
+.chip{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:6px 10px; border-radius:999px; background:linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#083344; box-shadow: 0 4px 16px rgba(15,23,42,.08);
+}
+
+/* Skeleton */
+.skeleton-row{
+  grid-column:1/-1; height:40px; border-radius:12px;
+  background: linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,.9), rgba(255,255,255,.55));
+  background-size:200% 100%; animation: shimmer 1.2s infinite;
+}
+
+/* mobile keeps same layout; widen days column a touch */
+@media (max-width: 860px){
+  .balances-table{ grid-template-columns: 1fr 136px; }
+}

@@ -173,7 +173,7 @@ function renderBalances({
   const availVac = Math.max(0, totalVac - usedVac);
 
   const totalVD = _toNum(vintti_days);
-  const usedVD = _toNum(vintti_days_consumidos);
+  const usedVD  = _toNum(vintti_days_consumidos);
   const availVD = Math.max(0, totalVD - usedVD);
 
   const host = document.getElementById('balancesTable');
@@ -181,55 +181,86 @@ function renderBalances({
 
   host.innerHTML = `
     <div class="th">Metric</div>
-    <div class="th hide-m">Value</div>
-    <div class="th hide-m">Notes</div>
+    <div class="th t-right">Days</div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vacation</span><span class="name">Accrued Vacation</span></div><span class="kpi">${_fmtDays(acc)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(acc)}</span></div>
-      <div class="cell hide-m"><span class="hint">DB: vacaciones_acumuladas</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vac">Vacation</span>
+          <span class="name">Accrued Vacation</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(acc)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vacation</span><span class="name">Business-day Vacation</span></div><span class="kpi">${_fmtDays(work)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(work)}</span></div>
-      <div class="cell hide-m"><span class="hint">DB: vacaciones_habiles</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vac">Vacation</span>
+          <span class="name">Business-day Vacation</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(work)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vacation</span><span class="name">Total Vacation</span></div><span class="kpi">${_fmtDays(totalVac)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(totalVac)}</span></div>
-      <div class="cell hide-m"><span class="hint">Accrued + Business-day</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vac">Vacation</span>
+          <span class="name">Total Vacation</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(totalVac)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vacation</span><span class="name">Vacation Used</span></div><span class="kpi">${_fmtDays(usedVac)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(usedVac)}</span></div>
-      <div class="cell hide-m"><span class="hint">DB: vacaciones_consumidas</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vac">Vacation</span>
+          <span class="name">Vacation Used</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(usedVac)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vacation</span><span class="name">Vacation Available</span></div><span class="kpi">${_fmtDays(availVac)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(availVac)}</span></div>
-      <div class="cell hide-m"><span class="hint">Total - Used</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vac">Vacation</span>
+          <span class="name">Vacation Available</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(availVac)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vintti Days</span><span class="name">Total Vintti Days</span></div><span class="kpi">${_fmtDays(totalVD)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(totalVD)}</span></div>
-      <div class="cell hide-m"><span class="hint">DB: vintti_days</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vd">Vintti Days</span>
+          <span class="name">Total Vintti Days</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(totalVD)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vintti Days</span><span class="name">Vintti Days Used</span></div><span class="kpi">${_fmtDays(usedVD)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(usedVD)}</span></div>
-      <div class="cell hide-m"><span class="hint">DB: vintti_days_consumidos</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vd">Vintti Days</span>
+          <span class="name">Vintti Days Used</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(usedVD)}</span></div>
     </div>
 
     <div class="row">
-      <div class="cell"><div class="metric"><span class="badge-soft">Vintti Days</span><span class="name">Vintti Days Available</span></div><span class="kpi">${_fmtDays(availVD)}</span></div>
-      <div class="cell hide-m"><span class="kpi">${_fmtDays(availVD)}</span></div>
-      <div class="cell hide-m"><span class="hint">Total - Used</span></div>
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--vd">Vintti Days</span>
+          <span class="name">Vintti Days Available</span>
+        </div>
+      </div>
+      <div class="cell t-right"><span class="kpi chip">${_fmtDays(availVD)}</span></div>
     </div>
   `;
 }
