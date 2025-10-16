@@ -1,155 +1,81 @@
-# profile_routes.py
+# profile_routes.py  (extracto limpio y consolidado)
 import logging
 from datetime import date, datetime, timezone, timedelta
 from typing import Optional, Dict, Any
-
 from flask import Blueprint, request, jsonify, g
 from psycopg2.extras import RealDictCursor
-
 from db import get_connection
-from flask import Blueprint, jsonify, request
-from psycopg2.extras import RealDictCursor
-from db import get_connection
-
-bp = Blueprint("profile", __name__, url_prefix="")
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
+
+# ✅ declarar UNA sola vez
+bp = Blueprint("profile", __name__, url_prefix="")
 users_bp = Blueprint("users", __name__)
 
+def _int_or_none(x):
+    try: return int(x)
+    except Exception: return None
+
+def _current_user_id() -> Optional[int]:
+    uid = getattr(g, "user_id", None)
+    if isinstance(uid, int): return uid
+    c = _int_or_none(request.cookies.get("user_id"))
+    if c: return c
+    q = _int_or_none(request.args.get("user_id"))
+    if q: return q
+    h = _int_or_none(request.headers.get("X-User-Id") or request.headers.get("x-user-id"))
+    if h: return h
+    return None
+
+@bp.before_app_request
+def _inject_user_from_cookie_or_query():
+    if getattr(g, "user_id", None) is None:
+        g.user_id = _current_user_id()
+
+def _row_to_json(row: Dict[str, Any]) -> Dict[str, Any]:
+    for k in ("ingreso_vintti_date","fecha_nacimiento","start_date","end_date","created_at","updated_at"):
+        if k in row and row[k] is not None:
+            v = row[k]
+            try:
+                if hasattr(v, "isoformat"): row[k] = v.date().isoformat() if hasattr(v, "date") else v.isoformat()
+            except Exception: pass
+    return row
+
+# ---------- USERS ----------
 @users_bp.get("/users/<int:user_id>")
 def get_user(user_id: int):
     q = """
     SELECT
       user_id, user_name, email_vintti, role, emergency_contact,
       ingreso_vintti_date, fecha_nacimiento, avatar_url,
-      -- balances:
       COALESCE(vacaciones_acumuladas, 0) AS vacaciones_acumuladas,
-      COALESCE(vacaciones_habiles, 0) AS vacaciones_habiles,
+      COALESCE(vacaciones_habiles, 0)    AS vacaciones_habiles,
       COALESCE(vacaciones_consumidas, 0) AS vacaciones_consumidas,
-      COALESCE(vintti_days, 0) AS vintti_days,
-      COALESCE(vintti_days_consumidos, 0) AS vintti_days_consumidos
+      COALESCE(vintti_days, 0)           AS vintti_days,
+      COALESCE(vintti_days_consumidos,0) AS vintti_days_consumidos
     FROM users
     WHERE user_id = %s
     """
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-      cur.execute(q, (user_id,))
-      row = cur.fetchone()
-    conn.close()
-    if not row:
-      return jsonify({"error":"user not found"}), 404
-    return jsonify(row)
-
-# --- helper: how we identify the current user ---
-def _current_user_id() -> Optional[int]:
-    """
-    Replace this with your real auth. For now:
-    - First try session (Flask login)
-    - Else try a header X-User-Id
-    - Else query param (for local testing only)
-    """
-    uid = getattr(g, "user_id", None)
-    if uid: return uid
-    h = request.headers.get("X-User-Id")
-    if h and h.isdigit(): return int(h)
-    q = request.args.get("user_id")
-    if q and q.isdigit(): return int(q)
-    return None
-
-def _row_to_json(row: Dict[str, Any]) -> Dict[str, Any]:
-    # Normalize date fields to YYYY-MM-DD
-    for k in ("ingreso_vintti_date", "fecha_nacimiento", "start_date", "end_date", "created_at", "updated_at"):
-        if k in row and row[k] is not None:
-            v = row[k]
-            if isinstance(v, (datetime, date)):
-                row[k] = v.date().isoformat() if isinstance(v, datetime) else v.isoformat()
-            else:
-                try:
-                    dt = datetime.fromisoformat(str(v))
-                    row[k] = dt.date().isoformat()
-                except Exception:
-                    pass
-    return row
-
-# --- USERS ---
-
-from flask import Blueprint, request, jsonify, g
-
-bp = Blueprint("profile", __name__, url_prefix="")
-users_bp = Blueprint("users", __name__)
-
-def _int_or_none(x):
-    try:
-        return int(x)
-    except Exception:
-        return None
-
-# ✔ centraliza la detección del usuario actual SIN exigir header
-def _current_user_id():
-    # 1) sesión/g
-    uid = getattr(g, "user_id", None)
-    if isinstance(uid, int):
-        return uid
-
-    # 2) cookie
-    c = request.cookies.get("user_id")
-    c = _int_or_none(c)
-    if c:
-        return c
-
-    # 3) query
-    q = _int_or_none(request.args.get("user_id"))
-    if q:
-        return q
-
-    # 4) (opcional) header legacy — ya no requerido
-    h = _int_or_none(request.headers.get("X-User-Id") or request.headers.get("x-user-id"))
-    if h:
-        return h
-
-    return None
-
-# (opcional) poblar g.user_id desde cookie/query para todo el app
-@bp.before_app_request
-def _inject_user_from_cookie_or_query():
-    if getattr(g, "user_id", None) is None:
-        g.user_id = _current_user_id()
-
-@bp.get("/profile/me")
-def me():
-    user_id = _current_user_id()
-    if not user_id:
-        return jsonify({"error": "unauthorized"}), 401
-    conn = get_connection()
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""
-            SELECT user_id, user_name, email_vintti, role, emergency_contact,
-                   ingreso_vintti_date, fecha_nacimiento, avatar_url
-            FROM users
-            WHERE user_id = %s
-        """, (user_id,))
+        cur.execute(q, (user_id,))
         row = cur.fetchone()
     conn.close()
+    if not row: return jsonify({"error":"user not found"}), 404
+    return jsonify(_row_to_json(dict(row)))
 
-    if not row:
-        return jsonify({"error":"not found"}), 404
-    return jsonify(_row_to_json(row))
-
-@users_bp.put("/users/<int:user_id>", methods=['GET','POST','PATCH'])
+@users_bp.put("/users/<int:user_id>")
 def update_user(user_id: int):
     data = request.get_json(silent=True) or {}
-
     caller = _current_user_id()
     ok = (caller == user_id)
-
     if not ok:
         q = _int_or_none(request.args.get("user_id"))
-        b = data.get("user_id")
-        b = _int_or_none(b)
+        b = _int_or_none(data.get("user_id"))
         ok = (q == user_id) or (b == user_id)
-
     if not ok:
         return jsonify({"error":"forbidden"}), 403
+
     fields = {
         "user_name": data.get("user_name"),
         "email_vintti": data.get("email_vintti"),
@@ -158,19 +84,13 @@ def update_user(user_id: int):
         "ingreso_vintti_date": data.get("ingreso_vintti_date"),
         "fecha_nacimiento": data.get("fecha_nacimiento"),
     }
-
-    sets = []
-    vals = []
+    sets, vals = [], []
     for col, val in fields.items():
         if val is not None:
-            sets.append(f"{col} = %s")
-            vals.append(val)
-
-    if not sets:
-        return jsonify({"ok": True})  # nothing to update
+            sets.append(f"{col} = %s"); vals.append(val)
+    if not sets: return jsonify({"ok": True})
 
     vals.append(user_id)
-
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(f"""
@@ -182,9 +102,26 @@ def update_user(user_id: int):
         updated = cur.fetchone()
         conn.commit()
     conn.close()
-    if not updated:
-        return jsonify({"error":"not found"}), 404
+    if not updated: return jsonify({"error":"not found"}), 404
     return jsonify({"ok": True})
+
+# ---------- PROFILE / ME ----------
+@bp.get("/profile/me")
+def me():
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"error":"unauthorized"}), 401
+    conn = get_connection()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute("""
+            SELECT user_id, user_name, email_vintti, role, emergency_contact,
+                   ingreso_vintti_date, fecha_nacimiento, avatar_url
+            FROM users WHERE user_id = %s
+        """, (user_id,))
+        row = cur.fetchone()
+    conn.close()
+    if not row: return jsonify({"error":"not found"}), 404
+    return jsonify(_row_to_json(dict(row)))
 
 # --- TIME OFF REQUESTS ---
 
