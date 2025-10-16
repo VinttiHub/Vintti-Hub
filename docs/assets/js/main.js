@@ -1045,15 +1045,28 @@ if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
 }
 
-async function initSidebarProfile() {
-  // 0) Asegura que el mount exista (igual que antes)
-  const sidebar = document.querySelector('.sidebar');
-  if (sidebar && sidebar.classList.contains('custom-sidebar-hidden')) {
-    sidebar.classList.remove('custom-sidebar-hidden');
+async function initSidebarProfile(){
+  // ——— small local helpers ———
+  function initialsFromName(name=""){
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '—';
+    const a = (parts[0]?.[0]||'').toUpperCase();
+    const b = (parts[1]?.[0]||'').toUpperCase();
+    return (a + b) || a || '—';
+  }
+  function initialsFromEmail(email=""){
+    const local = String(email).split('@')[0] || '';
+    if (!local) return '—';
+    const bits = local.split(/[._-]+/).filter(Boolean);
+    return (bits.length >= 2)
+      ? (bits[0][0] + bits[1][0]).toUpperCase()
+      : local.slice(0,2).toUpperCase();
   }
 
+  // ensure tile exists (your HTML already has it)
   let tile = document.getElementById('sidebarProfile');
-  if (!tile && sidebar) {
+  const sidebar = document.querySelector('.sidebar');
+  if (!tile && sidebar){
     sidebar.insertAdjacentHTML('beforeend', `
       <a href="profile.html" class="profile-tile" id="sidebarProfile">
         <span class="profile-avatar">
@@ -1061,7 +1074,7 @@ async function initSidebarProfile() {
           <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
         </span>
         <span class="profile-meta">
-          <span id="profileName" class="profile-name">Loading…</span>
+          <span id="profileName" class="profile-name">Profile</span>
           <span id="profileEmail" class="profile-email"></span>
         </span>
       </a>
@@ -1070,46 +1083,61 @@ async function initSidebarProfile() {
   }
   if (!tile) return;
 
-  const $img   = document.getElementById('profileAvatarImg');
-  const $init  = document.getElementById('profileAvatarInitials');
-  const $name  = document.getElementById('profileName');
-  const $emailEl = document.getElementById('profileEmail');
+  // elements
+  const $init   = document.getElementById('profileAvatarInitials');
+  const $name   = document.getElementById('profileName');
+  const $emailE = document.getElementById('profileEmail');
+  const $img    = document.getElementById('profileAvatarImg');
 
-  $name.textContent = 'profile';
-  if ($emailEl) { $emailEl.textContent = ''; $emailEl.style.display = 'none'; }
+  // never use the photo
+  if ($img) { $img.removeAttribute('src'); $img.style.display = 'none'; }
+  if ($emailE) { $emailE.textContent = ''; $emailE.style.display = 'none'; }
 
-  // ✅ Resolve and attach user_id to the link
+  // resolve current user_id (prefer your global)
+  let uid = null;
   try {
-    const uid = await getCurrentUserId();
-    if (uid != null && tile) {
-      // keep any existing path, just add query param
-      const base = 'profile.html';
-      tile.href = `${base}?user_id=${encodeURIComponent(uid)}`;
+    uid = (typeof window.getCurrentUserId === 'function')
+      ? (await window.getCurrentUserId())
+      : (Number(localStorage.getItem('user_id')) || null);
+  } catch {
+    uid = Number(localStorage.getItem('user_id')) || null;
+  }
+
+  // build link
+  const base = 'profile.html';
+  tile.href = uid != null ? `${base}?user_id=${encodeURIComponent(uid)}` : base;
+
+  // show fallback initials immediately from email (no flash)
+  const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase();
+  if ($init) $init.textContent = initialsFromEmail(email);
+
+  // fetch user -> show real user_name and initials from name
+  try {
+    if (uid != null) {
+      const r = await fetch(`${API_BASE}/users/${encodeURIComponent(uid)}?user_id=${encodeURIComponent(uid)}`, {
+        credentials: 'include'
+      });
+      if (r.ok) {
+        const u = await r.json();
+        const userName = u?.user_name || '';
+        if (userName) {
+          if ($name) $name.textContent = userName;              // label shows user_name
+          if ($init) $init.textContent = initialsFromName(userName); // initials from name (preferred)
+        } else {
+          if ($name) $name.textContent = 'Profile';
+        }
+      } else {
+        if ($name) $name.textContent = 'Profile';
+      }
     } else {
-      // as a safe fallback, still point to profile.html without id
-      tile.href = 'profile.html';
+      if ($name) $name.textContent = 'Profile';
     }
   } catch {
-    tile.href = 'profile.html';
-  }
-  const email = getCurrentUserEmail();
-  // Mantén compatibilidad con tu caché previa
-  const cachedAvatar = localStorage.getItem('user_avatar');
-  const avatarSrc = cachedAvatar || resolveAvatar?.(email);
-
-  if (avatarSrc) {
-    $img.src = avatarSrc;
-    $img.style.display = 'block';
-    $init.style.display = 'none';
-  } else {
-    // Fallback a iniciales: "PR" de "profile"
-    $init.textContent = 'PR';
-    $img.removeAttribute('src');
-    $img.style.display = 'none';
-    $init.style.display = 'grid';
+    // leave email-based initials + "Profile"
+    if ($name) $name.textContent = 'Profile';
   }
 
-  // Asegura visibilidad por si otro CSS lo pisa
+  // make sure the tile is visible
   const cs = window.getComputedStyle(tile);
   if (cs.display === 'none') tile.style.display = 'flex';
 }
