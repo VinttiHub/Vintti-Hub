@@ -1,6 +1,44 @@
 let emailToChoices = null;
 let emailCcChoices = null;
 // === Date-only utils (sin TZ) ===
+// === Fee visibility based on model ===
+function hideRow(el, hidden=true){
+  if (!el) return;
+  const row = el.closest('.input-group') || el;    // hide whole row/group if possible
+  row.style.display = hidden ? 'none' : '';
+}
+
+function applyFeeVisibility(modelValue){
+  const isRecruiting = String(modelValue || '').toLowerCase() === 'recruiting';
+
+  // IDs you already have on the page:
+  const expectedFeeInput = document.getElementById('expected-fee-input');
+  // If your "setup fee" is actually the plain fee field, leave this as 'fee-input'.
+  // If you have a distinct setup-fee input, the next line will catch it too.
+  const setupFeeInput    = document.getElementById('setup-fee-input') || document.getElementById('fee-input');
+
+  hideRow(expectedFeeInput, isRecruiting);
+  hideRow(setupFeeInput,    isRecruiting);
+}
+
+// Wire: whenever model changes (you already have both selects on the page)
+['model-select','details-model'].forEach(id => {
+  const sel = document.getElementById(id);
+  if (sel) {
+    sel.addEventListener('change', (e) => applyFeeVisibility(e.target.value));
+  }
+});
+
+// Call once on load after you paint the data
+function _applyFeeVisibilityFromData(d){
+  // prefer exact field you fill during load
+  const model = (d && d.opp_model) 
+             || document.getElementById('details-model')?.value
+             || document.getElementById('model-select')?.value
+             || '';
+  applyFeeVisibility(model);
+}
+
 function isYMD(s){ return /^\d{4}-\d{2}-\d{2}$/.test(String(s||'')); }
 function pad2(n){ return String(n).padStart(2,'0'); }
 
@@ -2130,7 +2168,7 @@ async function loadOpportunityData() {
     document.getElementById('details-opportunity-name').value = data.opp_position_name || '';
     document.getElementById('details-account-name').value = data.account_name || '';
     document.getElementById('details-model').value = data.opp_model || '';
-    
+    _applyFeeVisibilityFromData(data);
     // JOB DESCRIPTION
     document.getElementById('job-description-textarea').innerHTML = data.hr_job_description || '';
 
