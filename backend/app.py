@@ -189,11 +189,26 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 register_ai_routes(app)
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": ["https://vinttihub.vintti.com"],
+            "supports_credentials": True,
+            "allow_headers": [
+                "Content-Type",
+                "X-User-Id",   # title-case
+                "x-user-id"    # lowercase (what the browser advertises)
+            ],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "expose_headers": ["Content-Type"]
+        }
+    }
+)
+
 app.register_blueprint(reminders_bp)
 app.register_blueprint(coresignal_bp)
 app.register_blueprint(profile_bp)
-CORS(app, origins=["https://vinttihub.vintti.com"], supports_credentials=True,
-     allow_headers=["Content-Type", "X-User-Id"])
 # --- enum canonicals para el Sheet ---
 _CANON = {
     "career_job_type": {
