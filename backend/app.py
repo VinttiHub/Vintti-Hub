@@ -1649,7 +1649,6 @@ def get_hire_opportunity(candidate_id):
             FROM hire_opportunity h
             JOIN opportunity o ON o.opportunity_id = h.opportunity_id
             WHERE h.candidate_id = %s
-            ORDER BY h.hire_opportunity_id DESC
             LIMIT 1;
         """, (candidate_id,))
 
