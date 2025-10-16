@@ -1634,31 +1634,37 @@ def get_candidates_by_account_opportunities(account_id):
 
 @app.route('/candidates/<int:candidate_id>/hire_opportunity', methods=['GET'])
 def get_hire_opportunity(candidate_id):
+    """
+    Returns the opportunity_id and opp_model for the candidate based on the
+    hire_opportunity table, not the opportunity.candidato_contratado column.
+    If multiple hire_opportunity rows exist for the candidate, the most recent
+    one is returned (by hire_opportunity_id DESC).
+    """
     try:
         conn = get_connection()
-        cursor = conn.cursor()
+        cur = conn.cursor()
 
-        cursor.execute("""
+        cur.execute("""
             SELECT o.opportunity_id, o.opp_model
-            FROM opportunity o
-            WHERE o.candidato_contratado = %s
+            FROM hire_opportunity h
+            JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+            WHERE h.candidate_id = %s
+            ORDER BY h.hire_opportunity_id DESC
             LIMIT 1;
         """, (candidate_id,))
 
-        row = cursor.fetchone()
-
+        row = cur.fetchone()
         if not row:
-            cursor.close()
-            conn.close()
+            cur.close(); conn.close()
             return jsonify({}), 404
 
-        colnames = [desc[0] for desc in cursor.description]
-        opportunity = dict(zip(colnames, row))
+        colnames = [desc[0] for desc in cur.description]
+        out = dict(zip(colnames, row))
 
-        cursor.close()
+        cur.close()
         conn.close()
+        return jsonify(out)
 
-        return jsonify(opportunity)
     except Exception as e:
         import traceback
         print("❌ Error en GET /candidates/<candidate_id>/hire_opportunity:")
