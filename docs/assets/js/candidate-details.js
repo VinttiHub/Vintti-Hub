@@ -116,10 +116,20 @@ if (isStaffing){
 // ⛔️ Si NO hay nada real que guardar (salary ni fee numéricos), no postees
 if (!isValidNum(body.salary) && !isValidNum(body.fee)) return;
 
-// Depura lo que vas a enviar (te salva la vida si vuelve a pasar)
+// 🔐 Backend-safe: siempre manda ambas claves numéricas (0 si faltan)
+//    así evitamos 'null' por NaN y validaciones estrictas del server.
+body.salary = isValidNum(body.salary) ? Number(body.salary) : 0;
+body.fee    = isValidNum(body.fee)    ? Number(body.fee)    : 0;
+
+// Asegura fecha simple (algunos servers esperan 'YYYY-MM-DD')
+if (/^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
+  body.date = body.date; // ok
+} else {
+  body.date = todayYmd();
+}
+
 console.debug('POST /salary_updates payload →', body);
 
-// POST salary_update
 const resp = await fetch(`${apiBase}/candidates/${candidateId}/salary_updates`, {
   method:'POST',
   headers:{'Content-Type':'application/json'},
@@ -297,19 +307,32 @@ async function syncHireFromLatestSalaryUpdate(candidateId, apiBase='https://7m6m
     }
 
     // 6) PATCH si hay algo por cambiar
-    if (shouldSetSalary || shouldSetFee || shouldSetRev) {
-      const payload = {};
-      if (shouldSetSalary) payload.employee_salary = latestSalary;
-      if (isStaffing) {
-        if (shouldSetFee) payload.employee_fee = latestFee;
-        if (shouldSetRev && newRev != null) payload.employee_revenue = newRev;
-      }
-      await fetch(`${apiBase}/candidates/${candidateId}/hire`, {
-        method: 'PATCH',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-      });
-    }
+if (shouldSetSalary || shouldSetFee || shouldSetRev) {
+  // 🔑 Asegura opp_id para el backend
+  const oppId = await ensureCurrentOppId(candidateId, apiBase); // <- usa apiBase
+
+  const payload = { opportunity_id: oppId };
+  if (shouldSetSalary) payload.employee_salary = latestSalary;
+  if (isStaffing) {
+    if (shouldSetFee) payload.employee_fee = latestFee;
+    if (shouldSetRev && newRev != null) payload.employee_revenue = newRev;
+  }
+
+  console.debug('PATCH /hire payload →', payload);
+
+  const r = await fetch(`${apiBase}/candidates/${candidateId}/hire`, { // <- usa apiBase
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+
+  if (!r.ok){
+    const msg = await r.text().catch(()=> '');
+    console.error('❌ PATCH /hire failed', r.status, msg);
+    throw new Error(`PATCH /hire ${r.status}: ${msg}`);
+  }
+}
+
 
     // 7) refrescar UI si existe
     if (typeof window.loadHireData === 'function') window.loadHireData();
@@ -1217,8 +1240,12 @@ if (save){
       return alert('Please fill all required fields');
     }
 
-    const body = { salary, date };
-    if (!isRecruiting) body.fee = fee;
+    const body = {
+      date,
+      salary: Number.isFinite(salary) ? Number(salary) : 0,
+      // manda fee siempre; 0 en recruiting o si no hay valor
+      fee: (!isRecruiting && Number.isFinite(fee)) ? Number(fee) : 0
+    };
 
     await fetch(`${API}/candidates/${cid}/salary_updates`, {
       method:'POST',
