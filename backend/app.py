@@ -936,7 +936,7 @@ def get_opportunity_by_id(opportunity_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/users')
+@app.route('/users', methods=['GET','POST','PATCH'])
 def users_list_or_by_email():
     """
     GET /users
