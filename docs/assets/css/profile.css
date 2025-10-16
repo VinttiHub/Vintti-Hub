@@ -190,13 +190,22 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
   font-size:10px; font-weight:700; padding:5px 8px; border-radius:999px; border:1px solid var(--border);
   background: linear-gradient(180deg, #fff, #f8fafc);
 }
+/* Categorías */
 .badge--vac{
   background: linear-gradient(180deg, #ecfdf5, #ffffff);
-  border-color: #bbf7d0;
+  border-color: #bbf7d0; /* verde */
 }
+
+/* Vintti Days: azul */
 .badge--vd{
-  background: linear-gradient(180deg, #eef2ff, #ffffff);
-  border-color: #c7d2fe;
+  background: linear-gradient(180deg, #eff6ff, #ffffff);
+  border-color: #bfdbfe; /* azul */
+}
+
+/* Holiday: amarillo */
+.badge--hol{
+  background: linear-gradient(180deg, #fefce8, #ffffff);
+  border-color: #fde68a; /* amarillo */
 }
 
 /* KPI chip (single appearance on the right) */

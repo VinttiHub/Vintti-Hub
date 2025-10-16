@@ -53,6 +53,8 @@ def get_user(user_id: int):
       COALESCE(vacaciones_consumidas, 0) AS vacaciones_consumidas,
       COALESCE(vintti_days, 0)           AS vintti_days,
       COALESCE(vintti_days_consumidos,0) AS vintti_days_consumidos
+      COALESCE(feriados_totales, 0)        AS feriados_totales,      -- NEW
+      COALESCE(feriados_consumidos, 0)     AS feriados_consumidos 
     FROM users
     WHERE user_id = %s
     """

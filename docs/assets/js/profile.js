@@ -159,22 +159,38 @@ async function loadMyRequests(uid){
 function _toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function _fmtDays(n){ const v = Math.max(0, n); return `${v} day${v===1?'':'s'}`; }
 
+ // ——— Time Off Balances (read-only) ———
+function _toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function _fmtDays(n){ const v = Math.max(0, n); return `${v} day${v===1?'':'s'}`; }
+
 function renderBalances({
+  // VACATION
   vacaciones_acumuladas = 0,
   vacaciones_habiles = 0,
   vacaciones_consumidas = 0,
+  // VINTTI DAYS
   vintti_days = 0,
-  vintti_days_consumidos = 0
+  vintti_days_consumidos = 0,
+  // HOLIDAYS (DB: feriados_totales, feriados_consumidos)
+  feriados_totales = 0,
+  feriados_consumidos = 0,
 }){
+  // Vacation
   const acc = _toNum(vacaciones_acumuladas);
   const work = _toNum(vacaciones_habiles);
   const usedVac = _toNum(vacaciones_consumidas);
   const totalVac = Math.max(0, acc + work);
   const availVac = Math.max(0, totalVac - usedVac);
 
+  // Vintti Days
   const totalVD = _toNum(vintti_days);
   const usedVD  = _toNum(vintti_days_consumidos);
   const availVD = Math.max(0, totalVD - usedVD);
+
+  // Holidays
+  const holAvail = _toNum(feriados_totales);       // “Holiday Available” (DB: feriados_totales)
+  const holUsed  = _toNum(feriados_consumidos);    // “Holiday Used”      (DB: feriados_consumidos)
+  const holTotal = Math.max(0, holAvail - holUsed);// “Holiday Total” (remaining)
 
   const host = document.getElementById('balancesTable');
   if (!host) return;
@@ -183,6 +199,7 @@ function renderBalances({
     <div class="th">Metric</div>
     <div class="th t-right">Days</div>
 
+    <!-- Vacation -->
     <div class="row">
       <div class="cell">
         <div class="metric">
@@ -197,7 +214,7 @@ function renderBalances({
       <div class="cell">
         <div class="metric">
           <span class="badge-soft badge--vac">Vacation</span>
-          <span class="name">Business-day Vacation</span>
+          <span class="name">Current year Vacation</span>
         </div>
       </div>
       <div class="cell t-right"><span class="kpi chip">${_fmtDays(work)}</span></div>
@@ -233,6 +250,7 @@ function renderBalances({
       <div class="cell t-right"><span class="kpi chip">${_fmtDays(availVac)}</span></div>
     </div>
 
+    <!-- Vintti Days -->
     <div class="row">
       <div class="cell">
         <div class="metric">
@@ -262,6 +280,38 @@ function renderBalances({
       </div>
       <div class="cell t-right"><span class="kpi chip">${_fmtDays(availVD)}</span></div>
     </div>
+
+    <!-- Holidays -->
+<div class="row">
+  <div class="cell">
+    <div class="metric">
+      <span class="badge-soft badge--hol">Holiday</span>
+      <span class="name">Holiday Available</span>
+    </div>
+  </div>
+  <div class="cell t-right"><span class="kpi chip">${_fmtDays(holAvail)}</span></div>
+</div>
+
+<div class="row">
+  <div class="cell">
+    <div class="metric">
+      <span class="badge-soft badge--hol">Holiday</span>
+      <span class="name">Holiday Used</span>
+    </div>
+  </div>
+  <div class="cell t-right"><span class="kpi chip">${_fmtDays(holUsed)}</span></div>
+</div>
+
+<div class="row">
+  <div class="cell">
+    <div class="metric">
+      <span class="badge-soft badge--hol">Holiday</span>
+      <span class="name">Holiday Total</span>
+    </div>
+  </div>
+  <div class="cell t-right"><span class="kpi chip">${_fmtDays(holTotal)}</span></div>
+</div>
+
   `;
 }
 
@@ -277,11 +327,14 @@ async function loadBalances(uid){
       vacaciones_habiles: u.vacaciones_habiles,
       vacaciones_consumidas: u.vacaciones_consumidas,
       vintti_days: u.vintti_days,
-      vintti_days_consumidos: u.vintti_days_consumidos
+      vintti_days_consumidos: u.vintti_days_consumidos,
+      feriados_totales: u.feriados_totales,           // NEW
+      feriados_consumidos: u.feriados_consumidos      // NEW
     });
   }catch(err){
     console.error('loadBalances error:', err);
-    if (host) host.innerHTML = `<div class="th">Metric</div><div class="th hide-m">Value</div><div class="th hide-m">Notes</div>
+    if (host) host.innerHTML = `
+      <div class="th">Metric</div><div class="th t-right">Days</div>
       <div class="cell" style="grid-column:1/-1; justify-content:center">Could not load balances.</div>`;
   }
 }
