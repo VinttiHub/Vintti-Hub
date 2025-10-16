@@ -2091,29 +2091,57 @@ def update_stage_batch():
     
 @app.route('/candidates/<int:candidate_id>/hire', methods=['GET', 'PATCH'])
 def handle_candidate_hire_data(candidate_id):
+    """
+    GET:
+      - If ?opportunity_id= is provided, read that hire row.
+      - Else try to use the opportunity where this candidate is marcado como contratado,
+        prioritizing the most recently closed one.
+    PATCH:
+      - MUST receive JSON with {"opportunity_id": <clicked id>} from the frontend.
+      - Creates/updates hire_opportunity for (candidate_id, opportunity_id) exactly.
+    """
+    from psycopg2.extras import RealDictCursor
+    import re, calendar
+
     conn = get_connection()
-    cursor = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # 1) Oportunidad donde este candidato fue contratado (tomamos también account_id)
-        cursor.execute("""
-            SELECT opportunity_id, opp_model, account_id
-            FROM opportunity
-            WHERE candidato_contratado = %s
-            LIMIT 1
-        """, (candidate_id,))
-        opp = cursor.fetchone()
-        if not opp:
-            return jsonify({'error': 'Candidate is not linked to a hired opportunity'}), 404
-
-        opportunity_id, opp_model, account_id = opp
-
         if request.method == 'GET':
-            cursor.execute("""
+            # 1) pick the opportunity
+            opp_id_param = request.args.get('opportunity_id', type=int)
+
+            if opp_id_param:
+                cur.execute("""
+                    SELECT opportunity_id, opp_model, account_id
+                    FROM opportunity
+                    WHERE opportunity_id = %s
+                """, (opp_id_param,))
+                opp = cur.fetchone()
+            else:
+                # fallback: the latest opp where this candidate is the hired one
+                cur.execute("""
+                    SELECT opportunity_id, opp_model, account_id
+                    FROM opportunity
+                    WHERE candidato_contratado = %s
+                    ORDER BY COALESCE(opp_close_date, '1900-01-01') DESC, opportunity_id DESC
+                    LIMIT 1
+                """, (candidate_id,))
+                opp = cur.fetchone()
+
+            if not opp:
+                return jsonify({'error': 'No hired opportunity found for this candidate'}), 404
+
+            opportunity_id = opp['opportunity_id']
+            opp_model     = opp.get('opp_model')
+            account_id    = opp.get('account_id')
+
+            # 2) read hire_opportunity
+            cur.execute("""
                 SELECT
                     references_notes,
                     salary,
                     fee,
-                    setup_fee, 
+                    setup_fee,
                     computer,
                     extra_perks,
                     working_schedule,
@@ -2123,220 +2151,228 @@ def handle_candidate_hire_data(candidate_id):
                     start_date,
                     end_date,
                     revenue,
-                    -- NUEVO 👇
                     referral_dolar,
                     referral_daterange,
                     buyout_dolar,
                     buyout_daterange,
-                    carga_inactive           -- <--- AÑADIR
+                    carga_inactive
                 FROM hire_opportunity
                 WHERE candidate_id = %s AND opportunity_id = %s
                 LIMIT 1
             """, (candidate_id, opportunity_id))
-            row = cursor.fetchone()
-
-            # ...
-            (references_notes, salary, fee, setup_fee, computer, extra_perks, working_schedule,
-            pto, discount_dolar, discount_daterange, start_date, end_date, revenue,
-            referral_dolar, referral_daterange, buyout_dolar, buyout_daterange,
-            carga_inactive) = row  # <--- AÑADIR VARIABLE
+            row = cur.fetchone()
+            if not row:
+                # return an empty shell so the UI can render cleanly
+                return jsonify({
+                    'references_notes': None,
+                    'employee_salary': None,
+                    'employee_fee': None,
+                    'computer': None,
+                    'setup_fee': None,
+                    'extraperks': None,
+                    'working_schedule': None,
+                    'pto': None,
+                    'discount_dolar': None,
+                    'discount_daterange': None,
+                    'start_date': None,
+                    'end_date': None,
+                    'employee_revenue': None,
+                    'employee_revenue_recruiting': None,
+                    'referral_dolar': None,
+                    'referral_daterange': None,
+                    'buyout_dolar': None,
+                    'buyout_daterange': None,
+                    'carga_inactive': None
+                })
 
             return jsonify({
-                'references_notes': references_notes,
-                'employee_salary': salary,
-                'employee_fee': fee,
-                'computer': computer,
-                'setup_fee': setup_fee,
-                'extraperks': extra_perks,
-                'working_schedule': working_schedule,
-                'pto': pto,
-                'discount_dolar': discount_dolar,
-                'discount_daterange': discount_daterange,
-                'start_date': start_date,
-                'end_date': end_date,
-                'employee_revenue': revenue if (opp_model or '').lower() == 'staffing' else None,
-                'employee_revenue_recruiting': revenue if (opp_model or '').lower() == 'recruiting' else None,
-                'referral_dolar': referral_dolar,
-                'referral_daterange': referral_daterange,
-                'buyout_dolar': buyout_dolar,
-                'buyout_daterange': buyout_daterange,
-                'carga_inactive': carga_inactive   # <--- AÑADIR (opcional)
+                'references_notes': row['references_notes'],
+                'employee_salary': row['salary'],
+                'employee_fee': row['fee'],
+                'computer': row['computer'],
+                'setup_fee': row['setup_fee'],
+                'extraperks': row['extra_perks'],
+                'working_schedule': row['working_schedule'],
+                'pto': row['pto'],
+                'discount_dolar': row['discount_dolar'],
+                'discount_daterange': row['discount_daterange'],
+                'start_date': row['start_date'],
+                'end_date': row['end_date'],
+                'employee_revenue': row['revenue'] if (opp_model or '').lower() == 'staffing' else None,
+                'employee_revenue_recruiting': row['revenue'] if (opp_model or '').lower() == 'recruiting' else None,
+                'referral_dolar': row['referral_dolar'],
+                'referral_daterange': row['referral_daterange'],
+                'buyout_dolar': row['buyout_dolar'],
+                'buyout_daterange': row['buyout_daterange'],
+                'carga_inactive': row['carga_inactive']
             })
 
+        # ---------- PATCH ----------
+        data = request.get_json() or {}
+        opportunity_id = data.get('opportunity_id', None)
+        if not opportunity_id:
+            return jsonify({'error': 'opportunity_id is required in PATCH body'}), 400
 
-        # PATCH -> asegurar/actualizar fila en hire_opportunity
-        if request.method == 'PATCH':
-            data = request.get_json() or {}
+        # 1) fetch account/model for THIS opportunity
+        cur.execute("""
+            SELECT opp_model, account_id, candidato_contratado
+            FROM opportunity
+            WHERE opportunity_id = %s
+            LIMIT 1
+        """, (opportunity_id,))
+        opp = cur.fetchone()
+        if not opp:
+            return jsonify({'error': f'opportunity {opportunity_id} not found'}), 404
 
-            mapping = {
-                'references_notes': 'references_notes',
-                'employee_salary': 'salary',
-                'employee_fee': 'fee',
-                'setup_fee': 'setup_fee',
-                'computer': 'computer',
-                'extraperks': 'extra_perks',
-                'working_schedule': 'working_schedule',
-                'pto': 'pto',
-                'start_date': 'start_date',
-                'end_date': 'end_date', 
-                'employee_revenue': 'revenue',
-                'employee_revenue_recruiting': 'revenue',
-                'discount_dolar': 'discount_dolar',
-                'discount_daterange': 'discount_daterange',
-                # NUEVO 👇
-                'referral_dolar': 'referral_dolar',
-                'referral_daterange': 'referral_daterange',
-                'buyout_dolar': 'buyout_dolar',
-                'buyout_daterange': 'buyout_daterange'
-            }
+        opp_model  = opp.get('opp_model')
+        account_id = opp.get('account_id')
 
+        # 2) be robust: ensure this opportunity actually points to this candidate
+        if opp.get('candidato_contratado') != candidate_id:
+            # if frontend called /opportunities/<id>/fields first, this should already be set,
+            # but just in case, align it here:
+            cur.execute("""
+                UPDATE opportunity
+                SET candidato_contratado = %s
+                WHERE opportunity_id = %s
+            """, (candidate_id, opportunity_id))
 
-            set_cols, set_vals = [], []
-            # 👇 Siempre insertamos candidate_id, opportunity_id y account_id si no existe
-            insert_cols, insert_vals = ['candidate_id', 'opportunity_id', 'account_id'], [candidate_id, opportunity_id, account_id]
-            cursor.execute("""
+        # 3) upsert into hire_opportunity for this exact (candidate_id, opportunity_id)
+        cur.execute("""
+            INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
+        """, (candidate_id, opportunity_id, account_id))
+
+        # mapping of incoming JSON → columns
+        mapping = {
+            'references_notes': 'references_notes',
+            'employee_salary': 'salary',
+            'employee_fee': 'fee',
+            'setup_fee': 'setup_fee',
+            'computer': 'computer',
+            'extraperks': 'extra_perks',
+            'working_schedule': 'working_schedule',
+            'pto': 'pto',
+            'start_date': 'start_date',
+            'end_date': 'end_date',
+            'employee_revenue': 'revenue',                 # staffing
+            'employee_revenue_recruiting': 'revenue',      # recruiting
+            'discount_dolar': 'discount_dolar',
+            'discount_daterange': 'discount_daterange',
+            'referral_dolar': 'referral_dolar',
+            'referral_daterange': 'referral_daterange',
+            'buyout_dolar': 'buyout_dolar',
+            'buyout_daterange': 'buyout_daterange'
+        }
+
+        set_cols, set_vals = [], []
+        for k, col in mapping.items():
+            if k in data:
+                set_cols.append(f"{col} = %s")
+                set_vals.append(data[k])
+
+        created = False
+        updated = False
+
+        # if nothing else is being set, we still guaranteed the row exists (via insert above)
+        if set_cols:
+            set_vals.extend([candidate_id, opportunity_id])
+            cur.execute(f"""
+                UPDATE hire_opportunity
+                SET {", ".join(set_cols)}
+                WHERE candidate_id = %s AND opportunity_id = %s
+            """, set_vals)
+            updated = True
+
+        # if row didn’t exist before, mark created
+        cur.execute("""
+            SELECT 1 FROM hire_opportunity
+            WHERE candidate_id = %s AND opportunity_id = %s
+            LIMIT 1
+        """, (candidate_id, opportunity_id))
+        if cur.fetchone():
+            # row exists; assume created or updated above
+            pass
+        else:
+            # extremely rare (race), ensure it
+            cur.execute("""
                 INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
                 VALUES (%s, %s, %s)
-                ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
             """, (candidate_id, opportunity_id, account_id))
+            created = True
 
-            for k, col in mapping.items():
-                if k in data:
-                    set_cols.append(f"{col} = %s")
-                    set_vals.append(data[k])
-                    insert_cols.append(col)
-                    insert_vals.append(data[k])
+        # status alignment for batches
+        cur.execute("""
+            UPDATE candidates_batches cb
+               SET status = %s
+             WHERE cb.candidate_id = %s
+               AND EXISTS (
+                 SELECT 1
+                   FROM batch b
+                  WHERE b.batch_id = cb.batch_id
+                    AND b.opportunity_id = %s
+               )
+        """, ('Client hired', candidate_id, opportunity_id))
+        if cur.rowcount == 0:
+            cur.execute("""
+                UPDATE candidates_batches
+                   SET status = %s
+                 WHERE candidate_id = %s
+            """, ('Client hired', candidate_id))
 
-            # ¿Existe ya?
-            cursor.execute("""
-                SELECT 1 FROM hire_opportunity
-                WHERE candidate_id = %s AND opportunity_id = %s
-                LIMIT 1
-            """, (candidate_id, opportunity_id))
-            exists = cursor.fetchone()
-
-            created = False
-            updated = False
-
-            if not exists:
-                placeholders = ", ".join(["%s"] * len(insert_cols))
-                cursor.execute(f"""
-                    INSERT INTO hire_opportunity ({", ".join(insert_cols)})
-                    VALUES ({placeholders})
-                """, insert_vals)
-                created = True
-
-            if set_cols:
-                set_vals.extend([candidate_id, opportunity_id])
-                cursor.execute(f"""
-                    UPDATE hire_opportunity
-                    SET {", ".join(set_cols)}
-                    WHERE candidate_id = %s AND opportunity_id = %s
-                """, set_vals)
-                updated = True
-
-            if ('end_date' in data) and data.get('end_date'):
-                cursor.execute("""
-                    UPDATE hire_opportunity
-                    SET carga_inactive = COALESCE(carga_inactive, CURRENT_DATE)
-                    WHERE candidate_id = %s AND opportunity_id = %s
-                    AND end_date IS NOT NULL
-                """, (candidate_id, opportunity_id))
-
-            if ('buyout_dolar' in data or 'buyout_daterange' in data) and ('end_date' not in data):
-                def _end_date_from_buyout(val) -> str | None:
-                    """
-                    Acepta formatos:
-                    - 'YYYY-MM'
-                    - 'YYYY-MM-DD'
-                    - '[YYYY-MM-DD,YYYY-MM-DD]' (tomamos el último)
-                    Devuelve 'YYYY-MM-DD' (último día de ese mes) o None.
-                    """
-                    if not val:
-                        return None
-                    s = str(val)
-
-                    # 1) Si hay fechas completas en la cadena, toma la ÚLTIMA
-                    m_full = re.findall(r'\d{4}-\d{2}-\d{2}', s)
-                    if m_full:
-                        # toma la última aparición
-                        y, mo, d = map(int, m_full[-1].split('-'))
-                        last = calendar.monthrange(y, mo)[1]
-                        return f"{y:04d}-{mo:02d}-{last:02d}"
-
-                    # 2) Si viene 'YYYY-MM'
-                    m_ym = re.search(r'(\d{4})-(\d{2})', s)
-                    if m_ym:
-                        y = int(m_ym.group(1)); mo = int(m_ym.group(2))
-                        last = calendar.monthrange(y, mo)[1]
-                        return f"{y:04d}-{mo:02d}-{last:02d}"
+        # derive end_date from buyout if needed (only if caller didn’t set end_date)
+        if ('buyout_dolar' in data or 'buyout_daterange' in data) and ('end_date' not in data):
+            def _end_date_from_buyout(val):
+                if not val:
                     return None
+                s = str(val)
+                m_full = re.findall(r'\d{4}-\d{2}-\d{2}', s)
+                if m_full:
+                    y, mo, d = map(int, m_full[-1].split('-'))
+                    last = calendar.monthrange(y, mo)[1]
+                    return f"{y:04d}-{mo:02d}-{last:02d}"
+                m_ym = re.search(r'(\d{4})-(\d{2})', s)
+                if m_ym:
+                    y = int(m_ym.group(1)); mo = int(m_ym.group(2))
+                    last = calendar.monthrange(y, mo)[1]
+                    return f"{y:04d}-{mo:02d}-{last:02d}"
+                return None
 
-                # valor prioritario: lo que viene en el PATCH; si no, lo que ya hay en DB
-                bo_val = data.get('buyout_daterange')
-                if not bo_val:
-                    cursor.execute("""
-                        SELECT buyout_daterange
-                        FROM hire_opportunity
-                        WHERE candidate_id = %s AND opportunity_id = %s
-                        LIMIT 1
-                    """, (candidate_id, opportunity_id))
-                    row = cursor.fetchone()
-                    bo_val = row[0] if row else None
-
-                computed_end = _end_date_from_buyout(bo_val)
-                if computed_end:
-                    cursor.execute("""
-                        UPDATE hire_opportunity
-                        SET end_date = %s
-                        WHERE candidate_id = %s AND opportunity_id = %s
-                    """, (computed_end, candidate_id, opportunity_id))
-                    # ✅ Si el end_date fue inferido por buyout, fija carga_inactive si aún es NULL
-                    cursor.execute("""
-                        UPDATE hire_opportunity
-                        SET carga_inactive = COALESCE(carga_inactive, CURRENT_DATE)
-                        WHERE candidate_id = %s AND opportunity_id = %s
-                        AND end_date IS NOT NULL
-                    """, (candidate_id, opportunity_id))
-
-            # 2.5) Marcar al candidato como "Client hired" en candidates_batches (vía batch)
-            cursor.execute("""
-                UPDATE candidates_batches cb
-                SET status = %s
-                WHERE cb.candidate_id = %s
-                  AND EXISTS (
-                    SELECT 1
-                    FROM batch b
-                    WHERE b.batch_id = cb.batch_id
-                      AND b.opportunity_id = %s
-                  )
-            """, ('Client hired', candidate_id, opportunity_id))
-
-            # Fallback: si no hay batches ligados a esta opp, marcar cualquier batch del candidato
-            if cursor.rowcount == 0:
-                cursor.execute("""
-                    UPDATE candidates_batches
-                    SET status = %s
-                    WHERE candidate_id = %s
-                """, ('Client hired', candidate_id))
-
-            # Después de insertar/actualizar hire_opportunity, forzamos el status
-            cursor.execute("""
-                UPDATE hire_opportunity
-                SET status = CASE WHEN end_date IS NULL THEN 'active' ELSE 'inactive' END
-                WHERE candidate_id = %s AND opportunity_id = %s
+            cur.execute("""
+                SELECT buyout_daterange
+                  FROM hire_opportunity
+                 WHERE candidate_id = %s AND opportunity_id = %s
+                 LIMIT 1
             """, (candidate_id, opportunity_id))
+            row = cur.fetchone()
+            bo_val = data.get('buyout_daterange') or (row and row['buyout_daterange'])
+            computed_end = _end_date_from_buyout(bo_val)
+            if computed_end:
+                cur.execute("""
+                    UPDATE hire_opportunity
+                       SET end_date = %s
+                     WHERE candidate_id = %s AND opportunity_id = %s
+                """, (computed_end, candidate_id, opportunity_id))
 
-            conn.commit()
-            return jsonify({'success': True, 'created': created, 'updated': updated})
+        # align status based on end_date
+        cur.execute("""
+            UPDATE hire_opportunity
+               SET status = CASE WHEN end_date IS NULL THEN 'active' ELSE 'inactive' END
+             WHERE candidate_id = %s AND opportunity_id = %s
+        """, (candidate_id, opportunity_id))
+
+        conn.commit()
+        return jsonify({'success': True, 'created': created, 'updated': updated})
 
     except Exception as e:
+        conn.rollback()
         import traceback
-        print("❌ Error in /candidates/<id>/hire (hire_opportunity version):")
+        print("❌ Error in /candidates/<id>/hire:")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
     finally:
-        cursor.close()
+        cur.close()
         conn.close()
 
 
