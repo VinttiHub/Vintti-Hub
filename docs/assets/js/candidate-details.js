@@ -35,6 +35,19 @@ async function fetchHire(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsa
   if (!r.ok) throw new Error(`GET hire failed ${r.status}`);
   return r.json();
 }
+// global cache
+window.__currentOppId = null;
+
+async function ensureCurrentOppId(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
+  if (window.__currentOppId) return window.__currentOppId;
+  const r = await fetch(`${apiBase}/candidates/${candidateId}/hire_opportunity`);
+  const data = await r.json();
+  const oppId = Number(data?.opportunity_id) || null;
+  if (!oppId) throw new Error('No opportunity_id for this candidate (hire_opportunity not set)');
+  window.__currentOppId = oppId;
+  return oppId;
+}
+
 function todayYmd(){
   const d = new Date();
   const mm = String(d.getMonth()+1).padStart(2,'0');
@@ -212,20 +225,19 @@ function calcRevenueForStaffing(salary, fee){
 async function patchHireFromUpdate(candidateId, update, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
   if (!candidateId || !update) return;
 
+  const oppId = await ensureCurrentOppId(candidateId, apiBase); // 🔑
   const model = getOppModelLower();
 
-  // Base: salary y fee (fee puede venir vacío en Recruiting)
-  const payload = {};
+  const payload = { opportunity_id: oppId }; // 🔑 base
   if (update.salary != null && update.salary !== '') payload.employee_salary = Number(update.salary);
+
   if (model === 'staffing' && update.fee != null && update.fee !== '') {
     payload.employee_fee = Number(update.fee);
     const rev = calcRevenueForStaffing(update.salary, update.fee);
     if (rev != null) payload.employee_revenue = rev;
   }
 
-  // En recruiting no tocamos employee_revenue_recruiting (es editable manualmente)
-
-  if (Object.keys(payload).length === 0) return;
+  if (Object.keys(payload).length <= 1) return; // nothing but opp_id
 
   await fetch(`${apiBase}/candidates/${candidateId}/hire`, {
     method: 'PATCH',
@@ -800,14 +812,25 @@ function updateLinkedInUI(raw) {
   }
 
   // --- Patch helpers (Hire) ---
-  window.updateHireField = function(field, value) {
-    if (!candidateId) return;
-    return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value })
-    }).then(() => window.loadHireData && window.loadHireData());
-  };
+window.updateHireField = async function(field, value) {
+  if (!candidateId) return;
+  const oppId = await ensureCurrentOppId(candidateId);  // 🔑
+
+  const payload = { opportunity_id: oppId, [field]: value };
+  const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!r.ok) {
+    const t = await r.text().catch(()=> '');
+    console.error('PATCH /hire failed', r.status, t);
+    alert('We couldn’t save this field. Please try again.');
+    return;
+  }
+  if (typeof window.loadHireData === 'function') window.loadHireData();
+};
 
   // --- Restore Hire dates con <input type="date"> nativo ---
   (function restoreHireDates() {
@@ -1397,6 +1420,7 @@ if (hireRevenue){
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire_opportunity`)
       .then(res => res.json())
       .then(data => {
+        window.__currentOppId = Number(data?.opportunity_id) || window.__currentOppId;
         const model = data.opp_model;
         if (model) {
           const pill = document.getElementById('opp-model-pill');
