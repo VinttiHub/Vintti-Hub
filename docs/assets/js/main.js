@@ -4,6 +4,7 @@ function getCurrentUserEmail(){
     .toLowerCase()
     .trim();
 }
+const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
 // Try to get user_id from storage; if missing, resolve by email and cache it
 // Usa getCurrentUserId({force:true}) para ignorar cache.
@@ -1046,7 +1047,7 @@ if (summaryLink && allowedEmails.includes(currentUserEmail)) {
 }
 
 async function initSidebarProfile(){
-  // ——— small local helpers ———
+  // helpers
   function initialsFromName(name=""){
     const parts = String(name).trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '—';
@@ -1063,7 +1064,6 @@ async function initSidebarProfile(){
       : local.slice(0,2).toUpperCase();
   }
 
-  // ensure tile exists (your HTML already has it)
   let tile = document.getElementById('sidebarProfile');
   const sidebar = document.querySelector('.sidebar');
   if (!tile && sidebar){
@@ -1083,17 +1083,16 @@ async function initSidebarProfile(){
   }
   if (!tile) return;
 
-  // elements
   const $init   = document.getElementById('profileAvatarInitials');
   const $name   = document.getElementById('profileName');
   const $emailE = document.getElementById('profileEmail');
   const $img    = document.getElementById('profileAvatarImg');
 
-  // never use the photo
+  // never show photo
   if ($img) { $img.removeAttribute('src'); $img.style.display = 'none'; }
   if ($emailE) { $emailE.textContent = ''; $emailE.style.display = 'none'; }
 
-  // resolve current user_id (prefer your global)
+  // resolve uid
   let uid = null;
   try {
     uid = (typeof window.getCurrentUserId === 'function')
@@ -1103,41 +1102,40 @@ async function initSidebarProfile(){
     uid = Number(localStorage.getItem('user_id')) || null;
   }
 
-  // build link
+  // link
   const base = 'profile.html';
   tile.href = uid != null ? `${base}?user_id=${encodeURIComponent(uid)}` : base;
 
-  // show fallback initials immediately from email (no flash)
+  // show email initials immediately
   const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase();
   if ($init) $init.textContent = initialsFromEmail(email);
 
-  // fetch user -> show real user_name and initials from name
+  // try /users/<uid>, fallback to /profile/me
+  let user = null;
   try {
     if (uid != null) {
-      const r = await fetch(`${API_BASE}/users/${encodeURIComponent(uid)}?user_id=${encodeURIComponent(uid)}`, {
-        credentials: 'include'
-      });
-      if (r.ok) {
-        const u = await r.json();
-        const userName = u?.user_name || '';
-        if (userName) {
-          if ($name) $name.textContent = userName;              // label shows user_name
-          if ($init) $init.textContent = initialsFromName(userName); // initials from name (preferred)
-        } else {
-          if ($name) $name.textContent = 'Profile';
-        }
-      } else {
-        if ($name) $name.textContent = 'Profile';
-      }
-    } else {
-      if ($name) $name.textContent = 'Profile';
+      const r = await fetch(`${API_BASE}/users/${encodeURIComponent(uid)}?user_id=${encodeURIComponent(uid)}`, { credentials:'include' });
+      if (r.ok) user = await r.json();
+      else console.debug('[sidebar] /users/<uid> failed:', r.status);
     }
-  } catch {
-    // leave email-based initials + "Profile"
-    if ($name) $name.textContent = 'Profile';
+    if (!user) {
+      const r2 = await fetch(`${API_BASE}/profile/me${uid!=null?`?user_id=${encodeURIComponent(uid)}`:''}`, { credentials:'include' });
+      if (r2.ok) user = await r2.json();
+      else console.debug('[sidebar] /profile/me failed:', r2.status);
+    }
+  } catch (e) {
+    console.debug('[sidebar] fetch error:', e);
   }
 
-  // make sure the tile is visible
+  const userName = user?.user_name || '';
+  if (userName) {
+    if ($name) $name.textContent = userName;
+    if ($init) $init.textContent = initialsFromName(userName);
+  } else {
+    if ($name) $name.textContent = 'Profile'; // graceful fallback label
+  }
+
+  // ensure visible
   const cs = window.getComputedStyle(tile);
   if (cs.display === 'none') tile.style.display = 'flex';
 }
