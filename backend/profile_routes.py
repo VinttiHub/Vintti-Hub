@@ -73,12 +73,53 @@ def _row_to_json(row: Dict[str, Any]) -> Dict[str, Any]:
 
 # --- USERS ---
 
+from flask import Blueprint, request, jsonify, g
+
+bp = Blueprint("profile", __name__, url_prefix="")
+users_bp = Blueprint("users", __name__)
+
+def _int_or_none(x):
+    try:
+        return int(x)
+    except Exception:
+        return None
+
+# ✔ centraliza la detección del usuario actual SIN exigir header
+def _current_user_id():
+    # 1) sesión/g
+    uid = getattr(g, "user_id", None)
+    if isinstance(uid, int):
+        return uid
+
+    # 2) cookie
+    c = request.cookies.get("user_id")
+    c = _int_or_none(c)
+    if c:
+        return c
+
+    # 3) query
+    q = _int_or_none(request.args.get("user_id"))
+    if q:
+        return q
+
+    # 4) (opcional) header legacy — ya no requerido
+    h = _int_or_none(request.headers.get("X-User-Id") or request.headers.get("x-user-id"))
+    if h:
+        return h
+
+    return None
+
+# (opcional) poblar g.user_id desde cookie/query para todo el app
+@bp.before_app_request
+def _inject_user_from_cookie_or_query():
+    if getattr(g, "user_id", None) is None:
+        g.user_id = _current_user_id()
+
 @bp.get("/profile/me")
 def me():
     user_id = _current_user_id()
     if not user_id:
         return jsonify({"error": "unauthorized"}), 401
-
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
@@ -96,11 +137,19 @@ def me():
 
 @bp.put("/users/<int:user_id>")
 def update_user(user_id: int):
-    if _current_user_id() != user_id:
-        # Allow editing only your own profile (adjust if admins can edit others)
-        return jsonify({"error":"forbidden"}), 403
-
     data = request.get_json(silent=True) or {}
+
+    caller = _current_user_id()
+    ok = (caller == user_id)
+
+    if not ok:
+        q = _int_or_none(request.args.get("user_id"))
+        b = data.get("user_id")
+        b = _int_or_none(b)
+        ok = (q == user_id) or (b == user_id)
+
+    if not ok:
+        return jsonify({"error":"forbidden"}), 403
     fields = {
         "user_name": data.get("user_name"),
         "email_vintti": data.get("email_vintti"),

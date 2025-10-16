@@ -16,30 +16,22 @@ function initialsFromName(name=""){
   return (parts[0]?.[0]||"").toUpperCase() + (parts[1]?.[0]||"").toUpperCase();
 }
 
-// --- API helper (centraliza headers y fallback ?user_id=) ---
+// --- API helper (SIN headers custom; añade ?user_id= si existe) ---
 async function api(path, opts={}){
   const url = new URL(API_BASE + path);
   const uid = Number(localStorage.getItem('user_id')) || getUidFromQuery();
 
-  // si no hay X-User-Id, agregamos ?user_id= para endpoints que lo soportan
-  if (!opts.headers || !('X-User-Id' in opts.headers)){
-    if (!url.searchParams.has('user_id') && uid) {
-      url.searchParams.set('user_id', String(uid));
-    }
+  if (uid && !url.searchParams.has('user_id')) {
+    url.searchParams.set('user_id', String(uid));
   }
 
-  const headers = {
-    ...(opts.headers || {}),
-    ...(uid ? {'X-User-Id': String(uid)} : {}) // solo si existe
-  };
-
-  const res = await fetch(url.toString(), {
+  return fetch(url.toString(), {
     credentials: 'include',
     ...opts,
-    headers
+    headers: {
+      ...(opts.headers || {}) // NO agregamos X-User-Id
+    }
   });
-
-  return res;
 }
 
 function setAvatar({ user_name, avatar_url }){
@@ -116,13 +108,8 @@ let CURRENT_USER_ID = null;
 async function loadMe(uid){
   if (!uid) throw new Error("Missing uid for /profile/me");
 
-  // 1) intenta con header (api agrega X-User-Id y ?user_id= fallback)
-  let r = await api(`/profile/me`, { method: 'GET' });
-
-  // 2) si hay 401 por CORS/auth, intenta query explícita
-  if (r.status === 401) {
-    r = await fetch(`${API_BASE}/profile/me?user_id=${encodeURIComponent(uid)}`, { credentials: "include" });
-  }
+  // GET sin header custom; api() añade ?user_id=
+  const r = await api(`/profile/me`, { method: 'GET' });
   if (!r.ok) throw new Error("Failed to load profile");
 
   const me = await r.json();
@@ -251,7 +238,7 @@ async function loadBalances(uid){
   const host = document.getElementById('balancesTable');
   if (host) host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
   try{
-    let r = await api(`/users/${encodeURIComponent(uid)}`, { method: 'GET' });
+    const r = await api(`/users/${encodeURIComponent(uid)}`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const u = await r.json();
     renderBalances({
@@ -302,10 +289,11 @@ async function onTimeoffSubmit(e){
   }
 }
 
-// ===== Profile save (PUT) =====
+// ===== Profile save (PUT) — sin header custom =====
 $("#profileForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
   const payload = {
+    user_id: CURRENT_USER_ID, // opcional, el backend ya lo acepta por body
     user_name: $("#user_name").value.trim(),
     email_vintti: $("#email_vintti").value.trim(),
     role: $("#role").value.trim(),
@@ -315,15 +303,15 @@ $("#profileForm").addEventListener("submit", async (e)=>{
   };
   const toast = $("#profileToast");
   try{
-    const r = await fetch(`${API_BASE}/users/${encodeURIComponent(CURRENT_USER_ID)}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        "X-User-Id": String(CURRENT_USER_ID)  // <- solo aquí, PUT necesita auth
-      },
-      credentials: "include",
-      body: JSON.stringify(payload)
-    });
+    const r = await fetch(
+      `${API_BASE}/users/${encodeURIComponent(CURRENT_USER_ID)}?user_id=${encodeURIComponent(CURRENT_USER_ID)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }, // <- sin X-User-Id
+        credentials: "include",
+        body: JSON.stringify(payload)
+      }
+    );
     if (!r.ok) throw new Error(await r.text());
     showToast(toast, "Saved. Done & dusted 💫");
     setAvatar({ user_name: payload.user_name });

@@ -195,11 +195,6 @@ CORS(
         r"/*": {
             "origins": ["https://vinttihub.vintti.com"],
             "supports_credentials": True,
-            "allow_headers": [
-                "Content-Type",
-                "X-User-Id",   # title-case
-                "x-user-id"    # lowercase (what the browser advertises)
-            ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "expose_headers": ["Content-Type"]
         }
