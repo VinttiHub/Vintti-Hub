@@ -135,7 +135,7 @@ def me():
         return jsonify({"error":"not found"}), 404
     return jsonify(_row_to_json(row))
 
-@bp.put("/users/<int:user_id>")
+@users_bp.put("/users/<int:user_id>")
 def update_user(user_id: int):
     data = request.get_json(silent=True) or {}
 
