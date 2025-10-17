@@ -674,3 +674,30 @@ input:focus, select:focus, textarea:focus{
   border-radius: 8px;
 }
 .name-link:hover{ background: rgba(255,255,255,.6); box-shadow: 0 2px 10px rgba(15,23,42,.06); }
+/* ——— Fix: keep Team PTO rows inside the rounded panel ——— */
+#panel-teampto{
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;                 /* clip backgrounds & shadows */
+  clip-path: inset(0 round var(--radius)); /* extra-safe on Safari */
+  isolation: isolate;               /* contain effects inside */
+}
+
+/* Make sure the grid itself doesn’t create extra width */
+#teamPtoTable{
+  width: 100%;
+  max-width: 100%;
+}
+
+/* So the “lift” feels nice but doesn’t bloom outside the clip */
+#teamPtoTable .row:hover > .cell{
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 4px 14px rgba(15,23,42,.07);  /* slightly smaller blur */
+}
+
+/* Optional: also clip any inner skeletons/glows if you use them */
+#teamPtoTable .skeleton-row{
+  margin-inline: 0;
+  border-radius: 0;                 /* avoid rounding poking past the clip */
+}
+#teamPtoTable{ margin-left: -24px; margin-right: -24px; }
