@@ -145,6 +145,8 @@ async function loadMe(uid){
 async function loadMyRequests(uid){
   const host = document.getElementById("requestsTable");
   if (!host) return;
+
+  // skeleton while loading
   host.innerHTML = `
     <div class="skeleton-row"></div>
     <div class="skeleton-row"></div>
@@ -152,42 +154,42 @@ async function loadMyRequests(uid){
   `;
 
   const kindClass = (k) => ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[k] || "");
-  const kindLabel = (k) => (String(k||"").replace("_"," "));
+  const kindLabel = (k) => String(k || "").replace("_"," ");
 
   try{
     const r = await api(`/time_off_requests`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
 
+    const header = `
+      <div class="th">Type</div>
+      <div class="th">Dates</div>
+      <div class="th t-right">Status</div>
+      <div class="th">Note</div>
+    `;
+
     if (!arr.length){
-      host.innerHTML = `
-        <div class="th">Type</div>
-        <div class="th">Dates</div>
-        <div class="th t-right">Status</div>
-        <div class="th">Note</div>
+      host.innerHTML = header + `
         <div class="cell" style="grid-column:1/-1; justify-content:center">No requests yet.</div>
       `;
       return;
     }
 
-    host.innerHTML = `
-      <div class="th">Type</div>
-      <div class="th">Dates</div>
-      <div class="th t-right">Status</div>
-      <div class="th">Note</div>
-      ${arr.map(x => `
-        <div class="cell">
-          <div class="metric">
-            <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
-          </div>
+    host.innerHTML = header + arr.map(x => `
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
         </div>
-        <div class="cell mono">${x.start_date} → ${x.end_date}</div>
-        <div class="cell t-right">
-          <span class="status ${String(x.status||'').toLowerCase()}">${x.status}</span>
-        </div>
-        <div class="cell dim">${x.reason ? x.reason : ""}</div>
-      `).join("")}
-    `;
+      </div>
+
+      <div class="cell mono">${x.start_date} → ${x.end_date}</div>
+
+      <div class="cell t-right">
+        <span class="status ${String(x.status||'').toLowerCase()}">${x.status}</span>
+      </div>
+
+      <div class="cell dim">${x.reason ? x.reason : ""}</div>
+    `).join("");
   }catch(err){
     console.error(err);
     host.innerHTML = `
