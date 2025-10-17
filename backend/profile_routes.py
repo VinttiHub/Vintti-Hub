@@ -5,6 +5,9 @@ from typing import Optional, Dict, Any
 from flask import Blueprint, request, jsonify, g
 from psycopg2.extras import RealDictCursor
 from db import get_connection
+import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 
@@ -248,9 +251,6 @@ def create_time_off():
 
     # ——— Send the email (SendGrid) ———
     try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail, Email
-
         api_key = os.environ.get('SENDGRID_API_KEY')
         if not api_key:
             raise RuntimeError("SENDGRID_API_KEY not configured")
