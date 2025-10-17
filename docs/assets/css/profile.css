@@ -434,37 +434,110 @@ input:focus, select:focus, textarea:focus{
 }
 .teampto-caption{ font-size:11px; color:var(--muted); }
 
-.teampto-table{
-  display:grid;
-  gap: 2px;
-  grid-template-columns: 1.2fr repeat(8, minmax(100px, .8fr));
-  background: var(--glass);
-  border: 1px solid var(--border);
+/* =========================================================
+   Team PTO table — modern, clean, tech aesthetic
+   ========================================================= */
+.teampto-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.teampto-title {
+  margin: 0;
+  font-weight: 700;
+  font-size: clamp(18px, 2.2vw, 22px);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.3px;
+}
+
+.teampto-caption {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Main container */
+.teampto-table {
+  width: 100%;
+  border-collapse: collapse;
   border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--glass-strong);
   box-shadow: var(--shadow);
-  padding: 10px;
 }
 
-.teampto-table .th{
-  font-size:10px; letter-spacing:.35px; text-transform:uppercase;
-  color:var(--muted); padding:8px 6px;
+/* Header row */
+.teampto-table thead {
+  background: linear-gradient(135deg, #f9fafb, #f1f5f9);
 }
 
-.teampto-table .cell.plain{
-  background: transparent;
-  border: 0;
-  padding: 8px 6px;
+.teampto-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 
-.teampto-table .cell.plain:hover{
-  background: rgba(255,255,255,0.55);
-  border-radius: 10px;
+/* Data rows */
+.teampto-table td {
+  font-size: 14px;
+  color: var(--text);
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 920px){
-  .teampto-table{
-    overflow:auto;
-    grid-template-columns: 1.4fr repeat(8, 120px);
+/* Left-align first column (names) */
+.teampto-table td:first-child,
+.teampto-table th:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Row hover and alternates */
+.teampto-table tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.teampto-table tbody tr:hover {
+  background: linear-gradient(135deg, #f0fdfa, #eef2ff);
+  transition: background 0.25s ease;
+}
+
+/* Subtle row divider fade */
+.teampto-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Rounded corners on table wrapper */
+.teampto-table-wrapper {
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--glass);
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+
+/* Responsive scrolling on small screens */
+@media (max-width: 900px) {
+  .teampto-table-wrapper {
+    overflow-x: auto;
+  }
+  .teampto-table {
+    min-width: 960px;
   }
 }
 /* =========================================================
