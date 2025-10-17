@@ -510,6 +510,12 @@ input:focus, select:focus, textarea:focus{
 #teamPtoTable .group-vd.border-l  { box-shadow: inset 8px 0 0 -7px rgba(59,130,246,.18); }  /* blue  */
 #teamPtoTable .group-hol.border-l { box-shadow: inset 8px 0 0 -7px rgba(245,158,11,.20); }   /* yellow*/
 
+/* Hover: tactile lift for the whole row (per-cell fallback) */
+#teamPtoTable .row:hover > .cell{
+  background: rgba(255,255,255,.75);
+  box-shadow: 0 5px 18px rgba(15,23,42,.06);
+}
+
 /* Summary row — highlighted, rounded bottom corners */
 #teamPtoTable .summary > .cell{
   background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.85));
@@ -680,7 +686,7 @@ input:focus, select:focus, textarea:focus{
 /* Make sure the grid itself doesn’t create extra width */
 #teamPtoTable{
   width: 100%;
-  max-width: 98%;
+  max-width: 99%;
 }
 
 /* So the “lift” feels nice but doesn’t bloom outside the clip */
