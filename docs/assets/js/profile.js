@@ -201,8 +201,6 @@ async function loadMyRequests(uid){
             <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
           </div>
         </div>
-
-        /* Dates — super minimal */
         <div class="cell plain">
           <div class="dates-min">
             <time class="d" datetime="${x.start_date}">${start}</time>
