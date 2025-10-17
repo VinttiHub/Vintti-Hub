@@ -267,3 +267,51 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
 /* small tweaks for badges if needed */
 .badge.holiday{ background:#fde68a; color:#92400e; }
 .badge.vintti_day{ background:#bfdbfe; color:#1e40af; }
+/* === Floating "Take a Break" button === */
+#btnOpenTimeoff{
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 999; /* above cards/modal backdrop */
+  padding: 16px 22px;
+  font-size: 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fef3c7, #faf5ff);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 28px rgba(15,23,42,.16);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+#btnOpenTimeoff:hover{ transform: translateY(-1px); box-shadow: 0 16px 36px rgba(15,23,42,.18); }
+#btnOpenTimeoff:active{ transform: translateY(0); }
+
+/* keep existing “inline section” from taking vertical space */
+.timeoff-actions{ height:0; margin:0; }
+
+/* on very small screens, tuck it in a bit */
+@media (max-width: 480px){
+  #btnOpenTimeoff{ right: 16px; bottom: 16px; padding: 14px 18px; font-size: 15px; }
+}
+/* === Pretty pill select for "Type" === */
+#kind{
+  border-radius: 999px;
+  background: #fff;
+  appearance: none;                 /* remove native arrow */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 38px;              /* space for custom arrow */
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'>\
+<path d='M5 7.5L10 12.5L15 7.5' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>\
+</svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px 18px;
+}
+#kind:focus{
+  border-color:#c7d2fe;
+  box-shadow: 0 0 0 4px rgba(99,102,241,.15);
+}
+/* === Center modal actions === */
+#timeoffForm .actions{
+  justify-content: center;
+}
