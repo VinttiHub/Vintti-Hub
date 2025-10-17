@@ -106,7 +106,7 @@ async function loadTeamPto(){
   }
   try{
     // Reuse /users to pull everyone and compute totals on FE
-    const r = await api(`/team_pto`, { method: 'GET' });
+    const r = await api(`/users`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
 
