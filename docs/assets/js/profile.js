@@ -33,8 +33,7 @@ function initialsFromName(name=""){
 }
 // ===== Team PTO (helpers) =====
 const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
-
-function _nz(n){ n = Number(n); return Number.isFinite(n) ? n : 0; }
+const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
 function calcVacation(user){
   const acc  = _nz(user.vacaciones_acumuladas);
@@ -44,10 +43,15 @@ function calcVacation(user){
   const avail = Math.max(0, total - used);
   return { acc, work, total, used, avail };
 }
-
 function calcVintti(user){
   const total = _nz(user.vintti_days);
   const used  = _nz(user.vintti_days_consumidos);
+  const avail = Math.max(0, total - used);
+  return { total, used, avail };
+}
+function calcHoliday(user){
+  const total = _nz(user.feriados_totales);
+  const used  = _nz(user.feriados_consumidos);
   const avail = Math.max(0, total - used);
   return { total, used, avail };
 }
@@ -56,17 +60,20 @@ function renderTeamPtoTable(users){
   const host = document.getElementById("teamPtoTable");
   if (!host) return;
 
-  // Header row (9 columns)
+  // Header row (12 columns)
   const header = `
-    <div class="th">Nombre</div>
-    <div class="th t-right">Vac. acumuladas</div>
-    <div class="th t-right">Vac. hábiles</div>
-    <div class="th t-right">Vac. totales</div>
-    <div class="th t-right">Vac. consumidas</div>
-    <div class="th t-right">Vac. disponibles</div>
-    <div class="th t-right">VD totales</div>
-    <div class="th t-right">VD consumidas</div>
-    <div class="th t-right">VD disponibles</div>
+    <div class="th">Name</div>
+    <div class="th t-right">Vac Acc</div>
+    <div class="th t-right">Vac Work</div>
+    <div class="th t-right">Vac Total</div>
+    <div class="th t-right">Vac Used</div>
+    <div class="th t-right">Vac Left</div>
+    <div class="th t-right">VD Total</div>
+    <div class="th t-right">VD Used</div>
+    <div class="th t-right">VD Left</div>
+    <div class="th t-right">Hol Total</div>
+    <div class="th t-right">Hol Used</div>
+    <div class="th t-right">Hol Left</div>
   `;
 
   if (!users?.length){
@@ -76,15 +83,16 @@ function renderTeamPtoTable(users){
     return;
   }
 
-  // Sort by name for consistency
   users.sort((a,b)=> String(a.user_name||"").localeCompare(String(b.user_name||"")));
+
+  const cell = (v) => `<span class="mono">${Number(v) || 0}</span>`;
 
   host.innerHTML = header + users.map(u=>{
     const name = u.user_name || "—";
     const vac = calcVacation(u);
     const vd  = calcVintti(u);
+    const hol = calcHoliday(u);
 
-    const cell = (v) => `<span class="mono">${Number(v) || 0}</span>`;
     return `
       <div class="cell plain">${name}</div>
       <div class="cell plain t-right">${cell(vac.acc)}</div>
@@ -95,8 +103,47 @@ function renderTeamPtoTable(users){
       <div class="cell plain t-right">${cell(vd.total)}</div>
       <div class="cell plain t-right">${cell(vd.used)}</div>
       <div class="cell plain t-right">${cell(vd.avail)}</div>
+      <div class="cell plain t-right">${cell(hol.total)}</div>
+      <div class="cell plain t-right">${cell(hol.used)}</div>
+      <div class="cell plain t-right">${cell(hol.avail)}</div>
     `;
   }).join("");
+}
+
+async function loadTeamPto(){
+  const host = document.getElementById("teamPtoTable");
+  if (host){
+    host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
+  }
+  try{
+    const r = await api(`/users`, { method: 'GET' });
+    if (!r.ok) throw new Error(await r.text());
+    const arr = await r.json();
+
+    // include Holidays fields
+    const slim = arr.map(u => ({
+      user_name: u.user_name,
+      vacaciones_acumuladas: u.vacaciones_acumuladas,
+      vacaciones_habiles: u.vacaciones_habiles,
+      vacaciones_consumidas: u.vacaciones_consumidas,
+      vintti_days: u.vintti_days,
+      vintti_days_consumidos: u.vintti_days_consumidos,
+      feriados_totales: u.feriados_totales,
+      feriados_consumidos: u.feriados_consumidos,
+    }));
+    renderTeamPtoTable(slim);
+  }catch(err){
+    console.error('loadTeamPto error:', err);
+    if (host){
+      host.innerHTML = `
+        <div class="th">Name</div><div class="th">Vac Acc</div><div class="th">Vac Work</div>
+        <div class="th">Vac Total</div><div class="th">Vac Used</div><div class="th">Vac Left</div>
+        <div class="th">VD Total</div><div class="th">VD Used</div><div class="th">VD Left</div>
+        <div class="th">Hol Total</div><div class="th">Hol Used</div><div class="th">Hol Left</div>
+        <div class="cell plain" style="grid-column:1/-1;justify-content:center;">Could not load team PTO.</div>
+      `;
+    }
+  }
 }
 
 async function loadTeamPto(){
@@ -252,7 +299,7 @@ function renderApprovalsTable(items){
         chip.classList.remove("pending","approved","rejected");
         chip.classList.add(j.status);
         chip.textContent = j.status;
-        showApprovalsToast(`Marked as ${j.status}.`);
+        try { loadTeamPto(); } catch {}
       }catch(err){
         // revert tone
         row.classList.remove("row--approved","row--rejected");

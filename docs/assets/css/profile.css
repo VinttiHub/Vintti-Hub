@@ -461,103 +461,61 @@ input:focus, select:focus, textarea:focus{
   font-weight: 500;
 }
 
-/* =========================================================
-   Team PTO — grid table con <div> (9 columnas)
-   Se alinea con el markup que genera renderTeamPtoTable()
-   ========================================================= */
+/* ===== Team PTO — clean, minimal, Apple-style ===== */
 #teamPtoTable{
   display: grid;
-  grid-template-columns: 1.25fr repeat(8, minmax(90px, 1fr)); /* Nombre | 8 métricas */
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
+  grid-template-columns: 1.2fr repeat(11, minmax(84px, 1fr)); /* Name | 11 metrics */
+  gap: 0;                     /* no gaps -> looks like a real table */
+  padding: 8px 0;
   border-radius: var(--radius);
-  background: var(--glass);
-  box-shadow: var(--shadow);
+  background: transparent;
 }
 
-/* Encabezados */
+/* headers: small, muted, no boxes */
 #teamPtoTable .th{
-  position: sticky; /* luce como header fijo si hay scroll vertical dentro del panel */
-  top: 0;
-  z-index: 1;
   padding: 10px 12px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .35px;
-  font-weight: 700;
   color: var(--muted);
-  background: linear-gradient(135deg, #f9fafb, #f1f5f9);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: transparent;
+  border: 0;
 }
 
-/* Celdas */
+/* cells: simple rows separated by hairlines */
 #teamPtoTable .cell{
   padding: 10px 12px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);   /* hairline separator */
   display: flex;
   align-items: center;
-  min-height: 42px;
+  min-height: 40px;
 }
 
-/* Nombre a la izquierda; números alineados a la derecha */
-#teamPtoTable .cell:first-child { font-weight: 600; }
 #teamPtoTable .t-right{ justify-content: flex-end; text-align: right; }
 
-/* Números monospace suaves */
+/* name normal weight; numbers normal (no bold) */
+#teamPtoTable .cell:first-child { font-weight: 600; } /* only the name a bit stronger */
 #teamPtoTable .mono{
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 400;   /* ← no bold numbers */
 }
 
-/* Alterna filas visualmente (cada 9 celdas = 1 fila) */
-#teamPtoTable .cell:nth-child(9n+1),
-#teamPtoTable .cell:nth-child(9n+2),
-#teamPtoTable .cell:nth-child(9n+3),
-#teamPtoTable .cell:nth-child(9n+4),
-#teamPtoTable .cell:nth-child(9n+5),
-#teamPtoTable .cell:nth-child(9n+6),
-#teamPtoTable .cell:nth-child(9n+7),
-#teamPtoTable .cell:nth-child(9n+8),
-#teamPtoTable .cell:nth-child(9n+9){
-  background: rgba(255,255,255,.88);
-}
-#teamPtoTable .cell:nth-child(18n+10),
-#teamPtoTable .cell:nth-child(18n+11),
-#teamPtoTable .cell:nth-child(18n+12),
-#teamPtoTable .cell:nth-child(18n+13),
-#teamPtoTable .cell:nth-child(18n+14),
-#teamPtoTable .cell:nth-child(18n+15),
-#teamPtoTable .cell:nth-child(18n+16),
-#teamPtoTable .cell:nth-child(18n+17),
-#teamPtoTable .cell:nth-child(18n+18){
-  background: rgba(255,255,255,.6); /* ligera zebra */
-}
-
-/* Hover sutil por celda (sin JS extra) */
+/* subtle row hover */
 #teamPtoTable .cell:hover{
-  background: linear-gradient(135deg, #f0fdfa, #eef2ff);
-  transition: background .2s ease;
+  background: rgba(255,255,255,0.55);
 }
 
-/* Wrapper (opcional) si usas .teampto-table-wrapper */
-.teampto-table-wrapper{
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--glass);
-  box-shadow: var(--shadow);
-  padding: 6px;
+/* make header row stand out a touch using a thin bottom rule */
+#teamPtoTable .th{
+  border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
-/* Responsive: scroll horizontal suave si hiciera falta */
-@media (max-width: 900px){
+/* responsive: allow horizontal scroll if needed */
+@media (max-width: 980px){
   #panel-teampto{ overflow-x: auto; }
-  #teamPtoTable{ min-width: 960px; }
+  #teamPtoTable{ min-width: 1040px; }
 }
 /* =========================================================
    Approvals tab (leaders)

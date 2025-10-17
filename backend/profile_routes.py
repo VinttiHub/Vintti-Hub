@@ -170,9 +170,12 @@ def leader_list_timeoff():
         rows = cur.fetchall()
     conn.close()
     return jsonify([_row_to_json(dict(r)) for r in rows])
+
+
 @bp.patch("/leader/time_off_requests/<int:req_id>")
 def leader_update_timeoff(req_id: int):
-    """Approve or reject a request that belongs to one of my direct reports."""
+    """Approve or reject a request that belongs to one of my direct reports.
+       When approving (first time), deduct balances according to kind."""
     leader_id = _current_user_id()
     if not leader_id:
         return jsonify({"error":"unauthorized"}), 401
@@ -186,7 +189,7 @@ def leader_update_timeoff(req_id: int):
     rec = None
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Fetch the request & requester; ensure this leader owns it
+            # 1) Traer la request + usuario y chequear ownership
             cur.execute("""
                 SELECT
                   r.id, r.user_id, r.kind, r.start_date, r.end_date, r.reason, r.status,
@@ -200,16 +203,96 @@ def leader_update_timeoff(req_id: int):
                 return jsonify({"error":"not found"}), 404
             if int(rec["lider"] or 0) != int(leader_id):
                 return jsonify({"error":"forbidden (not your report)"}), 403
-            if rec["status"] == new_status:
-                # idempotent
+
+            old_status = str(rec["status"] or "").lower()
+
+            # 2) Actualizar el estado (idempotente si no cambia)
+            if old_status == new_status:
                 return jsonify({"ok": True, "status": new_status})
 
-            # Update status
             cur.execute("""
                 UPDATE time_off_requests
-                SET status = %s, updated_at = NOW() AT TIME ZONE 'UTC'
-                WHERE id = %s
+                   SET status = %s, updated_at = NOW() AT TIME ZONE 'UTC'
+                 WHERE id = %s
             """, (new_status, req_id))
+
+            # 3) Si pasa a APPROVED por primera vez -> descontar saldos
+            if new_status == "approved" and old_status != "approved":
+                # días inclusivos: (end - start) + 1
+                from datetime import date as _date, datetime as _dt
+                sd = rec["start_date"]; ed = rec["end_date"]
+
+                # psycopg puede devolver date o str; normalizamos
+                if isinstance(sd, str):
+                    try: sd = _dt.strptime(sd, "%Y-%m-%d").date()
+                    except: pass
+                if isinstance(ed, str):
+                    try: ed = _dt.strptime(ed, "%Y-%m-%d").date()
+                    except: pass
+
+                if hasattr(sd, "toordinal") and hasattr(ed, "toordinal"):
+                    total_days = max(0, (ed - sd).days) + 1
+                else:
+                    # fallback robusto (si vinieran como str raras)
+                    try:
+                        d1 = _dt.strptime(str(rec["start_date"]), "%Y-%m-%d")
+                        d2 = _dt.strptime(str(rec["end_date"]), "%Y-%m-%d")
+                        total_days = max(0, (d2 - d1).days) + 1
+                    except:
+                        total_days = 0
+
+                total_days = int(total_days)
+
+                if total_days > 0:
+                    k = str(rec["kind"] or "").lower()
+                    uid = int(rec["user_id"])
+
+                    if k == "vacation":
+                        # Regla: restar primero de vacaciones_acumuladas hasta 0, resto de vacaciones_habiles
+                        # y sumar a vacaciones_consumidas
+                        cur.execute("""
+                            UPDATE users
+                               SET
+                                 vacaciones_acumuladas = GREATEST(
+                                     0,
+                                     COALESCE(vacaciones_acumuladas,0)
+                                     - LEAST(COALESCE(vacaciones_acumuladas,0), %s)
+                                 ),
+                                 vacaciones_habiles = GREATEST(
+                                     0,
+                                     COALESCE(vacaciones_habiles,0)
+                                     - GREATEST(%s - LEAST(COALESCE(vacaciones_acumuladas,0), %s), 0)
+                                 ),
+                                 vacaciones_consumidas = COALESCE(vacaciones_consumidas,0) + %s,
+                                 updated_at = NOW() AT TIME ZONE 'UTC'
+                             WHERE user_id = %s
+                        """, (total_days, total_days, total_days, total_days, uid))
+
+                    elif k == "vintti_day":
+                        # Regla: restar de vintti_days y sumar a vintti_days_consumidos
+                        cur.execute("""
+                            UPDATE users
+                               SET
+                                 vintti_days = GREATEST(0, COALESCE(vintti_days,0) - %s),
+                                 vintti_days_consumidos = COALESCE(vintti_days_consumidos,0) + %s,
+                                 updated_at = NOW() AT TIME ZONE 'UTC'
+                             WHERE user_id = %s
+                        """, (total_days, total_days, uid))
+
+                    elif k == "holiday":
+                        # Regla: restar de feriados_totales y sumar a feriados_consumidos
+                        cur.execute("""
+                            UPDATE users
+                               SET
+                                 feriados_totales = GREATEST(0, COALESCE(feriados_totales,0) - %s),
+                                 feriados_consumidos = COALESCE(feriados_consumidos,0) + %s,
+                                 updated_at = NOW() AT TIME ZONE 'UTC'
+                             WHERE user_id = %s
+                        """, (total_days, total_days, uid))
+                    else:
+                        # Kinds desconocidos no descuentan (pero tu API solo usa 3)
+                        pass
+
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -219,7 +302,7 @@ def leader_update_timeoff(req_id: int):
         try: conn.close()
         except: pass
 
-    # Send human-friendly email to requester
+    # --- Email amistoso al solicitante (se mantiene tu lógica) ---
     try:
         api_key = os.environ.get('SENDGRID_API_KEY')
         if not api_key:
@@ -228,16 +311,19 @@ def leader_update_timeoff(req_id: int):
         from datetime import datetime
         def fmt_date(s):
             try:
-                d = datetime.strptime(s, "%Y-%m-%d")
+                # aceptar date o str
+                if hasattr(s, "strftime"):
+                    return s.strftime("%B %d, %Y")
+                d = datetime.strptime(str(s), "%Y-%m-%d")
                 return d.strftime("%B %d, %Y")
             except Exception:
-                return s
+                return str(s)
 
         start_fmt = fmt_date(rec["start_date"])
         end_fmt   = fmt_date(rec["end_date"])
         try:
-            d1 = datetime.strptime(rec["start_date"], "%Y-%m-%d")
-            d2 = datetime.strptime(rec["end_date"], "%Y-%m-%d")
+            d1 = datetime.strptime(str(rec["start_date"]), "%Y-%m-%d")
+            d2 = datetime.strptime(str(rec["end_date"]), "%Y-%m-%d")
             total_days = (d2 - d1).days + 1
         except Exception:
             total_days = None
@@ -279,7 +365,6 @@ def leader_update_timeoff(req_id: int):
         sg.send(msg)
     except Exception as e:
         logging.exception("leader decision email failed")
-        # Continue; the action itself succeeded
         return jsonify({"ok": True, "status": new_status, "email_warning": str(e)})
 
     return jsonify({"ok": True, "status": new_status})
