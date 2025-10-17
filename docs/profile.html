@@ -196,6 +196,59 @@
 </section>
 
   </main>
+  <!-- ——— Modal: Quick Profile ——— -->
+<div id="userQuickModal" class="modal" aria-hidden="true">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog quick-card" role="dialog" aria-modal="true" aria-labelledby="userQuickTitle">
+    <header class="modal__head">
+      <h3 id="userQuickTitle">Team Member</h3>
+      <button class="modal__close" title="Close" data-close-modal>×</button>
+    </header>
+
+    <div class="quick-body">
+      <div class="quick-avatar">
+        <img id="uqAvatarImg" alt="User avatar" />
+        <span id="uqAvatarInitials" aria-hidden="true"></span>
+      </div>
+
+      <div class="quick-main">
+        <div class="quick-name" id="uqName">—</div>
+        <div class="quick-meta">
+          <span id="uqEmail">—</span>
+          <span class="dot">•</span>
+          <span id="uqRole">—</span>
+          <span class="dot">•</span>
+          <span id="uqTeam">—</span>
+        </div>
+
+        <div class="quick-grid">
+          <div class="qfield"><span class="label">Emergency</span><span id="uqEmergency">—</span></div>
+          <div class="qfield"><span class="label">Birth</span><span id="uqBirth">—</span></div>
+          <div class="qfield"><span class="label">Start</span><span id="uqStart">—</span></div>
+        </div>
+
+        <div class="quick-totals">
+          <div class="qkpi">
+            <span class="badge-soft badge--vac">Vacation</span>
+            <div class="value" id="uqVacTotal">0</div>
+            <div class="caption">Total</div>
+          </div>
+          <div class="qkpi">
+            <span class="badge-soft badge--vd">Vintti Days</span>
+            <div class="value" id="uqVdTotal">0</div>
+            <div class="caption">Total</div>
+          </div>
+          <div class="qkpi">
+            <span class="badge-soft badge--hol">Holiday</span>
+            <div class="value" id="uqHolTotal">0</div>
+            <div class="caption">Total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="./assets/js/main.js" defer></script>
 <script src="./assets/js/profile.js" defer></script>
 </body>

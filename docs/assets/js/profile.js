@@ -127,8 +127,10 @@ function renderTeamPtoTable(users){
 
     // one row (display: contents so hover/background applies to all 12 cells)
     return `
-      <div class="row">
-        <div class="cell cell--name">${name}</div>
+      <div class="row" data-uid="${u.user_id || ''}">
+        <div class="cell cell--name">
+          <button class="name-link" data-uid="${u.user_id || ''}" type="button" title="View profile">${name}</button>
+        </div>
 
         <div class="cell t-center group-vac border-l">${valEl(vac.acc)}</div>
         <div class="cell t-center group-vac">${valEl(vac.work)}</div>
@@ -170,6 +172,89 @@ function renderTeamPtoTable(users){
 
   host.innerHTML = header + rows + summary;
 }
+// —— Quick Profile helpers —— //
+function openUserQuick(){ const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
+function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
+
+// Avatar for quick card
+function setQuickAvatar({ user_name, avatar_url }){
+  const img = $("#uqAvatarImg");
+  const ini = $("#uqAvatarInitials");
+  if (avatar_url){
+    img.src = avatar_url;
+    img.onload = ()=>{ img.style.display="block"; ini.style.display="none"; };
+    img.onerror = ()=>{ img.style.display="none"; ini.style.display="grid"; ini.textContent = initialsFromName(user_name); };
+  }else{
+    img.style.display="none";
+    ini.style.display="grid";
+    ini.textContent = initialsFromName(user_name);
+  }
+}
+
+function fmtLongDate(v){
+  if (!v) return "—";
+  const d = new Date(v);
+  if (isNaN(d)) return String(v);
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
+}
+
+// Fill modal content
+function renderUserQuick(u){
+  $("#userQuickTitle").textContent = u.user_name || "Team Member";
+  $("#uqName").textContent = u.user_name || "—";
+  $("#uqEmail").textContent = u.email_vintti || "—";
+  $("#uqRole").textContent = u.role || "—";
+  $("#uqTeam").textContent = u.team || "—";
+  $("#uqEmergency").textContent = u.emergency_contact || "—";
+  $("#uqBirth").textContent = fmtLongDate(u.fecha_nacimiento);
+  $("#uqStart").textContent = fmtLongDate(u.ingreso_vintti_date);
+
+  // totals: Vacation total = accrued + current (habiles); VD total = vintti_days; Holiday total = feriados_totales
+  const vacTotal = _nz(u.vacaciones_acumuladas) + _nz(u.vacaciones_habiles);
+  $("#uqVacTotal").textContent = String(vacTotal);
+  $("#uqVdTotal").textContent  = String(_nz(u.vintti_days));
+  $("#uqHolTotal").textContent = String(_nz(u.feriados_totales));
+
+  setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url });
+}
+
+// Click on a name → fetch + open
+document.addEventListener("click", async (e)=>{
+  const t = e.target;
+  if (t.matches(".name-link")){
+    e.preventDefault();
+    const uid = Number(t.dataset.uid);
+    if (!uid) return;
+
+    // optimistic skeleton fill (optional)
+    renderUserQuick({
+      user_name: "Loading…",
+      email_vintti: "—",
+      role: "—",
+      team: "—",
+      emergency_contact: "—",
+      fecha_nacimiento: null,
+      ingreso_vintti_date: null,
+      vacaciones_acumuladas: 0, vacaciones_habiles: 0,
+      vintti_days: 0, feriados_totales: 0,
+      avatar_url: null
+    });
+    openUserQuick();
+
+    try{
+      const r = await api(`/users/${encodeURIComponent(uid)}`, { method:'GET' });
+      if (!r.ok) throw new Error(await r.text());
+      const u = await r.json();
+      renderUserQuick(u);
+    }catch(err){
+      console.error("quick profile load error:", err);
+      $("#userQuickTitle").textContent = "Could not load profile";
+    }
+  }
+
+  // close handlers reuse your generic [data-close-modal]
+  if (t.matches("#userQuickModal [data-close-modal]")) { closeUserQuick(); }
+});
 
 // ✅ Keep ONE copy only
 async function loadTeamPto(){
@@ -184,7 +269,16 @@ async function loadTeamPto(){
 
     // include vacation, vintti days AND holidays
     const slim = arr.map(u => ({
+      user_id: u.user_id,
       user_name: u.user_name,
+      email_vintti: u.email_vintti,
+      role: u.role,
+      emergency_contact: u.emergency_contact,
+      team: u.team,
+      fecha_nacimiento: u.fecha_nacimiento,
+      ingreso_vintti_date: u.ingreso_vintti_date,
+      avatar_url: u.avatar_url,
+
       // Vacation
       vacaciones_acumuladas: u.vacaciones_acumuladas,
       vacaciones_habiles: u.vacaciones_habiles,
