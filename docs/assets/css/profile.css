@@ -1,3 +1,8 @@
+/* =========================================================
+   Vintti Hub • Profile / Time Off — single canonical CSS
+   (conflicts removed, order normalized, specificity tightened)
+   ========================================================= */
+
 /* ---------- Variables ---------- */
 :root{
   --glass: rgba(255,255,255,0.6);
@@ -129,7 +134,6 @@ input:focus, select:focus, textarea:focus{
   background: linear-gradient(135deg, #fef3c7, #faf5ff);
   border: 1px solid var(--border);
   padding: 10px 14px; border-radius: var(--radius);
-  box-shadow: var(--shadow);
 }
 .toast{ min-height:24px; color:#0f766e; font-weight:600; }
 
@@ -146,7 +150,7 @@ input:focus, select:focus, textarea:focus{
 }
 
 /* =========================================================
-   Time Off Balances — (single canonical version)
+   Time Off Balances — canonical
    ========================================================= */
 .balances{
   margin-bottom: 20px;
@@ -198,18 +202,17 @@ input:focus, select:focus, textarea:focus{
   border-radius:999px; border:1px solid var(--border);
   background: linear-gradient(180deg, #fff, #f8fafc);
 }
-/* Specific categories */
 .badge--vac{
   background: linear-gradient(180deg, #ecfdf5, #ffffff);
   border-color: #bbf7d0; /* verde */
 }
 .badge--vd{
   background: linear-gradient(180deg, #eff6ff, #ffffff);
-  border-color: #bfdbfe; /* azul - Vintti Day */
+  border-color: #bfdbfe; /* azul */
 }
 .badge--hol{
   background: linear-gradient(180deg, #fefce8, #ffffff);
-  border-color: #fde68a; /* amarillo - Holiday */
+  border-color: #fde68a; /* amarillo */
 }
 
 /* KPI chip (value on right column) */
@@ -305,21 +308,14 @@ input:focus, select:focus, textarea:focus{
 /* ---------- Utilities ---------- */
 .badge.holiday{ background:#fde68a; color:#92400e; }
 .badge.vintti_day{ background:#bfdbfe; color:#1e40af; }
+.mono{ font-variant-numeric: tabular-nums; }
+.dim{ color: var(--muted); }
 
-/* ---------- Responsive ---------- */
-@media (max-width: 860px){
-  .grid{ grid-template-columns: 1fr; }
-  .grid-compact{ grid-template-columns: 1fr; }
-  .balances-table{ grid-template-columns: 1fr 136px; }
-}
-@media (max-width: 480px){
-  #btnOpenTimeoff{
-    right: 16px; bottom: 16px;
-    padding: 14px 18px; font-size: 15px;
-  }
-}
 /* =========================================================
-   My Requests — tech table aesthetic
+   My Requests — tech table aesthetic (NOTE: single source of truth)
+   - No squares around Type/Dates/Status
+   - Note column removed
+   - Prettier date chips
    ========================================================= */
 .requests{
   margin-top: 24px;
@@ -335,29 +331,58 @@ input:focus, select:focus, textarea:focus{
 }
 .requests .legend{ display:flex; gap:6px; flex-wrap:wrap; }
 
-.requests-table{
-  display:grid; gap:6px;
-  grid-template-columns: 180px 1fr 140px 1.2fr; /* Type | Dates | Status | Note */
+/* FINAL requests table — only definition present */
+.requests .requests-table{
+  display:grid;
+  gap:2px;                                   /* tighter row spacing */
+  grid-template-columns: 200px 1fr 140px;     /* Type | Dates | Status */
 }
-.requests-table .th{
+.requests .requests-table .th{
   font-size:10px; letter-spacing:.35px; text-transform:uppercase;
-  color:var(--muted); padding:8px 10px;
-}
-.requests-table .cell{
-  background:#fff; border:1px solid var(--border); border-radius:12px;
-  padding:10px 12px; display:flex; align-items:center; gap:10px; min-height:40px;
-  transition: transform .08s ease, box-shadow .12s ease, border-color .12s ease;
-}
-.requests-table .cell:hover{
-  transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(15,23,42,.08);
-  border-color: rgba(99,102,241,.25);
+  color:var(--muted); padding:8px 6px;
 }
 
-.mono{ font-variant-numeric: tabular-nums; }
-.dim{ color: var(--muted); }
+/* no squares: kill backgrounds/borders, keep spacing */
+.requests .requests-table .cell.plain{
+  background: transparent;
+  border: 0;
+  padding: 8px 6px;
+}
 
-/* Status chips */
+/* subtle row hover using middle blocks (feels like entire row) */
+.requests .requests-table .cell.plain:nth-child(3n-2):hover,
+.requests .requests-table .cell.plain:nth-child(3n-1):hover,
+.requests .requests-table .cell.plain:nth-child(3n):hover{
+  background: rgba(255,255,255,0.6);
+  border-radius: 12px;
+}
+
+/* Dates cluster */
+.requests .dates{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  font-variant-numeric: tabular-nums;
+}
+.requests .date-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(15,23,42,.06);
+  font-weight: 700;
+}
+.requests .date-ico{ opacity:.8 }
+.requests .dates .arrow{ opacity:.6; font-weight:800; }
+.requests .duration{
+  font-weight:800;
+  padding:6px 10px;
+  border-radius:999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#083344;
+  box-shadow: 0 4px 16px rgba(15,23,42,.08);
+}
+
+/* Status chips — single definition */
 .status{
   display:inline-flex; align-items:center; justify-content:center;
   padding:6px 10px; border-radius:999px; font-weight:700; font-size:12px;
@@ -367,85 +392,30 @@ input:focus, select:focus, textarea:focus{
 .status.approved{ background:#dcfce7; color:#166534; border-color:#86efac; } /* green */
 .status.rejected{ background:#fee2e2; color:#991b1b; border-color:#fca5a5; } /* red */
 
-/* Keep your category badge styles from balances (badge-soft + badge--vac/vd/hol) */
-/* Responsive */
+/* ---------- Responsive ---------- */
 @media (max-width: 860px){
-  .requests-table{ grid-template-columns: 140px 1fr 120px 1fr; }
+  .grid{ grid-template-columns: 1fr; }
+  .grid-compact{ grid-template-columns: 1fr; }
+  .balances-table{ grid-template-columns: 1fr 136px; }
+
+  .requests .requests-table{
+    grid-template-columns: 160px 1fr 120px;
+  }
 }
 @media (max-width: 560px){
-  .requests-table{ grid-template-columns: 1fr 1fr; }
-  .requests-table .th:nth-child(1),
-  .requests-table .th:nth-child(3){ display:none; } /* hide Type/Status headers */
-  /* Stack rows: Type+Dates on first line, Status+Note on next */
-  .requests-table .cell:nth-child(4n-3){ grid-column:1/2; } /* Type */
-  .requests-table .cell:nth-child(4n-2){ grid-column:2/3; } /* Dates */
-  .requests-table .cell:nth-child(4n-1){ grid-column:1/2; } /* Status */
-  .requests-table .cell:nth-child(4n){ grid-column:2/3; }   /* Note */
-}
-/* ===== My Requests (no boxes, prettier dates) ===== */
-.requests-table{
-  display:grid; gap:2px;               /* tighter row spacing */
-  grid-template-columns: 200px 1fr 140px;  /* removed Note column */
-}
+  #btnOpenTimeoff{
+    right: 16px; bottom: 16px;
+    padding: 14px 18px; font-size: 15px;
+  }
 
-/* headers unchanged */
-.requests-table .th{ padding:8px 6px; }
-
-/* no squares: kill backgrounds/borders, keep spacing */
-.requests-table .cell.plain{
-  background: transparent !important;
-  border: 0 !important;
-  padding: 8px 6px;
-}
-
-/* subtle row hover using background on middle column only (feels like whole row) */
-.requests-table .cell.plain:nth-child(3n-1):hover,
-.requests-table .cell.plain:nth-child(3n-2):hover,
-.requests-table .cell.plain:nth-child(3n):hover{
-  background: rgba(255,255,255,0.6);
-  border-radius: 12px;
-}
-
-/* Dates cluster */
-.dates{
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  font-variant-numeric: tabular-nums;
-}
-.date-chip{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:8px 12px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #fff, #f8fafc);
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 10px rgba(15,23,42,.06);
-  font-weight: 700;
-}
-.date-ico{ opacity:.8 }
-.dates .arrow{ opacity:.6; font-weight:800; }
-.duration{
-  font-weight:800;
-  padding:6px 10px;
-  border-radius:999px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color:#083344;
-  box-shadow: 0 4px 16px rgba(15,23,42,.08);
-}
-
-/* Keep your status chips colors */
-.status.pending{ background:#f3f4f6; color:#374151; border-color:#e5e7eb; }
-.status.approved{ background:#dcfce7; color:#166534; border-color:#86efac; }
-.status.rejected{ background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
-
-/* Responsive tweaks for 3 columns */
-@media (max-width: 860px){
-  .requests-table{ grid-template-columns: 160px 1fr 120px; }
-}
-@media (max-width: 560px){
-  .requests-table{ grid-template-columns: 1fr 1fr; }
-  .requests-table .th:nth-child(1){ display:none; }       /* hide Type header */
-  .requests-table .th:nth-child(3){ display:none; }       /* hide Status header */
-  /* stack: Type+Dates, then Status spanning both */
-  .requests-table .cell.plain:nth-child(3n-2){ grid-column:1/2; } /* Type */
-  .requests-table .cell.plain:nth-child(3n-1){ grid-column:2/3; } /* Dates */
-  .requests-table .cell.plain:nth-child(3n){ grid-column:1/-1; justify-content:flex-end; } /* Status full width */
+  /* Stack requests table into 2 cols; hide Type/Status headers */
+  .requests .requests-table{
+    grid-template-columns: 1fr 1fr;
+  }
+  .requests .requests-table .th:nth-child(1),
+  .requests .requests-table .th:nth-child(3){ display:none; }
+  /* Type / Dates on first row, Status full width on second row */
+  .requests .requests-table .cell.plain:nth-child(3n-2){ grid-column:1/2; } /* Type */
+  .requests .requests-table .cell.plain:nth-child(3n-1){ grid-column:2/3; } /* Dates */
+  .requests .requests-table .cell.plain:nth-child(3n){ grid-column:1/-1; justify-content:flex-end; } /* Status */
 }
