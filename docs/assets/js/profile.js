@@ -142,6 +142,19 @@ async function loadMe(uid){
 }
 
 // ——— Time Off: listar ———
+function fmtDateNice(s){
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"2-digit" }); // e.g. Thu, Oct 16
+}
+function diffDaysInclusive(a, b){
+  const da = new Date(a), db = new Date(b);
+  if (isNaN(da) || isNaN(db)) return 0;
+  const ms = (db - da) / 86400000;
+  return Math.max(0, Math.round(ms)) + 1; // inclusive
+}
+
 async function loadMyRequests(uid){
   const host = document.getElementById("requestsTable");
   if (!host) return;
@@ -161,43 +174,61 @@ async function loadMyRequests(uid){
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
 
+    // 🔸 Only 3 columns now: Type | Dates | Status
     const header = `
       <div class="th">Type</div>
       <div class="th">Dates</div>
       <div class="th t-right">Status</div>
-      <div class="th">Note</div>
     `;
 
     if (!arr.length){
       host.innerHTML = header + `
-        <div class="cell" style="grid-column:1/-1; justify-content:center">No requests yet.</div>
+        <div class="cell plain" style="grid-column:1/-1; justify-content:center">No requests yet.</div>
       `;
       return;
     }
 
-    host.innerHTML = header + arr.map(x => `
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
+    host.innerHTML = header + arr.map(x => {
+      const start = fmtDateNice(x.start_date);
+      const end   = fmtDateNice(x.end_date);
+      const days  = diffDaysInclusive(x.start_date, x.end_date);
+      const daysTxt = `${days} day${days === 1 ? "" : "s"}`;
+
+      return `
+        <!-- Type -->
+        <div class="cell plain">
+          <div class="metric">
+            <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
+          </div>
         </div>
-      </div>
 
-      <div class="cell mono">${x.start_date} → ${x.end_date}</div>
+        <!-- Dates (pretty) -->
+        <div class="cell plain">
+          <div class="dates">
+            <span class="date-chip">
+              <span class="date-ico" aria-hidden="true">🗓️</span>${start}
+            </span>
+            <span class="arrow" aria-hidden="true">→</span>
+            <span class="date-chip">
+              <span class="date-ico" aria-hidden="true">🗓️</span>${end}
+            </span>
+            <span class="duration">${daysTxt}</span>
+          </div>
+        </div>
 
-      <div class="cell t-right">
-        <span class="status ${String(x.status||'').toLowerCase()}">${x.status}</span>
-      </div>
-
-      <div class="cell dim">${x.reason ? x.reason : ""}</div>
-    `).join("");
+        <!-- Status -->
+        <div class="cell plain t-right">
+          <span class="status ${String(x.status||'').toLowerCase()}">${x.status}</span>
+        </div>
+      `;
+    }).join("");
   }catch(err){
     console.error(err);
     host.innerHTML = `
       <div class="th">Type</div>
       <div class="th">Dates</div>
       <div class="th t-right">Status</div>
-      <div class="th">Note</div>
-      <div class="cell" style="grid-column:1/-1; justify-content:center">Could not load requests.</div>
+      <div class="cell plain" style="grid-column:1/-1; justify-content:center">Could not load requests.</div>
     `;
   }
 }
