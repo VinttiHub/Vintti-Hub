@@ -143,35 +143,60 @@ async function loadMe(uid){
 
 // ——— Time Off: listar ———
 async function loadMyRequests(uid){
-  const list = $("#timeoffList");
-  list.innerHTML = `<li>Loading…</li>`;
+  const host = document.getElementById("requestsTable");
+  if (!host) return;
+  host.innerHTML = `
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row"></div>
+  `;
+
+  const kindClass = (k) => ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[k] || "");
+  const kindLabel = (k) => (String(k||"").replace("_"," "));
+
   try{
     const r = await api(`/time_off_requests`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
+
     if (!arr.length){
-      list.innerHTML = `<li>No requests yet.</li>`;
+      host.innerHTML = `
+        <div class="th">Type</div>
+        <div class="th">Dates</div>
+        <div class="th t-right">Status</div>
+        <div class="th">Note</div>
+        <div class="cell" style="grid-column:1/-1; justify-content:center">No requests yet.</div>
+      `;
       return;
     }
-    list.innerHTML = "";
-    arr.forEach(x=>{
-      const li = document.createElement("li");
-      const kindLabel = String(x.kind || "").replace("_"," ");
-      li.innerHTML = `
-        <div>
-          <div>
-            <span class="badge ${x.kind || ''}">${kindLabel}</span>
-            • ${x.start_date} → ${x.end_date}
+
+    host.innerHTML = `
+      <div class="th">Type</div>
+      <div class="th">Dates</div>
+      <div class="th t-right">Status</div>
+      <div class="th">Note</div>
+      ${arr.map(x => `
+        <div class="cell">
+          <div class="metric">
+            <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
           </div>
-          <div style="color:#475569; font-size:12px">${x.reason ? x.reason : ""}</div>
         </div>
-        <div><span class="badge ${x.status}">${x.status}</span></div>
-      `;
-      list.appendChild(li);
-    });
+        <div class="cell mono">${x.start_date} → ${x.end_date}</div>
+        <div class="cell t-right">
+          <span class="status ${String(x.status||'').toLowerCase()}">${x.status}</span>
+        </div>
+        <div class="cell dim">${x.reason ? x.reason : ""}</div>
+      `).join("")}
+    `;
   }catch(err){
     console.error(err);
-    list.innerHTML = `<li>Could not load requests.</li>`;
+    host.innerHTML = `
+      <div class="th">Type</div>
+      <div class="th">Dates</div>
+      <div class="th t-right">Status</div>
+      <div class="th">Note</div>
+      <div class="cell" style="grid-column:1/-1; justify-content:center">Could not load requests.</div>
+    `;
   }
 }
 
