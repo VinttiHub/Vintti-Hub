@@ -240,10 +240,11 @@ def create_time_off():
 
     # Targets: leader (if any) + Jaz
     to_list = []
-    if leader_email:
-        to_list.append(leader_email)
+    #if leader_email:
+    #    to_list.append(leader_email)
     # Always add Jaz
-    to_list.append("jazmin@vintti.com")
+    #to_list.append("jazmin@vintti.com")
+    to_list.append("angie@vintti.com")
 
     # ——— Send the email (SendGrid) ———
     try:

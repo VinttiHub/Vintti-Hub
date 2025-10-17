@@ -1,8 +1,3 @@
-/* =========================================================
-   Vintti Profile / Time Off — Cleaned & De-duplicated CSS
-   Order: Variables → Base → Layout → Components → Utilities → Media
-   ========================================================= */
-
 /* ---------- Variables ---------- */
 :root{
   --glass: rgba(255,255,255,0.6);
