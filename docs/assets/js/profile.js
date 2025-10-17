@@ -60,20 +60,30 @@ function renderTeamPtoTable(users){
   const host = document.getElementById("teamPtoTable");
   if (!host) return;
 
-  // Header row (12 columns)
+  // helper for zero-dimming
+  const valEl = (n) => {
+    const v = Number(n) || 0;
+    const cls = v === 0 ? "mono zero" : "mono";
+    return `<span class="${cls}">${v}</span>`;
+  };
+
+  // Header (with group markers + rounded corners handled by CSS)
   const header = `
-    <div class="th">Name</div>
-    <div class="th t-right">Vac Acc</div>
-    <div class="th t-right">Vac</div>
-    <div class="th t-right">Vac Total</div>
-    <div class="th t-right">Vac Used</div>
-    <div class="th t-right">Vac Left</div>
-    <div class="th t-right">VD Total</div>
-    <div class="th t-right">VD Used</div>
-    <div class="th t-right">VD Left</div>
-    <div class="th t-right">Hol Total</div>
-    <div class="th t-right">Hol Used</div>
-    <div class="th t-right">Hol Left</div>
+    <div class="th th--name">Name</div>
+
+    <div class="th th--vac group-vac" data-col="vac-acc"  title="Vacation Accrued">VAC ACC</div>
+    <div class="th th--vac group-vac" data-col="vac-work" title="Vacation Current">VAC</div>
+    <div class="th th--vac group-vac" data-col="vac-tot"  title="Vacation Total">VAC TOTAL</div>
+    <div class="th th--vac group-vac" data-col="vac-used" title="Vacation Used">VAC USED</div>
+    <div class="th th--vac group-vac" data-col="vac-left" title="Vacation Left">VAC LEFT</div>
+
+    <div class="th th--vd  group-vd"  data-col="vd-tot"  title="Vintti Days Total">VD TOTAL</div>
+    <div class="th th--vd  group-vd"  data-col="vd-used" title="Vintti Days Used">VD USED</div>
+    <div class="th th--vd  group-vd"  data-col="vd-left" title="Vintti Days Left">VD LEFT</div>
+
+    <div class="th th--hol group-hol" data-col="hol-tot"  title="Holiday Total">HOL TOTAL</div>
+    <div class="th th--hol group-hol" data-col="hol-used" title="Holiday Used">HOL USED</div>
+    <div class="th th--hol group-hol" data-col="hol-left" title="Holiday Left">HOL LEFT</div>
   `;
 
   if (!users?.length){
@@ -83,31 +93,82 @@ function renderTeamPtoTable(users){
     return;
   }
 
+  // sort A→Z
   users.sort((a,b)=> String(a.user_name||"").localeCompare(String(b.user_name||"")));
 
-  const cell = (v) => `<span class="mono">${Number(v) || 0}</span>`;
+  // compute row data + collect totals for summary
+  let totals = {
+    vac_acc:0, vac_work:0, vac_total:0, vac_used:0, vac_left:0,
+    vd_total:0, vd_used:0,  vd_left:0,
+    hol_total:0, hol_used:0, hol_left:0
+  };
 
-  host.innerHTML = header + users.map(u=>{
+  const rows = users.map(u=>{
     const name = u.user_name || "—";
-    const vac = calcVacation(u);
-    const vd  = calcVintti(u);
-    const hol = calcHoliday(u);
 
+    const vac = calcVacation(u); // {acc, work, total, used, avail}
+    const vd  = calcVintti(u);   // {total, used, avail}
+    const hol = calcHoliday(u);  // {total, used, avail}
+
+    // accumulate totals
+    totals.vac_acc   += vac.acc;
+    totals.vac_work  += vac.work;
+    totals.vac_total += vac.total;
+    totals.vac_used  += vac.used;
+    totals.vac_left  += vac.avail;
+
+    totals.vd_total  += vd.total;
+    totals.vd_used   += vd.used;
+    totals.vd_left   += vd.avail;
+
+    totals.hol_total += hol.total;
+    totals.hol_used  += hol.used;
+    totals.hol_left  += hol.avail;
+
+    // one row (display: contents so hover/background applies to all 12 cells)
     return `
-      <div class="cell plain">${name}</div>
-      <div class="cell plain t-right">${cell(vac.acc)}</div>
-      <div class="cell plain t-right">${cell(vac.work)}</div>
-      <div class="cell plain t-right">${cell(vac.total)}</div>
-      <div class="cell plain t-right">${cell(vac.used)}</div>
-      <div class="cell plain t-right">${cell(vac.avail)}</div>
-      <div class="cell plain t-right">${cell(vd.total)}</div>
-      <div class="cell plain t-right">${cell(vd.used)}</div>
-      <div class="cell plain t-right">${cell(vd.avail)}</div>
-      <div class="cell plain t-right">${cell(hol.total)}</div>
-      <div class="cell plain t-right">${cell(hol.used)}</div>
-      <div class="cell plain t-right">${cell(hol.avail)}</div>
+      <div class="row">
+        <div class="cell cell--name">${name}</div>
+
+        <div class="cell t-center group-vac border-l">${valEl(vac.acc)}</div>
+        <div class="cell t-center group-vac">${valEl(vac.work)}</div>
+        <div class="cell t-center group-vac">${valEl(vac.total)}</div>
+        <div class="cell t-center group-vac">${valEl(vac.used)}</div>
+        <div class="cell t-center group-vac">${valEl(vac.avail)}</div>
+
+        <div class="cell t-center group-vd  border-l">${valEl(vd.total)}</div>
+        <div class="cell t-center group-vd">${valEl(vd.used)}</div>
+        <div class="cell t-center group-vd">${valEl(vd.avail)}</div>
+
+        <div class="cell t-center group-hol border-l">${valEl(hol.total)}</div>
+        <div class="cell t-center group-hol">${valEl(hol.used)}</div>
+        <div class="cell t-center group-hol">${valEl(hol.avail)}</div>
+      </div>
     `;
   }).join("");
+
+  // summary row (highlighted)
+  const summary = `
+    <div class="row summary">
+      <div class="cell cell--name summary__label">Team Total</div>
+
+      <div class="cell t-center group-vac border-l">${valEl(totals.vac_acc)}</div>
+      <div class="cell t-center group-vac">${valEl(totals.vac_work)}</div>
+      <div class="cell t-center group-vac">${valEl(totals.vac_total)}</div>
+      <div class="cell t-center group-vac">${valEl(totals.vac_used)}</div>
+      <div class="cell t-center group-vac">${valEl(totals.vac_left)}</div>
+
+      <div class="cell t-center group-vd  border-l">${valEl(totals.vd_total)}</div>
+      <div class="cell t-center group-vd">${valEl(totals.vd_used)}</div>
+      <div class="cell t-center group-vd">${valEl(totals.vd_left)}</div>
+
+      <div class="cell t-center group-hol border-l">${valEl(totals.hol_total)}</div>
+      <div class="cell t-center group-hol">${valEl(totals.hol_used)}</div>
+      <div class="cell t-center group-hol">${valEl(totals.hol_left)}</div>
+    </div>
+  `;
+
+  host.innerHTML = header + rows + summary;
 }
 
 // ✅ Keep ONE copy only
