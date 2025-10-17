@@ -64,7 +64,7 @@ function renderTeamPtoTable(users){
   const header = `
     <div class="th">Name</div>
     <div class="th t-right">Vac Acc</div>
-    <div class="th t-right">Vac Work</div>
+    <div class="th t-right">Vac</div>
     <div class="th t-right">Vac Total</div>
     <div class="th t-right">Vac Used</div>
     <div class="th t-right">Vac Left</div>
@@ -110,6 +110,7 @@ function renderTeamPtoTable(users){
   }).join("");
 }
 
+// ✅ Keep ONE copy only
 async function loadTeamPto(){
   const host = document.getElementById("teamPtoTable");
   if (host){
@@ -120,60 +121,30 @@ async function loadTeamPto(){
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
 
-    // include Holidays fields
+    // include vacation, vintti days AND holidays
     const slim = arr.map(u => ({
       user_name: u.user_name,
+      // Vacation
       vacaciones_acumuladas: u.vacaciones_acumuladas,
       vacaciones_habiles: u.vacaciones_habiles,
       vacaciones_consumidas: u.vacaciones_consumidas,
+      // Vintti Days
       vintti_days: u.vintti_days,
       vintti_days_consumidos: u.vintti_days_consumidos,
+      // Holidays
       feriados_totales: u.feriados_totales,
       feriados_consumidos: u.feriados_consumidos,
     }));
+
     renderTeamPtoTable(slim);
   }catch(err){
     console.error('loadTeamPto error:', err);
     if (host){
       host.innerHTML = `
-        <div class="th">Name</div><div class="th">Vac Acc</div><div class="th">Vac Work</div>
-        <div class="th">Vac Total</div><div class="th">Vac Used</div><div class="th">Vac Left</div>
-        <div class="th">VD Total</div><div class="th">VD Used</div><div class="th">VD Left</div>
-        <div class="th">Hol Total</div><div class="th">Hol Used</div><div class="th">Hol Left</div>
-        <div class="cell plain" style="grid-column:1/-1;justify-content:center;">Could not load team PTO.</div>
-      `;
-    }
-  }
-}
-
-async function loadTeamPto(){
-  const host = document.getElementById("teamPtoTable");
-  if (host){
-    host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
-  }
-  try{
-    // Reuse /users to pull everyone and compute totals on FE
-    const r = await api(`/users`, { method: 'GET' });
-    if (!r.ok) throw new Error(await r.text());
-    const arr = await r.json();
-
-    // We only need: user_name, vacaciones_*, vintti_days*
-    const slim = arr.map(u => ({
-      user_name: u.user_name,
-      vacaciones_acumuladas: u.vacaciones_acumuladas,
-      vacaciones_habiles: u.vacaciones_habiles,
-      vacaciones_consumidas: u.vacaciones_consumidas,
-      vintti_days: u.vintti_days,
-      vintti_days_consumidos: u.vintti_days_consumidos
-    }));
-    renderTeamPtoTable(slim);
-  }catch(err){
-    console.error('loadTeamPto error:', err);
-    if (host){
-      host.innerHTML = `
-        <div class="th">Nombre</div><div class="th">Vac. acumuladas</div><div class="th">Vac. hábiles</div>
-        <div class="th">Vac. totales</div><div class="th">Vac. consumidas</div><div class="th">Vac. disponibles</div>
-        <div class="th">VD totales</div><div class="th">VD consumidas</div><div class="th">VD disponibles</div>
+        <div class="th">Name</div><div class="th t-right">Vac Acc</div><div class="th t-right">Vac</div>
+        <div class="th t-right">Vac Total</div><div class="th t-right">Vac Used</div><div class="th t-right">Vac Left</div>
+        <div class="th t-right">VD Total</div><div class="th t-right">VD Used</div><div class="th t-right">VD Left</div>
+        <div class="th t-right">Hol Total</div><div class="th t-right">Hol Used</div><div class="th t-right">Hol Left</div>
         <div class="cell plain" style="grid-column:1/-1;justify-content:center;">Could not load team PTO.</div>
       `;
     }
