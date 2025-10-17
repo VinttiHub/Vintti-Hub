@@ -467,3 +467,73 @@ input:focus, select:focus, textarea:focus{
     grid-template-columns: 1.4fr repeat(8, 120px);
   }
 }
+/* =========================================================
+   Approvals tab (leaders)
+   ========================================================= */
+.approvals-head{
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  margin-bottom: 10px;
+}
+.approvals-title{
+  margin:0; font-weight:700; font-size: clamp(16px, 2.2vw, 20px);
+}
+.team-pill{
+  border:1px solid var(--border);
+  background: var(--glass);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+.approvals-table{
+  display:grid;
+  gap:2px;
+  grid-template-columns: 1.4fr 1.8fr 140px 180px; /* User | Type+Dates | Status | Actions */
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px;
+}
+.approvals-table .th{
+  font-size:10px; letter-spacing:.35px; text-transform:uppercase;
+  color:var(--muted); padding:8px 6px;
+}
+.approvals-table .cell{
+  background: transparent;
+  border: 0;
+  padding: 10px 8px;
+  display:flex; align-items:center; gap:10px;
+}
+.approvals-table .cell:hover{
+  background: rgba(255,255,255,.55);
+  border-radius: 10px;
+}
+
+.row{ display: contents; }
+.row--approved > .cell{ background:#f0fdf4; }  /* soft green */
+.row--rejected > .cell{ background:#fef2f2; }  /* soft red */
+
+.user{ gap:12px; }
+.avatar-min{
+  width:36px; height:36px; border-radius:50%;
+  background: radial-gradient(120% 120% at 20% 20%, var(--accent) 0%, var(--accent-2) 100%);
+  color:white; font-weight:800; display:grid; place-items:center; letter-spacing:.5px;
+}
+.uinfo .uname{ font-weight:700; }
+.uinfo .uteam{ font-size:12px; color:var(--muted); }
+
+.when .dates{ margin-left:8px; font-variant-numeric: tabular-nums; }
+.when .sep{ opacity:.5; font-weight:700; margin: 0 4px; }
+.when .days{ margin-left:6px; font-size:12px; color:var(--muted); font-weight:600; }
+.when .note{
+  margin-top:4px; color:var(--muted); font-size:12px; max-width:52ch; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+.actions{ gap:8px; justify-content:flex-end; }
+.btn.tiny{ padding:8px 10px; font-size:12px; }
+.btn.approve{ background: #dcfce7; border:1px solid #86efac; color:#14532d; }
+.btn.reject{  background: #fee2e2; border:1px solid #fca5a5; color:#7f1d1d; }
+
+.approvals-foot{ margin-top:8px; text-align:right; }

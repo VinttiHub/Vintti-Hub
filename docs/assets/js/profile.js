@@ -132,6 +132,178 @@ async function loadTeamPto(){
     }
   }
 }
+// ===== Leaders' Approvals Tab =====
+
+function enableApprovalsTab(){
+  const tabsBar = document.getElementById('tabsBar');
+  const panel = document.getElementById('panel-approvals');
+  if (!tabsBar || !panel) return;
+  if (tabsBar.querySelector('[data-tab="approvals"]')) return; // already added
+
+  const btn = document.createElement('button');
+  btn.className = 'tab';
+  btn.dataset.tab = 'approvals';
+  btn.id = 'tab-approvals';
+  btn.type = 'button';
+  btn.setAttribute('aria-selected', 'false');
+  btn.textContent = 'Approvals';
+  tabsBar.appendChild(btn);
+
+  wireTabs(); // rebind to include this tab
+}
+
+function fmtDateShort(s){
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"2-digit" });
+}
+function daysInclusive(a, b){
+  const da = new Date(a), db = new Date(b);
+  if (isNaN(da) || isNaN(db)) return 0;
+  return Math.max(0, Math.round((db - da)/86400000)) + 1;
+}
+const kindBadgeClass = (k) => ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[k] || "");
+const kindLabel = (k) => String(k||"").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
+
+function showApprovalsToast(text, ok=true){
+  const t = document.getElementById("approvalsToast");
+  if (!t) return;
+  t.textContent = text;
+  t.style.color = ok ? "#0f766e" : "#b91c1c";
+  setTimeout(()=> t.textContent = "", 3500);
+}
+function renderApprovalsTable(items){
+  const host = document.getElementById("approvalsTable");
+  if (!host) return;
+
+  const header = `
+    <div class="th">User</div>
+    <div class="th">Type & Dates</div>
+    <div class="th t-right">Status</div>
+    <div class="th t-right">Actions</div>
+  `;
+
+  if (!items?.length){
+    host.innerHTML = header + `
+      <div class="cell plain" style="grid-column:1/-1;justify-content:center;">No requests from your team.</div>
+    `;
+    return;
+  }
+
+  host.innerHTML = header + items.map(r=>{
+    const days = daysInclusive(r.start_date, r.end_date);
+    const initials = String(r.user_name||"")
+      .trim().split(/\s+/).slice(0,2).map(p=>p[0]||"").join("").toUpperCase();
+    const rowTone = r.status === 'approved' ? 'row--approved' : r.status === 'rejected' ? 'row--rejected' : '';
+    return `
+      <div class="row ${rowTone}" data-id="${r.id}">
+        <div class="cell user">
+          <div class="avatar-min">${initials || "—"}</div>
+          <div class="uinfo">
+            <div class="uname">${r.user_name || "—"}</div>
+            <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
+          </div>
+        </div>
+        <div class="cell when">
+          <span class="badge-soft ${kindBadgeClass(r.kind)}">${kindLabel(r.kind)}</span>
+          <span class="dates">
+            <time datetime="${r.start_date}">${fmtDateShort(r.start_date)}</time>
+            <span class="sep">→</span>
+            <time datetime="${r.end_date}">${fmtDateShort(r.end_date)}</time>
+            <span class="days">(${days} day${days===1?'':'s'})</span>
+          </span>
+          ${r.reason ? `<div class="note" title="Note">${r.reason}</div>` : ``}
+        </div>
+        <div class="cell t-right">
+          <span class="status ${r.status}">${r.status}</span>
+        </div>
+        <div class="cell t-right actions">
+          <button class="btn tiny approve" data-action="approve">Approve</button>
+          <button class="btn tiny reject"  data-action="reject">Reject</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // wire buttons
+  host.querySelectorAll("[data-action]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      const row = btn.closest(".row");
+      const id = row?.dataset?.id;
+      const action = btn.dataset.action; // approve | reject
+      if (!id) return;
+
+      // optimistic paint
+      row.classList.remove("row--approved","row--rejected");
+      if (action === "approve") row.classList.add("row--approved");
+      if (action === "reject")  row.classList.add("row--rejected");
+
+      try{
+        const r = await api(`/leader/time_off_requests/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ status: action === "approve" ? "approved" : "rejected" })
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+
+        const chip = row.querySelector(".status");
+        chip.classList.remove("pending","approved","rejected");
+        chip.classList.add(j.status);
+        chip.textContent = j.status;
+        showApprovalsToast(`Marked as ${j.status}.`);
+      }catch(err){
+        // revert tone
+        row.classList.remove("row--approved","row--rejected");
+        showApprovalsToast("Could not update: " + (err?.message || "error"), false);
+      }
+    };
+  });
+}
+async function loadLeaderApprovals(){
+  const host = document.getElementById("approvalsTable");
+  if (host){
+    host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
+  }
+  try{
+    // Try listing — if 403, the viewer isn’t a leader
+    const r = await api(`/leader/time_off_requests`, { method:'GET' });
+    if (r.status === 403) return false; // not a leader → don’t show tab
+    if (!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+
+    // Team pill: prefer your /profile/me.team; else fallback to first row.team
+    try{
+      const meRes = await api(`/profile/me`, { method:'GET' });
+      if (meRes.ok){
+        const me = await meRes.json();
+        if (me?.team){
+          document.getElementById("approvalsTeamName").textContent = me.team;
+          document.getElementById("approvalsTeamPill").hidden = false;
+        }
+      }
+    }catch{}
+
+    if (!document.getElementById("approvalsTeamPill").hidden && !document.getElementById("approvalsTeamName").textContent){
+      // fallback to first row's team
+      const firstTeam = rows?.[0]?.team;
+      if (firstTeam){
+        document.getElementById("approvalsTeamName").textContent = firstTeam;
+        document.getElementById("approvalsTeamPill").hidden = false;
+      }
+    }
+
+    renderApprovalsTable(rows);
+    return true;
+  }catch(err){
+    console.error('loadLeaderApprovals error:', err);
+    if (host){
+      host.innerHTML = `<div class="cell plain" style="grid-column:1/-1;justify-content:center;">Could not load approvals.</div>`;
+    }
+    return false;
+  }
+}
 
 function enableTeamTab(){
   const tabsBar = document.getElementById('tabsBar');
@@ -625,11 +797,18 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     await loadMyRequests(uid);
     await loadBalances(uid);
 
-    // Enable "Team PTO" tab for allowed users
+    // Existing: enable Team PTO for certain user_ids
     if (TEAM_ALLOWED.has(Number(uid))) {
       enableTeamTab();
-      // Preload data when the tab becomes visible (optional eager-load here)
       loadTeamPto();
+    }
+
+    // NEW: Try to enable Approvals tab only if user is truly leader (API decides)
+    const isLeader = await loadLeaderApprovals(); // preloads too
+    if (isLeader) {
+      enableApprovalsTab();
+      // re-load once tab exists (optional; we already preloaded)
+      // await loadLeaderApprovals();
     }
 
     const form = document.getElementById("timeoffForm");

@@ -120,13 +120,169 @@ def me():
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute("""
             SELECT user_id, user_name, email_vintti, role, emergency_contact,
-                   ingreso_vintti_date, fecha_nacimiento, avatar_url
+                ingreso_vintti_date, fecha_nacimiento, avatar_url,
+                team
             FROM users WHERE user_id = %s
         """, (user_id,))
         row = cur.fetchone()
     conn.close()
     if not row: return jsonify({"error":"not found"}), 404
     return jsonify(_row_to_json(dict(row)))
+@bp.get("/leader/time_off_requests")
+def leader_list_timeoff():
+    """Return requests for users whose 'lider' == current leader."""
+    leader_id = _current_user_id()
+    if not leader_id:
+        return jsonify({"error": "unauthorized"}), 401
+
+    conn = get_connection()
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        # Are you leader of anyone?
+        cur.execute("""
+            SELECT COUNT(*) AS cnt FROM users WHERE lider = %s
+        """, (leader_id,))
+        cnt = cur.fetchone()["cnt"]
+        if cnt == 0:
+            return jsonify({"error":"forbidden (not a leader of anyone)"}), 403
+
+        # Pull requests from your direct reports
+        cur.execute("""
+            SELECT
+              r.id,
+              r.user_id,
+              u.user_name,
+              u.email_vintti AS user_email,
+              u.team,
+              r.kind,
+              r.start_date,
+              r.end_date,
+              r.reason,
+              r.status,
+              r.created_at
+            FROM time_off_requests r
+            JOIN users u ON u.user_id = r.user_id
+            WHERE u.lider = %s
+            ORDER BY
+              CASE r.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+              r.created_at DESC
+            LIMIT 500
+        """, (leader_id,))
+        rows = cur.fetchall()
+    conn.close()
+    return jsonify([_row_to_json(dict(r)) for r in rows])
+@bp.patch("/leader/time_off_requests/<int:req_id>")
+def leader_update_timeoff(req_id: int):
+    """Approve or reject a request that belongs to one of my direct reports."""
+    leader_id = _current_user_id()
+    if not leader_id:
+        return jsonify({"error":"unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip().lower()
+    if new_status not in {"approved", "rejected"}:
+        return jsonify({"error":"status must be 'approved' or 'rejected'"}), 400
+
+    conn = get_connection()
+    rec = None
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Fetch the request & requester; ensure this leader owns it
+            cur.execute("""
+                SELECT
+                  r.id, r.user_id, r.kind, r.start_date, r.end_date, r.reason, r.status,
+                  u.user_name, u.email_vintti AS user_email, u.lider, u.team
+                FROM time_off_requests r
+                JOIN users u ON u.user_id = r.user_id
+                WHERE r.id = %s
+            """, (req_id,))
+            rec = cur.fetchone()
+            if not rec:
+                return jsonify({"error":"not found"}), 404
+            if int(rec["lider"] or 0) != int(leader_id):
+                return jsonify({"error":"forbidden (not your report)"}), 403
+            if rec["status"] == new_status:
+                # idempotent
+                return jsonify({"ok": True, "status": new_status})
+
+            # Update status
+            cur.execute("""
+                UPDATE time_off_requests
+                SET status = %s, updated_at = NOW() AT TIME ZONE 'UTC'
+                WHERE id = %s
+            """, (new_status, req_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error":"db error", "detail": str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+    # Send human-friendly email to requester
+    try:
+        api_key = os.environ.get('SENDGRID_API_KEY')
+        if not api_key:
+            raise RuntimeError("SENDGRID_API_KEY not configured")
+
+        from datetime import datetime
+        def fmt_date(s):
+            try:
+                d = datetime.strptime(s, "%Y-%m-%d")
+                return d.strftime("%B %d, %Y")
+            except Exception:
+                return s
+
+        start_fmt = fmt_date(rec["start_date"])
+        end_fmt   = fmt_date(rec["end_date"])
+        try:
+            d1 = datetime.strptime(rec["start_date"], "%Y-%m-%d")
+            d2 = datetime.strptime(rec["end_date"], "%Y-%m-%d")
+            total_days = (d2 - d1).days + 1
+        except Exception:
+            total_days = None
+
+        kind_label = str(rec["kind"]).replace("_"," ").title()
+        user_name  = rec["user_name"] or "there"
+
+        if new_status == "approved":
+            subj = f"Your time off was approved ✅"
+            intro = f"Good news, {user_name}! Your time off request was approved."
+            closing = "Enjoy your time away—everything’s set on our side."
+        else:
+            subj = f"Your time off was not approved ❌"
+            intro = f"Hi {user_name}, we reviewed your time off request."
+            closing = "If you have questions or want to propose new dates, just reply to this email."
+
+        parts = [
+            f"<p>{intro}</p>",
+            "<ul>",
+            f"<li><strong>Type:</strong> {kind_label}</li>",
+            f"<li><strong>Dates:</strong> {start_fmt} → {end_fmt}</li>",
+        ]
+        if total_days:
+            parts.append(f"<li><strong>Total days:</strong> {total_days}</li>")
+        if rec.get("reason"):
+            parts.append(f"<li><strong>Note:</strong> {rec['reason']}</li>")
+        parts.append("</ul>")
+        parts.append(f"<p>{closing}</p>")
+        parts.append("<p>— Vintti HUB</p>")
+        html = "\n".join(parts)
+
+        msg = Mail(
+            from_email=Email('hub@vintti-hub.com', name='Vintti HUB'),
+            to_emails=[rec["user_email"]],
+            subject=subj,
+            html_content=html
+        )
+        sg = SendGridAPIClient(api_key)
+        sg.send(msg)
+    except Exception as e:
+        logging.exception("leader decision email failed")
+        # Continue; the action itself succeeded
+        return jsonify({"ok": True, "status": new_status, "email_warning": str(e)})
+
+    return jsonify({"ok": True, "status": new_status})
 
 # --- TIME OFF REQUESTS ---
 
