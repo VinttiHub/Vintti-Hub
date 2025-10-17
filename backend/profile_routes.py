@@ -231,15 +231,56 @@ def create_time_off():
     leader_email = (requester or {}).get("leader_email")
 
     # Compose email
-    subj = f"Time off request • {requester_name} • {kind_raw.replace('_',' ').title()} • {start_date} → {end_date}"
-    html = f"""
-      <h2>New time off request</h2>
-      <p><strong>Requester:</strong> {requester_name}</p>
-      <p><strong>Type:</strong> {kind_raw.replace('_',' ').title()}</p>
-      <p><strong>Dates:</strong> {start_date} → {end_date}</p>
-      {"<p><strong>Note:</strong> " + reason + "</p>" if reason else ""}
-      <p>Status: <strong>Pending</strong></p>
-    """.strip()
+    from datetime import datetime
+
+    # 🏝️ pick an emoji for the kind
+    emoji_map = {
+        "vacation": "🏖️",
+        "holiday": "🎉",
+        "vintti_day": "💙"
+    }
+    kind_label = kind_raw.replace('_', ' ').title()
+    emoji = emoji_map.get(kind_raw, "🌴")
+
+    # Format dates nicely
+    def fmt_date(iso_str):
+        try:
+            d = datetime.strptime(iso_str, "%Y-%m-%d")
+            return d.strftime("%B %d, %Y")  # e.g., October 16, 2025
+        except Exception:
+            return iso_str
+
+    start_fmt = fmt_date(start_date)
+    end_fmt = fmt_date(end_date)
+
+    # Calculate number of days requested
+    try:
+        d1 = datetime.strptime(start_date, "%Y-%m-%d")
+        d2 = datetime.strptime(end_date, "%Y-%m-%d")
+        num_days = (d2 - d1).days + 1
+    except Exception:
+        num_days = None
+
+    subj = f"Time off request • {requester_name} • {kind_label} {emoji}"
+
+    # Build friendly HTML body
+    html_parts = [
+        f"<p>Hi there 👋,</p>",
+        f"<p><strong>{requester_name}</strong> just requested some time off. Here are the details:</p>",
+        "<ul>",
+        f"<li><strong>Type:</strong> {kind_label}</li>",
+        f"<li><strong>Dates:</strong> {start_fmt} → {end_fmt}</li>",
+    ]
+    if num_days:
+        html_parts.append(f"<li><strong>Total days:</strong> {num_days} day{'s' if num_days != 1 else ''}</li>")
+    if reason:
+        html_parts.append(f"<li><strong>Note:</strong> {reason}</li>")
+    html_parts.append("</ul>")
+    html_parts.append(
+        "<p>Please go to the <a href='https://vintti-hub.com/profile?tab=timeoff' style='color:#2563eb;text-decoration:none;font-weight:500;'>Vacations page</a> to approve or reject this request.</p>"
+    )
+    html_parts.append("<p>Have a great day ☀️<br>— The Vintti HUB Team</p>")
+    html = "\n".join(html_parts)
 
     # Targets: leader (if any) + Jaz
     to_list = []
