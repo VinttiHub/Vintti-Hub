@@ -1,6 +1,3 @@
-// ===== Config =====
-const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com"; // your Flask API base
-
 // ===== Utilities =====
 const $ = (sel, root=document) => root.querySelector(sel);
 const $all = (sel, root=document) => [...root.querySelectorAll(sel)];
