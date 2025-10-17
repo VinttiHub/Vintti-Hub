@@ -10,6 +10,25 @@ function showToast(el, text, ok=true){
   el.style.color = ok ? "#0f766e" : "#b91c1c";
   setTimeout(()=> el.textContent = "", 3500);
 }
+function openTimeoffModal(){ $("#timeoffModal").classList.add("active"); $("#timeoffModal").setAttribute("open",""); }
+function closeTimeoffModal(){
+  const m = $("#timeoffModal");
+  m.classList.remove("active"); m.removeAttribute("open");
+}
+
+function showSuccessSplash(){
+  const s = $("#timeoffCongrats");
+  if (!s) return;
+  s.classList.add("active");
+  setTimeout(()=> s.classList.remove("active"), 2200);
+}
+
+// Wire modal triggers
+document.addEventListener("click", (e)=>{
+  const t = e.target;
+  if (t.matches("#btnOpenTimeoff")) { e.preventDefault(); openTimeoffModal(); }
+  if (t.matches("[data-close-modal]")) { e.preventDefault(); closeTimeoffModal(); }
+});
 
 function initialsFromName(name=""){
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
@@ -140,9 +159,13 @@ async function loadMyRequests(uid){
     list.innerHTML = "";
     arr.forEach(x=>{
       const li = document.createElement("li");
+      const kindLabel = String(x.kind || "").replace("_"," ");
       li.innerHTML = `
         <div>
-          <div><strong>${x.kind}</strong> • ${x.start_date} → ${x.end_date}</div>
+          <div>
+            <span class="badge ${x.kind || ''}">${kindLabel}</span>
+            • ${x.start_date} → ${x.end_date}
+          </div>
           <div style="color:#475569; font-size:12px">${x.reason ? x.reason : ""}</div>
         </div>
         <div><span class="badge ${x.status}">${x.status}</span></div>
@@ -345,17 +368,23 @@ async function onTimeoffSubmit(e){
   const toast = $("#timeoffToast");
   const start = $("#start_date").value;
   const end   = $("#end_date").value;
+  if (!start || !end){
+    showToast(toast, "Please pick start & end dates.", false);
+    return;
+  }
   if (end < start){
     showToast(toast, "End date must be after start date.", false);
     return;
   }
+
   const payload = {
     user_id: CURRENT_USER_ID,
-    kind: $("#kind").value,
+    kind: $("#kind").value,               // "vacation" | "holiday" | "vintti_day"
     start_date: start,
     end_date: end,
     reason: ($("#reason").value || "").trim() || null
   };
+
   try{
     const r = await fetch(`${API_BASE}/time_off_requests`, {
       method: "POST",
@@ -363,9 +392,16 @@ async function onTimeoffSubmit(e){
       credentials: "include",
       body: JSON.stringify(payload)
     });
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok){
+      const msg = await r.text();
+      throw new Error(msg || "Failed");
+    }
+
     showToast(toast, "Request sent. You got it! ✅");
     $("#timeoffForm").reset();
+    closeTimeoffModal();
+    showSuccessSplash();
+
     await loadMyRequests(CURRENT_USER_ID);
   }catch(err){
     console.error(err);

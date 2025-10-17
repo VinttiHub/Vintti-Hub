@@ -171,29 +171,106 @@ def list_users():
 def create_time_off():
     data = request.get_json(silent=True) or {}
     user_id = data.get("user_id")
-    kind = (data.get("kind") or "").lower().strip()
+    kind_raw = (data.get("kind") or "").strip().lower()
     start_date = data.get("start_date")
     end_date = data.get("end_date")
-    reason = data.get("reason")
+    reason = (data.get("reason") or "").strip() or None
 
     if not user_id or not str(user_id).isdigit():
         return jsonify({"error":"user_id required"}), 400
-    if kind not in ("vacation","personal","medical","other"):
-        return jsonify({"error":"invalid kind"}), 400
+
+    # allow exactly these 3
+    ALLOWED = {"vacation","holiday","vintti_day"}
+    if kind_raw not in ALLOWED:
+        return jsonify({"error":"invalid kind (use 'vacation', 'holiday', or 'vintti_day')"}), 400
+
     if not start_date or not end_date:
         return jsonify({"error":"start_date and end_date required"}), 400
     if end_date < start_date:
         return jsonify({"error":"end_date before start_date"}), 400
 
+    # Insert + fetch requester + leader in one go
     conn = get_connection()
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute("""
-            INSERT INTO time_off_requests (user_id, kind, start_date, end_date, reason, status, created_at)
-            VALUES (%s, %s, %s, %s, %s, 'pending', NOW() AT TIME ZONE 'UTC')
-            RETURNING id
-        """, (int(user_id), kind, start_date, end_date, reason))
-        row = cur.fetchone()
-        conn.commit()
-    conn.close()
+    new_id = None
+    requester = None
+    leader_email = None
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # 1) insert
+            cur.execute("""
+                INSERT INTO time_off_requests (user_id, kind, start_date, end_date, reason, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, 'pending', NOW() AT TIME ZONE 'UTC')
+                RETURNING id
+            """, (int(user_id), kind_raw, start_date, end_date, reason))
+            row = cur.fetchone()
+            new_id = row["id"]
 
-    return jsonify({"ok": True, "id": row["id"]}), 201
+            # 2) requester & leader email
+            cur.execute("""
+                SELECT u.user_name, u.email_vintti, u.lider,
+                       l.email_vintti AS leader_email
+                FROM users u
+                LEFT JOIN users l ON l.user_id = u.lider
+                WHERE u.user_id = %s
+            """, (int(user_id),))
+            requester = cur.fetchone()
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": "db insert failed", "detail": str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass
+
+    requester_name = (requester or {}).get("user_name") or "Someone"
+    leader_email = (requester or {}).get("leader_email")
+
+    # Compose email
+    subj = f"Time off request • {requester_name} • {kind_raw.replace('_',' ').title()} • {start_date} → {end_date}"
+    html = f"""
+      <h2>New time off request</h2>
+      <p><strong>Requester:</strong> {requester_name}</p>
+      <p><strong>Type:</strong> {kind_raw.replace('_',' ').title()}</p>
+      <p><strong>Dates:</strong> {start_date} → {end_date}</p>
+      {"<p><strong>Note:</strong> " + reason + "</p>" if reason else ""}
+      <p>Status: <strong>Pending</strong></p>
+    """.strip()
+
+    # Targets: leader (if any) + Jaz
+    to_list = []
+    if leader_email:
+        to_list.append(leader_email)
+    # Always add Jaz
+    to_list.append("jazmin@vintti.com")
+
+    # ——— Send the email (SendGrid) ———
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail, Email
+
+        api_key = os.environ.get('SENDGRID_API_KEY')
+        if not api_key:
+            raise RuntimeError("SENDGRID_API_KEY not configured")
+
+        msg = Mail(
+            from_email=Email('hub@vintti-hub.com', name='Vintti HUB'),
+            to_emails=to_list,
+            subject=subj,
+            html_content=html
+        )
+        sg = SendGridAPIClient(api_key)
+        sg.send(msg)
+
+        # If you prefer calling your /send_email route instead:
+        # import requests as _rq
+        # _rq.post(request.url_root.rstrip('/') + '/send_email', json={
+        #   "to": to_list, "subject": subj, "body": html
+        # }, timeout=10)
+    except Exception as e:
+        # We keep the request but report the email error
+        logging.exception("time_off email failed")
+        return jsonify({"ok": True, "id": new_id, "email_warning": str(e)}), 201
+
+    return jsonify({"ok": True, "id": new_id}), 201

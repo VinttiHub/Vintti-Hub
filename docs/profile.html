@@ -85,6 +85,67 @@
       <div class="list">
         <h2 class="list-title">My Requests</h2>
         <ul id="timeoffList" class="cards"></ul>
+        <!-- ——— Trigger: fun request button ——— -->
+<div class="timeoff-actions">
+  <button id="btnOpenTimeoff" class="btn fun">
+    Take a Break 🌴
+  </button>
+</div>
+
+<!-- ——— Modal: Request Time Off ——— -->
+<div id="timeoffModal" class="modal" aria-hidden="true">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="timeoffTitle">
+    <header class="modal__head">
+      <h3 id="timeoffTitle">Request Time Off</h3>
+      <button class="modal__close" title="Close" data-close-modal>×</button>
+    </header>
+
+    <form id="timeoffForm" class="form">
+      <div class="grid">
+        <label class="field">
+          <span class="label">Type</span>
+          <select id="kind" required>
+            <option value="vacation">Vacation</option>
+            <option value="holiday">Holiday</option>
+            <option value="vintti_day">Vintti Day</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="label">Start</span>
+          <input id="start_date" type="date" required />
+        </label>
+
+        <label class="field">
+          <span class="label">End</span>
+          <input id="end_date" type="date" required />
+        </label>
+
+        <label class="field" style="grid-column:1/-1;">
+          <span class="label">Note (optional)</span>
+          <textarea id="reason" rows="3" placeholder="Family plan, medical appointment, etc."></textarea>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn primary">Send Request ✈️</button>
+        <button type="button" class="btn" data-close-modal>Cancel</button>
+        <span id="timeoffToast" class="toast" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ——— Success Splash (auto hides) ——— -->
+<div id="timeoffCongrats" class="splash" aria-hidden="true">
+  <div class="splash__card">
+    <div class="splash__emoji" aria-hidden="true">🏖️</div>
+    <h3>Request sent!</h3>
+    <p>You deserve a rest. We’ll notify your lead 💌</p>
+  </div>
+</div>
+
       </div>
     </section>
   </main>

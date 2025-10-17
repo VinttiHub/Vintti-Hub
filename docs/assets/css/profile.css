@@ -229,3 +229,41 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
 @media (max-width: 860px){
   .balances-table{ grid-template-columns: 1fr 136px; }
 }
+/* ——— Fun CTA ——— */
+.timeoff-actions{ margin:16px 0 8px; }
+.btn.fun{
+  background: linear-gradient(135deg, #fef3c7, #faf5ff);
+  border: 1px solid var(--border);
+  padding: 10px 14px; border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* ——— Modal ——— */
+.modal{ position: fixed; inset:0; display:none; }
+.modal[open], .modal.active{ display:block; }
+.modal__backdrop{
+  position:absolute; inset:0; background: rgba(15,23,42,.28); backdrop-filter: blur(2px);
+}
+.modal__dialog{
+  position: relative; width:min(560px, 92vw);
+  margin: 8vh auto; background: var(--glass-strong);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 14px 18px;
+}
+.modal__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.modal__close{
+  background: transparent; border:0; font-size: 22px; line-height:1; cursor:pointer;
+}
+
+/* ——— Success Splash ——— */
+.splash{ position: fixed; inset:0; display:none; place-items:center; background: transparent; }
+.splash.active{ display:grid; }
+.splash__card{
+  background: white; border:1px solid var(--border); border-radius: 20px;
+  padding: 20px 24px; box-shadow: 0 20px 50px rgba(15,23,42,.18); text-align:center;
+}
+.splash__emoji{ font-size: 56px; margin-bottom: 8px; }
+
+/* small tweaks for badges if needed */
+.badge.holiday{ background:#fde68a; color:#92400e; }
+.badge.vintti_day{ background:#bfdbfe; color:#1e40af; }
