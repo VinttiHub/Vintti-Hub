@@ -189,6 +189,27 @@
     <div class="skeleton-row"></div>
     <div class="skeleton-row"></div>
   </div>
+  <!-- Team PTO Calendar -->
+  <section class="approvals-calendar" aria-label="Team PTO Calendar">
+    <header class="cal-head">
+      <h3 class="cal-title">Team PTO Calendar</h3>
+      <div class="cal-controls" role="group" aria-label="Calendar navigation">
+        <button id="calPrev" class="btn cal-nav" type="button" aria-label="Previous month">‹</button>
+        <div id="calMonthLabel" class="cal-month">—</div>
+        <button id="calNext" class="btn cal-nav" type="button" aria-label="Next month">›</button>
+      </div>
+    </header>
+
+    <div id="calLegend" class="cal-legend" aria-label="People color legend"></div>
+
+    <div class="pto-cal-wrap">
+      <div class="pto-cal-head" aria-hidden="true">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+      </div>
+      <div id="approvalsCalendar" class="pto-cal" role="grid" aria-live="polite"></div>
+      <div id="calTooltip" class="cal-tooltip" aria-hidden="true"></div>
+    </div>
+  </section>
 
   <footer class="approvals-foot">
     <span id="approvalsToast" class="toast" role="status" aria-live="polite"></span>

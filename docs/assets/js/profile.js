@@ -172,6 +172,171 @@ function renderTeamPtoTable(users){
 
   host.innerHTML = header + rows + summary;
 }
+// ===== PTO Calendar (Approvals) =====
+
+// stable color per person (by user_id or name)
+function personColor(seedStr){
+  const s = String(seedStr || "");
+  let h = 0;
+  for (let i=0; i<s.length; i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  // gentle saturation/lightness -> pastel tech
+  return `hsl(${hue} 70% 68%)`;
+}
+
+const PTO_KIND_LABEL = { vacation: "VAC", holiday: "HOL", vintti_day: "VD" };
+
+function firstOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+function lastOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
+
+function fmtMonthLabel(d){
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+function expandEventsToDays(events, viewDate){
+  // returns Map(key=YYYY-MM-DD, value=[items])
+  const map = new Map();
+  const start = firstOfMonth(viewDate);
+  const end   = lastOfMonth(viewDate);
+  const startTs = new Date(start.getFullYear(), start.getMonth(), 1).setHours(0,0,0,0);
+  const endTs   = new Date(end.getFullYear(),   end.getMonth(),   end.getDate()).setHours(23,59,59,999);
+
+  for (const ev of events){
+    const a = new Date(ev.start_date);
+    const b = new Date(ev.end_date);
+    if (isNaN(a) || isNaN(b)) continue;
+
+    // clip to visible month window
+    let cur = new Date(Math.max(a, startTs));
+    const to  = new Date(Math.min(b,   endTs));
+    while (cur <= to){
+      const iso = cur.toISOString().slice(0,10);
+      if (!map.has(iso)) map.set(iso, []);
+      map.get(iso).push(ev);
+      cur.setDate(cur.getDate()+1);
+    }
+  }
+  return map;
+}
+
+function renderApprovalsCalendarFromRows(rows){
+  // filter only approved
+  const approved = (rows || []).filter(r => String(r.status).toLowerCase() === 'approved');
+
+  // build person palette & legend data
+  const people = [];
+  const byPerson = new Map();
+  for (const r of approved){
+    const key = String(r.user_id);
+    if (!byPerson.has(key)){
+      const color = personColor(key || r.user_name || r.user_email);
+      byPerson.set(key, { name: r.user_name || "—", color });
+      people.push({ id: key, name: r.user_name || "—", color });
+    }
+  }
+  // legend
+  const leg = document.getElementById("calLegend");
+  if (leg){
+    leg.innerHTML = people
+      .sort((a,b)=> a.name.localeCompare(b.name))
+      .map(p=> `<span class="leg"><span class="dot" style="background:${p.color}"></span>${p.name}</span>`)
+      .join("") || `<span class="leg">No approved PTO yet.</span>`;
+  }
+
+  const host = document.getElementById("approvalsCalendar");
+  const label = document.getElementById("calMonthLabel");
+  const tip = document.getElementById("calTooltip");
+  if (!host || !label || !tip) return;
+
+  // view state
+  let view = new Date(); // today
+  view.setDate(1);
+
+  function draw(){
+    label.textContent = fmtMonthLabel(view);
+
+    // build grid dates (start on Sunday)
+    const first = firstOfMonth(view);
+    const last  = lastOfMonth(view);
+    const padStart = first.getDay(); // 0=Sun
+    const padEnd   = 6 - last.getDay();
+
+    const cells = [];
+    // prev month tail
+    for (let i=padStart; i>0; i--){
+      const d = new Date(first); d.setDate(first.getDate() - i);
+      cells.push({ date: d, out: true });
+    }
+    // month days
+    for (let d=1; d<=last.getDate(); d++){
+      cells.push({ date: new Date(view.getFullYear(), view.getMonth(), d), out:false });
+    }
+    // next month head
+    for (let i=1; i<=padEnd; i++){
+      const d = new Date(last); d.setDate(last.getDate() + i);
+      cells.push({ date: d, out: true });
+    }
+
+    // date -> events today
+    const map = expandEventsToDays(
+      approved.map(r => ({
+        ...r,
+        _person: byPerson.get(String(r.user_id)) || { color: personColor(r.user_id), name: r.user_name || "—" }
+      })),
+      view
+    );
+
+    host.innerHTML = cells.map(({date, out})=>{
+      const iso = date.toISOString().slice(0,10);
+      const todays = map.get(iso) || [];
+      const evs = todays.slice(0,3).map(ev=>{
+        const color = ev._person.color;
+        const kind  = PTO_KIND_LABEL[ev.kind] || ev.kind;
+        const title = `${ev.user_name || "—"} • ${kind}`;
+        return `<div class="cal-badge" data-iso="${iso}" data-name="${ev.user_name||"-"}" data-kind="${kind}" style="--clr:${color}" title="${title}">
+                  <span class="kind">${kind}</span><span class="who" style="overflow:hidden;text-overflow:ellipsis;">${ev.user_name||"—"}</span>
+                </div>`;
+      }).join("");
+
+      // if more than 3, show a tiny counter
+      const extra = todays.length > 3 ? `<div class="cal-badge" style="--clr:#cbd5e1">+${todays.length-3} more</div>` : "";
+
+      return `
+        <div class="cal-cell ${out ? 'cal-out':''}" data-date="${iso}">
+          <div class="cal-daynum">${date.getDate()}</div>
+          <div class="cal-events">${evs}${extra}</div>
+        </div>`;
+    }).join("");
+
+    // hover tooltip
+    host.querySelectorAll(".cal-badge").forEach(b=>{
+      b.addEventListener("mouseenter", (e)=>{
+        const name = b.dataset.name || "—";
+        const kind = b.dataset.kind || "";
+        const iso  = b.dataset.iso || "";
+        tip.innerHTML = `<b>${name}</b><br><span style="opacity:.85">${kind} • ${iso}</span>`;
+        tip.style.display = "block";
+        const rect = b.getBoundingClientRect();
+        tip.style.left = `${rect.left + rect.width/2 + window.scrollX}px`;
+        tip.style.top  = `${rect.top + window.scrollY - 10}px`;
+        tip.setAttribute("aria-hidden","false");
+      });
+      b.addEventListener("mouseleave", ()=>{
+        tip.style.display = "none";
+        tip.setAttribute("aria-hidden","true");
+      });
+    });
+  }
+
+  // nav
+  const prev = document.getElementById("calPrev");
+  const next = document.getElementById("calNext");
+  prev?.addEventListener("click", ()=>{ view.setMonth(view.getMonth()-1); draw(); });
+  next?.addEventListener("click", ()=>{ view.setMonth(view.getMonth()+1); draw(); });
+
+  draw();
+}
+
 // —— Quick Profile helpers —— //
 function openUserQuick(){ const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
 function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
@@ -425,7 +590,10 @@ function renderApprovalsTable(items){
         chip.classList.remove("pending","approved","rejected");
         chip.classList.add(j.status);
         chip.textContent = j.status;
-        try { loadTeamPto(); } catch {}
+        try { 
+          loadTeamPto();
+          loadLeaderApprovals();
+         } catch {}
       }catch(err){
         // revert tone
         row.classList.remove("row--approved","row--rejected");
@@ -440,13 +608,12 @@ async function loadLeaderApprovals(){
     host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
   }
   try{
-    // Try listing — if 403, the viewer isn’t a leader
     const r = await api(`/leader/time_off_requests`, { method:'GET' });
-    if (r.status === 403) return false; // not a leader → don’t show tab
+    if (r.status === 403) return false;
     if (!r.ok) throw new Error(await r.text());
     const rows = await r.json();
 
-    // Team pill: prefer your /profile/me.team; else fallback to first row.team
+    // team pill (unchanged) ...
     try{
       const meRes = await api(`/profile/me`, { method:'GET' });
       if (meRes.ok){
@@ -459,7 +626,6 @@ async function loadLeaderApprovals(){
     }catch{}
 
     if (!document.getElementById("approvalsTeamPill").hidden && !document.getElementById("approvalsTeamName").textContent){
-      // fallback to first row's team
       const firstTeam = rows?.[0]?.team;
       if (firstTeam){
         document.getElementById("approvalsTeamName").textContent = firstTeam;
@@ -468,6 +634,9 @@ async function loadLeaderApprovals(){
     }
 
     renderApprovalsTable(rows);
+    // NEW: calendar right below
+    renderApprovalsCalendarFromRows(rows);
+
     return true;
   }catch(err){
     console.error('loadLeaderApprovals error:', err);
