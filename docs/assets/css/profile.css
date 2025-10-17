@@ -461,68 +461,91 @@ input:focus, select:focus, textarea:focus{
   font-weight: 500;
 }
 
-/* Main container */
-.teampto-table {
-  width: 100%;
-  border-collapse: collapse;
+/* =========================================================
+   Team PTO — grid table con <div> (9 columnas)
+   Se alinea con el markup que genera renderTeamPtoTable()
+   ========================================================= */
+#teamPtoTable{
+  display: grid;
+  grid-template-columns: 1.25fr repeat(8, minmax(90px, 1fr)); /* Nombre | 8 métricas */
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--glass-strong);
+  background: var(--glass);
   box-shadow: var(--shadow);
 }
 
-/* Header row */
-.teampto-table thead {
-  background: linear-gradient(135deg, #f9fafb, #f1f5f9);
-}
-
-.teampto-table th {
-  text-align: left;
+/* Encabezados */
+#teamPtoTable .th{
+  position: sticky; /* luce como header fijo si hay scroll vertical dentro del panel */
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.35px;
+  letter-spacing: .35px;
   font-weight: 700;
   color: var(--muted);
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  background: linear-gradient(135deg, #f9fafb, #f1f5f9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
-/* Data rows */
-.teampto-table td {
-  font-size: 14px;
+/* Celdas */
+#teamPtoTable .cell{
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   color: var(--text);
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+/* Nombre a la izquierda; números alineados a la derecha */
+#teamPtoTable .cell:first-child { font-weight: 600; }
+#teamPtoTable .t-right{ justify-content: flex-end; text-align: right; }
+
+/* Números monospace suaves */
+#teamPtoTable .mono{
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
-/* Left-align first column (names) */
-.teampto-table td:first-child,
-.teampto-table th:first-child {
-  text-align: left;
-  font-weight: 600;
-  color: var(--text);
+/* Alterna filas visualmente (cada 9 celdas = 1 fila) */
+#teamPtoTable .cell:nth-child(9n+1),
+#teamPtoTable .cell:nth-child(9n+2),
+#teamPtoTable .cell:nth-child(9n+3),
+#teamPtoTable .cell:nth-child(9n+4),
+#teamPtoTable .cell:nth-child(9n+5),
+#teamPtoTable .cell:nth-child(9n+6),
+#teamPtoTable .cell:nth-child(9n+7),
+#teamPtoTable .cell:nth-child(9n+8),
+#teamPtoTable .cell:nth-child(9n+9){
+  background: rgba(255,255,255,.88);
+}
+#teamPtoTable .cell:nth-child(18n+10),
+#teamPtoTable .cell:nth-child(18n+11),
+#teamPtoTable .cell:nth-child(18n+12),
+#teamPtoTable .cell:nth-child(18n+13),
+#teamPtoTable .cell:nth-child(18n+14),
+#teamPtoTable .cell:nth-child(18n+15),
+#teamPtoTable .cell:nth-child(18n+16),
+#teamPtoTable .cell:nth-child(18n+17),
+#teamPtoTable .cell:nth-child(18n+18){
+  background: rgba(255,255,255,.6); /* ligera zebra */
 }
 
-/* Row hover and alternates */
-.teampto-table tbody tr:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.teampto-table tbody tr:hover {
+/* Hover sutil por celda (sin JS extra) */
+#teamPtoTable .cell:hover{
   background: linear-gradient(135deg, #f0fdfa, #eef2ff);
-  transition: background 0.25s ease;
+  transition: background .2s ease;
 }
 
-/* Subtle row divider fade */
-.teampto-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Rounded corners on table wrapper */
-.teampto-table-wrapper {
+/* Wrapper (opcional) si usas .teampto-table-wrapper */
+.teampto-table-wrapper{
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -531,14 +554,10 @@ input:focus, select:focus, textarea:focus{
   padding: 6px;
 }
 
-/* Responsive scrolling on small screens */
-@media (max-width: 900px) {
-  .teampto-table-wrapper {
-    overflow-x: auto;
-  }
-  .teampto-table {
-    min-width: 960px;
-  }
+/* Responsive: scroll horizontal suave si hiciera falta */
+@media (max-width: 900px){
+  #panel-teampto{ overflow-x: auto; }
+  #teamPtoTable{ min-width: 960px; }
 }
 /* =========================================================
    Approvals tab (leaders)
