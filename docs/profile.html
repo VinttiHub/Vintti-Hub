@@ -11,10 +11,10 @@
     <!-- Header + Tabs -->
     <header class="header">
       <h1 class="title">My Profile</h1>
-      <nav class="tabs" role="tablist" aria-label="Profile tabs">
-        <button class="tab active" data-tab="profile" aria-selected="true">Profile</button>
-        <button class="tab" data-tab="timeoff" aria-selected="false">Request Time Off</button>
-      </nav>
+        <nav class="tabs" id="tabsBar" role="tablist" aria-label="Profile tabs">
+          <button class="tab active" data-tab="profile" aria-selected="true">Profile</button>
+          <button class="tab" data-tab="timeoff" aria-selected="false">Request Time Off</button>
+        </nav>
     </header>
 
     <!-- Avatar -->
@@ -162,6 +162,20 @@
 
       </div>
     </section>
+<section class="panel" id="panel-teampto" role="tabpanel" aria-labelledby="tab-teampto" hidden>
+  <header class="teampto-head">
+    <h2 class="teampto-title">Team PTO</h2>
+    <span class="teampto-caption">Read-only</span>
+  </header>
+
+  <div id="teamPtoTable" class="teampto-table">
+    <!-- Filled by JS -->
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row"></div>
+    <div class="skeleton-row"></div>
+  </div>
+</section>
+
   </main>
 <script src="./assets/js/main.js" defer></script>
 <script src="./assets/js/profile.js" defer></script>

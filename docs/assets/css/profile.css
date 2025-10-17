@@ -422,3 +422,48 @@ input:focus, select:focus, textarea:focus{
   .requests .requests-table .cell.plain:nth-child(3n-1){ grid-column:2/3; } /* Dates */
   .requests .requests-table .cell.plain:nth-child(3n){ grid-column:1/-1; justify-content:flex-end; } /* Status */
 }
+/* =========================================================
+   Team PTO table — clean, compact, no hard boxes
+   ========================================================= */
+.teampto-head{
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  margin-bottom: 10px;
+}
+.teampto-title{
+  margin:0; font-weight:700; font-size: clamp(16px, 2.2vw, 20px);
+}
+.teampto-caption{ font-size:11px; color:var(--muted); }
+
+.teampto-table{
+  display:grid;
+  gap: 2px;
+  grid-template-columns: 1.2fr repeat(8, minmax(100px, .8fr));
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px;
+}
+
+.teampto-table .th{
+  font-size:10px; letter-spacing:.35px; text-transform:uppercase;
+  color:var(--muted); padding:8px 6px;
+}
+
+.teampto-table .cell.plain{
+  background: transparent;
+  border: 0;
+  padding: 8px 6px;
+}
+
+.teampto-table .cell.plain:hover{
+  background: rgba(255,255,255,0.55);
+  border-radius: 10px;
+}
+
+@media (max-width: 920px){
+  .teampto-table{
+    overflow:auto;
+    grid-template-columns: 1.4fr repeat(8, 120px);
+  }
+}

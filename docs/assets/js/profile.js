@@ -31,6 +31,127 @@ function initialsFromName(name=""){
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   return (parts[0]?.[0]||"").toUpperCase() + (parts[1]?.[0]||"").toUpperCase();
 }
+// ===== Team PTO (helpers) =====
+const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
+
+function _nz(n){ n = Number(n); return Number.isFinite(n) ? n : 0; }
+
+function calcVacation(user){
+  const acc  = _nz(user.vacaciones_acumuladas);
+  const work = _nz(user.vacaciones_habiles);
+  const used = _nz(user.vacaciones_consumidas);
+  const total = Math.max(0, acc + work);
+  const avail = Math.max(0, total - used);
+  return { acc, work, total, used, avail };
+}
+
+function calcVintti(user){
+  const total = _nz(user.vintti_days);
+  const used  = _nz(user.vintti_days_consumidos);
+  const avail = Math.max(0, total - used);
+  return { total, used, avail };
+}
+
+function renderTeamPtoTable(users){
+  const host = document.getElementById("teamPtoTable");
+  if (!host) return;
+
+  // Header row (9 columns)
+  const header = `
+    <div class="th">Nombre</div>
+    <div class="th t-right">Vac. acumuladas</div>
+    <div class="th t-right">Vac. hábiles</div>
+    <div class="th t-right">Vac. totales</div>
+    <div class="th t-right">Vac. consumidas</div>
+    <div class="th t-right">Vac. disponibles</div>
+    <div class="th t-right">VD totales</div>
+    <div class="th t-right">VD consumidas</div>
+    <div class="th t-right">VD disponibles</div>
+  `;
+
+  if (!users?.length){
+    host.innerHTML = header + `
+      <div class="cell plain" style="grid-column:1/-1;justify-content:center;">No data.</div>
+    `;
+    return;
+  }
+
+  // Sort by name for consistency
+  users.sort((a,b)=> String(a.user_name||"").localeCompare(String(b.user_name||"")));
+
+  host.innerHTML = header + users.map(u=>{
+    const name = u.user_name || "—";
+    const vac = calcVacation(u);
+    const vd  = calcVintti(u);
+
+    const cell = (v) => `<span class="mono">${Number(v) || 0}</span>`;
+    return `
+      <div class="cell plain">${name}</div>
+      <div class="cell plain t-right">${cell(vac.acc)}</div>
+      <div class="cell plain t-right">${cell(vac.work)}</div>
+      <div class="cell plain t-right">${cell(vac.total)}</div>
+      <div class="cell plain t-right">${cell(vac.used)}</div>
+      <div class="cell plain t-right">${cell(vac.avail)}</div>
+      <div class="cell plain t-right">${cell(vd.total)}</div>
+      <div class="cell plain t-right">${cell(vd.used)}</div>
+      <div class="cell plain t-right">${cell(vd.avail)}</div>
+    `;
+  }).join("");
+}
+
+async function loadTeamPto(){
+  const host = document.getElementById("teamPtoTable");
+  if (host){
+    host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
+  }
+  try{
+    // Reuse /users to pull everyone and compute totals on FE
+    const r = await api(`/team_pto`, { method: 'GET' });
+    if (!r.ok) throw new Error(await r.text());
+    const arr = await r.json();
+
+    // We only need: user_name, vacaciones_*, vintti_days*
+    const slim = arr.map(u => ({
+      user_name: u.user_name,
+      vacaciones_acumuladas: u.vacaciones_acumuladas,
+      vacaciones_habiles: u.vacaciones_habiles,
+      vacaciones_consumidas: u.vacaciones_consumidas,
+      vintti_days: u.vintti_days,
+      vintti_days_consumidos: u.vintti_days_consumidos
+    }));
+    renderTeamPtoTable(slim);
+  }catch(err){
+    console.error('loadTeamPto error:', err);
+    if (host){
+      host.innerHTML = `
+        <div class="th">Nombre</div><div class="th">Vac. acumuladas</div><div class="th">Vac. hábiles</div>
+        <div class="th">Vac. totales</div><div class="th">Vac. consumidas</div><div class="th">Vac. disponibles</div>
+        <div class="th">VD totales</div><div class="th">VD consumidas</div><div class="th">VD disponibles</div>
+        <div class="cell plain" style="grid-column:1/-1;justify-content:center;">Could not load team PTO.</div>
+      `;
+    }
+  }
+}
+
+function enableTeamTab(){
+  const tabsBar = document.getElementById('tabsBar');
+  const panel = document.getElementById('panel-teampto');
+  if (!tabsBar || !panel) return;
+
+  // Avoid duplicating if already present
+  if (tabsBar.querySelector('[data-tab="teampto"]')) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'tab';
+  btn.dataset.tab = 'teampto';
+  btn.id = 'tab-teampto';
+  btn.type = 'button';
+  btn.setAttribute('aria-selected', 'false');
+  btn.textContent = 'Team PTO'; // short & clear
+
+  tabsBar.appendChild(btn);
+  wireTabs(); // rebind events including this new tab
+}
 
 // --- API helper (SIN headers custom; añade ?user_id= si existe) ---
 async function api(path, opts={}){
@@ -74,19 +195,22 @@ function toInputDate(v){
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-// ===== Tabs =====
-$all(".tab").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    $all(".tab").forEach(b=> b.classList.remove("active"));
-    btn.classList.add("active");
-    const tab = btn.dataset.tab;
-    $all(".panel").forEach(p=>{
-      const isActive = p.id === `panel-${tab}`;
-      p.toggleAttribute("hidden", !isActive);
-      p.classList.toggle("active", isActive);
-    });
+// ===== Tabs (re-usable) =====
+function wireTabs(){
+  $all(".tab").forEach(btn=>{
+    btn.onclick = () => {
+      $all(".tab").forEach(b=> b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      $all(".panel").forEach(p=>{
+        const isActive = p.id === `panel-${tab}`;
+        p.toggleAttribute("hidden", !isActive);
+        p.classList.toggle("active", isActive);
+      });
+    };
   });
-});
+}
+wireTabs();
 
 // ===== user_id helpers =====
 function getUidFromQuery() {
@@ -500,6 +624,13 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     await loadMe(uid);
     await loadMyRequests(uid);
     await loadBalances(uid);
+
+    // Enable "Team PTO" tab for allowed users
+    if (TEAM_ALLOWED.has(Number(uid))) {
+      enableTeamTab();
+      // Preload data when the tab becomes visible (optional eager-load here)
+      loadTeamPto();
+    }
 
     const form = document.getElementById("timeoffForm");
     if (form && !form.dataset.bound){
