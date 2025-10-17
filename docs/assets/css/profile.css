@@ -357,29 +357,32 @@ input:focus, select:focus, textarea:focus{
   border-radius: 12px;
 }
 
-/* Dates cluster */
-.requests .dates{
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+/* ===== Minimal date range ===== */
+.dates-min{
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
   font-variant-numeric: tabular-nums;
 }
-.requests .date-chip{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:8px 12px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #fff, #f8fafc);
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 10px rgba(15,23,42,.06);
+
+.dates-min .d{
   font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  /* no boxes, no backgrounds */
 }
-.requests .date-ico{ opacity:.8 }
-.requests .dates .arrow{ opacity:.6; font-weight:800; }
-.requests .duration{
-  font-weight:800;
-  padding:6px 10px;
-  border-radius:999px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color:#083344;
-  box-shadow: 0 4px 16px rgba(15,23,42,.08);
+
+.dates-min .sep{
+  opacity: .45;
+  font-weight: 700;
+  margin: 0 2px;
+}
+
+.dates-min .days{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-left: 2px;
 }
 
 /* Status chips — single definition */

@@ -277,17 +277,17 @@ def create_time_off():
         html_parts.append(f"<li><strong>Note:</strong> {reason}</li>")
     html_parts.append("</ul>")
     html_parts.append(
-        "<p>Please go to the <a href='https://vintti-hub.com/profile?tab=timeoff' style='color:#2563eb;text-decoration:none;font-weight:500;'>Vacations page</a> to approve or reject this request.</p>"
+        "<p>Please go to the <a href='https://vintti-hub.com' style='color:#2563eb;text-decoration:none;font-weight:500;'>Vacations page</a> to approve or reject this request.</p>"
     )
     html_parts.append("<p>Have a great day ☀️<br>— The Vintti HUB Team</p>")
     html = "\n".join(html_parts)
 
     # Targets: leader (if any) + Jaz
     to_list = []
-    #if leader_email:
-    #    to_list.append(leader_email)
+    if leader_email:
+        to_list.append(leader_email)
     # Always add Jaz
-    #to_list.append("jazmin@vintti.com")
+    to_list.append("jazmin@vintti.com")
     to_list.append("angie@vintti.com")
 
     # ——— Send the email (SendGrid) ———

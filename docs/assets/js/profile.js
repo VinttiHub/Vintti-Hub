@@ -202,17 +202,13 @@ async function loadMyRequests(uid){
           </div>
         </div>
 
-        <!-- Dates (pretty) -->
+        /* Dates — super minimal */
         <div class="cell plain">
-          <div class="dates">
-            <span class="date-chip">
-              <span class="date-ico" aria-hidden="true">🗓️</span>${start}
-            </span>
-            <span class="arrow" aria-hidden="true">→</span>
-            <span class="date-chip">
-              <span class="date-ico" aria-hidden="true">🗓️</span>${end}
-            </span>
-            <span class="duration">${daysTxt}</span>
+          <div class="dates-min">
+            <time class="d" datetime="${x.start_date}">${start}</time>
+            <span class="sep">→</span>
+            <time class="d" datetime="${x.end_date}">${end}</time>
+            <span class="days">(${days} day${days===1?'':'s'})</span>
           </div>
         </div>
 
