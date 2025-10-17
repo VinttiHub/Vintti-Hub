@@ -1,248 +1,267 @@
+/* =========================================================
+   Vintti Profile / Time Off — Cleaned & De-duplicated CSS
+   Order: Variables → Base → Layout → Components → Utilities → Media
+   ========================================================= */
+
+/* ---------- Variables ---------- */
 :root{
   --glass: rgba(255,255,255,0.6);
   --glass-strong: rgba(255,255,255,0.9);
   --border: rgba(0,0,0,0.08);
   --text: #0f172a;
   --muted: #475569;
-  --accent: #6ee7b7; /* money-green */
+  --accent: #6ee7b7;   /* money-green */
   --accent-2: #93c5fd; /* soft blue */
   --radius: 16px;
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
   --bg: linear-gradient(135deg, #f5f7fb 0%, #eef3ff 100%);
 }
 
-*{ box-sizing:border-box }
-html,body{ height:100% }
+/* ---------- Base / Reset ---------- */
+*{ box-sizing: border-box; }
+html, body{ height: 100%; }
 body{
-  margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
-  color:var(--text); background:var(--bg);
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+  color: var(--text);
+  background: var(--bg);
 }
+img{ max-width:100%; display:block; }
 
+/* ---------- Layout ---------- */
 .page{
-  max-width: 1120px; margin: 32px auto; padding: 0 16px 48px;
+  max-width: 1120px;
+  margin: 32px auto;
+  padding: 0 16px 48px;
 }
-
 .header{
-  display:flex; align-items:end; justify-content:space-between; gap:16px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
 }
-.title{ margin:0 0 8px; font-size: clamp(20px, 3vw, 28px); }
+.title{
+  margin: 0 0 8px;
+  font-size: clamp(20px, 3vw, 28px);
+}
 
+/* ---------- Tabs ---------- */
 .tabs{
-  display:flex; gap:8px; background:var(--glass); border:1px solid var(--border);
-  padding:6px; border-radius: calc(var(--radius) + 6px); box-shadow: var(--shadow);
+  display: flex;
+  gap: 8px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  padding: 6px;
+  border-radius: calc(var(--radius) + 6px);
+  box-shadow: var(--shadow);
 }
 .tab{
-  border:0; background:transparent; padding:10px 14px; border-radius:12px; font-weight:600; color:var(--muted);
-  cursor:pointer;
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
 }
-.tab.active{ background:var(--glass-strong); color:var(--text); }
+.tab.active{
+  background: var(--glass-strong);
+  color: var(--text);
+}
 
-.avatar-wrap{ display:flex; justify-content:center; margin: 28px 0 18px; }
+/* ---------- Avatar ---------- */
+.avatar-wrap{
+  display:flex;
+  justify-content:center;
+  margin: 28px 0 18px;
+}
 .avatar{
   width: 132px; height: 132px; border-radius: 50%;
   background: radial-gradient(120% 120% at 20% 20%, var(--accent) 0%, var(--accent-2) 100%);
-  display:grid; place-items:center; overflow:hidden; border:1px solid var(--border); box-shadow: var(--shadow);
+  display:grid; place-items:center; overflow:hidden;
+  border:1px solid var(--border); box-shadow: var(--shadow);
 }
 .avatar img{ width:100%; height:100%; object-fit:cover; display:none; }
 .avatar span{ font-size: 48px; font-weight:700; color:white; letter-spacing:1px }
 
+/* ---------- Panels ---------- */
 .panel{
-  background: var(--glass); border:1px solid var(--border); border-radius: var(--radius);
-  padding: 24px; box-shadow: var(--shadow);
-}
-.panel[hidden]{ display:none }
-
-.form{ display:grid; gap:20px }
-.grid{
-  display:grid; gap:16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.grid-compact{
-  display:grid; gap:16px; grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.field{ display:flex; flex-direction:column; gap:8px }
-.field-span{ grid-column: 1 / -1 }
-.label{ font-size: 12px; letter-spacing:.3px; color:var(--muted); font-weight:600; text-transform:uppercase }
-input, select, textarea{
-  width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
-  background: white; color:var(--text); outline: none;
-}
-input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0 0 4px rgba(99,102,241,.15) }
-
-.actions{ display:flex; gap:12px; align-items:center }
-.btn{
-  border:0; cursor:pointer; border-radius:12px; padding:12px 16px; font-weight:700; box-shadow: var(--shadow);
-}
-.btn.primary{ background:linear-gradient(135deg, var(--accent), var(--accent-2)); color:#083344 }
-.toast{ min-height:24px; color:#0f766e; font-weight:600 }
-
-.list{ margin-top: 28px }
-.list-title{ margin:0 0 12px; font-size:18px }
-.cards{ list-style:none; margin:0; padding:0; display:grid; gap:12px }
-.cards li{
-  background:white; border:1px solid var(--border); border-radius:12px; padding:12px 14px; display:flex; justify-content:space-between; gap:12px;
-}
-
-@media (max-width: 860px){
-  .grid{ grid-template-columns: 1fr }
-  .grid-compact{ grid-template-columns: 1fr }
-}
-/* ——— Time Off Balances ——— */
-.balances{
-  margin-bottom: 24px;
   background: var(--glass);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  padding: 24px;
   box-shadow: var(--shadow);
-  padding: 18px 18px 10px;
+}
+.panel[hidden]{ display:none; }
+
+/* ---------- Forms & Grids ---------- */
+.form{ display: grid; gap: 20px; }
+.grid{
+  display: grid; gap:16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.grid-compact{
+  display: grid; gap:16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.field{ display:flex; flex-direction:column; gap:8px; }
+.field-span{ grid-column: 1 / -1; }
+.label{
+  font-size: 12px; letter-spacing:.3px; color:var(--muted);
+  font-weight: 600; text-transform: uppercase;
+}
+input, select, textarea{
+  width:100%; padding:12px 14px; border-radius:12px;
+  border:1px solid var(--border);
+  background:#fff; color:var(--text); outline:none;
+}
+input:focus, select:focus, textarea:focus{
+  border-color:#c7d2fe;
+  box-shadow: 0 0 0 4px rgba(99,102,241,.15);
 }
 
-.balances-head{
-  display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px;
+/* ---------- Actions / Buttons ---------- */
+.actions{ display:flex; gap:12px; align-items:center; }
+.btn{
+  border:0; cursor:pointer; border-radius:12px;
+  padding:12px 16px; font-weight:700; box-shadow: var(--shadow);
 }
-.balances-title{ margin:0; font-size: clamp(18px, 2.6vw, 22px) }
-.balances-caption{ font-size:12px; color:var(--muted) }
-
-.balances-table{
-  display:grid; gap:8px;
-  grid-template-columns: 1fr 140px 140px;
+.btn.primary{
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#083344;
 }
-.balances-table .th{
-  font-size:11px; text-transform:uppercase; letter-spacing:.35px; color:var(--muted);
-  padding:10px 12px;
-}
-.balances-table .cell{
-  background:white; border:1px solid var(--border); border-radius:12px;
-  padding:12px; display:flex; align-items:center; justify-content:space-between; gap:10px;
-}
-.metric{
-  display:flex; align-items:center; gap:10px; width:100%;
-}
-.metric .name{
-  font-weight:600; color:var(--text);
-}
-.metric .hint{
-  font-size:12px; color:var(--muted);
-}
-
-.kpi{
-  font-variant-numeric: tabular-nums; font-weight:800;
-}
-
-.badge-soft{
-  font-size:11px; font-weight:700; padding:6px 8px; border-radius:999px; border:1px solid var(--border);
-  background: linear-gradient(180deg, #fff, #f8fafc);
-}
-
-.row{
-  display:contents;
-}
-
-/* Skeleton while loading */
-.skeleton-row{
-  grid-column: 1 / -1;
-  height:44px;
-  border-radius:12px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,255,255,0.9), rgba(255,255,255,0.55));
-  background-size: 200% 100%;
-  animation: shimmer 1.2s infinite;
-}
-@keyframes shimmer{ 0%{background-position:0 0} 100%{background-position:200% 0} }
-
-@media (max-width: 860px){
-  .balances-table{ grid-template-columns: 1fr 1fr; }
-  .balances-table .th.hide-m{ display:none }
-}
-/* =============== Time Off Balances (refresh) =============== */
-.balances { margin-bottom: 20px; padding: 16px 16px 10px; }
-
-.balances-head { margin-bottom: 8px; }
-.balances-title { margin:0; font-weight:700; font-size: clamp(16px, 2.2vw, 20px); }
-.balances-caption { font-size: 11px; color: var(--muted); }
-
-/* two columns: metric | days */
-.balances-table{
-  display:grid; gap:6px;
-  grid-template-columns: 1fr 120px;
-}
-
-.balances-table .th{
-  font-size:10px; letter-spacing:.35px; text-transform:uppercase;
-  color:var(--muted); padding:8px 10px;
-}
-.t-right{ text-align:right; }
-
-.row{ display:contents; }
-
-.balances-table .cell{
-  background:white; border:1px solid var(--border); border-radius:12px;
-  padding:10px 12px; display:flex; align-items:center; gap:10px;
-  min-height:40px;
-}
-
-.metric{ display:flex; align-items:center; gap:10px; min-width:0; }
-.metric .name{
-  font-weight:600; font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-
-/* Category badges (soft pastel) */
-.badge-soft{
-  font-size:10px; font-weight:700; padding:5px 8px; border-radius:999px; border:1px solid var(--border);
-  background: linear-gradient(180deg, #fff, #f8fafc);
-}
-/* Categorías */
-.badge--vac{
-  background: linear-gradient(180deg, #ecfdf5, #ffffff);
-  border-color: #bbf7d0; /* verde */
-}
-
-/* Vintti Days: azul */
-.badge--vd{
-  background: linear-gradient(180deg, #eff6ff, #ffffff);
-  border-color: #bfdbfe; /* azul */
-}
-
-/* Holiday: amarillo */
-.badge--hol{
-  background: linear-gradient(180deg, #fefce8, #ffffff);
-  border-color: #fde68a; /* amarillo */
-}
-
-/* KPI chip (single appearance on the right) */
-.kpi{
-  font-variant-numeric: tabular-nums; font-weight:800; font-size:13px;
-}
-.chip{
-  display:inline-flex; align-items:center; justify-content:center;
-  padding:6px 10px; border-radius:999px; background:linear-gradient(135deg, var(--accent), var(--accent-2));
-  color:#083344; box-shadow: 0 4px 16px rgba(15,23,42,.08);
-}
-
-/* Skeleton */
-.skeleton-row{
-  grid-column:1/-1; height:40px; border-radius:12px;
-  background: linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,.9), rgba(255,255,255,.55));
-  background-size:200% 100%; animation: shimmer 1.2s infinite;
-}
-
-/* mobile keeps same layout; widen days column a touch */
-@media (max-width: 860px){
-  .balances-table{ grid-template-columns: 1fr 136px; }
-}
-/* ——— Fun CTA ——— */
-.timeoff-actions{ margin:16px 0 8px; }
 .btn.fun{
   background: linear-gradient(135deg, #fef3c7, #faf5ff);
   border: 1px solid var(--border);
   padding: 10px 14px; border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
+.toast{ min-height:24px; color:#0f766e; font-weight:600; }
 
-/* ——— Modal ——— */
+/* ---------- Lists / Cards ---------- */
+.list{ margin-top: 28px; }
+.list-title{ margin:0 0 12px; font-size:18px; }
+.cards{
+  list-style:none; margin:0; padding:0;
+  display:grid; gap:12px;
+}
+.cards li{
+  background:#fff; border:1px solid var(--border); border-radius:12px;
+  padding:12px 14px; display:flex; justify-content:space-between; gap:12px;
+}
+
+/* =========================================================
+   Time Off Balances — (single canonical version)
+   ========================================================= */
+.balances{
+  margin-bottom: 20px;
+  padding: 16px 16px 10px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.balances-head{
+  display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+  margin-bottom: 8px;
+}
+.balances-title{
+  margin:0; font-weight:700; font-size: clamp(16px, 2.2vw, 20px);
+}
+.balances-caption{ font-size: 11px; color: var(--muted); }
+
+/* two columns: metric | days */
+.balances-table{
+  display:grid; gap:6px;
+  grid-template-columns: 1fr 120px;
+}
+.balances-table .th{
+  font-size:10px; letter-spacing:.35px; text-transform:uppercase;
+  color:var(--muted); padding:8px 10px;
+}
+.t-right{ text-align:right; }
+
+/* rows use display: contents to keep grid semantics */
+.row{ display: contents; }
+
+.balances-table .cell{
+  background:#fff; border:1px solid var(--border); border-radius:12px;
+  padding:10px 12px; display:flex; align-items:center; gap:10px;
+  min-height:40px;
+}
+.metric{
+  display:flex; align-items:center; gap:10px; min-width:0;
+}
+.metric .name{
+  font-weight:600; font-size:14px; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Category badges (soft pastel) */
+.badge-soft{
+  font-size:10px; font-weight:700; padding:5px 8px;
+  border-radius:999px; border:1px solid var(--border);
+  background: linear-gradient(180deg, #fff, #f8fafc);
+}
+/* Specific categories */
+.badge--vac{
+  background: linear-gradient(180deg, #ecfdf5, #ffffff);
+  border-color: #bbf7d0; /* verde */
+}
+.badge--vd{
+  background: linear-gradient(180deg, #eff6ff, #ffffff);
+  border-color: #bfdbfe; /* azul - Vintti Day */
+}
+.badge--hol{
+  background: linear-gradient(180deg, #fefce8, #ffffff);
+  border-color: #fde68a; /* amarillo - Holiday */
+}
+
+/* KPI chip (value on right column) */
+.kpi{
+  font-variant-numeric: tabular-nums;
+  font-weight:800; font-size:13px;
+}
+.chip{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:6px 10px; border-radius:999px;
+  background:linear-gradient(135deg, var(--accent), var(--accent-2));
+  color:#083344; box-shadow: 0 4px 16px rgba(15,23,42,.08);
+}
+
+/* Skeleton while loading */
+@keyframes shimmer{ 0%{background-position:0 0} 100%{background-position:200% 0} }
+.skeleton-row{
+  grid-column:1 / -1; height:40px; border-radius:12px;
+  background: linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,.9), rgba(255,255,255,.55));
+  background-size:200% 100%; animation: shimmer 1.2s infinite;
+}
+
+/* ---------- Floating “Take a Break” button ---------- */
+#btnOpenTimeoff{
+  position: fixed; right: 24px; bottom: 24px; z-index: 999;
+  padding: 16px 22px; font-size: 16px; border-radius: 999px;
+  background: linear-gradient(135deg, #fef3c7, #faf5ff);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 28px rgba(15,23,42,.16);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+#btnOpenTimeoff:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(15,23,42,.18);
+}
+#btnOpenTimeoff:active{ transform: translateY(0); }
+
+/* keep inline actions from taking vertical space if you also use floating CTA */
+.timeoff-actions{ margin:16px 0 8px; height:0; margin:0; }
+
+/* ---------- Modal ---------- */
 .modal{ position: fixed; inset:0; display:none; }
 .modal[open], .modal.active{ display:block; }
 .modal__backdrop{
-  position:absolute; inset:0; background: rgba(15,23,42,.28); backdrop-filter: blur(2px);
+  position:absolute; inset:0;
+  background: rgba(15,23,42,.28);
+  backdrop-filter: blur(2px);
 }
 .modal__dialog{
   position: relative; width:min(560px, 92vw);
@@ -250,55 +269,28 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
   border:1px solid var(--border); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 14px 14px 18px;
 }
-.modal__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.modal__head{
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;
+}
 .modal__close{
   background: transparent; border:0; font-size: 22px; line-height:1; cursor:pointer;
 }
 
-/* ——— Success Splash ——— */
+/* ---------- Success Splash ---------- */
 .splash{ position: fixed; inset:0; display:none; place-items:center; background: transparent; }
 .splash.active{ display:grid; }
 .splash__card{
-  background: white; border:1px solid var(--border); border-radius: 20px;
+  background: #fff; border:1px solid var(--border); border-radius: 20px;
   padding: 20px 24px; box-shadow: 0 20px 50px rgba(15,23,42,.18); text-align:center;
 }
 .splash__emoji{ font-size: 56px; margin-bottom: 8px; }
 
-/* small tweaks for badges if needed */
-.badge.holiday{ background:#fde68a; color:#92400e; }
-.badge.vintti_day{ background:#bfdbfe; color:#1e40af; }
-/* === Floating "Take a Break" button === */
-#btnOpenTimeoff{
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 999; /* above cards/modal backdrop */
-  padding: 16px 22px;
-  font-size: 16px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #fef3c7, #faf5ff);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 28px rgba(15,23,42,.16);
-  transition: transform .15s ease, box-shadow .15s ease;
-}
-#btnOpenTimeoff:hover{ transform: translateY(-1px); box-shadow: 0 16px 36px rgba(15,23,42,.18); }
-#btnOpenTimeoff:active{ transform: translateY(0); }
-
-/* keep existing “inline section” from taking vertical space */
-.timeoff-actions{ height:0; margin:0; }
-
-/* on very small screens, tuck it in a bit */
-@media (max-width: 480px){
-  #btnOpenTimeoff{ right: 16px; bottom: 16px; padding: 14px 18px; font-size: 15px; }
-}
-/* === Pretty pill select for "Type" === */
+/* ---------- Pretty pill select for "Type" ---------- */
 #kind{
   border-radius: 999px;
   background: #fff;
-  appearance: none;                 /* remove native arrow */
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  padding-right: 38px;              /* space for custom arrow */
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding-right: 38px; /* space for custom arrow */
   background-image: url("data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'>\
 <path d='M5 7.5L10 12.5L15 7.5' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/>\
@@ -311,7 +303,23 @@ input:focus, select:focus, textarea:focus{ border-color:#c7d2fe; box-shadow: 0 0
   border-color:#c7d2fe;
   box-shadow: 0 0 0 4px rgba(99,102,241,.15);
 }
-/* === Center modal actions === */
-#timeoffForm .actions{
-  justify-content: center;
+
+/* Center modal actions in the timeoff form */
+#timeoffForm .actions{ justify-content: center; }
+
+/* ---------- Utilities ---------- */
+.badge.holiday{ background:#fde68a; color:#92400e; }
+.badge.vintti_day{ background:#bfdbfe; color:#1e40af; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 860px){
+  .grid{ grid-template-columns: 1fr; }
+  .grid-compact{ grid-template-columns: 1fr; }
+  .balances-table{ grid-template-columns: 1fr 136px; }
+}
+@media (max-width: 480px){
+  #btnOpenTimeoff{
+    right: 16px; bottom: 16px;
+    padding: 14px 18px; font-size: 15px;
+  }
 }
