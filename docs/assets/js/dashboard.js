@@ -1,7 +1,50 @@
 // ===== Helpers =====
 const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+
+/** Normalize any string-ish value to lowercased, trimmed text. */
+function norm(s){ return String(s || '').toLowerCase().trim(); }
+
+/**
+ * Exclude pipeline stages you do NOT want to count in aggregations.
+ * Mirrors the visual table filters: deep dive, nda sent, close win/lost.
+ */
+function isStageExcluded(stage){
+  const v = norm(stage);
+  if (!v) return false;
+  return /(deep\s*dive|nda\s*sent|close[ds]?\s*win|close[ds]?\s*lost)/i.test(v);
+}
+
+/** Map raw model to canonical bucket. */
+function normalizeModel(modelRaw){
+  const v = norm(modelRaw);
+  if (!v) return null;
+  if (v.includes('staff')) return 'staffing';
+  if (v.includes('recru')) return 'recruiting';
+  return null;
+}
+
+/** Map raw type to canonical bucket. */
+function normalizeType(typeRaw){
+  const v = norm(typeRaw);
+  if (!v) return null;
+  if (v.includes('new')) return 'new';
+  if (v.includes('repl')) return 'replacement';
+  return null;
+}
+
+/** Format money in whole dollars with US locale commas. */
+function fmtMoney(v){
+  const num = Number(v) || 0;
+  return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
 // ======= TSR/TSF History (Staffing) =======
 // === Expected (Fee & Revenue) por modelo (Staffing / Recruiting) ===
+/**
+ * Aggregate expected fee & revenue by model, respecting pipeline exclusions.
+ * @param {Array<Object>} opps
+ * @returns {{staffing:{fee:number,revenue:number}, recruiting:{fee:number,revenue:number}}}
+ */
 function computeExpectedByModel(opps){
   const out = {
     staffing:   { fee: 0, revenue: 0 },
@@ -9,8 +52,7 @@ function computeExpectedByModel(opps){
   };
 
   for (const o of opps){
-    // mismo filtro que la tabla de pipeline
-    if (isStageExcluded(o.opp_stage)) continue;
+    if (isStageExcluded(o.opp_stage)) continue; // same filter as pipeline
 
     const m = normalizeModel(o.opp_model);
     if (!m || !(m in out)) continue;
@@ -24,6 +66,9 @@ function computeExpectedByModel(opps){
   return out;
 }
 
+/**
+ * Push KPI numbers into fixed DOM ids.
+ */
 function renderExpectedByModel(modelTotals){
   const map = [
     ['kpiExpectedFeeStaff', modelTotals.staffing.fee],
@@ -35,25 +80,28 @@ function renderExpectedByModel(modelTotals){
     if (el) el.textContent = fmtMoney(val);
   }
 }
+
+/**
+ * Fetch TSR/TSF history. If no range is provided, defaults to the
+ * last FULL 12 months (ending on the last day of the previous month).
+ * @param {{fromYM?:string,toYM?:string}} [opts]
+ */
 async function fetchTSHistory({ fromYM = null, toYM = null } = {}) {
   const params = new URLSearchParams();
   if (fromYM) params.set('from', fromYM);
   if (toYM) params.set('to', toYM);
 
-  // Por defecto: últimos 12 meses completos (hasta último mes completo)
   if (!fromYM || !toYM) {
+    // Build default range: last 12 full months
     const today = new Date();
     const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastFullMonth = new Date(firstOfThisMonth - 1); // último día del mes pasado
-    const toY = lastFullMonth.getFullYear();
-    const toM = String(lastFullMonth.getMonth() + 1).padStart(2, '0');
-    const toDefault = `${toY}-${toM}`;
+    const lastFullMonth = new Date(firstOfThisMonth - 1);
+
+    const toDefault = `${lastFullMonth.getFullYear()}-${String(lastFullMonth.getMonth() + 1).padStart(2, '0')}`;
 
     const fromAnchor = new Date(lastFullMonth);
-    fromAnchor.setMonth(fromAnchor.getMonth() - 11); // 12 meses
-    const fromY = fromAnchor.getFullYear();
-    const fromM = String(fromAnchor.getMonth() + 1).padStart(2, '0');
-    const fromDefault = `${fromY}-${fromM}`;
+    fromAnchor.setMonth(fromAnchor.getMonth() - 11);
+    const fromDefault = `${fromAnchor.getFullYear()}-${String(fromAnchor.getMonth() + 1).padStart(2, '0')}`;
 
     if (!fromYM) params.set('from', fromDefault);
     if (!toYM) params.set('to', toDefault);
@@ -65,15 +113,19 @@ async function fetchTSHistory({ fromYM = null, toYM = null } = {}) {
   return Array.isArray(arr) ? arr : [];
 }
 
+/**
+ * Render TSR/TSF history table and SVG chart with a lightweight tooltip.
+ * Uses custom SVG paths for performance and visual control.
+ */
 function renderTSHistory(data){
-  const wrap = document.getElementById('tsHistoryWrap');
-  const tbl  = document.getElementById('tsHistoryTableBody');
-  const svg  = document.getElementById('tsHistoryChart');
-  const tip  = document.getElementById('tsTooltip');
+  const wrap   = document.getElementById('tsHistoryWrap');
+  const tbl    = document.getElementById('tsHistoryTableBody');
+  const svg    = document.getElementById('tsHistoryChart');
+  const tip    = document.getElementById('tsTooltip');
   const legend = document.getElementById('tsLegend');
   if (!wrap || !tbl || !svg) return;
 
-  // ---- Tabla ----
+  // ---- Table ----
   tbl.innerHTML = '';
   for (const it of data){
     const tr = document.createElement('tr');
@@ -92,7 +144,7 @@ function renderTSHistory(data){
   const H = svg.viewBox.baseVal.height || 220;
   const PAD = 36;
 
-  const months = data.map(d => d.month);
+  const months  = data.map(d => d.month);
   const tsrVals = data.map(d => Number(d.tsr || 0));
   const tsfVals = data.map(d => Number(d.tsf || 0));
   const hires   = data.map(d => Number(d.active_count || 0));
@@ -105,7 +157,7 @@ function renderTSHistory(data){
   const fmtMoneyShort = (v) => {
     const num = Number(v) || 0;
     if (num >= 1_000_000) return '$' + (num/1_000_000).toFixed(1).replace(/\.0$/,'') + 'M';
-    if (num >= 1_000) return '$' + (num/1_000).toFixed(1).replace(/\.0$/,'') + 'k';
+    if (num >= 1_000)     return '$' + (num/1_000).toFixed(1).replace(/\.0$/,'') + 'k';
     return '$' + num.toLocaleString('en-US');
   };
 
@@ -115,7 +167,7 @@ function renderTSHistory(data){
     return n;
   };
 
-  // --- Defs: gradients y filtros suaves ---
+  // --- Defs: gradients ---
   const defs = el('defs');
   const gradTSR = el('linearGradient', { id:'gTSR', x1:'0', y1:'0', x2:'0', y2:'1' });
   gradTSR.append(el('stop', { offset:'0%',  'stop-color':'var(--tsr)', 'stop-opacity': '0.25'}));
@@ -126,32 +178,29 @@ function renderTSHistory(data){
   defs.append(gradTSR, gradTSF);
   svg.append(defs);
 
-  // --- Grid Y (4 líneas) + ejes mínimos ---
+  // --- Grid Y (4 lines) + labels ---
   for (let g=0; g<=4; g++){
     const gy = PAD + g * (H - 2*PAD) / 4;
-    const line = el('line', { x1: PAD, x2: W-PAD, y1: gy, y2: gy, stroke: 'var(--grid)', 'stroke-width':'1' });
-    svg.append(line);
-    // etiquetas eje Y a la izquierda (0, 25%, 50%, 75%, 100%)
+    svg.append(el('line', { x1: PAD, x2: W-PAD, y1: gy, y2: gy, stroke: 'var(--grid)', 'stroke-width':'1' }));
     const val = Math.round((1 - g/4) * maxY);
     const text = el('text', { x: 8, y: y(val) + 4, 'font-size':'10', fill:'var(--muted)' });
     text.textContent = fmtMoneyShort(val);
     svg.append(text);
   }
 
-  // --- Helpers path ---
+  // Helpers to build paths
   const pathFrom = (arr) => arr.map((v,i) => `${i?'L':'M'} ${x(i)} ${y(v)}`).join(' ');
   const areaFrom = (arr) => `${pathFrom(arr)} L ${x(n-1)} ${y(0)} L ${x(0)} ${y(0)} Z`;
 
-  // --- Series visibles (toggle legend) ---
+  // Toggle state from legend (both on by default)
   const visibility = { tsr: true, tsf: true };
 
-  // --- Draw function (idempotente) ---
   const draw = () => {
-    // limpia todo excepto defs y grid/labels ya insertados (dejamos los primeros elementos hasta defs y 10 objetos aprox)
-    const keep = 1 + 5 + 5; // defs + grid lines + y labels (aprox) – por simplicidad, reconstruimos completo:
-    while (svg.childNodes.length > 0) svg.removeChild(svg.lastChild);
+    // wipe everything and rebuild (keeps logic simple for toggles)
+    while (svg.childNodes.length) svg.removeChild(svg.lastChild);
     svg.append(defs);
-    // redibuja grid y labels Y
+
+    // grid + labels
     for (let g=0; g<=4; g++){
       const gy = PAD + g * (H - 2*PAD) / 4;
       svg.append(el('line', { x1: PAD, x2: W-PAD, y1: gy, y2: gy, stroke: 'var(--grid)', 'stroke-width':'1' }));
@@ -161,122 +210,98 @@ function renderTSHistory(data){
       svg.append(text);
     }
 
-    // Áreas
-    if (visibility.tsr){
-      const a1 = el('path', { d: areaFrom(tsrVals), fill: 'url(#gTSR)' });
-      svg.append(a1);
-    }
-    if (visibility.tsf){
-      const a2 = el('path', { d: areaFrom(tsfVals), fill: 'url(#gTSF)' });
-      svg.append(a2);
-    }
+    // Areas
+    if (visibility.tsr) svg.append(el('path', { d: areaFrom(tsrVals), fill: 'url(#gTSR)' }));
+    if (visibility.tsf) svg.append(el('path', { d: areaFrom(tsfVals), fill: 'url(#gTSF)' }));
 
-    // Líneas
-    if (visibility.tsr){
-      svg.append(el('path', { d: pathFrom(tsrVals), fill:'none', stroke:'var(--tsr)', 'stroke-width':'2.5' }));
-    }
-    if (visibility.tsf){
-      svg.append(el('path', { d: pathFrom(tsfVals), fill:'none', stroke:'var(--tsf)', 'stroke-width':'2.5' }));
-    }
+    // Lines
+    if (visibility.tsr) svg.append(el('path', { d: pathFrom(tsrVals), fill:'none', stroke:'var(--tsr)', 'stroke-width':'2.5' }));
+    if (visibility.tsf) svg.append(el('path', { d: pathFrom(tsfVals), fill:'none', stroke:'var(--tsf)', 'stroke-width':'2.5' }));
 
-    // Puntos
+    // Points
     const pts = el('g', { id:'points' });
     for (let i=0;i<n;i++){
-      if (visibility.tsr){
-        pts.append(el('circle', { cx:x(i), cy:y(tsrVals[i]), r:'3.5', fill:'#fff', stroke:'var(--tsr)', 'stroke-width':'2' }));
-      }
-      if (visibility.tsf){
-        pts.append(el('circle', { cx:x(i), cy:y(tsfVals[i]), r:'3.5', fill:'#fff', stroke:'var(--tsf)', 'stroke-width':'2' }));
-      }
+      if (visibility.tsr) pts.append(el('circle', { cx:x(i), cy:y(tsrVals[i]), r:'3.5', fill:'#fff', stroke:'var(--tsr)', 'stroke-width':'2' }));
+      if (visibility.tsf) pts.append(el('circle', { cx:x(i), cy:y(tsfVals[i]), r:'3.5', fill:'#fff', stroke:'var(--tsf)', 'stroke-width':'2' }));
     }
     svg.append(pts);
 
-    // Guía vertical + hit-area
+    // Guide + hit area
     const guide = el('line', { id:'vGuide', x1:0, x2:0, y1:PAD-6, y2:H-PAD+6, stroke:'rgba(0,0,0,.25)', 'stroke-dasharray':'3 3', 'stroke-width':'1.2', opacity:'0' });
     svg.append(guide);
 
     const hit = el('rect', { x:PAD, y:0, width:(W-2*PAD), height:H, fill:'transparent', style:'cursor:crosshair' });
     svg.append(hit);
 
-// reemplaza la función showTip por esta versión
-  const showTip = (i, clientX, clientY) => {
-    if (i < 0 || i >= n) return;
+    // Tooltip helpers
+    const showTip = (i, clientX, clientY) => {
+      if (!tip || i < 0 || i >= n) return;
 
-    // 1) Actualiza la guía vertical
-    const gx = x(i);
-    guide.setAttribute('x1', gx);
-    guide.setAttribute('x2', gx);
-    guide.setAttribute('opacity', '1');
+      const gx = x(i);
+      guide.setAttribute('x1', gx);
+      guide.setAttribute('x2', gx);
+      guide.setAttribute('opacity', '1');
 
-    // 2) Contenido del tooltip
-    const m = months[i];
-    const tsr = tsrVals[i];
-    const tsf = tsfVals[i];
-    const act = hires[i];
+      const m = months[i];
+      const tsr = tsrVals[i];
+      const tsf = tsfVals[i];
+      const act = hires[i];
 
-    tip.innerHTML = `
-      <div class="tt-title">${m}</div>
-      <div class="row"><span class="badge"><span class="dot tsr"></span>TSR</span><span>${fmtMoneyShort(tsr)}</span></div>
-      <div class="row"><span class="badge"><span class="dot tsf"></span>TSF</span><span>${fmtMoneyShort(tsf)}</span></div>
-      <div class="muted">Active hires: ${act}</div>
-    `;
-    tip.style.display = 'block';
+      tip.innerHTML = `
+        <div class="tt-title">${m}</div>
+        <div class="row"><span class="badge"><span class="dot tsr"></span>TSR</span><span>${fmtMoneyShort(tsr)}</span></div>
+        <div class="row"><span class="badge"><span class="dot tsf"></span>TSF</span><span>${fmtMoneyShort(tsf)}</span></div>
+        <div class="muted">Active hires: ${act}</div>
+      `;
+      tip.style.display = 'block';
 
-    // 3) Convertir coords del SVG (viewBox) a pixels reales
-    const svgRect  = svg.getBoundingClientRect();
-    const wrapRect = wrap.getBoundingClientRect();
-    const sx = svgRect.width  / W;
-    const sy = svgRect.height / H;
+      // convert viewbox coords → pixels
+      const svgRect  = svg.getBoundingClientRect();
+      const wrapRect = wrap.getBoundingClientRect();
+      const sx = svgRect.width  / W;
+      const sy = svgRect.height / H;
 
-    // x de ese índice
-    const px = x(i) * sx + (svgRect.left - wrapRect.left);
+      const px = x(i) * sx + (svgRect.left - wrapRect.left);
 
-    // y según las series visibles (tomamos el punto más “alto”, o sea menor y)
-    const ys = [];
-    if (visibility.tsr) ys.push(y(tsrVals[i]) * sy);
-    if (visibility.tsf) ys.push(y(tsfVals[i]) * sy);
-    // fallback por si ambas están ocultas
-    if (!ys.length) ys.push(y(0) * sy);
+      const ys = [];
+      if (visibility.tsr) ys.push(y(tsrVals[i]) * sy);
+      if (visibility.tsf) ys.push(y(tsfVals[i]) * sy);
+      if (!ys.length) ys.push(y(0) * sy);
 
-    const pYsvg   = Math.min(...ys);
-    const py      = pYsvg + (svgRect.top - wrapRect.top);
+      const pYsvg = Math.min(...ys);
+      const py    = pYsvg + (svgRect.top - wrapRect.top);
 
-    // 4) Clamp dentro del card y decidir si va arriba o abajo del punto
-    const margin = 12;
-    const leftClamped = Math.max(margin, Math.min(px, wrapRect.width - margin));
+      const margin = 12;
+      const leftClamped = Math.max(margin, Math.min(px, wrapRect.width - margin));
 
-    // Si el punto está muy arriba, mostramos el tooltip por debajo
-    // medimos altura después de display:block para decidir
-    const willOverflowTop = (py - tip.offsetHeight - 16) < 0;
-    tip.classList.toggle('below', willOverflowTop);
+      const willOverflowTop = (py - tip.offsetHeight - 16) < 0;
+      tip.classList.toggle('below', willOverflowTop);
 
-    // 5) Posicionar
-    tip.style.left = `${leftClamped}px`;
-    tip.style.top  = `${py}px`;
-  };
+      tip.style.left = `${leftClamped}px`;
+      tip.style.top  = `${py}px`;
+    };
 
-  const hideTip = () => {
-    guide.setAttribute('opacity', '0');
-    tip.style.display = 'none';
-    tip.classList.remove('below');
-  };
+    const hideTip = () => {
+      guide.setAttribute('opacity', '0');
+      if (tip){ tip.style.display = 'none'; tip.classList.remove('below'); }
+    };
 
-
-    // índice más cercano para un x dado
+    // nearest index by x in pixels
     const nearestIndex = (px) => {
       const rel = Math.max(PAD, Math.min(px, W-PAD));
       const t = (rel - PAD) / Math.max(1, (W - 2*PAD));
       return Math.round(t * (n - 1));
     };
 
-    // Eventos hover
+    // Pointer events
     hit.addEventListener('mousemove', (e) => {
       const rect = svg.getBoundingClientRect();
       const i = nearestIndex(e.clientX - rect.left);
       showTip(i, e.clientX, e.clientY);
     });
     hit.addEventListener('mouseleave', hideTip);
-    // también para touch
+
+    // Touch events
     hit.addEventListener('touchstart', (e) => {
       const t = e.touches[0];
       const rect = svg.getBoundingClientRect();
@@ -292,23 +317,31 @@ function renderTSHistory(data){
     hit.addEventListener('touchend', hideTip);
   };
 
-  // ---- Leyenda: toggle series ----
+  // Legend toggles
   if (legend){
     legend.querySelectorAll('.legend-item').forEach(btn => {
       btn.onclick = () => {
         const key = btn.getAttribute('data-series');
-        visibility[key] = !visibility[key];
-        btn.classList.toggle('off', !visibility[key]);
-        btn.classList.toggle('on',  visibility[key]);
-        draw();
+        if (!key) return;
+        const next = !btn.classList.contains('on');
+        // sync state
+        btn.classList.toggle('off', !next);
+        btn.classList.toggle('on',  next);
+        // reflect in visibility, then redraw
+        if (key in { tsr:1, tsf:1 }){
+          // recompute from DOM state to avoid drift
+          const tsrOn = !!legend.querySelector('[data-series="tsr"].on');
+          const tsfOn = !!legend.querySelector('[data-series="tsf"].on');
+          visibility.tsr = tsrOn; visibility.tsf = tsfOn;
+          draw();
+        }
       };
     });
   }
 
-  // Dibuja inicial
   draw();
 
-  // Etiquetas de extremos (mes inicial/final)
+  // Month labels (start & end only to keep it clean)
   if (data.length){
     const mkText = (txt, px) => {
       const t = document.createElementNS('http://www.w3.org/2000/svg','text');
@@ -324,75 +357,7 @@ function renderTSHistory(data){
   }
 }
 
-async function loadTSHistorySection(){
-  try {
-    const data = await fetchTSHistory(); // últimos 12 meses completos
-    renderTSHistory(data);
-  } catch (e){
-    console.warn('TS history error:', e);
-  }
-}
-
-function norm(s){ return String(s || '').toLowerCase().trim(); }
-
-// Normaliza stage a categorías y excluye las que no contamos
-function isStageExcluded(stage){
-  const v = norm(stage);
-  if (!v) return false;
-  // excluye deep dive, nda sent, close win, close lost
-  return /(deep\s*dive|nda\s*sent|close[ds]?\s*win|close[ds]?\s*lost)/i.test(v);
-}
-
-// Normaliza opp_model → 'staffing' | 'recruiting' | null
-function normalizeModel(modelRaw){
-  const v = norm(modelRaw);
-  if (!v) return null;
-  if (v.includes('staff')) return 'staffing';
-  if (v.includes('recru')) return 'recruiting';
-  return null;
-}
-
-// Normaliza opp_type → 'new' | 'replacement' | null
-function normalizeType(typeRaw){
-  const v = norm(typeRaw);
-  if (!v) return null;
-  if (v.includes('new')) return 'new';
-  if (v.includes('repl')) return 'replacement';
-  return null;
-}
-
-function fmtMoney(v){
-  const num = Number(v) || 0;
-  return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
-}
-// === Expected (Fee & Revenue) usando filtros del pipeline ===
-function computeExpectedTotals(opps){
-  let sumFee = 0;
-  let sumRevenue = 0;
-
-  for (const o of opps){
-    // mismo filtro que la tabla de pipeline
-    if (isStageExcluded(o.opp_stage)) continue;
-
-    const fee = Number(o.expected_fee);
-    const rev = Number(o.expected_revenue);
-
-    if (!Number.isNaN(fee)) sumFee += fee;
-    if (!Number.isNaN(rev)) sumRevenue += rev;
-  }
-  return { sumFee, sumRevenue };
-}
-
-function renderExpectedCard({ sumFee, sumRevenue }){
-  const elFee = document.getElementById('kpiExpectedFee');
-  const elRev = document.getElementById('kpiExpectedRevenue');
-  if (!elFee || !elRev) return;
-
-  elFee.textContent = fmtMoney(sumFee);
-  elRev.textContent = fmtMoney(sumRevenue);
-}
-
-// ===== Data =====
+// ===== Data fetchers =====
 async function fetchOpportunitiesLight(){
   const r = await fetch(`${API}/opportunities/light`, { credentials:'include' });
   const arr = await r.json();
@@ -400,7 +365,7 @@ async function fetchOpportunitiesLight(){
 }
 
 async function fetchAccountsLight(){
-  // trae tsr/tsf por account; tu SQL ya separa por modelo
+  // tsr/tsf by account (SQL already separated by model)
   const r = await fetch(`${API}/data/light`, { credentials:'include' });
   const arr = await r.json();
   return Array.isArray(arr) ? arr : [];
@@ -414,6 +379,9 @@ function buildEmptyMatrix(){
   };
 }
 
+/**
+ * Count opportunities by (model × type) with pipeline stage exclusions.
+ */
 function computeMatrix(opps){
   const M = buildEmptyMatrix();
   for (const o of opps){
@@ -423,17 +391,21 @@ function computeMatrix(opps){
     const t = normalizeType(o.opp_type);
 
     if (!m || !t) continue;
-    if (!(m in M)) continue;
-    if (!(t in M[m])) continue;
+    if (!(m in M) || !(t in M[m])) continue;
 
     M[m][t] += 1;
   }
   return M;
 }
 
+/**
+ * Render the (model × type) matrix table using an existing row template.
+ * Adds a `.pill` span around totals without altering surrounding markup.
+ */
 function renderTable(matrix){
   const tbody = document.getElementById('oppsTbody');
-  const tpl = document.getElementById('rowTemplate');
+  const tpl   = document.getElementById('rowTemplate');
+  if (!tbody || !tpl) return;
 
   tbody.innerHTML = '';
 
@@ -457,36 +429,33 @@ function renderTable(matrix){
     tr.querySelector('[data-key="new"]').textContent = newVal;
     tr.querySelector('[data-key="replacement"]').textContent = repVal;
     tr.querySelector('.row-total-val').textContent = rowTotal;
-// envolver valores en <span class="pill"> sin tocar el HTML base
-const totalCell = tr.querySelector('.row-total-val');
-totalCell.innerHTML = `<span class="pill">${totalCell.textContent}</span>`;
+
+    // wrap totals with a pill (idempotent)
+    const totalCell = tr.querySelector('.row-total-val');
+    if (totalCell && !totalCell.querySelector('.pill')){
+      totalCell.innerHTML = `<span class="pill">${totalCell.textContent}</span>`;
+    }
 
     tbody.appendChild(tr);
 
     colNew += newVal;
     colRep += repVal;
-    grand += rowTotal;
+    grand  += rowTotal;
   }
 
-  document.getElementById('colTotalNew').textContent = colNew;
-  document.getElementById('colTotalReplacement').textContent = colRep;
-  document.getElementById('grandTotal').textContent = grand;
-  // aplicar pill a totales de columnas del tfoot
-['colTotalNew','colTotalReplacement','grandTotal'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el && !el.querySelector('.pill')) {
-    el.innerHTML = `<span class="pill">${el.textContent}</span>`;
-  }
-});
-
+  // Footer totals
+  const ids = ['colTotalNew','colTotalReplacement','grandTotal'];
+  const vals = [colNew, colRep, grand];
+  ids.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = String(vals[i]);
+    if (!el.querySelector('.pill')) el.innerHTML = `<span class="pill">${el.textContent}</span>`;
+  });
 }
 
 // ===== Render MRR (Solo Staffing) =====
 function renderMRRFromAccounts(accounts){
-  // Tus campos por cuenta:
-  //  - tsr: suma salaries de Staffing (revenue)
-  //  - tsf: suma fees de Staffing
-  // Sumamos globalmente:
   let totalTSR = 0;
   let totalTSF = 0;
 
@@ -494,25 +463,37 @@ function renderMRRFromAccounts(accounts){
     totalTSR += Number(a.tsr || 0);
     totalTSF += Number(a.tsf || 0);
   }
-  document.getElementById('kpiTSR').textContent = fmtMoney(totalTSR);
-  document.getElementById('kpiTSF').textContent = fmtMoney(totalTSF);
+
+  const elTSR = document.getElementById('kpiTSR');
+  const elTSF = document.getElementById('kpiTSF');
+  if (elTSR) elTSR.textContent = fmtMoney(totalTSR);
+  if (elTSF) elTSF.textContent = fmtMoney(totalTSF);
 }
 
-// ===== Orquestación =====
+// ===== Orchestración =====
+async function loadTSHistorySection(){
+  try {
+    const data = await fetchTSHistory();
+    renderTSHistory(data);
+  } catch (e){
+    console.warn('TS history error:', e);
+  }
+}
+
 async function loadDashboard(){
   try{
     document.body.classList.add('loading');
 
-    // 1) Tabla (desde opportunities/light)
+    // 1) Opportunities table
     const opps = await fetchOpportunitiesLight();
     const matrix = computeMatrix(opps);
     renderTable(matrix);
 
-    // 1.b) Expected Fee / Expected Revenue (mismos filtros del pipeline)
+    // 1.b) Expected Fee/Revenue (pipeline filters)
     const expectedByModel = computeExpectedByModel(opps);
     renderExpectedByModel(expectedByModel);
 
-    // 2) MRR (desde data/light)
+    // 2) MRR from accounts
     const accounts = await fetchAccountsLight();
     renderMRRFromAccounts(accounts);
   }catch(e){
@@ -522,12 +503,12 @@ async function loadDashboard(){
   }
 }
 
-
+// ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
-  loadTSHistorySection(); // ← ¡esta faltaba!
+  loadTSHistorySection();
   document.getElementById('refreshBtn')?.addEventListener('click', () => {
     loadDashboard();
-    loadTSHistorySection(); // opcional: refrescar también el histórico
+    loadTSHistorySection();
   });
 });

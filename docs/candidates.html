@@ -1,66 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- ====== Meta ====== -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Candidates</title>
-  <link rel="stylesheet" href="./assets/css/candidates.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
-<link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
-<link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
-<meta name="theme-color" content="#0B3D91">
+  <meta name="theme-color" content="#0B3D91" />
 
+  <!-- (Optional) Helpful description for SEO / share cards -->
+  <meta name="description" content="Vintti Hub · Candidates table with quick filters and search." />
+
+  <!-- ====== Icons / PWA bits (kept as-is) ====== -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
+
+  <!-- ====== Fonts ====== -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- ====== Vendor CSS ====== -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- ====== App CSS (kept path and filename) ====== -->
+  <link rel="stylesheet" href="./assets/css/candidates.css" />
 </head>
+
 <body class="light-mode">
-  <div class="sidebar">
-    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
-    <a class="menu-item active" href="candidates.html">Candidates</a>
+  <!-- ======================== Sidebar ======================== -->
+  <aside class="sidebar" aria-label="Primary">
+    <!-- Logo kept; lazy to avoid blocking first paint -->
+    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" loading="lazy" />
+    <a class="menu-item active" href="candidates.html" aria-current="page">Candidates</a>
     <a class="menu-item" href="crm.html">CRM</a>
     <a class="menu-item" href="opportunities.html">Opportunities</a>
-    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display: none;">📊 Opportunities Summary</a>
+    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display:none;">📊 Opportunities Summary</a>
     <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">🧰 Equipments</a>
-  </div>
-<div class="sidebar-wow-toggle" id="sidebarToggle">
-  <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon"></i>
-</div>
+  </aside>
 
-  <div class="main-content">
-    <!-- TÍTULO EN BLOQUE AZUL -->
+  <!-- Sidebar toggle (kept IDs/classes) -->
+  <div class="sidebar-wow-toggle" id="sidebarToggle" role="button" aria-label="Toggle sidebar" tabindex="0">
+    <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon" aria-hidden="true"></i>
+  </div>
+
+  <!-- ======================== Main ======================== -->
+  <main class="main-content">
+    <!-- Title block (kept structure/classes) -->
     <div class="title-container">
       <h1 class="page-title">Candidates</h1>
     </div>
-    <div class="table-controls-wrapper">
+
+    <!-- Controls: left (DataTables UI) + right (name search) -->
+    <div class="table-controls-wrapper" role="region" aria-label="Table controls">
       <div class="left-controls">
+        <!-- DataTables will inject its controls here -->
         <div id="datatable-wrapper"></div>
       </div>
       <div class="right-controls">
+        <!-- Kept id/class; added label for a11y -->
+        <label for="searchByName" class="sr-only">Search by name</label>
         <input type="text" id="searchByName" placeholder="Search by name..." class="name-search-input" />
       </div>
     </div>
-    <!-- TABLA DE CANDIDATOS -->
-    <table id="candidatesTable">
-    <thead>
-      <tr>
-        <th><span class="column-filter" data-column="0"><i class="fa-solid fa-filter"></i></span> Condition</th>
-        <th><span class="column-filter" data-column="1"><i class="fa-solid fa-filter"></i></span> Full Name</th>
-        <th>Country</th>
-        <th>Whatsapp</th>
-        <th>LinkedIn</th>
-      </tr>
-    </thead>
-      <tbody id="candidatesTableBody"></tbody>
-    </table>
-  </div> <!-- ← Este cierre va DESPUÉS de la tabla -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-<script src="./assets/js/candidate.js"></script>
-<audio id="click-sound" src="./assets/sounds/transition_tables.mp3" preload="auto"></audio>
+
+    <!-- ======================== Candidates Table ======================== -->
+    <div class="table-container" role="region" aria-label="Candidates table">
+      <!-- Kept table id/thead structure for your JS -->
+      <table id="candidatesTable">
+        <thead>
+          <tr>
+            <th>
+              <span class="column-filter" data-column="0" title="Filter Condition">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+              </span>
+              <span>Condition</span>
+            </th>
+            <th>
+              <span class="column-filter" data-column="1" title="Filter Full Name">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+              </span>
+              <span>Full Name</span>
+            </th>
+            <th>Country</th>
+            <th>Whatsapp</th>
+            <th>LinkedIn</th>
+          </tr>
+        </thead>
+        <tbody id="candidatesTableBody"></tbody>
+      </table>
+    </div>
+    <!-- ====================== /Candidates Table ====================== -->
+  </main>
+
+  <!-- ======================== Scripts (order preserved; deferred) ======================== -->
+  <!-- jQuery first (required by DataTables) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js" defer></script>
+  <!-- DataTables -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" defer></script>
+  <!-- Font Awesome JS (icons) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" defer></script>
+  <!-- App JS (kept filename/path) -->
+  <script src="./assets/js/candidate.js" defer></script>
+
+  <!-- SFX (kept id/src). Preload left as-is; controls hidden for UX -->
+  <audio id="click-sound" src="./assets/sounds/transition_tables.mp3" preload="auto"></audio>
 </body>
 </html>

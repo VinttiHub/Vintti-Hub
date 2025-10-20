@@ -1402,7 +1402,7 @@ def update_opportunity_fields(opportunity_id):
         logging.exception("❌ Error updating opportunity fields (opp=%s)", opportunity_id)
         return jsonify({'error': str(e)}), 500
 
-@app.route('/accounts/status/bulk_update', methods=['POST'])
+@app.route('/accounts/status/bulk_update', methods=['POST','GET'])
 def bulk_update_account_status():
     """
     Body: { "updates": [ { "account_id": 123, "status": "Active Client" }, ... ] }
@@ -3587,7 +3587,7 @@ def accounts_status_summary():
 
 
 # === NEW: Bulk update de calculated_status (POST) ===
-@app.route('/accounts/status/bulk_update', methods=['POST', 'OPTIONS'])
+@app.route('/accounts/status/bulk_update', methods=['POST', 'OPTIONS', 'GET'])
 def accounts_status_bulk_update():
     if request.method == 'OPTIONS':
         return ('', 204)

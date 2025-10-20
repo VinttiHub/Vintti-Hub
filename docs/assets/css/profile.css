@@ -689,18 +689,6 @@ input:focus, select:focus, textarea:focus{
   max-width: 99%;
 }
 
-/* So the “lift” feels nice but doesn’t bloom outside the clip */
-#teamPtoTable .row:hover > .cell{
-  background: rgba(255,255,255,.72);
-  box-shadow: 0 4px 14px rgba(15,23,42,.07);  /* slightly smaller blur */
-}
-
-/* Optional: also clip any inner skeletons/glows if you use them */
-#teamPtoTable .skeleton-row{
-  margin-inline: 0;
-  border-radius: 0;                 /* avoid rounding poking past the clip */
-}
-#teamPtoTable{ margin-left: -24px; margin-right: -24px; }
 /* ===== Team PTO Calendar (Approvals) ===== */
 .approvals-calendar{
   margin-top: 18px;

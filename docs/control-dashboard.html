@@ -1,109 +1,141 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- ===== Document meta ===== -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Vintti HUB · Dashboard</title>
+
+  <!-- ===== Fonts (kept names to avoid CSS breakage) ===== -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- ===== App assets ===== -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./assets/css/dashboard.css">
 </head>
 <body>
   <div class="page">
+    <!-- =====================================================
+         TOP BAR
+         - Refresh button id/class unchanged for JS hooks
+         ===================================================== -->
     <header class="topbar">
       <div class="spacer"></div>
       <h1>Management Metrics</h1>
-      <button id="refreshBtn" class="btn-refresh" title="Refresh data">Refresh</button>
+      <button id="refreshBtn" class="btn-refresh" title="Refresh data" aria-label="Refresh data">Refresh</button>
     </header>
 
+    <!-- =====================================================
+         MAIN CONTENT
+         ===================================================== -->
     <main class="content">
-      <!-- ====== CARD: Opportunities by model & type ====== -->
+
+      <!-- =====================================================
+           CARD: Opportunities — Pipeline
+           ===================================================== -->
       <section class="card glass" id="oppsCard">
-      <div class="card-head card-head--center">
-        <h2 class="h2--bluegrad title-with-info">
-          Opportunities — Pipeline
-          <button class="info-ghost" aria-label="Excluded stages"
-                  data-tip="Deep Dive, NDA Sent, Close Won/Lost">i</button>
-        </h2>
+        <div class="card-head card-head--center">
+          <h2 class="h2--bluegrad title-with-info">
+            Opportunities — Pipeline
+            <button
+              class="info-ghost"
+              aria-label="Excluded stages: Deep Dive, NDA Sent, Close Won and Close Lost"
+              data-tip="Deep Dive, NDA Sent, Close Won/Lost">
+              <span aria-hidden="true">i</span>
+            </button>
+          </h2>
         </div>
 
-      <div class="table-wrap">
-        <table class="v-table" id="oppsTable" aria-describedby="Opportunities by model and type">
-          <colgroup>
-            <col class="col-model">
-            <col class="col-new">
-            <col class="col-repl">
-            <col class="col-total">
-          </colgroup>
+        <div class="table-wrap">
+          <table class="v-table" id="oppsTable" aria-describedby="oppsTableDesc">
+            <caption id="oppsTableDesc" class="sr-only">
+              Opportunities by model and type excluding Deep Dive, NDA Sent, Close Won and Close Lost.
+            </caption>
 
-          <thead>
-            <tr>
-              <th class="sticky-col">Model</th>
-              <th>New</th>
-              <th>Replacement</th>
-              <th class="total-col">Total</th>
-            </tr>
-          </thead>
+            <!-- Column sizing for CSS; classes retained -->
+            <colgroup>
+              <col class="col-model">
+              <col class="col-new">
+              <col class="col-repl">
+              <col class="col-total">
+            </colgroup>
 
-          <tbody id="oppsTbody"></tbody>
+            <thead>
+              <tr>
+                <th class="sticky-col" scope="col">Model</th>
+                <th scope="col">New</th>
+                <th scope="col">Replacement</th>
+                <th class="total-col" scope="col">Total</th>
+              </tr>
+            </thead>
 
-          <tfoot>
-            <tr class="row-total">
-              <th class="sticky-col">Total</th>
-              <th id="colTotalNew">0</th>
-              <th id="colTotalReplacement">0</th>
-              <th id="grandTotal" class="total-col">0</th>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+            <!-- JS populates this -->
+            <tbody id="oppsTbody"></tbody>
+
+            <!-- Totals row (ids kept for JS aggregation) -->
+            <tfoot>
+              <tr class="row-total">
+                <th class="sticky-col" scope="row">Total</th>
+                <th id="colTotalNew">0</th>
+                <th id="colTotalReplacement">0</th>
+                <th id="grandTotal" class="total-col">0</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </section>
-<!-- ====== CARD: Expected (Pipeline filters) ====== -->
-<section class="card expected glass" id="expectedCard">
-  <div class="card-head expected-head">
-    <div class="expected-icon" aria-hidden="true">💸</div>
-    <div>
-      <h2 class="expected-title">Expected · Pipeline</h2>
-      <div class="muted">Same filters as Opportunities — Pipeline (excludes Deep Dive, NDA Sent, Close Won/Lost)</div>
-    </div>
-  </div>
 
-  <div class="expected-grid expected-grid--pretty">
-    <!-- Row 1 -->
-    <div class="kpi kpi--fee kpi--staff">
-      <div class="kpi-label">
-        <span class="badge-model badge-staff">Staffing</span> Fee
-      </div>
-      <div class="kpi-value" id="kpiExpectedFeeStaff">—</div>
-    </div>
-
-    <div class="kpi kpi--rev kpi--staff">
-      <div class="kpi-label">
-        <span class="badge-model badge-staff">Staffing</span> Revenue
-      </div>
-      <div class="kpi-value" id="kpiExpectedRevStaff">—</div>
-    </div>
-
-    <!-- Row 2 (spans both columns) -->
-    <div class="kpi kpi--rev kpi--rec kpi--span2">
-      <div class="kpi-label">
-        <span class="badge-model badge-rec">Recruiting</span> Revenue
-      </div>
-      <div class="kpi-value" id="kpiExpectedRevRec">—</div>
-    </div>
-  </div>
-</section>
-
-
-      <!-- ====== CARD: MRR (Staffing only) ====== -->
-      <section class="card money glass" id="mrrCard">
-        <div class="card-head money-head">
-        <div class="money-visual" aria-hidden="true">
-          <div class="gif-circle">
-            <img class="money-gif" src="./assets/img/piggy-mrr.gif" alt="Piggy bank" />
+      <!-- =====================================================
+           CARD: Expected · Pipeline
+           ===================================================== -->
+      <section class="card expected glass" id="expectedCard">
+        <div class="card-head expected-head">
+          <div class="expected-icon" aria-hidden="true">💸</div>
+          <div>
+            <h2 class="expected-title">Expected · Pipeline</h2>
+            <div class="muted">
+              Same filters as Opportunities — Pipeline (excludes Deep Dive, NDA Sent, Close Won/Lost)
+            </div>
           </div>
         </div>
+
+        <div class="expected-grid expected-grid--pretty">
+          <!-- Row 1 -->
+          <div class="kpi kpi--fee kpi--staff">
+            <div class="kpi-label">
+              <span class="badge-model badge-staff">Staffing</span> Fee
+            </div>
+            <div class="kpi-value" id="kpiExpectedFeeStaff">—</div>
+          </div>
+
+          <div class="kpi kpi--rev kpi--staff">
+            <div class="kpi-label">
+              <span class="badge-model badge-staff">Staffing</span> Revenue
+            </div>
+            <div class="kpi-value" id="kpiExpectedRevStaff">—</div>
+          </div>
+
+          <!-- Row 2 (spans both columns) -->
+          <div class="kpi kpi--rev kpi--rec kpi--span2">
+            <div class="kpi-label">
+              <span class="badge-model badge-rec">Recruiting</span> Revenue
+            </div>
+            <div class="kpi-value" id="kpiExpectedRevRec">—</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================
+           CARD: MRR · Staffing Only
+           ===================================================== -->
+      <section class="card money glass" id="mrrCard">
+        <div class="card-head money-head">
+          <div class="money-visual" aria-hidden="true">
+            <div class="gif-circle">
+              <img class="money-gif" src="./assets/img/piggy-mrr.gif" alt="Piggy bank" loading="lazy" />
+            </div>
+          </div>
           <div>
             <h2>MRR · Staffing Only</h2>
             <div class="muted">Based on hires (Closed Win) in Staffing</div>
@@ -121,7 +153,10 @@
           </div>
         </div>
       </section>
-      <!-- ====== CARD: TSR/TSF History (Staffing) ====== -->
+
+      <!-- =====================================================
+           CARD: TSR/TSF History · Staffing (Closed Won)
+           ===================================================== -->
       <section class="card glass" id="tsHistoryCard">
         <div class="card-head card-head--center">
           <h2 class="h2--bluegrad">TSR/TSF History · Staffing (Closed Won)</h2>
@@ -140,18 +175,24 @@
             </button>
           </div>
 
-          <svg id="tsHistoryChart" viewBox="0 0 720 220" role="img" aria-label="TSR vs TSF over time"></svg>
+          <!-- SVG chart populated by JS -->
+          <svg id="tsHistoryChart" viewBox="0 0 720 220" role="img" aria-label="TSR versus TSF over time"></svg>
+
+          <!-- Tooltip for chart interactions -->
           <div id="tsTooltip" class="chart-tooltip" role="status" aria-live="polite"></div>
         </div>
 
         <div class="table-wrap">
-          <table class="v-table compact" aria-describedby="Monthly TSR and TSF with active hires">
+          <table class="v-table compact" aria-describedby="tsHistoryDesc">
+            <caption id="tsHistoryDesc" class="sr-only">
+              Monthly TSR and TSF with active hires.
+            </caption>
             <thead>
               <tr>
-                <th>Month</th>
-                <th>TSR (revenue)</th>
-                <th>TSF (fee)</th>
-                <th>Active Hires</th>
+                <th scope="col">Month</th>
+                <th scope="col">TSR (revenue)</th>
+                <th scope="col">TSF (fee)</th>
+                <th scope="col">Active Hires</th>
               </tr>
             </thead>
             <tbody id="tsHistoryTableBody"></tbody>
@@ -159,19 +200,22 @@
         </div>
       </section>
 
-
     </main>
   </div>
 
+  <!-- =====================================================
+       TEMPLATE: Row for Opportunities table
+       ===================================================== -->
   <template id="rowTemplate">
     <tr>
-      <th class="sticky-col row-head"></th>
+      <th class="sticky-col row-head" scope="row"></th>
       <td class="cell" data-key="new">0</td>
       <td class="cell" data-key="replacement">0</td>
       <td class="cell total-col row-total-val">0</td>
     </tr>
   </template>
 
+  <!-- ===== JS ===== -->
   <script src="./assets/js/dashboard.js"></script>
 </body>
 </html>

@@ -1,46 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- ===== Meta ===== -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CRM</title>
-  <link rel="stylesheet" href="./assets/css/crm.css" />
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
-<link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
-<link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
-<meta name="theme-color" content="#0B3D91">
+  <meta name="theme-color" content="#0B3D91">
 
+  <!-- ===== Favicons / PWA ===== -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
+
+  <!-- ===== Fonts (Onest) ===== -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- ===== Vendor CSS (DataTables) ===== -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+  <!-- ===== App CSS (scoped) ===== -->
+  <link rel="stylesheet" href="./assets/css/crm.css" />
 </head>
+
 <body>
-  <div class="sidebar">
+  <!-- ====================== SIDEBAR ====================== -->
+  <div class="sidebar" role="navigation" aria-label="Primary">
     <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
     <a class="menu-item" href="candidates.html">Candidates</a>
     <a class="menu-item active" href="crm.html">CRM</a>
     <a class="menu-item" href="opportunities.html">Opportunities</a>
+    <!-- Hidden links are toggled by app logic -->
     <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display: none;">📊 Opportunities Summary</a>
     <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">🧰 Equipments</a>
   </div>
-<div class="sidebar-wow-toggle" id="sidebarToggle">
-  <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon"></i>
-</div>
 
-
-  <div class="main-content">
-  <div class="filters-top-bar">
-    <h1 class="page-title">CRM</h1>
-    <button class="new-btn" onclick="openPopup()">New</button>
+  <!-- Sidebar wow toggle (kept ids/classes) -->
+  <div class="sidebar-wow-toggle" id="sidebarToggle" role="button" aria-label="Toggle sidebar" tabindex="0">
+    <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon" aria-hidden="true"></i>
   </div>
 
-<div class="crm-controls-bar">
-  <div id="datatable-length-container"></div>
-  <input type="text" id="searchClientInput" placeholder="Search by Client Name" class="crm-search-input" />
-</div>
+  <!-- ====================== MAIN ====================== -->
+  <div class="main-content">
+    <!-- Top bar: title + primary action -->
+    <div class="filters-top-bar">
+      <h1 class="page-title">CRM</h1>
+      <button class="new-btn" onclick="openPopup()">New</button>
+    </div>
 
+    <!-- Controls: page length (DataTables) + client search -->
+    <div class="crm-controls-bar">
+      <div id="datatable-length-container" aria-live="polite"></div>
+      <input
+        type="text"
+        id="searchClientInput"
+        placeholder="Search by Client Name"
+        class="crm-search-input"
+        inputmode="search"
+        aria-label="Search by Client Name"
+      />
+    </div>
+
+    <!-- Accounts table (DataTables enhances this) -->
     <table id="accountTable">
       <thead>
         <tr>
@@ -53,175 +78,200 @@
           <th>TSR</th>
         </tr>
       </thead>
-      <tbody id="accountTableBody">
-      </tbody>
+      <tbody id="accountTableBody"><!-- rows rendered by JS --></tbody>
     </table>
-
-
-  <!-- Popup -->
-<div id="popup" class="popup-overlay">
-  <div class="popup-content">
-    <span class="close-btn" onclick="closePopup()">&times;</span>
-    <h2 class="popup-title">New Account</h2>
-    <form class="popup-form two-columns">
-      <div class="popup-field">
-        <label>Name</label>
-        <input type="text" name="name" placeholder="Account name" />
-      </div>
-
-      <div class="popup-field">
-        <label>Size</label>
-        <select name="size">
-          <option value="1-10">1-10</option>
-          <option value="11-50">11-50</option>
-          <option value="51-200">51-200</option>
-          <option value="201-500">201-500</option>
-          <option value="+500">+500</option>
-        </select>
-      </div>
-
-      <div class="popup-field">
-        <label>Timezone</label>
-        <select name="timezone">
-          <option>EST</option>
-          <option>CST</option>
-          <option>PST</option>
-          <option>MST</option>
-          <option>AST</option>
-          <option>HST</option>
-        </select>
-      </div>
-
-      <div class="popup-field">
-        <label>State</label>
-        <select name="state">
-          <option>Alabama</option>
-          <option>Alaska</option>
-          <option>Arizona</option>
-          <option>Arkansas</option>
-          <option>California</option>
-          <option>Colorado</option>
-          <option>Connecticut</option>
-          <option>Delaware</option>
-          <option>Florida</option>
-          <option>Georgia</option>
-          <option>Hawaii</option>
-          <option>Idaho</option>
-          <option>Illinois</option>
-          <option>Indiana</option>
-          <option>Iowa</option>
-          <option>Kansas</option>
-          <option>Kentucky</option>
-          <option>Louisiana</option>
-          <option>Maine</option>
-          <option>Maryland</option>
-          <option>Massachusetts</option>
-          <option>Michigan</option>
-          <option>Minnesota</option>
-          <option>Mississippi</option>
-          <option>Missouri</option>
-          <option>Montana</option>
-          <option>Nebraska</option>
-          <option>Nevada</option>
-          <option>New Hampshire</option>
-          <option>New Jersey</option>
-          <option>New Mexico</option>
-          <option>New York</option>
-          <option>North Carolina</option>
-          <option>North Dakota</option>
-          <option>Ohio</option>
-          <option>Oklahoma</option>
-          <option>Oregon</option>
-          <option>Pennsylvania</option>
-          <option>Rhode Island</option>
-          <option>South Carolina</option>
-          <option>South Dakota</option>
-          <option>Tennessee</option>
-          <option>Texas</option>
-          <option>Utah</option>
-          <option>Vermont</option>
-          <option>Virginia</option>
-          <option>Washington</option>
-          <option>West Virginia</option>
-          <option>Wisconsin</option>
-          <option>Wyoming</option>
-          <option>Other</option>
-        </select>
-      </div>
-
-      <div class="popup-field">
-        <label>Website</label>
-        <input type="text" name="website" placeholder="e.g. example.com" />
-      </div>
-
-      <div class="popup-field">
-        <label>Email</label>
-        <input type="email" name="mail" placeholder="e.g. hello@company.com" />
-      </div>
-      
-      <div class="popup-field">
-        <label>LinkedIn</label>
-        <input type="text" name="linkedin" placeholder="LinkedIn URL" />
-      </div>
-      <div class="popup-field">
-        <label>Lead source</label>
-        <select name="where_come_from" required>
-          <option value="" disabled selected>Select source</option>
-          <option>SEO</option>
-          <option>AI</option>
-          <option>Slack Community</option>
-          <option>Referral</option>
-          <option>Re-target</option>
-          <option>Outbound</option>
-          <option>Linkedin - Agus</option>
-        </select>
-      </div>
-      <!-- Referral selector (solo se muestra si Lead source = Referral) -->
-      <div class="popup-field" id="referralSourceWrapper" style="display:none">
-        <label>Referral – Client</label>
-        <input
-          type="text"
-          name="referal_source"
-          id="referralSourceInput"
-          placeholder="Type to search clients…"
-          list="referralList"
-          autocomplete="off"
-        />
-        <datalist id="referralList"></datalist>
-        <small class="muted">Choose the client who referred this account.</small>
-      </div>
-      <div class="popup-field full">
-        <label>About</label>
-        <textarea name="about" placeholder="Write a description..."></textarea>
-      </div>
-
-      <button type="submit" class="create-btn">Create</button>
-    </form>
   </div>
-</div>
 
-<!-- Toast de ordenamiento -->
-<div id="crmSortToast" class="sort-toast" role="status" aria-live="polite" style="display:none">
-  <div class="sort-toast__content">
-    <div class="sort-toast__header">
-      <span class="sort-toast__dot"></span>
-      <span>Prepping the cutest view — sorting the table by <b>Status</b>…</span>
-    </div>
+  <!-- ====================== POPUP (Create Account) ====================== -->
+  <div id="popup" class="popup-overlay" aria-hidden="true">
+    <div class="popup-content" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
+      <span class="close-btn" onclick="closePopup()" aria-label="Close">&times;</span>
+      <h2 class="popup-title" id="popupTitle">New Account</h2>
 
-    <div class="sort-toast__progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-      <div class="sort-toast__bar" style="width:0%"></div>
-    </div>
+      <!-- Keep class names/structure (two-columns/full) for existing CSS/JS -->
+      <form class="popup-form two-columns">
+        <!-- Name -->
+        <div class="popup-field">
+          <label>Name</label>
+          <input type="text" name="name" placeholder="Account name" />
+        </div>
 
-    <div class="sort-toast__meta">
-      <span id="sortToastPercent">0%</span>
+        <!-- Size -->
+        <div class="popup-field">
+          <label>Size</label>
+          <select name="size">
+            <option value="1-10">1-10</option>
+            <option value="11-50">11-50</option>
+            <option value="51-200">51-200</option>
+            <option value="201-500">201-500</option>
+            <option value="+500">+500</option>
+          </select>
+        </div>
+
+        <!-- Timezone -->
+        <div class="popup-field">
+          <label>Timezone</label>
+          <select name="timezone">
+            <option>EST</option>
+            <option>CST</option>
+            <option>PST</option>
+            <option>MST</option>
+            <option>AST</option>
+            <option>HST</option>
+          </select>
+        </div>
+
+        <!-- State -->
+        <div class="popup-field">
+          <label>State</label>
+          <select name="state">
+            <option>Alabama</option>
+            <option>Alaska</option>
+            <option>Arizona</option>
+            <option>Arkansas</option>
+            <option>California</option>
+            <option>Colorado</option>
+            <option>Connecticut</option>
+            <option>Delaware</option>
+            <option>Florida</option>
+            <option>Georgia</option>
+            <option>Hawaii</option>
+            <option>Idaho</option>
+            <option>Illinois</option>
+            <option>Indiana</option>
+            <option>Iowa</option>
+            <option>Kansas</option>
+            <option>Kentucky</option>
+            <option>Louisiana</option>
+            <option>Maine</option>
+            <option>Maryland</option>
+            <option>Massachusetts</option>
+            <option>Michigan</option>
+            <option>Minnesota</option>
+            <option>Mississippi</option>
+            <option>Missouri</option>
+            <option>Montana</option>
+            <option>Nebraska</option>
+            <option>Nevada</option>
+            <option>New Hampshire</option>
+            <option>New Jersey</option>
+            <option>New Mexico</option>
+            <option>New York</option>
+            <option>North Carolina</option>
+            <option>North Dakota</option>
+            <option>Ohio</option>
+            <option>Oklahoma</option>
+            <option>Oregon</option>
+            <option>Pennsylvania</option>
+            <option>Rhode Island</option>
+            <option>South Carolina</option>
+            <option>South Dakota</option>
+            <option>Tennessee</option>
+            <option>Texas</option>
+            <option>Utah</option>
+            <option>Vermont</option>
+            <option>Virginia</option>
+            <option>Washington</option>
+            <option>West Virginia</option>
+            <option>Wisconsin</option>
+            <option>Wyoming</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <!-- Website -->
+        <div class="popup-field">
+          <label>Website</label>
+          <input type="text" name="website" placeholder="e.g. example.com" />
+        </div>
+
+        <!-- Email -->
+        <div class="popup-field">
+          <label>Email</label>
+          <input type="email" name="mail" placeholder="e.g. hello@company.com" />
+        </div>
+
+        <!-- LinkedIn -->
+        <div class="popup-field">
+          <label>LinkedIn</label>
+          <input type="text" name="linkedin" placeholder="LinkedIn URL" />
+        </div>
+
+        <!-- Lead source -->
+        <div class="popup-field">
+          <label>Lead source</label>
+          <select name="where_come_from" required>
+            <option value="" disabled selected>Select source</option>
+            <option>SEO</option>
+            <option>AI</option>
+            <option>Slack Community</option>
+            <option>Referral</option>
+            <option>Re-target</option>
+            <option>Outbound</option>
+            <option>Linkedin - Agus</option>
+          </select>
+        </div>
+
+        <!-- Referral source (shown only when Lead source = Referral) -->
+        <div class="popup-field" id="referralSourceWrapper" style="display:none">
+          <label>Referral – Client</label>
+          <input
+            type="text"
+            name="referal_source"
+            id="referralSourceInput"
+            placeholder="Type to search clients…"
+            list="referralList"
+            autocomplete="off"
+          />
+          <datalist id="referralList"></datalist>
+          <small class="muted">Choose the client who referred this account.</small>
+        </div>
+
+        <!-- About -->
+        <div class="popup-field full">
+          <label>About</label>
+          <textarea name="about" placeholder="Write a description..."></textarea>
+        </div>
+
+        <button type="submit" class="create-btn">Create</button>
+      </form>
     </div>
   </div>
-</div>
 
+  <!-- ====================== SORT TOAST ====================== -->
+  <div
+    id="crmSortToast"
+    class="sort-toast"
+    role="status"
+    aria-live="polite"
+    style="display:none"
+  >
+    <div class="sort-toast__content">
+      <div class="sort-toast__header">
+        <span class="sort-toast__dot"></span>
+        <span>Prepping the cutest view — sorting the table by <b>Status</b>…</span>
+      </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-  <script src="./assets/js/crm.js"></script>
+      <div
+        class="sort-toast__progress"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div class="sort-toast__bar" style="width:0%"></div>
+      </div>
+
+      <div class="sort-toast__meta">
+        <span id="sortToastPercent">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================== SCRIPTS ====================== -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  <script src="./assets/js/crm.js"></script>
 </body>
 </html>

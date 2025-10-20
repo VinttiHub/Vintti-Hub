@@ -1,30 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <!-- ---------- Meta ---------- -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Opportunities</title>
-  <link rel="stylesheet" href="./assets/css/opportunities.css" />
+  <meta name="theme-color" content="#0B3D91">
+
+  <!-- ---------- Icons & Favicons ---------- -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
+
+  <!-- ---------- Fonts ---------- -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
-<link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
-<link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
-<meta name="theme-color" content="#0B3D91">
 
+  <!-- ---------- Vendor CSS ---------- -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+  <!-- ---------- App CSS ---------- -->
+  <link rel="stylesheet" href="./assets/css/opportunities.css" />
 </head>
-<body class="light-mode">
 
-  <div class="sidebar">
+<body class="light-mode">
+  <!-- =========================================================
+       Sidebar
+       - Keep classes/ids as-is (used by CSS/JS elsewhere)
+    ========================================================== -->
+  <aside class="sidebar">
     <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
+
     <a class="menu-item" href="candidates.html">Candidates</a>
     <a class="menu-item" href="crm.html">CRM</a>
     <a class="menu-item active" href="opportunities.html">Opportunities</a>
+
+    <!-- Shown via JS for allowed users -->
     <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display: none;">📊 Opportunities Summary</a>
+
     <!-- Profile tile (bottom-left) -->
     <a href="profile.html" class="profile-tile" id="sidebarProfile">
       <span class="profile-avatar">
@@ -36,210 +52,249 @@
         <span id="profileEmail" class="profile-email"></span>
       </span>
     </a>
-  </div>
-<div class="sidebar-wow-toggle" id="sidebarToggleUnique">
-  <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon"></i>
-</div>
-  <div class="main-content">
-    <div class="page-header">
+  </aside>
+
+  <!-- Sidebar toggle (kept ids/classes) -->
+  <button class="sidebar-wow-toggle" id="sidebarToggleUnique" aria-label="Toggle sidebar">
+    <i class="fa-solid fa-chevron-left" id="sidebarToggleIcon" aria-hidden="true"></i>
+  </button>
+
+  <!-- =========================================================
+       Main Content
+    ========================================================== -->
+  <main class="main-content">
+    <!-- ---------- Page Header ---------- -->
+    <header class="page-header">
       <h1 class="page-title">Opportunities</h1>
-      <button class="new-btn" onclick="openPopup()">New</button>
-    </div>
-    <div class="filters-top-bar">
+      <button class="new-btn" type="button" onclick="openPopup()">New</button>
+    </header>
+
+    <!-- ---------- Filters Bar ---------- -->
+    <section class="filters-top-bar" aria-label="Filters">
+      <!-- DataTables page-length control target -->
       <div class="dataTables-length-wrapper" id="dataTablesLengthTarget"></div>
 
-  <div class="multi-filter" id="filterStageContainer">
-    <div class="filter-header filter-toggle" data-target="filterStage">
-      <label>Stage</label>
-      <span class="stage-dot-bar" id="stageDotBar"></span>
-      <button class="filter-toggle" data-target="filterStage">
-        <i class="fa-solid fa-angle-down"></i>
-      </button>
-    </div>
-    <div class="multi-select hidden" id="filterStage"></div>
-  </div>
-
-<div class="multi-filter" id="filterSalesLeadContainer">
-  <div class="filter-header filter-toggle" data-target="filterSalesLead">
-    <label>Sales Lead</label>
-    <button class="filter-toggle" data-target="filterSalesLead">
-      <i class="fa-solid fa-angle-down"></i>
-    </button>
-  </div>
-  <div class="multi-select hidden" id="filterSalesLead"></div>
-</div>
-
-<div class="multi-filter" id="filterHRLeadContainer">
-  <div class="filter-header filter-toggle" data-target="filterHRLead">
-    <label>HR Lead</label>
-    <button class="filter-toggle" data-target="filterHRLead">
-      <i class="fa-solid fa-angle-down"></i>
-    </button>
-  </div>
-  <div class="multi-select hidden" id="filterHRLead"></div>
-</div>
-<div class="text-filter">
-  <input type="text" id="accountSearchInput" placeholder="Search account..." />
-</div>
-
-
-    </div>
-
-  <div class="table-card">
-    <div class="table-scroll-wrapper">
-  <table id="opportunityTable" style="min-width: 1400px; width: max-content;">
-    <thead>
-      <tr>
-        <th>Stage</th>
-        <th>Account</th>
-        <th>Position</th>
-        <th>Type</th>
-        <th>Model</th>
-        <th>Sales Lead</th>
-        <th>HR Lead</th>
-        <th>Comment</th>
-        <th>Days</th>
-        <th>Days Since Batch</th>
-      </tr>
-    </thead>
-    <tbody id="opportunityTableBody"></tbody>
-  </table>
-  </div>
-  </div>
-</div>
-  </div>
-<!-- Popup -->
-<div id="popup" class="popup-overlay" style="display:none;">
-  <div class="popup-content">
-    <span class="close-btn" onclick="closePopup()">&times;</span>
-    <h2 class="popup-title">New Opportunity</h2>
-   <form id="createOpportunityForm" class="popup-form">
-  <div class="popup-row">
-    <div class="popup-field">
-      <label>Client Name</label>
-      <div class="input-with-button">
-        <input type="text" id="client_name" name="client_name" list="accountList" placeholder="Search by name..." />
-        <datalist id="accountList"></datalist>
+      <!-- Stage Filter (with dot bar) -->
+      <div class="multi-filter" id="filterStageContainer">
+        <div class="filter-header filter-toggle" data-target="filterStage">
+          <label>Stage</label>
+          <span class="stage-dot-bar" id="stageDotBar" aria-hidden="true"></span>
+          <button class="filter-toggle" data-target="filterStage" type="button" aria-expanded="false" aria-controls="filterStage">
+            <i class="fa-solid fa-angle-down" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="multi-select hidden" id="filterStage"></div>
       </div>
+
+      <!-- Sales Lead Filter -->
+      <div class="multi-filter" id="filterSalesLeadContainer">
+        <div class="filter-header filter-toggle" data-target="filterSalesLead">
+          <label>Sales Lead</label>
+          <button class="filter-toggle" data-target="filterSalesLead" type="button" aria-expanded="false" aria-controls="filterSalesLead">
+            <i class="fa-solid fa-angle-down" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="multi-select hidden" id="filterSalesLead"></div>
+      </div>
+
+      <!-- HR Lead Filter -->
+      <div class="multi-filter" id="filterHRLeadContainer">
+        <div class="filter-header filter-toggle" data-target="filterHRLead">
+          <label>HR Lead</label>
+          <button class="filter-toggle" data-target="filterHRLead" type="button" aria-expanded="false" aria-controls="filterHRLead">
+            <i class="fa-solid fa-angle-down" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="multi-select hidden" id="filterHRLead"></div>
+      </div>
+
+      <!-- Account Text Search -->
+      <div class="text-filter">
+        <input type="text" id="accountSearchInput" placeholder="Search account..." autocomplete="off" />
+      </div>
+    </section>
+
+    <!-- ---------- Table Card ---------- -->
+    <section class="table-card" aria-label="Opportunities table">
+      <div class="table-scroll-wrapper">
+        <table id="opportunityTable" style="min-width: 1400px; width: max-content;">
+          <thead>
+            <tr>
+              <th>Stage</th>
+              <th>Account</th>
+              <th>Position</th>
+              <th>Type</th>
+              <th>Model</th>
+              <th>Sales Lead</th>
+              <th>HR Lead</th>
+              <th>Comment</th>
+              <th>Days</th>
+              <th>Days Since Batch</th>
+            </tr>
+          </thead>
+          <tbody id="opportunityTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- =========================================================
+       Popups / Modals
+       (IDs & classes preserved; added ARIA where safe)
+    ========================================================== -->
+
+  <!-- Create Opportunity -->
+  <div id="popup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
+    <div class="popup-content">
+      <button class="close-btn" type="button" onclick="closePopup()" aria-label="Close">&times;</button>
+      <h2 class="popup-title" id="popupTitle">New Opportunity</h2>
+
+      <form id="createOpportunityForm" class="popup-form">
+        <div class="popup-row">
+          <div class="popup-field">
+            <label for="client_name">Client Name</label>
+            <div class="input-with-button">
+              <input
+                type="text"
+                id="client_name"
+                name="client_name"
+                list="accountList"
+                placeholder="Search by name..."
+                autocomplete="off" />
+              <datalist id="accountList"></datalist>
+            </div>
+          </div>
+
+          <div class="popup-field">
+            <label for="opp_model">Model</label>
+            <select id="opp_model" name="opp_model">
+              <option>Staffing</option>
+              <option>Recruiting</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="popup-field">
+          <label for="position_name">Position Name</label>
+          <input type="text" id="position_name" name="position_name" placeholder="E.g. Senior Accountant" autocomplete="off" />
+        </div>
+
+        <div class="popup-field">
+          <label for="sales_lead">Sales Lead</label>
+          <select id="sales_lead" name="sales_lead"></select>
+        </div>
+
+        <div class="popup-field">
+          <label for="opp_type">Opportunity type</label>
+          <select id="opp_type" name="opp_type">
+            <option>New</option>
+            <option>Replacement</option>
+          </select>
+        </div>
+
+        <!-- Replacement-only fields (toggled by JS) -->
+        <div id="replacementFields" style="display:none;">
+          <div class="popup-field">
+            <label for="replacementCandidate">Candidate to replace</label>
+            <input
+              type="text"
+              id="replacementCandidate"
+              list="replacementCandidates"
+              placeholder="Search candidate by name..."
+              autocomplete="off" />
+            <datalist id="replacementCandidates"></datalist>
+          </div>
+
+          <div class="popup-field">
+            <label for="replacementEndDate">Replacement end date</label>
+            <input type="date" id="replacementEndDate" />
+          </div>
+        </div>
+
+        <button type="submit" class="create-btn">Create</button>
+      </form>
     </div>
-    <div class="popup-field">
-      <label>Model</label>
-      <select id="opp_model" name="opp_model">
-        <option>Staffing</option>
-        <option>Recruiting</option>
+  </div>
+
+  <!-- Set Sourcing Date -->
+  <div id="sourcingPopup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sourcingTitle">
+    <div class="popup-content">
+      <button class="close-btn" type="button" onclick="closeSourcingPopup()" aria-label="Close">&times;</button>
+      <h2 id="sourcingTitle">Set Sourcing Date</h2>
+      <input type="date" id="sourcingDate" />
+      <button id="saveSourcingDate" type="button">Save</button>
+    </div>
+  </div>
+
+  <!-- Close Win -->
+  <div id="closeWinPopup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="closeWinTitle">
+    <div class="popup-content">
+      <button class="close-btn" type="button" onclick="closeCloseWinPopup()" aria-label="Close">&times;</button>
+      <h2 id="closeWinTitle">Set Close Win Info</h2>
+
+      <label for="closeWinHireInput">Hire:</label>
+      <div class="autocomplete" id="closeWinHireBox">
+        <input
+          type="text"
+          id="closeWinHireInput"
+          placeholder="Search candidate by name..."
+          autocomplete="off" />
+        <div class="autocomplete-list" id="closeWinHireList" role="listbox"></div>
+      </div>
+
+      <label for="closeWinDate">Close Date:</label>
+      <input type="date" id="closeWinDate" />
+
+      <button id="saveCloseWin" type="button">Save</button>
+    </div>
+  </div>
+
+  <!-- Since Last Sourcing -->
+  <div id="newSourcingPopup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="newSourcingTitle">
+    <div class="popup-content">
+      <button class="close-btn" type="button" onclick="closeNewSourcingPopup()" aria-label="Close">&times;</button>
+      <h2 id="newSourcingTitle">Since Last Sourcing</h2>
+      <input type="date" id="newSourcingDate" />
+      <button id="saveNewSourcing" type="button">Save</button>
+    </div>
+  </div>
+
+  <!-- Closed Lost -->
+  <div id="closeLostPopup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="closeLostTitle">
+    <div class="popup-content">
+      <button class="close-btn" type="button" onclick="closeCloseLostPopup()" aria-label="Close">&times;</button>
+      <h2 id="closeLostTitle">Closed Lost Details</h2>
+
+      <label for="closeLostDate">Close Date:</label>
+      <input type="date" id="closeLostDate" />
+
+      <label for="closeLostReason">Reason:</label>
+      <select id="closeLostReason">
+        <option value="">Select reason</option>
+        <option value="Ghosting">Ghosting</option>
+        <option value="Pricing">Pricing</option>
+        <option value="Shopping">Shopping</option>
+        <option value="Competencia">Competencia</option>
+        <option value="Timing">Timing</option>
       </select>
+
+      <button id="saveCloseLost" type="button">Save</button>
     </div>
   </div>
 
-  <div class="popup-field">
-    <label>Position Name</label>
-    <input type="text" id="position_name" name="position_name" placeholder="E.g. Senior Accountant" />
-  </div>
+  <!-- Stage toast -->
+  <div id="stage-toast" role="status" aria-live="polite">✨ Stage updated!</div>
 
-  <div class="popup-field">
-    <label>Sales Lead</label>
-    <select id="sales_lead" name="sales_lead"></select>
-  </div>
+  <!-- =========================================================
+       Scripts (vendor first, then app)
+       - Kept same filenames/paths
+       - Added 'defer' where safe to avoid render blocking
+    ========================================================== -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" defer></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js" defer></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js" defer></script>
 
-  <div class="popup-field">
-    <label>Opportunity type</label>
-    <select id="opp_type" name="opp_type">
-      <option>New</option>
-      <option>Replacement</option>
-    </select>
-  </div>
-  <!-- Replacement extra fields (hidden by default) -->
-  <div id="replacementFields" style="display:none;">
-    <div class="popup-field">
-      <label for="replacementCandidate">Candidate to replace</label>
-      <input type="text"
-             id="replacementCandidate"
-             list="replacementCandidates"
-             placeholder="Search candidate by name..."
-             autocomplete="off" />
-      <datalist id="replacementCandidates"></datalist>
-    </div>
-
-    <div class="popup-field">
-      <label for="replacementEndDate">Replacement end date</label>
-      <input type="date" id="replacementEndDate" />
-    </div>
-  </div>
-
-  <button type="submit" class="create-btn">Create</button>
-</form>
-  </div>
-</div>
-<!-- Popup Sourcing -->
-<div id="sourcingPopup" class="popup-overlay" style="display:none;">
-  <div class="popup-content">
-    <span class="close-btn" onclick="closeSourcingPopup()">&times;</span>
-    <h2>Set Sourcing Date</h2>
-    <input type="date" id="sourcingDate" />
-    <button id="saveSourcingDate">Save</button>
-  </div>
-</div>
-
-
-<!-- Popup Close Win -->
-<div id="closeWinPopup" class="popup-overlay" style="display:none;">
-  <div class="popup-content">
-    <span class="close-btn" onclick="closeCloseWinPopup()">&times;</span>
-    <h2>Set Close Win Info</h2>
-
-    <label>Hire:</label>
-    <div class="autocomplete" id="closeWinHireBox">
-      <input
-        type="text"
-        id="closeWinHireInput"
-        placeholder="Search candidate by name..."
-        autocomplete="off" />
-      <div class="autocomplete-list" id="closeWinHireList" role="listbox"></div>
-    </div>
-
-    <label>Close Date:</label>
-    <input type="date" id="closeWinDate" />
-
-    <button id="saveCloseWin">Save</button>
-  </div>
-</div>
-
-<!-- Nueva Popup para registrar nuevo sourcing -->
-<div id="newSourcingPopup" class="popup-overlay" style="display:none;">
-  <div class="popup-content">
-    <span class="close-btn" onclick="closeNewSourcingPopup()">&times;</span>
-    <h2>Since Last Sourcing</h2>
-    <input type="date" id="newSourcingDate" />
-    <button id="saveNewSourcing">Save</button>
-  </div>
-</div>
-<!-- Popup Closed Lost -->
-<div id="closeLostPopup" class="popup-overlay" style="display: none;">
-  <div class="popup-content">
-    <span class="close-btn" onclick="closeCloseLostPopup()">&times;</span>
-    <h2>Closed Lost Details</h2>
-    
-    <label>Close Date:</label>
-    <input type="date" id="closeLostDate" />
-
-    <label>Reason:</label>
-    <select id="closeLostReason">
-      <option value="">Select reason</option>
-      <option value="Ghosting">Ghosting</option>
-      <option value="Pricing">Pricing</option>
-      <option value="Shopping">Shopping</option>
-      <option value="Competencia">Competencia</option>
-      <option value="Timing">Timing</option>
-    </select>
-
-    <button id="saveCloseLost">Save</button>
-  </div>
-</div>
-<div id="stage-toast">✨ Stage updated!</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-<script src="./assets/js/main.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <!-- Your app bundle(s) -->
+  <script src="./assets/js/main.js" defer></script>
 </body>
 </html>

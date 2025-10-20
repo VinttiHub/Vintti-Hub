@@ -1,9 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
+  /* --------------------------------------
+   * 0) Theme boot
+   * ------------------------------------ */
   document.body.classList.add('light-mode');
 
+  /* --------------------------------------
+   * 1) Constants & DOM refs
+   * ------------------------------------ */
   const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
-  const tbody = document.getElementById('candidatesTableBody');
+  const tbody    = document.getElementById('candidatesTableBody');
+  const tableEl  = document.getElementById('candidatesTable');
 
+  /* --------------------------------------
+   * 2) Fetch + render candidates
+   * ------------------------------------ */
   fetch(`${API_BASE}/candidates/light_fast`)
     .then(r => r.json())
     .then(data => {
@@ -18,9 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const tr = document.createElement('tr');
         tr.dataset.id = candidate.candidate_id || '';
 
-        const phone = candidate.phone ? String(candidate.phone).replace(/\D/g, '') : '';
+        const rawPhone = candidate.phone ? String(candidate.phone) : '';
+        const phone    = rawPhone.replace(/\D/g, ''); // solo dígitos
         const linkedin = candidate.linkedin || '';
 
+        // condition inicial viene del payload; luego la refinamos asíncronamente
         const condition = candidate.condition || 'unhired';
         const chipClass = {
           active:   'status-active',
@@ -33,18 +45,22 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${candidate.name || '—'}</td>
           <td>${candidate.country || '—'}</td>
           <td>
-            ${phone
-              ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
-                  <i class='fab fa-whatsapp'></i>
-                </button>`
-              : '—'}
+            ${
+              phone
+                ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
+                     <i class='fab fa-whatsapp'></i>
+                   </button>`
+                : '—'
+            }
           </td>
           <td>
-            ${linkedin
-              ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
-                  <i class='fab fa-linkedin-in'></i>
-                </button>`
-              : '—'}
+            ${
+              linkedin
+                ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
+                     <i class='fab fa-linkedin-in'></i>
+                   </button>`
+                : '—'
+            }
           </td>
         `;
         frag.appendChild(tr);
@@ -52,6 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       tbody.replaceChildren(frag);
 
+      /* --------------------------------------
+       * 3) DataTable setup
+       * ------------------------------------ */
       const table = $('#candidatesTable').DataTable({
         responsive: true,
         pageLength: 50,
@@ -66,21 +85,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
+      // Mover el selector de "length" al wrapper custom si existe
       const dataTableLength = document.querySelector('.dataTables_length');
       const wrapper = document.getElementById('datatable-wrapper');
       if (dataTableLength && wrapper) wrapper.appendChild(dataTableLength);
 
+      // Búsqueda por nombre (columna 1) con pequeño debounce
       const searchInput = document.getElementById('searchByName');
-      let t;
-      searchInput.addEventListener('input', function () {
-        clearTimeout(t);
-        const v = this.value;
-        t = setTimeout(() => table.column(1).search(v).draw(), 150);
-      });
+      if (searchInput) {
+        let t;
+        searchInput.addEventListener('input', function () {
+          clearTimeout(t);
+          const v = this.value;
+          t = setTimeout(() => table.column(1).search(v).draw(), 150);
+        });
+      }
+
+      /* --------------------------------------
+       * 4) Post-hydration: resolver condición real
+       * ------------------------------------ */
+      kickoffConditionResolve(table);
     })
     .catch(err => console.error('❌ Error al obtener candidatos:', err));
 
-  // Navegación por fila
+  /* --------------------------------------
+   * 5) Row navigation (click fila -> details)
+   * ------------------------------------ */
   tbody.addEventListener('click', (e) => {
     const row = e.target.closest('tr');
     if (!row) return;
@@ -96,105 +126,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Sidebar
-  const sidebar = document.querySelector('.sidebar');
-  const mainContent = document.querySelector('.main-content');
+  /* --------------------------------------
+   * 6) Sidebar toggle (persistente en localStorage)
+   * ------------------------------------ */
+  const sidebar      = document.querySelector('.sidebar');
+  const mainContent  = document.querySelector('.main-content');
   const toggleButton = document.getElementById('sidebarToggle');
-  const toggleIcon = document.getElementById('sidebarToggleIcon');
+  const toggleIcon   = document.getElementById('sidebarToggleIcon');
 
-  const savedState = localStorage.getItem('sidebarHidden') === 'true';
-  if (savedState) {
-    sidebar.classList.add('custom-sidebar-hidden');
-    mainContent.classList.add('custom-main-expanded');
-    toggleIcon.classList.remove('fa-chevron-left');
-    toggleIcon.classList.add('fa-chevron-right');
-    toggleButton.style.left = '12px';
-  } else {
-    toggleButton.style.left = '220px';
+  if (sidebar && mainContent && toggleButton && toggleIcon) {
+    const savedState = localStorage.getItem('sidebarHidden') === 'true';
+    applySidebarState(savedState);
+
+    toggleButton.addEventListener('click', () => {
+      const isHidden = !sidebar.classList.contains('custom-sidebar-hidden');
+      applySidebarState(isHidden);
+      localStorage.setItem('sidebarHidden', isHidden);
+    });
   }
 
-  toggleButton.addEventListener('click', () => {
-    const isHidden = sidebar.classList.toggle('custom-sidebar-hidden');
+  function applySidebarState(isHidden) {
+    sidebar.classList.toggle('custom-sidebar-hidden', isHidden);
     mainContent.classList.toggle('custom-main-expanded', isHidden);
     toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
     toggleIcon.classList.toggle('fa-chevron-right', isHidden);
+    // Mantener posiciones existentes del toggle sin cambiar estilos globales
     toggleButton.style.left = isHidden ? '12px' : '220px';
-    localStorage.setItem('sidebarHidden', isHidden);
-  });
-
-  const summaryLink = document.getElementById('summaryLink');
-  const currentUserEmail = localStorage.getItem('user_email');
-  if (summaryLink && allowedEmails.includes(currentUserEmail)) summaryLink.style.display = 'block';
-
-  // ---------------- helpers Condition ----------------
-  async function kickoffConditionResolve(tableInstance) {
-    const rows = Array.from(document.querySelectorAll('#candidatesTableBody tr'));
-    const tasks = rows.map(tr => async () => {
-      const id = tr.dataset.id;
-      const cell = tr.querySelector('.condition-cell');
-      if (!id || !cell) return;
-
-      try {
-        const hire = await fetchHireDates(id);
-        const start = hire?.start_date || hire?.[0]?.start_date || null;
-        const end   = hire?.end_date   || hire?.[0]?.end_date   || null;
-
-        const condition = !start ? 'unhired' : (end ? 'inactive' : 'active');
-        renderCondition(cell, condition);
-
-        // (Opcional) actualizar DataTables internamente para filtros/búsquedas futuras
-        // Busca índice de la fila en DataTables y sincroniza la columna 0
-        const rowIdx = tableInstance.row(tr).index();
-        if (rowIdx != null && rowIdx >= 0) {
-          tableInstance.cell(rowIdx, 0).data(cell.innerHTML);
-        }
-      } catch (e) {
-        // En error, mostrar "unhired"
-        renderCondition(cell, 'unhired');
-      }
-    });
-
-    await runWithConcurrency(tasks, 8); // limita concurrencia para no saturar la red
-  }
-
-  async function fetchHireDates(candidateId) {
-    // Preferimos un GET que ya usas para PATCH: /candidates/:id/hire
-    // Debe devolver al menos { start_date, end_date } o []/{} si no hay registro
-    try {
-      const r = await fetch(`${API_BASE}/candidates/${candidateId}/hire`, { method: 'GET' });
-      if (!r.ok) return null;
-      return await r.json();
-    } catch {
-      return null;
-    }
-  }
-
-  function renderCondition(cell, condition) {
-    const cls = {
-      active: 'status-active',
-      inactive: 'status-inactive',
-      unhired: 'status-unhired'
-    }[condition] || 'status-unhired';
-
-    cell.innerHTML = `<span class="status-chip ${cls}">${condition}</span>`;
-  }
-
-  async function runWithConcurrency(tasks, limit) {
-    let i = 0;
-    const workers = new Array(limit).fill(0).map(async () => {
-      while (i < tasks.length) {
-        const t = tasks[i++];
-        await t();
-      }
-    });
-    await Promise.all(workers);
   }
 });
 
-// ===== Filtros tipo Excel (tu código tal cual) =====
+/* =========================================================================
+   Column filters (tipo Excel) — Global (usado por UI existente)
+   ====================================================================== */
 function createColumnFilter(columnIndex, table) {
+  // Cierra cualquier dropdown anterior
   document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
 
+  // Normaliza valores y deduplica
   const columnData = table
     .column(columnIndex)
     .data()
@@ -203,14 +171,17 @@ function createColumnFilter(columnIndex, table) {
     .filter((v, i, a) => v && a.indexOf(v) === i)
     .sort();
 
+  // Contenedor del dropdown
   const container = document.createElement('div');
   container.classList.add('filter-dropdown');
 
+  // Buscador local dentro del dropdown
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
   searchInput.placeholder = 'Search...';
   container.appendChild(searchInput);
 
+  // Lista de checks
   const checkboxContainer = document.createElement('div');
   checkboxContainer.classList.add('checkbox-list');
 
@@ -218,7 +189,8 @@ function createColumnFilter(columnIndex, table) {
     const label = document.createElement('label');
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.value = value.replace(/<[^>]*>/g, ''); // limpia HTML
+    // Limpia HTML si la celda venía con tags
+    checkbox.value = value.replace(/<[^>]*>/g, '');
     label.appendChild(checkbox);
     label.append(' ' + checkbox.value);
     checkboxContainer.appendChild(label);
@@ -226,9 +198,11 @@ function createColumnFilter(columnIndex, table) {
 
   container.appendChild(checkboxContainer);
 
+  // Monta el dropdown sobre el TH correspondiente
   const headerCell = document.querySelectorAll(`#candidatesTable thead th`)[columnIndex];
-  headerCell.appendChild(container);
+  if (headerCell) headerCell.appendChild(container);
 
+  // Filtro de texto dentro del dropdown
   searchInput.addEventListener('input', () => {
     const searchTerm = searchInput.value.toLowerCase();
     checkboxContainer.querySelectorAll('label').forEach(label => {
@@ -237,18 +211,23 @@ function createColumnFilter(columnIndex, table) {
     });
   });
 
+  // Aplica filtro a DataTables (OR con regex por valores seleccionados)
   checkboxContainer.addEventListener('change', () => {
     const selected = Array.from(checkboxContainer.querySelectorAll('input:checked')).map(c => c.value);
     table.column(columnIndex).search(selected.length ? selected.join('|') : '', true, false).draw();
   });
 }
 
-// Cerrar dropdown si haces clic fuera
+// Cierra dropdown si se hace clic fuera
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.filter-dropdown') && !e.target.classList.contains('column-filter')) {
     document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
   }
 });
+
+/* =========================================================================
+   Permissions (Summary / Equipments): visible por email
+   ====================================================================== */
 (() => {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
@@ -269,25 +248,28 @@ document.addEventListener('click', (e) => {
     'lara@vintti.com'
   ];
 
-  const summaryLink = document.getElementById('summaryLink');
+  const summaryLink    = document.getElementById('summaryLink');
   const equipmentsLink = document.getElementById('equipmentsLink');
 
-  if (summaryLink)   summaryLink.style.display   = summaryAllowed.includes(email)   ? '' : 'none';
-  if (equipmentsLink) equipmentsLink.style.display = equipmentsAllowed.includes(email) ? '' : 'none';
+  if (summaryLink)     summaryLink.style.display     = summaryAllowed.includes(email)     ? '' : 'none';
+  if (equipmentsLink)  equipmentsLink.style.display  = equipmentsAllowed.includes(email)  ? '' : 'none';
 })();
-// ——— Dashboard + Management Metrics (cross-pages) ———
+
+/* =========================================================================
+   Dashboard + Management Metrics (cross-pages)
+   ====================================================================== */
 (() => {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
   const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com', 'bahia@vintti.com']);
 
-  // Si no está permitido: no insertes los botones y elimina si ya existieran
+  // Si no está permitido: elimina si existieran y sal
   if (!email || !MGMT_ALLOWED.has(email)) {
     document.getElementById('dashboardLink')?.remove();
     document.getElementById('managementMetricsLink')?.remove();
-    return; // 👈 salimos, no hay parpadeo
+    return;
   }
 
-  // 1) Resolver anclas disponibles en el sidebar
+  // 1) Resolver anclas existentes en el sidebar
   const summary = document.getElementById('summaryLink')
     || document.querySelector('.sidebar a[href*="opportunities-summary"]')
     || document.querySelector('.sidebar a[href*="summary"]');
@@ -295,19 +277,18 @@ document.addEventListener('click', (e) => {
   const opportunities = document.getElementById('opportunitiesLink')
     || document.querySelector('.sidebar a[href*="opportunities.html"]');
 
-  // Equipments puede ser creado dinámicamente en algunas páginas
   const equipments = document.getElementById('equipmentsLink')
     || document.querySelector('.sidebar a[href*="equipments.html"]');
 
   // Punto de inserción preferido
   const anchor = equipments || summary || opportunities
-    || document.querySelector('.sidebar a, nav a, .menu a'); // último fallback
+    || document.querySelector('.sidebar a, nav a, .menu a');
   if (!anchor) return;
 
-  // 2) Base de estilos (hereda del Summary si existe, si no "menu-item")
+  // 2) Base de estilos (hereda del Summary si existe)
   const baseClass = (document.getElementById('summaryLink')?.className) || anchor.className || 'menu-item';
 
-  // 3) Crear enlaces solo si no existen
+  // 3) Crear enlaces si no existen
   if (!document.getElementById('dashboardLink')) {
     const a = document.createElement('a');
     a.id = 'dashboardLink';
@@ -340,11 +321,9 @@ document.addEventListener('click', (e) => {
         || document.querySelector('.sidebar a, nav a, .menu a');
       if (again) {
         o.disconnect();
-        // Reinyecta una vez
+        // Reinyecta una vez (evitando duplicados)
         setTimeout(() => {
-          // Evita duplicados
           if (!document.getElementById('dashboardLink') || !document.getElementById('managementMetricsLink')) {
-            // Reejecuta este mismo bloque creando los links faltantes
             const evt = document.createElement('script');
             evt.type = 'module';
             evt.textContent = `(${arguments.callee.toString()})();`;
@@ -356,3 +335,77 @@ document.addEventListener('click', (e) => {
     obs.observe(document.body, { childList: true, subtree: true });
   }
 })();
+
+/* =========================================================================
+   Helpers — hire condition resolution (kept public names)
+   ====================================================================== */
+
+/**
+ * Recorre filas y sincroniza la condición (active/inactive/unhired) contra la API.
+ * Limita concurrencia para no saturar la red y, si existe DataTables,
+ * actualiza su celda (col 0) para mantener búsquedas/ordenamientos consistentes.
+ */
+async function kickoffConditionResolve(tableInstance) {
+  const rows  = Array.from(document.querySelectorAll('#candidatesTableBody tr'));
+  const tasks = rows.map(tr => async () => {
+    const id   = tr.dataset.id;
+    const cell = tr.querySelector('.condition-cell');
+    if (!id || !cell) return;
+
+    try {
+      const hire  = await fetchHireDates(id);
+      const start = hire?.start_date || hire?.[0]?.start_date || null;
+      const end   = hire?.end_date   || hire?.[0]?.end_date   || null;
+
+      const condition = !start ? 'unhired' : (end ? 'inactive' : 'active');
+      renderCondition(cell, condition);
+
+      // sincroniza DataTables si está disponible
+      if (tableInstance) {
+        const rowIdx = tableInstance.row(tr).index();
+        if (rowIdx != null && rowIdx >= 0) {
+          tableInstance.cell(rowIdx, 0).data(cell.innerHTML);
+        }
+      }
+    } catch {
+      renderCondition(cell, 'unhired');
+    }
+  });
+
+  await runWithConcurrency(tasks, 8);
+}
+
+/** GET /candidates/:id/hire — devuelve { start_date, end_date } o []/{} */
+async function fetchHireDates(candidateId) {
+  try {
+    const r = await fetch(`${API_BASE}/candidates/${candidateId}/hire`, { method: 'GET' });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Renderiza chip de estado en la celda dada */
+function renderCondition(cell, condition) {
+  const cls = {
+    active:   'status-active',
+    inactive: 'status-inactive',
+    unhired:  'status-unhired'
+  }[condition] || 'status-unhired';
+
+  cell.innerHTML = `<span class="status-chip ${cls}">${condition}</span>`;
+}
+
+/** Ejecuta tareas async con límite de concurrencia */
+async function runWithConcurrency(tasks, limit = 8) {
+  let i = 0;
+  const workers = new Array(limit).fill(0).map(async () => {
+    while (i < tasks.length) {
+      const t = tasks[i++];
+      // protege contra fallas aisladas
+      try { await t(); } catch {}
+    }
+  });
+  await Promise.all(workers);
+}
