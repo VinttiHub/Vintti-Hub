@@ -1,280 +1,297 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+  <!--
+    Candidate Details · Cleaned & Commented
+  -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Candidate Details</title>
-  <link rel="stylesheet" href="./assets/css/candidate-details.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
 
+  <title>Candidate Details</title>
+
+  <!-- Fonts & Styles -->
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/css/candidate-details.css" />
+
+  <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
 </head>
+
 <body>
-  <button id="goBackButton" class="go-back-button">
+  <!-- ===== Back / Navigation ===== -->
+  <button id="goBackButton" class="go-back-button" aria-label="Go back">
     <span class="arrow">←</span>
     <span class="text">Go Back</span>
   </button>
 
-
   <div class="main-content">
-    <!-- AI Action Button -->
-    <div id="ai-action-button" class="pill hidden" >
+    <!-- ===== AI Action Pill (floating opener) ===== -->
+    <!-- Shown/hidden by JS (class .hidden). Keep IDs for JS hooks. -->
+    <div id="ai-action-button" class="pill hidden">
       <span style="font-size: 20px; margin-right: 8px;">✨</span>
       <span>AI Assistant</span>
     </div>
 
+    <!-- ===== AI Popup (Fullscreen modal) ===== -->
+    <!-- Kept IDs for JS to wire open/close & actions -->
+    <div id="ai-popup" class="hidden" role="dialog" aria-modal="true" aria-labelledby="ai-popup-title">
+      <button id="ai-close" class="modal-close" aria-label="Close">×</button>
+      <h2 id="ai-popup-title">✨ AI Assistant</h2>
 
-  <!-- AI Popup Fullscreen -->
-  <div id="ai-popup" class="hidden">
-    <button id="ai-close" class="modal-close" aria-label="Close">×</button>
-    <h2>✨ AI Assistant</h2>
-    
-    <label>LinkedIn Data</label>
-    <div id="ai-linkedin-note" style="
-      background:#f5f7fb;
-      border:1px dashed #d5dbea;
-      color:#222;
-      padding:10px 12px;
-      border-radius:10px;
-      font-size:14px;
-    ">
-      LinkedIn? VinttiHub covered it. You do you 💅
+      <!-- LinkedIn note (read-only) -->
+      <label>LinkedIn Data</label>
+      <div id="ai-linkedin-note" style="
+        background:#f5f7fb;
+        border:1px dashed #d5dbea;
+        color:#222;
+        padding:10px 12px;
+        border-radius:10px;
+        font-size:14px;
+      ">
+        LinkedIn? VinttiHub covered it. You do you 💅
+      </div>
+
+      <!-- PDF note (read-only) -->
+      <label>PDF Extract</label>
+      <div id="ai-pdf-note" style="
+        background:#f5f7fb;
+        border:1px dashed #d5dbea;
+        color:#222;
+        padding:10px 12px;
+        border-radius:10px;
+        font-size:14px;
+      ">
+        PDF? Already scanned by VinttiHub 🪄
+      </div>
+
+      <!-- Free-form comments for the AI flow -->
+      <label for="ai-comments">Do you want me to take something into account?</label>
+      <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
+
+      <button id="ai-lets-go">✨ Let's Go!</button>
     </div>
 
-    <label>PDF Extract</label>
-    <div id="ai-pdf-note" style="
-      background:#f5f7fb;
-      border:1px dashed #d5dbea;
-      color:#222;
-      padding:10px 12px;
-      border-radius:10px;
-      font-size:14px;
-    ">
-      PDF? Already scanned by VinttiHub 🪄
+    <!-- ===== Tabs (Overview / Resume / Opportunities / Hire) ===== -->
+    <div class="tabs" role="tablist" aria-label="Candidate sections">
+      <button class="tab active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
+      <button class="tab" data-tab="resume" role="tab" aria-controls="resume">Resume</button>
+      <button class="tab" data-tab="opportunities" role="tab" aria-controls="opportunities">Opportunities</button>
+      <button class="tab" data-tab="hire" role="tab" aria-controls="hire">Hire</button>
     </div>
 
-    <label>Do you want me to take something into account?</label>
-    <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
-
-    <button id="ai-lets-go">✨ Let's Go!</button>
-  </div>
-
-    <div class="tabs">
-      <button class="tab active" data-tab="overview">Overview</button>
-      <button class="tab" data-tab="resume">Resume</button>
-      <button class="tab" data-tab="opportunities">Opportunities</button>
-      <button class="tab" data-tab="hire">Hire</button>
-    </div>
-
-    <div id="overview" class="tab-content active">
+    <!-- ===================== OVERVIEW ===================== -->
+    <div id="overview" class="tab-content active" role="tabpanel" aria-labelledby="overview">
       <div class="grid">
 
-<!-- NAME -->
-<div class="field">
-  <label>
-    <svg class="icon" viewBox="0 0 24 24">
-      <path d="M12 12c2.7 0 4.5-1.8 4.5-4.5S14.7 3 12 3 7.5 4.8 7.5 7.5 9.3 12 12 12zm0 1.5c-3 0-9 1.5-9 4.5v1.5h18V18c0-3-6-4.5-9-4.5z"/>
-    </svg>
-    Name
-  </label>
-  <div id="field-name" contenteditable="true">—</div>
-</div>
-
-
-<!-- COUNTRY -->
-<div class="field">
-  <label style="display: flex; align-items: center; gap: 8px;">
-    <svg class="icon" ...></svg>
-    <span>Country</span>
-    <span id="country-flag" class="country-flag"></span>
-  </label>
-  <select id="field-country">
-    <option value="">—</option>
-    <option value="Argentina">Argentina</option>
-    <option value="Bolivia">Bolivia</option>
-    <option value="Brazil">Brazil</option>
-    <option value="Chile">Chile</option>
-    <option value="Colombia">Colombia</option>
-    <option value="Costa Rica">Costa Rica</option>
-    <option value="Cuba">Cuba</option>
-    <option value="Dominican Republic">Dominican Republic</option>
-    <option value="Ecuador">Ecuador</option>
-    <option value="El Salvador">El Salvador</option>
-    <option value="Guatemala">Guatemala</option>
-    <option value="Honduras">Honduras</option>
-    <option value="Mexico">Mexico</option>
-    <option value="Nicaragua">Nicaragua</option>
-    <option value="Panama">Panama</option>
-    <option value="Paraguay">Paraguay</option>
-    <option value="Peru">Peru</option>
-    <option value="Uruguay">Uruguay</option>
-    <option value="Venezuela">Venezuela</option>
-  </select>
-</div>
-
-
-<!-- PHONE -->
-<div class="field">
-  <label>
-    <svg class="icon" viewBox="0 0 24 24">
-      <path d="M22 16.92V21a1 1 0 0 1-1.1 1 19 19 0 0 1-8.3-3.1 19 19 0 0 1-5.6-5.6A19 19 0 0 1 2 3.1 1 1 0 0 1 3 2h4.09a1 1 0 0 1 1 .76c.2.86.53 1.68.96 2.44a1 1 0 0 1-.18 1.12L7.91 8.91a16 16 0 0 0 5.6 5.6l2.6-2.6a1 1 0 0 1 1.12-.18c.76.43 1.58.76 2.44.96a1 1 0 0 1 .76 1V16.92z"/>
-    </svg>
-    Phone number
-  </label>
-  <div id="field-phone" contenteditable="true">—</div>
-</div>
-
-<!-- EMAIL -->
-<div class="field">
-  <label>
-    <svg class="icon" viewBox="0 0 24 24">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6c0-1.1.9-2 2-2zm8 6 8-5H4l8 5zm0 2-8-5v10h16V7l-8 5z"/>
-    </svg>
-    Email
-  </label>
-  <div id="field-email" contenteditable="true">—</div>
-</div>
-
-<!-- LINKEDIN -->
-<div class="field">
-  <label style="display: flex; align-items: center; justify-content: space-between;">
-    <span>LinkedIn</span>
-    <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank">🔗</a>
-  </label>
-  <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
-</div>
-
-
-<!-- ENGLISH LEVEL -->
-<div class="field">
-  <label>
-    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20" />
-      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
-    </svg>
-    English Level
-  </label>
-  <select id="field-english-level">
-    <option value="">—</option>
-    <option value="Poor">Poor</option>
-    <option value="Regular">Regular</option>
-    <option value="Good">Good</option>
-    <option value="Very Good">Very Good</option>
-    <option value="Excellent">Excellent</option>
-  </select>
-</div>
-
-<!-- MIN SALARY -->
-<div class="field">
-  <label>
-    <svg class="icon" viewBox="0 0 24 24">
-      <path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
-    </svg>
-    Min Salary
-  </label>
-  <div id="field-salary-range" contenteditable="true">—</div>
-</div>
-<!-- CREATED BY -->
-<div class="field">
-  <label>Created by</label>
-  <div id="field-created-by">—</div>
-</div>
-
-<!-- CREATED AT -->
-<div class="field">
-  <label>Created at</label>
-  <div id="field-created-at">—</div>
-</div>
-<!-- ===== Documents row (CV + Resignation Letter) ===== -->
-<div class="doc-row">
-  <!-- CV / Resume -->
-  <div class="field doc-card" id="cv-card">
-    <label class="doc-card-label">
-      <span>Candidate CV</span>
-      <button id="cv-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
-        <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
-      </button>
-    </label>
-    <div class="value two-by-two">
-      <div id="cv-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
-        <input id="cv-input" type="file" accept=".pdf,image/*" hidden />
-        <div class="cv-cta">
-          Drop a CV here, or
-          <button id="cv-browse" type="button" class="btn-soft btn-sm">Browse</button>
+        <!-- NAME (contenteditable) -->
+        <div class="field">
+          <label>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 12c2.7 0 4.5-1.8 4.5-4.5S14.7 3 12 3 7.5 4.8 7.5 7.5 9.3 12 12 12zm0 1.5c-3 0-9 1.5-9 4.5v1.5h18V18c0-3-6-4.5-9-4.5z"/>
+            </svg>
+            Name
+          </label>
+          <div id="field-name" contenteditable="true">—</div>
         </div>
-        <div class="cv-hint">Only PDF is allowed</div>
-      </div>
-      <div id="cv-list" class="cv-list" style="grid-column: 1 / -1;"></div>
-    </div>
-  </div>
 
-  <!-- Resignation Letter -->
-  <div class="field doc-card" id="resig-card">
-    <label class="doc-card-label">
-      <span>Resignation Letter</span>
-      <button id="resig-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
-        <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
-      </button>
-    </label>
-    <div class="value two-by-two">
-      <div id="resig-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
-        <input id="resig-input" type="file" accept=".pdf" hidden />
-        <div class="cv-cta">
-          Drop a PDF here, or
-          <button id="resig-browse" type="button" class="btn-soft btn-sm">Browse</button>
+        <!-- COUNTRY (select + flag chip) -->
+        <div class="field">
+          <label style="display:flex; align-items:center; gap:8px;">
+            <!-- NOTE: This SVG is a placeholder in source; leave as-is to avoid breaking hooks -->
+            <svg class="icon" ...></svg>
+            <span>Country</span>
+            <span id="country-flag" class="country-flag"></span>
+          </label>
+          <select id="field-country">
+            <option value="">—</option>
+            <option value="Argentina">Argentina</option>
+            <option value="Bolivia">Bolivia</option>
+            <option value="Brazil">Brazil</option>
+            <option value="Chile">Chile</option>
+            <option value="Colombia">Colombia</option>
+            <option value="Costa Rica">Costa Rica</option>
+            <option value="Cuba">Cuba</option>
+            <option value="Dominican Republic">Dominican Republic</option>
+            <option value="Ecuador">Ecuador</option>
+            <option value="El Salvador">El Salvador</option>
+            <option value="Guatemala">Guatemala</option>
+            <option value="Honduras">Honduras</option>
+            <option value="Mexico">Mexico</option>
+            <option value="Nicaragua">Nicaragua</option>
+            <option value="Panama">Panama</option>
+            <option value="Paraguay">Paraguay</option>
+            <option value="Peru">Peru</option>
+            <option value="Uruguay">Uruguay</option>
+            <option value="Venezuela">Venezuela</option>
+          </select>
         </div>
-        <div class="cv-hint">Only PDF is allowed</div>
+
+        <!-- PHONE (contenteditable) -->
+        <div class="field">
+          <label>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22 16.92V21a1 1 0 0 1-1.1 1 19 19 0 0 1-8.3-3.1 19 19 0 0 1-5.6-5.6A19 19 0 0 1 2 3.1 1 1 0 0 1 3 2h4.09a1 1 0 0 1 1 .76c.2.86.53 1.68.96 2.44a1 1 0 0 1-.18 1.12L7.91 8.91a16 16 0 0 0 5.6 5.6l2.6-2.6a1 1 0 0 1 1.12-.18c.76.43 1.58.76 2.44.96a1 1 0 0 1 .76 1V16.92z"/>
+            </svg>
+            Phone number
+          </label>
+          <div id="field-phone" contenteditable="true">—</div>
+        </div>
+
+        <!-- EMAIL (contenteditable) -->
+        <div class="field">
+          <label>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6c0-1.1.9-2 2-2zm8 6 8-5H4l8 5zm0 2-8-5v10h16V7l-8 5z"/>
+            </svg>
+            Email
+          </label>
+          <div id="field-email" contenteditable="true">—</div>
+        </div>
+
+        <!-- LINKEDIN (editable link + external open button) -->
+        <div class="field">
+          <label style="display:flex; align-items:center; justify-content:space-between;">
+            <span>LinkedIn</span>
+            <!-- href is set by JS; keep blank but add rel for security when target=_blank -->
+            <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank" rel="noopener noreferrer">🔗</a>
+          </label>
+          <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
+        </div>
+
+        <!-- ENGLISH LEVEL (select) -->
+        <div class="field">
+          <label>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20" />
+              <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
+            </svg>
+            English Level
+          </label>
+          <select id="field-english-level">
+            <option value="">—</option>
+            <option value="Poor">Poor</option>
+            <option value="Regular">Regular</option>
+            <option value="Good">Good</option>
+            <option value="Very Good">Very Good</option>
+            <option value="Excellent">Excellent</option>
+          </select>
+        </div>
+
+        <!-- MIN SALARY (contenteditable) -->
+        <div class="field">
+          <label>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
+            </svg>
+            Min Salary
+          </label>
+          <div id="field-salary-range" contenteditable="true">—</div>
+        </div>
+
+        <!-- CREATED BY / CREATED AT (read-only text) -->
+        <div class="field">
+          <label>Created by</label>
+          <div id="field-created-by">—</div>
+        </div>
+
+        <div class="field">
+          <label>Created at</label>
+          <div id="field-created-at">—</div>
+        </div>
+
+        <!-- ===== Documents row: CV + Resignation Letter ===== -->
+        <div class="doc-row">
+          <!-- CV / Resume (drag & drop + list) -->
+          <div class="field doc-card" id="cv-card">
+            <label class="doc-card-label">
+              <span>Candidate CV</span>
+              <button id="cv-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
+                <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
+              </button>
+            </label>
+
+            <div class="value two-by-two">
+              <div id="cv-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
+                <input id="cv-input" type="file" accept=".pdf,image/*" hidden />
+                <div class="cv-cta">
+                  Drop a CV here, or
+                  <button id="cv-browse" type="button" class="btn-soft btn-sm">Browse</button>
+                </div>
+                <div class="cv-hint">Only PDF is allowed</div>
+              </div>
+
+              <div id="cv-list" class="cv-list" style="grid-column: 1 / -1;"></div>
+            </div>
+          </div>
+
+          <!-- Resignation Letter (drag & drop + list) -->
+          <div class="field doc-card" id="resig-card">
+            <label class="doc-card-label">
+              <span>Resignation Letter</span>
+              <button id="resig-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
+                <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
+              </button>
+            </label>
+
+            <div class="value two-by-two">
+              <div id="resig-drop" class="cv-drop" tabindex="0" style="grid-column: 1 / -1;">
+                <input id="resig-input" type="file" accept=".pdf" hidden />
+                <div class="cv-cta">
+                  Drop a PDF here, or
+                  <button id="resig-browse" type="button" class="btn-soft btn-sm">Browse</button>
+                </div>
+                <div class="cv-hint">Only PDF is allowed</div>
+              </div>
+
+              <div id="resig-list" class="cv-list" style="grid-column: 1 / -1;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RED FLAGS & COMMENTS (textareas) -->
+        <div class="field-group">
+          <div class="field textarea red-flag">
+            <label for="redFlags">Red Flags</label>
+            <textarea id="redFlags" placeholder="No red flags">—</textarea>
+          </div>
+
+          <div class="field textarea comments">
+            <label for="comments">Comments</label>
+            <textarea id="comments" placeholder="No comments">—</textarea>
+          </div>
+        </div>
+
+        <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
+        <div class="field textarea">
+          <label>Candidate success</label>
+          <div class="rich-toolbar" id="candidate-succes-toolbar">
+            <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
+            <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
+            <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
+          </div>
+          <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
+        </div>
+
+        <!-- EQUIPMENTS (chips + external details link) -->
+        <div class="field">
+          <label style="display:flex; align-items:center; justify-content:space-between;">
+            <span>Equipments</span>
+            <a id="equipments-details-link" class="pill pill-link" href="#" target="_blank" rel="noopener">Details →</a>
+          </label>
+          <div id="equipments-chips" class="chips-row">—</div>
+        </div>
+
       </div>
-      <div id="resig-list" class="cv-list" style="grid-column: 1 / -1;"></div>
-    </div>
-  </div>
-</div>
-
-
-<!-- RED FLAGS y COMMENTS -->
-<div class="field-group">
-  <!-- RED FLAGS -->
-  <div class="field textarea red-flag">
-    <label for="redFlags">Red Flags</label>
-    <textarea id="redFlags" placeholder="No red flags">—</textarea>
-  </div>
-
-  <!-- COMMENTS -->
-  <div class="field textarea comments">
-    <label for="comments">Comments</label>
-    <textarea id="comments" placeholder="No comments">—</textarea>
-  </div>
-
-</div>
- <!-- CANDIDATE SUCCESS -->
-<div class="field textarea">
-  <label>Candidate success</label>
-  <div class="rich-toolbar" id="candidate-succes-toolbar">
-    <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
-    <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
-    <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
-  </div>
-  <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
-</div>
-  <!-- EQUIPMENTS -->
-<div class="field">
-  <label style="display:flex; align-items:center; justify-content:space-between;">
-    <span>Equipments</span>
-    <a id="equipments-details-link" class="pill pill-link" href="#" target="_blank" rel="noopener">Details →</a>
-  </label>
-  <div id="equipments-chips" class="chips-row">—</div>
-</div>
-      </div>
     </div>
 
-    <div id="resume" class="tab-content">
+    <!-- ===================== RESUME ===================== -->
+    <div id="resume" class="tab-content" role="tabpanel" aria-labelledby="resume">
       <div class="cv-container">
-
         <!-- About -->
         <section class="cv-section">
           <div class="cv-heading-wrapper">
-          <h2 class="cv-heading">About</h2>
-          <button class="star-button" id="about-star-button" data-target="popup-about">⭐</button>
+            <h2 class="cv-heading">About</h2>
+            <button class="star-button" id="about-star-button" data-target="popup-about" title="Add comment">⭐</button>
           </div>
           <div class="cv-card">
             <p id="aboutField">Click here to edit your About section.</p>
@@ -284,8 +301,8 @@
         <!-- Work Experience -->
         <section class="cv-section" id="workExperienceSection">
           <div class="cv-heading-wrapper">
-          <h2 class="cv-heading">Work Experience</h2>
-          <button class="star-button" data-target="popup-work" title="Add comment">✨</button>
+            <h2 class="cv-heading">Work Experience</h2>
+            <button class="star-button" data-target="popup-work" title="Add comment">✨</button>
           </div>
           <div id="workExperienceList"></div>
           <button id="addWorkExperienceBtn">Add Work Experience</button>
@@ -294,8 +311,8 @@
         <!-- Education -->
         <section class="cv-section" id="educationSection">
           <div class="cv-heading-wrapper">
-          <h2 class="cv-heading">Education</h2>
-          <button class="star-button" data-target="popup-education" title="Add comment">✨</button>
+            <h2 class="cv-heading">Education</h2>
+            <button class="star-button" data-target="popup-education" title="Add comment">✨</button>
           </div>
           <div id="educationList"></div>
           <button id="addEducationBtn">Add Education</button>
@@ -304,12 +321,13 @@
         <!-- Tools -->
         <section class="cv-section" id="toolsSection">
           <div class="cv-heading-wrapper">
-          <h2 class="cv-heading">Tools</h2>
-          <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+            <h2 class="cv-heading">Tools</h2>
+            <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
           </div>
           <div class="cv-card" id="toolsList"></div>
           <button id="addToolBtn">Add Tool</button>
         </section>
+
         <!-- Languages -->
         <section class="cv-section" id="languagesSection">
           <div class="cv-heading-wrapper">
@@ -320,24 +338,26 @@
           <button id="addLanguageBtn">Add Language</button>
         </section>
 
-        <!-- Video Link -->
+        <!-- Video Link (rich toolbar + contenteditable) -->
         <section class="cv-section">
           <h2 class="cv-heading">Video Link</h2>
           <div class="cv-card">
-          <div class="rich-toolbar" id="video-toolbar">
-            <button type="button" data-target="videoLinkInput" data-command="bold"><b>B</b></button>
-            <button type="button" data-target="videoLinkInput" data-command="italic"><i>I</i></button>
-            <button type="button" data-target="videoLinkInput" data-command="insertUnorderedList">• List</button>
-          </div>
-          <div id="videoLinkInput" class="rich-input" contenteditable="true" placeholder="Paste video link or notes..."></div>
-
+            <div class="rich-toolbar" id="video-toolbar">
+              <button type="button" data-target="videoLinkInput" data-command="bold"><b>B</b></button>
+              <button type="button" data-target="videoLinkInput" data-command="italic"><i>I</i></button>
+              <button type="button" data-target="videoLinkInput" data-command="insertUnorderedList">• List</button>
+            </div>
+            <div id="videoLinkInput" class="rich-input" contenteditable="true" placeholder="Paste video link or notes..."></div>
           </div>
         </section>
       </div>
     </div>
-    <a id="client-version-btn" class="pill hidden" target="_blank"
-      href="resume-readonly.html?id=123">📄 Client Version</a>
-    <div id="opportunities" class="tab-content">
+
+    <!-- Client Read-only view (URL updated by JS) -->
+    <a id="client-version-btn" class="pill hidden" target="_blank" rel="noopener" href="resume-readonly.html?id=123">📄 Client Version</a>
+
+    <!-- ===================== OPPORTUNITIES ===================== -->
+    <div id="opportunities" class="tab-content" role="tabpanel" aria-labelledby="opportunities">
       <table id="opportunitiesTable">
         <thead>
           <tr>
@@ -353,198 +373,215 @@
         <tbody></tbody>
       </table>
     </div>
-    <div id="hire" class="tab-content">
-  <div class="grid">
-    <div id="opp-model-pill" class="pill">Model: —</div>
-    <div class="field">
-      <label>Salary</label>
-      <input type="number" id="hire-salary" />
-    </div>
-    <div class="field">
-      <label>Fee</label>
-      <input type="number" id="hire-fee" />
-    </div>
-    <!-- SET UP FEE (solo Staffing) -->
-<div class="field" id="setup-fee-field">
-  <label>Set up Fee</label>
-  <input type="number" id="hire-setup-fee" />
-</div>
-    <div class="field">
-      <label>Revenue</label>
-      <input type="number" id="hire-revenue"/>
-    </div>
-    <div class="field">
-      <label>Computer</label>
-      <select id="hire-computer">
-        <option value="">—</option>
-        <option value="yes">Yes</option>
-        <option value="no">No</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Working Schedule</label>
-      <input type="text" id="hire-working-schedule" />
-    </div>
-    <div class="field">
-      <label>PTO</label>
-      <input type="text" id="hire-pto" />
-    </div>
-    <div class="field">
-      <label>Start Date</label>
-      <div id="hire-start-picker" class="month-year"></div>
-    </div>
-    <div class="field">
-      <label>End Date</label>
-      <div id="hire-end-picker" class="month-year"></div>
-    </div>
-    <!-- Reminders Card -->
-<div class="field reminders-card">
-  <label>Internal follow-ups</label>
 
-  <div class="reminders-body">
-    <ul class="reminders-list">
-      <li>
-        <label class="rem-chk">
-          <input type="checkbox" id="rem-lara" />
-          <span class="rem-box"></span>
-          <span class="rem-name">Lara</span>
-        </label>
-        <div class="rem-countdown" id="cd-lar">—</div>
-        <div class="rem-msg" id="msg-lar"></div>
-      </li>
-      <li>
-        <label class="rem-chk">
-          <input type="checkbox" id="rem-jazmin" />
-          <span class="rem-box"></span>
-          <span class="rem-name">Jazmin</span>
-        </label>
-        <div class="rem-countdown" id="cd-jaz">—</div>
-        <div class="rem-msg" id="msg-jaz"></div>
-      </li>
-      <li>
-        <label class="rem-chk">
-          <input type="checkbox" id="rem-agustin" />
-          <span class="rem-box"></span>
-          <span class="rem-name">Agustin</span>
-        </label>
-        <div class="rem-countdown" id="cd-agus">—</div>
-        <div class="rem-msg" id="msg-agus"></div>
-      </li>
-    </ul>
+    <!-- ===================== HIRE ===================== -->
+    <div id="hire" class="tab-content" role="tabpanel" aria-labelledby="hire">
+      <div class="grid">
+        <!-- Model pill (text updated by JS) -->
+        <div id="opp-model-pill" class="pill">Model: —</div>
 
-    <button id="btn-send-reminders" type="button" class="btn-blue">
-      Information Complete — Send Reminders
-    </button>
+        <!-- Hire financials & terms -->
+        <div class="field">
+          <label for="hire-salary">Salary</label>
+          <input type="number" id="hire-salary" />
+        </div>
+
+        <div class="field">
+          <label for="hire-fee">Fee</label>
+          <input type="number" id="hire-fee" />
+        </div>
+
+        <!-- Set up Fee (staffing only; visibility handled by JS) -->
+        <div class="field" id="setup-fee-field">
+          <label for="hire-setup-fee">Set up Fee</label>
+          <input type="number" id="hire-setup-fee" />
+        </div>
+
+        <div class="field">
+          <label for="hire-revenue">Revenue</label>
+          <input type="number" id="hire-revenue" />
+        </div>
+
+        <div class="field">
+          <label for="hire-computer">Computer</label>
+          <select id="hire-computer">
+            <option value="">—</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="hire-working-schedule">Working Schedule</label>
+          <input type="text" id="hire-working-schedule" />
+        </div>
+
+        <div class="field">
+          <label for="hire-pto">PTO</label>
+          <input type="text" id="hire-pto" />
+        </div>
+
+        <!-- Date pickers (month-year widgets mounted by JS) -->
+        <div class="field">
+          <label>Start Date</label>
+          <div id="hire-start-picker" class="month-year"></div>
+        </div>
+
+        <div class="field">
+          <label>End Date</label>
+          <div id="hire-end-picker" class="month-year"></div>
+        </div>
+
+        <!-- ===== Internal Follow-ups (Reminders) ===== -->
+        <div class="field reminders-card">
+          <label>Internal follow-ups</label>
+
+          <div class="reminders-body">
+            <ul class="reminders-list">
+              <li>
+                <label class="rem-chk">
+                  <input type="checkbox" id="rem-lara" />
+                  <span class="rem-box"></span>
+                  <span class="rem-name">Lara</span>
+                </label>
+                <div class="rem-countdown" id="cd-lar">—</div>
+                <div class="rem-msg" id="msg-lar"></div>
+              </li>
+
+              <li>
+                <label class="rem-chk">
+                  <input type="checkbox" id="rem-jazmin" />
+                  <span class="rem-box"></span>
+                  <span class="rem-name">Jazmin</span>
+                </label>
+                <div class="rem-countdown" id="cd-jaz">—</div>
+                <div class="rem-msg" id="msg-jaz"></div>
+              </li>
+
+              <li>
+                <label class="rem-chk">
+                  <input type="checkbox" id="rem-agustin" />
+                  <span class="rem-box"></span>
+                  <span class="rem-name">Agustin</span>
+                </label>
+                <div class="rem-countdown" id="cd-agus">—</div>
+                <div class="rem-msg" id="msg-agus"></div>
+              </li>
+            </ul>
+
+            <button id="btn-send-reminders" type="button" class="btn-blue">
+              Information Complete — Send Reminders
+            </button>
+          </div>
+        </div>
+
+        <!-- References (rich input) -->
+        <div class="field textarea">
+          <label>References</label>
+          <div class="rich-toolbar">
+            <button type="button" data-command="bold"><b>B</b></button>
+            <button type="button" data-command="italic"><i>I</i></button>
+            <button type="button" data-command="insertUnorderedList">• List</button>
+          </div>
+          <div id="hire-references" class="rich-input" contenteditable="true" placeholder="Enter references here..."></div>
+        </div>
+
+        <!-- Extra Perks (rich input) -->
+        <div class="field textarea">
+          <label>Extra Perks</label>
+          <div class="rich-toolbar" id="extraperks-toolbar">
+            <button type="button" data-target="hire-extraperks" data-command="bold"><b>B</b></button>
+            <button type="button" data-target="hire-extraperks" data-command="italic"><i>I</i></button>
+            <button type="button" data-target="hire-extraperks" data-command="insertUnorderedList">• List</button>
+          </div>
+          <div id="hire-extraperks" class="rich-input" contenteditable="true" placeholder="Extra perks..."></div>
+        </div>
+
+        <!-- ===== Salary Updates ===== -->
+        <section class="cv-section full-width-salary-updates">
+          <h2 class="cv-heading">Salary Updates</h2>
+          <div id="salary-updates-box" class="cv-card">
+            <!-- Fetched salary updates will appear here -->
+          </div>
+          <button id="add-salary-update">➕ New Update</button>
+        </section>
+
+        <!-- Salary Update Popup -->
+        <div id="salary-update-popup" class="popup hidden" role="dialog" aria-modal="true" aria-labelledby="salary-update-title">
+          <h3 id="salary-update-title">New Salary Update</h3>
+          <button id="close-salary-update" class="modal-close" aria-label="Close">×</button>
+
+          <label for="update-salary">Salary ($)</label>
+          <input type="number" id="update-salary" placeholder="$" />
+
+          <label for="update-fee">Fee ($)</label>
+          <input type="number" id="update-fee" placeholder="$" />
+
+          <label for="update-date">Date</label>
+          <input type="date" id="update-date" />
+
+          <button id="save-salary-update">Save</button>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
 
-<!-- REFERENCES -->
-<div class="field textarea">
-  <label>References</label>
-  <div class="rich-toolbar">
-    <button type="button" data-command="bold"><b>B</b></button>
-    <button type="button" data-command="italic"><i>I</i></button>
-    <button type="button" data-command="insertUnorderedList">• List</button>
+  <!-- ===================== STAR POPUPS (AI prompts) ===================== -->
+  <div id="popup-about" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-about-title">
+    <button class="close-star-popup" aria-label="Close">✖</button>
+    <h3 id="popup-about-title">About Prompt</h3>
+    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
+    <textarea placeholder="What would you like to improve in this section?"></textarea>
+    <button class="generate-btn">Generate</button>
   </div>
-  <div id="hire-references" class="rich-input" contenteditable="true" placeholder="Enter references here..."></div>
-</div>
 
-<!-- EXTRA PERKS (to be enhanced next) -->
-<div class="field textarea">
-  <label>Extra Perks</label>
-  <div class="rich-toolbar" id="extraperks-toolbar">
-    <button type="button" data-target="hire-extraperks" data-command="bold"><b>B</b></button>
-    <button type="button" data-target="hire-extraperks" data-command="italic"><i>I</i></button>
-    <button type="button" data-target="hire-extraperks" data-command="insertUnorderedList">• List</button>
+  <div id="popup-education" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-education-title">
+    <button class="close-star-popup" aria-label="Close">✖</button>
+    <h3 id="popup-education-title">Education Prompt</h3>
+    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
+    <textarea placeholder="What would you like to improve in this section?"></textarea>
+    <button class="generate-btn">Generate</button>
   </div>
-  <div id="hire-extraperks" class="rich-input" contenteditable="true" placeholder="Extra perks..."></div>
-</div>
 
-
-  <section class="cv-section full-width-salary-updates">
-  <h2 class="cv-heading">Salary Updates</h2>
-  <div id="salary-updates-box" class="cv-card">
-    <!-- Fetched salary updates will appear here -->
+  <div id="popup-work" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-work-title">
+    <button class="close-star-popup" aria-label="Close">✖</button>
+    <h3 id="popup-work-title">Work Experience Prompt</h3>
+    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
+    <textarea placeholder="What would you like to improve in this section?"></textarea>
+    <button class="generate-btn">Generate</button>
   </div>
-  <button id="add-salary-update">➕ New Update</button>
-  </section>
 
-  <!-- SALARY UPDATE POPUP -->
-  <div id="salary-update-popup" class="popup hidden">
-    <h3>New Salary Update</h3>
-    <button id="close-salary-update" class="modal-close" aria-label="Close">×</button>
-    <label>Salary ($)</label>
-    <input type="number" id="update-salary" placeholder="$" />
-    <label>Fee ($)</label>
-    <input type="number" id="update-fee" placeholder="$" />
-    <label>Date</label>
-    <input type="date" id="update-date" />
-    <button id="save-salary-update">Save</button>
+  <div id="popup-tools" class="star-popup hidden" role="dialog" aria-modal="true" aria-labelledby="popup-tools-title">
+    <button class="close-star-popup" aria-label="Close">✖</button>
+    <h3 id="popup-tools-title">Tools Prompt</h3>
+    <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
+    <textarea placeholder="What would you like to improve in this section?"></textarea>
+    <button class="generate-btn">Generate</button>
   </div>
+
+  <!-- ===================== Loaders ===================== -->
+  <div id="about-loader" class="ai-loader hidden" aria-live="polite">
+    <span>Improving About...</span><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
   </div>
-</div>
 
-<div id="popup-about" class="star-popup hidden">
-  <button class="close-star-popup">✖</button>
-  <h3>About Prompt</h3>
-  <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-  <textarea placeholder="What would you like to improve in this section?"></textarea>
-  <button class="generate-btn">Generate</button>
-</div>
-
-<div id="popup-education" class="star-popup hidden">
-  <button class="close-star-popup">✖</button>
-  <h3>Education Prompt</h3>
-  <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-  <textarea placeholder="What would you like to improve in this section?"></textarea>
-  <button class="generate-btn">Generate</button>
-</div>
-
-<div id="popup-work" class="star-popup hidden">
-  <button class="close-star-popup">✖</button>
-  <h3>Work Experience Prompt</h3>
-  <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-  <textarea placeholder="What would you like to improve in this section?"></textarea>
-  <button class="generate-btn">Generate</button>
-</div>
-
-<div id="popup-tools" class="star-popup hidden">
-  <button class="close-star-popup">✖</button>
-  <h3>Tools Prompt</h3>
-  <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
-  <textarea placeholder="What would you like to improve in this section?"></textarea>
-  <button class="generate-btn">Generate</button>
-</div>
-
-
-
-<div id="about-loader" class="ai-loader hidden">
-  <span>Improving About...</span>
-  <span class="dot">.</span>
-  <span class="dot">.</span>
-  <span class="dot">.</span>
-</div>
-<div id="work-loader" class="ai-loader hidden">
-  <span>Improving Work Experience section, please wait</span>
-  <span class="dot">.</span>
-  <span class="dot">.</span>
-  <span class="dot">.</span>
-</div>
-<div id="tools-loader" class="ai-loader hidden">
-  <span>Improving Tools section, please wait</span>
-  <span class="dot">.</span>
-  <span class="dot">.</span>
-  <span class="dot">.</span>
-</div>
-<div id="resume-loader" class="resume-loader hidden">
-  <div class="resume-loader-box">
-    <div class="resume-loader-title">✨ Please wait</div>
-    <div id="resume-loader-phrase" class="resume-loader-phrase">Las chicas lindas saben esperar</div>
-    <div class="resume-loader-dots"><span>.</span><span>.</span><span>.</span></div>
+  <div id="work-loader" class="ai-loader hidden" aria-live="polite">
+    <span>Improving Work Experience section, please wait</span><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
   </div>
-</div>
 
+  <div id="tools-loader" class="ai-loader hidden" aria-live="polite">
+    <span>Improving Tools section, please wait</span><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+  </div>
+
+  <div id="resume-loader" class="resume-loader hidden" aria-live="polite">
+    <div class="resume-loader-box">
+      <div class="resume-loader-title">✨ Please wait</div>
+      <div id="resume-loader-phrase" class="resume-loader-phrase">Las chicas lindas saben esperar</div>
+      <div class="resume-loader-dots"><span>.</span><span>.</span><span>.</span></div>
+    </div>
+  </div>
+
+  <!-- ===================== Scripts ===================== -->
   <script defer src="./assets/js/resume.js"></script>
-  <script src="./assets/js/candidate-details.js"></script>
+  <script defer src="./assets/js/candidate-details.js"></script>
 </body>
 </html>

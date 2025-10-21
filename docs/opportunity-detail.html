@@ -1,223 +1,250 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- ===== Meta & Title ===== -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Opportunity Details</title>
+
+  <!-- ===== Fonts ===== -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- ===== Styles ===== -->
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- en <head> (o antes de cerrar </body>) -->
-  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
 
+  <!-- ===== Web Components / UI libs (modules load fast, safe to keep in head) ===== -->
+  <!-- Keep ONE emoji-picker include (the duplicate was removed) -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
 </head>
-<script src="./assets/js/pipeline.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-<script type="module" src="https://unpkg.com/emoji-picker-element?module"></script>
 
 <body>
+  <!-- ===== Fixed back button (with fallback) ===== -->
   <div id="fixedBackContainer">
     <button id="goBackButton" class="go-back-button" data-fallback="/opportunities.html">
-  <span class="arrow">←</span>
-  <span class="text">Go Back</span>
-</button>
+      <span class="arrow">←</span>
+      <span class="text">Go Back</span>
+    </button>
   </div>
+
+  <!-- ===== Header / Tabs ===== -->
   <header class="detail-header">
     <div class="header-left">
       <h1 class="detail-title">Opportunity Detail</h1>
     </div>
-      <nav class="detail-nav">
-        <ul>
-          <li class="nav-item active">Overview</li>
-          <li class="nav-item">Information</li>
-          <li class="nav-item">Job Description</li>
-          <li class="nav-item">Pipeline</li>
-          <li class="nav-item">Candidates</li>
-          <div class="nav-indicator"></div>
-        </ul>
-      </nav>
+    <nav class="detail-nav" aria-label="Opportunity sections">
+      <ul>
+        <li class="nav-item active">Overview</li>
+        <li class="nav-item">Information</li>
+        <li class="nav-item">Job Description</li>
+        <li class="nav-item">Pipeline</li>
+        <li class="nav-item">Candidates</li>
+        <div class="nav-indicator"></div>
+      </ul>
+    </nav>
   </header>
 
+  <!-- ===== Main Content ===== -->
   <main class="detail-main">
+    <!-- ========== Overview ========== -->
     <section id="overview" class="detail-section">
       <div class="section-header">
         <h2 class="overview-title">Overview</h2>
-        <p class="section-subtext"> </p>
+        <p class="section-subtext"></p>
       </div>
 
-<div class="overview-card pastel-card" style="padding-top: 2rem;">
-  <div class="stage-top">
-    <div class="opportunity-id-card">
-      <span class="label">Opportunity ID</span>
-      <span id="opportunity-id-text" data-id="">1</span>
-    </div>
-    <div class="opportunity-stage-card" id="stage-tag">
-      <span id="stage-text">—</span>
-    </div>
-  </div>
-  <div class="overview-grid">
-    <div class="input-group">
-      <label>Start Date</label>
-      <input type="text" id="start-date-input" value="" />
-    </div>
-    <div class="input-group">
-      <label>Signed</label>
-      <div class="info-tag" id="signed-tag">—</div>
-    </div>
-    <div class="input-group">
-      <label>Closed Date</label>
-      <input type="text" id="close-date-input" placeholder="Closed Date" />
-    </div>
-    <div class="input-group">
-      <label>Hire</label>
-      <input id="hire-display" type="text" readonly placeholder="No hire assigned yet" />
-    </div>
-  </div>
-  <div class="input-group comments-group">
-  <label>Comments</label>
-  <textarea id="comments-overview-textarea" placeholder="Write internal comments here..."></textarea>
-</div>
-</div>
-
-<!-- Client -->
-<div class="overview-card">
-  <div class="card-title-row">
-    <button class="card-toggle">
-      <h3>Client</h3>
-      <span class="toggle-icon">▾</span>
-    </button>
-  </div>
-  <div class="card-content">
-    <div class="overview-grid">
-      <div class="input-group"><label>Name</label><input id="client-name-input" value="" readonly/></div>
-      <div class="input-group">
-        <label>Size</label>
-        <input type="text" id="client-size-input" value="" readonly />
-      </div>
-      <div class="input-group"><label>State</label><input id="client-state-input" value="" ></div>
-      <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value="" ></div>
-      <div class="input-group"><label>Website</label><input id="client-website-input" value="" ></div>
-      <div class="input-group full"><label>Mail</label><input id="client-mail-input" value="" ></div>
-      <div class="input-group full"><label>About</label><textarea id="client-about-textarea" placeholder="Client background, culture, values..." class="taller-textarea"></textarea></div>
-    </div>
-  </div>
-</div>
-
-
-<!-- Details -->
-<div class="overview-card">
-  <button class="card-toggle">
-    <h3>Details</h3>
-    <span class="toggle-icon">▾</span>
-  </button>
-  <div class="card-content">
-    <div class="overview-grid">
-      <div class="input-group"><label>Opportunity Name</label><input id="details-opportunity-name" value="" ></div>
-      <div class="input-group"><label>Account</label><input id="details-account-name" value="" readonly/></div>
-      <div class="input-group"><label>Sales Lead</label><select id="details-sales-lead"><option></option></select></div>
-      <div class="input-group"><label>HR Lead</label><select id="details-hr-lead"><option></option></select></div>
-      <div class="input-group"><label>Model</label>
-        <select id="details-model">
-          <option value="staffing">Staffing</option>
-          <option value="recruiting">Recruiting</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</div>
-
-    </section>
-          <section id="information" class="detail-section hidden">
-        <div class="section-header">
-          <p class="section-subtext"></p>
-        </div>
-        <div class="overview-card">
-          <div class="overview-grid">
-            <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
-            <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
-            <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
-            <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
-            <div class="input-group"><label>Model</label>
-              <select id="model-select">
-                <option value="Staffing">Staffing</option>
-                <option value="Recruiting">Recruiting</option>
-              </select>
-            </div>
-            <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
-            <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
-            <div class="input-group">
-              <label>Expected Fee</label>
-              <input id="expected-fee-input" type="number" step="0.01" min="0" placeholder="0.00" />
-            </div>
-            <div class="input-group">
-              <label>Expected Revenue</label>
-              <input id="expected-revenue-input" type="number" step="0.01" min="0" placeholder="0.00" />
-            </div>
-            <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
-            <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
-            <div class="input-group full">
-              <label>Deep Dive Recording</label>
-              <input id="deepdive-recording-input" placeholder="Deep dive recording..." />
-            </div>
-            <div class="input-group full"><label>First Meeting Comments</label><textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea></div>
-            <div class="input-group full">
-              <label>Client Interviewing Process</label>
-              <div class="toolbar small-toolbar" id="interviewing-toolbar">
-                <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
-                <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
-                <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
-              </div>
-              <div id="interviewing-process-editor" contenteditable="true" class="job-description-editor" placeholder="Describe the client interview steps..."></div>
-            </div>
-
+      <!-- Summary card: stage, IDs, dates, signed, hire, comments -->
+      <div class="overview-card pastel-card" style="padding-top: 2rem;">
+        <div class="stage-top">
+          <div class="opportunity-id-card">
+            <span class="label">Opportunity ID</span>
+            <span id="opportunity-id-text" data-id="">1</span>
+          </div>
+          <div class="opportunity-stage-card" id="stage-tag">
+            <span id="stage-text">—</span>
           </div>
         </div>
-      </section>
 
+        <div class="overview-grid">
+          <div class="input-group">
+            <label>Start Date</label>
+            <input type="text" id="start-date-input" value="" />
+          </div>
+
+          <div class="input-group">
+            <label>Signed</label>
+            <div class="info-tag" id="signed-tag">—</div>
+          </div>
+
+          <div class="input-group">
+            <label>Closed Date</label>
+            <input type="text" id="close-date-input" placeholder="Closed Date" />
+          </div>
+
+          <div class="input-group">
+            <label>Hire</label>
+            <input id="hire-display" type="text" readonly placeholder="No hire assigned yet" />
+          </div>
+        </div>
+
+        <div class="input-group comments-group">
+          <label>Comments</label>
+          <textarea id="comments-overview-textarea" placeholder="Write internal comments here..."></textarea>
+        </div>
+      </div>
+
+      <!-- Client card -->
+      <div class="overview-card">
+        <div class="card-title-row">
+          <button class="card-toggle" aria-expanded="true">
+            <h3>Client</h3>
+            <span class="toggle-icon">▾</span>
+          </button>
+        </div>
+        <div class="card-content">
+          <div class="overview-grid">
+            <div class="input-group"><label>Name</label><input id="client-name-input" value="" readonly/></div>
+            <div class="input-group"><label>Size</label><input type="text" id="client-size-input" value="" readonly /></div>
+            <div class="input-group"><label>State</label><input id="client-state-input" value=""></div>
+            <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value=""></div>
+            <div class="input-group"><label>Website</label><input id="client-website-input" value=""></div>
+            <div class="input-group full"><label>Mail</label><input id="client-mail-input" value=""></div>
+            <div class="input-group full">
+              <label>About</label>
+              <textarea id="client-about-textarea" placeholder="Client background, culture, values..." class="taller-textarea"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Details card -->
+      <div class="overview-card">
+        <button class="card-toggle" aria-expanded="true">
+          <h3>Details</h3>
+          <span class="toggle-icon">▾</span>
+        </button>
+        <div class="card-content">
+          <div class="overview-grid">
+            <div class="input-group"><label>Opportunity Name</label><input id="details-opportunity-name" value=""></div>
+            <div class="input-group"><label>Account</label><input id="details-account-name" value="" readonly/></div>
+            <div class="input-group"><label>Sales Lead</label><select id="details-sales-lead"><option></option></select></div>
+            <div class="input-group"><label>HR Lead</label><select id="details-hr-lead"><option></option></select></div>
+            <div class="input-group">
+              <label>Model</label>
+              <select id="details-model">
+                <option value="staffing">Staffing</option>
+                <option value="recruiting">Recruiting</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Information ========== -->
+    <section id="information" class="detail-section hidden">
+      <div class="section-header"><p class="section-subtext"></p></div>
+
+      <div class="overview-card">
+        <div class="overview-grid">
+          <!-- Budget & Salary -->
+          <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
+          <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
+          <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
+          <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
+
+          <!-- Model (duplicate source of truth used by Fees visibility script) -->
+          <div class="input-group">
+            <label>Model</label>
+            <select id="model-select">
+              <option value="Staffing">Staffing</option>
+              <option value="Recruiting">Recruiting</option>
+            </select>
+          </div>
+
+          <!-- Other info -->
+          <div class="input-group"><label>Years of Experience</label><input id="years-experience-input" /></div>
+          <div class="input-group"><label>Set Up Fee</label><input id="fee-input" /></div>
+
+          <!-- Expecteds (toggled by model) -->
+          <div class="input-group">
+            <label>Expected Fee</label>
+            <input id="expected-fee-input" type="number" step="0.01" min="0" placeholder="0.00" />
+          </div>
+          <div class="input-group">
+            <label>Expected Revenue</label>
+            <input id="expected-revenue-input" type="number" step="0.01" min="0" placeholder="0.00" />
+          </div>
+
+          <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
+          <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
+          <div class="input-group full"><label>Deep Dive Recording</label><input id="deepdive-recording-input" placeholder="Deep dive recording..." /></div>
+
+          <!-- Rich notes (interviewing process) -->
+          <div class="input-group full">
+            <label>First Meeting Comments</label>
+            <textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea>
+          </div>
+
+          <div class="input-group full">
+            <label>Client Interviewing Process</label>
+            <div class="toolbar small-toolbar" id="interviewing-toolbar">
+              <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
+              <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
+              <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
+            </div>
+            <div id="interviewing-process-editor" contenteditable="true" class="job-description-editor" placeholder="Describe the client interview steps..."></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== Job Description ========== -->
     <section id="job" class="detail-section hidden">
       <div class="job-header">
         <div class="job-header-left">
           <h2>Job Description</h2>
           <p class="subtitle">Complete job description for this opportunity.</p>
         </div>
+
         <div class="job-header-right">
           <div id="header-actions">
-            <!-- fila superior: Send + Publish -->
+            <!-- Row 1: Send + Publish -->
             <div class="top-actions">
               <button id="send-btn" class="header-btn">Send</button>
               <button id="publish-career-btn" class="header-btn">Publish to Career Site</button>
             </div>
-
-            <!-- fila inferior: Pause + Delete -->
+            <!-- Row 2: Pause + Delete -->
             <div class="bottom-actions" id="sheet-quick-actions">
-              <button id="pause-career-btn" class="header-btn ghost-btn" title="Archive on Sheet">
-                <span class="icon">⏸️</span>
-              </button>
-              <button id="delete-career-btn" class="header-btn danger-ghost-btn" title="Delete on Sheet">
-                <span class="icon">🗑️</span>
-              </button>
+              <button id="pause-career-btn" class="header-btn ghost-btn" title="Archive on Sheet"><span class="icon">⏸️</span></button>
+              <button id="delete-career-btn" class="header-btn danger-ghost-btn" title="Delete on Sheet"><span class="icon">🗑️</span></button>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Job editor toolbar -->
       <div class="toolbar" id="job-toolbar">
         <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
         <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
         <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
+
+        <!-- Emoji picker trigger -->
         <div style="position: relative; display: inline-block;">
           <button id="emoji-trigger">😊</button>
           <emoji-picker id="emoji-picker" style="position: absolute; top: 100%; left: 0; display: none;"></emoji-picker>
         </div>
       </div>
+
       <div class="job-card">
-        <div id="job-description-textarea" contenteditable="true" class="job-description-editor" placeholder="Write your message here..."></div>  
+        <div id="job-description-textarea" contenteditable="true" class="job-description-editor" placeholder="Write your message here..."></div>
       </div>
     </section>
-    
+
+    <!-- ========== Pipeline ========== -->
     <section id="pipeline" class="detail-section hidden pipeline-section">
       <div class="pipeline-header">
         <h2>Pipeline</h2>
@@ -226,47 +253,56 @@
           <button id="signOffBtn">Sign off</button>
         </div>
       </div>
-    
+
       <div class="pipeline-columns">
-              <!-- Column: Applicant -->
-    <div class="column" data-status="applicant">
-      <h3 style="background-color:#fff7ed;" class="column-title">
-        <span class="column-name">Applicant</span>
-        <span class="column-count" id="count-applicant">0</span>
-      </h3>
-      <div class="card-container" id="applicant"></div>
-    </div>
-        <!-- Column 1 -->
-        <div class="column" data-status="contacted">
-          <h3 style="background-color: #fef2f2;" class="column-title"><span class="column-name">Contactado</span> <span class="column-count" id="count-contacted">0</span></h3>
-          <div class="card-container" id="contacted">
-          </div>
+        <!-- Column: Applicant -->
+        <div class="column" data-status="applicant">
+          <h3 class="column-title" style="background-color:#fff7ed;">
+            <span class="column-name">Applicant</span>
+            <span class="column-count" id="count-applicant">0</span>
+          </h3>
+          <div class="card-container" id="applicant"></div>
         </div>
+
+        <!-- Column: Contacted -->
+        <div class="column" data-status="contacted">
+          <h3 class="column-title" style="background-color:#fef2f2;">
+            <span class="column-name">Contactado</span>
+            <span class="column-count" id="count-contacted">0</span>
+          </h3>
+          <div class="card-container" id="contacted"></div>
+        </div>
+
         <!-- Column: No avanza primera -->
         <div class="column" data-status="no-advance">
-          <h3 style="background-color: #effaf0;" class="column-title"><span class="column-name">No avanza primera</span> <span class="column-count" id="count-no-advance">0</span></h3>
-          <div class="card-container" id="no-advance">
-            <!-- puedes dejarlo vacío por ahora -->
-          </div>
+          <h3 class="column-title" style="background-color:#effaf0;">
+            <span class="column-name">No avanza primera</span>
+            <span class="column-count" id="count-no-advance">0</span>
+          </h3>
+          <div class="card-container" id="no-advance"></div>
         </div>
-        <!-- Column 2 -->
+
+        <!-- Column: First interview -->
         <div class="column" data-status="first-interview">
-          <h3 style="background-color: #edf4ff;" class="column-title"><span class="column-name">Primera entrevista</span> <span class="column-count" id="count-first-interview">0</span></h3>
-          <div class="card-container" id="first-interview">
-          </div>
+          <h3 class="column-title" style="background-color:#edf4ff;">
+            <span class="column-name">Primera entrevista</span>
+            <span class="column-count" id="count-first-interview">0</span>
+          </h3>
+          <div class="card-container" id="first-interview"></div>
         </div>
-    
-        <!-- Column 3 -->
+
+        <!-- Column: Client process -->
         <div class="column" data-status="client-process">
-          <h3 style="background-color: #fef3fb;" class="column-title"><span class="column-name">En proceso con Cliente</span> <span class="column-count" id="count-client-process">0</span></h3>
-          <div class="card-container" id="client-process">
-          </div>
+          <h3 class="column-title" style="background-color:#fef3fb;">
+            <span class="column-name">En proceso con Cliente</span>
+            <span class="column-count" id="count-client-process">0</span>
+          </h3>
+          <div class="card-container" id="client-process"></div>
         </div>
       </div>
-
     </section>
-    
-    
+
+    <!-- ========== Candidates / Batches ========== -->
     <section id="candidates" class="detail-section fade-in">
       <div class="candidates-header">
         <div>
@@ -274,7 +310,8 @@
           <p class="subtitle">See the final candidates for this opportunity.</p>
         </div>
       </div>
-    
+
+      <!-- Batches table -->
       <div class="batch-table">
         <table>
           <thead>
@@ -284,31 +321,26 @@
               <th>Time (days)</th>
             </tr>
           </thead>
-            <tbody id="presentation-batch-table-body">
-              <!-- Aquí se insertarán dinámicamente las filas -->
-            </tbody>
+          <tbody id="presentation-batch-table-body"><!-- rows injected dynamically --></tbody>
         </table>
       </div>
-    
-      <div class="batch-detail" id="batch-detail-container">
-        <!-- Aquí se insertarán dinámicamente los batch-box -->
-      </div>
+
+      <!-- Batch detail cards -->
+      <div class="batch-detail" id="batch-detail-container"><!-- batch boxes injected dynamically --></div>
+
       <div class="create-batch-wrap">
         <button class="btn-create">Create new batch</button>
       </div>
     </section>
-    
   </main>
-  <!-- AI Assistant Button -->
-  <div id="ai-assistant-btn" style="display: none;">
-    ✨ AI Assistant ✨
-  </div>
 
-  <!-- AI Assistant Popup -->
+  <!-- ===== AI Assistant (hidden by default) ===== -->
+  <div id="ai-assistant-btn" style="display: none;">✨ AI Assistant ✨</div>
   <div id="ai-assistant-popup" class="ai-popup hidden">
     <div class="ai-popup-content">
       <span id="ai-assistant-close" class="ai-close-x">×</span>
       <h2>AI Assistant</h2>
+
       <label>Intro Call</label>
       <textarea placeholder="00:00 Speaker: Text here..."></textarea>
 
@@ -323,21 +355,29 @@
         <input type="file" id="ai-file-input" />
         <div class="upload-icon">📁</div>
       </div>
+
       <div class="button-group">
         <button id="ai-assistant-go">Let's Go 🚀</button>
       </div>
     </div>
   </div>
-    <!-- ADD Candidate Popup -->
-    <div id="candidatePopup" class="popup hidden">
-      <div class="popup-content">
-        <span class="close-btn" id="closePopup">&times;</span>
-        <h2>Add Candidate</h2>
-        <input type="text" id="candidate-name" placeholder="Full name *" autocomplete="off"/>
-        <p id="name-warning" style="display: none;">Please select a candidate from the list</p>
-        <ul id="pipelineCandidateSearchResults" class="search-results-list"></ul>
-        <div id="extra-fields">
+
+  <!-- ===== Popups: Candidate / Batch / Email flows ===== -->
+  <div id="candidatePopup" class="popup hidden">
+    <div class="popup-content">
+      <span class="close-btn" id="closePopup">&times;</span>
+      <h2>Add Candidate</h2>
+
+      <!-- Search + warning -->
+      <input type="text" id="candidate-name" placeholder="Full name *" autocomplete="off"/>
+      <p id="name-warning" style="display: none;">Please select a candidate from the list</p>
+      <ul id="pipelineCandidateSearchResults" class="search-results-list"></ul>
+
+      <!-- Fields for new candidate -->
+      <div id="extra-fields">
         <input type="text" id="candidate-email" placeholder="Email *" />
+
+        <!-- Country -->
         <select id="candidate-country" required>
           <option value="">Select country...</option>
           <option value="Argentina">🇦🇷 Argentina</option>
@@ -361,145 +401,154 @@
           <option value="Uruguay">🇺🇾 Uruguay</option>
           <option value="Venezuela">🇻🇪 Venezuela</option>
         </select>
+
+        <!-- Phone (kept simple; intl-tel-input available if you init it elsewhere) -->
         <div style="display: flex; gap: 8px;">
           <select id="phone-country-code" style="width: 30%;">
-            <option value="54" selected>🇦🇷 +54    Argentina</option>
-            <option value="591">🇧🇴 +591    Bolivia</option>
-            <option value="55">🇧🇷 +55    Brasil</option>
-            <option value="56">🇨🇱 +56    Chile</option>
-            <option value="57">🇨🇴 +57    Colombia</option>
-            <option value="506">🇨🇷 +506    Costa Rica</option>
-            <option value="53">🇨🇺 +53    Cuba</option>
-            <option value="593">🇪🇨 +593    Ecuador</option>
-            <option value="503">🇸🇻 +503    El Salvador</option>
-            <option value="502">🇬🇹 +502    Guatemala</option>
-            <option value="504">🇭🇳 +504    Honduras</option>
-            <option value="52">🇲🇽 +52    México</option>
-            <option value="505">🇳🇮 +505    Nicaragua</option>
-            <option value="507">🇵🇦 +507    Panamá</option>
-            <option value="595">🇵🇾 +595    Paraguay</option>
-            <option value="51">🇵🇪 +51    Perú</option>
-            <option value="1">🇵🇷 +1    Puerto Rico</option>
-            <option value="1">🇩🇴 +1    República Dominicana</option>
-            <option value="598">🇺🇾 +598    Uruguay</option>
-            <option value="58">🇻🇪 +58    Venezuela</option>
+            <option value="54" selected>🇦🇷 +54    Argentina</option>
+            <option value="591">🇧🇴 +591   Bolivia</option>
+            <option value="55">🇧🇷 +55    Brasil</option>
+            <option value="56">🇨🇱 +56    Chile</option>
+            <option value="57">🇨🇴 +57    Colombia</option>
+            <option value="506">🇨🇷 +506  Costa Rica</option>
+            <option value="53">🇨🇺 +53    Cuba</option>
+            <option value="593">🇪🇨 +593  Ecuador</option>
+            <option value="503">🇸🇻 +503  El Salvador</option>
+            <option value="502">🇬🇹 +502  Guatemala</option>
+            <option value="504">🇭🇳 +504  Honduras</option>
+            <option value="52">🇲🇽 +52    México</option>
+            <option value="505">🇳🇮 +505  Nicaragua</option>
+            <option value="507">🇵🇦 +507  Panamá</option>
+            <option value="595">🇵🇾 +595  Paraguay</option>
+            <option value="51">🇵🇪 +51    Perú</option>
+            <option value="1">🇵🇷 +1     Puerto Rico</option>
+            <option value="1">🇩🇴 +1     República Dominicana</option>
+            <option value="598">🇺🇾 +598  Uruguay</option>
+            <option value="58">🇻🇪 +58    Venezuela</option>
           </select>
           <input type="text" id="candidate-phone" placeholder="Phone number *" style="width: 70%;" />
         </div>
+
         <input type="text" id="candidate-linkedin" placeholder="LinkedIn URL *" />
         <button id="popupcreateCandidateBtn">Create Candidate</button>
-        </div>
-        <button id="popupAddExistingBtn" style="display:none;">Add Candidate to Pipeline</button>
       </div>
-    </div>
 
-<!-- Popup para agregar candidato a batch -->
-<div id="batchCandidatePopup" class="popup hidden">
-  <div class="popup-content">
-    <span class="close-btn" id="closeBatchPopup">&times;</span>
-    <h2>Select Candidate</h2>
-    <input type="text" id="candidateSearchInput" placeholder="Search by name..." />
-    <ul id="candidateSearchResults" class="search-results-list"></ul>
-  </div>
-</div>
-<template id="candidate-card-template">
-  <div class="candidate-card">
-    <div class="candidate-card-header">
-      <div class="candidate-info-inline">
-        <strong class="candidate-name">Name</strong>
-        <span class="candidate-country">🇲🇽 Mexico</span>
-        <span class="candidate-salary">$3500</span>
-      </div>
-            <select class="candidate-status-dropdown pipeline-only-hide">
-            <option disabled value="">Select status...</option>
-            <option value="Client rejected CV">Client rejected CV</option>
-            <option value="Client interviewing/testing">Client interviewing/testing</option>
-            <option value="Client rejected after interviewing">Client rejected after interviewing</option>
-            <option value="Candidate abandoned process">Candidate abandoned process</option>
-            <option value="Client hired">Client hired</option>
-          </select>
+      <button id="popupAddExistingBtn" style="display:none;">Add Candidate to Pipeline</button>
     </div>
-    <div class="preview">
-      <img class="candidate-img" src="" />
+  </div>
+
+  <!-- Popup: add candidate to batch -->
+  <div id="batchCandidatePopup" class="popup hidden">
+    <div class="popup-content">
+      <span class="close-btn" id="closeBatchPopup">&times;</span>
+      <h2>Select Candidate</h2>
+      <input type="text" id="candidateSearchInput" placeholder="Search by name..." />
+      <ul id="candidateSearchResults" class="search-results-list"></ul>
+    </div>
+  </div>
+
+  <!-- Template: pipeline candidate card -->
+  <template id="candidate-card-template">
+    <div class="candidate-card">
+      <div class="candidate-card-header">
+        <div class="candidate-info-inline">
+          <strong class="candidate-name">Name</strong>
+          <span class="candidate-country">🇲🇽 Mexico</span>
+          <span class="candidate-salary">$3500</span>
+        </div>
+
+        <select class="candidate-status-dropdown pipeline-only-hide">
+          <option disabled value="">Select status...</option>
+          <option value="Client rejected CV">Client rejected CV</option>
+          <option value="Client interviewing/testing">Client interviewing/testing</option>
+          <option value="Client rejected after interviewing">Client rejected after interviewing</option>
+          <option value="Candidate abandoned process">Candidate abandoned process</option>
+          <option value="Client hired">Client hired</option>
+        </select>
+      </div>
+
+      <div class="preview">
+        <img class="candidate-img" src="" />
         <div class="info">
           <span class="name candidate-name">Name</span>
           <span class="email candidate-email"></span>
           <span class="salary candidate-salary"></span>
-          <span class="country candidate-country"></span> <!-- 🔹 Agregar este span -->
+          <span class="country candidate-country"></span>
         </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Email popups -->
+  <div id="emailPopup" class="popup hidden">
+    <div class="popup-content email-popup-content">
+      <span class="close-btn" id="closeEmailPopup">&times;</span>
+      <h2>Send Job Description</h2>
+
+      <label>To</label>
+      <select id="email-to" multiple></select>
+
+      <label>CC</label>
+      <select id="email-cc" multiple></select>
+
+      <label>Subject</label>
+      <input type="text" id="email-subject" placeholder="Subject..." />
+
+      <label>Message</label>
+      <div id="email-message" class="rich-editor" contenteditable="true" style="height: 200px; border: 1px solid #ccc; padding: 10px; border-radius: 8px;"></div>
+
+      <button id="sendEmailBtn">Send</button>
     </div>
   </div>
-</template>
-<div id="emailPopup" class="popup hidden">
-  <div class="popup-content email-popup-content">
-    <span class="close-btn" id="closeEmailPopup">&times;</span>
-    <h2>Send Job Description</h2>
 
-    <label>To</label>
-    <select id="email-to" multiple></select>
-
-    <label>CC</label>
-    <select id="email-cc" multiple></select>
-
-    <label>Subject</label>
-    <input type="text" id="email-subject" placeholder="Subject..." />
-
-    <label>Message</label>
-    <div id="email-message" class="rich-editor" contenteditable="true" style="height: 200px; border: 1px solid #ccc; padding: 10px; border-radius: 8px;"></div>
-
-    <button id="sendEmailBtn">Send</button>
-  </div>
-</div>
-<!-- Popup inicial para elegir acción -->
-<div id="chooseCandidateActionPopup" class="popup hidden">
-  <div class="popup-content">
-    <span class="close-btn" id="closeChoosePopup">&times;</span>
-    <h2>Add to Pipeline</h2>
-    <p>Let’s get someone on board!</p>
-    <button id="openNewCandidatePopup">Create New Candidate</button>
-  </div>
-</div>
-<div id="preCreateCheckPopup" class="popup hidden">
-  <div class="popup-content">
-    <span class="close-btn" id="closePreCreatePopup">&times;</span>
-    <h2>Check Candidate</h2>
-    <p style="margin-bottom: 10px;">Let's check if this candidate already exists</p>
-    <input type="text" id="precreate-search" placeholder="Full name or search..." autocomplete="off"/>
-    
-    <!-- mensaje de coincidencias -->
-    <p id="precreate-found-msg" style="display: none; color: #444; font-weight: 500; margin-top: 10px;">We found some matches</p>
-    
-    <ul id="precreate-results" class="search-results-list"></ul>
-
-    <div id="precreate-no-match" style="display:none; margin-top:20px; text-align: center;">
-      <p>We're all set! Create a new candidate</p>
-      <button id="goToCreateCandidateBtn" class="arrow-btn"></button>
+  <div id="chooseCandidateActionPopup" class="popup hidden">
+    <div class="popup-content">
+      <span class="close-btn" id="closeChoosePopup">&times;</span>
+      <h2>Add to Pipeline</h2>
+      <p>Let’s get someone on board!</p>
+      <button id="openNewCandidatePopup">Create New Candidate</button>
     </div>
   </div>
-</div>
 
+  <div id="preCreateCheckPopup" class="popup hidden">
+    <div class="popup-content">
+      <span class="close-btn" id="closePreCreatePopup">&times;</span>
+      <h2>Check Candidate</h2>
+      <p style="margin-bottom: 10px;">Let's check if this candidate already exists</p>
 
-<div id="email-overlay" class="email-overlay hidden">
-  <div class="email-overlay-content">
-    <span class="spinner"></span>
-    <p id="email-overlay-message">Sending email...</p>
+      <input type="text" id="precreate-search" placeholder="Full name or search..." autocomplete="off"/>
+      <p id="precreate-found-msg" style="display: none; color: #444; font-weight: 500; margin-top: 10px;">We found some matches</p>
+      <ul id="precreate-results" class="search-results-list"></ul>
+
+      <div id="precreate-no-match" style="display:none; margin-top:20px; text-align: center;">
+        <p>We're all set! Create a new candidate</p>
+        <button id="goToCreateCandidateBtn" class="arrow-btn"></button>
+      </div>
+    </div>
   </div>
-</div>
 
-<!-- Sign Off Popup -->
-<div id="signOffPopup" class="popup hidden">
-  <div class="popup-content email-popup-content">
-    <span class="close-btn" id="closeSignOffPopup">&times;</span>
-    <h2>Send Rejection Email</h2>
+  <!-- Email overlay spinner -->
+  <div id="email-overlay" class="email-overlay hidden">
+    <div class="email-overlay-content">
+      <span class="spinner"></span>
+      <p id="email-overlay-message">Sending email...</p>
+    </div>
+  </div>
 
-    <label>To</label>
-    <select id="signoff-to" multiple></select>
+  <!-- Sign Off -->
+  <div id="signOffPopup" class="popup hidden">
+    <div class="popup-content email-popup-content">
+      <span class="close-btn" id="closeSignOffPopup">&times;</span>
+      <h2>Send Rejection Email</h2>
 
-    <label>Subject</label>
-    <input type="text" id="signoff-subject" value="Update on your application" />
+      <label>To</label>
+      <select id="signoff-to" multiple></select>
 
-    <label>Message</label>
-    <textarea id="signoff-message" style="height: 200px;">Dear applicant,
+      <label>Subject</label>
+      <input type="text" id="signoff-subject" value="Update on your application" />
+
+      <label>Message</label>
+      <textarea id="signoff-message" style="height: 200px;">Dear applicant,
 
 Thank you so much for being part of our process at Vintti. After careful consideration, we’ve decided to move forward with another candidate.
 
@@ -511,229 +560,226 @@ Wishing you all the best in your journey! ✨
 Warmly,
 the Vintti team</textarea>
 
-    <div style="margin-top: 10px;">
-      <button id="toggleLangBtn">Change Language</button>
+      <div style="margin-top: 10px;">
+        <button id="toggleLangBtn">Change Language</button>
+      </div>
+
+      <button id="sendSignOffBtn">Send</button>
     </div>
-
-    <button id="sendSignOffBtn">Send</button>
   </div>
-</div>
-<div id="approvalEmailPopup" class="popup hidden">
-  <div class="popup-content email-popup-content">
-    <span class="close-btn" id="closeApprovalEmailPopup">&times;</span>
-    <h2>Send Candidates for Approval</h2>
 
-    <label>To</label>
-    <select id="approval-to" multiple></select>
+  <!-- Approval email -->
+  <div id="approvalEmailPopup" class="popup hidden">
+    <div class="popup-content email-popup-content">
+      <span class="close-btn" id="closeApprovalEmailPopup">&times;</span>
+      <h2>Send Candidates for Approval</h2>
 
-    <label>CC</label>
-    <select id="approval-cc" multiple></select>
+      <label>To</label>
+      <select id="approval-to" multiple></select>
 
-    <label>Subject</label>
-    <input type="text" id="approval-subject" placeholder="Subject..." />
+      <label>CC</label>
+      <select id="approval-cc" multiple></select>
 
-    <label>Message</label>
-    <div id="approval-message" contenteditable="true" style="height: 300px; border: 1px solid #ccc; padding: 10px; border-radius: 8px; overflow-y: auto;"></div>
+      <label>Subject</label>
+      <input type="text" id="approval-subject" placeholder="Subject..." />
 
-    <button id="sendApprovalEmailBtn">Send</button>
-  </div>
-</div>
-<!-- Nueva popup para fecha de presentación -->
-<div id="createBatchPopup" class="popup hidden">
-  <div class="popup-content">
-    <span class="close-btn" id="closeCreateBatchPopup">&times;</span>
-    <h2>Create New Batch</h2>
-    <label for="presentationDateInput">Presentation Date</label>
-    <input type="date" id="presentationDateInput" />
-    <button id="confirmCreateBatchBtn">Create Batch</button>
-  </div>
-</div>
-<!-- Publish Career Popup -->
-<div id="publishCareerPopup" class="popup hidden">
-  <div class="popup-content" style="max-width:820px;">
-    <span class="close-btn" id="closePublishCareerPopup">&times;</span>
-    <h2>Publish to Career Site</h2>
-    <div class="career-actions">
-      <button id="career-ai-btn" class="btn-ghost" title="Generate sections from Job Description">⭐ Generate</button>
-      <span id="career-ai-status" class="ai-status" style="display:none;margin-left:8px;font-weight:600;">
-        ⏳ Generating…
-      </span>
+      <label>Message</label>
+      <div id="approval-message" contenteditable="true" style="height: 300px; border: 1px solid #ccc; padding: 10px; border-radius: 8px; overflow-y: auto;"></div>
+
+      <button id="sendApprovalEmailBtn">Send</button>
     </div>
-
-    <div class="overview-grid">
-      <!-- Job ID -->
-      <div class="input-group">
-        <label>Job ID</label>
-        <input id="career-jobid" type="text" readonly />
-      </div>
-
-      <!-- Job (title) -->
-      <div class="input-group">
-        <label>Job</label>
-        <input id="career-job" type="text" placeholder="Job title..." />
-      </div>
-
-      <!-- Country -->
-      <div class="input-group">
-        <label>Country</label>
-        <select id="career-country" multiple></select>
-      </div>
-
-      <!-- City -->
-      <div class="input-group">
-        <label>City</label>
-        <select id="career-city" disabled></select>
-      </div>
-
-      <!-- Job Type -->
-      <div class="input-group">
-        <label>Job Type</label>
-        <select id="career-jobtype">
-          <option value="" selected disabled>Select…</option>
-          <option value="full-time">Full time</option>
-          <option value="part-time">Part time</option>
-        </select>
-      </div>
-
-      <!-- Seniority -->
-      <div class="input-group">
-        <label>Seniority</label>
-        <select id="career-seniority">
-          <option value="" selected disabled>Select…</option>
-          <option value="entry-level">Entry-level</option>
-          <option value="junior">Junior</option>
-          <option value="semi-senior">Semi-senior</option>
-          <option value="senior">Senior</option>
-          <option value="manager">Manager</option>
-        </select>
-      </div>
-
-      <!-- Experience Level -->
-      <div class="input-group">
-        <label>Experience Level</label>
-        <select id="career-exp-level">
-          <option value="" selected disabled>Select…</option>
-          <option value="entry level job">Entry level job</option>
-          <option value="experienced">Experienced</option>
-        </select>
-      </div>
-
-      <!-- Field -->
-      <div class="input-group">
-        <label>Field</label>
-        <select id="career-field">
-          <option value="" selected disabled>Select…</option>
-          <option value="accounting">Finance & Accounting</option>
-          <option value="it">Sales & Business Development</option>
-          <option value="legal">Customer Support</option>
-          <option value="marketing">Marketing</option>
-          <option value="virtual assistant">Legal</option>
-          <option value="it">Human Resources</option>
-          <option value="legal">Virtual & Executive Assistant</option>
-          <option value="marketing">Design & Project Management</option>
-          <option value="virtual assistant">IT, Engineering & Software Development</option>
-        </select>
-      </div>
-
-      <!-- Work modality -->
-      <div class="input-group">
-        <label>Work modality</label>
-        <select id="career-modality">
-          <option value="" selected disabled>Select…</option>
-          <option value="remote">Remote</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="on site">On site</option>
-        </select>
-      </div>
-
-      <!-- Years of Experience -->
-      <div class="input-group">
-        <label>Years of Experience</label>
-        <input id="career-years" type="number" min="0" placeholder="e.g. 3" />
-      </div>
-
-  <!-- Description -->
-  <div class="input-group full field-desc">
-    <label>Description</label>
-    <textarea id="career-description" class="taller-textarea" placeholder="Job description..."></textarea>
   </div>
 
-  <!-- Requirements -->
-  <div class="input-group full field-req">
-    <label>Requirements</label>
-    <textarea id="career-requirements" class="taller-textarea" placeholder="Requirements..."></textarea>
+  <!-- Create batch -->
+  <div id="createBatchPopup" class="popup hidden">
+    <div class="popup-content">
+      <span class="close-btn" id="closeCreateBatchPopup">&times;</span>
+      <h2>Create New Batch</h2>
+      <label for="presentationDateInput">Presentation Date</label>
+      <input type="date" id="presentationDateInput" />
+      <button id="confirmCreateBatchBtn">Create Batch</button>
+    </div>
   </div>
 
-  <!-- Additional Info -->
-  <div class="input-group full field-add">
-    <label>Additional Information</label>
-    <textarea id="career-additional" class="taller-textarea" placeholder="Additional information..."></textarea>
+  <!-- Publish to career site -->
+  <div id="publishCareerPopup" class="popup hidden">
+    <div class="popup-content" style="max-width:820px;">
+      <span class="close-btn" id="closePublishCareerPopup">&times;</span>
+      <h2>Publish to Career Site</h2>
+
+      <div class="career-actions">
+        <button id="career-ai-btn" class="btn-ghost" title="Generate sections from Job Description">⭐ Generate</button>
+        <span id="career-ai-status" class="ai-status" style="display:none;margin-left:8px;font-weight:600;">⏳ Generating…</span>
+      </div>
+
+      <div class="overview-grid">
+        <div class="input-group">
+          <label>Job ID</label>
+          <input id="career-jobid" type="text" readonly />
+        </div>
+
+        <div class="input-group">
+          <label>Job</label>
+          <input id="career-job" type="text" placeholder="Job title..." />
+        </div>
+
+        <div class="input-group">
+          <label>Country</label>
+          <select id="career-country" multiple></select>
+        </div>
+
+        <div class="input-group">
+          <label>City</label>
+          <select id="career-city" disabled></select>
+        </div>
+
+        <div class="input-group">
+          <label>Job Type</label>
+          <select id="career-jobtype">
+            <option value="" selected disabled>Select…</option>
+            <option value="full-time">Full time</option>
+            <option value="part-time">Part time</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Seniority</label>
+          <select id="career-seniority">
+            <option value="" selected disabled>Select…</option>
+            <option value="entry-level">Entry-level</option>
+            <option value="junior">Junior</option>
+            <option value="semi-senior">Semi-senior</option>
+            <option value="senior">Senior</option>
+            <option value="manager">Manager</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Experience Level</label>
+          <select id="career-exp-level">
+            <option value="" selected disabled>Select…</option>
+            <option value="entry level job">Entry level job</option>
+            <option value="experienced">Experienced</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Field</label>
+          <select id="career-field">
+            <option value="" selected disabled>Select…</option>
+            <option value="accounting">Finance & Accounting</option>
+            <option value="it">Sales & Business Development</option>
+            <option value="legal">Customer Support</option>
+            <option value="marketing">Marketing</option>
+            <option value="virtual assistant">Legal</option>
+            <option value="it">Human Resources</option>
+            <option value="legal">Virtual & Executive Assistant</option>
+            <option value="marketing">Design & Project Management</option>
+            <option value="virtual assistant">IT, Engineering & Software Development</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Work modality</label>
+          <select id="career-modality">
+            <option value="" selected disabled>Select…</option>
+            <option value="remote">Remote</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="on site">On site</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Years of Experience</label>
+          <input id="career-years" type="number" min="0" placeholder="e.g. 3" />
+        </div>
+
+        <div class="input-group full field-desc">
+          <label>Description</label>
+          <textarea id="career-description" class="taller-textarea" placeholder="Job description..."></textarea>
+        </div>
+
+        <div class="input-group full field-req">
+          <label>Requirements</label>
+          <textarea id="career-requirements" class="taller-textarea" placeholder="Requirements..."></textarea>
+        </div>
+
+        <div class="input-group full field-add">
+          <label>Additional Information</label>
+          <textarea id="career-additional" class="taller-textarea" placeholder="Additional information..."></textarea>
+        </div>
+
+        <div class="actions-row">
+          <button id="saveDraftCareerBtn">Save Draft</button>
+          <button id="publishCareerBtn" class="header-btn">Publish</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="actions-row">
-    <button id="saveDraftCareerBtn">Save Draft</button>
-    <button id="publishCareerBtn" class="header-btn">Publish</button>
-  </div>
+  <!-- ===== Scripts (deferred to avoid blocking) ===== -->
+  <!-- Choices.js (multiselects) -->
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js" defer></script>
 
-  </div>
-</div>
+  <!-- Phone input lib (kept; only remove if confirmed unused across your JS) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js" defer></script>
 
-<script src="./assets/js/opportunity-detail.js"></script>
-<script>
-// === FEES: mostrar solo en Staffing, ocultar en Recruiting ===
-// Busca el .input-group del input por id
-function __fee_findGroup(inputId){
-  const el = document.getElementById(inputId);
-  return el ? el.closest('.input-group') : null;
-}
+  <!-- Your app bundles -->
+  <script src="./assets/js/pipeline.js" defer></script>
+  <script src="./assets/js/opportunity-detail.js" defer></script>
 
-// Aplica/quita clase fuerte
-function __fee_setVisible(inputId, visible){
-  const group = __fee_findGroup(inputId);
-  if (!group) return;
-  group.classList.toggle('hide-fee-group', !visible);
-  const input = group.querySelector('input, select, textarea');
-  if (input) input.disabled = !visible;
-}
+  <!-- ===== Fees visibility helper (kept names & behavior) ===== -->
+  <script>
+    // === FEES: show only for Staffing, hide for Recruiting ===
+    // Helper: find the .input-group parent of an input/select by ID
+    function __fee_findGroup(inputId){
+      const el = document.getElementById(inputId);
+      return el ? el.closest('.input-group') : null;
+    }
 
-// Lee modelo desde cualquiera de los selects (case-insensitive)
-function __fee_getModel(){
-  const a = document.getElementById('details-model')?.value || '';
-  const b = document.getElementById('model-select')?.value || '';
-  return (a || b).toString().trim().toLowerCase();
-}
+    // Helper: toggle visibility + disable input when hidden (no data loss on show)
+    function __fee_setVisible(inputId, visible){
+      const group = __fee_findGroup(inputId);
+      if (!group) return;
+      group.classList.toggle('hide-fee-group', !visible);
+      const input = group.querySelector('input, select, textarea');
+      if (input) input.disabled = !visible;
+    }
 
-// Aplica la visibilidad
-function __fee_apply(){
-  const isStaffing = __fee_getModel().includes('staff'); // tolerante a "Staffing"
-  __fee_setVisible('fee-input',           isStaffing); // Set Up Fee
-  __fee_setVisible('expected-fee-input',  isStaffing); // Expected Fee
-}
+    // Reads current model from either select (case-insensitive)
+    function __fee_getModel(){
+      const a = document.getElementById('details-model')?.value || '';
+      const b = document.getElementById('model-select')?.value || '';
+      return (a || b).toString().trim().toLowerCase();
+    }
 
-// Listeners sin colisiones
-function __fee_wire(){
-  ['details-model','model-select'].forEach(id=>{
-    const el = document.getElementById(id);
-    if (!el) return;
-    // evita duplicados
-    if (el.__fee_wired) return;
-    el.addEventListener('change', __fee_apply, { passive:true });
-    el.__fee_wired = true;
-  });
-  __fee_apply();
-}
+    // Apply visibility rules based on model
+    function __fee_apply(){
+      const isStaffing = __fee_getModel().includes('staff'); // tolerant to “Staffing”
+      __fee_setVisible('fee-input',          isStaffing); // Set Up Fee
+      __fee_setVisible('expected-fee-input', isStaffing); // Expected Fee
+    }
 
-// Corre al cargar
-document.addEventListener('DOMContentLoaded', () => {
-  __fee_wire();
-  // fallback: re-aplica tras cargas diferidas (por si setean el valor desde fetch)
-  setTimeout(__fee_apply, 100);
-  setTimeout(__fee_apply, 500);
-});
+    // Wire change listeners safely (idempotent)
+    function __fee_wire(){
+      ['details-model','model-select'].forEach(id=>{
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.__fee_wired) return;           // avoid duplicates
+        el.addEventListener('change', __fee_apply, { passive:true });
+        el.__fee_wired = true;
+      });
+      __fee_apply();
+    }
 
-// Si tu código cambia el modelo vía JS después, puedes llamar manualmente:
-// __fee_apply();
-</script>
+    // Init on DOM ready + delayed re-apply in case values are set after fetch
+    document.addEventListener('DOMContentLoaded', () => {
+      __fee_wire();
+      setTimeout(__fee_apply, 100);
+      setTimeout(__fee_apply, 500);
+    });
+
+    // If you change the model programmatically elsewhere, call: __fee_apply();
+  </script>
 </body>
 </html>
-

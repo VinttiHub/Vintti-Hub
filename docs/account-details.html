@@ -1,124 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- === Meta & Title === -->
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account Details</title>
-  <link rel="stylesheet" href="./assets/css/account-details.css" />
+
+  <!-- === Typography === -->
+  <!-- Onest for UI text -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- === Styles === -->
+  <link rel="stylesheet" href="./assets/css/account-details.css" />
+  <!-- Litepicker styles (calendar UI used elsewhere by your JS) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css" />
-  <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js"></script>
 </head>
 
 <body>
-<button id="goBackButton" class="go-back-button" title="Go Back">
-  ← Go Back
-</button>
+  <!-- ===== Global: Go Back control ===== -->
+  <!-- Kept id/class; added type and aria-label -->
+  <button id="goBackButton" class="go-back-button" type="button" title="Go Back" aria-label="Go back to previous page">
+    ← Go Back
+  </button>
 
-  <div class="main-content">
-    <h1 class="page-title">Account Details</h1>
-    <div class="tab-selector">
-      <button class="tab-btn active" data-tab="overview">Overview</button>
-      <button class="tab-btn" data-tab="employees">Employees</button>
+  <!-- ===== Main app container ===== -->
+  <main class="main-content" role="main" aria-labelledby="page-title">
+    <h1 id="page-title" class="page-title">Account Details</h1>
+
+    <!-- ===== Tab selector (Overview / Employees) ===== -->
+    <div class="tab-selector" role="tablist" aria-label="Account sections">
+      <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
+      <button class="tab-btn" data-tab="employees" role="tab" aria-selected="false" aria-controls="employees">Employees</button>
     </div>
 
-    <!-- Tab: Overview -->
-    <div class="tab-content active" id="overview">
-    <div class="accordion-section open">
-      <div class="accordion-header">
-        Account Info 🏢
-      </div>
+    <!-- =========================
+         TAB: OVERVIEW
+         ========================= -->
+    <section class="tab-content active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+      <!-- ——— Accordion: Account Info ——— -->
+      <div class="accordion-section open">
+        <div class="accordion-header">Account Info 🏢</div>
+
         <div class="accordion-content">
+          <!-- Two-column summary grid -->
           <div class="grid-two-cols">
-            <p><strong>Name:</strong> <input id="account-client-name" class="editable-input" type="text" placeholder="Not available" /></p>
+            <!-- Kept IDs & placeholders; input preserved for external JS to read/write -->
+            <p>
+              <strong>Name:</strong>
+              <input id="account-client-name" class="editable-input" type="text" placeholder="Not available" />
+            </p>
+
             <p><strong>Size:</strong> <span id="account-size" class="placeholder">Not available</span></p>
             <p><strong>Timezone:</strong> <span id="account-timezone" class="placeholder">Not available</span></p>
             <p><strong>State:</strong> <span id="account-state" class="placeholder">Not available</span></p>
+
+            <!-- External links kept with same IDs; added rel and aria where helpful -->
             <p>
               <strong>LinkedIn:</strong>
-              <a id="linkedin-link" href="#" target="_blank">
-                <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/linkedin.svg" alt="LinkedIn" style="width: 20px; vertical-align: middle; margin-right: 8px;">
+              <a id="linkedin-link" href="#" target="_blank" rel="noopener" aria-label="Open LinkedIn profile">
+                <img
+                  src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/linkedin.svg"
+                  alt=""
+                  style="width: 20px; vertical-align: middle; margin-right: 8px;"
+                />
+                <span class="sr-only">LinkedIn</span>
               </a>
-              <button class="edit-btn" onclick="editField('linkedin')">✎</button>
+              <button class="edit-btn" type="button" onclick="editField('linkedin')" aria-label="Edit LinkedIn">✎</button>
             </p>
+
             <p>
               <strong>Website:</strong>
-              <a id="website-link" href="#" target="_blank">
-                <img src="https://cdn-icons-png.flaticon.com/512/841/841364.png" alt="Website" style="width: 20px; vertical-align: middle; margin-right: 8px;">
+              <a id="website-link" href="#" target="_blank" rel="noopener" aria-label="Open company website">
+                <img
+                  src="https://cdn-icons-png.flaticon.com/512/841/841364.png"
+                  alt=""
+                  style="width: 20px; vertical-align: middle; margin-right: 8px;"
+                />
+                <span class="sr-only">Website</span>
               </a>
-              <button class="edit-btn" onclick="editField('website')">✎</button>
+              <button class="edit-btn" type="button" onclick="editField('website')" aria-label="Edit website">✎</button>
             </p>
-              <p><strong>Contract:</strong> <span class="placeholder">Not available</span></p>
-              <p><strong>Total Staffing Fee:</strong> <span id="account-tsf" class="placeholder">Not available</span></p>
-              <p><strong>Total Staffing Revenue:</strong> <span id="account-tsr" class="placeholder">Not available</span></p>
-              <p><strong>Total Recruiting Revenue:</strong> <span id="account-trr" class="placeholder">Not available</span></p>
+
+            <p><strong>Contract:</strong> <span class="placeholder">Not available</span></p>
+            <p><strong>Total Staffing Fee:</strong> <span id="account-tsf" class="placeholder">Not available</span></p>
+            <p><strong>Total Staffing Revenue:</strong> <span id="account-tsr" class="placeholder">Not available</span></p>
+            <p><strong>Total Recruiting Revenue:</strong> <span id="account-trr" class="placeholder">Not available</span></p>
           </div>
-          <!-- Contracts (full width, below grid) -->
-            <div class="contracts-block" id="contracts-block">
-              <div class="contracts-header">
-                <div class="contracts-titles">
-                  <h3>Contracts</h3>
-                  <p class="subtle">Upload and manage all contract PDFs for this account.</p>
-                </div>
-                <div class="upload-row">
-                  <input type="file" id="pdfUpload" accept="application/pdf" multiple />
-                  <button id="uploadPdfBtn">Upload</button>
-                </div>
+
+          <!-- ——— Contracts manager block (full width) ——— -->
+          <section class="contracts-block" id="contracts-block" aria-labelledby="contracts-title">
+            <div class="contracts-header">
+              <div class="contracts-titles">
+                <h3 id="contracts-title">Contracts</h3>
+                <p class="subtle">Upload and manage all contract PDFs for this account.</p>
               </div>
-              <div id="pdfPreviewContainer" class="contracts-list"></div>
+              <div class="upload-row">
+                <!-- Kept IDs; multiple upload preserved -->
+                <input type="file" id="pdfUpload" accept="application/pdf" multiple aria-label="Select contract PDF files" />
+                <button id="uploadPdfBtn" type="button">Upload</button>
+              </div>
             </div>
+
+            <!-- JS will render PDF previews here -->
+            <div id="pdfPreviewContainer" class="contracts-list" aria-live="polite"></div>
+          </section>
+
+          <!-- Text areas (notes) -->
           <div class="comment-box">
             <label for="comments"><strong>Comments:</strong></label>
-            <textarea id="comments" placeholder="Write comments here..."></textarea>
+            <textarea id="comments" placeholder="Write comments here..." rows="4"></textarea>
           </div>
+
           <div class="comment-box">
             <label for="pain-points"><strong>Pain Points:</strong></label>
-            <textarea id="pain-points" placeholder="Write Pain Points here..."></textarea>
+            <textarea id="pain-points" placeholder="Write Pain Points here..." rows="4"></textarea>
           </div>
         </div>
       </div>
-    
-      <!-- SECTION: Associated Opportunities -->
+
+      <!-- ——— Accordion: Associated Opportunities ——— -->
       <div class="accordion-section">
-        <div class="accordion-header">
-          Associated Opportunities 💼
-        </div>
+        <div class="accordion-header">Associated Opportunities 💼</div>
+
         <div class="accordion-content">
-          <table class="styled-table">
+          <!-- Kept classes; table body remains empty for JS population -->
+          <table class="styled-table" role="table" aria-label="Associated opportunities">
             <thead>
-              <tr><th>Position</th><th>Stage</th><th>Hire</th></tr>
+              <tr>
+                <th scope="col">Position</th>
+                <th scope="col">Stage</th>
+                <th scope="col">Hire</th>
+              </tr>
             </thead>
-            <tbody>
-            </tbody>
+            <tbody></tbody>
           </table>
         </div>
       </div>
-    </div>
-    
+    </section>
 
-    <!-- Tab: Employees -->
-    <div class="tab-content" id="employees">
+    <!-- =========================
+         TAB: EMPLOYEES
+         ========================= -->
+    <section class="tab-content" id="employees" role="tabpanel" aria-labelledby="employees-tab" hidden>
       <!-- Staffing Employees -->
       <div class="card">
         <h2>Employees – Staffing</h2>
-        <table class="styled-table expandable">
+        <table class="styled-table expandable" role="table" aria-label="Staffing employees">
           <thead>
             <tr>
-              <th>Status</th>
-              <th>Employee</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Position</th>
-              <th>Fee</th>
-              <th>Salary</th>
-              <th>Revenue</th>
-              <th>Discount $</th>
-              <th>Discount Date Range</th>
-              <th>Discount Months</th>
-              <th>Referral $</th>
-              <th>Referral Date Range</th>
-              <th>Buy Out $</th>
-              <th>Buy Out Month</th>
+              <th scope="col">Status</th>
+              <th scope="col">Employee</th>
+              <th scope="col">Start Date</th>
+              <th scope="col">End Date</th>
+              <th scope="col">Position</th>
+              <th scope="col">Fee</th>
+              <th scope="col">Salary</th>
+              <th scope="col">Revenue</th>
+              <th scope="col">Discount $</th>
+              <th scope="col">Discount Date Range</th>
+              <th scope="col">Discount Months</th>
+              <th scope="col">Referral $</th>
+              <th scope="col">Referral Date Range</th>
+              <th scope="col">Buy Out $</th>
+              <th scope="col">Buy Out Month</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -128,31 +172,43 @@
       <!-- Recruiting Employees -->
       <div class="card">
         <h2>Employees – Recruiting</h2>
-        <table class="styled-table expandable">
+        <table class="styled-table expandable" role="table" aria-label="Recruiting employees">
           <thead>
             <tr>
-              <th>Status</th>
-              <th>Employee</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>Position</th>
-              <th>Probation (Days)</th>
-              <th>Salary</th>
-              <th>Revenue</th>
-              <th>Referral</th>
-              <th>Referral Date Range</th>
+              <th scope="col">Status</th>
+              <th scope="col">Employee</th>
+              <th scope="col">Start Date</th>
+              <th scope="col">End Date</th>
+              <th scope="col">Position</th>
+              <th scope="col">Probation (Days)</th>
+              <th scope="col">Salary</th>
+              <th scope="col">Revenue</th>
+              <th scope="col">Referral</th>
+              <th scope="col">Referral Date Range</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-    </div>
-  </div>
-<div id="discount-alert" class="discount-alert hidden">
-  <button id="close-discount-alert" class="close-alert-btn">❌</button>
-  <strong>⚡ <span id="discount-count">0</span> discounts active</strong>
-  <ul id="discount-list"></ul>
-</div>
-  <script src="./assets/js/account-details.js"></script>
+    </section>
+  </main>
+
+  <!-- ===== Discounts floating alert ===== -->
+  <!-- Kept IDs/classes; visibility controlled by .hidden -->
+  <aside id="discount-alert" class="discount-alert hidden" aria-live="polite">
+    <button id="close-discount-alert" class="close-alert-btn" type="button" aria-label="Close discounts alert">❌</button>
+    <strong>⚡ <span id="discount-count">0</span> discounts active</strong>
+    <ul id="discount-list"></ul>
+  </aside>
+
+  <!-- ===== Scripts (deferred) ===== -->
+  <!-- Litepicker JS (used by your page JS). Loaded deferred to avoid blocking. -->
+  <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js" defer></script>
+
+  <!-- Page logic (kept path & name). Defer improves first paint and keeps execution order. -->
+  <script src="./assets/js/account-details.js" defer></script>
+
+  <!-- Fallback for users without JS -->
+  <noscript>This page requires JavaScript enabled to load account data.</noscript>
 </body>
 </html>
