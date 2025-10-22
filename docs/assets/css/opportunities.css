@@ -1,99 +1,14 @@
-/* =========================================================
-   Vintti Hub — Opportunities / Shared UI
-   Cleaned, commented & organized CSS (no class/ID renamed)
-   ========================================================= */
-
-/* ------------------------------
-   0) CSS Variables (Design tokens)
-   ------------------------------ */
 :root{
-  /* Layout */
-  --sidebar-width: 250px;     /* ancho único para TODOS los sidebars */
-  --toggle-size: 36px;        /* diámetro del botón burbuja */
-
-  /* Palette */
-  --bg-page: #fdf4ee;
-  --ink: #000;
-  --card: #fff;
-  --line: #e0e0e0;
-  --line-soft: #ececec;
-  --muted: #444;
-  --brand: #0044ff;
-  --brand-press: #0028ff;
-  --accent: #cdff30;          /* botones neón */
-  --accent-press: #b6ea2a;
-  --shadow-soft: 0 4px 12px rgba(0,0,0,.10);
-  --shadow-card: 0 1px 4px rgba(0,0,0,.05);
-
-  /* Stage dots (legenda) */
-  --stage-negotiating: #ffe39a;
-  --stage-interviewing: #d7e9ff;
-  --stage-sourcing:    #c8f5e6;
-  --stage-nda:         #ffdfc2;
-  --stage-deep-dive:   #e0ccff;
-  --stage-close-win:   #c8f7c8;
-  --stage-closed-lost: #ffcccc;
+  --sidebar-width: 250px;         /* ancho único para TODOS los sidebars */
+  --toggle-size: 36px;            /* diámetro del botón burbuja */
 }
 
-/* ------------------------------
-   1) Reset & Base
-   ------------------------------ */
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  padding: 0;
-  display: flex;                      /* sidebar + main */
-  font-family: 'Onest', sans-serif;
-  background-color: var(--bg-page);
-  color: var(--ink);
-}
-
-h1, h2, p { margin: 0; }
-
-/* ------------------------------
-   2) Sidebar (sticky column) + Toggle bubble
-   ------------------------------ */
+/* Sidebar del mismo ancho en todas las páginas */
 .sidebar{
-  position: sticky;       /* se mantiene fija mientras el main hace scroll */
-  top: 0;
-  height: 100vh;          /* llena alto del viewport */
   width: var(--sidebar-width);
-  background-color: var(--card);
-  border-right: 1px solid var(--line);
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center;
-  overflow-y: auto;       /* scroll si hay muchos items */
-  padding: 20px 0 14px;   /* aire inferior para la profile-tile sticky */
 }
 
-.sidebar .logo {
-  width: 100px;
-  margin-bottom: 30px;
-}
-
-.sidebar .menu-item{
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 180px;
-  height: 50px;
-  margin: 10px 0;
-  padding: 0 20px;
-  text-decoration: none;
-  color: var(--brand);
-  border: 2px solid var(--brand);
-  border-radius: 30px;
-  font-weight: 600;
-  font-size: 16px;
-  text-align: center;
-  transition: background-color .3s, color .3s;
-}
-.sidebar .menu-item.active,
-.sidebar .menu-item:hover{ background-color: var(--brand); color: #fff; }
-
-/* Botón burbuja que vive al borde derecho del sidebar (mitad adentro/mitad afuera) */
+/* Botón burbuja SIEMPRE pegado al borde derecho del sidebar (mitad adentro, mitad afuera) */
 .sidebar-wow-toggle{
   position: fixed;
   top: 20px;
@@ -102,351 +17,1715 @@ h1, h2, p { margin: 0; }
   height: var(--toggle-size);
   background-color: #fff;
   border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   z-index: 10000;
   box-shadow: 0 4px 12px rgba(0,0,0,.25);
   cursor: pointer;
   transition: left .3s ease, transform .3s ease, background .3s ease;
 }
-/* Cuando ocultas el sidebar con tu clase personalizada, pegamos la burbuja al borde */
-.custom-sidebar-hidden + .sidebar-wow-toggle{ left: 12px; }
 
-/* Variante si usas .sidebar-hidden en el <body> u otro wrapper */
-.sidebar-hidden .sidebar-wow-toggle{ left: 12px !important; }
-.sidebar-wow-toggle:hover{ background:#f0f0f0; transform: scale(1.1); }
-.sidebar-wow-toggle i{ transition: transform .3s ease; font-size: 16px; }
-.rotated-icon{ transform: rotate(180deg); }
-
-/* Toggle minimalista alternativo (icono fijo) */
-.sidebar-toggle-icon{
-  position: fixed; top: 12px; left: calc(var(--sidebar-width) - 30px);
-  cursor: pointer; z-index: 9999; font-size: 18px;
-  background: #fff; border-radius: 50%; padding: 5px;
-  box-shadow: 0 0 6px rgba(0,0,0,.15); transition: left .3s ease;
+/* Cuando el sidebar está oculto, la burbuja se va a 12px del borde de la ventana */
+.custom-sidebar-hidden + .sidebar-wow-toggle{
+  left: 12px;
 }
-.custom-sidebar-hidden + .sidebar-toggle-icon{ left: 12px; }
 
-/* Ocultar realmente el sidebar si aplicas tu clase */
-.custom-sidebar-hidden{ display: none !important; }
-.sidebar.custom-sidebar-hidden{ left: calc(-1 * var(--sidebar-width)); }
-.custom-main-expanded{ width: 100% !important; margin-left: 0 !important; transition: all .3s ease; }
-
+/* (opcional) en móviles, muévelo a 12px para evitar desalineados si ocultas el sidebar */
 @media (max-width: 900px){
-  .sidebar{ display: none; }
   .sidebar-wow-toggle{ left: 12px; }
 }
 
-/* ------------------------------
-   3) Main layout wrappers
-   ------------------------------ */
-.main-content{ flex: 1; padding: 30px; overflow-x: hidden; }
-
-.page-header{
-  display: flex; justify-content: space-between; align-items: center;
-  background-color: var(--brand); color: #fff; border-radius: 20px;
-  padding: 20px 30px; margin-bottom: 20px; box-shadow: var(--shadow-soft);
+/* GENERAL RESET */
+body {
+    font-family: 'Onest', sans-serif;
+    background-color: #fdf4ee;
+    color: #000;
+    margin: 0;
+    padding: 0;
+    display: flex;
 }
-.page-header .page-title{ font-size: 28px; font-weight: 700; }
 
-/* Primary action (neón) */
-.new-btn{
-  background-color: var(--accent); color: #000; font-weight: 700;
-  border: 0; padding: 10px 25px; border-radius: 20px; cursor: pointer; font-size: 16px;
-  transition: background-color .3s;
+/* SIDEBAR */
+.sidebar {
+    width: 250px;
+    background-color: #fff;
+    border-right: 1px solid #e0e0e0;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
-.new-btn:hover{ background-color: var(--accent-press); }
 
-/* ------------------------------
-   4) Table card + Datatable sizing
-   ------------------------------ */
-.table-card{
-  position: relative;
-  background: var(--card);
+.sidebar .logo {
+    width: 100px;
+    margin-bottom: 30px;
+}
+
+.sidebar .menu-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 180px; /* ancho fijo */
+    height: 50px; /* alto fijo */
+    margin: 10px 0;
+    padding: 0 20px; /* un poco de padding horizontal por si quieres */
+    text-decoration: none;
+    color: #0044ff;
+    border: 2px solid #0044ff;
+    border-radius: 30px;
+    font-weight: 600;
+    font-size: 16px;
+    text-align: center;
+    transition: background-color 0.3s, color 0.3s;
+    box-sizing: border-box; /* para que padding + border no lo desborden */
+}
+
+.sidebar .menu-item.active,
+.sidebar .menu-item:hover {
+    background-color: #0044ff;
+    color: #fff;
+}
+
+
+.main-content {
+  flex: 1;
+  padding: 30px;
+  overflow-x: hidden; /* ❌ Previene scroll horizontal global */
+}
+
+.new-btn {
+    background-color: #cdff30;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.new-btn:hover {
+    background-color: #b6ea2a;
+}
+
+/* TABLE STYLES */
+#opportunityTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+}
+
+#opportunityTable thead th {
+    background-color: transparent;
+    text-align: left;
+    padding: 12px 15px;
+    font-weight: 600;
+    color: #000;
+    border-bottom: 2px solid #f0f0f0;
+    font-size: 14px;
+}
+
+#opportunityTable tbody tr {
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+#opportunityTable tbody td {
+    padding: 12px 15px;
+    font-size: 14px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f9f9f9;
+}
+
+/* STAGE PILL COLORS */
+.stage-pill {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.stage-closewin {
+    background-color: #0b3d2e;
+}
+
+.stage-negotiating {
+    background-color: #f9c6d0;
+    color: #000;
+}
+
+.stage-interviewing {
+    background-color: #e0ff60;
+    color: #000;
+}
+
+.stage-sourcing {
+    background-color: #d5ff80;
+    color: #000;
+}
+
+.stage-nda {
+    border: 1px solid #ff4d4d;
+    color: #ff4d4d;
+    background-color: transparent;
+}
+
+.stage-deepdive {
+    border: 1px solid #e6007a;
+    color: #e6007a;
+    background-color: transparent;
+}
+
+/* COMMENT FIELD */
+#opportunityTable tbody td input[type="text"] {
+    border: 1px solid #d0aaff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    width: 100%;
+    font-size: 14px;
+    outline: none;
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+    .sidebar {
+        display: none;
+    }
+
+    .main-content {
+        padding: 20px;
+    }
+}
+/* POPUP OVERLAY */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: none; /* Oculta por defecto */
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+/* POPUP CONTENT */
+.popup-content {
+    background-color: #fff;
+    padding: 30px 20px;
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* CLOSE BUTTON */
+.close-btn {
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    transition: color 0.3s;
+}
+
+.close-btn:hover {
+    color: #000;
+}
+
+/* FORM FIELDS */
+.popup-form .popup-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.popup-form label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.popup-form input[type="text"],
+.popup-form select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+}
+
+.popup-form .create-btn {
+    background-color: #cdff30;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+    margin-top: 10px;
+}
+
+.popup-form .create-btn:hover {
+    background-color: #b6ea2a;
+}
+.stage-dropdown {
+    padding: 6px 10px;
+    border-radius: 12px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    width: 100px;
+    max-width: 100px;
+    background-color: #fefefe;
+    color: #333;
+    font-family: 'Onest', sans-serif;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    appearance: none;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.filter-dropdown {
+    position: absolute;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    z-index: 1000;
+    width: 200px;
+    max-height: 250px;
+    overflow-y: auto;
+    margin-top: 5px;
+}
+
+/* Search input */
+.filter-dropdown input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* Checkbox list */
+.filter-dropdown .checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.filter-dropdown .checkbox-list label {
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+/* MEJORAS POPUP ESTÉTICA */
+
+/* Titulo de la popup */
+.popup-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #000;
+    text-align: center;
+}
+
+/* Campos de texto */
+.popup-form input[type="text"] {
+    background-color: #fefefe;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.popup-form input[type="text"]:focus {
+    border-color: #cdff30;
+    box-shadow: 0 0 0 3px rgba(205, 255, 48, 0.3);
+    outline: none;
+}
+
+/* Selects */
+.popup-form select {
+    background-color: #fefefe;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg fill='black' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+}
+
+.popup-form select:focus {
+    border-color: #cdff30;
+    box-shadow: 0 0 0 3px rgba(205, 255, 48, 0.3);
+    outline: none;
+}
+
+/* Botón de Create */
+.popup-form .create-btn {
+    background-color: #cdff30;
+    align-self: center;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s, transform 0.2s;
+    margin-top: 20px;
+    margin: 20px auto 0 auto; 
+    display: block; 
+}
+
+.popup-form .create-btn:hover {
+    background-color: #b6ea2a;
+    transform: scale(1.03);
+}
+
+/* Espaciado general */
+.popup-form .popup-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.popup-form .input-with-button {
+    width: 92%; /* que ocupe todo el ancho como los otros campos */
+}
+
+.popup-form .input-with-button input[type="text"] {
+    background-color: #fefefe;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    width: 100%; /* que ocupe todo el ancho */
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.popup-form .input-with-button input[type="text"]:focus {
+    border-color: #cdff30;
+    box-shadow: 0 0 0 3px rgba(205, 255, 48, 0.3);
+    outline: none;
+}
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #0044ff;
+    color: #fff;
+    border-radius: 20px;
+    padding: 20px 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.page-header .page-title {
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0;
+    font-family: 'Onest', sans-serif;
+}
+
+.page-header .new-btn {
+    background-color: #cdff30;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    padding: 10px 25px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.page-header .new-btn:hover {
+    background-color: #b6ea2a;
+}
+.table-card {
+  background-color: #fff;
   border-radius: 20px;
   padding: 20px 30px;
-  box-shadow: var(--shadow-soft);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   margin-bottom: 40px;
-  width: 100%; max-width: 100%;
-  overflow-x: auto; overflow-y: hidden;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  position: relative;
 }
-.table-card::-webkit-scrollbar{ height: 8px; }
-.table-card::-webkit-scrollbar-thumb{ background: #ccc; border-radius: 4px; }
-.table-card::-webkit-scrollbar-track{ background: transparent; }
 
-.table-scroll-wrapper{ overflow-x: auto; width: 100%; }
-
-/* ------------------------------
-   5) Opportunities table (structure & rhythm)
-   ------------------------------ */
-#opportunityTable{ width: 100%; border-collapse: separate; border-spacing: 0 8px; min-width: 1400px; width: max-content; }
-#opportunityTable thead th{
-  background: transparent; text-align: left;
-  padding: 12px 15px; font-weight: 600; color: var(--ink);
-  border-bottom: 2px solid #f0f0f0; font-size: 14px;
+/* SPINNER OVERLAY */
+.spinner-overlay {
+  position: absolute;
+  top: 0;
+  left: 240px; /* compensar sidebar */
+  width: calc(100% - 240px);
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  transition: opacity 0.3s ease;
 }
-#opportunityTable tbody tr{
-  background: #fff; border-radius: 16px; box-shadow: var(--shadow-card);
-  transition: transform .2s ease, box-shadow .3s ease, background .3s ease;
-  animation: fadeInUp .25s ease both;
+
+.spinner-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
-#opportunityTable tbody tr:hover{ background: linear-gradient(to right, #e3f2fd, #f0f8ff); cursor: pointer; }
-#opportunityTable tbody td{ padding: 12px 15px; font-size: 14px; vertical-align: middle; border-bottom: 1px solid #f9f9f9; }
 
-/* Centrar columna Days (9) y Days Since Batch (10) sin romper otras columnas */
-#opportunityTable tbody td:nth-child(9){ text-align: center; }
-#opportunityTable thead th:nth-child(10),
-#opportunityTable tbody td:nth-child(10){ min-width: 140px; text-align: center; }
-
-/* Column width tweaks */
-#opportunityTable thead th:nth-child(6),
-#opportunityTable tbody td:nth-child(6){ width: 140px; }
-
-/* Inputs dentro de la tabla (comentarios) */
-#opportunityTable tbody td input[type="text"],
-.comment-input{
-  border: 1px solid #d0aaff; border-radius: 8px; padding: 6px 10px; width: 100%; font-size: 14px; outline: none;
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #ccc;
+  border-top-color: #0028ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
-.comment-input:focus{ border-color: #ffb3e6; box-shadow: 0 0 0 3px rgba(255,179,230,.4); }
 
-/* Celdas en rojo (validaciones) */
-.red-cell{ background-color: #f9e5e5 !important; color: rgb(204,78,78) !important; font-weight: 700; }
-
-/* ------------------------------
-   6) Stage badges & dropdowns
-   ------------------------------ */
-.stage-pill{ display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fff; }
-.stage-closewin{ background-color: #0b3d2e; }
-.stage-negotiating{ background-color: #f9c6d0; color: #000; }
-.stage-interviewing{ background-color: #e0ff60; color: #000; }
-.stage-sourcing{ background-color: #d5ff80; color: #000; }
-.stage-nda{ border: 1px solid #ff4d4d; color: #ff4d4d; background: transparent; }
-.stage-deepdive{ border: 1px solid #e6007a; color: #e6007a; background: transparent; }
-
-/* Dropdown look & focus */
-.stage-dropdown,
-.hr-lead-dropdown{
-  padding: 6px 10px; border-radius: 12px; border: 1px solid #ccc; font-size: 13px; background: #fefefe; color: #333;
-  font-family: 'Onest', sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.05); appearance: none; transition: border-color .3s ease, box-shadow .3s ease;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
-.stage-dropdown:focus,
-.hr-lead-dropdown:focus{ outline: none; border-color: #ffb3e6; box-shadow: 0 0 0 3px rgba(255,179,230,.4); }
-
-/* Pastel backgrounds per-option (visual cue al abrir) */
-.stage-dropdown option[value="Negotiating"]{ background-color: #fce3ec; }
-.stage-dropdown option[value="Interviewing"]{ background-color: #edf5ff; }
-.stage-dropdown option[value="Sourcing"]{ background-color: #e6fff5; }
-.stage-dropdown option[value="NDA Sent"]{ background-color: #fff4e6; }
-.stage-dropdown option[value="Deep Dive"]{ background-color: #f3e6ff; }
-.stage-dropdown option[value="Close Win"]{ background-color: #e1ffe1; }
-.stage-dropdown option[value="Closed Lost"]{ background-color: #ffe6e6; }
-
-/* HR pastel options */
-.hr-lead-dropdown option[value*="Pilar"]{ background-color: #fce4ff; }
-.hr-lead-dropdown option[value*="Jazmin"]{ background-color: #e6faff; }
-.hr-lead-dropdown option[value*="Agostina"]{ background-color: #fff5e6; }
-.hr-lead-dropdown option[value*="Sol"]{ background-color: #f0fff4; }
-
-/* Compact look variants for Close Win modal (mantener IDs/clases) */
-:root{ --cw-h: 32px; --cw-fs: 13px; --cw-px: 10px; --cw-radius: 8px; }
-#closeWinPopup .popup-content{ max-width: 440px; padding: 16px 18px 18px; display:flex; flex-direction:column; gap:8px; max-height:80vh; overflow:auto; }
-#closeWinPopup .popup-content input[type="text"],
-#closeWinPopup .popup-content input[type="date"],
-#closeWinPopup .popup-content select{ height: var(--cw-h); font-size: var(--cw-fs); line-height: var(--cw-h); padding: 0 var(--cw-px); border-radius: var(--cw-radius); border: 1.5px solid #e3e6ef; background: #fff; width: 100%; max-width: 400px; box-sizing: border-box; }
-#closeWinPopup .popup-content input[type="date"]{ -webkit-appearance: none; appearance: none; padding-right: .6rem; }
-#closeWinPopup .popup-content ::placeholder{ font-size: var(--cw-fs); opacity: .7; }
-#closeWinPopup .popup-content label{ font-size: 12.5px; margin: 4px 0 6px; display:inline-block; }
-#closeWinPopup .autocomplete{ position: relative; width: 100%; margin-bottom: 8px; }
-#closeWinPopup .autocomplete-list{ top: calc(100% + 4px); border-radius: var(--cw-radius); max-height: 200px; }
-#closeWinPopup .autocomplete-item{ padding: 6px 9px; font-size: var(--cw-fs); }
-#closeWinPopup #saveCloseWin{ display:inline-flex !important; justify-content:center; align-items:center; margin:12px auto 0; height:36px; padding:6px 14px; font-size:13px; border-radius:10px; border:0; background: var(--brand-press); color:#fff; cursor:pointer; z-index:1001; }
-#closeWinPopup .autocomplete-list{ z-index: 1000; }
-
-/* ------------------------------
-   7) Popups: overlay + content + fields
-   ------------------------------ */
-.popup-overlay{
-  position: fixed; inset: 0; background-color: rgba(0,0,0,.4);
-  display: none; justify-content: center; align-items: center; z-index: 9999;
+/* Popup genérico */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
 }
-.popup-content{
-  position: relative; display:flex; flex-direction:column; gap:15px;
-  width: 400px; max-width: 90%; padding: 30px 20px; background: #fff;
-  border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,.3);
+
+.popup-content {
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 12px;
+  width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
-.close-btn{ position: absolute; top: 12px; right: 15px; font-size: 24px; cursor: pointer; color: #999; transition: color .3s; }
-.close-btn:hover{ color: #000; }
 
-.popup-title{ font-size: 24px; font-weight: 700; margin-bottom: 10px; color: var(--ink); text-align: center; }
+.popup-content h2 {
+  margin-top: 0;
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+}
 
-.popup-form .popup-field{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
-.popup-form label{ font-weight: 600; font-size: 14px; color: #333; }
-.popup-form input[type="text"],
-.popup-form select{ padding: 10px 14px; border-radius: 12px; border: 1px solid #ddd; font-size: 14px; background:#fefefe; transition: border-color .3s, box-shadow .3s; }
-.popup-form input[type="text"]:focus,
-.popup-form select:focus{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(205,255,48,.3); outline: none; }
-.popup-form select{ appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml;utf8,<svg fill='black' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>"); background-repeat:no-repeat; background-position: right 10px center; background-size: 12px; }
-.popup-form .create-btn{ background: var(--accent); color:#000; font-weight:700; border:0; padding:12px 24px; border-radius:30px; cursor:pointer; font-size:16px; transition: background-color .3s, transform .2s; margin:20px auto 0; display:block; }
-.popup-form .create-btn:hover{ background: var(--accent-press); transform: scale(1.03); }
-.popup-form .input-with-button{ width: 92%; }
-.popup-form .input-with-button input[type="text"]{ width: 100%; }
-
-/* Generic popup (date/select) buttons */
 .popup-content input[type="date"],
-.popup-content select{ padding:10px; font-size:14px; border-radius:6px; border:1px solid #ccc; width:100%; }
-.popup-content button{ background: #007bff; color:#fff; padding:12px; border:0; border-radius:6px; font-size:14px; cursor:pointer; transition: background-color .2s; }
-.popup-content button:hover{ background:#0056b3; }
-.popup-content .close-btn{ color:#333; }
-
-/* ------------------------------
-   8) Filters (top bar, chips, search, stage & lead dots)
-   ------------------------------ */
-.filters-top-bar{ display:flex; align-items:center; justify-content:space-between; gap:20px; margin-bottom:20px; }
-.text-filter{ display:flex; flex-direction:column; margin-right:20px; }
-.text-filter input{ padding: 8px 10px; border:1px solid var(--line-soft); border-radius:8px; font-family:'Onest',sans-serif; font-size:14px; background:#fff; }
-
-.active-filters{ display:flex; flex-wrap:wrap; gap:10px; padding:12px 16px; background:#fff; border:1px solid #ececec; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,.03); margin-bottom:16px; }
-.filter-chip{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f8f8f8; border:1px solid #eee; font-size:12px; }
-.filter-chip .x{ cursor:pointer; opacity:.65; }
-
-/* Multi-select dropdown */
-.multi-filter{ background:#fff; border:1px solid #ccc; border-radius:14px; padding:10px 12px; min-width:150px; font-family:'Onest',sans-serif; font-size:13px; box-shadow:0 2px 6px rgba(0,0,0,.04); display:flex; flex-direction:column; gap:6px; }
-.filter-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-weight:600; font-size:13px; color:#444; cursor:pointer; }
-.filter-count{ display:inline-flex; align-items:center; justify-content:center; padding:2px 8px; border-radius:999px; font-size:12px; line-height:18px; background:#f6f6f6; border:1px solid #e9e9e9; color:#333; }
-.multi-select{ max-height:100px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
-.multi-select.hidden{ display:none; }
-.filter-toggle{ background:none; border:0; font-size:12px; color:#444; cursor:pointer; padding:0; margin-left:6px; }
-.filter-toggle i{ font-size:12px; transition: transform .2s ease; }
-.filter-header i.rotate-up{ transform: rotate(180deg); }
-
-/* Search input in dropdown */
-.filter-dropdown{ position:absolute; background:#fff; border:1px solid #ccc; border-radius:8px; box-shadow: 0 4px 12px rgba(0,0,0,.1); padding:10px; z-index:1000; width:200px; max-height:250px; overflow-y:auto; margin-top:5px; }
-.filter-dropdown input[type="text"]{ width:100%; padding:6px 8px; margin-bottom:8px; border:1px solid #ccc; border-radius:6px; font-size:14px; }
-.filter-dropdown .checkbox-list{ display:flex; flex-direction:column; gap:6px; }
-.filter-dropdown .checkbox-list label{ font-size:14px; color:#333; display:flex; align-items:center; gap:6px; cursor:pointer; }
-
-/* Stage & lead dot bars (header tooltips) */
-.stage-dot-bar, .lead-dot-bar{ display:flex; align-items:center; gap:6px; margin-left:8px; flex-wrap:wrap; }
-.stage-dot{ width:10px; height:10px; border-radius:50%; display:inline-block; box-shadow:0 0 0 2px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.10); position: relative; }
-.stage-dot[title], .stage-dot[aria-label]{ cursor: help; }
-.stage-dot--negotiating{ background: var(--stage-negotiating); }
-.stage-dot--interviewing{ background: var(--stage-interviewing); }
-.stage-dot--sourcing{ background: var(--stage-sourcing); }
-.stage-dot--nda{ background: var(--stage-nda); }
-.stage-dot--deep-dive{ background: var(--stage-deep-dive); }
-.stage-dot--close-win{ background: var(--stage-close-win); }
-.stage-dot--closed-lost{ background: var(--stage-closed-lost); }
-.stage-dot--default{ background:#d1d5db; }
-
-/* Tooltip (solo en dispositivos con hover) */
-@media (hover:hover){
-  .stage-dot::after{ content: attr(data-tip); position:absolute; bottom: calc(100% + 8px); left:50%; transform: translateX(-50%) translateY(4px); background: rgba(255,255,255,.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color:#333; border:1px solid rgba(0,0,0,.06); border-radius:10px; padding:6px 10px; font-size:12px; line-height:1; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.08); opacity:0; pointer-events:none; transition: opacity .15s, transform .15s; z-index:20; }
-  .stage-dot::before{ content:""; position:absolute; bottom: calc(100% + 2px); left:50%; transform: translateX(-50%) rotate(45deg); width:8px; height:8px; background: rgba(255,255,255,.95); border-left:1px solid rgba(0,0,0,.06); border-top:1px solid rgba(0,0,0,.06); opacity:0; transition: opacity .15s; z-index:19; }
-  .stage-dot:hover::after, .stage-dot:focus-visible::after{ opacity:1; transform: translateX(-50%) translateY(0); }
-  .stage-dot:hover::before, .stage-dot:focus-visible::before{ opacity:1; }
+.popup-content select {
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  width: 100%;
 }
 
-/* Lead dot (avatar mini) */
-.lead-dot{ width:18px; height:18px; border-radius:50%; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; background:#f1f1f1; box-shadow:0 0 0 2px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.10); font-size:10px; font-weight:700; color:#666; position: relative; }
-.lead-dot img{ width:100%; height:100%; object-fit:cover; }
-@media (hover:hover){
-  .lead-dot::after{ content: attr(data-tip); position:absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgba(255,255,255,.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color:#333; border:1px solid rgba(0,0,0,.06); border-radius:10px; padding:6px 10px; font-size:12px; line-height:1; white-space:nowrap; box-shadow:0 8px 24px rgba(0,0,0,.08); opacity:0; pointer-events:none; transition: opacity .15s, transform .15s; z-index:20; }
-  .lead-dot::before{ content:""; position:absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%) rotate(45deg); width:8px; height:8px; background: rgba(255,255,255,.95); border-left:1px solid rgba(0,0,0,.06); border-top:1px solid rgba(0,0,0,.06); opacity:0; transition: opacity .15s; z-index:19; }
-  .lead-dot:hover::after, .lead-dot:focus-visible::after{ opacity:1; transform: translateX(-50%) translateY(0); }
-  .lead-dot:hover::before, .lead-dot:focus-visible::before{ opacity:1; }
+.popup-content button {
+  background-color: #007bff;
+  color: #fff;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-/* Sales lead bubbles + avatar (columna compacta) */
-.sales-lead{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
-.lead-bubble{ width:28px; height:28px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; letter-spacing:.5px; border:1px solid rgba(0,0,0,.06); }
-.lead-bubble.bl{ background:#f5e8ff; color:#5b3ea6; }
-.lead-bubble.lr{ background:#fffbe6; color:#8a6d00; }
-.lead-bubble.ar{ background:#eaf4ff; color:#205493; }
-.lead-avatar{ width:22px; height:22px; border-radius:50%; object-fit:cover; box-shadow:0 0 0 1px rgba(0,0,0,.06); }
-
-/* Type badge (N/R) */
-.type-badge{ display:inline-flex; width:24px; height:24px; border-radius:6px; align-items:center; justify-content:center; font-weight:900; font-size:12px; }
-.type-badge.N{ background:#e6f9e6; color:#000; border:1px solid #e5fbe5; }
-.type-badge.R{ background:#fff0e6; color:#000; border:1px solid #f9deca; }
-
-/* ------------------------------
-   9) Spinner overlay (covers table-card)
-   ------------------------------ */
-.spinner-overlay{ position:absolute; inset:0; left: 240px; width: calc(100% - 240px); height: 100%; background-color: rgba(255,255,255,.8); display:flex; align-items:center; justify-content:center; z-index:999; transition: opacity .3s ease; }
-.spinner-overlay.hidden{ opacity:0; pointer-events:none; }
-.spinner{ width:40px; height:40px; border:4px solid #ccc; border-top-color: var(--brand-press); border-radius:50%; animation: spin 1s linear infinite; }
-
-/* ------------------------------
-   10) Toast: stage action feedback
-   ------------------------------ */
-#stage-toast{
-  position: fixed; top: 20px; right: 20px; background: var(--bg-page); color: #b9608b;
-  padding: 12px 20px; border-radius: 18px; font-weight: 500; font-size: 15px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.08); z-index: 99999; display: none; animation: sparkleFade 2.8s ease forwards;
+.popup-content button:hover {
+  background-color: #0056b3;
 }
-.sparkle-show{ animation: sparkleFade 2.8s ease forwards; }
+.popup-content .close-btn {
+  position: absolute;
+  top: 12px;
+  right: 15px;
+  font-size: 24px;
+  color: #333;
+  cursor: pointer;
+}
 
-/* ------------------------------
-   11) Profile tile (sidebar bottom)
-   ------------------------------ */
-.profile-tile{ position: sticky; bottom: 12px; margin-top:auto; display:flex !important; align-items:center; gap:10px; padding:10px 12px; border-radius:14px; text-decoration:none; transition: transform .15s ease, box-shadow .15s ease, background .3s ease; background: rgba(255,255,255,.22); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.35); box-shadow: 0 4px 14px rgba(0,0,0,.08) inset, 0 2px 10px rgba(0,0,0,.04); color: inherit; z-index: 1; }
-.custom-sidebar-hidden .profile-tile{ display:none; }
-.profile-avatar{ position: relative; width:42px; height:42px; border-radius:50%; overflow:hidden; flex:0 0 42px; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(255,255,255,.35)); border:1px solid rgba(255,255,255,.5); }
-.profile-avatar img{ width:100%; height:100%; display:none; object-fit:cover; }
-.profile-initials{ position:absolute; inset:0; display:grid; place-items:center; font-weight:700; letter-spacing:.3px; user-select:none; }
-.profile-meta{ display:flex; flex-direction:column; line-height:1.1; }
-.profile-name{ font-weight:700; font-size:14px; }
-.profile-email{ font-size:12px; opacity:.75; }
+.popup-content .close-btn:hover {
+  color: #000;
+}
+.hr-lead-dropdown {
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  width: 130px;
+  max-width: 100%;
+  background-color: #fefefe;
+  color: #333;
+  font-family: 'Onest', sans-serif;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  appearance: none;
+}
 
-/* Cute gradient avatar variant */
-.profile-tile .profile-avatar{ --size: 42px; --radius: 999px; --ring: 2px; --bg1:#5da8ff; --bg2:#2563eb; --glow: rgba(37,99,235,.28); width: var(--size); height: var(--size); display:grid; place-items:center; position:relative; overflow:hidden; flex-shrink:0; background: radial-gradient(120% 120% at 20% 15%, var(--bg1), var(--bg2)); box-shadow: 0 8px 24px var(--glow), inset 0 1px 0 rgba(255,255,255,.35); transform: translateZ(0); }
-.profile-tile .profile-avatar::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding: var(--ring); background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.25)); -webkit-mask: radial-gradient(#000 70%, transparent 71%) content-box, radial-gradient(#000 70%, transparent 71%); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events:none; }
-.profile-tile .profile-avatar::after{ content:""; position:absolute; inset:auto 6px 55% 6px; height:36%; border-radius:999px; background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0)); filter: blur(1px); pointer-events:none; }
-.profile-tile .profile-initials{ display:grid; place-items:center; width:100%; height:100%; font-weight:800; font-size:14px; letter-spacing:.6px; color:#fff; text-shadow: 0 1px 0 rgba(0,0,0,.15), 0 8px 18px rgba(0,0,0,.18); user-select:none; }
-.profile-tile .profile-avatar img{ display:none !important; }
-.profile-tile:hover .profile-avatar{ transform: translateY(-1px); box-shadow: 0 12px 28px var(--glow), inset 0 1px 0 rgba(255,255,255,.38); }
-.avatar--sm{ --size:32px; }
-.avatar--lg{ --size:56px; }
-.avatar--pastel{ --bg1:#a8c5ff; --bg2:#6ea8ff; --glow: rgba(110,168,255,.25); }
 
-/* ------------------------------
-   12) Misc
-   ------------------------------ */
+.hr-lead-dropdown:focus {
+  border-color: #888;
+  box-shadow: 0 0 0 2px rgba(100, 100, 250, 0.2);
+  outline: none;
+}
+.table-card::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-card::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.table-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-scroll-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+#opportunityTable {
+  min-width: 1400px; /* Fuerza overflow horizontal */
+  width: max-content;
+}
+.red-cell {
+  background-color: #f9e5e5 !important;
+  color: rgb(204, 78, 78) !important;
+  font-weight: bold;
+}
+/* 1. Estilo de tarjeta para cada fila */
+#opportunityTable tbody tr {
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: background 0.3s ease;
+}
+
+#opportunityTable tbody tr:hover {
+  background: linear-gradient(to right, #e3f2fd, #f0f8ff);
+}
+
+/* 2. Centrar columna Days + más espacio Days Since Batch */
+#opportunityTable tbody td:nth-child(9) {
+  text-align: center;
+}
+
+#opportunityTable thead th:nth-child(10),
+#opportunityTable tbody td:nth-child(10) {
+  min-width: 140px;
+}
+
+/* 3. Sombra rosa en campo comments */
+.comment-input:focus {
+  outline: none;
+  border-color: #ffb3e6;
+  box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
+}
+
+/* 4. Colores pastel para stage */
+.stage-dropdown option[value="Negotiating"] {
+  background-color: #fce3ec;
+}
+.stage-dropdown option[value="Interviewing"] {
+  background-color: #edf5ff;
+}
+.stage-dropdown option[value="Sourcing"] {
+  background-color: #e6fff5;
+}
+.stage-dropdown option[value="NDA Sent"] {
+  background-color: #fff4e6;
+}
+.stage-dropdown option[value="Deep Dive"] {
+  background-color: #f3e6ff;
+}
+.stage-dropdown option[value="Close Win"] {
+  background-color: #e1ffe1;
+}
+.stage-dropdown option[value="Closed Lost"] {
+  background-color: #ffe6e6;
+}
+
+/* 5. Colores pastel para HR Lead */
+.hr-lead-dropdown option[value*="Pilar"] {
+  background-color: #fce4ff;
+}
+.hr-lead-dropdown option[value*="Jazmin"] {
+  background-color: #e6faff;
+}
+.hr-lead-dropdown option[value*="Agostina"] {
+  background-color: #fff5e6;
+}
+.hr-lead-dropdown option[value*="Sol"] {
+  background-color: #f0fff4;
+}
+
+/* 6. Sombra rosita al enfocar dropdowns */
+.stage-dropdown:focus,
+.hr-lead-dropdown:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
+  border-color: #ffb3e6;
+}
+/* Centrar texto en la columna "Days Since Batch" (10ma columna = índice 9) */
+#opportunityTable tbody td:nth-child(10),
+#opportunityTable thead th:nth-child(10) {
+  text-align: center;
+}
+.dataTables_length select {
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  font-family: 'Onest', sans-serif;
+  text-align: center;              /* centrado horizontal */
+  text-align-last: center;         /* centrado en el valor seleccionado */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: box-shadow 0.3s ease;
+  width: 80px;    
+  padding: 6px 10px;
+  height: 32px;
+  font-size: 13px;                 /* ancho fijo más compacto */
+}
+
+.dataTables_length select:focus {
+  outline: none;
+  border-color: #ffb3e6;
+  box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
+}
+#opportunityTable tbody tr {
+  transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+#stage-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #fdf4ee;
+  color: #b9608b;
+  padding: 12px 20px;
+  border-radius: 18px;
+  font-weight: 500;
+  font-size: 15px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  z-index: 99999;
+  display: none;
+  animation: sparkleFade 2.8s ease forwards;
+}
+
+@keyframes sparkleFade {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(-10px);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+}
+.sparkle-show {
+  animation: sparkleFade 2.8s ease forwards;
+}
+
+.table-card.exit-left {
+  animation: fadeSlideLeft 0.4s ease forwards;
+}
+
+@keyframes fadeSlideLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+/* Dropdown STAGE - fondo pastel */
+.stage-dropdown {
+  background-color: #fdf1fc; /* rosa pastel */
+}
+
+/* Cambia según valor */
+.stage-dropdown option[value="Negotiating"] {
+  background-color: #fce3ec;
+}
+.stage-dropdown option[value="Interviewing"] {
+  background-color: #edf5ff;
+}
+.stage-dropdown option[value="Sourcing"] {
+  background-color: #e6fff5;
+}
+.stage-dropdown option[value="NDA Sent"] {
+  background-color: #fff4e6;
+}
+.stage-dropdown option[value="Deep Dive"] {
+  background-color: #f3e6ff;
+}
+.stage-dropdown option[value="Close Win"] {
+  background-color: #e1ffe1;
+}
+.stage-dropdown option[value="Closed Lost"] {
+  background-color: #ffe6e6;
+}
+
+/* Dropdown HR Lead - fondo pastel */
+.hr-lead-dropdown {
+  background-color: #e6fff5; /* lila pastel */
+}
+.stage-dropdown,
+.hr-lead-dropdown {
+  border: none !important;
+  box-shadow: none !important;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+.filters-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 20px;
+}
+
+
+.multi-filter {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 14px;
+  padding: 10px 12px;
+  min-width: 150px;
+  font-family: 'Onest', sans-serif;
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+  color: #444;
+}
+
+.multi-filter label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  display: block;
+  color: #444;
+}
+
+.multi-select {
+  max-height: 100px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.multi-select label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.filter-toggle {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #444;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 6px;
+}
+.filter-toggle i {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+/* Opcional: rotar ícono al abrir */
+.multi-select:not(.hidden) ~ .filter-toggle i {
+  transform: rotate(180deg);
+}
+.multi-select.hidden {
+  display: none;
+}
+.dataTables-length-wrapper {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.filter-header {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-header i {
+  transition: transform 0.3s ease;
+}
+
+.filter-header i.rotate-up {
+  transform: rotate(180deg) !important;
+}
+/* 🎯 Botón de toggle visible siempre */
+.sidebar-toggle-icon {
+  position: fixed;
+  top: 12px;
+  left: 220px; /* alineado al borde derecho del sidebar */
+  cursor: pointer;
+  z-index: 9999;
+  font-size: 18px;
+  background: #fff;
+  border-radius: 50%;
+  padding: 5px;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
+  transition: left 0.3s ease;
+}
+
+.custom-sidebar-hidden + .sidebar-toggle-icon {
+  left: 12px; /* cuando el sidebar está oculto */
+}
+
+.custom-sidebar-hidden {
+  display: none !important;
+}
+
+.custom-main-expanded {
+  width: 100% !important;
+}
+
+/* Oculto (lo mandamos a la izquierda) */
+.sidebar.custom-sidebar-hidden {
+  left: -220px;
+}
+
+/* Main content expandido */
+.custom-main-expanded {
+  margin-left: 0 !important;
+  width: calc(100% - 12px);
+  transition: all 0.3s ease;
+}
+
+/* Botón burbuja */
+.sidebar-wow-toggle {
+  position: fixed;
+  top: 20px;
+  left: 220px;
+  width: 36px;
+  height: 36px;
+  background-color: white;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Botón cuando el sidebar está oculto */
+.sidebar-hidden .sidebar-wow-toggle {
+  left: 12px !important;
+}
+
+.sidebar-wow-toggle:hover {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+
+.sidebar-wow-toggle i {
+  transition: transform 0.3s ease;
+  font-size: 16px;
+}
+
+/* Flecha rotada */
+.rotated-icon {
+  transform: rotate(180deg);
+}
+
+
 #accountTable tbody tr:hover,
 #candidatesTable tbody tr:hover,
-#opportunityTable tbody tr:hover{ cursor: pointer; }
-
-/* Stage row color helpers (si los usas en celdas/rows) */
-.stage-color-close-win{ background-color:#8bfc9c !important; }
-.stage-color-closed-lost{ background-color:#f9c2c2 !important; }
-.stage-color-negotiating{ background-color:#fff3cc !important; }
-.stage-color-interviewing{ background-color:#e0f0ff !important; }
-.stage-color-sourcing{ background-color:#e4fbe6 !important; }
-.stage-color-nda-sent{ background-color:#fcdb94 !important; }
-.stage-color-deep-dive{ background-color:#f3e8fd !important; }
-
-/* DataTables: selector de length */
-.dataTables_length select{
-  background:#fff; border:1px solid #ccc; border-radius:999px; font-family:'Onest',sans-serif; text-align:center; text-align-last:center;
-  appearance:none; -webkit-appearance:none; -moz-appearance:none; transition: box-shadow .3s ease; width:80px; padding:6px 10px; height:32px; font-size:13px;
+#opportunityTable tbody tr:hover {
+  cursor: pointer;
 }
-.dataTables_length select:focus{ outline:none; border-color:#ffb3e6; box-shadow:0 0 0 3px rgba(255,179,230,.4); }
-
-/* ------------------------------
-   13) Animations & keyframes
-   ------------------------------ */
-@keyframes spin{ to{ transform: rotate(360deg); } }
-@keyframes fadeInUp{ from{ opacity: 0; transform: translateY(10px);} to{ opacity: 1; transform: translateY(0);} }
-@keyframes sparkleFade{
-  0%{ opacity:0; transform: scale(.96) translateY(-10px); }
-  10%{ opacity:1; transform: scale(1.02) translateY(0); }
-  80%{ opacity:1; }
-  100%{ opacity:0; transform: scale(.95) translateY(-10px); }
+.text-filter {
+  display: flex;
+  flex-direction: column;
+  margin-right: 20px;
 }
 
-/* ------------------------------
-   14) Responsive small adjustments
-   ------------------------------ */
-@media (max-width: 900px){
-  .main-content{ padding: 20px; }
+.text-filter input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  background-color: white;
+}
+.stage-color-close-win {
+  background-color: #8bfc9c !important; /* verde pastel suave (éxito) */
 }
 
+.stage-color-closed-lost {
+  background-color: #f9c2c2 !important; /* rojo pastel claro (error/pérdida) */
+}
+
+.stage-color-negotiating {
+  background-color: #fff3cc !important; /* amarillo pastel (precaución/negociación) */
+}
+
+.stage-color-interviewing {
+  background-color: #e0f0ff !important; /* azul pastel (proceso activo) */
+}
+
+.stage-color-sourcing {
+  background-color: #e4fbe6 !important; /* verde menta pastel (búsqueda/fresco) */
+}
+
+.stage-color-nda-sent {
+  background-color: #fcdb94 !important; /* durazno pastel (documentos enviados) */
+}
+
+.stage-color-deep-dive {
+  background-color: #f3e8fd !important; /* lila suave (investigación profunda) */
+}
+
+.filter-header i.rotate-up {
+  transform: rotate(180deg);
+}
+/* --- Sales Lead: burbuja + avatar (compacto) --- */
+.sales-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.lead-bubble {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: .5px;
+  border: 1px solid rgba(0,0,0,.06);
+}
+.lead-bubble.bl {           /* Bahía → lila pastel */
+  background: #f5e8ff;
+  color: #5b3ea6;
+}
+.lead-bubble.lr {           /* Lara → amarillo suave */
+  background: #fffbe6;
+  color: #8a6d00;
+}
+.lead-bubble.ar {           /* Agustín → azul suave */
+  background: #eaf4ff;
+  color: #205493;
+}
+.lead-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Columna Sales Lead más angosta */
+#opportunityTable thead th:nth-child(6),
+#opportunityTable tbody td:nth-child(6) { width: 140px; }
+
+/* --- Type: N / R bien fuertes --- */
+.type-badge{
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 12px;
+}
+.type-badge.N { background: #e6f9e6; color: #000000; border: 1px solid #e5fbe5;}
+.type-badge.R { background: #fff0e6; color: #000000; border: 1px solid #f9deca;}
+
+/* --- Chips de filtros activos (look Apple) --- */
+.active-filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:12px 16px;
+  background:#fff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.03);
+  margin-bottom:16px;
+}
+.filter-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#f8f8f8;
+  border:1px solid #eee;
+  font-size:12px;
+}
+.filter-chip .x{ cursor:pointer; opacity:.65; }
+
+/* --- Buscador con lupa para Account --- */
+.search-input{ position: relative; }
+.search-input i{
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  font-size:14px;
+}
+.search-input input{ padding-left:32px; }
+/* Badges mini en los toggles de filtros */
+.filter-header label{ display:flex; align-items:center; gap:8px; }
+.filter-count{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:2px 8px; border-radius:999px; font-size:12px; line-height:18px;
+  background:#f6f6f6; border:1px solid #e9e9e9; color:#333;
+}
+.tab-icon{
+  display:inline-block;
+  vertical-align:middle;
+  margin-right:8px;
+  border-radius:9999px; /* por si usas fondo */
+}
+/* opcional: ajustes suaves para HR */
+.hr-lead .lead-bubble {
+  width: 22px; height: 22px; line-height: 22px; 
+  display:inline-flex; align-items:center; justify-content:center;
+  border-radius:999px; font-weight:600; font-size:12px;
+}
+.hr-lead .lead-avatar { width: 22px; height: 22px; border-radius: 999px; object-fit: cover; }
+/* Header como fila flexible para que quepan el label, los puntitos y el botón */
+.filter-header{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* ——— Stage dots en el header ——— */
+.filter-header .stage-dot-bar{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-left:8px;
+  flex-wrap:wrap;
+  /* opcional: si quieres que los clicks pasen al header */
+  /* pointer-events: none; */
+}
+
+/* Puntito base */
+.stage-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display:inline-block;
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,0.04),
+    0 1px 2px rgba(0,0,0,0.10);
+}
+.stage-dot[title]{ cursor: help; }
+
+/* Colores por stage */
+.stage-dot--negotiating { background: #ffe39a; }
+.stage-dot--interviewing{ background: #d7e9ff; }
+.stage-dot--sourcing    { background: #c8f5e6; }
+.stage-dot--nda         { background: #ffdfc2; }
+.stage-dot--deep-dive   { background: #e0ccff; }
+.stage-dot--close-win   { background: #c8f7c8; }
+.stage-dot--closed-lost { background: #ffcccc; }
+
+/* Fallback gris si llega un stage no mapeado */
+.stage-dot--default     { background: #d1d5db; }
+
+/* (opcional) ocultar badge numérico en Stage */
+#filterStageContainer .filter-count{ display:none !important; }
+/* Tooltip para puntitos de stage */
+.stage-dot { position: relative; }
+
+/* solo en dispositivos con hover */
+@media (hover: hover) {
+  .stage-dot::after{
+    content: attr(data-tip);              /* ← el texto viene del atributo data-tip */
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #333;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 20;
+  }
+  .stage-dot::before{
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: rgba(255,255,255,.95);
+    border-left: 1px solid rgba(0,0,0,.06);
+    border-top: 1px solid rgba(0,0,0,.06);
+    opacity: 0;
+    transition: opacity .15s ease;
+    z-index: 19;
+  }
+  .stage-dot:hover::after,
+  .stage-dot:focus-visible::after{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .stage-dot:hover::before,
+  .stage-dot:focus-visible::before{
+    opacity: 1;
+  }
+}
+
+/* Cursor de ayuda sobre los dots con etiqueta accesible */
+.stage-dot[aria-label]{ cursor: help; }
+/* ——— HR & Sales: avatar dots en el header del filtro ——— */
+.filter-header .lead-dot-bar{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-left:8px;
+  flex-wrap:wrap;
+}
+
+/* Puntito-Avatar (más grande que el de stage) */
+.lead-dot{
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  overflow: hidden;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#f1f1f1;
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,.04),
+    0 1px 2px rgba(0,0,0,.10);
+  font-size:10px;         /* para iniciales cuando no hay avatar */
+  font-weight:700;
+  color:#666;
+}
+.lead-dot img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+/* Tooltip (mismo estilo que los stage-dots) */
+@media (hover: hover) {
+  .lead-dot{ position: relative; }
+  .lead-dot::after{
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #333;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 20;
+  }
+  .lead-dot::before{
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: rgba(255,255,255,.95);
+    border-left: 1px solid rgba(0,0,0,.06);
+    border-top: 1px solid rgba(0,0,0,.06);
+    opacity: 0;
+    transition: opacity .15s ease;
+    z-index: 19;
+  }
+  .lead-dot:hover::after,
+  .lead-dot:focus-visible::after{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .lead-dot:hover::before,
+  .lead-dot:focus-visible::before{
+    opacity: 1;
+  }
+}
+.lead-dot[aria-label]{ cursor: help; }
+/* ——— Tooltip para avatares dentro de la tabla (HR/Sales) ——— */
+.lead-tip { position: relative; display:inline-flex; align-items:center; gap:6px; }
+
+@media (hover:hover){
+  .lead-tip::after{
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(255,255,255,.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #333;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease, transform .15s ease;
+    z-index: 20;
+  }
+  .lead-tip::before{
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px; height: 8px;
+    background: rgba(255,255,255,.95);
+    border-left: 1px solid rgba(0,0,0,.06);
+    border-top: 1px solid rgba(0,0,0,.06);
+    opacity: 0;
+    transition: opacity .15s ease;
+    z-index: 19;
+  }
+  .lead-tip:hover::after,
+  .lead-tip:focus-visible::after{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .lead-tip:hover::before,
+  .lead-tip:focus-visible::before{ opacity:1; }
+}
+/* ===== Close Win popup: versión compacta real ===== */
+#closeWinPopup .popup-content{
+  max-width: 440px;              /* modal más angosto */
+  padding: 16px 18px 18px;       /* menos padding interno */
+}
+
+/* tamaño “S” consistente */
+:root{
+  --cw-h: 32px;                  /* altura final del campo */
+  --cw-fs: 13px;                 /* font-size pequeño */
+  --cw-px: 10px;                 /* padding horizontal */
+  --cw-radius: 8px;              /* borde redondo pero sutil */
+}
+
+/* inputs del modal (texto + fecha + selects si hubiese) */
+#closeWinPopup .popup-content input[type="text"],
+#closeWinPopup .popup-content input[type="date"],
+#closeWinPopup .popup-content select{
+  height: var(--cw-h);
+  font-size: var(--cw-fs);
+  line-height: var(--cw-h);      /* evita que “crezca” por line-height heredado */
+  padding: 0 var(--cw-px);
+  border-radius: var(--cw-radius);
+  border: 1.5px solid #e3e6ef;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+/* Safari/Chrome WebKit: el date-input suele inflarse */
+#closeWinPopup .popup-content input[type="date"]{
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 0.6rem;         /* deja espacio al icono del datepicker */
+}
+
+/* placeholder y labels más chicos */
+#closeWinPopup .popup-content ::placeholder{ font-size: var(--cw-fs); opacity:.7; }
+#closeWinPopup .popup-content label{
+  font-size: 12.5px;
+  margin: 4px 0 6px;
+  display: inline-block;
+}
+
+/* separaciones verticales compactas */
+#closeWinPopup .autocomplete,
+#closeWinPopup .popup-content input[type="date"]{ margin-bottom: 8px; }
+
+/* lista del autocomplete también mini */
+#closeWinPopup .autocomplete{ width:100%; }
+#closeWinPopup .autocomplete-list{
+  top: calc(100% + 4px);
+  border-radius: var(--cw-radius);
+  max-height: 200px;
+}
+#closeWinPopup .autocomplete-item{
+  padding: 6px 9px;
+  font-size: var(--cw-fs);
+}
+
+/* botón Save compacto */
+#closeWinPopup #saveCloseWin{
+  height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+#closeWinPopup .popup-content input,
+#closeWinPopup .popup-content select{ width: 100%; max-width: 400px; }
+/* —— Close Win autocomplete ———————————————— */
+.autocomplete {
+  position: relative;
+  width: 100%;
+}
+#closeWinHireInput,
+#closeWinDate,
+.popup-content select,
+.popup-content input[type="text"],
+.popup-content input[type="date"]{
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #e6e6eb;
+  border-radius: 12px;            /* redondeado */
+  background: #fff;               /* fondo blanco */
+  font-size: 0.95rem;
+  outline: none;
+  transition: box-shadow .15s, border-color .15s;
+}
+#closeWinHireInput:focus,
+#closeWinDate:focus{
+  border-color: #bfc7ff;
+  box-shadow: 0 0 0 3px rgba(0,40,255,.08);
+}
+.autocomplete-list{
+  position: absolute;
+  left: 0; right: 0; top: calc(100% + 6px);
+  background: #fff;
+  border: 1px solid #ececf3;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.08);
+  z-index: 50;
+  max-height: 260px;
+  overflow-y: auto;
+  display: none;                  /* se muestra vía JS */
+}
+.autocomplete-item{
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: .95rem;
+}
+.autocomplete-item:hover,
+.autocomplete-item[aria-selected="true"]{
+  background: #f4f6ff;
+}
+.autocomplete-empty{
+  padding: 10px 12px;
+  color: #666;
+}
+/* ===== Close Win popup: aseguremos que el botón Save exista y se vea ===== */
+#closeWinPopup .popup-content{
+  display: flex;               /* columna para ordenar todo */
+  flex-direction: column;
+  gap: 8px;                    /* separaciones verticales */
+  max-height: 80vh;            /* por si hay scroll */
+  overflow: auto;
+}
+
+/* ===== Close Win popup: botón Save centrado ===== */
+#closeWinPopup #saveCloseWin{
+  display: inline-flex !important;
+  justify-content: center;
+  align-items: center;
+  margin: 12px auto 0;       /* auto en los lados lo centra */
+  height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+  border: 0;
+  background: #0028ff;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Si la lista del autocomplete se superpone, que no tape el botón */
+#closeWinPopup .autocomplete-list{
+  z-index: 1000;               /* suficiente para estar sobre inputs */
+}
+#closeWinPopup #saveCloseWin{
+  z-index: 1001;               /* botón por encima de la lista */
+}
+
+/* Un pelín de aire antes del botón */
+#closeWinPopup .popup-content label:last-of-type + input[type="date"]{
+  margin-bottom: 6px;
+}
+/* Sidebar needs to be a column so the profile can pin to bottom */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Profile tile styles */
+.profile-tile{
+  margin-top: auto;               /* pins to bottom of the column */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease, background .3s ease;
+  background: rgba(255,255,255,.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 4px 14px rgba(0,0,0,.08) inset, 0 2px 10px rgba(0,0,0,.04);
+  color: inherit;
+}
+body.dark-mode .profile-tile{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.18);
+}
+.profile-tile:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.10);
+}
+
+/* Avatar circle */
+.profile-avatar{
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 42px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(255,255,255,.35));
+  border: 1px solid rgba(255,255,255,.5);
+}
+.profile-avatar img{
+  width: 100%;
+  height: 100%;
+  display: none;          /* toggled ON by JS if we have an avatar */
+  object-fit: cover;
+}
+.profile-initials{
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  letter-spacing: .3px;
+  user-select: none;
+}
+
+/* Name + email */
+.profile-meta{ display:flex; flex-direction:column; line-height: 1.1; }
+.profile-name{ font-weight: 700; font-size: 14px; }
+.profile-email{ font-size: 12px; opacity: .75; }
+
+/* Respect your sidebar collapse if you have one */
+.custom-sidebar-hidden .profile-tile{ display: none; }
+/* Hardening por si otro CSS pisa el display o la dirección */
+.sidebar { display: flex !important; flex-direction: column !important; }
+
+/* Si *algo* lo oculta, que al menos el tile se vea */
+.profile-tile { display: flex !important; }
+/* Sidebar: full-height column pinned to the viewport */
+.sidebar{
+  position: sticky;      /* stays put while main content scrolls */
+  top: 0;
+  height: 100vh;         /* fill viewport height */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;      /* sidebar scrolls if it has a lot of items */
+  padding-bottom: 14px;  /* breathing room for the sticky tile */
+}
+/* Profile tile: always visible at bottom-left of the sidebar */
+.profile-tile{
+  position: sticky;
+  bottom: 12px;          /* distance from the bottom edge */
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease, background .3s ease;
+  background: rgba(255,255,255,.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 4px 14px rgba(0,0,0,.08) inset, 0 2px 10px rgba(0,0,0,.04);
+  color: inherit;
+  z-index: 1;            /* sit above sidebar content if it overlaps */
+}
+
+/* If your sidebar can collapse, keep hiding it there */
+.custom-sidebar-hidden .profile-tile{ display:none; }
+/* —— Cute initials avatar —— */
+.profile-tile .profile-avatar{
+  --size: 42px;
+  --radius: 999px;
+  --ring: 2px;
+  --bg1: #5da8ff;         /* top-left gradient */
+  --bg2: #2563eb;         /* bottom-right gradient (brand blue) */
+  --glow: rgba(37,99,235,.28);
+
+  width: var(--size);
+  height: var(--size);
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: radial-gradient(120% 120% at 20% 15%, var(--bg1), var(--bg2));
+  box-shadow:
+    0 8px 24px var(--glow),
+    inset 0 1px 0 rgba(255,255,255,.35);
+  transform: translateZ(0); /* smoother */
+}
+
+/* subtle glass ring */
+.profile-tile .profile-avatar::before{
+  content:"";
+  position:absolute; inset:0;
+  border-radius: inherit;
+  padding: var(--ring);
+  background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.25));
+  -webkit-mask:
+    radial-gradient(#000 70%, transparent 71%) content-box,
+    radial-gradient(#000 70%, transparent 71%);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events:none;
+}
+
+/* tiny glossy highlight */
+.profile-tile .profile-avatar::after{
+  content:"";
+  position:absolute;
+  inset:auto 6px 55% 6px;
+  height: 36%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0));
+  filter: blur(1px);
+  pointer-events:none;
+}
+
+/* initials */
+.profile-tile .profile-initials{
+  display:grid; place-items:center;
+  width:100%; height:100%;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: .6px;
+  color:#fff;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,.15),
+    0 8px 18px rgba(0,0,0,.18);
+  user-select:none;
+}
+
+/* never show image */
+.profile-tile .profile-avatar img{ display:none !important; }
+
+/* gentle micro-interaction */
+.profile-tile .profile-tile:hover .profile-avatar,
+.profile-tile:hover .profile-avatar{
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 28px var(--glow),
+    inset 0 1px 0 rgba(255,255,255,.38);
+}
+
+/* optional sizes if you need elsewhere */
+.avatar--sm { --size: 32px; }
+.avatar--lg { --size: 56px; }
+
+/* (Optional) pastel variant: add .avatar--pastel to .profile-avatar to soften */
+.avatar--pastel{
+  --bg1: #a8c5ff;
+  --bg2: #6ea8ff;
+  --glow: rgba(110,168,255,.25);
+}
