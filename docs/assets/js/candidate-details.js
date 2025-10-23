@@ -9,6 +9,41 @@
     document.addEventListener(ev, stop, false);
   });
 })();
+// === WhatsApp (handler único y “live”) ===
+const waBtn   = document.getElementById('wa-btn-overview');
+const phoneEl = document.getElementById('field-phone');
+
+function currentDigits(){
+  return (phoneEl?.innerText || '').replace(/\D/g, '');
+}
+
+// Handler único: lee el valor en el momento del click
+if (waBtn) {
+  waBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const digits = currentDigits();
+    if (!digits) {
+      // feedback opcional si no hay número
+      waBtn.classList.remove('is-visible'); // o muestra un tooltip si prefieres
+      return;
+    }
+    window.open(`https://wa.me/${digits}`, '_blank');
+  });
+}
+
+// Pinta estado visual (solo muestra/oculta)
+function paintWaBtn(){
+  if (!waBtn || !phoneEl) return;
+  const hasDigits = !!currentDigits();
+  waBtn.classList.toggle('is-visible', hasDigits);
+}
+
+// Llamadas que mantienen el estado correcto:
+paintWaBtn();                       // al cargar
+phoneEl?.addEventListener('blur', paintWaBtn);     // al editar y salir
+phoneEl?.addEventListener('input', paintWaBtn);    // mientras escriben
 
 window.__VINTTI_WIRED = window.__VINTTI_WIRED || {};
 
@@ -881,6 +916,8 @@ window.updateHireField = async function(field, value) {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     .then(r => r.json())
     .then(data => {
+
+
       updateLinkedInUI(data.linkedin || '');
       // Mapeo de campos (overview)
       const overviewFields = {
@@ -892,6 +929,31 @@ window.updateHireField = async function(field, value) {
         'field-salary-range': 'salary_range',
         'field-linkedin':      'linkedin',  
       };
+            // === WhatsApp (simple como en la tabla) =========================
+      const waBtn   = document.getElementById('wa-btn-overview');
+      const phoneEl = document.getElementById('field-phone');
+
+      // helper: solo dígitos
+      function onlyDigits(s){ return String(s||'').replace(/\D/g, ''); }
+
+function paintWaBtn(){
+  if (!waBtn || !phoneEl) return;
+  const digits = (phoneEl.innerText || '').replace(/\D/g, '');
+  if (digits) {
+    waBtn.classList.add('is-visible');
+    waBtn.onclick = (e) => {
+      e.stopPropagation();
+      window.open(`https://wa.me/${digits}`, '_blank');
+    };
+  } else {
+    waBtn.classList.remove('is-visible');
+    waBtn.onclick = null;
+  }
+}
+
+      // refrescar cuando editen el teléfono (tu blur ya hace PATCH)
+      phoneEl.addEventListener('blur', paintWaBtn);
+      paintWaBtn();
       Object.entries(overviewFields).forEach(([elementId, fieldName]) => {
         const el = document.getElementById(elementId);
         if (!el) return;
@@ -1081,10 +1143,6 @@ wireRichToolbar('candidate-succes-toolbar');
 
 const successDiv = document.getElementById('candidate-succes');
 if (successDiv) {
-  // Cargar valor (viene en el GET /candidates/<id>)
-  // Este bloque debe ir dentro del .then(data => { ... }) donde ya setéas overviewFields
-  // Si estás fuera, asegura que 'data' se tenga a mano o mueve estas dos líneas adentro.
-  // Aquí asumo que estás todavía dentro del .then(data => { ... }).
   successDiv.innerHTML = (data.candidate_succes || '');
 
   // Guardar al salir de foco

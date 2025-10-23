@@ -2277,3 +2277,46 @@ html body .month-year .btn-clear:active{
   text-align:center;
 }
 .fireworks-pop img { width:160px; height:auto; display:block; margin:8px auto 12px; }
+/* Pill editable estilo input, centrado */
+#field-phone.editable-pill[contenteditable="true"]{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height: 30px;      /* ↓ antes 44px */
+  padding: 4px 14px;     /* ↓ menos alto, misma anchura */
+  border:1px solid #e5e7eb;
+  border-radius:999px;
+  background:#fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  line-height: 1.1;      /* compacto */
+  letter-spacing: .2px;
+  text-align:center;
+}
+.icon-button.whatsapp{
+  width: 32px;   /* antes 36 */
+  height: 32px;  /* antes 36 */
+}
+
+/* Botón WhatsApp redondo */
+.icon-button.whatsapp{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:36px; height:36px;
+  border-radius:999px;
+  background:#25D366;
+  color:#fff;
+  border:none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  cursor:pointer;
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease;
+  opacity:0; pointer-events:none; /* por defecto oculto; JS lo habilita */
+}
+.icon-button.whatsapp:hover{ transform: scale(1.05); filter: saturate(1.1); }
+.icon-button.whatsapp.is-visible{ opacity:1; pointer-events:auto; }
+.icon-button.whatsapp {
+  opacity: 1; /* visible por defecto */
+  pointer-events: auto;
+}
