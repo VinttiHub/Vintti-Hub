@@ -8,6 +8,7 @@ from db import get_connection
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
+from calendar import monthrange
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 
@@ -29,6 +30,74 @@ def _current_user_id() -> Optional[int]:
     h = _int_or_none(request.headers.get("X-User-Id") or request.headers.get("x-user-id"))
     if h: return h
     return None
+
+# ----- US Federal Holidays (observed) helpers -----
+def _nth_weekday(year, month, weekday, n):
+    """weekday: 0=Mon..6=Sun; n: 1..5 (5 -> 'last' if it exists, manejar aparte)"""
+    # primer día del mes: (1..7)
+    first_weekday = date(year, month, 1).weekday()  # 0=Mon..6=Sun
+    # offset hasta el primer 'weekday' del mes
+    offset = (weekday - first_weekday) % 7
+    day = 1 + offset + (n - 1) * 7
+    last_day = monthrange(year, month)[1]
+    return date(year, month, min(day, last_day))
+
+def _last_weekday(year, month, weekday):
+    last_day = monthrange(year, month)[1]
+    d = date(year, month, last_day)
+    while d.weekday() != weekday:
+        d -= timedelta(days=1)
+    return d
+
+def _observed(d: date) -> date:
+    """Regla de observancia estándar en EE.UU.: 
+       si cae sábado → se observa viernes previo; si domingo → lunes siguiente."""
+    if d.weekday() == 5:   # Saturday
+        return d - timedelta(days=1)
+    if d.weekday() == 6:   # Sunday
+        return d + timedelta(days=1)
+    return d
+
+def us_federal_holidays_observed_for_year(year: int) -> set[date]:
+    """Conjunto de feriados federales de EE.UU. (observados) para un año."""
+    # Fijos (con observancia):
+    new_years      = _observed(date(year, 1, 1))
+    juneteenth     = _observed(date(year, 6, 19))
+    independence   = _observed(date(year, 7, 4))
+    veterans       = _observed(date(year, 11, 11))
+    christmas      = _observed(date(year, 12, 25))
+
+    # Móviles:
+    mlk            = _nth_weekday(year, 1, 0, 3)   # 3er lunes de enero
+    presidents     = _nth_weekday(year, 2, 0, 3)   # 3er lunes de febrero
+    memorial       = _last_weekday(year, 5, 0)     # último lunes de mayo
+    labor          = _nth_weekday(year, 9, 0, 1)   # 1er lunes de septiembre
+    columbus       = _nth_weekday(year,10, 0, 2)   # 2do lunes de octubre
+    thanksgiving   = _nth_weekday(year,11, 3, 4)   # 4to jueves de noviembre (3=Thu)
+
+    return {
+        new_years, mlk, presidents, memorial, juneteenth, independence,
+        labor, columbus, veterans, thanksgiving, christmas
+    }
+
+def business_days_us(start: date, end: date) -> int:
+    """Cuenta días hábiles (lun-vie) excluyendo feriados federales de EE.UU. observados."""
+    if end < start:
+        return 0
+    # Prepara set de feriados para todos los años tocados por el rango
+    years = range(start.year, end.year + 1)
+    hols = set()
+    for y in years:
+        hols |= us_federal_holidays_observed_for_year(y)
+
+    count = 0
+    cur = start
+    one = timedelta(days=1)
+    while cur <= end:
+        if cur.weekday() < 5 and cur not in hols:  # 0..4 = Mon..Fri
+            count += 1
+        cur += one
+    return count
 
 @bp.before_app_request
 def _inject_user_from_cookie_or_query():
@@ -221,25 +290,17 @@ def leader_update_timeoff(req_id: int):
                 # días inclusivos: (end - start) + 1
                 from datetime import date as _date, datetime as _dt
                 sd = rec["start_date"]; ed = rec["end_date"]
-
-                # psycopg puede devolver date o str; normalizamos
                 if isinstance(sd, str):
-                    try: sd = _dt.strptime(sd, "%Y-%m-%d").date()
-                    except: pass
+                    sd = datetime.strptime(sd, "%Y-%m-%d").date()
                 if isinstance(ed, str):
-                    try: ed = _dt.strptime(ed, "%Y-%m-%d").date()
-                    except: pass
+                    ed = datetime.strptime(ed, "%Y-%m-%d").date()
 
-                if hasattr(sd, "toordinal") and hasattr(ed, "toordinal"):
-                    total_days = max(0, (ed - sd).days) + 1
+                k = str(rec["kind"] or "").lower()
+                if k == "vacation":
+                    total_days = business_days_us(sd, ed)  # <-- SOLO vacaciones: días hábiles US
                 else:
-                    # fallback robusto (si vinieran como str raras)
-                    try:
-                        d1 = _dt.strptime(str(rec["start_date"]), "%Y-%m-%d")
-                        d2 = _dt.strptime(str(rec["end_date"]), "%Y-%m-%d")
-                        total_days = max(0, (d2 - d1).days) + 1
-                    except:
-                        total_days = 0
+                    # Para VD/Holiday mantenemos conteo inclusivo calendario
+                    total_days = max(0, (ed - sd).days) + 1
 
                 total_days = int(total_days)
 
@@ -322,11 +383,18 @@ def leader_update_timeoff(req_id: int):
         start_fmt = fmt_date(rec["start_date"])
         end_fmt   = fmt_date(rec["end_date"])
         try:
-            d1 = datetime.strptime(str(rec["start_date"]), "%Y-%m-%d")
-            d2 = datetime.strptime(str(rec["end_date"]), "%Y-%m-%d")
-            total_days = (d2 - d1).days + 1
+            d1 = datetime.strptime(str(rec["start_date"]), "%Y-%m-%d").date()
+            d2 = datetime.strptime(str(rec["end_date"]), "%Y-%m-%d").date()
+            kind_lower = str(rec["kind"] or "").lower()
+            if kind_lower == "vacation":
+                total_days = business_days_us(d1, d2)
+                total_days_label = "Business days"
+            else:
+                total_days = (d2 - d1).days + 1
+                total_days_label = "Days"
         except Exception:
             total_days = None
+            total_days_label = "Days"
 
         kind_label = str(rec["kind"]).replace("_"," ").title()
         user_name  = rec["user_name"] or "there"
@@ -346,8 +414,8 @@ def leader_update_timeoff(req_id: int):
             f"<li><strong>Type:</strong> {kind_label}</li>",
             f"<li><strong>Dates:</strong> {start_fmt} → {end_fmt}</li>",
         ]
-        if total_days:
-            parts.append(f"<li><strong>Total days:</strong> {total_days}</li>")
+        if total_days is not None:
+            parts.append(f"<li><strong>{total_days_label}:</strong> {total_days}</li>")
         if rec.get("reason"):
             parts.append(f"<li><strong>Note:</strong> {rec['reason']}</li>")
         parts.append("</ul>")

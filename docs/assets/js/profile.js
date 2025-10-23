@@ -1,6 +1,102 @@
 // ===== Utilities =====
 const $ = (sel, root=document) => root.querySelector(sel);
 const $all = (sel, root=document) => [...root.querySelectorAll(sel)];
+// --- Date-only helpers (local, sin UTC) ---
+const _ISO_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseISODateLocal(s){
+  if (!s) return null;
+  if (_ISO_ONLY.test(s)) {
+    const [y,m,d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d); // <-- local midnight
+  }
+  // Si llega otro formato, normalizamos a fecha local (tirando hora)
+  const d = new Date(s);
+  if (isNaN(d)) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function toLocalISO(d){
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// ===== US Federal Holidays (observed) for UI =====
+// utilidades para calcular n-ésimo día de la semana y último lunes, etc.
+function nthWeekday(year, month /*1-12*/, weekday /*0=Sun..6=Sat*/, n /*1..4*/){
+  const first = new Date(year, month-1, 1);
+  const firstW = first.getDay();
+  const offset = (weekday - firstW + 7) % 7;
+  const day = 1 + offset + (n - 1) * 7;
+  return new Date(year, month-1, day);
+}
+function lastWeekday(year, month /*1-12*/, weekday){
+  const last = new Date(year, month, 0); // last day of month
+  const w = last.getDay();
+  const offset = (w - weekday + 7) % 7;
+  return new Date(year, month-1, last.getDate() - offset);
+}
+function observed(d){
+  // Sat -> Fri, Sun -> Mon
+  const w = d.getDay();
+  if (w === 6) { const x=new Date(d); x.setDate(d.getDate()-1); return x; }
+  if (w === 0) { const x=new Date(d); x.setDate(d.getDate()+1); return x; }
+  return d;
+}
+function computeUSHolidaysObserved(year){
+  const set = new Set();
+  function add(dt){ set.add(toLocalISO(dt)); }
+  // fijos con observancia
+  add(observed(new Date(year,0,1)));   // New Year's Day
+  add(observed(new Date(year,5,19)));  // Juneteenth
+  add(observed(new Date(year,6,4)));   // Independence Day
+  add(observed(new Date(year,10,11))); // Veterans Day
+  add(observed(new Date(year,11,25))); // Christmas
+  // móviles
+  add(nthWeekday(year,1,1,3));  // MLK (Mon=1, 3rd)
+  add(nthWeekday(year,2,1,3));  // Presidents (3rd Mon Feb)
+  add(lastWeekday(year,5,1));   // Memorial (last Mon May)
+  add(nthWeekday(year,9,1,1));  // Labor (1st Mon Sep)
+  add(nthWeekday(year,10,1,2)); // Columbus/Indigenous (2nd Mon Oct)
+  add(nthWeekday(year,11,4,4)); // Thanksgiving (4th Thu Nov)  (Thu=4)
+  return set;
+}
+// Cuenta business days (Mon-Fri, sin feriados US observados)
+function businessDaysBetweenISO(startISO, endISO){
+  const a = parseISODateLocal(startISO), b = parseISODateLocal(endISO);
+  if (!a || !b || b < a) return 0;
+
+  const years = [];
+  for(let y=a.getFullYear(); y<=b.getFullYear(); y++) years.push(y);
+
+  const hols = new Set();
+  years.forEach(y=>{
+    const s = computeUSHolidaysObserved(y);
+    for (const d of s) hols.add(d);
+  });
+
+  let cnt = 0;
+  const cur = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  while (cur <= b){
+    const w = cur.getDay();
+    const iso = toLocalISO(cur);
+    if (w>=1 && w<=5 && !hols.has(iso)) cnt++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return cnt;
+}
+// Wrapper: si es vacation => business days; otro => inclusivo calendario
+function daysForKind(kind, startISO, endISO){
+  const k = String(kind || "").toLowerCase();
+  if (k === "vacation") return businessDaysBetweenISO(startISO, endISO);
+  // VD/Holiday: inclusivo simple
+  const da = new Date(startISO), db = new Date(endISO);
+  if (isNaN(da) || isNaN(db) || db < da) return 0;
+  return Math.round((db - da)/86400000) + 1;
+}
 
 function showToast(el, text, ok=true){
   el.textContent = text;
@@ -202,15 +298,15 @@ function expandEventsToDays(events, viewDate){
   const endTs   = new Date(end.getFullYear(),   end.getMonth(),   end.getDate()).setHours(23,59,59,999);
 
   for (const ev of events){
-    const a = new Date(ev.start_date);
-    const b = new Date(ev.end_date);
+    const a = parseISODateLocal(ev.start_date);
+    const b = parseISODateLocal(ev.end_date);
     if (isNaN(a) || isNaN(b)) continue;
 
     // clip to visible month window
     let cur = new Date(Math.max(a, startTs));
     const to  = new Date(Math.min(b,   endTs));
     while (cur <= to){
-      const iso = cur.toISOString().slice(0,10);
+      const iso = toLocalISO(cur);
       if (!map.has(iso)) map.set(iso, []);
       map.get(iso).push(ev);
       cur.setDate(cur.getDate()+1);
@@ -287,7 +383,7 @@ function renderApprovalsCalendarFromRows(rows){
     );
 
     host.innerHTML = cells.map(({date, out})=>{
-      const iso = date.toISOString().slice(0,10);
+      const iso = toLocalISO(date);
       const todays = map.get(iso) || [];
       const evs = todays.slice(0,3).map(ev=>{
         const color = ev._person.color;
@@ -492,13 +588,13 @@ function enableApprovalsTab(){
 
 function fmtDateShort(s){
   if (!s) return "";
-  const d = new Date(s);
-  if (isNaN(d)) return s;
+  const d = parseISODateLocal(s);
+  if (!d) return s;
   return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"2-digit" });
 }
 function daysInclusive(a, b){
-  const da = new Date(a), db = new Date(b);
-  if (isNaN(da) || isNaN(db)) return 0;
+  const da = parseISODateLocal(a), db = parseISODateLocal(b);
+  if (!da || !db) return 0;
   return Math.max(0, Math.round((db - da)/86400000)) + 1;
 }
 const kindBadgeClass = (k) => ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[k] || "");
@@ -530,7 +626,7 @@ function renderApprovalsTable(items){
   }
 
   host.innerHTML = header + items.map(r=>{
-    const days = daysInclusive(r.start_date, r.end_date);
+    const days = daysForKind(r.kind, r.start_date, r.end_date);
     const initials = String(r.user_name||"")
       .trim().split(/\s+/).slice(0,2).map(p=>p[0]||"").join("").toUpperCase();
     const rowTone = r.status === 'approved' ? 'row--approved' : r.status === 'rejected' ? 'row--rejected' : '';
@@ -702,11 +798,10 @@ function setAvatar({ user_name, avatar_url }){
 // Format helpers for date inputs (YYYY-MM-DD)
 function toInputDate(v){
   if (!v) return "";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "";
-  const mm = String(d.getMonth()+1).padStart(2,"0");
-  const dd = String(d.getDate()).padStart(2,"0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
+  if (_ISO_ONLY.test(v)) return v; // ya está bien
+  const d = parseISODateLocal(v);
+  if (!d) return "";
+  return toLocalISO(d);
 }
 
 // ===== Tabs (re-usable) =====
@@ -787,10 +882,9 @@ function fmtDateNice(s){
   return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"2-digit" }); // e.g. Thu, Oct 16
 }
 function diffDaysInclusive(a, b){
-  const da = new Date(a), db = new Date(b);
-  if (isNaN(da) || isNaN(db)) return 0;
-  const ms = (db - da) / 86400000;
-  return Math.max(0, Math.round(ms)) + 1; // inclusive
+  const da = parseISODateLocal(a), db = parseISODateLocal(b);
+  if (!da || !db) return 0;
+  return Math.max(0, Math.round((db - da)/86400000)) + 1;
 }
 
 async function loadMyRequests(uid){
@@ -829,8 +923,10 @@ async function loadMyRequests(uid){
     host.innerHTML = header + arr.map(x => {
       const start = fmtDateNice(x.start_date);
       const end   = fmtDateNice(x.end_date);
-      const days  = diffDaysInclusive(x.start_date, x.end_date);
-      const daysTxt = `${days} day${days === 1 ? "" : "s"}`;
+      const days  = daysForKind(x.kind, x.start_date, x.end_date);
+      const isBiz = (x.kind === 'vacation');
+      const unit  = isBiz ? 'business day' : 'day';
+      const daysTxt = `${days} ${unit}${days === 1 ? "" : "s"}`;
 
       return `
         <!-- Type -->
