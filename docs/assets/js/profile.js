@@ -92,9 +92,10 @@ function businessDaysBetweenISO(startISO, endISO){
 function daysForKind(kind, startISO, endISO){
   const k = String(kind || "").toLowerCase();
   if (k === "vacation") return businessDaysBetweenISO(startISO, endISO);
-  // VD/Holiday: inclusivo simple
-  const da = new Date(startISO), db = new Date(endISO);
-  if (isNaN(da) || isNaN(db) || db < da) return 0;
+  // VD/Holiday: inclusivo calendario **en local**
+  const da = parseISODateLocal(startISO);
+  const db = parseISODateLocal(endISO);
+  if (!da || !db || db < da) return 0;
   return Math.round((db - da)/86400000) + 1;
 }
 
@@ -454,8 +455,8 @@ function setQuickAvatar({ user_name, avatar_url }){
 
 function fmtLongDate(v){
   if (!v) return "—";
-  const d = new Date(v);
-  if (isNaN(d)) return String(v);
+  const d = _ISO_ONLY.test(v) ? parseISODateLocal(v) : new Date(v);
+  if (!d || isNaN(d)) return String(v);
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
 }
 
@@ -877,9 +878,9 @@ async function loadMe(uid){
 // ——— Time Off: listar ———
 function fmtDateNice(s){
   if (!s) return "";
-  const d = new Date(s);
-  if (isNaN(d)) return s;
-  return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"2-digit" }); // e.g. Thu, Oct 16
+  const d = parseISODateLocal(s);
+  if (!d) return String(s);
+  return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"2-digit" });
 }
 function diffDaysInclusive(a, b){
   const da = parseISODateLocal(a), db = parseISODateLocal(b);
