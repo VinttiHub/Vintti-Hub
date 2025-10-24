@@ -2442,54 +2442,88 @@ async function runJDClassifierAndPersist(opportunityData) {
 function getAccountId() {
   return window.currentAccountId || null;
 }
-document.querySelector('.btn-create').addEventListener('click', () => {
-  document.getElementById('presentationDateInput').value = ''; // limpia fecha previa
-  document.getElementById('createBatchPopup').classList.remove('hidden');
-});
-
-document.getElementById('closeCreateBatchPopup').addEventListener('click', () => {
-  document.getElementById('createBatchPopup').classList.add('hidden');
-});
-
-document.getElementById('confirmCreateBatchBtn').addEventListener('click', async () => {
-  const presentationDate = document.getElementById('presentationDateInput').value;
-  const opportunityId = getOpportunityId();
-
-  if (!presentationDate) return alert('❌ Please select a presentation date');
-
-  try {
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ presentation_date: presentationDate })  // ← ahora se envía la fecha
+// --- Crear batch
+(function wireCreateBatchOnce(){
+  const openBtn = document.querySelector('.btn-create');
+  if (openBtn && !openBtn.dataset.wired) {
+    openBtn.dataset.wired = '1';
+    openBtn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const form = openBtn.closest('form');
+      if (form) form.addEventListener('submit', ev => ev.preventDefault(), { once:true });
+      document.getElementById('presentationDateInput').value = '';
+      document.getElementById('createBatchPopup').classList.remove('hidden');
     });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      const batchContainer = document.createElement('div');
-      batchContainer.classList.add('batch-box');
-      batchContainer.innerHTML = `
-        <div class="batch-actions">
-          <h3>Batch #${data.batch_number}</h3>
-          <div>
-            <button class="btn-add">Add candidate</button>
-            <button class="btn-send">Send for Approval</button>
-          </div>
-        </div>
-      `;
-      document.getElementById('batch-detail-container').appendChild(batchContainer);
-      document.getElementById('createBatchPopup').classList.add('hidden');
-      showFriendlyPopup("✅ Batch created successfully");
-      setTimeout(() => location.reload(), 1000);
-    } else {
-      alert('❌ Failed to create batch');
-    }
-  } catch (err) {
-    console.error('Error creating batch:', err);
-    alert('❌ Could not create batch');
   }
-});
+
+  let confirmBtn = document.getElementById('confirmCreateBatchBtn');
+  if (!confirmBtn) return;
+
+  if (!confirmBtn.dataset.cloned) {
+    const clean = confirmBtn.cloneNode(true);
+    clean.id = 'confirmCreateBatchBtn';
+    clean.dataset.cloned = '1';
+    confirmBtn.replaceWith(clean);
+    confirmBtn = clean;
+  }
+
+  let creatingBatch = false;
+
+  confirmBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (creatingBatch) return;
+    creatingBatch = true;
+
+    try {
+      const btn = e.currentTarget;
+      const popup = document.getElementById('createBatchPopup');
+      const dateInput = document.getElementById('presentationDateInput');
+      const opportunityId = getOpportunityId();
+
+      const presentationDate = (dateInput?.value || '').trim();
+      if (!opportunityId) { alert('❌ Invalid Opportunity ID'); return; }
+      if (!presentationDate) { alert('❌ Please select a presentation date'); return; }
+
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Creating…';
+
+      const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/batches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presentation_date: presentationDate })
+      });
+
+      const data = await res.json().catch(()=> ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to create batch');
+
+      popup?.classList.add('hidden');
+      showFriendlyPopup(`✅ Batch #${data.batch_number} created`);
+      await reloadBatchCandidates();
+    } catch (err) {
+      console.error('❌ Error creating batch:', err);
+      alert('❌ Could not create batch');
+    } finally {
+      const btn = document.getElementById('confirmCreateBatchBtn');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Create';
+      }
+      creatingBatch = false;
+    }
+  });
+
+  const closeBtn = document.getElementById('closeCreateBatchPopup');
+  if (closeBtn && !closeBtn.dataset.wired) {
+    closeBtn.dataset.wired = '1';
+    closeBtn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const form = closeBtn.closest('form');
+      if (form) form.addEventListener('submit', ev => ev.preventDefault(), { once:true });
+      document.getElementById('createBatchPopup').classList.add('hidden');
+    });
+  }
+})();
 async function loadBatchesForOpportunity(opportunityId) {
   try {
     const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
