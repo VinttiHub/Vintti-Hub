@@ -1605,8 +1605,6 @@ body.dark-mode .profile-tile{
 
 /* Respect your sidebar collapse if you have one */
 .custom-sidebar-hidden .profile-tile{ display: none; }
-/* Hardening por si otro CSS pisa el display o la dirección */
-.sidebar { display: flex !important; flex-direction: column !important; }
 
 /* Si *algo* lo oculta, que al menos el tile se vea */
 .profile-tile { display: flex !important; }
