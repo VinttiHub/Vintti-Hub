@@ -612,11 +612,17 @@ function renderApprovalsTable(items){
   const host = document.getElementById("approvalsTable");
   if (!host) return;
 
+  host.classList.add("approvals-grid");
+
+  // Header actualizado (7 columnas)
   const header = `
-    <div class="th">User</div>
-    <div class="th">Type & Dates</div>
-    <div class="th t-right">Status</div>
-    <div class="th t-right">Actions</div>
+    <div class="hdr hdr--employee">Employee</div>
+    <div class="hdr hdr--request">Request Date</div>
+    <div class="hdr hdr--return">Return Date</div>
+    <div class="hdr hdr--days">Days</div>
+    <div class="hdr hdr--type">Type</div>
+    <div class="hdr hdr--status">Status</div>
+    <div class="hdr hdr--action">Action</div>
   `;
 
   if (!items?.length){
@@ -626,40 +632,52 @@ function renderApprovalsTable(items){
     return;
   }
 
-  host.innerHTML = header + items.map(r=>{
-    const days = daysForKind(r.kind, r.start_date, r.end_date);
-    const initials = String(r.user_name||"")
-      .trim().split(/\s+/).slice(0,2).map(p=>p[0]||"").join("").toUpperCase();
-    const rowTone = r.status === 'approved' ? 'row--approved' : r.status === 'rejected' ? 'row--rejected' : '';
-    return `
-      <div class="row ${rowTone}" data-id="${r.id}">
-        <div class="cell user">
-          <div class="avatar-min">${initials || "—"}</div>
-          <div class="uinfo">
-            <div class="uname">${r.user_name || "—"}</div>
-            <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
+ host.innerHTML = header + items.map(r=>{
+  const initials = String(r.user_name||"")
+    .trim().split(/\s+/).slice(0,2).map(p=>p[0]||"").join("").toUpperCase();
+
+  const startLbl = fmtDateShort(r.start_date);
+  const endLbl   = fmtDateShort(r.end_date);
+  const days     = daysInclusive(r.start_date, r.end_date);
+  const kClass   = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
+  const kLabel   = String(r.kind||"").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
+  const esc = (s) => String(s).replace(/[&<>"']/g, m => (
+  { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]
+));
+
+
+  return `
+    <div class="row ${r.status}" data-id="${r.id}">
+
+      <div class="cell col-employee">
+        <div class="avatar-min">${initials}</div>
+        <div class="uinfo">
+          <div class="uname">${r.user_name || "—"}
+          ${r.reason ? `
+            <button class="note-dot" type="button"
+                    aria-label="View note"
+                    title="${esc(r.reason)}"
+                    data-note="${esc(r.reason)}">💬</button>
+          ` : ``}
           </div>
-        </div>
-        <div class="cell when">
-          <span class="badge-soft ${kindBadgeClass(r.kind)}">${kindLabel(r.kind)}</span>
-          <span class="dates">
-            <time datetime="${r.start_date}">${fmtDateShort(r.start_date)}</time>
-            <span class="sep">→</span>
-            <time datetime="${r.end_date}">${fmtDateShort(r.end_date)}</time>
-            <span class="days">(${days} day${days===1?'':'s'})</span>
-          </span>
-          ${r.reason ? `<div class="note" title="Note">${r.reason}</div>` : ``}
-        </div>
-        <div class="cell t-right">
-          <span class="status ${r.status}">${r.status}</span>
-        </div>
-        <div class="cell t-right actions">
-          <button class="btn tiny approve" data-action="approve">Approve</button>
-          <button class="btn tiny reject"  data-action="reject">Reject</button>
+          <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
         </div>
       </div>
-    `;
-  }).join("");
+      <div class="cell col-request"><time>${startLbl}</time></div>
+      <div class="cell col-return"><time>${endLbl}</time></div>
+      <div class="cell col-days">${days} day${days===1?'':'s'}</div>
+      <div class="cell col-type"><span class="badge-soft ${kClass}">${kLabel}</span></div>
+      <div class="cell col-status"><span class="status ${r.status}">${r.status}</span></div>
+      <div class="cell col-actions">
+      <div class="cell t-right actions">
+        <button class="btn tiny approve" data-action="approve">✔️</button>
+        <button class="btn tiny reject"  data-action="reject">❌</button>
+        </div>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+    </div>
+  `;
+}).join("");
 
   // wire buttons
   host.querySelectorAll("[data-action]").forEach(btn=>{
@@ -907,12 +925,16 @@ async function loadMyRequests(uid){
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
 
-    // 🔸 Only 3 columns now: Type | Dates | Status
-    const header = `
-      <div class="th">Type</div>
-      <div class="th">Dates</div>
-      <div class="th t-right">Status</div>
-    `;
+    // 🔸 5 columnas: Type | Request Date | Return Date | Days | Status
+    // Header con iconos (no usa comillas dentro, solo texto plano)
+  const header = `
+    <div class="th icon icon--type">Type</div>
+    <div class="th icon icon--request">Request Date</div>
+    <div class="th icon icon--return">Return Date</div>
+    <div class="th icon icon--days">Days</div>
+    <div class="th icon icon--status">Status</div>
+  `;
+
 
     if (!arr.length){
       host.innerHTML = header + `
@@ -921,41 +943,33 @@ async function loadMyRequests(uid){
       return;
     }
 
-    host.innerHTML = header + arr.map(x => {
-      const start = fmtDateNice(x.start_date);
-      const end   = fmtDateNice(x.end_date);
-      const days  = daysForKind(x.kind, x.start_date, x.end_date);
-      const isBiz = (x.kind === 'vacation');
-      const unit  = isBiz ? 'business day' : 'day';
-      const daysTxt = `${days} ${unit}${days === 1 ? "" : "s"}`;
+    host.innerHTML = header + arr.map(x=>{
+  const start = fmtDateNice(x.start_date);
+  const end   = fmtDateNice(x.end_date);
+  const days  = diffDaysInclusive(x.start_date, x.end_date);
+  const statusCls = String(x.status || '').toLowerCase();  // approved | rejected | pending
+  const rowCls = statusCls ? `row--${statusCls}` : '';
 
-      return `
-        <!-- Type -->
-        <div class="cell plain">
-          <div class="metric">
-            <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
-          </div>
-        </div>
-        <div class="cell plain">
-          <div class="dates-min">
-            <time class="d" datetime="${x.start_date}">${start}</time>
-            <span class="sep">→</span>
-            <time class="d" datetime="${x.end_date}">${end}</time>
-            <span class="days">(${days} day${days===1?'':'s'})</span>
-          </div>
-        </div>
+  return `
+    <div class="row ${rowCls}">
+      <div class="cell">
+        <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
+      </div>
+      <div class="cell"><time datetime="${x.start_date}">${start}</time></div>
+      <div class="cell"><time datetime="${x.end_date}">${end}</time></div>
+      <div class="cell t-right"><b class="days">${days} day${days===1?'':'s'}</b></div>
+      <div class="cell t-center"><span class="status ${statusCls}">${x.status}</span></div>
+    </div>
+  `;
+}).join("");
 
-        <!-- Status -->
-        <div class="cell plain t-right">
-          <span class="status ${String(x.status||'').toLowerCase()}">${x.status}</span>
-        </div>
-      `;
-    }).join("");
   }catch(err){
     console.error(err);
     host.innerHTML = `
       <div class="th">Type</div>
-      <div class="th">Dates</div>
+      <div class="th">Request Date</div>
+      <div class="th">Return Date</div>
+      <div class="th t-right">Days</div>
       <div class="th t-right">Status</div>
       <div class="cell plain" style="grid-column:1/-1; justify-content:center">Could not load requests.</div>
     `;
@@ -1193,7 +1207,7 @@ async function onTimeoffSubmit(e){
   }
 }
 
-// ===== Profile save (PUT) — sin header custom =====
+// ============================= PROFILEEEE =============================
 $("#profileForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
   const payload = {
@@ -1260,3 +1274,113 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     alert("Could not load your profile. Please refresh.");
   }
 })();
+
+
+// cache global de perfil (raw del backend)
+let PROFILE_CACHE = null;
+
+function fmtLongDateSafe(v){
+  if (!v) return "—";
+  const d = new Date(v);
+  if (isNaN(d)) return "—";
+  return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" });
+}
+
+function renderProfileView(me){
+  if (!me) return;
+  // Header
+  $("#v_user_name")?.replaceChildren(document.createTextNode(me.user_name || "—"));
+  $("#v_role")?.replaceChildren(document.createTextNode(me.role || "—"));
+
+  // Card fields
+  $("#v_full_name")?.replaceChildren(document.createTextNode(me.user_name || "—"));
+  $("#v_email")?.replaceChildren(document.createTextNode(me.email_vintti || "—"));
+  $("#v_role_2")?.replaceChildren(document.createTextNode(me.role || "—"));
+  $("#v_emergency")?.replaceChildren(document.createTextNode(me.emergency_contact || "—"));
+  $("#v_start")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.ingreso_vintti_date)));
+  $("#v_birth")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.fecha_nacimiento)));
+
+  // Avatar
+  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url });
+}
+
+function showProfileView(){
+  $("#profileView")?.removeAttribute("hidden");
+  $("#profileEdit")?.setAttribute("hidden", "");
+}
+function showProfileEdit(){
+  $("#profileView")?.setAttribute("hidden", "");
+  $("#profileEdit")?.removeAttribute("hidden");
+  $("#user_name")?.focus();
+}
+
+async function loadMe(uid){
+  if (!uid) throw new Error("Missing uid for /profile/me");
+
+  const r = await api(`/profile/me`, { method: 'GET' });
+  if (!r.ok) throw new Error("Failed to load profile");
+  const me = await r.json();
+  CURRENT_USER_ID = me.user_id ?? uid;
+
+  // Guarda RAW en cache para vista/cancel
+  PROFILE_CACHE = {
+    user_id: CURRENT_USER_ID,
+    user_name: me.user_name || "",
+    email_vintti: me.email_vintti || "",
+    role: me.role || "",
+    emergency_contact: me.emergency_contact || "",
+    ingreso_vintti_date: me.ingreso_vintti_date || null, // RAW
+    fecha_nacimiento: me.fecha_nacimiento || null,       // RAW
+    avatar_url: me.avatar_url || null
+  };
+
+  // Inputs con formato input-date
+  $("#user_name").value = PROFILE_CACHE.user_name;
+  $("#email_vintti").value = PROFILE_CACHE.email_vintti;
+  $("#role").value = PROFILE_CACHE.role;
+  $("#emergency_contact").value = PROFILE_CACHE.emergency_contact;
+  $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
+  $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+
+  // Vista
+  renderProfileView(PROFILE_CACHE);
+  showProfileView();
+}
+
+document.addEventListener("click", (e)=>{
+  if (e.target.matches("#btnEditHeader, #btnEditPersonal")){
+    e.preventDefault();
+    if (PROFILE_CACHE){
+      $("#user_name").value = PROFILE_CACHE.user_name || "";
+      $("#email_vintti").value = PROFILE_CACHE.email_vintti || "";
+      $("#role").value = PROFILE_CACHE.role || "";
+      $("#emergency_contact").value = PROFILE_CACHE.emergency_contact || "";
+      $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
+      $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+    }
+    showProfileEdit();
+  }
+
+  if (e.target.matches("#btnCancelEdit")){
+    e.preventDefault();
+    renderProfileView(PROFILE_CACHE); // restaura vista
+    showProfileView();
+  }
+});
+
+// Actualiza cache desde los inputs (lo guardamos crudo y que la vista lo formatee)
+PROFILE_CACHE = {
+  user_id: CURRENT_USER_ID,
+  user_name: $("#user_name").value.trim(),
+  email_vintti: $("#email_vintti").value.trim(),
+  role: $("#role").value.trim(),
+  emergency_contact: $("#emergency_contact").value.trim(),
+  // guardamos las fechas como las entrega el <input type="date"> (YYYY-MM-DD)
+  ingreso_vintti_date: $("#ingreso_vintti_date").value || null,
+  fecha_nacimiento: $("#fecha_nacimiento").value || null,
+  avatar_url: $("#avatarImg").src || null
+};
+
+// Repinta tarjeta y vuelve a modo vista
+renderProfileView(PROFILE_CACHE);
+showProfileView();
