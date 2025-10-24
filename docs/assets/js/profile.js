@@ -275,10 +275,12 @@ function renderTeamPtoTable(users){
 function personColor(seedStr){
   const s = String(seedStr || "");
   let h = 0;
-  for (let i=0; i<s.length; i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
-  const hue = h % 360;
-  // gentle saturation/lightness -> pastel tech
-  return `hsl(${hue} 70% 68%)`;
+  for (let i = 0; i < s.length; i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
+
+  let hue = h % 360;
+  if (hue >= 70 && hue <= 120) hue = (hue + 100) % 360;
+
+  return `oklch(0.6 0.10 ${hue}deg)`;
 }
 
 const PTO_KIND_LABEL = { vacation: "VAC", holiday: "HOL", vintti_day: "VD" };
