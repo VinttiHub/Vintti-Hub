@@ -1,3 +1,91 @@
+// Mapa de códigos (si ya lo tienes global, puedes usar ese y borrar este)
+const WA_countryToCodeMap = {
+  "Argentina": "54","Bolivia": "591","Brazil": "55","Chile": "56","Colombia": "57",
+  "Costa Rica": "506","Cuba": "53","Ecuador": "593","El Salvador": "503","Guatemala": "502",
+  "Honduras": "504","Mexico": "52","Nicaragua": "505","Panama": "507","Paraguay": "595",
+  "Peru": "51","Puerto Rico": "1","Dominican Republic": "1","Uruguay": "598","Venezuela": "58"
+};
+
+// Limpia y normaliza a E.164 sin "+" (wa.me exige dígitos, sin signos)
+function normalizePhoneForWA(rawPhone, country){
+  if (!rawPhone) return '';
+  let s = String(rawPhone).trim();
+
+  // Quita espacios, paréntesis y guiones
+  s = s.replace(/[\s\-\(\)]/g, '');
+
+  // Si viene con "00" o "+", quitarlos
+  s = s.replace(/^00/, '');
+  s = s.replace(/^\+/, '');
+
+  // Si tras limpiar empieza con código de país (2–3 dígitos) probablemente ya está bien
+  // Si NO, y tenemos país, lo preprendemos.
+  const cc = WA_countryToCodeMap[country] || '';
+  if (cc && !s.startsWith(cc)) {
+    // Evita doble indicativo si el número ya venía con él
+    // (heurística simple: si la longitud sin cc es <= 10–11, prepende)
+    const maybeLocal = s.length <= 11;
+    if (maybeLocal) s = cc + s;
+  }
+
+  // Deja sólo dígitos
+  s = s.replace(/\D/g, '');
+  return s;
+}
+// === WhatsApp helpers ===
+const PHONE_CACHE = Object.create(null);
+const onlyDigits = s => String(s||'').replace(/\D/g, '');
+
+// Intenta muchas keys (pipeline y details pueden diferir)
+function pickPhoneFromCandidate(obj){
+  if (!obj || typeof obj !== 'object') return '';
+  const keys = [
+    'phone', 'candidate_phone', 'phone_number', 'mobile', 'cellphone',
+    'whatsapp', 'tel', 'telefono'
+  ];
+  // 1) directas
+  for (const k of keys){
+    const v = (obj?.[k] ?? '').toString().trim();
+    if (v) return v;
+  }
+  // 2) anidadas típicas
+  const nested = [
+    obj?.candidate?.phone,
+    obj?.contact?.phone,
+    obj?.phones?.primary,
+    obj?.phones?.main
+  ].map(x => (x ?? '').toString().trim()).find(Boolean);
+  if (nested) return nested;
+
+  return '';
+}
+
+// Trae y cachea el teléfono si no vino en el pipeline
+async function resolvePhone(candidate){
+  const id = candidate?.candidate_id || candidate?.id;
+  if (!id) return '';
+
+  // a) ¿vino inline?
+  const inline = pickPhoneFromCandidate(candidate);
+  if (inline){
+    PHONE_CACHE[id] = inline;
+    return inline;
+  }
+
+  // b) caché
+  if (PHONE_CACHE[id]) return PHONE_CACHE[id];
+
+  // c) fallback a /candidates/:id
+  try{
+    const r = await fetch(`${API_BASE}/candidates/${id}`, { cache: 'no-store' });
+    if (!r.ok) throw 0;
+    const full = await r.json();
+    const phone = pickPhoneFromCandidate(full);
+    if (phone) PHONE_CACHE[id] = phone;
+    return phone || '';
+  }catch{ return ''; }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const containers = document.querySelectorAll(".card-container");
     const stageMap = {
@@ -220,26 +308,61 @@ candidates.forEach(candidate => {
   const starClass = isStarred ? 'starred' : '';
 
 card.innerHTML = `
-  <div class="card-header">
-    <div class="candidate-info">
-      <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
-      <div class="candidate-meta">
-        <span class="country">${getFlagEmoji(candidate.country || '')}</span>
-        <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
-      </div>
-      <div class="star-wrapper">
-        <i class="fas fa-star star-icon ${starClass}"></i>
-      </div>
+<div class="card-header">
+  <div class="candidate-info">
+    <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
+    <div class="candidate-meta">
+      <span class="country">${getFlagEmoji(candidate.country || '')}</span>
+      <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
     </div>
-    <span class="delete-icon" title="Delete">🗑️</span>
-    <div class="signoff-toggle">
-      <label class="switch">
-        <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
-        <span class="slider round"></span>
-      </label>
+    <div class="star-wrapper">
+      <i class="fas fa-star star-icon ${starClass}" title="Star"></i>
+      <i class="fab fa-whatsapp wa-icon" title="WhatsApp"></i>
     </div>
   </div>
+  <span class="delete-icon" title="Delete">🗑️</span>
+  <div class="signoff-toggle">
+    <label class="switch">
+      <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
+      <span class="slider round"></span>
+    </label>
+  </div>
+</div>
 `;
+// WhatsApp click (robusto con fallback a /candidates/:id)
+// WhatsApp click (robusto con fallback a /candidates/:id)
+{
+  const waIcon = card.querySelector('.wa-icon');
+  if (waIcon) {
+    // si ya vino un teléfono “inline”, precárgalo en dataset (no bloquea el fallback)
+    const inlineRaw = pickPhoneFromCandidate(candidate);
+    if (inlineRaw) waIcon.dataset.rawPhone = inlineRaw;
+
+    waIcon.addEventListener('click', async (e) => {
+      e.stopPropagation();
+
+      // 1) usa dataset si existe, si no, resuélvelo con fetch al /candidates/:id
+      let raw = waIcon.dataset.rawPhone || '';
+      if (!raw) {
+        raw = await resolvePhone(candidate);
+        if (raw) waIcon.dataset.rawPhone = raw; // cachea en el DOM
+      }
+
+      // 2) normaliza → E.164 sin "+" (wa.me requiere solo dígitos)
+      const waNumber = normalizePhoneForWA(raw, candidate.country);
+
+      if (!waNumber) {
+        alert('No phone number for this candidate.');
+        return;
+      }
+
+      // 3) abrir en la MISMA pestaña para evitar bloqueos de popup
+      location.href = `https://wa.me/${waNumber}`;
+      // (alternativa igual de válida)
+      // location.assign(`https://wa.me/${waNumber}`);
+    });
+  }
+}
 
 
 

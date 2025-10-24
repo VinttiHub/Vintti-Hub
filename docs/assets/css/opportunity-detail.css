@@ -2844,3 +2844,33 @@ input:checked + .slider::before {
 }
 /* fuerza ocultar los grupos de fee por encima de cualquier estilo previo */
 .hide-fee-group { display: none !important; }
+/* Asegura layout horizontal para estrella + WhatsApp */
+.star-wrapper{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;            /* separación sutil */
+}
+
+/* Mismo tamaño visual para ambos íconos */
+.star-wrapper .star-icon,
+.star-wrapper .wa-icon{
+  font-size: 16px;     /* ajusta si tu estrella usa otro tamaño */
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.star-wrapper .wa-icon{
+  color: #25D366;      /* WhatsApp */
+  opacity: .9;
+  transition: transform .15s ease, opacity .15s ease;
+}
+
+.star-wrapper .wa-icon:hover{
+  transform: translateY(-1px) scale(1.05);
+  opacity: 1;
+}
