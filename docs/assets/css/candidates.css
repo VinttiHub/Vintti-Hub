@@ -422,20 +422,55 @@ body {
 .status-chip.loading .dot:nth-child(3){ animation-delay:.4s; }
 
 /* =========================================================================
-   FILTROS
+   FILTROS (Status / Model) — pill style como el buscador
    ========================================================================= */
 .filters-bar{
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
+/* Select redondo y limpio, mismo alto del input de búsqueda */
 .filter-select{
-  padding: 8px 10px;
-  border: 1px solid rgba(0,0,0,.12);
-  border-radius: 12px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  height: 34px;                     /* = .name-search-input */
+  padding: 6px 36px 6px 12px;       /* espacio para el caret */
+  border-radius: 999px;             /* pill */
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-family: 'Onest', sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  transition: all .3s ease;
+  box-shadow: none;
+
+  /* caret SVG igual a los selects de DataTables */
+  background-image: url("data:image/svg+xml;charset=UTF-8,<svg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M1 1L5 5L9 1' stroke='%230044FF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px;
+  text-align-last: left;            /* texto alineado como un input */
+}
+
+/* Hover / focus para sensación “input” */
+.filter-select:hover{
+  box-shadow: 0 0 4px rgba(0, 68, 255, 0.15);
+}
+.filter-select:focus{
+  border-color: #f5cfdb;
+  box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.25);
+}
+
+/* Tamaños responsivos coherentes con el buscador */
+@media (min-width: 901px){
+  .filter-select{ min-width: 160px; }
+}
+@media (max-width: 900px){
+  .filter-select{ min-width: 140px; }
 }
