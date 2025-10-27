@@ -5,12 +5,16 @@
   <title>My Profile • Vintti Hub</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="./assets/css/profile.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
 </head>
 <body>
   <main class="page">
     <!-- Header + Tabs -->
     <header class="header">
-      <h1 class="title">My Profile</h1>
+      <h1 class="title"></h1>
         <nav class="tabs" id="tabsBar" role="tablist" aria-label="Profile tabs">
           <button class="tab active" data-tab="profile" aria-selected="true">Profile</button>
           <button class="tab" data-tab="timeoff" aria-selected="false">Request Time Off</button>
@@ -18,14 +22,14 @@
     </header>
 
     <!-- Avatar -->
-    <section class="avatar-wrap">
+    <!-- <section class="avatar-wrap">
       <div class="avatar" id="avatar">
         <img id="avatarImg" alt="User avatar" />
         <span id="avatarInitials" aria-hidden="true"></span>
       </div>
-    </section>
+    </section> -->
 
-    <!-- Panels -->
+    <!-- Panels
     <section class="panel active" id="panel-profile" role="tabpanel" aria-labelledby="tab-profile">
       <form id="profileForm" class="form">
         <div class="grid">
@@ -65,9 +69,131 @@
           <span id="profileToast" class="toast" role="status" aria-live="polite"></span>
         </div>
       </form>
+    </section> -->
+
+    <section class="panel active" id="panel-profile" role="tabpanel" aria-labelledby="tab-profile">
+      <!-- ===== Profile VIEW (solo lectura) ===== -->
+      <section id="profileView" class="view">
+        <!-- Header card -->
+        
+        <div class="card header-card">
+          <div class="header-left">
+            <div class="avatar" id="avatar">
+              <img id="avatarImg" alt="User avatar" />
+              <span id="avatarInitials" aria-hidden="true"></span>
+            </div>
+            <div class="who">
+              <h2 id="v_user_name" class="name">—</h2>
+              <div id="v_role" class="muted">—</div>
+              <div id="v_location" class="muted" hidden>—</div>
+            </div>
+          </div>
+          <div class="header-right">
+            <button class="btn pill ghost" type="button" id="btnEditHeader">
+            Edit <span aria-hidden="true">✎</span>
+          </button>
+          </div>
+        </div>
+
+        <!-- Personal info card -->
+        <div class="card">
+          <div class="card-head">
+            <h3 class="title">Personal information</h3>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-field">
+              <div class="label">Vintti Email</div>
+              <div id="v_email" class="value">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">Emergency Contact</div>
+              <div id="v_emergency" class="value">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">Vintti Start Date</div>
+              <div id="v_start" class="value">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">Date of Birth</div>
+              <div id="v_birth" class="value">—</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+  <!-- ===== Profile EDIT (tu form actual) ===== -->
+      <section id="profileEdit" class="edit" hidden>
+        <!-- acciones arriba a la derecha como en la referencia -->
+        <div class="card form-card">
+          <div class="card-head">
+            <h3 class="title">Edit personal information</h3>
+            <div class="actions">
+              <button type="button" id="btnCancelEdit" class="btn">Cancel</button>
+            </div>
+          </div>
+
+          <!-- tu formulario tal cual -->
+          <form id="profileForm" class="form">
+            <div class="grid">
+              <label class="field">
+                <span class="label">Full Name</span>
+                <input name="user_name" id="user_name" placeholder="Full Name" />
+              </label>
+
+              <label class="field">
+                <span class="label">Vintti Email</span>
+                <input name="email_vintti" id="email_vintti" type="email" placeholder="name@vintti.com" />
+              </label>
+
+              <label class="field">
+                <span class="label">Role</span>
+                <input name="role" id="role" placeholder="Role" />
+              </label>
+
+              <label class="field">
+                <span class="label">Emergency Contact</span>
+                <input name="emergency_contact" id="emergency_contact" placeholder="+57 300 000 0000 — Contact Name" />
+              </label>
+
+              <label class="field">
+                <span class="label">Vintti Start Date</span>
+                <input name="ingreso_vintti_date" id="ingreso_vintti_date" type="date" />
+              </label>
+
+              <label class="field">
+                <span class="label">Date of Birth</span>
+                <input name="fecha_nacimiento" id="fecha_nacimiento" type="date" />
+              </label>
+            </div>
+
+            <div class="actions">
+              <button type="submit" class="btn primary">Save Changes</button>
+              <span id="profileToast" class="toast" role="status" aria-live="polite"></span>
+            </div>
+          </form>
+        </div>
+      </section>
     </section>
 
     <section class="panel" id="panel-timeoff" role="tabpanel" aria-labelledby="tab-timeoff" hidden>
+      <section class="requests">
+        <header class="requests-head">
+          <h2 class="list-title">My Requests</h2>
+          <div class="legend">
+            <span class="badge-soft badge--vac">Vacation</span>
+            <span class="badge-soft badge--vd">Vintti Day</span>
+            <span class="badge-soft badge--hol">Holiday</span>
+          </div>
+        </header>
+
+        <div id="requestsTable" class="requests-table">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+      </section>
+
       <!-- ——— Time Off Balances (read-only) ——— -->
       <section class="balances" aria-label="Time Off Balances">
         <header class="balances-head">
@@ -82,27 +208,12 @@
           <div class="skeleton-row"></div>
         </div>
       </section>
-      <section class="requests">
-  <header class="requests-head">
-    <h2 class="list-title">My Requests</h2>
-    <div class="legend">
-      <span class="badge-soft badge--vac">Vacation</span>
-      <span class="badge-soft badge--hol">Holiday</span>
-      <span class="badge-soft badge--vd">Vintti Day</span>
-    </div>
-  </header>
-
-  <div id="requestsTable" class="requests-table">
-    <div class="skeleton-row"></div>
-    <div class="skeleton-row"></div>
-    <div class="skeleton-row"></div>
-  </div>
-</section>
+      
 
       <div class="list">
 <div class="timeoff-actions">
   <button id="btnOpenTimeoff" class="btn fun">
-    Take a Break 🌴
+    ✨ Take a Break ✨
   </button>
 </div>
 
@@ -152,19 +263,29 @@
 </div>
 
 <!-- ——— Success Splash (auto hides) ——— -->
-<div id="timeoffCongrats" class="splash" aria-hidden="true">
-  <div class="splash__card">
-    <div class="splash__emoji" aria-hidden="true">🏖️</div>
-    <h3>Request sent!</h3>
-    <p>You deserve a rest. We’ll notify your lead 💌</p>
-  </div>
-</div>
+    <div id="timeoffCongrats" class="splash" aria-hidden="true" role="status" aria-live="polite">
+      <div class="tc-card">
+        <div class="tc-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+            <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-opacity=".18" stroke-width="2"/>
+            <path d="M7 12.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3 class="tc-title">Time Off Requested</h3>
+        <p class="tc-sub">We’ll notify your lead and keep you posted.</p>
+      </div>
+    </div>
 
       </div>
     </section>
 <section class="panel" id="panel-teampto" role="tabpanel" aria-labelledby="tab-teampto" hidden>
   <header class="teampto-head">
     <h2 class="teampto-title">Team PTO</h2>
+    <div class="legend">
+            <span class="badge-soft badge--vac">Vacation</span>
+            <span class="badge-soft badge--vd">Vintti Day</span>
+            <span class="badge-soft badge--hol">Holiday</span>
+          </div>
     <span class="teampto-caption">Read-only</span>
   </header>
 
