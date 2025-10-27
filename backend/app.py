@@ -37,6 +37,14 @@ from reminders_routes import bp as reminders_bp
 from profile_routes import bp as profile_bp, users_bp as users_bp
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
+def _to_bool(x):
+    if isinstance(x, bool):
+        return x
+    if x is None:
+        return None
+    s = str(x).strip().lower()
+    return s in ('1', 'true', 't', 'yes', 'y', '✓', '[v]', 'on')
+
 def _strip_attrs_keep_href(tag_html: str) -> str:
     """
     Devuelve la misma etiqueta pero sin atributos, salvo <a href="..."> (solo http/https/mailto).
@@ -1879,8 +1887,12 @@ def update_candidate_fields(candidate_id):
 
     for field in allowed_fields:
         if field in data:
+            val = data[field]
+            # 👉 fuerza tipos especiales
+            if field == 'check_hr_lead':
+                val = _to_bool(val)
             updates.append(f"{field} = %s")
-            values.append(data[field])
+            values.append(val)
 
     if not updates:
         return jsonify({'error': 'No valid fields provided'}), 400

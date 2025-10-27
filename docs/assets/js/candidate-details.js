@@ -1327,14 +1327,32 @@ if (save){
     loadSalaryUpdates();
   }
   // ✅ Resignation & References (check_hr_lead) — estado inicial desde BD
-{
-  const resigCheck = document.getElementById('resig-ref-check');
-  if (resigCheck) {
-    const raw = data.check_hr_lead; // puede venir boolean, "yes", "true", "1", etc.
-    const initial = (typeof raw === 'boolean') ? raw : /^(1|y|yes|true|✓|\[v\])$/i.test(String(raw||'').trim());
-    resigCheck.checked = !!initial;
+// ✅ Estado inicial del checkbox desde BD (autónomo)
+(async function loadResigRefInitial(){
+  const check = document.getElementById('resig-ref-check');
+  if (!check) return;
+
+  const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const cid  = new URLSearchParams(window.location.search).get('id');
+  if (!cid) return;
+
+  try {
+    const r = await fetch(`${API}/candidates/${cid}`);
+    if (!r.ok) throw 0;
+    const row = await r.json();
+    const raw = row?.check_hr_lead;
+
+    // normalización flexible → booleano
+    const initial = (typeof raw === 'boolean')
+      ? raw
+      : /^(1|y|yes|true|✓|\[v\])$/i.test(String(raw ?? '').trim());
+
+    check.checked = !!initial;
+  } catch(e) {
+    console.warn('No se pudo leer check_hr_lead inicial', e);
   }
-}
+})();
+
 })(); 
 
   // Si llegaste con #hire desde Close Win → mensaje
@@ -1621,7 +1639,6 @@ function wireVideoLinkDedupe() {
   const cid  = new URLSearchParams(window.location.search).get('id');
 
   function showAutoToast(html, ms = 5000){
-    // Evita toasts duplicados superpuestos
     document.querySelectorAll('.toast-floating').forEach(n => n.remove());
     const box = document.createElement('div');
     box.className = 'toast-floating';
@@ -1642,7 +1659,6 @@ function wireVideoLinkDedupe() {
       });
       if (!r.ok) throw new Error(await r.text().catch(()=> 'PATCH failed'));
 
-      // UX lindo cuando el usuario lo marca
       if (val) {
         showAutoToast(
           `🎀 You rock! Task completed — resignation letter & references are on track.<br/>
@@ -1652,8 +1668,7 @@ function wireVideoLinkDedupe() {
       }
     } catch (e) {
       console.error('❌ Saving check_hr_lead failed', e);
-      // revertir el toggle si falló
-      check.checked = !val;
+      check.checked = !val; // revertir si falló
       alert('We could not save this change. Please try again.');
     }
   });
