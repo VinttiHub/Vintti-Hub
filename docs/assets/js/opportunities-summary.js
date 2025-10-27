@@ -5,8 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "pilar.fernandez@vintti.com": "Pilar Fernandez",
     "agostina@vintti.com": "Agostina",
     "jazmin@vintti.com": "Jazmín",
-    "agustina.barbero@vintti.com": "Agustina Barbero",
-    "agustina.ferrari@vintti.com": "Agustina Ferrari"
+    "agustina.barbero@vintti.com": "Agustina Barbero"
   };
 // --- Construir tbody dinámicamente desde `emails`
 const tbody = document.querySelector('#summaryTable tbody');
@@ -104,18 +103,21 @@ opportunities.forEach((opp) => {
   lastUpdatedDiv.textContent = `Last updated: ${formattedDate} at ${formattedTime} — refresh the page to get the latest numbers.`;
 
   // ——— Cargar datos para desglose por prioridad en click
-  let oppsCache = null;
-  let accountsCache = null;
-  async function ensureCaches() {
-    if (!oppsCache || !accountsCache) {
-      const [oppsRes, accountsRes] = await Promise.all([
-        fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light"),
-        fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/data/light"),
-      ]);
-      oppsCache = await oppsRes.json();
-      accountsCache = await accountsRes.json();
-    }
+let oppsCache = null;
+let accountsCache = null;
+
+async function ensureCaches() {
+  if (!oppsCache || !accountsCache) {
+    const [oppsRes, accountsRes] = await Promise.all([
+      fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light"),
+      // 🔄 Importante: /data (completo) trae account.priority
+      fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/data"),
+    ]);
+    oppsCache = await oppsRes.json();
+    accountsCache = await accountsRes.json();
   }
+}
+
   function accountNameFor(opp){
   // Si /opportunities/light ya trae el nombre del cliente, úsalo
   if (opp?.client_name) return opp.client_name;
@@ -235,11 +237,16 @@ table.addEventListener("click", async (evt) => {
 
   await ensureCaches();
 
-  // Mapa account_id -> prioridad (ya lo usabas para los chips A/B/C)
-  const priorityMap = {};
-  (accountsCache || []).forEach((acc) => {
-    if (acc?.account_id) priorityMap[acc.account_id] = acc.priority || "N/A";
-  });
+// Mapa account_id -> prioridad (A/B/C) tomado de /data
+const priorityMap = {};
+(accountsCache || []).forEach((acc) => {
+  const id = acc?.account_id;
+  let pr = (acc?.priority || '').toString().trim().toUpperCase();
+  // Solo aceptamos A/B/C; cualquier otro valor se ignora
+  if (!['A','B','C'].includes(pr)) pr = null;
+  if (id) priorityMap[id] = pr;
+});
+
 
   // Filtro por HR Lead + Stage
 const filteredOpps = (oppsCache || []).filter((o) =>
