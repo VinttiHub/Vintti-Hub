@@ -2320,3 +2320,119 @@ html body .month-year .btn-clear:active{
   opacity: 1; /* visible por defecto */
   pointer-events: auto;
 }
+/* ===== Cute doc-check makeover ===== */
+.doc-check.cute{
+  --glass: rgba(255,255,255,.65);
+  --stroke: rgba(125,144,170,.25);
+  --shadow: 0 8px 30px rgba(16,24,40,.06);
+  --accent: #7c3aed; /* tu violeta suave */
+  --accent-2: #9b8cff;
+  --bg-gradient: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.6));
+  background: var(--bg-gradient);
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: saturate(140%) blur(6px);
+}
+
+/* banda sutil arriba */
+.doc-check.cute::before{
+  content:"";
+  position:absolute; inset:0 0 auto 0; height:3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  opacity:.35;
+}
+
+/* header */
+.doc-check__head{
+  display:flex; align-items:center; gap:12px;
+}
+.doc-check__emoji{
+  font-size:20px; line-height:1; transform: translateY(1px);
+}
+.doc-check__titlewrap{ display:flex; flex-direction:column; }
+.doc-check__title{
+  font-weight:600; letter-spacing:.2px; font-size:15px; color:#111827;
+}
+.doc-check__subtitle{
+  font-size:12px; color:#6b7280; margin-top:2px;
+}
+
+/* fila del checkbox */
+.doc-check .check-row{
+  display:flex; align-items:center; gap:12px; margin-top:12px;
+}
+
+/* pretty checkbox – versión cute */
+.pretty-check{
+  display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none;
+  font-size:14px; color:#374151;
+}
+.pretty-check input{
+  appearance:none; -webkit-appearance:none;
+  width:22px; height:22px; border-radius:8px;
+  border:1.5px solid #d9dfe8; background:#fff;
+  display:grid; place-items:center; outline:none;
+  transition: transform .14s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+  box-shadow: 0 2px 8px rgba(17,24,39,.06) inset;
+}
+.pretty-check input:hover{ transform: translateY(-1px); }
+.pretty-check input:active{ transform: scale(.96); }
+
+.pretty-check input::before{
+  content:"";
+  width:12px; height:12px; transform: scale(0);
+  transition: transform .18s ease;
+  clip-path: polygon(14% 44%, 0 65%, 46% 100%, 100% 16%, 82% 0, 43% 62%);
+  background:#fff;
+}
+
+/* caja visual que permite sparkles */
+.pretty-check .box{
+  pointer-events:none; position:absolute; width:0; height:0;
+}
+
+/* estado checked con gradiente pastel y sparkles */
+.pretty-check input:checked{
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  box-shadow: 0 6px 18px rgba(124,58,237,.25);
+}
+.pretty-check input:checked::before{ transform: scale(1); }
+
+/* sparkles */
+.pretty-check input:checked + .box::after{
+  content:"✨"; position:absolute; font-size:12px; left:28px; top:-4px;
+  animation: twinkle .9s ease-out forwards;
+  filter: saturate(1.2);
+}
+@keyframes twinkle{
+  0% { opacity:0; transform: translateY(4px) scale(.8); }
+  40%{ opacity:1; transform: translateY(-2px) scale(1); }
+  100%{ opacity:0; transform: translateY(-8px) scale(.9); }
+}
+
+.pretty-check .txt{ line-height:1.35; }
+.u-muted{ color:#8b97a7; font-style:italic; }
+
+/* ===== Cute toast (auto-oculto) ===== */
+.cute-toast{
+  position: fixed; right: 18px; bottom: 18px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(125,144,170,.25);
+  box-shadow: 0 14px 40px rgba(16,24,40,.16);
+  backdrop-filter: blur(8px) saturate(140%);
+  padding: 12px 14px; border-radius: 14px; max-width: 320px;
+  font-size: 14px; color:#111827; display:none; z-index: 10000;
+}
+.cute-toast.show{ display:block; animation: toastIn .25s ease-out; }
+@keyframes toastIn{
+  from{ transform: translateY(8px); opacity:0; }
+  to{ transform: translateY(0); opacity:1; }
+}
+.cute-toast .tiny{
+  display:block; font-size:12px; color:#6b7280; margin-top:4px;
+}

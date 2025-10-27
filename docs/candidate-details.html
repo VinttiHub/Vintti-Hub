@@ -271,6 +271,28 @@
             <textarea id="comments" placeholder="No comments">—</textarea>
           </div>
         </div>
+        <!-- === Resignation Letter & References (full width) === -->
+        <div class="field full doc-check cute" id="resig-ref-block">
+          <div class="doc-check__head">
+            <span class="doc-check__emoji">📎✨</span>
+            <div class="doc-check__titlewrap">
+              <span class="doc-check__title">Resignation letter & references</span>
+            </div>
+          </div>
+
+          <div class="check-row">
+            <label class="pretty-check">
+              <input type="checkbox" id="resig-ref-check" />
+              <span class="box" aria-hidden="true"></span>
+              <span class="txt">
+                All set! I requested and uploaded both items.
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Toast contenedor (si no tienes ya uno global) -->
+        <div id="cuteToast" class="cute-toast" role="status" aria-live="polite"></div>
 
         <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
         <div class="field textarea">
@@ -596,3 +618,18 @@
   <script defer src="./assets/js/candidate-details.js"></script>
 </body>
 </html>
+<script>
+  (function(){
+    const check = document.getElementById('resig-ref-check');
+    const toast = document.getElementById('cuteToast');
+    if (!check || !toast) return;
+    check.addEventListener('change', () => {
+      if (!check.checked) return;
+      toast.innerHTML =         
+        `Task completed<br/>
+         You’re the cutest recruiter ever 💖✨`;
+      toast.classList.add('show');
+      setTimeout(()=> toast.classList.remove('show'), 5000);
+    });
+  })();
+</script>

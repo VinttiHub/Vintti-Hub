@@ -1229,7 +1229,8 @@ def get_candidate_by_id(candidate_id):
                 discount_daterange,
                 affinda_scrapper,
                 coresignal_scrapper,
-                candidate_succes
+                candidate_succes,
+                check_hr_lead 
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))

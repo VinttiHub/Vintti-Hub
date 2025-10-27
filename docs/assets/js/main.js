@@ -2222,3 +2222,85 @@ function getTypeBadge(type) {
 window.getCurrentUserEmail = getCurrentUserEmail;
 window.getCurrentUserId    = getCurrentUserId;
 
+// --- evita duplicados por cambios rápidos / re-renders ---
+window._negotiatingEmailSent = window._negotiatingEmailSent || new Set();
+
+/**
+ * Obtiene info clave de la opp y manda el email a la HR Lead.
+ */
+async function sendNegotiatingReminder(opportunityId){
+  try {
+    // evita re-envíos en la misma sesión
+    if (window._negotiatingEmailSent.has(opportunityId)) return;
+
+    // 1) Traer detalles de la oportunidad (para HR lead + contexto)
+    const r = await fetch(`${API_BASE}/opportunities/${opportunityId}`);
+    if (!r.ok) throw new Error(`GET opp ${opportunityId} failed ${r.status}`);
+    const opp = await r.json();
+
+    const hrEmail = (opp.opp_hr_lead || '').toLowerCase().trim();
+    if (!hrEmail) {
+      console.warn('⚠️ No HR Lead email on opp', opportunityId);
+      return; // sin HR lead asignada, no enviamos
+    }
+
+    const client = opp.client_name || 'the client';
+    const role   = opp.opp_position_name || 'the role';
+
+    // 2) Construir asunto y cuerpo (tono cálido + emojis)
+    const subject = `Heads up: ${client} — ${role} moved to Negotiating ✨`;
+
+    const textBody =
+`Hi there! 🌸
+
+Quick note to share that the opportunity **${client} — ${role}** has just moved to **Negotiating**. 🎉
+
+This is a reminder to:
+• Request and upload the **resignation letter** 📝
+• Collect and upload the **references** 📎
+
+Once both are in the hub, check the box in the candidate overview page. 💕
+    
+— Vintti HUB`;
+
+    // 3) Enviar usando tu endpoint de correo
+    const payload = {
+      to: [hrEmail],
+      // cc: ['jazmin@vintti.com'], // <- opcional, déjalo comentado si no quieres copia
+      subject,
+      body: textBody
+    };
+
+    const res = await fetch(`${API_BASE}/send_email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(()=> '');
+      throw new Error(`send_email failed ${res.status}: ${errText}`);
+    }
+
+    // marca como enviado para no duplicar
+    window._negotiatingEmailSent.add(opportunityId);
+    console.info('✅ Negotiating reminder sent to', hrEmail);
+
+  } catch (e) {
+    console.error('❌ Failed to send negotiating reminder:', e);
+  }
+}
+
+/**
+ * Hook: después de actualizar el stage, si es Negotiating -> enviar mail.
+ * (Usa tu patchOpportunityStage existente y solo añadimos la llamada)
+ */
+const _origPatchOpportunityStage = window.patchOpportunityStage;
+window.patchOpportunityStage = async function(opportunityId, newStage, dropdownElement){
+  await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
+  // Si salió bien y la etapa es Negotiating, dispara el recordatorio
+  if (String(newStage) === 'Negotiating') {
+    sendNegotiatingReminder(opportunityId);
+  }
+};

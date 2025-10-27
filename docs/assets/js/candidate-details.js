@@ -1284,7 +1284,6 @@ box.querySelectorAll('.delete-salary-update').forEach(btn=>{
   wireSalaryPopupClose();
 
   // guardar
-// guardar
 if (save){
   save.addEventListener('click', async () => {
     const salary = parseFloat(salIn?.value || '');
@@ -1327,6 +1326,15 @@ if (save){
   if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
     loadSalaryUpdates();
   }
+  // ✅ Resignation & References (check_hr_lead) — estado inicial desde BD
+{
+  const resigCheck = document.getElementById('resig-ref-check');
+  if (resigCheck) {
+    const raw = data.check_hr_lead; // puede venir boolean, "yes", "true", "1", etc.
+    const initial = (typeof raw === 'boolean') ? raw : /^(1|y|yes|true|✓|\[v\])$/i.test(String(raw||'').trim());
+    resigCheck.checked = !!initial;
+  }
+}
 })(); 
 
   // Si llegaste con #hire desde Close Win → mensaje
@@ -1344,7 +1352,6 @@ if (save){
   }
 
   // --- Wire Hire inputs básicos ---
-// --- Wire Hire inputs básicos (actualizado para crear salary_update) ---
 const hireWorkingSchedule = document.getElementById('hire-working-schedule');
 const hirePTO = document.getElementById('hire-pto');
 const hireComputer = document.getElementById('hire-computer');
@@ -1605,8 +1612,54 @@ function wireVideoLinkDedupe() {
     setTimeout(dedupe, 0);
   });
 }
+// === Resignation & References: checkbox + toast + PATCH =====================
+(function wireResigRefCheck(){
+  const check = document.getElementById('resig-ref-check');
+  if (!check) return;
 
-// ⚠️ Llamar de inmediato (ya estás dentro de un DOMContentLoaded más grande)
+  const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const cid  = new URLSearchParams(window.location.search).get('id');
+
+  function showAutoToast(html, ms = 5000){
+    // Evita toasts duplicados superpuestos
+    document.querySelectorAll('.toast-floating').forEach(n => n.remove());
+    const box = document.createElement('div');
+    box.className = 'toast-floating';
+    box.innerHTML = html;
+    document.body.appendChild(box);
+    setTimeout(()=> box.remove(), ms);
+  }
+
+  check.addEventListener('change', async () => {
+    if (!cid) return;
+    const val = !!check.checked;
+
+    try {
+      const r = await fetch(`${API}/candidates/${cid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ check_hr_lead: val })
+      });
+      if (!r.ok) throw new Error(await r.text().catch(()=> 'PATCH failed'));
+
+      // UX lindo cuando el usuario lo marca
+      if (val) {
+        showAutoToast(
+          `🎀 You rock! Task completed — resignation letter & references are on track.<br/>
+           You’re the cutest recruiter ever 💖✨`,
+          5000
+        );
+      }
+    } catch (e) {
+      console.error('❌ Saving check_hr_lead failed', e);
+      // revertir el toggle si falló
+      check.checked = !val;
+      alert('We could not save this change. Please try again.');
+    }
+  });
+})();
+
+//  Llamar de inmediato 
 wireVideoLinkDedupe();
 
 
