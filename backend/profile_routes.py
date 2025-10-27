@@ -1,7 +1,7 @@
 # profile_routes.py  (extracto limpio y consolidado)
 import logging
 from datetime import date, datetime, timezone, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
 from flask import Blueprint, request, jsonify, g
 from psycopg2.extras import RealDictCursor
 from db import get_connection
@@ -58,7 +58,7 @@ def _observed(d: date) -> date:
         return d + timedelta(days=1)
     return d
 
-def us_federal_holidays_observed_for_year(year: int) -> set[date]:
+def us_federal_holidays_observed_for_year(year: int) -> Set[date]:
     """Conjunto de feriados federales de EE.UU. (observados) para un año."""
     # Fijos (con observancia):
     new_years      = _observed(date(year, 1, 1))

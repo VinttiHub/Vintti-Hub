@@ -1,5 +1,33 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+// === MODEL helpers (normaliza, setea UI y guarda consistente) ===
+const MODEL = {
+  normalize(v){
+    const s = (v ?? '').toString().trim().toLowerCase();
+    if (!s) return '';
+    if (s.startsWith('staff')) return 'staffing';
+    if (s.startsWith('recr'))  return 'recruiting';
+    return '';
+  },
+  toTitle(norm){           // 'staffing' -> 'Staffing'
+    if (!norm) return '';
+    return norm === 'staffing' ? 'Staffing' : 'Recruiting';
+  },
+  setUI(raw){
+    const norm  = MODEL.normalize(raw);
+    const title = MODEL.toTitle(norm);
+
+    const d = document.getElementById('details-model'); // opciones: 'staffing' | 'recruiting'
+    const m = document.getElementById('model-select');  // opciones: 'Staffing' | 'Recruiting'
+
+    if (d) d.value = norm || '';
+    if (m) m.value = title || '';
+
+    // Actualiza visibilidad de fees si existe el helper
+    if (typeof __fee_apply === 'function') __fee_apply();
+  }
+};
+
 // === Date-only utils (sin TZ) ===
 // === Fee visibility based on model ===
 function hideRow(el, hidden=true){
@@ -894,8 +922,15 @@ document.getElementById('min-salary-input').addEventListener('blur', e =>
 document.getElementById('max-salary-input').addEventListener('blur', e =>
   updateOpportunityField('max_salary', e.target.value));
 
-document.getElementById('model-select').addEventListener('change', e =>
-  updateOpportunityField('opp_model', e.target.value));
+document.getElementById('model-select').addEventListener('change', async (e) => {
+  const norm  = MODEL.normalize(e.target.value);   // viene en Title Case del select
+  const title = MODEL.toTitle(norm);
+  // sincroniza el otro select sin disparar su change
+  const other = document.getElementById('details-model');
+  if (other) other.value = norm;
+  if (typeof __fee_apply === 'function') __fee_apply();
+  await updateOpportunityField('opp_model', title);
+});
 
 document.getElementById('years-experience-input').addEventListener('blur', e =>
   updateOpportunityField('years_experience', e.target.value));
@@ -954,7 +989,13 @@ document.getElementById('details-hr-lead').addEventListener('change', async (e) 
 
 
 document.getElementById('details-model').addEventListener('change', async (e) => {
-  await updateOpportunityField('opp_model', e.target.value);
+  const norm  = MODEL.normalize(e.target.value);   // viene en lowercase del select
+  const title = MODEL.toTitle(norm);               // guardamos siempre 'Staffing'/'Recruiting'
+  // sincroniza el otro select sin disparar su change
+  const other = document.getElementById('model-select');
+  if (other) other.value = title;
+  if (typeof __fee_apply === 'function') __fee_apply();
+  await updateOpportunityField('opp_model', title);
 });
 // AI Assistant logic
 const aiBtn = document.getElementById('ai-assistant-btn');
@@ -2167,7 +2208,7 @@ async function loadOpportunityData() {
     // DETAILS
     document.getElementById('details-opportunity-name').value = data.opp_position_name || '';
     document.getElementById('details-account-name').value = data.account_name || '';
-    document.getElementById('details-model').value = data.opp_model || '';
+    MODEL.setUI(data.opp_model);
     _applyFeeVisibilityFromData(data);
     // JOB DESCRIPTION
     document.getElementById('job-description-textarea').innerHTML = data.hr_job_description || '';
