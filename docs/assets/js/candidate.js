@@ -11,102 +11,102 @@ document.addEventListener('DOMContentLoaded', () => {
   const tbody    = document.getElementById('candidatesTableBody');
   const tableEl  = document.getElementById('candidatesTable');
 
-  /* --------------------------------------
-   * 2) Fetch + render candidates
-   * ------------------------------------ */
-  fetch(`${API_BASE}/candidates/light_fast`)
-    .then(r => r.json())
-    .then(data => {
-      if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5">No data available</td></tr>`;
-        return;
+/* --------------------------------------
+ * 2) Fetch + render candidates
+ * ------------------------------------ */
+fetch(`${API_BASE}/candidates/light_fast`)
+  .then(r => r.json())
+  .then(data => {
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5">No data available</td></tr>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+
+    for (const candidate of data) {
+      const tr = document.createElement('tr');
+      tr.dataset.id     = candidate.candidate_id || '';
+      tr.dataset.status = (candidate.status || '').toLowerCase();                // 'active' | 'unhired'
+      tr.dataset.model  = (candidate.opp_model || '').trim();                    // 'Recruiting' | 'Staffing' | ''
+
+      const rawPhone = candidate.phone ? String(candidate.phone) : '';
+      const phone    = rawPhone.replace(/\D/g, '');
+      const linkedin = candidate.linkedin || '';
+
+      const condition = tr.dataset.status || 'unhired';
+      const chipClass = {
+        active:  'status-active',
+        unhired: 'status-unhired'
+      }[condition] || 'status-unhired';
+
+      tr.innerHTML = `
+        <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
+        <td>${candidate.name || '—'}</td>
+        <td>${candidate.country || '—'}</td>
+        <td>
+          ${
+            phone
+              ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
+                   <i class='fab fa-whatsapp'></i>
+                 </button>`
+              : '—'
+          }
+        </td>
+        <td>
+          ${
+            linkedin
+              ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
+                   <i class='fab fa-linkedin-in'></i>
+                 </button>`
+              : '—'
+          }
+        </td>
+      `;
+      frag.appendChild(tr);
+    }
+
+    tbody.replaceChildren(frag);
+
+    /* --------------------------------------
+     * 3) DataTable setup
+     * ------------------------------------ */
+    const table = $('#candidatesTable').DataTable({
+      responsive: true,
+      pageLength: 50,
+      dom: 'lrtip',
+      lengthMenu: [[50, 100, 150], [50, 100, 150]],
+      language: {
+        search: "🔍 Buscar:",
+        lengthMenu: "Mostrar _MENU_ registros por página",
+        zeroRecords: "No se encontraron resultados",
+        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+        paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
       }
+    });
 
-      const frag = document.createDocumentFragment();
+    // Mover selector de length
+    const dataTableLength = document.querySelector('.dataTables_length');
+    const wrapper = document.getElementById('datatable-wrapper');
+    if (dataTableLength && wrapper) wrapper.appendChild(dataTableLength);
 
-      for (const candidate of data) {
-        const tr = document.createElement('tr');
-        tr.dataset.id = candidate.candidate_id || '';
-
-        const rawPhone = candidate.phone ? String(candidate.phone) : '';
-        const phone    = rawPhone.replace(/\D/g, ''); // solo dígitos
-        const linkedin = candidate.linkedin || '';
-
-        // condition inicial viene del payload; luego la refinamos asíncronamente
-        const condition = candidate.condition || 'unhired';
-        const chipClass = {
-          active:   'status-active',
-          inactive: 'status-inactive',
-          unhired:  'status-unhired'
-        }[condition] || 'status-unhired';
-
-        tr.innerHTML = `
-          <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
-          <td>${candidate.name || '—'}</td>
-          <td>${candidate.country || '—'}</td>
-          <td>
-            ${
-              phone
-                ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
-                     <i class='fab fa-whatsapp'></i>
-                   </button>`
-                : '—'
-            }
-          </td>
-          <td>
-            ${
-              linkedin
-                ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
-                     <i class='fab fa-linkedin-in'></i>
-                   </button>`
-                : '—'
-            }
-          </td>
-        `;
-        frag.appendChild(tr);
-      }
-
-      tbody.replaceChildren(frag);
-
-      /* --------------------------------------
-       * 3) DataTable setup
-       * ------------------------------------ */
-      const table = $('#candidatesTable').DataTable({
-        responsive: true,
-        pageLength: 50,
-        dom: 'lrtip',
-        lengthMenu: [[50, 100, 150], [50, 100, 150]],
-        language: {
-          search: "🔍 Buscar:",
-          lengthMenu: "Mostrar _MENU_ registros por página",
-          zeroRecords: "No se encontraron resultados",
-          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-          paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
-        }
+    // Búsqueda por nombre (columna 1) con debounce
+    const searchInput = document.getElementById('searchByName');
+    if (searchInput) {
+      let t;
+      searchInput.addEventListener('input', function () {
+        clearTimeout(t);
+        const v = this.value;
+        t = setTimeout(() => table.column(1).search(v).draw(), 150);
       });
+    }
 
-      // Mover el selector de "length" al wrapper custom si existe
-      const dataTableLength = document.querySelector('.dataTables_length');
-      const wrapper = document.getElementById('datatable-wrapper');
-      if (dataTableLength && wrapper) wrapper.appendChild(dataTableLength);
-
-      // Búsqueda por nombre (columna 1) con pequeño debounce
-      const searchInput = document.getElementById('searchByName');
-      if (searchInput) {
-        let t;
-        searchInput.addEventListener('input', function () {
-          clearTimeout(t);
-          const v = this.value;
-          t = setTimeout(() => table.column(1).search(v).draw(), 150);
-        });
-      }
-
-      /* --------------------------------------
-       * 4) Post-hydration: resolver condición real
-       * ------------------------------------ */
-      kickoffConditionResolve(table);
-    })
-    .catch(err => console.error('❌ Error al obtener candidatos:', err));
+    /* --------------------------------------
+     * 4) Filtros: Status + Model
+     * ------------------------------------ */
+    installAdvancedFilters(table);
+  })
+  .catch(err => console.error('❌ Error al obtener candidatos:', err));
 
   /* --------------------------------------
    * 5) Row navigation (click fila -> details)
@@ -224,6 +224,34 @@ document.addEventListener('click', (e) => {
     document.querySelectorAll('.filter-dropdown').forEach(e => e.remove());
   }
 });
+function installAdvancedFilters(table) {
+  const statusSel = document.getElementById('statusFilter');
+  const modelSel  = document.getElementById('modelFilter');
+
+  if (!statusSel && !modelSel) return;
+
+  // Filtro custom usando los data-attrs del <tr>
+  $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
+    if (settings.nTable !== document.getElementById('candidatesTable')) return true;
+
+    const tr      = table.row(dataIndex).node();
+    const rStatus = (tr?.dataset?.status || '').toLowerCase();   // 'active'|'unhired'|''
+    const rModel  = (tr?.dataset?.model  || '');                  // 'Recruiting'|'Staffing'|''
+
+    const wantStatus = (statusSel?.value || '').toLowerCase();    // '', 'active', 'unhired'
+    const wantModel  = (modelSel?.value  || '');                  // '', 'Recruiting', 'Staffing'
+
+    const passStatus = !wantStatus || rStatus === wantStatus;
+    const passModel  = !wantModel  || rModel  === wantModel;
+
+    return passStatus && passModel;
+  });
+
+  const redraw = () => $('#candidatesTable').DataTable().draw();
+
+  statusSel?.addEventListener('change', redraw);
+  modelSel?.addEventListener('change', redraw);
+}
 
 /* =========================================================================
    Permissions (Summary / Equipments): visible por email

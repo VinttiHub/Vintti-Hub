@@ -2914,45 +2914,57 @@ def rename_account_pdf(account_id):
         return jsonify({"error": str(e)}), 500
     
 
-@app.route('/candidates/light_fast', methods=['GET'])
-def candidates_light_fast():
+@app.route('/candidates/light_fast')
+def get_candidates_light_fast():
+    """
+    Devuelve candidatos + status (unhired/active) y opp_model del hire ACTIVO.
+    Regla:
+      - Hay hire_opportunity con end_date IS NULL => status='active' y opp_model viene de opportunity.
+      - No hay hire activo (o solo cerrados)     => status='unhired' y opp_model=NULL.
+    """
     try:
         conn = get_connection()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur  = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute("""
+            WITH active_or_latest AS (
+              -- Prioriza la fila ACTIVA (end_date IS NULL). Si no hay, toma la más reciente por start_date.
+              SELECT DISTINCT ON (h.candidate_id)
+                     h.candidate_id,
+                     h.opportunity_id,
+                     h.end_date,
+                     h.start_date
+              FROM hire_opportunity h
+              ORDER BY h.candidate_id,
+                       (h.end_date IS NULL) DESC,
+                       h.start_date DESC NULLS LAST
+            )
             SELECT
               c.candidate_id,
               c.name,
               c.country,
               c.phone,
               c.linkedin,
-              h.start_date,
-              h.end_date,
-              h.has_hire,
               CASE
-                WHEN h.has_hire IS NULL THEN 'unhired'                -- no hay fila en hire_opportunity
-                WHEN h.end_date IS NULL    THEN 'active'              -- hay fila y no tiene end_date
-                ELSE 'inactive'                                       -- hay fila y sí tiene end_date
-              END AS condition
+                WHEN a.candidate_id IS NULL THEN 'unhired'     -- sin hires
+                WHEN a.end_date IS NULL      THEN 'active'      -- hire activo
+                ELSE 'unhired'                                    -- solo hires cerrados
+              END AS status,
+              CASE
+                WHEN a.end_date IS NULL THEN o.opp_model
+                ELSE NULL
+              END AS opp_model
             FROM candidates c
-            LEFT JOIN LATERAL (
-              SELECT TRUE AS has_hire, start_date, end_date
-              FROM hire_opportunity h
-              WHERE h.candidate_id = c.candidate_id
-              -- prioriza activo (end_date NULL); si no hay, el más reciente por start_date
-              ORDER BY (h.end_date IS NULL) DESC,
-                       h.start_date DESC NULLS LAST
-              LIMIT 1
-            ) h ON TRUE
-            ORDER BY c.name ASC;
+            LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
+            LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
+            ORDER BY c.candidate_id DESC;
         """)
 
         rows = cur.fetchall()
         cur.close(); conn.close()
         return jsonify(rows)
     except Exception as e:
-        import logging; logging.exception("Error in /candidates/light_fast")
+        import traceback; print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
     
 @app.route('/candidates/<int:candidate_id>/resignations', methods=['GET'])
