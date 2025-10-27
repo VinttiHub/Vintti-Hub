@@ -1870,7 +1870,8 @@ def update_candidate_fields(candidate_id):
         'cv_pdf_scrapper',
         'discount_dolar', 
         'discount_daterange',
-        'candidate_succes'
+        'candidate_succes',
+        'check_hr_lead'
     ]
 
     updates = []
