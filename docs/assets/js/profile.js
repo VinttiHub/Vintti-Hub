@@ -308,12 +308,27 @@ function expandEventsToDays(events, viewDate){
     // clip to visible month window
     let cur = new Date(Math.max(a, startTs));
     const to  = new Date(Math.min(b,   endTs));
-    while (cur <= to){
-      const iso = toLocalISO(cur);
-      if (!map.has(iso)) map.set(iso, []);
-      map.get(iso).push(ev);
-      cur.setDate(cur.getDate()+1);
-    }
+    const isBusinessDayLocal = (d) => {
+  const w = d.getDay();               // 0=Sun..6=Sat (local)
+  if (w === 0 || w === 6) return false;
+  const hols = computeUSHolidaysObserved(d.getFullYear());
+  return !hols.has(toLocalISO(d));
+};
+while (cur <= to){
+  const iso = toLocalISO(cur);
+
+  // solo vacaciones: filtrar a días hábiles US; otros tipos, todos los días
+  const ok = (String(ev.kind || '').toLowerCase() === 'vacation')
+    ? isBusinessDayLocal(cur)
+    : true;
+
+  if (ok){
+    if (!map.has(iso)) map.set(iso, []);
+    map.get(iso).push(ev);
+  }
+
+  cur.setDate(cur.getDate()+1);
+}
   }
   return map;
 }
@@ -640,7 +655,9 @@ function renderApprovalsTable(items){
 
   const startLbl = fmtDateShort(r.start_date);
   const endLbl   = fmtDateShort(r.end_date);
-  const days     = daysInclusive(r.start_date, r.end_date);
+  const days = (String(r.kind || '').toLowerCase() === 'vacation')
+  ? businessDaysBetweenISO(r.start_date, r.end_date)
+  : diffDaysInclusive(r.start_date, r.end_date);
   const kClass   = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
   const kLabel   = String(r.kind||"").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
   const esc = (s) => String(s).replace(/[&<>"']/g, m => (
@@ -948,7 +965,9 @@ async function loadMyRequests(uid){
     host.innerHTML = header + arr.map(x=>{
   const start = fmtDateNice(x.start_date);
   const end   = fmtDateNice(x.end_date);
-  const days  = diffDaysInclusive(x.start_date, x.end_date);
+  const days = (String(x.kind || '').toLowerCase() === 'vacation')
+  ? businessDaysBetweenISO(x.start_date, x.end_date)
+  : diffDaysInclusive(x.start_date, x.end_date);
   const statusCls = String(x.status || '').toLowerCase();  // approved | rejected | pending
   const rowCls = statusCls ? `row--${statusCls}` : '';
 
