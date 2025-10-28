@@ -213,6 +213,7 @@ app.register_blueprint(reminders_bp)
 app.register_blueprint(coresignal_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(users_bp)
+app.register_blueprint(bp_candidate_search, url_prefix="")
 # --- enum canonicals para el Sheet ---
 _CANON = {
     "career_job_type": {
