@@ -1,3 +1,35 @@
+// === Helper: traer el nombre del cliente desde accounts usando account_id ===
+async function resolveAccountName(opp) {
+  // si ya viene correcto, úsalo
+  const direct = (opp.client_name || '').trim();
+  if (direct) return direct;
+
+  const accountId = opp.account_id ?? opp.accountId ?? opp.accountid ?? null;
+  if (!accountId) return 'the client';
+
+  try {
+    // intenta endpoint REST de item único
+    let r = await fetch(`${API_BASE}/accounts/${encodeURIComponent(accountId)}`, { credentials: 'include' });
+    if (r.ok) {
+      const acc = await r.json();
+      return (acc.client_name || acc.account_name || acc.name || '').trim() || 'the client';
+    }
+
+    // fallback: buscar en lista si no tienes endpoint por id
+    r = await fetch(`${API_BASE}/accounts`, { credentials: 'include' });
+    if (r.ok) {
+      const list = await r.json();
+      const acc = (list || []).find(a =>
+        String(a.account_id ?? a.id ?? '').trim() === String(accountId).trim()
+      );
+      if (acc) return (acc.client_name || acc.account_name || acc.name || '').trim() || 'the client';
+    }
+  } catch (e) {
+    console.warn('resolveAccountName() failed:', e);
+  }
+  return 'the client';
+}
+
 // ——— Current user helpers ———
 function getCurrentUserEmail(){
   return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
@@ -2152,49 +2184,64 @@ window.getCurrentUserId    = getCurrentUserId;
 window._negotiatingEmailSent = window._negotiatingEmailSent || new Set();
 
 /**
- * Obtiene info clave de la opp y manda el email a la HR Lead.
+ * Obtiene info clave de la opp, resuelve el client_name desde accounts y envía email en HTML.
  */
 async function sendNegotiatingReminder(opportunityId){
   try {
     // evita re-envíos en la misma sesión
     if (window._negotiatingEmailSent.has(opportunityId)) return;
 
-    // 1) Traer detalles de la oportunidad (para HR lead + contexto)
-    const r = await fetch(`${API_BASE}/opportunities/${opportunityId}`);
+    // 1) Traer detalles de la oportunidad
+    const r = await fetch(`${API_BASE}/opportunities/${opportunityId}`, { credentials: 'include' });
     if (!r.ok) throw new Error(`GET opp ${opportunityId} failed ${r.status}`);
     const opp = await r.json();
 
-    const hrEmail = (opp.opp_hr_lead || '').toLowerCase().trim();
+    const hrEmail = String(opp.opp_hr_lead || '').toLowerCase().trim();
     if (!hrEmail) {
       console.warn('⚠️ No HR Lead email on opp', opportunityId);
       return; // sin HR lead asignada, no enviamos
     }
 
-    const client = opp.client_name || 'the client';
+    // 2) Resolver nombre de cliente desde accounts (via account_id)
+    const client = await resolveAccountName(opp);
+
+    // 3) Rol/posición
     const role   = opp.opp_position_name || 'the role';
 
-    // 2) Construir asunto y cuerpo (tono cálido + emojis)
+    // 4) Asunto + cuerpo en HTML (negritas reales)
     const subject = `Heads up: ${client} — ${role} moved to Negotiating ✨`;
 
-    const textBody =
-`Hi there! 🌸
+    // pequeño escape por seguridad
+    const esc = s => String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 
-Quick note to share that the opportunity **${client} — ${role}** has just moved to **Negotiating**. 🎉
+    const htmlBody = `
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p>Hi there! 🌸</p>
+  <p>
+    Quick note to share that the opportunity
+    <strong>${esc(client)} — ${esc(role)}</strong>
+    has just moved to <strong>Negotiating</strong>. 🎉
+  </p>
+  <p>This is a reminder to:</p>
+  <ul>
+    <li>Request and upload the <strong>resignation letter</strong> 📝</li>
+    <li>Collect and upload the <strong>references</strong> 📎</li>
+  </ul>
+  <p>Once both are in the hub, please check the box in the candidate overview page. 💕</p>
+  <p style="margin-top:16px">— Vintti HUB</p>
+</div>`.trim();
 
-This is a reminder to:
-• Request and upload the **resignation letter** 📝
-• Collect and upload the **references** 📎
-
-Once both are in the hub, check the box in the candidate overview page. 💕
-    
-— Vintti HUB`;
-
-    // 3) Enviar usando tu endpoint de correo
+    // 5) Enviar email.
+    // 🔸 En muchos backends el campo se llama "body" y si huele a HTML lo mandan como HTML.
+    // 🔸 Para mayor compatibilidad añadimos también "body_html" y una pista "content_type".
     const payload = {
-      to: [hrEmail],
-      // cc: ['jazmin@vintti.com'], // <- opcional, déjalo comentado si no quieres copia
+      to: [hrEmail, 'angie@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
       subject,
-      body: textBody
+      body: htmlBody,              // si tu /send_email usa esto, verá HTML
+      body_html: htmlBody,         // alternativo común
+      content_type: 'text/html',   // pista para el backend
+      html: true                   // pista opcional
+      // cc: ['jazmin@vintti.com'] // descomenta si quieres copia
     };
 
     const res = await fetch(`${API_BASE}/send_email`, {
