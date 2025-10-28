@@ -12,24 +12,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const empty = $('#vintti-empty');
   const tpl   = $('#card-tpl');
 
-  async function parseQuery(q){
-    const res = await fetch(`${API_BASE}/ai/parse_candidate_query`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      credentials:'include',
-      body: JSON.stringify({ query: q })
-    });
-    if (!res.ok) throw new Error('Parse failed');
-    return await res.json(); // {title, tools, years_experience}
-  }
+async function parseQuery(q){
+  console.log('➡️ POST /ai/parse_candidate_query body:', { query: q });
+  const res = await fetch(`${API_BASE}/ai/parse_candidate_query`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({ query: q })
+  });
+  if (!res.ok) throw new Error('Parse failed');
+  return await res.json();
+}
 
-  async function searchCandidates(tools){
-    const params = new URLSearchParams();
-    if (tools && tools.length) params.set('tools', tools.join(','));
-    const res = await fetch(`${API_BASE}/search/candidates?`+params.toString(), { credentials:'include' });
-    if (!res.ok) throw new Error('Search failed');
-    return await res.json(); // {items:[{candidate_id,name,country,comments}]}
-  }
+async function searchCandidates(tools){
+  const params = new URLSearchParams();
+  if (tools && tools.length) params.set('tools', tools.join(','));
+  const full = `${API_BASE}/search/candidates?`+params.toString();
+  console.log('➡️ GET', full);
+  const res = await fetch(full, { credentials:'include' });
+  if (!res.ok) throw new Error('Search failed');
+  const json = await res.json();
+  // espejo mínimo para ver cuántos items vinieron
+  console.log('📦 items:', (json.items||[]).length);
+  return json;
+}
 
   function renderChips({ title, tools, years_experience }){
     chips.innerHTML = '';
@@ -64,23 +70,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function doSearch(){
-    const q = input.value.trim();
-    if (!q){ input.focus(); return; }
-    btn.disabled = true; btn.textContent = 'Buscando…';
-    try{
-      const parsed = await parseQuery(q);
-      renderChips(parsed);
-      const tools = (parsed.tools || []).map(s => s.toLowerCase());
-      const data = await searchCandidates(tools);
-      renderCards(data.items || []);
-    }catch(err){
-      console.error(err);
-      renderCards([]);
-    }finally{
-      btn.disabled = false; btn.textContent = 'Buscar';
-    }
+async function doSearch(){
+  const q = input.value.trim();
+  if (!q){ input.focus(); return; }
+
+  // —— DEBUG: entrada del usuario
+  console.groupCollapsed('%cAI Candidate Search','color:#6b5b95;font-weight:bold');
+  console.log('🔎 Query (usuario) →', q);
+
+  btn.disabled = true; btn.textContent = 'Buscando…';
+  try{
+    // —— DEBUG: petición al parser
+    console.groupCollapsed('🧠 Llamada a /ai/parse_candidate_query');
+    const parsed = await parseQuery(q);
+    console.log('↩️ Respuesta parser:', parsed);
+    console.groupEnd();
+
+    renderChips(parsed);
+
+    const tools = (parsed.tools || []).map(s => String(s).toLowerCase().trim()).filter(Boolean);
+
+    // —— DEBUG: tools normalizadas
+    console.groupCollapsed('🧰 Tools normalizadas para buscar');
+    console.log('tools →', tools);
+    console.groupEnd();
+
+    // —— DEBUG: request a /search/candidates
+    const params = new URLSearchParams();
+    if (tools.length) params.set('tools', tools.join(','));
+    const url = `${API_BASE}/search/candidates?${params.toString()}`;
+    console.groupCollapsed('📡 Fetch /search/candidates');
+    console.log('URL →', url);
+
+    const data = await searchCandidates(tools);
+    console.log('↩️ Respuesta search:', data);
+    console.groupEnd();
+
+    renderCards(data.items || []);
+  }catch(err){
+    console.error('❌ Error en doSearch:', err);
+    renderCards([]);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Buscar';
+    console.groupEnd(); // AI Candidate Search
   }
+}
+
 
   btn.addEventListener('click', doSearch);
   input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSearch(); });

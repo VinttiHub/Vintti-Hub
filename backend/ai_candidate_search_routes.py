@@ -27,6 +27,8 @@ def parse_candidate_query():
     try:
         data = request.get_json(force=True) or {}
         query = (data.get("query") or "").strip()
+        logging.info("🧠 [/ai/parse_candidate_query] query_in=%r", query)
+
         if not query:
             resp = jsonify({"title":"", "tools":[], "years_experience": None})
             return _ok_origin(resp), 200
@@ -48,7 +50,6 @@ QUERY:
 {query}
 ---
 """
-
         r = client.responses.create(
             model=OPENAI_MODEL,
             input=prompt,
@@ -56,11 +57,15 @@ QUERY:
             temperature=0
         )
         content = getattr(r, "output_text", "") or ""
+        logging.info("🧠 raw_model_output=%r", content)
+
         cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content).strip()
+        logging.info("🧠 cleaned_json_candidate=%r", cleaned)
 
         try:
             obj = json.loads(cleaned)
         except Exception:
+            logging.exception("⚠️ JSON parse error on model output")
             obj = {"title":"", "tools":[], "years_experience": None}
 
         # normalizar
@@ -71,6 +76,8 @@ QUERY:
             years = int(years) if years is not None else None
         except:
             years = None
+
+        logging.info("🧠 normalized → title=%r tools=%r years=%r", title, tools, years)
 
         resp = jsonify({"title": title, "tools": tools, "years_experience": years})
         return _ok_origin(resp), 200
@@ -88,20 +95,21 @@ def search_candidates():
         return _ok_origin(resp)
 
     try:
-        tools = _parse_list(request.args.get('tools', ''))
-        tools_lc = [t.lower() for t in tools]
+        raw_tools = request.args.get('tools', '')
+        tools = _parse_list(raw_tools)
+        tools_lc = [t.lower().strip() for t in tools if t.strip()]
+
+        logging.info("🔎 [/search/candidates] qs.tools_raw=%r → tools_lc=%r", raw_tools, tools_lc)
+
         # Si no hay tools, devolvemos vacío para evitar traer todo
         if not tools_lc:
+            logging.info("🔎 No tools provided → return empty items")
             resp = jsonify({"items":[]})
             return _ok_origin(resp), 200
 
         conn = get_connection()
         cur = conn.cursor()
 
-        # IMPORTANTE:
-        # - Contamos cuántas herramientas del query existen en resume.tools (json/ jsonb).
-        # - Debe cumplir un match AND: el candidato debe tener TODAS las tools pedidas.
-        # - Usamos HAVING COUNT(DISTINCT ...) = len(tools_lc).
         sql = """
         SELECT c.candidate_id, c.name, c.country, c.comments
         FROM candidates c
@@ -109,19 +117,23 @@ def search_candidates():
         LEFT JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem) ON TRUE
         GROUP BY c.candidate_id, c.name, c.country, c.comments
         HAVING COUNT(DISTINCT CASE
-        WHEN lower(t.elem->>'tool') = ANY(%s) THEN lower(t.elem->>'tool')
-        ELSE NULL
-        END) >= 1
+                 WHEN lower(trim(t.elem->>'tool')) = ANY(%s) THEN lower(trim(t.elem->>'tool'))
+                 ELSE NULL
+               END) >= 1
         ORDER BY COUNT(DISTINCT CASE
-                WHEN lower(t.elem->>'tool') = ANY(%s) THEN lower(t.elem->>'tool')
-                ELSE NULL
-                END) DESC,
-                c.name NULLS LAST, c.candidate_id ASC
+                   WHEN lower(trim(t.elem->>'tool')) = ANY(%s) THEN lower(trim(t.elem->>'tool'))
+                   ELSE NULL
+                 END) DESC,
+                 c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200
         """
+
+        logging.info("🧾 SQL params (twice): %r", tools_lc)
         cur.execute(sql, (tools_lc, tools_lc))
 
         rows = cur.fetchall()
+        logging.info("📦 rows_found=%d", len(rows))
+
         cur.close(); conn.close()
 
         items = []
@@ -132,6 +144,9 @@ def search_candidates():
                 "country": country,
                 "comments": comments
             })
+
+        # espejo mini para ver primeros IDs (no voluminoso)
+        logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 
         resp = jsonify({"items": items})
         return _ok_origin(resp), 200
