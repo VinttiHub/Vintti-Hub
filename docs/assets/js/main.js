@@ -292,11 +292,13 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
   .then(users => {
   const ALLOWED_HR_EMAILS = new Set([
     'pilar@vintti.com',
-    'pilar.fernandez@vintti.com', // ⬅️ NUEVA
+    'pilar.fernandez@vintti.com', 
     'jazmin@vintti.com',
     'agostina@vintti.com',
     'agustina.barbero@vintti.com',
-    'agustina.ferrari@vintti.com'
+    'agustina.ferrari@vintti.com',
+    'josefina@vintti.com',
+    'constanza@vintti.com'
   ]);
 
 window.allowedHRUsers = users.filter(u =>
@@ -622,7 +624,9 @@ if (!allowedHRUsers.length) {
       'jazmin@vintti.com',
       'agostina@vintti.com',
       'agustina.barbero@vintti.com',
-      'agustina.ferrari@vintti.com'
+      'agustina.ferrari@vintti.com',
+      'josefina@vintti.com',
+      'constanza@vintti.com'
     ]);
     allowedHRUsers = users.filter(u =>
       ALLOWED_HR_EMAILS.has(String(u.email_vintti||'').toLowerCase())
@@ -1986,7 +1990,8 @@ const AVATAR_BY_EMAIL = {
   'pilar.fernandez@vintti.com':         'pilar_fer.png', // ⬅️ NUEVO
   'agustin@vintti.com':                 'agus.png',
   'agustina.barbero@vintti.com':        'agustina.png',
-  'agustina.ferrari@vintti.com':        'agustina_ferrari.png'
+  'josefina@vintti.com':                'josefina.png',
+  'constanza@vintti.com':               'constanza.png'
 };
 
 // --- HR initials (dos letras) ---
@@ -1996,7 +2001,8 @@ const HR_INITIALS_BY_EMAIL = {
   'pilar@vintti.com':                   'PL', // ⬅️ antes PF, ahora PL
   'pilar.fernandez@vintti.com':         'PF', // ⬅️ NUEVA
   'agustina.barbero@vintti.com':        'AB',
-  'agustina.ferrari@vintti.com':        'AF'
+  'josefina@vintti.com':                'JP',
+  'constanza@vintti.com':               'CL'
 };
 
 function initialsForHRLead(emailOrName) {
