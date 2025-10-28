@@ -2062,7 +2062,7 @@ const payload = {
   career_seniority: document.getElementById('career-seniority').value || '',
   career_years_experience: document.getElementById('career-years').value || '',
   career_experience_level: document.getElementById('career-exp-level').value || '',
-  career_field: document.getElementById('career-field').value || '',
+  career_field: fieldLabel, 
   career_modality: document.getElementById('career-modality').value || '',
   career_tools: finalTools,
   career_description: (descEditorEl?.innerHTML ?? document.getElementById('career-description').value ?? ''),
@@ -2128,6 +2128,9 @@ async function publishCareerNow() {
   // 👉 convierte SOLO para publicar
   const countriesCSV = toCSV(countriesArr);
   const toolsCSV     = toCSV(toolsArr);
+  // === Tomar la ETIQUETA visible del dropdown Field (no el value) ===
+  const fieldSel = document.getElementById('career-field');
+  const fieldLabel = fieldSel?.selectedOptions?.[0]?.textContent?.trim() || '';
 
   const payload = {
     publish_mode: 'sheet_only',
@@ -2139,7 +2142,7 @@ async function publishCareerNow() {
     career_seniority: document.getElementById('career-seniority').value || '',
     career_years_experience: document.getElementById('career-years').value || '',
     career_experience_level: document.getElementById('career-exp-level').value || '',
-    career_field: document.getElementById('career-field').value || '',
+    career_field: fieldLabel,  
     career_modality: document.getElementById('career-modality').value || '',
     career_tools: toolsCSV,                                         // ✅ CSV
     sheet_description_html: descHTML_CLEAN,
