@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buscar Candidatos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="./assets/css/candidate-search.css"/>
+</head>
+<body class="light-mode">
+  <header class="hero">
+    <h1 class="title">🔎 Vintti Candidate Finder</h1>
+    <p class="subtitle">Escribe algo como: <i>“analista de software que sepa Python y 3 años de experiencia”</i></p>
+    <div class="search-wrap">
+      <input id="nl-query" class="search-input" type="text" placeholder="Describe al candidato ideal…"/>
+      <button id="search-btn" class="search-btn">Buscar</button>
+    </div>
+    <div id="chips" class="chips hidden" aria-live="polite"></div>
+  </header>
+
+  <main class="grid">
+    <section class="col">
+      <h2 class="col-title">🌱 Vintti Talent</h2>
+      <div id="vintti-results" class="cards"></div>
+      <div id="vintti-empty" class="empty hidden">No encontramos candidatos con esas herramientas (aún).</div>
+    </section>
+
+    <section class="col">
+      <h2 class="col-title">🛰️ Coresignal</h2>
+      <div class="coming-soon">
+        <p>Próximamente conectamos con Coresignal para ampliar el pool ✨</p>
+      </div>
+    </section>
+  </main>
+
+  <template id="card-tpl">
+    <a class="card" target="_self">
+      <div class="card-avatar" aria-hidden="true"></div>
+      <div class="card-body">
+        <div class="card-name"></div>
+        <div class="card-meta"></div>
+        <div class="card-notes"></div>
+      </div>
+    </a>
+  </template>
+
+  <script src="./assets/js/candidate-search.js" defer></script>
+</body>
+</html>

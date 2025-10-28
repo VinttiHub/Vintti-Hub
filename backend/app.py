@@ -35,6 +35,7 @@ from affinda import AffindaAPI, TokenCredential
 import re, html as _html
 from reminders_routes import bp as reminders_bp
 from profile_routes import bp as profile_bp, users_bp as users_bp
+from ai_candidate_search_routes import bp_candidate_search
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
 def _to_bool(x):
