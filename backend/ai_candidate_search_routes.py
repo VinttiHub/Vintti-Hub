@@ -123,33 +123,54 @@ def search_candidates():
         conn = get_connection()
         cur = conn.cursor()
 
+        # Ordenamos por cantidad de tools matcheadas (hits) y luego por nombre/id
         sql = """
-        SELECT c.candidate_id, c.name, c.country, c.comments
+        SELECT
+        c.candidate_id,
+        c.name,
+        c.country,
+        c.comments,
+        COUNT(DISTINCT kw) AS hits
         FROM candidates c
         JOIN resume r ON r.candidate_id = c.candidate_id
-        LEFT JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem) ON TRUE
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem)
+        JOIN unnest(%s::text[]) AS kw
+        ON lower(t.elem->>'tool') ILIKE kw
         GROUP BY c.candidate_id, c.name, c.country, c.comments
-        HAVING COUNT(DISTINCT CASE
-                 WHEN EXISTS (
-                     SELECT 1 FROM unnest(%s::text[]) AS kw
-                     WHERE lower(t.elem->>'tool') ILIKE kw
-                 )
-                 THEN lower(t.elem->>'tool')
-                 ELSE NULL
-               END) >= 1
-        ORDER BY COUNT(DISTINCT CASE
-                 WHEN EXISTS (
-                     SELECT 1 FROM unnest(%s::text[]) AS kw
-                     WHERE lower(t.elem->>'tool') ILIKE kw
-                 )
-                 THEN lower(t.elem->>'tool')
-                 ELSE NULL
-               END) DESC,
-               c.name NULLS LAST, c.candidate_id ASC
+        HAVING COUNT(DISTINCT kw) >= 1
+        ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200
         """
+        # --- Sanity checks (BORRAR en prod) ---
+        try:
+            cur.execute("select current_database()")
+            dbname = cur.fetchone()[0]
+            logging.info("🗄️ current_database=%s", dbname)
 
-        cur.execute(sql, (patterns, patterns))
+            cur.execute("""
+                SELECT count(*) FROM resume r
+                WHERE jsonb_typeof(COALESCE(r.tools::jsonb, '[]'::jsonb)) = 'array'
+            """)
+            logging.info("🧮 resume rows with tools array = %s", cur.fetchone()[0])
+
+            # Muestra 1 ejemplo real de tools en la DB
+            cur.execute("""
+                SELECT c.candidate_id,
+                    array_agg(lower(t.elem->>'tool')) AS tools_lc
+                FROM candidates c
+                JOIN resume r ON r.candidate_id = c.candidate_id
+                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem)
+                WHERE t.elem ? 'tool'
+                GROUP BY c.candidate_id
+                ORDER BY c.candidate_id
+                LIMIT 1
+            """)
+            logging.info("🔎 sample tools from DB: %r", cur.fetchone())
+        except Exception:
+            logging.exception("⚠️ sanity checks failed")
+        # --- fin sanity checks ---
+
+        cur.execute(sql, (patterns,))
         rows = cur.fetchall()
         logging.info("📦 rows_found=%d", len(rows))
 
