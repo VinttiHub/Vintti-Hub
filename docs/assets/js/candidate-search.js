@@ -46,18 +46,45 @@ async function coresignalSearch(parsed, page=1){
   const body = {
     title: parsed.title || "",
     skills: (parsed.tools || []).map(s => String(s).toLowerCase().trim()).filter(Boolean),
-    location: parsed.location || "",          // si luego extraes lugar
+    location: parsed.location || "",
     years_min: parsed.years_experience ?? null,
-    page
+    page,
+    debug: true // ← pide metadatos de depuración desde el backend
   };
+
+  console.groupCollapsed('%c🌐 POST /ext/coresignal/search','color:#1f7a8c;font-weight:bold');
+  console.log('➡️ body →', body);
+
   const res = await fetch(`${API_BASE}/ext/coresignal/search`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     credentials:'include',
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error('Coresignal search failed');
-  return await res.json();
+
+  console.log('⬅️ status →', res.status, res.statusText);
+  const json = await res.json();
+
+  // espejo de debug
+  if (json.debug){
+    console.log('⏱️ duration_ms →', json.debug.response?.duration_ms);
+    console.log('📦 items_count →', json.debug.response?.items_count);
+    console.log('🔎 sample →', json.debug.response?.sample);
+    console.log('🧪 filtros enviados →', json.debug.request?.body);
+  } else {
+    // fallback si no vino debug
+    const count = (json?.data?.items || []).length;
+    console.log('📦 items (sin debug) →', count);
+  }
+
+  // tips cuando 0 items
+  const count = (json?.data?.items || []).length;
+  if (count === 0){
+    console.warn('⚠️ Coresignal devolvió 0 items. Revisa los filtros (title/skill/location/years_from).');
+  }
+
+  console.groupEnd();
+  return json;
 }
 
 function renderCs(items, {append=false}={}){

@@ -190,12 +190,14 @@ def search_candidates():
         logging.error("❌ /search/candidates\n"+traceback.format_exc())
         resp = jsonify({"items":[]})
         return _ok_origin(resp), 200
+    
 @bp_candidate_search.route('/ext/coresignal/search', methods=['POST','OPTIONS'])
 def coresignal_search():
     if request.method == 'OPTIONS':
         resp = jsonify({}); resp.status_code=204
         return _ok_origin(resp)
 
+    import time
     try:
         payload = request.get_json(force=True) or {}
         title   = (payload.get("title") or "").strip()
@@ -203,10 +205,12 @@ def coresignal_search():
         loc     = (payload.get("location") or "").strip()
         years   = payload.get("years_min") or payload.get("years_experience") or None
         page    = int(payload.get("page") or 1)
+        debug   = bool(payload.get("debug"))  # ← permite devolver metadatos de depuración al front
 
         # —— Construcción de filtros Coresignal
         filt = {}
         if title:
+            # headline exacta entre comillas si hay espacios; y además experiencia por título
             filt["headline"] = f"\"{title}\"" if " " in title else title
             filt["experience_title"] = title
         if tools:
@@ -220,20 +224,84 @@ def coresignal_search():
                 cutoff = dt.date.today().replace(year=dt.date.today().year - years)
                 filt["experience_date_from"] = cutoff.isoformat()
             except Exception:
-                pass
+                logging.exception("⚠️ years_experience inválido, ignorando filtro")
 
         url = f"{CORESIGNAL_API_BASE}/employee_base/search/filter/preview?page={page}"
-        r = requests.post(url, headers=_cs_headers(), json=filt, timeout=30)
-        r.raise_for_status()
-        data = r.json()
 
-        resp = jsonify({"page": page, "filters": filt, "data": data})
-        return _ok_origin(resp), 200
+        # —— LOG previo a la llamada
+        logging.info("🌐 [Coresignal.preview] page=%s url=%s", page, url)
+        logging.info("➡️ Filtros enviados (minificado): %s", json.dumps(filt, ensure_ascii=False))
+
+        t0 = time.time()
+        r = requests.post(url, headers=_cs_headers(), json=filt, timeout=30)
+        dt_ms = int((time.time() - t0) * 1000)
+
+        # —— LOG de respuesta
+        logging.info("⬅️ Status=%s Duración=%sms Content-Type=%s Content-Length=%s",
+                     r.status_code, dt_ms, r.headers.get("Content-Type"), r.headers.get("Content-Length"))
+
+        # Si no es 2xx, intenta loguear texto para diagnóstico
+        try:
+            r.raise_for_status()
+        except Exception:
+            txt = r.text[:2000] if r.text else ""
+            logging.error("❌ Error HTTP Coresignal (%s). Primeros 2000 chars de body:\n%s", r.status_code, txt)
+            # devuelve estructura estándar vacía con debug si se pidió
+            out = {"page": page, "filters": filt, "data": {"items": []}}
+            if debug:
+                out["debug"] = {
+                    "request": {"url": url, "body": filt},
+                    "response": {"status": r.status_code, "duration_ms": dt_ms, "raw_snippet": txt[:500]}
+                }
+            return _ok_origin(jsonify(out)), 200
+
+        # Parsear JSON y loguear métricas
+        data = {}
+        try:
+            data = r.json()
+        except Exception:
+            txt = r.text[:2000] if r.text else ""
+            logging.exception("⚠️ Respuesta no JSON. Snippet:\n%s", txt)
+            data = {"items": []}
+
+        items = (data or {}).get("items") or []
+        logging.info("📦 Coresignal preview items=%d", len(items))
+
+        # Muestreo de IDs/campos (hasta 5)
+        sample = []
+        for it in items[:5]:
+            sample.append({
+                "id": it.get("employee_id") or it.get("id") or it.get("public_identifier"),
+                "name": it.get("name") or it.get("full_name") or it.get("public_identifier"),
+                "loc": it.get("location") or it.get("country"),
+                "headline": (it.get("headline") or "")[:120]
+            })
+        logging.info("🔎 Sample(≤5): %s", json.dumps(sample, ensure_ascii=False))
+
+        # Armar salida estándar con sección debug opcional
+        out = {"page": page, "filters": filt, "data": data}
+        if debug:
+            out["debug"] = {
+                "request": {
+                    "url": url,
+                    # NUNCA devolvemos headers (para no filtrar API key) — solo el body:
+                    "body": filt
+                },
+                "response": {
+                    "status": r.status_code,
+                    "duration_ms": dt_ms,
+                    "items_count": len(items),
+                    "sample": sample
+                }
+            }
+
+        return _ok_origin(jsonify(out)), 200
 
     except Exception:
         logging.error("❌ /ext/coresignal/search\n"+traceback.format_exc())
         resp = jsonify({"page": 1, "filters": {}, "data": {"items":[]}})
         return _ok_origin(resp), 200
+    
 @bp_candidate_search.route('/ext/coresignal/collect', methods=['POST','OPTIONS'])
 def coresignal_collect():
     if request.method == 'OPTIONS':
