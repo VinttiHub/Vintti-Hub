@@ -101,11 +101,14 @@ def search_candidates():
 
         logging.info("🔎 [/search/candidates] qs.tools_raw=%r → tools_lc=%r", raw_tools, tools_lc)
 
-        # Si no hay tools, devolvemos vacío para evitar traer todo
         if not tools_lc:
             logging.info("🔎 No tools provided → return empty items")
             resp = jsonify({"items":[]})
             return _ok_origin(resp), 200
+
+        # Preparamos patrones para coincidencia parcial
+        patterns = [f"%{t}%" for t in tools_lc]
+        logging.info("🧾 ILIKE patterns=%r", patterns)
 
         conn = get_connection()
         cur = conn.cursor()
@@ -117,35 +120,36 @@ def search_candidates():
         LEFT JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem) ON TRUE
         GROUP BY c.candidate_id, c.name, c.country, c.comments
         HAVING COUNT(DISTINCT CASE
-                 WHEN lower(trim(t.elem->>'tool')) = ANY(%s) THEN lower(trim(t.elem->>'tool'))
+                 WHEN EXISTS (
+                     SELECT 1 FROM unnest(%s::text[]) AS kw
+                     WHERE lower(t.elem->>'tool') ILIKE kw
+                 )
+                 THEN lower(t.elem->>'tool')
                  ELSE NULL
                END) >= 1
         ORDER BY COUNT(DISTINCT CASE
-                   WHEN lower(trim(t.elem->>'tool')) = ANY(%s) THEN lower(trim(t.elem->>'tool'))
-                   ELSE NULL
-                 END) DESC,
-                 c.name NULLS LAST, c.candidate_id ASC
+                 WHEN EXISTS (
+                     SELECT 1 FROM unnest(%s::text[]) AS kw
+                     WHERE lower(t.elem->>'tool') ILIKE kw
+                 )
+                 THEN lower(t.elem->>'tool')
+                 ELSE NULL
+               END) DESC,
+               c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200
         """
 
-        logging.info("🧾 SQL params (twice): %r", tools_lc)
-        cur.execute(sql, (tools_lc, tools_lc))
-
+        cur.execute(sql, (patterns, patterns))
         rows = cur.fetchall()
         logging.info("📦 rows_found=%d", len(rows))
 
         cur.close(); conn.close()
 
-        items = []
-        for candidate_id, name, country, comments in rows:
-            items.append({
-                "candidate_id": candidate_id,
-                "name": name,
-                "country": country,
-                "comments": comments
-            })
+        items = [
+            {"candidate_id": cid, "name": name, "country": country, "comments": comments}
+            for cid, name, country, comments in rows
+        ]
 
-        # espejo mini para ver primeros IDs (no voluminoso)
         logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 
         resp = jsonify({"items": items})
