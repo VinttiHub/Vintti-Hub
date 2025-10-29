@@ -3,6 +3,11 @@ import os, json, logging, traceback, re
 from flask import Blueprint, request, jsonify
 from openai import OpenAI
 from db import get_connection
+import datetime as dt
+import requests
+
+CORESIGNAL_API_BASE = "https://api.coresignal.com/cdapi/v2"
+CORESIGNAL_API_KEY = os.getenv("CORESIGNAL_API_KEY")  # <-- ponla en variables de entorno
 
 bp_candidate_search = Blueprint("candidate_search", __name__)
 OPENAI_MODEL = os.getenv("OPENAI_QUERY_MODEL", "gpt-4o-mini")
@@ -17,6 +22,11 @@ def _parse_list(s):
     if isinstance(s, list): return s
     if not s: return []
     return [x.strip() for x in str(s).split(",") if x.strip()]
+
+def _cs_headers():
+    if not CORESIGNAL_API_KEY:
+        raise RuntimeError("Falta CORESIGNAL_API_KEY en variables de entorno")
+    return {"apikey": CORESIGNAL_API_KEY, "Content-Type": "application/json"}
 
 @bp_candidate_search.route('/ai/parse_candidate_query', methods=['POST','OPTIONS'])
 def parse_candidate_query():
@@ -159,3 +169,67 @@ def search_candidates():
         logging.error("❌ /search/candidates\n"+traceback.format_exc())
         resp = jsonify({"items":[]})
         return _ok_origin(resp), 200
+@bp_candidate_search.route('/ext/coresignal/search', methods=['POST','OPTIONS'])
+def coresignal_search():
+    if request.method == 'OPTIONS':
+        resp = jsonify({}); resp.status_code=204
+        return _ok_origin(resp)
+
+    try:
+        payload = request.get_json(force=True) or {}
+        title   = (payload.get("title") or "").strip()
+        tools   = [str(x).strip() for x in (payload.get("skills") or payload.get("tools") or []) if str(x).strip()]
+        loc     = (payload.get("location") or "").strip()
+        years   = payload.get("years_min") or payload.get("years_experience") or None
+        page    = int(payload.get("page") or 1)
+
+        # —— Construcción de filtros Coresignal
+        filt = {}
+        if title:
+            filt["headline"] = f"\"{title}\"" if " " in title else title
+            filt["experience_title"] = title
+        if tools:
+            # Prefieres OR → "(a) OR (b) OR (c)"
+            filt["skill"] = " OR ".join([f"({t})" for t in tools])
+        if loc:
+            filt["location"] = loc
+        if years:
+            try:
+                years = int(years)
+                cutoff = dt.date.today().replace(year=dt.date.today().year - years)
+                filt["experience_date_from"] = cutoff.isoformat()
+            except Exception:
+                pass
+
+        url = f"{CORESIGNAL_API_BASE}/employee_base/search/filter/preview?page={page}"
+        r = requests.post(url, headers=_cs_headers(), json=filt, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+
+        resp = jsonify({"page": page, "filters": filt, "data": data})
+        return _ok_origin(resp), 200
+
+    except Exception:
+        logging.error("❌ /ext/coresignal/search\n"+traceback.format_exc())
+        resp = jsonify({"page": 1, "filters": {}, "data": {"items":[]}})
+        return _ok_origin(resp), 200
+@bp_candidate_search.route('/ext/coresignal/collect', methods=['POST','OPTIONS'])
+def coresignal_collect():
+    if request.method == 'OPTIONS':
+        resp = jsonify({}); resp.status_code=204
+        return _ok_origin(resp)
+
+    try:
+        employee_id = (request.get_json(force=True) or {}).get("employee_id")
+        if not employee_id:
+            return _ok_origin(jsonify({"error":"missing employee_id"})), 400
+
+        url = f"{CORESIGNAL_API_BASE}/employee_base/collect/{employee_id}"
+        r = requests.get(url, headers=_cs_headers(), timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        return _ok_origin(jsonify(data)), 200
+
+    except Exception:
+        logging.error("❌ /ext/coresignal/collect\n"+traceback.format_exc())
+        return _ok_origin(jsonify({"error":"collect-failed"})), 200

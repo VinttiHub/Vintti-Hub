@@ -11,6 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const cards = $('#vintti-results');
   const empty = $('#vintti-empty');
   const tpl   = $('#card-tpl');
+  const csWrap   = document.querySelector('#coresignal-wrap');
+  const csList   = document.querySelector('#cs-results');
+  const csEmpty  = document.querySelector('#cs-empty');
+  const csMore   = document.querySelector('#cs-more');
+  const csTpl    = document.querySelector('#cs-card-tpl');
+  let   _csState = { lastParsed: null, page: 1, hasMore: true };
 
 async function parseQuery(q){
   console.log('➡️ POST /ai/parse_candidate_query body:', { query: q });
@@ -35,6 +41,63 @@ async function searchCandidates(tools){
   // espejo mínimo para ver cuántos items vinieron
   console.log('📦 items:', (json.items||[]).length);
   return json;
+}
+async function coresignalSearch(parsed, page=1){
+  const body = {
+    title: parsed.title || "",
+    skills: (parsed.tools || []).map(s => String(s).toLowerCase().trim()).filter(Boolean),
+    location: parsed.location || "",          // si luego extraes lugar
+    years_min: parsed.years_experience ?? null,
+    page
+  };
+  const res = await fetch(`${API_BASE}/ext/coresignal/search`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('Coresignal search failed');
+  return await res.json();
+}
+
+function renderCs(items, {append=false}={}){
+  if (!append) csList.innerHTML = '';
+  if (!items || !items.length){
+    if (!append) csEmpty.classList.remove('hidden');
+    return;
+  }
+  csEmpty.classList.add('hidden');
+
+  for (const it of (items || [])){
+    const node = csTpl.content.firstElementChild.cloneNode(true);
+
+    // Campos típicos de preview (dependerán del response; ajusta si cambia):
+    const name  = it.name || it.full_name || it.public_identifier || 'Profile';
+    const loc   = it.location || it.country || '—';
+    const head  = it.headline || '';
+    const eid   = it.employee_id || it.id;
+
+    node.querySelector('.cs-card-name').textContent = name;
+    node.querySelector('.cs-card-meta').textContent = loc;
+    node.querySelector('.cs-card-notes').textContent = head || '—';
+    // click: podrías abrir tu modal y llamar /collect
+    node.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      if (!eid) return;
+      try{
+        const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          credentials:'include',
+          body: JSON.stringify({ employee_id: eid })
+        }).then(r=>r.json());
+        console.log('🧾 collect →', det);
+        // TODO: abre un modal lindo con info clave (linkedin, skills, exp…)
+      }catch(err){ console.error('collect error', err); }
+    });
+
+    csList.appendChild(node);
+  }
 }
 
   function renderChips({ title, tools, years_experience }){
@@ -105,8 +168,25 @@ async function doSearch(){
     const data = await searchCandidates(tools);
     console.log('↩️ Respuesta search:', data);
     console.groupEnd();
-
     renderCards(data.items || []);
+
+    // —— Coresignal (preview)
+    _csState = { lastParsed: parsed, page: 1, hasMore: true };
+    csList.innerHTML = ''; csEmpty.classList.add('hidden');
+    csMore.classList.add('hidden');
+
+    const csRes = await coresignalSearch(parsed, 1);
+    const csItems = (csRes?.data?.items) || [];
+    renderCs(csItems, {append:false});
+
+    // control de paginación de preview (1..5)
+    if (csItems.length > 0){
+      csMore.classList.remove('hidden');
+    }else{
+      csEmpty.classList.remove('hidden');
+      csMore.classList.add('hidden');
+    }
+
   }catch(err){
     console.error('❌ Error en doSearch:', err);
     renderCards([]);
@@ -119,4 +199,26 @@ async function doSearch(){
 
   btn.addEventListener('click', doSearch);
   input.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSearch(); });
+    if (csMore){
+    csMore.addEventListener('click', async ()=>{
+      try{
+        csMore.disabled = true; csMore.textContent = 'Cargando…';
+        _csState.page += 1;
+        const pageRes = await coresignalSearch(_csState.lastParsed, _csState.page);
+        const items = (pageRes?.data?.items) || [];
+        renderCs(items, {append:true});
+        // preview tiene hasta 5 páginas
+        const totalPages = 5;
+        if (_csState.page >= totalPages || items.length === 0) {
+          _csState.hasMore = false;
+          csMore.classList.add('hidden');
+        } else {
+          csMore.classList.remove('hidden');
+        }
+      } finally {
+        csMore.disabled = false; csMore.textContent = 'Cargar más';
+      }
+    });
+  }
+
 });

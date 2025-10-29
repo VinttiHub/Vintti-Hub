@@ -27,8 +27,11 @@
 
     <section class="col">
       <h2 class="col-title">🛰️ Coresignal</h2>
-      <div class="coming-soon">
-        <p>Próximamente conectamos con Coresignal para ampliar el pool ✨</p>
+
+      <div id="coresignal-wrap">
+        <div id="cs-results" class="cards"></div>
+        <div id="cs-empty" class="empty hidden">Sin resultados en Coresignal para este criterio.</div>
+        <button id="cs-more" class="search-btn small hidden" type="button">Cargar más</button>
       </div>
     </section>
   </main>
@@ -40,6 +43,16 @@
         <div class="card-name"></div>
         <div class="card-meta"></div>
         <div class="card-notes"></div>
+      </div>
+    </a>
+  </template>
+  <template id="cs-card-tpl">
+    <a class="card cs-card" href="#" target="_self">
+      <div class="card-avatar" aria-hidden="true"></div>
+      <div class="card-body">
+        <div class="card-name cs-card-name"></div>
+        <div class="card-meta cs-card-meta"></div>
+        <div class="card-notes cs-card-notes"></div>
       </div>
     </a>
   </template>
