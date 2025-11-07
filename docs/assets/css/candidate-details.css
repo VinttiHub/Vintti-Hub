@@ -15,7 +15,7 @@ body {
   color: var(--text);
   padding: 40px;
 }
-.tabs {
+/* .tabs {
   display: flex;
   gap: 10px;
   margin-top: 30px;
@@ -30,7 +30,7 @@ body {
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
-}
+} */
 #linkedin-open-btn {
   font-size: 20px;
   text-decoration: none;
@@ -435,45 +435,6 @@ a {
   background-color: #81c7a1;
 }
 
-/* Salary Update Popup */
-#salary-update-popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #fff9f6;
-  padding: 1.5rem;
-  border: 1px solid #dfcfc2;
-  border-radius: 18px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 300px;
-}
-
-#salary-update-popup input {
-  padding: 8px;
-  border-radius: 10px;
-  border: 1px solid #d8c4b4;
-  font-size: 0.95rem;
-}
-
-#salary-update-popup button {
-  background-color: #ffb88c;
-  color: #44260e;
-  border: none;
-  border-radius: 12px;
-  padding: 10px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.2s ease;
-}
-
-#salary-update-popup button:hover {
-  background-color: #ffa466;
-}
 
 /* Hidden Utility */
 .hidden {
@@ -489,6 +450,281 @@ a {
   display: inline-block;
   margin-bottom: 12px;
 }
+
+/* ===== Tweaks visuales para Salary Updates (solo diseño) ===== */
+
+/* Caja principal más “card” */
+#salary-updates-box {
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+/* Fila base: mismas columnas, más espacio y mejor alineado */
+.salary-entry {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2fr auto; /* Salary | Fee | Date | Botón */
+  align-items: center;
+  column-gap: 16px;
+  padding: 14px 28px;
+  font-size: 15px;
+  font-family: 'Onest', sans-serif;
+  color: #111827;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.salary-entry span {
+  white-space: nowrap;
+}
+
+.salary-entry:last-child {
+  border-bottom: none;
+}
+
+/* Primera fila como “header” (si la estás usando para títulos) */
+#salary-updates-box .salary-entry:first-child {
+  background: #f9fafb;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#salary-updates-box .salary-entry:first-child span {
+  color: #0f172a;
+}
+
+/* Ocultar el botón en el header pero dejar la columna para alinear */
+#salary-updates-box .salary-entry:first-child button {
+  visibility: hidden;
+}
+
+/* Hover suave en filas de datos */
+#salary-updates-box .salary-entry:not(:first-child):hover {
+  background-color: #f9fafb;
+}
+
+/* Botón de borrar tipo pill azul, alineado a la derecha */
+.salary-entry button {
+  justify-self: end;
+  background-color: transparent !important;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 26px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.salary-entry button:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
+}
+
+/* Por si el botón tiene ícono img o svg adentro */
+.salary-entry button img,
+.salary-entry button svg {
+  width: 18px;
+  height: 18px;
+}
+
+
+/* Popup un pelín más limpio */
+#salary-update-popup {
+  background: #f8f9ff;
+  border-radius: 18px;
+  border: 1px solid #e5d5c6;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
+}
+
+#salary-update-popup input {
+  border-radius: 10px;
+  border: 1px solid #f8f9ff;
+}
+
+
+#salary-update-popup button:hover {
+  background-color: #6C38FF;
+}
+
+/* ====== POPUP: New Salary Update (override visual) ====== */
+
+#salary-update-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #f8f9ff;
+  padding: 24px 24px 20px;
+  border: 1px solid #6d38ff36;
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, 90vw);
+  font-family: 'Onest', sans-serif;
+}
+
+/* Título del popup */
+#salary-update-popup h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Labels encima de los inputs */
+#salary-update-popup label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-top: 6px;
+}
+
+/* Inputs */
+#salary-update-popup input {
+  margin-top: 4px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid #faf8ff;
+  font-size: 14px;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+#salary-update-popup input:focus {
+  outline: none;
+  border-color: #faf8ff;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.25);
+  background-color: #fffaf5;
+}
+
+/* Botón principal: Save */
+#salary-update-popup #save-salary-update {
+  margin-top: 16px;
+  width: 100%;
+  background: #003BFF;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 0;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+
+}
+
+#salary-update-popup #save-salary-update:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+/* Botón de cerrar (la X) arriba a la derecha */
+#salary-update-popup #close-salary-update {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+#salary-update-popup #close-salary-update:hover {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  transform: translateY(-1px);
+}
+
+/* ===== BOTÓN “NEW UPDATE” – VIOLETA BRILLANTE CON ICONO “+” ===== */
+#add-salary-update {
+  margin-top: 22px;
+  background: linear-gradient(90deg, #003BFF 0%, #003BFF 100%);
+  color: #ffffff;
+  padding: 12px 34px 12px 46px;
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ✨ Efecto de brillo animado (destello diagonal) */
+#add-salary-update::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.05) 100%);
+  transform: skewX(-25deg);
+  transition: 0.6s;
+}
+
+#add-salary-update:hover::before {
+  left: 120%;
+}
+
+/* 🔹 Ícono "+" decorativo (pseudo-elemento) */
+#add-salary-update::after {
+  content: "+";
+  position: absolute;
+  left: 18px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  transition: transform 0.3s ease, text-shadow 0.3s ease;
+}
+
+/* Hover: brillo más intenso + animación + */
+#add-salary-update:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: linear-gradient(90deg, #003BFF 0%, #003BFF 100%);
+}
+
+#add-salary-update:hover::after {
+  transform: rotate(90deg) scale(1.2);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+}
+
+/* Glow constante (resplandor alrededor) */
+#add-salary-update:before,
+#add-salary-update:after {
+  z-index: 1;
+}
+
+#add-salary-update span {
+  position: relative;
+  z-index: 2;
+}
+
+
+
+
 /* === NUEVO CSS para Resume estilo limpio tipo Notion / LinkedIn === */
 
 .cv-container {
@@ -510,13 +746,23 @@ a {
 }
 
 .cv-heading {
-  font-size: 20px;
-  font-weight: 600;
-  color: #111827;
-  border-left: 4px solid #3b82f6;
-  padding-left: 12px;
-  margin-bottom: 8px;
-  letter-spacing: 0.5px;
+  font-size: 18px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  color: #000;
+  letter-spacing: 0.15em;
+  margin-bottom: 12px;
+  position: relative;
+  padding-left: 26px;
+  font-family: 'Onest', sans-serif;
+}
+
+.cv-heading::before {
+  content: attr(data-icon);
+  position: absolute;
+  left: 0;
+  top: -5px;
+  font-size: 18px;
 }
 
 .cv-card {
@@ -658,22 +904,6 @@ a {
 /* === Tools Section - Estilo limpio y profesional === */
 
 
-#addToolBtn {
-  align-self: start;
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-top: 8px;
-}
-
-#addToolBtn:hover {
-  background-color: #2563eb;
-}
 .cv-card-entry input.edu-title {
   font-size: 18px;
   font-weight: 700;
@@ -753,7 +983,7 @@ a {
 }
 
 
-.cv-switch {
+/* .cv-switch {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -795,7 +1025,7 @@ a {
 
 .cv-switch input[type="checkbox"]:checked::before {
   transform: translateX(20px);
-}
+} */
 .cv-card-entry .edu-current {
   appearance: none;
   width: 42px;
@@ -1094,30 +1324,19 @@ select:focus {
   padding-right: 0;
 }
 
-.cv-heading {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #111827;
-  border-left: 4px solid #3b82f6;
-  padding-left: 12px;
-  letter-spacing: 0.5px;
-}
-
 .star-button {
   font-size: 16px;
-  border: 2px solid #ffc0cb;
   border-radius: 12px;
   padding: 6px 10px;
-  background-color: #fffafa;
+  background-color: #fff !important;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+
 }
 
 .star-button:hover {
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+
 }
 .ai-loader {
   position: fixed;
@@ -1231,23 +1450,24 @@ select:focus {
   overflow-y: auto;
 }
 .go-back-button {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background-color: #f0f0f0;
-  color: #333;
+  top: 1px;
+  left: 25px;
+  width: 100px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #e6f3ff;
+  color: #003BFF;
+  font-size: 12px;
   border: none;
-  border-radius: 100%;
-  padding: 12px 16px;
-  font-size: 18px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  z-index: 9999;
-  transition: transform 0.2s ease, background-color 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s, transform 0.2s;
+  z-index: 1000;
+  margin-left: 15px;
 }
 .go-back-button:hover {
-  transform: scale(1.1);
-  background-color: #e0e0e0;
+  background-color: #d0eaff;
+  transform: scale(1.05);
 }
 #opportunitiesTable {
   width: 100%;
@@ -1282,26 +1502,28 @@ select:focus {
 .linkedin-link:hover {
   transform: scale(1.2);
 }
-.go-back-button {
-  position: absolute;
-  top: 16px;
-  left: 25px;
-  width: 100px;
-  height: 36px;
-  border-radius: 8px;
-  background-color: #e6f3ff;
-  color: #0077cc;
-  font-size: 12px;
+/* Go Back button */
+.go-back-button{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(214, 222, 248, 0.58);
+  color: #003BFF;
+  font-weight: 600;
   border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-family: "Onest", system-ui, sans-serif;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transition: background 0.2s, transform 0.2s;
-  z-index: 1000;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: background .2s ease, color .2s ease;
 }
-.go-back-button:hover {
-  background-color: #d0eaff;
-  transform: scale(1.05);
+
+.go-back-button:hover{
+  background: #e5e9ff;
+  color: #0a3ad1;
 }
+
 .country-flag {
   margin-left: 8px;
   font-size: 20px;
@@ -1318,7 +1540,6 @@ select:focus {
 
 #field-country {
   margin-top: 6px;
-  border: 1px solid #d1d5db;
   background-color: #ffffff;
 }
 #linkedin-open-btn {
@@ -1359,64 +1580,6 @@ select:focus {
 }
 
 
-#client-version-btn span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-#client-version-btn {
-  line-height: 1;
-  text-align: center;
-  vertical-align: middle;
-}
-
-#client-version-btn > * {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-#client-version-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: row; /* Asegura que emoji y texto estén en fila */
-  gap: 8px;
-
-  height: 50px;
-  width: 162px;
-  padding: 0 20px;
-
-  font-size: 15px;
-  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
-  font-weight: 600;
-
-  background-color: #9b5de5;
-  color: white;
-  border: none;
-  border-radius: 16px;
-  text-decoration: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-
-  position: fixed;
-  top: 64px;
-  right: 10px;
-  z-index: 999;
-}
-
-#client-version-btn span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  line-height: 1;
-}
-#client-version-btn {
-  line-height: 50px; /* igual a la altura */
-  padding-top: 0px;
-  padding-bottom: 0px;
-}
 
 .resume-loader {
   position: fixed;
@@ -2134,14 +2297,19 @@ html body .month-year .btn-clear:active{
   font-size: 13px;
 }
 
-/* Botón azul compacto */
 #hire #btn-send-reminders.btn-blue {
-  padding: 10px 14px;
+  padding: 8px 16px;
   font-size: 13px;
-  line-height: 1;
+  line-height: 1.4;
   border-radius: 999px;
-  white-space: nowrap;
+  white-space: normal;          /* ← permite saltos de línea */
+  text-align: center;           /* ← centra el texto */
+  align-self: center;
+  max-width: 150px;             /* ajusta el ancho del botón */
+  word-break: keep-all;
+  background-color: #003BFF;
 }
+
 
 /* Hint opcional (si lo usas), aún más chico y debajo en móviles */
 #hire .rem-hint {
@@ -2166,6 +2334,8 @@ html body .month-year .btn-clear:active{
   display: flex;
   flex-direction: column;
   gap: 10px;
+  font-family: 'Onest', sans-serif;
+  
 }
 
 .reminders-card label {
@@ -2236,7 +2406,7 @@ html body .month-year .btn-clear:active{
 
 .btn-blue {
   border: 0;
-  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  background: linear-gradient(180deg, #003BFF, #003BFF);
   color: #fff;
   border-radius: 999px;
   padding: 12px 16px;
@@ -2254,20 +2424,181 @@ html body .month-year .btn-clear:active{
   color: #6b7280;
 }
 
-/* Reminders: nombres en caso 'Capitalized' (primera mayúscula, resto minúscula) */
-#hire .reminders-card .rem-name {
-  font-weight: 400;          /* sin negrilla */
-  text-transform: lowercase; /* todo en minúscula... */
-  letter-spacing: 0.2px;
+/* ===========================
+   INTERNAL FOLLOW-UPS (nuevo)
+   =========================== */
+
+/* Contenedor principal */
+.reminders-card {
+  background: #f9fafb;
+  border-radius: 22px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-#hire .reminders-card .rem-name::first-letter {
-  text-transform: uppercase; /* ...y solo la primera va en mayúscula */
+/* Título */
+.reminders-card > label {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 4px;
 }
-.reminders-card .reminders-list { list-style:none; padding:0; margin:0; display:grid; gap:10px; }
-.rem-chk { display:flex; align-items:center; gap:10px; }
-.rem-countdown { font-size:12px; opacity:.8; margin-left:32px; }
-.rem-msg { font-size:12px; color:#2e7d32; margin-left:32px; }
+
+/* Cuerpo general */
+.reminders-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* === GRID de 3 columnas === */
+.reminders-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+/* === Cada tarjeta individual === */
+.reminders-list li {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reminders-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
+}
+
+/* === Encabezado (check + nombre) === */
+.rem-chk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rem-chk input {
+  appearance: none;
+  position: absolute;
+  opacity: 0;
+}
+
+/* Check redondo azul */
+.rem-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  border: 2px solid #93c5fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 0 0 0 transparent;
+}
+
+.rem-box::after {
+  content: "";
+  width: 6px;
+  height: 10px;
+  border: 2px solid transparent;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Estado checked */
+.rem-chk input:checked + .rem-box {
+  background: linear-gradient(145deg, #2563eb, #3b82f6);
+  border-color: #2563eb;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+}
+
+.rem-chk input:checked + .rem-box::after {
+  opacity: 1;
+}
+
+/* Nombre */
+.rem-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+
+/* === Mensajes internos === */
+.rem-countdown,
+.rem-msg {
+  font-size: 12.5px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.rem-countdown::before,
+.rem-msg::before {
+  font-size: 13px;
+}
+
+/* Ocultar si están vacíos */
+.rem-countdown:empty,
+.rem-msg:empty {
+  display: none;
+}
+
+/* === Botón azul final === */
+.btn-blue {
+  align-self: flex-end;
+  border: 0;
+  background: linear-gradient(90deg, #003BFF, #003BFF);
+  color: #fff;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-blue:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.45);
+}
+
+.btn-blue:active {
+  transform: translateY(1px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+}
+
+/* === Responsive === */
+@media (max-width: 960px) {
+  .reminders-list { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .reminders-list { grid-template-columns: 1fr; }
+}
+
 .fireworks-pop {
   position: fixed; inset:0; display:flex; align-items:center; justify-content:center;
   background: rgba(0,0,0,.35); z-index: 9999; backdrop-filter: blur(2px);
@@ -2284,10 +2615,9 @@ html body .month-year .btn-clear:active{
   justify-content:center;
   min-height: 30px;      /* ↓ antes 44px */
   padding: 4px 14px;     /* ↓ menos alto, misma anchura */
-  border:1px solid #e5e7eb;
-  border-radius:999px;
+  border: transparent;
+
   background:#fff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
   font-family: 'Onest', sans-serif;
   font-size: 14px;
   line-height: 1.1;      /* compacto */
@@ -2320,6 +2650,7 @@ html body .month-year .btn-clear:active{
   opacity: 1; /* visible por defecto */
   pointer-events: auto;
 }
+
 /* ===== Cute doc-check makeover ===== */
 .doc-check.cute{
   --glass: rgba(255,255,255,.65);
@@ -2436,3 +2767,1078 @@ html body .month-year .btn-clear:active{
 .cute-toast .tiny{
   display:block; font-size:12px; color:#6b7280; margin-top:4px;
 }
+
+
+
+
+
+
+
+/* -------------/*-------------/* overview -------------/*-------------/* /
+
+/* Contenedor: izquierda (main) + derecha (sidebar) */
+#overview .overview-layout{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 360px; /* main flexible | sidebar fija */
+  gap: 24px;
+  align-items:start;
+}
+
+/* Grid interna SOLO para los campos de la izquierda (2 columnas) */
+#overview .overview-layout > .grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(280px,1fr));
+  gap: 18px 20px;
+}
+
+/* bloques que deben abarcar ambas columnas de la izquierda */
+#overview .overview-layout > .grid .field.full,
+#overview .overview-layout > .grid .field-group,
+#overview .overview-layout > .grid .field.textarea,
+#overview .overview-layout > .grid .field:has(.rich-toolbar){
+  grid-column: 1 / -1;
+}
+
+/* Sidebar fija y apilada, SIN afectar la altura de filas del main */
+#overview .overview-layout > .sidebar{
+  position: sticky;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+/* Responsive: todo apilado */
+@media (max-width: 1024px){
+  #overview .overview-layout{
+    grid-template-columns: 1fr;
+  }
+  #overview .overview-layout > .sidebar{
+    position: static;
+  }
+}
+
+
+/* -------------/*-------------/* header -------------/*-------------/*/
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  height: 80px;
+  background:#003BFF;            /* azul del mock */
+  color:#fff;
+  border-radius:20px;
+  padding-left: 25px;
+  padding-right: 25px;
+  box-shadow:0 14px 34px rgba(0,0,0,.12);
+  margin-bottom: 20px;
+}
+
+/* Botón "Go Back" dentro del topbar */
+.topbar .back{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:transparent;
+  border:0;
+  color:#fff;
+  font-weight:700;               /* bold fuerte como el mock */
+  font-size:16px;
+  letter-spacing:.2px;
+  cursor:pointer;
+  border-radius:12px;
+  transition:background .15s ease, transform .06s ease;
+}
+.topbar .back:hover{ background:rgba(255,255,255,.12); }
+.topbar .back:active{ transform:translateY(1px); }
+
+
+/* ===== Header bar (Go Back + Tabs aligned) ===== */
+.header-bar{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* header */
+.tabs{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f9fafb;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 40px;
+  padding: 1px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  margin-bottom: 1px;
+}
+
+.tabs .tab{
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 22px;
+  font-family: "Onest", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #374151;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+
+.tabs .tab:hover{
+  background: #f1f2f4;
+  color: #111827;
+}
+
+.tabs .tab.active{
+  background: #000;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Responsive */
+@media (max-width: 720px){
+  .header-bar{
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+}
+
+/* fila del header */
+.header-row{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:16px;
+  width:100%;
+  padding:8px 20px;
+  box-sizing:border-box;
+  margin-top: -10px;
+  text-align:initial !important; /* por si el padre tenía text-align:center */
+}
+
+
+/* FORZAR tabs a la derecha (rompe centrados previos) */
+.header-row .tabs{
+  margin-left:auto !important;
+  margin-right:10px !important;
+  position:static !important;
+  left:auto !important;
+  transform:none !important;
+}
+
+/* (opcional) ancho mínimo para que no “salten” */
+.header-row .tabs .tab{ white-space:nowrap; }
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 25px;
+  box-shadow: 0 4px 20px rgba(15,23,42,0.05);
+  backdrop-filter: saturate(1.3) blur(10px);
+}
+
+/* ---------- Layout ---------- */
+.overview-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 28px;
+  padding: 20px 40px 60px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+/* ---------- Field Cards ---------- */
+.field {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: 0.2s ease;
+}
+.field:hover {
+  box-shadow: 0 6px 18px rgba(15,23,42,0.08);
+  transform: translateY(-2px);
+}
+
+/* ---------- Labels ---------- */
+.field label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Editable & Inputs ---------- */
+.field [contenteditable="true"],
+.field select,
+.field textarea {
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-weight: 500;
+  background: transparent;
+  color: #0f172a;
+  resize: none;
+}
+.field select {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.field textarea {
+  min-height: 70px;
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 8px 10px;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.doc-card {
+  border: 1px solid rgba(0,0,0,0.06);
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+}
+.doc-card-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.cv-drop {
+  background: #f8fafc;
+  border: 2px dashed rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  color: #475569;
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+.cv-drop:hover {
+  border-color: #a5b4fc;
+  background: #f1f5ff;
+}
+.cv-hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+/* ---------- Rich Editor ---------- */
+.rich-toolbar {
+  display: flex;
+  gap: 6px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 4px;
+}
+.rich-toolbar button {
+  background: transparent;
+  border: none;
+  color: #475569;
+  font-size: 13px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.rich-toolbar button:hover {
+  background: #e2e8f0;
+}
+.rich-input {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.05);
+  padding: 10px;
+  min-height: 80px;
+}
+
+/* ---------- WhatsApp Button ---------- */
+.icon-button.whatsapp {
+  background: #25D366;
+  color: #fff;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.25s;
+}
+.icon-button.whatsapp:hover {
+  background: #1da851;
+}
+
+/* ===== Nombre como header editable (sin card) ===== */
+/* Quita background/borde/sombra SOLO al field que contiene #field-name */
+.field:has(#field-name){
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  
+ 
+  font-size: 30px;
+}
+
+/* El contenido editable luce como título */
+#field-name{
+  display: block;
+  margin-top: 1px;
+  margin-left: 27px;
+  margin-right: 27px;
+  line-height: 1.25;
+  font-size: 30px !important;
+  font-weight: 700;
+  color: #111827;
+  border-radius: 10px;
+  outline: none;
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: box-shadow .2s ease, background .2s ease, transform .06s ease;
+}
+
+#field-name:focus{
+  background: rgba(2,6,23,.055);
+  box-shadow: inset 0 0 0 2px rgba(99,102,241,.18), 0 1px 0 rgba(2,6,23,.03);
+}
+
+/* Selección de texto más visible */
+#field-name::selection{
+  background: #e5e7ff;
+}
+
+/* Cursor y feedback al teclear */
+#field-name:focus-visible{
+  outline: none;
+}
+#field-name:active{
+  transform: translateY(0);
+}
+
+#field-name{
+  color: #111827;
+  font-weight: 700;
+}
+#field-name:empty::before{
+  content: "—";
+  color: #94a3b8;
+}
+
+.field:has(#field-name){
+  margin-bottom: 1px !important;  
+  padding-bottom: 0 !important;
+  margin-top: 1px !important;
+}
+
+/* === PATCH: alinear icono + texto y mandar acciones a la derecha === */
+
+/* Base: los cards pueden tener elementos absolutos */
+#overview .field{ position:relative; }
+
+/* 1) Label compacto (sin space-between) */
+#overview .field > label{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:8px !important;
+  padding-right:44px;                /* reserva espacio para acción derecha si existe */
+}
+
+/* 2) PHONE: botón WhatsApp pegado a la derecha */
+#overview #phone-field > label #wa-btn-overview{
+  position:absolute !important;
+  top:25% !important;
+  right:14px !important;
+  transform:translateY(-50%) !important;
+  margin:0 !important;
+}
+#overview #phone-field #field-phone{
+  display:flex; align-items:center; justify-content:flex-start;
+  padding-right:50px;                /* evita que el texto choque con el botón */
+  text-align:left;
+}
+
+/* 3) LINKEDIN: botón 🔗 a la derecha, texto alineado normal */
+#overview .field > label #linkedin-open-btn{
+  position:absolute !important;
+  top:25% !important;
+  right:14px !important;
+  transform:translateY(-50%) !important;
+  margin:0 !important;
+}
+#overview #field-linkedin{ padding-right:50px; }
+
+/* 4) COUNTRY: oculta el SVG placeholder que abre hueco y ajusta la banderita */
+#overview .field label .icon{ display:none; }          /* placeholder vacío */
+#overview .country-flag{
+  font-size:16px; margin-left:6px; transform:translateY(1px);
+}
+
+/* 5) Imágenes de icono: sin margen extra */
+#overview .field label img{ display:inline-block; vertical-align:middle; }
+
+
+
+
+
+
+
+/* === Sidebar docs – CV / Resignation: lista limpia y compacta === */
+
+/* Espacio entre dropzone y lista */
+#cv-card .cv-drop,
+#resig-card .cv-drop{
+  margin-bottom: 1px;
+}
+
+/* La lista en columna con gap consistente */
+#cv-card .cv-list,
+#resig-card .cv-list{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Cada item de la lista (sirve aunque el JS inserte <div>, <li>, etc.) */
+#cv-card .cv-list > *,
+#resig-card .cv-list > *{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 10px 12px;
+  border: 1px solid #e7ecf3;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(15,23,42,.05);
+
+  /* que no se pegue al borde del card */
+  margin: 0 4px;
+}
+
+/* El nombre del archivo: una sola línea con elipsis */
+#cv-card .cv-list > *{
+  overflow: hidden;        /* para que funcione elipsis con text node */
+}
+#cv-card .cv-list > * > .cv-name,
+#resig-card .cv-list > * > .cv-name{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Si NO tienes .cv-name y el texto va suelto, el <a> “Open” se va a la derecha */
+#cv-card .cv-list > * > a:first-of-type,
+#resig-card .cv-list > * > a:first-of-type{
+  margin-left: auto;     /* empuja acciones a la derecha */
+}
+
+/* Botón/enlace Open */
+#cv-card .cv-list a,
+#resig-card .cv-list a{
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Botón Delete sin agresivo, redondeado */
+#cv-card .cv-list button,
+#resig-card .cv-list button{
+  border: 0;
+  background: #fdecec;
+  color: #b42318;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter .2s ease, transform .06s ease;
+}
+#cv-card .cv-list button:hover,
+#resig-card .cv-list button:hover{
+  filter: brightness(0.98);
+}
+#cv-card .cv-list button:active,
+#resig-card .cv-list button:active{
+  transform: translateY(1px);
+}
+
+/* Card visual más compacto y consistente */
+.sidebar .doc-card{
+  border: 1px solid #e7ecf3 !important;
+  padding: 16px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 20px rgba(15,23,42,.06) !important;
+}
+
+/* Dropzone normal */
+#cv-card .cv-drop,
+#resig-card .cv-drop {
+  border: 2px dashed rgba(0,0,0,.08);
+  background: #f8fafc;
+  border-radius: 14px;
+  transition: all 0.25s ease; /* animación suave */
+}
+
+/* Hover del dropzone */
+#cv-card .cv-drop:hover,
+#resig-card .cv-drop:hover {
+  border-color: #2564eb97;           
+  background: #eff6ff;             
+  box-shadow: 0 0 0 3px #dbeafe;   
+}
+
+
+/* Etiqueta de card (título + refresh) alineada y con espaciado */
+.doc-card-label{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+
+/* 1. layout correcto */
+#overview .overview-layout{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 360px;
+  gap: 24px;
+  align-items:start;
+}
+
+/* 2. grid izquierda en 2 columnas fijas */
+#overview .overview-layout > .grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(280px,1fr));
+  gap: 18px 20px;
+}
+
+/* 3. solo sidebar con cards */
+#overview .overview-layout > .sidebar .field {
+  background:#fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+/* (opcional) quita esto si ya estaba */
+/* .overview-layout { ... } */
+/* .grid { ... } */
+
+
+
+
+
+/* =======================================================
+   RESUME V2 – TODO UNIFICADO (Work, Education, Tools, Langs)
+   ======================================================= */
+
+/* ---------- Layout base del resume ---------- */
+html body #resume .cv-container {
+  padding: 32px 36px !important;
+  background: #ffffff !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(15,23,42,0.06) !important;
+  max-width: 960px !important;
+  margin: 0 auto 40px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 40px !important;
+}
+
+html body #resume .cv-section {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+}
+
+
+
+/* ---------- CARD genérico (About, Video, contenedor Tools/Langs) ---------- */
+html body #resume .cv-card {
+  background: #f9fafb !important;
+  border-radius: 14px !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 16px 18px !important;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04) !important;
+}
+
+/* =======================================================
+   Work Experience + Education – tarjetas unificadas
+   ======================================================= */
+
+
+/* Tarjeta base para cada experiencia/educación */
+html body #resume #workExperienceSection .cv-card-entry,
+html body #resume #educationSection      .cv-card-entry {
+  display: grid !important;
+  grid-template-columns: minmax(0, 2fr) minmax(230px, 1fr) !important;
+  column-gap: 24px !important;
+  row-gap: 8px !important;
+
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+  padding: 18px 22px !important;
+  position: relative !important;
+}
+
+/* Títulos (puesto y estudios) */
+html body #resume #workExperienceSection .cv-card-entry input.work-title,
+html body #resume #educationSection      .cv-card-entry input.edu-title {
+  grid-column: 1 / 2 !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 0 2px 0 !important;
+}
+
+/* Subtítulo / empresa / programa */
+html body #resume #workExperienceSection .cv-card-entry input.work-company,
+html body #resume #educationSection      .cv-card-entry input[type="text"]:not(.edu-title) {
+  grid-column: 1 / 2 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #4b5563 !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 0 8px 0 !important;
+}
+
+/* Select de país en Education también en la columna izquierda */
+html body #resume #educationSection .cv-card-entry select {
+  grid-column: 1 / 2 !important;
+}
+
+/* ---------- Fechas (START / END) + Clear ---------- */
+html body #resume #workExperienceSection .cv-card-entry .month-year,
+html body #resume #educationSection      .cv-card-entry .month-year {
+  grid-column: 2 / 3 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* Selects de mes y año como pills blancas */
+html body #resume #workExperienceSection .cv-card-entry .month-year select,
+html body #resume #educationSection      .cv-card-entry .month-year select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  min-width: 88px !important;
+  height: 34px !important;
+  padding: 6px 12px !important;
+
+  border-radius: 999px !important;
+  border: 1px solid #e5e7eb !important;
+  background-color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #111827 !important;
+
+  box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important;
+}
+
+/* Botón CLEAR como mini-pill link morado */
+html body #resume #workExperienceSection .month-year .btn-clear,
+html body #resume #educationSection      .month-year .btn-clear {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 8px !important;
+  margin-left: 4px !important;
+  height: auto !important;
+
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #3b82f6 !important;
+  border-radius: 999px !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+}
+
+html body #resume #workExperienceSection .month-year .btn-clear:hover,
+html body #resume #educationSection      .month-year .btn-clear:hover {
+  background-color: rgba(59,130,246,0.08) !important;
+}
+
+
+/* ---------- Descripción (toolbar + texto) ---------- */
+html body #resume #workExperienceSection .cv-card-entry .rich-toolbar,
+html body #resume #educationSection      .cv-card-entry .rich-toolbar,
+html body #resume #workExperienceSection .cv-card-entry .rich-input,
+html body #resume #educationSection      .cv-card-entry .rich-input {
+  grid-column: 1 / -1 !important;
+}
+
+html body #resume #workExperienceSection .cv-card-entry .rich-toolbar,
+html body #resume #educationSection      .cv-card-entry .rich-toolbar {
+  margin-top: 6px !important;
+  background: #f3f4f6 !important;
+  border-radius: 8px !important;
+  padding: 4px 6px !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+html body #resume #workExperienceSection .cv-card-entry .rich-input,
+html body #resume #educationSection      .cv-card-entry .rich-input {
+  margin-top: 4px !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: 60px !important;
+  font-size: 14px !important;
+  color: #374151 !important;
+}
+
+/* =======================================================
+   Tools & Languages – chips con nivel
+   ======================================================= */
+
+/* Contenedor tipo “línea de chips” */
+html body #resume #toolsSection #toolsList,
+html body #resume #languagesSection #languagesList {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  padding: 6px 2px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+
+
+/* Nombre de la tool / language */
+html body #resume #toolsSection .tool-entry input[type="text"],
+html body #resume #languagesSection .tool-entry input[type="text"],
+html body #resume #languagesSection .language-entry input[type="text"] {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #111827 !important;
+}
+
+/* Nivel como mini-pill gris */
+html body #resume #toolsSection .tool-entry select,
+html body #resume #languagesSection .tool-entry select,
+html body #resume #languagesSection .language-entry select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  border: none !important;
+  background-color: #f3f4f6 !important;
+  border-radius: 999px !important;
+  padding: 3px 8px !important;
+
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #4b5563 !important;
+
+  width: auto !important;
+  min-width: 0 !important;
+
+  background-image: url("data:image/svg+xml,%3Csvg fill='%239ca3af' height='14' viewBox='0 0 20 20' width='14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 4px center !important;
+  background-size: 12px 12px !important;
+}
+
+/* Botón eliminar pequeño dentro del chip */
+html body #resume #toolsSection .tool-entry .remove-entry,
+html body #resume #languagesSection .tool-entry .remove-entry,
+html body #resume #languagesSection .language-entry .remove-entry {
+  position: static !important;
+  margin-left: 4px !important;
+
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  font-size: 14px !important;
+  color: #9ca3af !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+/* === Botones ADD unificados tipo ghost suave (tu estilo) === */
+#resume #addWorkExperienceBtn,
+#resume #addEducationBtn,
+#resume #addToolBtn,
+#resume #addLanguageBtn {
+  margin-top: 10px !important;
+  padding: 8px 14px !important;
+  border-radius: 999px !important;
+  border: 1px dashed #cbd5f5 !important;
+  background: transparent !important;
+  font-size: 13px !important;
+  color: #4f46e5 !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+/* hover morado pastel */
+#resume #addWorkExperienceBtn:hover,
+#resume #addEducationBtn:hover,
+#resume #addToolBtn:hover,
+#resume #addLanguageBtn:hover {
+  background: #eef2ff !important;
+}
+
+/* anular el "+" que agregamos antes */
+#resume #addWorkExperienceBtn::before,
+#resume #addEducationBtn::before,
+#resume #addToolBtn::before,
+#resume #addLanguageBtn::before {
+  content: "" !important;
+}
+
+/* =======================================================
+   ALIGN + ESTILO: Clear / Current / Basurero
+   (Work Experience + Education)
+   ======================================================= */
+
+/* ---------- CLEAR: hacerlos link-pill pequeños ---------- */
+/* cualquier botón dentro de una tarjeta, excepto el basurero y los Add */
+#resume #workExperienceSection .cv-card-entry button:not(.remove-entry),
+#resume #educationSection      .cv-card-entry button:not(.remove-entry) {
+  background: transparent !important;
+  border: none !important;
+  color: #6366f1 !important;          /* morado tipo Clear/link */
+  padding: 4px 10px !important;
+  margin-top: 6px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#resume #workExperienceSection .cv-card-entry button:not(.remove-entry):hover,
+#resume #educationSection      .cv-card-entry button:not(.remove-entry):hover {
+  background: #eef2ff !important;     /* morado pastel */
+  color: #4f46e5 !important;
+}
+
+
+/* ============================
+   Work Experience & Education en 2 columnas tipo cards
+   ============================ */
+
+/* El contenedor pasa a ser fila con wrap */
+#resume #workExperienceSection #workExperienceList,
+#resume #educationSection      #educationList {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 24px !important;
+  align-items: flex-start !important;
+}
+
+/* Cada tarjeta ocupa media fila en desktop */
+#resume #workExperienceSection #workExperienceList .cv-card-entry,
+#resume #educationSection      #educationList .cv-card-entry {
+  flex: 1 1 380px !important;                 /* base ~380px */
+  max-width: calc(50% - 12px) !important;     /* 2 columnas */
+  box-sizing: border-box !important;
+}
+
+/* Responsive: en pantallas chicas se apilan de nuevo en 1 columna */
+@media (max-width: 960px) {
+  #resume #workExperienceSection #workExperienceList .cv-card-entry,
+  #resume #educationSection      #educationList .cv-card-entry {
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+}
+
+
+
+
+/* Permitir que los títulos largos hagan wrap o se expandan correctamente */
+html body #resume #workExperienceSection .cv-card-entry input.work-title,
+html body #resume #educationSection      .cv-card-entry input.edu-title {
+  white-space: normal !important;   /* permite salto de línea */
+  word-break: break-word !important; /* corta palabras si es necesario */
+  overflow-wrap: break-word !important;
+  width: 100% !important;
+}
+
+/* 2) Títulos largos: permitir salto de línea y que no se corten */
+#resume #workExperienceSection .cv-card-entry input.work-title,
+#resume #educationSection      .cv-card-entry input.edu-title {
+  white-space: normal !important;      /* permite varias líneas */
+  word-break: break-word !important;   /* corta palabras si son muy largas */
+  overflow-wrap: break-word !important;
+  width: 100% !important;
+}
+
+/* ==== FORCE: toggle "Current" pegado a la izquierda ==== */
+#resume .cv-card-entry .cv-switch,
+#resume .cv-card-entry label:has(.work-current),
+#resume .cv-card-entry label:has(.edu-current) {
+  grid-column: 1 / -1 !important;   /* ocupa toda la fila pero anclado a la izquierda */
+  justify-self: flex-start !important;
+  text-align: left !important;
+
+  display: inline-flex !important;  /* que no se estire al ancho completo */
+  align-items: center !important;
+  width: auto !important;
+
+  margin-top: 8px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;    /* truco para que se pegue a la izquierda en flex */
+}
+
+.cv-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.cv-buttons .pill {
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid #c7d2fe;
+  transition: all 0.2s ease;
+}
+
+.cv-buttons .pill:hover {
+  background: #c7d2fe;
+  color: #1e1b4b;
+}
+
+#equipments-card .pill-link {
+  background: none;
+  border: none;
+  color: #6C38FF;
+  font-weight: 600;
+  position: relative;
+  padding-bottom: 2px;
+  margin-left: 65px;
+
+}
+#equipments-card .pill-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0%;
+  background: #6C38FF;
+  transition: width 0.3s ease;
+}
+#equipments-card .pill-link:hover::after {
+  width: 100%;
+}
+
+
+
+
+
+/* === Nueva fila de botones (bajo el menú de tabs) === */
+.header-buttons-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 24px 0 24px; /* separación del menú y del contenido */
+}
+
+/* Reutiliza el estilo morado, pero ya no fijo */
+#client-version-btn,
+#ai-action-button {
+  position: static;
+  background-color: #003BFF;
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 15px;
+  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+#client-version-btn:hover,
+#ai-action-button:hover {
+  background-color: #003BFF;
+  transform: scale(1.05);
+}
+
+/* ===== Mantener el menú fijo al hacer scroll ===== */
+.header-row {
+  position: sticky;
+  top: 0;                   /* se queda pegado al borde superior */
+  z-index: 100;             /* por encima del contenido */
+  background: #f9fafc;      /* color de fondo (ajústalo al tuyo) */
+  padding: 16px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+/* Evita que el contenido se esconda detrás */
+.main-content {
+  scroll-padding-top: 100px; /* agrega margen virtual para los anchors */
+}
+

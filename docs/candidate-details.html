@@ -10,7 +10,7 @@
   <title>Candidate Details</title>
 
   <!-- Fonts & Styles -->
-  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/css/candidate-details.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
@@ -18,18 +18,18 @@
 
 <body>
   <!-- ===== Back / Navigation ===== -->
-  <button id="goBackButton" class="go-back-button" aria-label="Go back">
+  <!-- <button id="goBackButton" class="go-back-button" aria-label="Go back">
     <span class="arrow">←</span>
     <span class="text">Go Back</span>
-  </button>
+  </button> -->
 
   <div class="main-content">
     <!-- ===== AI Action Pill (floating opener) ===== -->
     <!-- Shown/hidden by JS (class .hidden). Keep IDs for JS hooks. -->
-    <div id="ai-action-button" class="pill hidden">
+    <!-- <div id="ai-action-button" class="pill hidden">
       <span style="font-size: 20px; margin-right: 8px;">✨</span>
       <span>AI Assistant</span>
-    </div>
+    </div> -->
 
     <!-- ===== AI Popup (Fullscreen modal) ===== -->
     <!-- Kept IDs for JS to wire open/close & actions -->
@@ -71,147 +71,200 @@
     </div>
 
     <!-- ===== Tabs (Overview / Resume / Opportunities / Hire) ===== -->
-    <div class="tabs" role="tablist" aria-label="Candidate sections">
+    <!-- <div class="tabs" role="tablist" aria-label="Candidate sections">
       <button class="tab active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
       <button class="tab" data-tab="resume" role="tab" aria-controls="resume">Resume</button>
       <button class="tab" data-tab="opportunities" role="tab" aria-controls="opportunities">Opportunities</button>
       <button class="tab" data-tab="hire" role="tab" aria-controls="hire">Hire</button>
+    </div> -->
+
+    <div class="header-row">
+      <button id="goBackButton" class="go-back-button" aria-label="Go back">
+        <span class="arrow">←</span>
+        <span class="text">Go Back</span>
+      </button>
+
+      <div class="tabs" role="tablist" aria-label="Candidate sections">
+        <button class="tab active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
+        <button class="tab" data-tab="resume" role="tab" aria-controls="resume">Resume</button>
+        <button class="tab" data-tab="opportunities" role="tab" aria-controls="opportunities">Opportunities</button>
+        <button class="tab" data-tab="hire" role="tab" aria-controls="hire">Hire</button>
+      </div>
     </div>
+
 
     <!-- ===================== OVERVIEW ===================== -->
     <div id="overview" class="tab-content active" role="tabpanel" aria-labelledby="overview">
-      <div class="grid">
 
         <!-- NAME (contenteditable) -->
         <div class="field">
           <label>
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 12c2.7 0 4.5-1.8 4.5-4.5S14.7 3 12 3 7.5 4.8 7.5 7.5 9.3 12 12 12zm0 1.5c-3 0-9 1.5-9 4.5v1.5h18V18c0-3-6-4.5-9-4.5z"/>
-            </svg>
-            Name
+            <!-- <img src="/docs/assets/img/user.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;"> -->
+        
           </label>
           <div id="field-name" contenteditable="true">—</div>
         </div>
 
-        <!-- COUNTRY (select + flag chip) -->
-        <div class="field">
-          <label style="display:flex; align-items:center; gap:8px;">
-            <!-- NOTE: This SVG is a placeholder in source; leave as-is to avoid breaking hooks -->
-            <svg class="icon" ...></svg>
-            <span>Country</span>
-            <span id="country-flag" class="country-flag"></span>
-          </label>
-          <select id="field-country">
-            <option value="">—</option>
-            <option value="Argentina">Argentina</option>
-            <option value="Bolivia">Bolivia</option>
-            <option value="Brazil">Brazil</option>
-            <option value="Chile">Chile</option>
-            <option value="Colombia">Colombia</option>
-            <option value="Costa Rica">Costa Rica</option>
-            <option value="Cuba">Cuba</option>
-            <option value="Dominican Republic">Dominican Republic</option>
-            <option value="Ecuador">Ecuador</option>
-            <option value="El Salvador">El Salvador</option>
-            <option value="Guatemala">Guatemala</option>
-            <option value="Honduras">Honduras</option>
-            <option value="Mexico">Mexico</option>
-            <option value="Nicaragua">Nicaragua</option>
-            <option value="Panama">Panama</option>
-            <option value="Paraguay">Paraguay</option>
-            <option value="Peru">Peru</option>
-            <option value="Uruguay">Uruguay</option>
-            <option value="Venezuela">Venezuela</option>
-          </select>
+        <div class="overview-layout">
+
+        <div class="grid">
+
+          <!-- COUNTRY (select + flag chip) -->
+          <div class="field">
+            <label style="display:flex; align-items:center; gap:8px;">
+              <!-- NOTE: This SVG is a placeholder in source; leave as-is to avoid breaking hooks -->
+              <img src="/docs/assets/img/earth-location.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+
+              <span>Country</span>
+              <span id="country-flag" class="country-flag"></span>
+            </label>
+            <select id="field-country">
+              <option value="">—</option>
+              <option value="Argentina">Argentina</option>
+              <option value="Bolivia">Bolivia</option>
+              <option value="Brazil">Brazil</option>
+              <option value="Chile">Chile</option>
+              <option value="Colombia">Colombia</option>
+              <option value="Costa Rica">Costa Rica</option>
+              <option value="Cuba">Cuba</option>
+              <option value="Dominican Republic">Dominican Republic</option>
+              <option value="Ecuador">Ecuador</option>
+              <option value="El Salvador">El Salvador</option>
+              <option value="Guatemala">Guatemala</option>
+              <option value="Honduras">Honduras</option>
+              <option value="Mexico">Mexico</option>
+              <option value="Nicaragua">Nicaragua</option>
+              <option value="Panama">Panama</option>
+              <option value="Paraguay">Paraguay</option>
+              <option value="Peru">Peru</option>
+              <option value="Uruguay">Uruguay</option>
+              <option value="Venezuela">Venezuela</option>
+            </select>
+          </div>
+
+          <!-- PHONE (contenteditable) -->
+          <div class="field" id="phone-field">
+            <label style="display:flex; align-items:center; justify-content:space-between;">
+              <span style="display:flex; align-items:center; gap:8px;">
+                <img src="/docs/assets/img/telephone.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+
+                Phone number
+              </span>
+
+              <!-- SIN display:none -->
+              <button id="wa-btn-overview" class="icon-button whatsapp" type="button" title="Open WhatsApp">
+                <img src="/docs/assets/img/whatsapp.png" alt="Phone" style="width:28px; height:28px; object-fit:contain;">
+              </button>
+            </label>
+
+            <div id="field-phone" class="editable-pill" contenteditable="true">—</div>
+          </div>
+
+          <!-- EMAIL (contenteditable) -->
+          <div class="field">
+            <label>
+              <img src="/docs/assets/img/mail.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              Email
+            </label>
+            <div id="field-email" contenteditable="true">—</div>
+          </div>
+
+          <!-- LINKEDIN (editable link + external open button) -->
+          <div class="field">
+            <label style="display:flex; align-items:center; justify-content:space-between;">
+              <img src="/docs/assets/img/linkedin copy.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              <span>LinkedIn</span>
+              <!-- href is set by JS; keep blank but add rel for security when target=_blank -->
+              <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank" rel="noopener noreferrer">
+                <img src="/docs/assets/img/external-link.png" alt="Phone" style="width:18px; height:18px; object-fit:contain;">
+              </a>
+            </label>
+            <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
+          </div>
+
+          <!-- ENGLISH LEVEL (select) -->
+          <div class="field">
+            <label>
+              <img src="/docs/assets/img/language.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              English Level
+            </label>
+            <select id="field-english-level">
+              <option value="">—</option>
+              <option value="Poor">Poor</option>
+              <option value="Regular">Regular</option>
+              <option value="Good">Good</option>
+              <option value="Very Good">Very Good</option>
+              <option value="Excellent">Excellent</option>
+            </select>
+          </div>
+
+          <!-- MIN SALARY (contenteditable) -->
+          <div class="field">
+            <label>
+              <img src="/docs/assets/img/dollar.png" alt="Phone" style="width:17px; height:17px; object-fit:contain;">
+              Min Salary
+            </label>
+            <div id="field-salary-range" contenteditable="true">—</div>
+          </div>
+
+          <!-- CREATED BY / CREATED AT (read-only text) -->
+          <div class="field">
+            <label>
+              <img src="/docs/assets/img/edit.png" alt="Phone" style="width:15px; height:15px; object-fit:contain;">
+              Created by
+            </label>
+            <div id="field-created-by">—</div>
+          </div>
+
+          <div class="field">
+            <label>
+              <img src="/docs/assets/img/calendar.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              Created at
+            </label>
+            <div id="field-created-at">—</div>
+          </div>
+
+
+          <!-- RED FLAGS & COMMENTS (textareas) -->
+          <div class="field-group">
+            <div class="field textarea red-flag">
+              <label for="redFlags">
+                <img src="/docs/assets/img/flag.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
+                Red Flags
+              </label>
+              <textarea id="redFlags" placeholder="No red flags">—</textarea>
+            </div>
+
+            <div class="field textarea comments">
+              <label for="comments">
+                <img src="/docs/assets/img/comment.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
+                Comments
+              </label>
+              <textarea id="comments" placeholder="No comments">—</textarea>
+            </div>
+          </div>
+
+          <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
+          <div class="field textarea">
+            <label>
+              <img src="/docs/assets/img/success.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              Candidate success
+            </label>
+            <div class="rich-toolbar" id="candidate-succes-toolbar">
+              <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
+              <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
+              <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
+            </div>
+            <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
+          </div>
+
+          
+
         </div>
 
-        <!-- PHONE (contenteditable) -->
-        <div class="field" id="phone-field">
-          <label style="display:flex; align-items:center; justify-content:space-between;">
-            <span style="display:flex; align-items:center; gap:8px;">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M22 16.92V21a1 1 0 0 1-1.1 1 19 19 0 0 1-8.3-3.1 19 19 0 0 1-5.6-5.6A19 19 0 0 1 2 3.1 1 1 0 0 1 3 2h4.09a1 1 0 0 1 1 .76c.2.86.53 1.68.96 2.44a1 1 0 0 1-.18 1.12L7.91 8.91a16 16 0 0 0 5.6 5.6l2.6-2.6a1 1 0 0 1 1.12-.18c.76.43 1.58.76 2.44.96a1 1 0 0 1 .76 1V16.92z"/>
-              </svg>
-              Phone number
-            </span>
 
-            <!-- SIN display:none -->
-            <button id="wa-btn-overview" class="icon-button whatsapp" type="button" title="Open WhatsApp">
-              <svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true">
-                <path d="M19.11 17.44c-.27-.14-1.57-.77-1.81-.86-.24-.09-.42-.14-.6.14-.18.27-.69.86-.84 1.03-.16.18-.31.2-.58.07-.27-.14-1.13-.42-2.16-1.34-.8-.71-1.34-1.59-1.5-1.86-.16-.27-.02-.41.12-.55.12-.12.27-.31.4-.47.13-.16.18-.27.27-.45.09-.18.04-.34-.02-.48-.06-.14-.6-1.45-.83-1.98-.22-.53-.44-.45-.6-.45-.16 0-.34-.02-.52-.02s-.48.07-.73.34c-.25.27-.96.94-.96 2.29 0 1.34.98 2.64 1.12 2.82.14.18 1.93 2.95 4.68 4.13.65.28 1.15.45 1.55.58.65.21 1.23.18 1.69.11.52-.08 1.57-.64 1.79-1.26.22-.62.22-1.15.15-1.26-.06-.11-.24-.18-.51-.31z" fill="currentColor"/>
-                <path d="M27.6 4.4C24.8 1.6 21.08 0 17.13 0 8.74 0 1.94 6.8 1.94 15.19c0 2.64.69 5.21 2 7.48L2 32l9.54-1.96c2.2 1.2 4.69 1.84 7.22 1.84h.01c8.39 0 15.19-6.8 15.19-15.19 0-3.95-1.61-7.68-4.36-10.49zM18.78 29.35h-.01c-2.24 0-4.43-.59-6.35-1.7l-.46-.27-5.66 1.17 1.18-5.51-.3-.49c-1.25-2.02-1.91-4.35-1.91-6.77 0-7.02 5.71-12.73 12.73-12.73 3.4 0 6.59 1.32 8.99 3.72 2.4 2.4 3.72 5.59 3.72 8.99 0 7.03-5.72 12.74-12.73 12.74z" fill="currentColor"/>
-              </svg>
-            </button>
-          </label>
-
-          <div id="field-phone" class="editable-pill" contenteditable="true">—</div>
-        </div>
-
-        <!-- EMAIL (contenteditable) -->
-        <div class="field">
-          <label>
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6c0-1.1.9-2 2-2zm8 6 8-5H4l8 5zm0 2-8-5v10h16V7l-8 5z"/>
-            </svg>
-            Email
-          </label>
-          <div id="field-email" contenteditable="true">—</div>
-        </div>
-
-        <!-- LINKEDIN (editable link + external open button) -->
-        <div class="field">
-          <label style="display:flex; align-items:center; justify-content:space-between;">
-            <span>LinkedIn</span>
-            <!-- href is set by JS; keep blank but add rel for security when target=_blank -->
-            <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank" rel="noopener noreferrer">🔗</a>
-          </label>
-          <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
-        </div>
-
-        <!-- ENGLISH LEVEL (select) -->
-        <div class="field">
-          <label>
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20" />
-              <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
-            </svg>
-            English Level
-          </label>
-          <select id="field-english-level">
-            <option value="">—</option>
-            <option value="Poor">Poor</option>
-            <option value="Regular">Regular</option>
-            <option value="Good">Good</option>
-            <option value="Very Good">Very Good</option>
-            <option value="Excellent">Excellent</option>
-          </select>
-        </div>
-
-        <!-- MIN SALARY (contenteditable) -->
-        <div class="field">
-          <label>
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6"/>
-            </svg>
-            Min Salary
-          </label>
-          <div id="field-salary-range" contenteditable="true">—</div>
-        </div>
-
-        <!-- CREATED BY / CREATED AT (read-only text) -->
-        <div class="field">
-          <label>Created by</label>
-          <div id="field-created-by">—</div>
-        </div>
-
-        <div class="field">
-          <label>Created at</label>
-          <div id="field-created-at">—</div>
-        </div>
-
-        <!-- ===== Documents row: CV + Resignation Letter ===== -->
-        <div class="doc-row">
+        <aside class="sidebar">
+          <!-- ===== Documents row: CV + Resignation Letter ===== -->
           <!-- CV / Resume (drag & drop + list) -->
           <div class="field doc-card" id="cv-card">
             <label class="doc-card-label">
@@ -257,74 +310,67 @@
               <div id="resig-list" class="cv-list" style="grid-column: 1 / -1;"></div>
             </div>
           </div>
-        </div>
+        
 
-        <!-- RED FLAGS & COMMENTS (textareas) -->
-        <div class="field-group">
-          <div class="field textarea red-flag">
-            <label for="redFlags">Red Flags</label>
-            <textarea id="redFlags" placeholder="No red flags">—</textarea>
-          </div>
+          <!-- === Resignation Letter & References (full width) === -->
+          <div class="field full doc-check cute" id="resig-ref-block">
+            <div class="doc-check__head">
+              <span class="doc-check__emoji">📎✨</span>
+              <div class="doc-check__titlewrap">
+                <span class="doc-check__title">Resignation letter & references</span>
+              </div>
+            </div>
 
-          <div class="field textarea comments">
-            <label for="comments">Comments</label>
-            <textarea id="comments" placeholder="No comments">—</textarea>
-          </div>
-        </div>
-        <!-- === Resignation Letter & References (full width) === -->
-        <div class="field full doc-check cute" id="resig-ref-block">
-          <div class="doc-check__head">
-            <span class="doc-check__emoji">📎✨</span>
-            <div class="doc-check__titlewrap">
-              <span class="doc-check__title">Resignation letter & references</span>
+            <div class="check-row">
+              <label class="pretty-check">
+                <input type="checkbox" id="resig-ref-check" />
+                <span class="box" aria-hidden="true"></span>
+                <span class="txt">
+                  All set! I requested and uploaded both items.
+                </span>
+              </label>
             </div>
           </div>
 
-          <div class="check-row">
-            <label class="pretty-check">
-              <input type="checkbox" id="resig-ref-check" />
-              <span class="box" aria-hidden="true"></span>
-              <span class="txt">
-                All set! I requested and uploaded both items.
-              </span>
-            </label>
+          <!-- Toast contenedor (si no tienes ya uno global) -->
+          <div id="cuteToast" class="cute-toast" role="status" aria-live="polite"></div>
+
+          <div class="field" id="equipments-card">
+            <!-- EQUIPMENTS (chips + external details link) -->
+            <div class="field">
+              <label style="display:flex; align-items:center; justify-content:space-between;">
+                <span>
+                  Equipments
+                  <a id="equipments-details-link" class="pill pill-link" href="#" target="_blank" rel="noopener">Details →</a>                
+                </span>
+                
+              </label>
+              <div id="equipments-chips" class="chips-row">—</div>
+            </div>
           </div>
-        </div>
-
-        <!-- Toast contenedor (si no tienes ya uno global) -->
-        <div id="cuteToast" class="cute-toast" role="status" aria-live="polite"></div>
-
-        <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
-        <div class="field textarea">
-          <label>Candidate success</label>
-          <div class="rich-toolbar" id="candidate-succes-toolbar">
-            <button type="button" data-target="candidate-succes" data-command="bold"><b>B</b></button>
-            <button type="button" data-target="candidate-succes" data-command="italic"><i>I</i></button>
-            <button type="button" data-target="candidate-succes" data-command="insertUnorderedList">• List</button>
-          </div>
-          <div id="candidate-succes" class="rich-input" contenteditable="true" placeholder="Write success highlights, achievements, notes..."></div>
-        </div>
-
-        <!-- EQUIPMENTS (chips + external details link) -->
-        <div class="field">
-          <label style="display:flex; align-items:center; justify-content:space-between;">
-            <span>Equipments</span>
-            <a id="equipments-details-link" class="pill pill-link" href="#" target="_blank" rel="noopener">Details →</a>
-          </label>
-          <div id="equipments-chips" class="chips-row">—</div>
-        </div>
-
+        </aside>
       </div>
     </div>
 
     <!-- ===================== RESUME ===================== -->
+     <div class="header-buttons-row">
+      <a id="client-version-btn" class="pill" target="_blank" rel="noopener">
+        📄 Client Version
+      </a>
+
+      <button id="ai-action-button" class="pill" type="button">
+        ✨ AI Assistant
+      </button>
+    </div>
     <div id="resume" class="tab-content" role="tabpanel" aria-labelledby="resume">
       <div class="cv-container">
         <!-- About -->
         <section class="cv-section">
           <div class="cv-heading-wrapper">
-            <h2 class="cv-heading">About</h2>
-            <button class="star-button" id="about-star-button" data-target="popup-about" title="Add comment">⭐</button>
+            <h2 class="cv-heading" data-icon="🧠">About</h2>
+            <button class="star-button" id="about-star-button" data-target="popup-about" title="Add comment">
+              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+            </button>
           </div>
           <div class="cv-card">
             <p id="aboutField">Click here to edit your About section.</p>
@@ -334,8 +380,10 @@
         <!-- Work Experience -->
         <section class="cv-section" id="workExperienceSection">
           <div class="cv-heading-wrapper">
-            <h2 class="cv-heading">Work Experience</h2>
-            <button class="star-button" data-target="popup-work" title="Add comment">✨</button>
+            <h2 class="cv-heading" data-icon="💼">Work Experience</h2>
+            <button class="star-button" data-target="popup-work" title="Add comment">
+              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+            </button>
           </div>
           <div id="workExperienceList"></div>
           <button id="addWorkExperienceBtn">Add Work Experience</button>
@@ -344,8 +392,10 @@
         <!-- Education -->
         <section class="cv-section" id="educationSection">
           <div class="cv-heading-wrapper">
-            <h2 class="cv-heading">Education</h2>
-            <button class="star-button" data-target="popup-education" title="Add comment">✨</button>
+            <h2 class="cv-heading" data-icon="🎓">Education</h2>
+            <button class="star-button" data-target="popup-education" title="Add comment">
+              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+            </button>
           </div>
           <div id="educationList"></div>
           <button id="addEducationBtn">Add Education</button>
@@ -354,8 +404,10 @@
         <!-- Tools -->
         <section class="cv-section" id="toolsSection">
           <div class="cv-heading-wrapper">
-            <h2 class="cv-heading">Tools</h2>
-            <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+            <h2 class="cv-heading" data-icon="🛠️">Tools</h2>
+            <button class="star-button" data-target="popup-about" title="Add comment">
+              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+            </button>
           </div>
           <div class="cv-card" id="toolsList"></div>
           <button id="addToolBtn">Add Tool</button>
@@ -364,8 +416,10 @@
         <!-- Languages -->
         <section class="cv-section" id="languagesSection">
           <div class="cv-heading-wrapper">
-            <h2 class="cv-heading">Languages</h2>
-            <button class="star-button" data-target="popup-about" title="Add comment">✨</button>
+            <h2 class="cv-heading" data-icon="🌐">Languages</h2>
+            <button class="star-button" data-target="popup-about" title="Add comment">
+              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+            </button>
           </div>
           <div class="cv-card" id="languagesList"></div>
           <button id="addLanguageBtn">Add Language</button>
@@ -373,7 +427,7 @@
 
         <!-- Video Link (rich toolbar + contenteditable) -->
         <section class="cv-section">
-          <h2 class="cv-heading">Video Link</h2>
+          <h2 class="cv-heading" data-icon="📹">Video Link</h2>
           <div class="cv-card">
             <div class="rich-toolbar" id="video-toolbar">
               <button type="button" data-target="videoLinkInput" data-command="bold"><b>B</b></button>
@@ -387,7 +441,7 @@
     </div>
 
     <!-- Client Read-only view (URL updated by JS) -->
-    <a id="client-version-btn" class="pill hidden" target="_blank" rel="noopener" href="resume-readonly.html?id=123">📄 Client Version</a>
+    <!-- <a id="client-version-btn" class="pill hidden" target="_blank" rel="noopener" href="resume-readonly.html?id=123">📄 Client Version</a> -->
 
     <!-- ===================== OPPORTUNITIES ===================== -->
     <div id="opportunities" class="tab-content" role="tabpanel" aria-labelledby="opportunities">
@@ -536,7 +590,7 @@
           <div id="salary-updates-box" class="cv-card">
             <!-- Fetched salary updates will appear here -->
           </div>
-          <button id="add-salary-update">➕ New Update</button>
+          <button id="add-salary-update">New Update</button>
         </section>
 
         <!-- Salary Update Popup -->

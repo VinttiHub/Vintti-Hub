@@ -54,6 +54,9 @@ cleanInlineStyles(aboutP);
 // 💼 Work Experience
 // 💼 Work Experience (LinkedIn-like multi-roles)
 const workExperienceList = document.getElementById("workExperienceList");
+
+workExperienceList.classList.add("timeline");
+
 let workExperience = [];
 try {
   workExperience = JSON.parse(data.work_experience || "[]");
@@ -119,25 +122,55 @@ function extractMultiRoles(exp) {
 function renderExperienceEntry(exp) {
   const roles = extractMultiRoles(exp);
 
-  // Caso normal (sin multi-roles o 1 rol)
+  // ---------- CASO SIMPLE: 0 o 1 rol ----------
   if (!roles || roles.length <= 1) {
-    const entry = document.createElement("div");
-    entry.className = "resume-entry";
     const startDate = formatDate(exp.start_date);
     const endDate = exp.current ? "Present" : formatDate(exp.end_date);
-    entry.innerHTML = `
-      <strong>${exp.company || "—"}</strong><br/>
-      <span>${exp.title || "—"} (${startDate} – ${endDate})</span><br/>
-      <div class="resume-description">${cleanHTML(exp.description || "")}</div>
-    `;
+    const locationText = exp.location || exp.country || "";
+
+    const entry = document.createElement("div");
+    entry.className = "cv-entry";
+
+    const left = document.createElement("div");
+    left.className = "cv-entry-left";
+
+    const dateDiv = document.createElement("div");
+    dateDiv.className = "cv-entry-date";
+    dateDiv.textContent = `${startDate} – ${endDate}`;
+    left.appendChild(dateDiv);
+
+    if (locationText) {
+      const locDiv = document.createElement("div");
+      locDiv.className = "cv-entry-location";
+      locDiv.textContent = locationText;
+      left.appendChild(locDiv);
+    }
+
+    const right = document.createElement("div");
+    right.className = "cv-entry-right";
+
+    const roleDiv = document.createElement("div");
+    roleDiv.className = "cv-entry-role";
+    roleDiv.textContent = exp.title || "—";
+
+    const companyDiv = document.createElement("div");
+    companyDiv.className = "cv-entry-company";
+    companyDiv.textContent = exp.company || "—";
+
+    const summaryDiv = document.createElement("div");
+    summaryDiv.className = "cv-entry-summary resume-description";
+    summaryDiv.innerHTML = cleanHTML(exp.description || "");
+
+    right.appendChild(roleDiv);
+    right.appendChild(companyDiv);
+    right.appendChild(summaryDiv);
+
+    entry.appendChild(left);
+    entry.appendChild(right);
     return entry;
   }
 
-  // Caso multi-roles (LinkedIn-like)
-  const container = document.createElement("div");
-  container.className = "resume-entry multi-company";
-
-  // Rango global de la empresa
+  // ---------- CASO MULTI-ROLES (misma empresa, varios cargos) ----------
   const hasCurrent = roles.some((r) => r.current);
   const overallStart = roles.reduce((min, r) => {
     const d = safeDate(r.start_date);
@@ -150,35 +183,72 @@ function renderExperienceEntry(exp) {
         return (!max || (d && d > max)) ? d : max;
       }, null);
 
-  const headerHTML = `
-    <div class="multi-header">
-      <div>
-        <div class="company-name">${exp.company || "—"}</div>
-        <div class="company-range">
-          ${formatDateFromDateObj(overallStart)} – ${overallEnd ? formatDateFromDateObj(overallEnd) : "Present"} · ${roles.length} roles
-        </div>
-      </div>
-    </div>
-  `;
+  const entry = document.createElement("div");
+  entry.className = "cv-entry multi-company";
 
-  const rolesHTML = roles
-    .map((r) => {
-      const sd = formatDate(r.start_date);
-      const ed = r.current ? "Present" : formatDate(r.end_date);
-      const desc = r.description_html ? `<div class="multi-desc">${cleanHTML(r.description_html)}</div>` : "";
-      return `
-        <div class="multi-role ${r.current ? "current" : ""}">
-          <div class="multi-title">${r.title || "—"}</div>
-          <div class="multi-dates">${sd} – ${ed}</div>
-          ${desc}
-        </div>
-      `;
-    })
-    .join("");
+  const left = document.createElement("div");
+  left.className = "cv-entry-left";
 
-  container.innerHTML = headerHTML + `<div class="multi-timeline">${rolesHTML}</div>`;
-  return container;
+  const dateDiv = document.createElement("div");
+  dateDiv.className = "cv-entry-date";
+  dateDiv.textContent = `${formatDateFromDateObj(overallStart)} – ${
+    overallEnd ? formatDateFromDateObj(overallEnd) : "Present"
+  }`;
+  left.appendChild(dateDiv);
+
+  const locationText = exp.location || exp.country || "";
+  if (locationText) {
+    const locDiv = document.createElement("div");
+    locDiv.className = "cv-entry-location";
+    locDiv.textContent = locationText;
+    left.appendChild(locDiv);
+  }
+
+  const right = document.createElement("div");
+  right.className = "cv-entry-right";
+
+  const companyDiv = document.createElement("div");
+  companyDiv.className = "cv-entry-company";
+  companyDiv.textContent = exp.company || "—";
+  right.appendChild(companyDiv);
+
+  const rolesContainer = document.createElement("div");
+  rolesContainer.className = "multi-timeline";
+
+  roles.forEach((r) => {
+    const roleBlock = document.createElement("div");
+    roleBlock.className = "multi-role";
+
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "cv-entry-role";
+    titleDiv.textContent = r.title || "—";
+
+    const datesDiv = document.createElement("div");
+    datesDiv.className = "multi-dates";
+    const sd = formatDate(r.start_date);
+    const ed = r.current ? "Present" : formatDate(r.end_date);
+    datesDiv.textContent = `${sd} – ${ed}`;
+
+    roleBlock.appendChild(titleDiv);
+    roleBlock.appendChild(datesDiv);
+
+    if (r.description_html) {
+      const descDiv = document.createElement("div");
+      descDiv.className = "multi-desc";
+      descDiv.innerHTML = cleanHTML(r.description_html);
+      roleBlock.appendChild(descDiv);
+    }
+
+    rolesContainer.appendChild(roleBlock);
+  });
+
+  right.appendChild(rolesContainer);
+  entry.appendChild(left);
+  entry.appendChild(right);
+
+  return entry;
 }
+
 
 /* Pintamos la experiencia (orden existente por fin de contrato) */
 sortByEndDateDescending(workExperience).forEach((exp) => {
@@ -187,66 +257,90 @@ sortByEndDateDescending(workExperience).forEach((exp) => {
 
 // 🎓 Education
 const educationList = document.getElementById("educationList");
-let education = [];
-try {
-  education = JSON.parse(data.education || "[]");
-} catch (e) {
-  console.error("❌ Error parsing education:", e);
-}
-if (education.length === 0) {
-  document.getElementById("educationSection").style.display = "none";
-} else {
-  sortByEndDateDescending(education).forEach((edu) => {
-    const entry = document.createElement("div");
-    entry.className = "resume-entry";
+
+  educationList.classList.add("timeline");
+
+  let education = [];
+  try {
+    education = JSON.parse(data.education || "[]");
+  } catch (e) {
+    console.error("❌ Error parsing education:", e);
+  }
+  if (education.length === 0) {
+    document.getElementById("educationSection").style.display = "none";
+  } else {
+    sortByEndDateDescending(education).forEach((edu) => {
     const startDate = formatDate(edu.start_date);
     const endDate = edu.current ? "Present" : formatDate(edu.end_date);
-    // 🎓 Education
-    const countryHtml = (edu.country && edu.country.trim())
-      ? `<div class="edu-country">${getFlagEmoji(edu.country)} ${edu.country}</div>`
-      : '';
 
-    entry.innerHTML = `
-      <div class="edu-header">
-        <strong>${edu.institution || "—"}</strong>
-      </div>
-      <div class="edu-subheader">
-        <span class="edu-title">${edu.title || "—"}</span>
-        <span class="edu-dates">${startDate} – ${endDate}</span>
-      </div>
-      ${countryHtml}
-      ${edu.description ? `<div class="resume-description">${edu.description}</div>` : ""}
-    `;
+    const entry = document.createElement("div");
+    entry.className = "cv-entry";
 
+    const left = document.createElement("div");
+    left.className = "cv-entry-left";
 
+    const dateDiv = document.createElement("div");
+    dateDiv.className = "cv-entry-date";
+    dateDiv.textContent = `${startDate} – ${endDate}`;
+    left.appendChild(dateDiv);
 
+    if (edu.country && edu.country.trim()) {
+      const locDiv = document.createElement("div");
+      locDiv.className = "cv-entry-location";
+      locDiv.textContent = `${getFlagEmoji(edu.country)} ${edu.country}`.trim();
+      left.appendChild(locDiv);
+    }
+
+    const right = document.createElement("div");
+    right.className = "cv-entry-right";
+
+    const titleDiv = document.createElement("div");
+    titleDiv.className = "cv-entry-role";
+    titleDiv.textContent = edu.title || "—";
+
+    const instDiv = document.createElement("div");
+    instDiv.className = "cv-entry-company";
+    instDiv.textContent = edu.institution || "—";
+
+    right.appendChild(titleDiv);
+    right.appendChild(instDiv);
+
+    if (edu.description) {
+      const descDiv = document.createElement("div");
+      descDiv.className = "cv-entry-summary resume-description";
+      descDiv.innerHTML = cleanHTML(edu.description);
+      right.appendChild(descDiv);
+    }
+
+    entry.appendChild(left);
+    entry.appendChild(right);
     educationList.appendChild(entry);
-    // ⬇️ Mostrar países de Education bajo el título
-(() => {
-  const el = document.getElementById("educationCountry");
-  if (!el) return;
 
-  // ordena por más reciente y arma lista única de países (más reciente primero)
-  const ordered = sortByEndDateDescending([...(education || [])])
-    .map(e => (e.country || '').trim())
-    .filter(Boolean);
-
-  const seen = new Set();
-  const unique = ordered.filter(c => !seen.has(c) && seen.add(c));
-
-  if (unique.length) {
-    const pretty = unique
-      .map(c => `${getFlagEmoji(c)} ${c}`.trim())
-      .join(' · ');
-    el.textContent = `Education: ${pretty}`;
-    el.style.display = '';
-  } else {
-    el.style.display = 'none';
-  }
-})();
-
-  });
+});
 }
+
+function createDots(level, mapping, maxDots) {
+  const count = mapping[level] || 0;
+  let html = "";
+  for (let i = 1; i <= maxDots; i++) {
+    html += `<span class="level-dot ${i <= count ? "filled" : ""}"></span>`;
+  }
+  return html;
+}
+
+const TOOL_LEVEL_MAP = {
+  Basic: 1,
+  Intermediate: 2,
+  Advanced: 3,
+};
+
+const LANGUAGE_LEVEL_MAP = {
+  Basic: 1,
+  Regular: 2,
+  Fluent: 3,
+  Native: 4,
+};
+
 
 // 🛠️ Tools
 const toolsList = document.getElementById("toolsList");
@@ -256,21 +350,30 @@ try {
 } catch (e) {
   console.error("❌ Error parsing tools:", e);
 }
+
 if (tools.length === 0) {
   document.getElementById("toolsSection").style.display = "none";
 } else {
+  toolsList.innerHTML = "";
   tools.forEach((tool) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "tool-pill";
+    const row = document.createElement("div");
+    row.className = "skill-row";
+
     const name = typeof tool === "object" ? tool.tool : tool;
     const level = typeof tool === "object" && tool.level ? tool.level : "";
-    wrapper.innerHTML = `
-      <div class="tool-name">${name}</div>
-      <div class="tool-level">${level}</div>
+
+    row.innerHTML = `
+      <div class="skill-name">${name}</div>
+      <div class="skill-level">${level}</div>
+      <div class="skill-dots">
+        ${createDots(level, TOOL_LEVEL_MAP, 3)}
+      </div>
     `;
-    toolsList.appendChild(wrapper);
+
+    toolsList.appendChild(row);
   });
 }
+
 // 🌐 Languages
 const languagesList = document.getElementById("languagesList");
 let languages = [];
@@ -283,21 +386,30 @@ try {
 if (languages.length === 0) {
   document.getElementById("languagesSection").style.display = "none";
 } else {
+  languagesList.innerHTML = "";
   languages.forEach((lang) => {
-    const wrapper = document.createElement("div");
-    wrapper.className = "tool-pill";
-    wrapper.innerHTML = `
-      <div class="tool-name">${lang.language || '—'}</div>
-      <div class="tool-level">${lang.level || ''}</div>
+    const row = document.createElement("div");
+    row.className = "skill-row";
+
+    const name = lang.language || "—";
+    const level = lang.level || "";
+
+    row.innerHTML = `
+      <div class="skill-name">${name}</div>
+      <div class="skill-level">${level}</div>
+      <div class="skill-dots">
+        ${createDots(level, LANGUAGE_LEVEL_MAP, 4)}
+      </div>
     `;
-    languagesList.appendChild(wrapper);
+
+    languagesList.appendChild(row);
   });
 }
 
-    // 📹 Video Link
-    const videoDiv = document.getElementById("readonly-video-link");
-    if (data.video_link && data.video_link.trim() !== "") {
-      const link = document.createElement("a");
+// 📹 Video Link
+const videoDiv = document.getElementById("readonly-video-link");
+if (data.video_link && data.video_link.trim() !== "") {
+  const link = document.createElement("a");
       link.href = data.video_link;
       link.target = "_blank";
       link.textContent = data.video_link;
