@@ -586,7 +586,10 @@ def create_time_off():
         html_parts.append(f"<li><strong>Note:</strong> {reason}</li>")
     html_parts.append("</ul>")
     html_parts.append(
-        "<p>Please go to the <a href='https://vintti-hub.com' style='color:#2563eb;text-decoration:none;font-weight:500;'>Vacations page</a> to approve or reject this request.</p>"
+        "<p>Please go to the "
+        "<a href='https://vinttihub.vintti.com' target='_blank' rel='noopener' "
+        "style='color:#2563eb;text-decoration:none;font-weight:500;'>Vacations page</a> "
+        "to approve or reject this request.</p>"
     )
     html_parts.append("<p>Have a great day ☀️<br>— The Vintti HUB Team</p>")
     html = "\n".join(html_parts)
@@ -613,12 +616,6 @@ def create_time_off():
         )
         sg = SendGridAPIClient(api_key)
         sg.send(msg)
-
-        # If you prefer calling your /send_email route instead:
-        # import requests as _rq
-        # _rq.post(request.url_root.rstrip('/') + '/send_email', json={
-        #   "to": to_list, "subject": subj, "body": html
-        # }, timeout=10)
     except Exception as e:
         # We keep the request but report the email error
         logging.exception("time_off email failed")
