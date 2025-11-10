@@ -155,15 +155,21 @@ def search_candidates():
 
             # Muestra 1 ejemplo real de tools en la DB
             cur.execute("""
-                SELECT c.candidate_id,
-                    array_agg(lower(t.elem->>'tool')) AS tools_lc
-                FROM candidates c
-                JOIN resume r ON r.candidate_id = c.candidate_id
-                CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem)
-                WHERE t.elem ? 'tool'
-                GROUP BY c.candidate_id
-                ORDER BY c.candidate_id
-                LIMIT 1
+            SELECT c.candidate_id,
+                array_agg(lower(t.elem->>'tool')) AS tools_lc
+            FROM candidates c
+            JOIN resume r ON r.candidate_id = c.candidate_id
+            CROSS JOIN LATERAL jsonb_array_elements(
+            CASE
+                WHEN r.tools IS NULL OR trim(r.tools) = '' THEN '[]'::jsonb
+                WHEN r.tools ~ '^\s*\[.*\]\s*$' THEN r.tools::jsonb
+                ELSE '[]'::jsonb
+            END
+            ) AS t(elem)
+            WHERE t.elem ? 'tool'
+            GROUP BY c.candidate_id
+            ORDER BY c.candidate_id
+            LIMIT 1;
             """)
             logging.info("🔎 sample tools from DB: %r", cur.fetchone())
         except Exception:
@@ -227,9 +233,10 @@ def coresignal_search():
         # ⚠️ si el usuario no puso años, no agregamos filtro temporal
         if years:
             try:
-                years = int(years)
-                cutoff = dt.date.today().replace(year=dt.date.today().year - years)
-                filt["experience_date_from"] = cutoff.isoformat()
+                y = int(years)
+                cutoff_year = dt.date.today().year - y
+                # Coresignal acepta "%Y" o "%B %Y". Mandemos solo el año: "2022"
+                filt["experience_date_from"] = str(cutoff_year)
             except Exception:
                 logging.exception("⚠️ years_experience inválido, ignorando filtro")
 
