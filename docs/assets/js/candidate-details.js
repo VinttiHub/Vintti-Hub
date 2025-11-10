@@ -1725,13 +1725,13 @@ function render(items = []) {
     BIND(delBtn, 'click', async (e) => {
       const key = e.currentTarget.getAttribute('data-key');
       if (!key) return;
-      if (!confirm('Delete this resignation letter?')) return;
-      await fetch(`${apiBase}/candidates/${cid}/resignations`, {
+      if (!confirm('Delete this CV?')) return;
+      await fetch(`${apiBase}/candidates/${cid}/cvs`, {
         method: 'DELETE',
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key })
       });
-      await loadResignations();
+      await loadCVs(); // 👈 recarga la lista de CVs (no resignations)
     });
     list.appendChild(row);
   });
@@ -1749,9 +1749,24 @@ function render(items = []) {
   }
   window.loadCVs = loadCVs;
 
-  async function uploadFile(file) {
-    if (inFlight) return;        // ⛔️ evita doble POST simultáneo
-    inFlight = true;
+    async function uploadFile(file) {
+      if (!file) return;
+
+      // 🔒 De-dupe: si es exactamente el mismo archivo en < 3s, ignorar
+      const sig = [file.name, file.size, file.lastModified].join(':');
+      const now = Date.now();
+      if (sig === lastUploadSig && (now - lastUploadTs) < 3000) {
+        console.debug('⛔️ Ignorado: intento duplicado de upload', sig);
+        return;
+      }
+      lastUploadSig = sig;
+      lastUploadTs  = now;
+
+      if (inFlight) {
+        console.debug('⛔️ Ignorado: upload en curso');
+        return;
+      }
+      inFlight = true;
 
     const allowedMimes = new Set([
       'application/pdf','image/png','image/jpeg','image/webp','application/octet-stream',''
@@ -1774,8 +1789,7 @@ function render(items = []) {
     } finally {
       drop?.classList.remove('dragover');
       if (input) input.value = '';
-      // 👇 pequeño debounce para impedir doble disparo por wiring cruzado
-      setTimeout(() => { inFlight = false; }, 200);
+      setTimeout(() => { inFlight = false; }, 600); // antes estaba en 200ms
     }
   }
 
@@ -1825,6 +1839,8 @@ function render(items = []) {
   if (!cid || !list) return;
 
   let inFlight = false;
+  let lastUploadSig = null;     // firma (nombre+tamaño+mtime) del último archivo
+  let lastUploadTs  = 0;        // timestamp del último intento (ms)
   const BIND = (el, type, fn) => {
     if (!el) return;
     el.__wired = el.__wired || {};
@@ -1835,6 +1851,16 @@ function render(items = []) {
   };
 
   function render(items = []) {
+    // De-dupe por key (o por nombre si no hay key)
+    const seen = new Set();
+    items = (items || []).filter(it => {
+      const k = it?.key || `name:${it?.name}`;
+      if (!k) return false;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
     list.innerHTML = '';
     if (!items.length) {
       list.innerHTML = `<div class="cv-item"><span class="cv-name" style="opacity:.65">No files yet</span></div>`;
