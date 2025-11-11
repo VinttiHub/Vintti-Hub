@@ -36,23 +36,24 @@ def parse_candidate_query():
 
     try:
         data = request.get_json(force=True) or {}
-        query = (data.get("query") or "").strip()
+        query = (data.get("query") or "").trim()
         logging.info("🧠 [/ai/parse_candidate_query] query_in=%r", query)
 
         if not query:
-            resp = jsonify({"title":"", "tools":[], "years_experience": None})
+            resp = jsonify({"title":"", "tools":[], "years_experience": None, "location": ""})
             return _ok_origin(resp), 200
 
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         prompt = f"""
 Read the following natural language query describing a candidate.
 Extract a STRICT JSON with:
-- title: the role/job title in English (short, lowercase words, no punctuation). If absent, return "".
+- title: role/job title in English (short, lowercase words, no punctuation). If absent, return "".
 - tools: array of tool/technology names in English, lowercase (e.g., ["python","excel","react"]). Only explicit tools; do NOT invent; singularize if possible.
 - years_experience: integer years if explicitly stated (e.g., "3 years"), else null.
+- location: city/region/country if explicitly present (e.g., "Mexico", "Mexico City", "CDMX", "Guadalajara", "Latin America"). If absent, return "".
 
 Rules:
-- Only parse what's explicitly present in the query.
+- Only parse what's explicitly present in the query (do NOT infer).
 - Output minified JSON. No markdown, no commentary.
 
 QUERY:
@@ -76,7 +77,7 @@ QUERY:
             obj = json.loads(cleaned)
         except Exception:
             logging.exception("⚠️ JSON parse error on model output")
-            obj = {"title":"", "tools":[], "years_experience": None}
+            obj = {"title":"", "tools":[], "years_experience": None, "location": ""}
 
         # normalizar
         title = (obj.get("title") or "").strip()
@@ -86,15 +87,16 @@ QUERY:
             years = int(years) if years is not None else None
         except:
             years = None
+        location = (obj.get("location") or "").strip()
 
-        logging.info("🧠 normalized → title=%r tools=%r years=%r", title, tools, years)
+        logging.info("🧠 normalized → title=%r tools=%r years=%r location=%r", title, tools, years, location)
 
-        resp = jsonify({"title": title, "tools": tools, "years_experience": years})
+        resp = jsonify({"title": title, "tools": tools, "years_experience": years, "location": location})
         return _ok_origin(resp), 200
 
     except Exception:
         logging.error("❌ /ai/parse_candidate_query\n"+traceback.format_exc())
-        resp = jsonify({"title":"", "tools":[], "years_experience": None})
+        resp = jsonify({"title":"", "tools":[], "years_experience": None, "location": ""})
         return _ok_origin(resp), 200
 
 
