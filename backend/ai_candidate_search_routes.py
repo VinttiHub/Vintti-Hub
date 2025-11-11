@@ -126,22 +126,31 @@ def search_candidates():
         # Ordenamos por cantidad de tools matcheadas (hits) y luego por nombre/id
         sql = """
         SELECT
-        c.candidate_id,
-        c.name,
-        c.country,
-        c.comments,
-        COUNT(DISTINCT kw) AS hits
+            c.candidate_id,
+            c.name,
+            c.country,
+            c.comments,
+            COUNT(DISTINCT kw) AS hits
         FROM candidates c
         JOIN resume r ON r.candidate_id = c.candidate_id
-        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(r.tools::jsonb, '[]'::jsonb)) AS t(elem)
+
+        -- ✅ Fix: solo castea JSON si r.tools es JSON válido
+        CROSS JOIN LATERAL jsonb_array_elements(
+            CASE
+                WHEN r.tools IS NULL OR trim(r.tools) = '' THEN '[]'::jsonb
+                WHEN r.tools ~ '^\s*\[.*\]\s*$' THEN r.tools::jsonb
+                ELSE '[]'::jsonb
+            END
+        ) AS t(elem)
+
         JOIN unnest(%s::text[]) AS kw
-        ON lower(t.elem->>'tool') ILIKE kw
+            ON lower(t.elem->>'tool') ILIKE kw
+
         GROUP BY c.candidate_id, c.name, c.country, c.comments
         HAVING COUNT(DISTINCT kw) >= 1
         ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
-        LIMIT 200
+        LIMIT 200;
         """
-        # --- Sanity checks (BORRAR en prod) ---
         # --- Sanity checks (SEGUROS; quita en prod si quieres) ---
         try:
             cur.execute("select current_database()")
