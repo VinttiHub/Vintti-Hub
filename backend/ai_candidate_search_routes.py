@@ -194,8 +194,14 @@ def search_candidates():
         cur.close(); conn.close()
 
         items = [
-            {"candidate_id": cid, "name": name, "country": country, "comments": comments}
-            for cid, name, country, comments in rows
+            {
+                "candidate_id": cid,
+                "name": name,
+                "country": country,
+                "comments": comments,
+                "hits": int(hits),
+            }
+            for cid, name, country, comments, hits in rows
         ]
 
         logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
