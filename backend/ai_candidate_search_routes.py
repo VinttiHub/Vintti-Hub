@@ -142,34 +142,36 @@ def search_candidates():
         LIMIT 200
         """
         # --- Sanity checks (BORRAR en prod) ---
+        # --- Sanity checks (SEGUROS; quita en prod si quieres) ---
         try:
             cur.execute("select current_database()")
             dbname = cur.fetchone()[0]
             logging.info("🗄️ current_database=%s", dbname)
 
+            # Cuenta filas que PARECEN json array por regex (sin castear)
             cur.execute("""
-                SELECT count(*) FROM resume r
-                WHERE jsonb_typeof(COALESCE(r.tools::jsonb, '[]'::jsonb)) = 'array'
+                SELECT count(*)
+                FROM resume r
+                WHERE r.tools ~ '^\s*\[.*\]\s*$'
             """)
-            logging.info("🧮 resume rows with tools array = %s", cur.fetchone()[0])
+            logging.info("🧮 resume rows with tools that look like JSON array = %s", cur.fetchone()[0])
 
-            # Muestra 1 ejemplo real de tools en la DB
+            # Muestra 1 ejemplo usando cast SOLO si pasa regex
             cur.execute("""
-            SELECT c.candidate_id,
-                array_agg(lower(t.elem->>'tool')) AS tools_lc
-            FROM candidates c
-            JOIN resume r ON r.candidate_id = c.candidate_id
-            CROSS JOIN LATERAL jsonb_array_elements(
-            CASE
-                WHEN r.tools IS NULL OR trim(r.tools) = '' THEN '[]'::jsonb
-                WHEN r.tools ~ '^\s*\[.*\]\s*$' THEN r.tools::jsonb
-                ELSE '[]'::jsonb
-            END
-            ) AS t(elem)
-            WHERE t.elem ? 'tool'
-            GROUP BY c.candidate_id
-            ORDER BY c.candidate_id
-            LIMIT 1;
+                SELECT c.candidate_id,
+                       array_agg(lower(t.elem->>'tool')) AS tools_lc
+                FROM candidates c
+                JOIN resume r ON r.candidate_id = c.candidate_id
+                CROSS JOIN LATERAL jsonb_array_elements(
+                CASE
+                    WHEN r.tools ~ '^\s*\[.*\]\s*$' THEN r.tools::jsonb
+                    ELSE '[]'::jsonb
+                END
+                ) AS t(elem)
+                WHERE t.elem ? 'tool'
+                GROUP BY c.candidate_id
+                ORDER BY c.candidate_id
+                LIMIT 1;
             """)
             logging.info("🔎 sample tools from DB: %r", cur.fetchone())
         except Exception:
@@ -257,7 +259,20 @@ def coresignal_search():
             logging.error("❌ Error Coresignal %s: %s", r.status_code, txt)
             data = {"items": []}
 
-        items = (data or {}).get("items") or []
+        try:
+            r.raise_for_status()
+            data = r.json()
+        except Exception:
+            txt = (r.text or "")[:800]
+            logging.error("❌ Error Coresignal %s: %s", r.status_code, txt)
+            data = {"items": []}
+
+        # --- Soportar list ó dict ---
+        if isinstance(data, list):
+            items = data
+        else:
+            items = (data or {}).get("items") or []
+
         logging.info("📦 items=%d", len(items))
 
         sample = [{

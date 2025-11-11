@@ -66,7 +66,8 @@ async function coresignalSearch(parsed, page=1){
   console.log('⬅️ status →', res.status, res.statusText);
   const json = await res.json();
 
-  const count = (json?.data?.items || []).length;
+  const arr = Array.isArray(json?.data) ? json.data : (json?.data?.items || []);
+  const count = arr.length;
   console.log('📦 items_count →', count);
   console.log('🧭 strategy_used →', json.strategy_used);
 
@@ -199,8 +200,8 @@ async function doSearch(){
     csMore.classList.add('hidden');
 
     const csRes = await coresignalSearch(parsed, 1);
-    const csItems = (csRes?.data?.items) || [];
-    renderCs(csItems, {append:false});
+    const csItems = Array.isArray(csRes?.data) ? csRes.data : (csRes?.data?.items || []);
+    renderCs(csItems, { append:false });
 
     // control de paginación de preview (1..5)
     if (csItems.length > 0){
