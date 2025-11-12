@@ -36,7 +36,8 @@ def parse_candidate_query():
 
     try:
         data = request.get_json(force=True) or {}
-        query = (data.get("query") or "").trim()
+        raw = data.get("query")
+        query = raw.strip() if isinstance(raw, str) else str(raw or "").strip()
         logging.info("🧠 [/ai/parse_candidate_query] query_in=%r", query)
 
         if not query:

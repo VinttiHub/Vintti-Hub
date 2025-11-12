@@ -867,8 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const goBackButton = document.getElementById('goBackButton');
   if (goBackButton) {
     goBackButton.addEventListener('click', () => {
-      if (document.referrer) window.history.back();
-      else window.location.href = '/';
+      window.location.href = 'https://vinttihub.vintti.com/crm.html';
     });
   }
 
