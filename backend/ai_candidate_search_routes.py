@@ -5,6 +5,8 @@ from openai import OpenAI
 from db import get_connection
 import datetime as dt
 import requests
+from typing import Optional
+
 # --- LATAM / Central America location gate ---
 LATAM_COUNTRIES = [
     # Central America
@@ -31,7 +33,7 @@ def _is_latam_location(text: str) -> bool:
     tl = text.lower().strip()
     return any(n.lower() in tl for n in _LATAM_NAMES) or any(iso.lower() == tl for iso in _LATAM_ISO2)
 
-def _resolve_latam_country_name(text: str) -> str | None:
+def _resolve_latam_country_name(text: str) -> Optional[str]:
     """Devuelve el nombre canónico del país LATAM si el texto coincide por nombre o ISO2."""
     if not text:
         return None
