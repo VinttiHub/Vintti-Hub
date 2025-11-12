@@ -2277,16 +2277,128 @@ async function sendNegotiatingReminder(opportunityId){
     console.error('❌ Failed to send negotiating reminder:', e);
   }
 }
+// --- Close Win email (staffing: sin cambios; recruiting: plantilla nueva) ---
+async function sendCloseWinEmail(opportunityId){
+  try {
+    // 1) Traer la opp
+    const r = await fetch(`${API_BASE}/opportunities/${opportunityId}`, { credentials: 'include' });
+    if (!r.ok) throw new Error(`GET opp ${opportunityId} failed ${r.status}`);
+    const opp = await r.json();
 
-/**
- * Hook: después de actualizar el stage, si es Negotiating -> enviar mail.
- * (Usa tu patchOpportunityStage existente y solo añadimos la llamada)
- */
-const _origPatchOpportunityStage = window.patchOpportunityStage;
+    // 2) Resolver client_name
+    const client = await resolveAccountName(opp);
+
+    // 3) Campos útiles
+    const modelRaw = String(opp.opp_model || '').toLowerCase();
+    const isRecruiting = /recru/.test(modelRaw);      // recruiting
+    const isStaffing   = /staff/.test(modelRaw);      // staffing (deja el actual)
+    const role         = opp.opp_position_name || 'the role';
+
+    // 4) Traer candidato contratado (si existe) solo para mostrar nombre
+    const hiredId = opp.candidato_contratado || opp.hire_candidate_id || null;
+    let hiredName = '';
+    let hiredEmail = '';
+    if (hiredId != null) {
+      try {
+        // endpoint por id (si no existe, ignora silencioso)
+        const rc = await fetch(`${API_BASE}/candidates/${encodeURIComponent(hiredId)}`, { credentials:'include' });
+        if (rc.ok) {
+          const c = await rc.json();
+          hiredName  = c?.name || '';
+          hiredEmail = c?.email || c?.email_primary || '';
+        }
+      } catch (_) {}
+    }
+
+    const esc = s => String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+    const openCandidateHref = hiredId != null
+      ? `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(hiredId)}#hire`
+      : `https://vinttihub.vintti.com`;
+
+    // 5) Cuerpo según modelo
+    let subject;
+    let htmlBody;
+
+    if (isRecruiting) {
+      // === Plantilla nueva (Recruiting) ===
+      subject = `Close-Win: ${client} — ${role}`;
+      htmlBody = `
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p><strong>Hey team — new Close-Win 🎉</strong></p>
+  <p>We’ve just closed <strong>${esc(client)}’s ${esc(role)}</strong> with <strong>${esc(hiredName || '—')}</strong>.</p>
+
+  <p><strong>Start date:</strong> <br>
+  <strong>Salary:</strong> <br>
+  <strong>Revenue:</strong> <br>
+  <strong>Client email:</strong> ${esc(hiredEmail)}</p>
+
+  <p><strong>References / notes:</strong><br>—</p>
+
+  <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
+  <a href="${esc(openCandidateHref)}" target="_blank" rel="noopener">Open candidate in Vintti Hub</a></p>
+
+  <p>Also, don’t forget to request any equipment needed for the new hire. 💻🖥️</p>
+
+  <p>Thanks! — Vintti Hub</p>
+</div>`.trim();
+    } else {
+      // === Staffing: deja el actual ===
+      // Si tu plantilla actual la arma el backend, puedes solo mandar el mismo payload/trigger que hoy.
+      // Si se arma aquí, reutiliza tu HTML actual. Para no romper nada:
+      subject = `Close Win: ${client} — ${role}`;
+      htmlBody = `
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p><strong>Close Win (Staffing)</strong></p>
+  <p><strong>${esc(client)}</strong> — <strong>${esc(role)}</strong></p>
+  <p>Open candidate: <a href="${esc(openCandidateHref)}" target="_blank" rel="noopener">Vintti Hub</a></p>
+</div>`.trim();
+    }
+
+    // 6) Destinatarios (PRUEBAS → solo Angie). Descomenta la lista final cuando quieras.
+    const TO_FOR_TESTS = ['angie@vintti.com'];
+    // const TO_FINAL = ['jazmin@vintti.com','lara@vintti.com','agustin@vintti.com','angie@vintti.com'];
+
+    const payload = {
+      to: TO_FOR_TESTS,
+      subject,
+      body: htmlBody,
+      body_html: htmlBody,
+      content_type: 'text/html',
+      html: true
+      // cc: TO_FINAL   // o muévelos a "to" cuando termines pruebas
+    };
+
+    const res = await fetch(`${API_BASE}/send_email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(()=> '');
+      throw new Error(`send_email failed ${res.status}: ${errText}`);
+    }
+    console.info('✅ Close Win email sent (model=%s)', isRecruiting ? 'recruiting' : 'staffing');
+  } catch (e) {
+    console.error('❌ Failed to send Close Win email:', e);
+  }
+}
+
+// ✅ Hook único: después de actualizar el stage, disparamos correos según etapa
+const __origPatchOpportunityStage = window.patchOpportunityStage;
 window.patchOpportunityStage = async function(opportunityId, newStage, dropdownElement){
-  await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
-  // Si salió bien y la etapa es Negotiating, dispara el recordatorio
-  if (String(newStage) === 'Negotiating') {
+  await __origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
+
+  // Normaliza por si llega con distintas mayúsculas/espacios
+  const stage = String(newStage || '').trim();
+
+  if (stage === 'Negotiating') {
+    // (sin cambios) correo para HR Lead
     sendNegotiatingReminder(opportunityId);
+  }
+  if (stage === 'Close Win') {
+    // 🔔 NUEVO: correo Close Win (elige plantilla por opp_model)
+    sendCloseWinEmail(opportunityId);
   }
 };

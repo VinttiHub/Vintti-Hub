@@ -14,6 +14,7 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 JAZ_EMAIL  = "jazmin@vintti.com"
 LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
+ANGIE_EMAIL = "angie@vintti.com"
 
 def _serialize_reminder(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not row:
@@ -252,7 +253,7 @@ def press_and_send(candidate_id):
         ok = _send_email(
             subject="New Close-Win 🎉 — Action needed",
             html_body=html_body,
-            to=[JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL]
+            to=[ANGIE_EMAIL]
         )
 
         conn.commit()
