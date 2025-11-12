@@ -187,10 +187,8 @@ def press_and_send(candidate_id):
                 opp_position_name=opp_position_name
             )
 
-        # Destinatarios: (testing)
-        to_list = [ANGIE_EMAIL]
-        
-        # to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, ANGIE_EMAIL]
+
+        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, ANGIE_EMAIL]
 
         ok = _send_email(
             subject="New Close-Win 🎉 — Action needed",
