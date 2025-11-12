@@ -166,7 +166,7 @@ def press_and_send(candidate_id):
                 candidate_id=candidate_id,
                 start_date=hire.get("start_date"),
                 salary=hire.get("salary"),
-                revenue=hire.get("fee"),  # usamos fee como Revenue
+                revenue=hire.get("revenue"),  # ← antes decía hire.get("fee")
                 references=hire.get("references_notes") or "",
                 client_mail=client_mail,
                 candidate_name=candidate_name,
@@ -237,15 +237,17 @@ def _send_email(subject: str, html_body: str, to: List[str]):
 def _fetch_hire_core(candidate_id: int, cur):
     """
     Devuelve los datos del hire más reciente para el candidato desde hire_opportunity.
-    Campos esperados por el correo: start_date, references_notes, setup_fee, salary, fee, opportunity_id
+    Campos esperados por el correo:
+      start_date, references_notes, setup_fee, salary, fee, revenue, opportunity_id
     """
     cur.execute("""
         SELECT
             ho.start_date::date                           AS start_date,
             COALESCE(ho.references_notes, '')             AS references_notes,
             COALESCE(ho.setup_fee, 0)                     AS setup_fee,
-            COALESCE(ho.salary, 0)               AS salary,
-            COALESCE(ho.fee, 0)                  AS fee,
+            COALESCE(ho.salary, 0)                        AS salary,
+            COALESCE(ho.fee, 0)                           AS fee,       -- usado por staffing
+            COALESCE(ho.revenue, 0)                       AS revenue,   -- usado por recruiting
             ho.opportunity_id                             AS opportunity_id
         FROM hire_opportunity ho
         WHERE ho.candidate_id = %s
