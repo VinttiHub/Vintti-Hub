@@ -166,7 +166,7 @@ def press_and_send(candidate_id):
                 candidate_id=candidate_id,
                 start_date=hire.get("start_date"),
                 salary=hire.get("salary"),
-                revenue=hire.get("revenue"),  # ← antes decía hire.get("fee")
+                revenue=hire.get("revenue"),
                 references=hire.get("references_notes") or "",
                 client_mail=client_mail,
                 candidate_name=candidate_name,
@@ -190,8 +190,18 @@ def press_and_send(candidate_id):
 
         to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, ANGIE_EMAIL]
 
+        # Nuevo subject dinámico
+        subject = f"🎉 Close-Win: {client_name or 'Client'} — {opp_position_name or 'Role'}"
+
+        # O si quieres un formato más limpio y consistente
+        # subject = f"New Close-Win 🎉 | {client_name} — {opp_position_name}"
+
+        # Limitar longitud para evitar subjects demasiado largos
+        if len(subject) > 120:
+            subject = subject[:117] + "..."
+
         ok = _send_email(
-            subject="New Close-Win 🎉 — Action needed",
+            subject=subject,
             html_body=html_body,
             to=to_list
         )
