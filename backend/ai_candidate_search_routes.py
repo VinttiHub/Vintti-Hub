@@ -288,21 +288,24 @@ def coresignal_search():
             filt["skill"] = " OR ".join([f"({t})" for t in tools])
 
         # --- Ubicación: siempre restringimos a LATAM/CA ---
-        # Si el usuario dio país LATAM, usamos location_country exacto;
+        # Si el usuario dio país LATAM, usamos country exacto;
         # si no, gateamos a todo LATAM por country OR.
         if loc and _is_latam_location(loc):
             country_name = _resolve_latam_country_name(loc)
             if country_name:
-                filt["location_country"] = country_name
+                filt["country"] = country_name                    # <-- antes: location_country
                 logging.info("🌎 location del usuario aceptada (LATAM-country): %r", country_name)
+                # si el usuario puso ciudad/estado además del país, puedes opcionalmente mantener 'location'
+                if country_name.lower() not in loc.lower():
+                    filt["location"] = loc
             else:
-                # Si escribió ciudad/estado dentro de un país LATAM, mantenemos country gate
-                filt["location_country"] = LATAM_COUNTRY_OR
-                filt["location"] = loc  # opcional: ayuda a acotar por ciudad
+                # Ciudad/estado dentro de país LATAM no mapeado con exactitud
+                filt["country"] = LATAM_COUNTRY_OR               # <-- antes: location_country = OR
+                filt["location"] = loc                            # ciudad/estado ayuda a acotar
                 logging.info("🌎 location de usuario (ciudad en LATAM): %r → country gate LATAM + location=%r", loc, loc)
         else:
             # Sin location del usuario o fuera de LATAM → gate amplio LATAM por país
-            filt["location_country"] = LATAM_COUNTRY_OR
+            filt["country"] = LATAM_COUNTRY_OR                   # <-- antes: location_country
             if loc:
                 logging.info("🌎 location del usuario NO es LATAM (%r) → aplicando gate LATAM por país", loc)
             else:
