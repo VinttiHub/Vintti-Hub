@@ -95,30 +95,86 @@ function renderCs(items, {append=false}={}){
   for (const it of (items || [])){
     const node = csTpl.content.firstElementChild.cloneNode(true);
 
-    // Campos típicos de preview (dependerán del response; ajusta si cambia):
+    // Campos típicos de preview (ajusta si tu respuesta cambia):
     const name  = it.name || it.full_name || it.public_identifier || 'Profile';
     const loc   = it.location || it.country || '—';
     const head  = it.headline || '';
-    const eid   = it.employee_id || it.id;
+    const eid   = it.employee_id || it.id || it.public_identifier;
 
     node.querySelector('.cs-card-name').textContent = name;
     node.querySelector('.cs-card-meta').textContent = loc;
     node.querySelector('.cs-card-notes').textContent = head || '—';
-    // click: podrías abrir tu modal y llamar /collect
-    node.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      if (!eid) return;
-      try{
-        const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          credentials:'include',
-          body: JSON.stringify({ employee_id: eid })
-        }).then(r=>r.json());
-        console.log('🧾 collect →', det);
-        // TODO: abre un modal lindo con info clave (linkedin, skills, exp…)
-      }catch(err){ console.error('collect error', err); }
-    });
+
+    // === LinkedIn href directo, si está en el preview ===
+    // Posibles campos: linkedin_url directo, o public_identifier para armar la URL
+    const liRaw =
+      it.linkedin_url || it.linkedin || it.linkedinUrl || null;
+    const publicId =
+      it.public_identifier || it.publicIdentifier || null;
+
+    let liHref = null;
+    if (liRaw && /^https?:\/\//i.test(liRaw)) {
+      liHref = liRaw;
+    } else if (publicId) {
+      liHref = `https://www.linkedin.com/in/${encodeURIComponent(publicId)}`;
+    }
+
+    // Asegurar que abra en nueva pestaña de manera segura
+    node.target = '_blank';
+    node.rel = 'noopener';
+
+    if (liHref) {
+      // Si ya tenemos LinkedIn, enlazamos directamente la tarjeta
+      node.href = liHref;
+      node.title = 'Abrir perfil en LinkedIn';
+      // (opcional): quitar cualquier handler para evitar bloquear el default
+      node.addEventListener('click', (e) => {
+        // Permitir el comportamiento por defecto del <a>
+      });
+    } else {
+      // Si no tenemos LinkedIn en el preview, usamos collect al hacer click
+      node.href = '#';
+      node.title = 'Ver detalles (intentará abrir LinkedIn)';
+      node.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        if (!eid) return;
+
+        try{
+          const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            credentials:'include',
+            body: JSON.stringify({ employee_id: eid })
+          }).then(r=>r.json());
+
+          console.log('🧾 collect →', det);
+
+          // Intentar resolver LinkedIn desde el collect:
+          const dLi =
+            det.linkedin_url || det.linkedin || det.linkedinUrl || null;
+          const dPublic =
+            det.public_identifier || det.publicIdentifier || null;
+
+          let finalUrl = null;
+          if (dLi && /^https?:\/\//i.test(dLi)) {
+            finalUrl = dLi;
+          } else if (dPublic) {
+            finalUrl = `https://www.linkedin.com/in/${encodeURIComponent(dPublic)}`;
+          }
+
+          if (finalUrl) {
+            window.open(finalUrl, '_blank', 'noopener');
+            return;
+          }
+
+          // Fallback: si tampoco viene en collect, mantén tu modal
+          // TODO: abre un modal lindo con info clave (linkedin, skills, exp…)
+          console.warn('No se encontró LinkedIn en preview ni en collect.');
+        }catch(err){
+          console.error('collect error', err);
+        }
+      });
+    }
 
     csList.appendChild(node);
   }
