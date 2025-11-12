@@ -8,22 +8,42 @@ import requests
 # --- LATAM / Central America location gate ---
 LATAM_COUNTRIES = [
     # Central America
-    "Mexico", "Guatemala", "Honduras", "El Salvador", "Nicaragua",
-    "Costa Rica", "Panama", "Belize",
+    ("Mexico","MX"), ("Guatemala","GT"), ("Honduras","HN"), ("El Salvador","SV"), ("Nicaragua","NI"),
+    ("Costa Rica","CR"), ("Panama","PA"), ("Belize","BZ"),
     # South America
-    "Colombia", "Venezuela", "Ecuador", "Peru", "Bolivia",
-    "Chile", "Argentina", "Uruguay", "Paraguay", "Brazil",
+    ("Colombia","CO"), ("Venezuela","VE"), ("Ecuador","EC"), ("Peru","PE"), ("Bolivia","BO"),
+    ("Chile","CL"), ("Argentina","AR"), ("Uruguay","UY"), ("Paraguay","PY"), ("Brazil","BR"),
     # Caribbean (latino)
-    "Dominican Republic", "Cuba", "Puerto Rico"
+    ("Dominican Republic","DO"), ("Cuba","CU"), ("Puerto Rico","PR")
 ]
-LATAM_LOCATION_OR = " OR ".join(f"({c})" for c in LATAM_COUNTRIES)
+
+_LATAM_NAMES = [n for (n, _iso) in LATAM_COUNTRIES]
+_LATAM_ISO2  = [iso for (_n, iso) in LATAM_COUNTRIES]
+
+# Para OR en filter: "Mexico OR Colombia OR …"
+LATAM_COUNTRY_OR = " OR ".join(f"({n})" for n in _LATAM_NAMES)
+LATAM_ISO2_OR    = " OR ".join(f"({c})" for c in _LATAM_ISO2)
 
 def _is_latam_location(text: str) -> bool:
-    """Devuelve True si el string dado sugiere un país LATAM/CA (substring, case-insensitive)."""
+    """True si el string sugiere un país LATAM (por nombre o ISO2)."""
     if not text:
         return False
-    tl = text.lower()
-    return any(c.lower() in tl for c in LATAM_COUNTRIES)
+    tl = text.lower().strip()
+    return any(n.lower() in tl for n in _LATAM_NAMES) or any(iso.lower() == tl for iso in _LATAM_ISO2)
+
+def _resolve_latam_country_name(text: str) -> str | None:
+    """Devuelve el nombre canónico del país LATAM si el texto coincide por nombre o ISO2."""
+    if not text:
+        return None
+    tl = text.lower().strip()
+    for name, iso in LATAM_COUNTRIES:
+        if tl == name.lower() or tl == iso.lower():
+            return name
+    # matches parciales tipo "México", "mexico city", "cdmx" → intenta encontrar por substring de nombre
+    for name, _iso in LATAM_COUNTRIES:
+        if name.lower() in tl:
+            return name
+    return None
 
 CORESIGNAL_API_BASE = "https://api.coresignal.com/cdapi/v2"
 CORESIGNAL_API_KEY = os.getenv("CORESIGNAL_API_KEY")  # <-- ponla en variables de entorno
@@ -265,19 +285,26 @@ def coresignal_search():
         if tools:
             filt["skill"] = " OR ".join([f"({t})" for t in tools])
 
-        # ⚠️ si el usuario no puso location, no agregamos filtro
         # --- Ubicación: siempre restringimos a LATAM/CA ---
-        # Si el usuario escribió una location y es LATAM, la respetamos.
-        # Si no escribió o no es LATAM, usamos el OR de países LATAM.
+        # Si el usuario dio país LATAM, usamos location_country exacto;
+        # si no, gateamos a todo LATAM por country OR.
         if loc and _is_latam_location(loc):
-            filt["location"] = loc
-            logging.info("🌎 location del usuario aceptada (LATAM): %r", loc)
-        else:
-            filt["location"] = LATAM_LOCATION_OR
-            if loc:
-                logging.info("🌎 location del usuario NO es LATAM (%r) → aplicando gate LATAM", loc)
+            country_name = _resolve_latam_country_name(loc)
+            if country_name:
+                filt["location_country"] = country_name
+                logging.info("🌎 location del usuario aceptada (LATAM-country): %r", country_name)
             else:
-                logging.info("🌎 sin location del usuario → aplicando gate LATAM")
+                # Si escribió ciudad/estado dentro de un país LATAM, mantenemos country gate
+                filt["location_country"] = LATAM_COUNTRY_OR
+                filt["location"] = loc  # opcional: ayuda a acotar por ciudad
+                logging.info("🌎 location de usuario (ciudad en LATAM): %r → country gate LATAM + location=%r", loc, loc)
+        else:
+            # Sin location del usuario o fuera de LATAM → gate amplio LATAM por país
+            filt["location_country"] = LATAM_COUNTRY_OR
+            if loc:
+                logging.info("🌎 location del usuario NO es LATAM (%r) → aplicando gate LATAM por país", loc)
+            else:
+                logging.info("🌎 sin location del usuario → aplicando gate LATAM por país")
 
         # ⚠️ si el usuario no puso años, no agregamos filtro temporal
         if years:
