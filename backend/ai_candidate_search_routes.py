@@ -5,6 +5,25 @@ from openai import OpenAI
 from db import get_connection
 import datetime as dt
 import requests
+# --- LATAM / Central America location gate ---
+LATAM_COUNTRIES = [
+    # Central America
+    "Mexico", "Guatemala", "Honduras", "El Salvador", "Nicaragua",
+    "Costa Rica", "Panama", "Belize",
+    # South America
+    "Colombia", "Venezuela", "Ecuador", "Peru", "Bolivia",
+    "Chile", "Argentina", "Uruguay", "Paraguay", "Brazil",
+    # Caribbean (latino)
+    "Dominican Republic", "Cuba", "Puerto Rico"
+]
+LATAM_LOCATION_OR = " OR ".join(f"({c})" for c in LATAM_COUNTRIES)
+
+def _is_latam_location(text: str) -> bool:
+    """Devuelve True si el string dado sugiere un país LATAM/CA (substring, case-insensitive)."""
+    if not text:
+        return False
+    tl = text.lower()
+    return any(c.lower() in tl for c in LATAM_COUNTRIES)
 
 CORESIGNAL_API_BASE = "https://api.coresignal.com/cdapi/v2"
 CORESIGNAL_API_KEY = os.getenv("CORESIGNAL_API_KEY")  # <-- ponla en variables de entorno
@@ -247,8 +266,18 @@ def coresignal_search():
             filt["skill"] = " OR ".join([f"({t})" for t in tools])
 
         # ⚠️ si el usuario no puso location, no agregamos filtro
-        if loc:
+        # --- Ubicación: siempre restringimos a LATAM/CA ---
+        # Si el usuario escribió una location y es LATAM, la respetamos.
+        # Si no escribió o no es LATAM, usamos el OR de países LATAM.
+        if loc and _is_latam_location(loc):
             filt["location"] = loc
+            logging.info("🌎 location del usuario aceptada (LATAM): %r", loc)
+        else:
+            filt["location"] = LATAM_LOCATION_OR
+            if loc:
+                logging.info("🌎 location del usuario NO es LATAM (%r) → aplicando gate LATAM", loc)
+            else:
+                logging.info("🌎 sin location del usuario → aplicando gate LATAM")
 
         # ⚠️ si el usuario no puso años, no agregamos filtro temporal
         if years:
