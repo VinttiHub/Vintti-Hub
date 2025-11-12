@@ -155,6 +155,7 @@ function displayNameForSales(value){
   if (key.includes('bahia'))   return 'Bahía';
   if (key.includes('lara'))    return 'Lara';
   if (key.includes('agustin')) return 'Agustín';
+  if (key.includes('mariano')) return 'Mariano';
 
   // 4) Último recurso
   return String(value||'Unassigned');
@@ -310,7 +311,8 @@ window.allowedHRUsers = users.filter(u =>
     const allowedSalesEmails = new Set([
       'agustin@vintti.com',
       'bahia@vintti.com',
-      'lara@vintti.com'
+      'lara@vintti.com',
+      'mariano@vintti.com'
     ]);
     window.allowedSalesUsers = users.filter(u =>
       allowedSalesEmails.has((u.email_vintti || '').toLowerCase())
@@ -1440,7 +1442,8 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     const allowedEmails = new Set([
       'agustin@vintti.com',
       'bahia@vintti.com',
-      'lara@vintti.com'
+      'lara@vintti.com',
+      'mariano@vintti.com'
     ]);
 
     // Limpia opciones previas y agrega placeholder
@@ -1454,7 +1457,7 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
       .forEach(user => {
         const option = document.createElement('option');
         option.value = (user.email_vintti || '').toLowerCase();
-        option.textContent = user.user_name; // se verá “Agustín”, “Bahía”, “Lara”
+        option.textContent = user.user_name; 
         salesDropdown.appendChild(option);
       });
 
@@ -1987,19 +1990,20 @@ const AVATAR_BY_EMAIL = {
   'lara@vintti.com':                    'lara.png',
   'jazmin@vintti.com':                  'jaz.png',
   'pilar@vintti.com':                   'pilar.png',
-  'pilar.fernandez@vintti.com':         'pilar_fer.png', // ⬅️ NUEVO
+  'pilar.fernandez@vintti.com':         'pilar_fer.png', 
   'agustin@vintti.com':                 'agus.png',
   'agustina.barbero@vintti.com':        'agustina.png',
   'josefina@vintti.com':                'josefina.png',
-  'constanza@vintti.com':               'constanza.png'
+  'constanza@vintti.com':               'constanza.png',
+  'mariano@vintti.com':                 'mariano.png'
 };
 
 // --- HR initials (dos letras) ---
 const HR_INITIALS_BY_EMAIL = {
   'agostina@vintti.com':                'AC',
   'jazmin@vintti.com':                  'JP',
-  'pilar@vintti.com':                   'PL', // ⬅️ antes PF, ahora PL
-  'pilar.fernandez@vintti.com':         'PF', // ⬅️ NUEVA
+  'pilar@vintti.com':                   'PL', 
+  'pilar.fernandez@vintti.com':         'PF', 
   'agustina.barbero@vintti.com':        'AB',
   'josefina@vintti.com':                'JP',
   'constanza@vintti.com':               'CL'
@@ -2138,6 +2142,7 @@ function emailForSalesLead(opp) {
   if (name.includes('bahia'))   return 'bahia@vintti.com';
   if (name.includes('lara'))    return 'lara@vintti.com';
   if (name.includes('agustin')) return 'agustin@vintti.com';
+  if (name.includes('mariano')) return 'mariano@vintti.com';
   return '';
 }
 
@@ -2145,6 +2150,7 @@ function emailForSalesLead(opp) {
 function initialsForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'BL';
   if (key.includes('lara')    || key.includes('lara@'))    return 'LR';
+  if (key.includes('mariano')    || key.includes('marian@'))    return 'MS';
   if (key.includes('agustin')) return 'AM';
   return '--';
 }
@@ -2153,6 +2159,7 @@ function initialsForSalesLead(key) {
 function badgeClassForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'bl';
   if (key.includes('lara')    || key.includes('lara@'))    return 'lr';
+  if (key.includes('mariano')    || key.includes('marian@'))    return 'ms';
   if (key.includes('agustin')) return 'am';
   return '';
 }
