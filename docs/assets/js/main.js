@@ -611,18 +611,13 @@ if (accountSearchInput) {
   });
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
-if (!allowedHRUsers.length) {
-  try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
-    const users = await res.json();
-// 🔒 Fallback si aún no está cargado:
-if (!allowedHRUsers.length) {
+if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
   try {
     const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
     const users = await res.json();
     const ALLOWED_HR_EMAILS = new Set([
       'pilar@vintti.com',
-      'pilar.fernandez@vintti.com', // ⬅️ NUEVA
+      'pilar.fernandez@vintti.com',
       'jazmin@vintti.com',
       'agostina@vintti.com',
       'agustina.barbero@vintti.com',
@@ -630,14 +625,9 @@ if (!allowedHRUsers.length) {
       'josefina@vintti.com',
       'constanza@vintti.com'
     ]);
-    allowedHRUsers = users.filter(u =>
-      ALLOWED_HR_EMAILS.has(String(u.email_vintti||'').toLowerCase())
+    window.allowedHRUsers = users.filter(u =>
+      ALLOWED_HR_EMAILS.has(String(u.email_vintti || '').toLowerCase())
     );
-  } catch (e) {
-    console.error('Error reloading HR Leads:', e);
-  }
-}
-
   } catch (e) {
     console.error('Error reloading HR Leads:', e);
   }
@@ -645,7 +635,9 @@ if (!allowedHRUsers.length) {
 
 // Mapa email->nombre de HR permitidos
 const emailToNameMap = {};
-allowedHRUsers.forEach(u => emailToNameMap[u.email_vintti] = u.user_name);
+(window.allowedHRUsers || []).forEach(u => {
+  emailToNameMap[u.email_vintti] = u.user_name;
+});
 
 // STAGES (igual que antes)
 const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))];
