@@ -10,13 +10,12 @@ from typing import Optional
 # --- LATAM / Central America location gate ---
 LATAM_COUNTRIES = [
     # Central America
-    ("Mexico","MX"), ("Guatemala","GT"), ("Honduras","HN"), ("El Salvador","SV"), ("Nicaragua","NI"),
-    ("Costa Rica","CR"), ("Panama","PA"), ("Belize","BZ"),
+    ("Mexico","MX"), 
     # South America
-    ("Colombia","CO"), ("Venezuela","VE"), ("Ecuador","EC"), ("Peru","PE"), ("Bolivia","BO"),
+    ("Colombia","CO"), ("Ecuador","EC"), ("Peru","PE"), ("Bolivia","BO"),
     ("Chile","CL"), ("Argentina","AR"), ("Uruguay","UY"), ("Paraguay","PY"), ("Brazil","BR"),
     # Caribbean (latino)
-    ("Dominican Republic","DO"), ("Cuba","CU"), ("Puerto Rico","PR")
+    ("Dominican Republic","DO"), ("Puerto Rico","PR")
 ]
 
 _LATAM_NAMES = [n for (n, _iso) in LATAM_COUNTRIES]
@@ -25,6 +24,90 @@ _LATAM_ISO2  = [iso for (_n, iso) in LATAM_COUNTRIES]
 # Para OR en filter: "Mexico OR Colombia OR …"
 LATAM_COUNTRY_OR = " OR ".join(f"({n})" for n in _LATAM_NAMES)
 LATAM_ISO2_OR    = " OR ".join(f"({c})" for c in _LATAM_ISO2)
+
+def _parse_date_soft(s: str) -> Optional[dt.date]:
+    """
+    Intenta parsear una fecha en varios formatos simples.
+    Esperamos principalmente 'YYYY-MM-DD', pero soporta algunos degradados.
+    """
+    if not s:
+        return None
+    s = str(s).strip()
+    if not s:
+        return None
+
+    for fmt in ("%Y-%m-%d", "%Y-%m", "%Y"):
+        try:
+            d = dt.datetime.strptime(s, fmt).date()
+            return d
+        except Exception:
+            continue
+    return None
+
+
+def compute_years_experience_from_workexp(raw) -> Optional[int]:
+    """
+    raw viene de resume.work_experience (texto JSON).
+    Regla:
+      - Tomar la start_date más antigua.
+      - Tomar la end_date más reciente (o hoy si está current=true o end_date vacío).
+      - Devolver diferencia en años (entero, redondeado hacia abajo).
+    """
+    if not raw:
+        return None
+
+    try:
+        if isinstance(raw, str):
+            work_list = json.loads(raw)
+        else:
+            # por si ya viene parseado como dict/list en algún contexto futuro
+            work_list = raw
+    except Exception:
+        logging.exception("⚠️ compute_years_experience_from_workexp: JSON inválido")
+        return None
+
+    if not isinstance(work_list, list) or not work_list:
+        return None
+
+    earliest_start = None
+    latest_end = None
+    today = dt.date.today()
+
+    for job in work_list:
+        if not isinstance(job, dict):
+            continue
+
+        s_start = job.get("start_date") or ""
+        s_end   = job.get("end_date") or ""
+        current = bool(job.get("current"))
+
+        start = _parse_date_soft(s_start)
+        if not start:
+            continue
+
+        if current or not s_end.strip():
+            end = today
+        else:
+            end = _parse_date_soft(s_end) or today
+
+        # actualizar rangos
+        if earliest_start is None or start < earliest_start:
+            earliest_start = start
+        if latest_end is None or end > latest_end:
+            latest_end = end
+
+    if not earliest_start or not latest_end or latest_end < earliest_start:
+        return None
+
+    delta_days = (latest_end - earliest_start).days
+    years = int(delta_days // 365.25)  # aprox, redondeando hacia abajo
+    if years < 0:
+        return None
+
+    # por seguridad, acotamos a un rango razonable (0–60)
+    years = max(0, min(years, 60))
+    return years
+
 
 def _is_latam_location(text: str) -> bool:
     """True si el string sugiere un país LATAM (por nombre o ISO2)."""
@@ -174,7 +257,8 @@ def search_candidates():
             c.name,
             c.country,
             c.comments,
-            COUNT(DISTINCT kw) AS hits
+            COUNT(DISTINCT kw) AS hits,
+            r.work_experience
         FROM candidates c
         JOIN resume r ON r.candidate_id = c.candidate_id
 
@@ -190,7 +274,7 @@ def search_candidates():
         JOIN unnest(%s::text[]) AS kw
             ON lower(t.elem->>'tool') ILIKE kw
 
-        GROUP BY c.candidate_id, c.name, c.country, c.comments
+        GROUP BY c.candidate_id, c.name, c.country, c.comments, r.work_experience
         HAVING COUNT(DISTINCT kw) >= 1
         ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200;
@@ -237,16 +321,21 @@ def search_candidates():
 
         cur.close(); conn.close()
 
-        items = [
-            {
+        items = []
+        for cid, name, country, comments, hits, work_exp_raw in rows:
+            years = compute_years_experience_from_workexp(work_exp_raw)
+            logging.info("👤 candidate_id=%s → years_experience=%r", cid, years)
+
+            items.append({
                 "candidate_id": cid,
                 "name": name,
                 "country": country,
                 "comments": comments,
                 "hits": int(hits),
-            }
-            for cid, name, country, comments, hits in rows
-        ]
+                "years_experience": years  # ← NUEVO CAMPO
+            })
+
+        logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 
         logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 

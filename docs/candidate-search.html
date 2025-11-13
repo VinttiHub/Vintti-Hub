@@ -24,6 +24,28 @@
   <main class="grid">
     <section class="col">
       <h2 class="col-title">🌱 Vintti Talent</h2>
+
+      <!-- 🔽 Filtro de años de experiencia (solo afecta a Vintti Talent) -->
+      <div class="filters-row">
+        <label for="exp-filter" class="filter-label">
+          Years of experience
+        </label>
+        <select id="exp-filter" class="filter-select">
+          <option value="">Any experience</option>
+          <option value="0">0+ years</option>
+          <option value="1">1+ years</option>
+          <option value="2">2+ years</option>
+          <option value="3">3+ years</option>
+          <option value="4">4+ years</option>
+          <option value="5">5+ years</option>
+          <option value="6">6+ years</option>
+          <option value="7">7+ years</option>
+          <option value="8">8+ years</option>
+          <option value="9">9+ years</option>
+          <option value="10">10+ years</option>
+        </select>
+      </div>
+
       <div id="vintti-results" class="cards"></div>
       <div id="vintti-empty" class="empty hidden">No encontramos candidatos con esas herramientas (aún).</div>
     </section>

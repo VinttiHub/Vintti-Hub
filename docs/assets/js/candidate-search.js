@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const cards = $('#vintti-results');
   const empty = $('#vintti-empty');
   const tpl   = $('#card-tpl');
+  const expFilter = $('#exp-filter');
+  let _vinttiAll = []; // ← guardamos todos los candidatos internos de la última búsqueda
   const csWrap   = document.querySelector('#coresignal-wrap');
   const csList   = document.querySelector('#cs-results');
   const csEmpty  = document.querySelector('#cs-empty');
@@ -148,16 +150,22 @@ function renderCs(items, {append=false}={}){
           }).then(r=>r.json());
 
           console.log('🧾 collect →', det);
-
           // Intentar resolver LinkedIn desde el collect:
           const dLi =
             det.linkedin_url || det.linkedin || det.linkedinUrl || null;
           const dPublic =
             det.public_identifier || det.publicIdentifier || null;
+          const dProfile =
+            det.profile_url || det.profileUrl || null; // 👈 este es el que estás viendo en el log
 
           let finalUrl = null;
+
+          // 1) Si viene un URL directo (linkedin_url o profile_url)
           if (dLi && /^https?:\/\//i.test(dLi)) {
             finalUrl = dLi;
+          } else if (dProfile && /^https?:\/\//i.test(dProfile)) {
+            finalUrl = dProfile;
+          // 2) Si no, lo armamos con public_identifier
           } else if (dPublic) {
             finalUrl = `https://www.linkedin.com/in/${encodeURIComponent(dPublic)}`;
           }
@@ -166,6 +174,9 @@ function renderCs(items, {append=false}={}){
             window.open(finalUrl, '_blank', 'noopener');
             return;
           }
+
+          // Fallback: si tampoco viene en collect, mantén tu modal / log
+          console.warn('No se encontró LinkedIn en preview ni en collect.');
 
           // Fallback: si tampoco viene en collect, mantén tu modal
           // TODO: abre un modal lindo con info clave (linkedin, skills, exp…)
@@ -196,15 +207,38 @@ function renderChips({ title, tools, years_experience, location }){
   }
   chips.classList.remove('hidden');
 }
-
-  function renderCards(results){
+  function applyExperienceFilterAndRender(){
+    // Limpiamos las tarjetas
     cards.innerHTML = '';
-    if (!results?.length){
+
+    // Si no hay resultados cargados aún
+    if (!_vinttiAll || !_vinttiAll.length){
       empty.classList.remove('hidden');
       return;
     }
+
+    let filtered = _vinttiAll;
+
+    if (expFilter && expFilter.value !== '') {
+      const minYears = parseInt(expFilter.value, 10);
+      if (!Number.isNaN(minYears)) {
+        filtered = _vinttiAll.filter(row => {
+          const y = (typeof row.years_experience === 'number' && Number.isFinite(row.years_experience))
+            ? row.years_experience
+            : 0; // si no tenemos info, lo tratamos como 0 años
+          return y >= minYears;
+        });
+      }
+    }
+
+    if (!filtered.length){
+      empty.classList.remove('hidden');
+      return;
+    }
+
     empty.classList.add('hidden');
-    for (const row of results){
+
+    for (const row of filtered){
       const node = tpl.content.firstElementChild.cloneNode(true);
       node.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(row.candidate_id)}`;
       node.querySelector('.card-name').textContent = row.name || '(sin nombre)';
@@ -214,6 +248,12 @@ function renderChips({ title, tools, years_experience, location }){
     }
   }
 
+  function renderCards(results){
+    // Guardamos todos los resultados de la búsqueda actual
+    _vinttiAll = results || [];
+    // Renderizamos aplicando (o no) el filtro actual de experiencia
+    applyExperienceFilterAndRender();
+  }
 async function doSearch(){
   const q = input.value.trim();
   if (!q){ input.focus(); return; }
@@ -301,5 +341,9 @@ async function doSearch(){
       }
     });
   }
-
+  if (expFilter){
+    expFilter.addEventListener('change', () => {
+      applyExperienceFilterAndRender();
+    });
+  }
 });
