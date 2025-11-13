@@ -257,6 +257,7 @@ def search_candidates():
             c.name,
             c.country,
             c.comments,
+            c.english_level,
             COUNT(DISTINCT kw) AS hits,
             r.work_experience
         FROM candidates c
@@ -266,7 +267,7 @@ def search_candidates():
         CROSS JOIN LATERAL jsonb_array_elements(
             CASE
                 WHEN r.tools IS NULL OR trim(r.tools) = '' THEN '[]'::jsonb
-                WHEN r.tools ~ '^\s*\[.*\]\s*$' THEN r.tools::jsonb
+                WHEN r.tools ~ '^\s*\\[.*\\]\s*$' THEN r.tools::jsonb
                 ELSE '[]'::jsonb
             END
         ) AS t(elem)
@@ -274,7 +275,19 @@ def search_candidates():
         JOIN unnest(%s::text[]) AS kw
             ON lower(t.elem->>'tool') ILIKE kw
 
-        GROUP BY c.candidate_id, c.name, c.country, c.comments, r.work_experience
+        -- ❌ Excluir candidatos con english_level = 'Regular' o 'Poor'
+        WHERE
+            c.english_level IS NULL
+            OR trim(c.english_level) = ''
+            OR lower(c.english_level) NOT IN ('regular', 'poor')
+
+        GROUP BY
+            c.candidate_id,
+            c.name,
+            c.country,
+            c.comments,
+            c.english_level,
+            r.work_experience
         HAVING COUNT(DISTINCT kw) >= 1
         ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200;
@@ -322,17 +335,21 @@ def search_candidates():
         cur.close(); conn.close()
 
         items = []
-        for cid, name, country, comments, hits, work_exp_raw in rows:
+        for cid, name, country, comments, english_level, hits, work_exp_raw in rows:
             years = compute_years_experience_from_workexp(work_exp_raw)
-            logging.info("👤 candidate_id=%s → years_experience=%r", cid, years)
+            logging.info(
+                "👤 candidate_id=%s → years_experience=%r, english_level=%r",
+                cid, years, english_level
+            )
 
             items.append({
                 "candidate_id": cid,
                 "name": name,
                 "country": country,
                 "comments": comments,
+                "english_level": english_level,
                 "hits": int(hits),
-                "years_experience": years  # ← NUEVO CAMPO
+                "years_experience": years
             })
 
         logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])

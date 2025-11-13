@@ -243,7 +243,8 @@ function renderChips({ title, tools, years_experience, location }){
       node.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(row.candidate_id)}`;
       node.querySelector('.card-name').textContent = row.name || '(sin nombre)';
       node.querySelector('.card-meta').textContent = row.country || '—';
-      node.querySelector('.card-notes').textContent = (row.comments || '').trim() || 'No comments yet.';
+      node.querySelector('.card-meta').textContent =
+        (row.country || '—') + (row.english_level ? ` · 🇬🇧 ${row.english_level}` : '');
       cards.appendChild(node);
     }
   }

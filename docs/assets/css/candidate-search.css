@@ -75,3 +75,111 @@ html,body{ margin:0; background:var(--bg); color:var(--text); font-family: Onest
   display:flex; align-items:center; justify-content:center;
   min-height: 220px; border:2px dashed rgba(0,0,0,0.08); border-radius: 16px; background: #fff8;
 }
+/* ==========================
+   Filtro: Years of experience
+   ========================== */
+
+.filters-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(160, 174, 192, 0.25);
+}
+
+body.dark-mode .filters-row {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.filter-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+body.dark-mode .filter-label {
+  color: #e2e8f0;
+}
+
+.filter-select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-weight: 500;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    transform 0.08s ease;
+  /* pequeño icono de flecha */
+  background-image:
+    linear-gradient(45deg, #94a3b8 50%, transparent 50%),
+    linear-gradient(135deg, #94a3b8 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 52%,
+    calc(100% - 8px) 52%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+body.dark-mode .filter-select {
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.7);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.65);
+}
+
+.filter-select:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 10px 24px rgba(56, 189, 248, 0.18);
+  transform: translateY(-1px);
+}
+
+.filter-select:focus-visible {
+  border-color: #0ea5e9;
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.05),
+    0 0 0 3px rgba(56, 189, 248, 0.35);
+}
+
+.filter-select:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+/* Responsive para pantallas pequeñas */
+@media (max-width: 768px) {
+  .filters-row {
+    flex-direction: column;
+    align-items: flex-start;
+    border-radius: 1rem;
+  }
+
+  .filter-label {
+    font-size: 0.75rem;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+}
