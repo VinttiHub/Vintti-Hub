@@ -1083,6 +1083,25 @@ const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.c
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';
 }
+// --- Candidate Search button visibility ---
+const candidateSearchLink = document.getElementById('candidateSearchLink');
+
+if (candidateSearchLink) {
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  const CANDIDATE_SEARCH_ALLOWED = new Set([
+    'agustina.barbero@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com',
+    'constanza@vintti.com',
+    'pilar@vintti.com',
+    'pilar.fernandez@vintti.com',
+    'angie@vintti.com',
+    'agostina@vintti.com'
+  ]);
+
+  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'block' : 'none';
+}
 
 async function initSidebarProfile(){
   // helpers
