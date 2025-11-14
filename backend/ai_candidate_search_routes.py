@@ -274,6 +274,7 @@ def search_candidates():
             c.country,
             c.comments,
             c.english_level,
+            c.salary_range,
             COUNT(DISTINCT kw) AS hits,
             r.work_experience
         FROM candidates c
@@ -314,6 +315,7 @@ def search_candidates():
             c.country,
             c.comments,
             c.english_level,
+            c.salary_range,
             r.work_experience
         HAVING COUNT(DISTINCT kw) >= 1
         ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
@@ -361,11 +363,11 @@ def search_candidates():
         cur.close(); conn.close()
 
         items = []
-        for cid, name, country, comments, english_level, hits, work_exp_raw in rows:
+        for cid, name, country, comments, english_level, salary_range, hits, work_exp_raw in rows:
             years = compute_years_experience_from_workexp(work_exp_raw)
             logging.info(
-                "👤 candidate_id=%s → years_experience=%r, english_level=%r",
-                cid, years, english_level
+                "👤 candidate_id=%s → years_experience=%r, english_level=%r, salary_range=%r",
+                cid, years, english_level, salary_range
             )
 
             items.append({
@@ -374,6 +376,7 @@ def search_candidates():
                 "country": country,
                 "comments": comments,
                 "english_level": english_level,
+                "salary_range": salary_range,
                 "hits": int(hits),
                 "years_experience": years
             })

@@ -245,10 +245,24 @@ function renderChips({ title, tools, years_experience, location }){
     for (const row of filtered){
       const node = tpl.content.firstElementChild.cloneNode(true);
       node.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(row.candidate_id)}`;
+      
+      // Nombre
       node.querySelector('.card-name').textContent = row.name || '(sin nombre)';
-      node.querySelector('.card-meta').textContent = row.country || '—';
+      
+      // País + nivel de inglés
       node.querySelector('.card-meta').textContent =
         (row.country || '—') + (row.english_level ? ` · 🇬🇧 ${row.english_level}` : '');
+      
+      // 💸 Salario deseado (salary_range)
+      const notesEl = node.querySelector('.card-notes');
+      const salary = row.salary_range && String(row.salary_range).trim();
+      if (salary) {
+        // Puedes ajustar el texto como prefieras
+        notesEl.textContent = `Desired salary: ${salary}`;
+      } else {
+        notesEl.textContent = '';
+      }
+
       cards.appendChild(node);
     }
   }
