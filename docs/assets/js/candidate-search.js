@@ -137,30 +137,37 @@ function renderCs(items, {append=false}={}){
       node.addEventListener('click', (e) => {
         // Permitir el comportamiento por defecto del <a>
       });
-    } else {
-      // Si no tenemos LinkedIn en el preview, usamos collect al hacer click
-      node.href = '#';
-      node.title = 'Ver detalles (intentará abrir LinkedIn)';
-      node.addEventListener('click', async (e)=>{
-        e.preventDefault();
-        if (!eid) return;
+  } else {
+    // Si no tenemos LinkedIn en el preview, usamos collect al hacer click
+    node.href = '#';
+    node.title = 'Ver detalles (intentará abrir LinkedIn)';
 
-        try{
+    node.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (!eid) return;
+
+      // 💡 Abrimos la pestaña inmediatamente (esto sí cuenta como user-initiated)
+      const popup = window.open('', '_blank', 'noopener');
+      const hasPopup = !!popup;
+
+      (async () => {
+        try {
           const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            credentials:'include',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ employee_id: eid })
-          }).then(r=>r.json());
+          }).then(r => r.json());
 
           console.log('🧾 collect →', det);
+
           // Intentar resolver LinkedIn desde el collect:
           const dLi =
             det.linkedin_url || det.linkedin || det.linkedinUrl || null;
           const dPublic =
             det.public_identifier || det.publicIdentifier || null;
           const dProfile =
-            det.profile_url || det.profileUrl || null; // 👈 este es el que estás viendo en el log
+            det.profile_url || det.profileUrl || null; // 👈 este es el que ves en el log
 
           let finalUrl = null;
 
@@ -175,21 +182,25 @@ function renderCs(items, {append=false}={}){
           }
 
           if (finalUrl) {
-            window.open(finalUrl, '_blank', 'noopener');
+            if (hasPopup) {
+              // usamos la pestaña ya abierta (no la bloquean)
+              popup.location = finalUrl;
+            } else {
+              // fallback por si el navegador bloqueó la pestaña vacía
+              window.open(finalUrl, '_blank', 'noopener');
+            }
             return;
           }
 
-          // Fallback: si tampoco viene en collect, mantén tu modal / log
           console.warn('No se encontró LinkedIn en preview ni en collect.');
-
-          // Fallback: si tampoco viene en collect, mantén tu modal
-          // TODO: abre un modal lindo con info clave (linkedin, skills, exp…)
-          console.warn('No se encontró LinkedIn en preview ni en collect.');
-        }catch(err){
+          if (hasPopup) popup.close();
+        } catch (err) {
           console.error('collect error', err);
+          if (hasPopup) popup.close();
         }
-      });
-    }
+      })();
+    });
+  }
 
     csList.appendChild(node);
   }
