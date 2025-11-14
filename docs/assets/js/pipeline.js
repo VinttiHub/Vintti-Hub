@@ -268,12 +268,61 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
   }
 });
 
+  // 🔢 Prefill + guardado del input "Number of interviewed candidates"
+  const interviewedInput = document.getElementById('interviewed-count-input');
+  if (interviewedInput) {
+    // Prefill desde la BD
+    (async () => {
+      try {
+        const el = document.getElementById('opportunity-id-text');
+        const oppId = (el?.getAttribute('data-id') || el?.textContent || '').trim();
+        if (!oppId || oppId === '—') return;
 
+        const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) return;
 
+        const data = await res.json();
+        const v = data.cantidad_entrevistados;
+        interviewedInput.value =
+          v === null || v === undefined ? '' : String(v);
+      } catch (err) {
+        console.warn('⚠️ Could not prefill interviewed count', err);
+      }
+    })();
 
+    // Guardar en la BD al cambiar
+    interviewedInput.addEventListener('blur', async (e) => {
+      if (typeof updateOpportunityField !== 'function') {
+        console.warn('⚠️ updateOpportunityField no está definido en este scope');
+        return;
+      }
 
-  });
-  // 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline
+      let raw = (e.target.value || '').trim();
+
+      if (raw === '') {
+        // Borrado → guardamos null
+        await updateOpportunityField('cantidad_entrevistados', null);
+        return;
+      }
+
+      let n = parseInt(raw, 10);
+      if (!Number.isFinite(n) || n < 0) {
+        n = 0;
+      }
+
+      // Normalizar lo que ve el usuario
+      e.target.value = String(n);
+
+      // 💾 Guardar en DB (tabla opportunity.cantidad_entrevistados)
+      await updateOpportunityField('cantidad_entrevistados', n);
+    });
+  }
+
+}); //  cierre del DOMContentLoaded
+
+// 🚀 FUNCION: Cargar candidatos desde el backend y mostrarlos en el pipeline
 function loadPipelineCandidates() {
   // Leer el opportunity_id que ya está en la página
   const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();

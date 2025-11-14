@@ -1317,6 +1317,7 @@ def update_opportunity_fields(opportunity_id):
         'replacement_of',
         'replacement_end_date',        # 👈 asegúrate de tratarla como DATE
         'candidato_contratado',
+        'cantidad_entrevistados',
 
         # 👇 Career Site
         'career_job_id',
