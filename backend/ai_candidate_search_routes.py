@@ -299,6 +299,15 @@ def search_candidates():
                 OR trim(c.english_level) = ''
                 OR lower(c.english_level) NOT IN ('regular', 'poor')
             )
+            -- 🧱 Nuevo: excluir candidatos actualmente contratados
+            AND NOT EXISTS (
+                SELECT 1
+                FROM hire_opportunity h
+                WHERE
+                    h.candidate_id = c.candidate_id
+                    AND h.start_date IS NOT NULL
+                    AND h.end_date IS NULL
+            )
         """
 
         params = [patterns]
