@@ -243,61 +243,80 @@ function renderChips({ title, tools, years_experience, location }){
   }
   chips.classList.remove('hidden');
 }
-  function applyExperienceFilterAndRender(){
-    // Limpiamos las tarjetas
-    cards.innerHTML = '';
+function applyExperienceFilterAndRender(){
+  // Limpiamos las tarjetas
+  cards.innerHTML = '';
 
-    // Si no hay resultados cargados aún
-    if (!_vinttiAll || !_vinttiAll.length){
-      empty.classList.remove('hidden');
-      return;
-    }
+  // Si no hay resultados cargados aún
+  if (!_vinttiAll || !_vinttiAll.length){
+    empty.classList.remove('hidden');
+    return;
+  }
 
-    let filtered = _vinttiAll;
+  // 👇 empezamos con una copia para no mutar el array original
+  let filtered = Array.isArray(_vinttiAll) ? [..._vinttiAll] : [];
 
-    if (expFilter && expFilter.value !== '') {
-      const minYears = parseInt(expFilter.value, 10);
-      if (!Number.isNaN(minYears)) {
-        filtered = _vinttiAll.filter(row => {
-          const y = (typeof row.years_experience === 'number' && Number.isFinite(row.years_experience))
-            ? row.years_experience
-            : 0; // si no tenemos info, lo tratamos como 0 años
-          return y >= minYears;
-        });
-      }
-    }
-
-    if (!filtered.length){
-      empty.classList.remove('hidden');
-      return;
-    }
-
-    empty.classList.add('hidden');
-
-    for (const row of filtered){
-      const node = tpl.content.firstElementChild.cloneNode(true);
-      node.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(row.candidate_id)}`;
-      
-      // Nombre
-      node.querySelector('.card-name').textContent = row.name || '(sin nombre)';
-      
-      // País + nivel de inglés
-      node.querySelector('.card-meta').textContent =
-        (row.country || '—') + (row.english_level ? ` · 🇬🇧 ${row.english_level}` : '');
-      
-      // 💸 Salario deseado (salary_range)
-      const notesEl = node.querySelector('.card-notes');
-      const salary = row.salary_range && String(row.salary_range).trim();
-      if (salary) {
-        // Puedes ajustar el texto como prefieras
-        notesEl.textContent = `Desired salary: ${salary}`;
-      } else {
-        notesEl.textContent = '';
-      }
-
-      cards.appendChild(node);
+  // 1) Filtro por años de experiencia (si hay valor en el dropdown)
+  if (expFilter && expFilter.value !== '') {
+    const minYears = parseInt(expFilter.value, 10);
+    if (!Number.isNaN(minYears)) {
+      filtered = filtered.filter(row => {
+        const y = (typeof row.years_experience === 'number' && Number.isFinite(row.years_experience))
+          ? row.years_experience
+          : 0; // si no tenemos info, lo tratamos como 0 años
+        return y >= minYears;
+      });
     }
   }
+
+  if (!filtered.length){
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  // 2) 👇 Ordenar por salario deseado (salary_range) de menor a mayor
+  const parseSalary = (val) => {
+    if (!val) return Infinity; // sin salario → van al final
+    const str = String(val).trim();
+    const match = str.match(/\d+/); // primer número que aparezca
+    if (!match) return Infinity;
+    const num = parseInt(match[0], 10);
+    return Number.isNaN(num) ? Infinity : num;
+  };
+
+  filtered.sort((a, b) => {
+    const sa = parseSalary(a.salary_range);
+    const sb = parseSalary(b.salary_range);
+    if (sa === sb) return 0;
+    return sa - sb; // menor → mayor
+  });
+
+  empty.classList.add('hidden');
+
+  // 3) Render de tarjetas (ya filtradas y ordenadas)
+  for (const row of filtered){
+    const node = tpl.content.firstElementChild.cloneNode(true);
+    node.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(row.candidate_id)}`;
+    
+    // Nombre
+    node.querySelector('.card-name').textContent = row.name || '(sin nombre)';
+    
+    // País + nivel de inglés
+    node.querySelector('.card-meta').textContent =
+      (row.country || '—') + (row.english_level ? ` · 🇬🇧 ${row.english_level}` : '');
+    
+    // 💸 Salario deseado (salary_range)
+    const notesEl = node.querySelector('.card-notes');
+    const salary = row.salary_range && String(row.salary_range).trim();
+    if (salary) {
+      notesEl.textContent = `Desired salary: ${salary}`;
+    } else {
+      notesEl.textContent = '';
+    }
+
+    cards.appendChild(node);
+  }
+}
 
   function renderCards(results){
     // Guardamos todos los resultados de la búsqueda actual
