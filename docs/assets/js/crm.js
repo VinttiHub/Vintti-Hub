@@ -641,7 +641,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">$0</span>';
         const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">$0</span>';
         const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">$0</span>';
-
+        const priorityRaw   = (item.priority || '').toString().trim();
+        const priorityUpper = priorityRaw.toUpperCase();   // 'a ' -> 'A'
+        const priorityClass = priorityUpper
+          ? 'priority-' + priorityUpper.toLowerCase()      // 'A' -> 'priority-a'
+          : 'priority-empty';
         return `
           <tr data-id="${item.account_id}">
             <td>${item.client_name || '—'}</td>
@@ -662,16 +666,16 @@ document.addEventListener('DOMContentLoaded', () => {
             ${showPriorityColumn ? `
               <td>
                 <select
-                  class="priority-select ${item.priority ? 'priority-' + item.priority.toLowerCase() : 'priority-empty'}"
+                  class="priority-select ${priorityClass}"
                   data-id="${item.account_id}">
-                  <option value="" ${item.priority ? '' : 'selected'}> </option>
-                  <option value="A" ${item.priority === 'A' ? 'selected' : ''}>A</option>
-                  <option value="B" ${item.priority === 'B' ? 'selected' : ''}>B</option>
-                  <option value="C" ${item.priority === 'C' ? 'selected' : ''}>C</option>
+                  <option value="" ${priorityUpper ? '' : 'selected'}> </option>
+                  <option value="A" ${priorityUpper === 'A' ? 'selected' : ''}>A</option>
+                  <option value="B" ${priorityUpper === 'B' ? 'selected' : ''}>B</option>
+                  <option value="C" ${priorityUpper === 'C' ? 'selected' : ''}>C</option>
                 </select>
               </td>` : ``}
           </tr>`;
-      }).join('');
+        }).join('');
       tableBody.innerHTML = rowsHtml;
 
       // Ensure column header name

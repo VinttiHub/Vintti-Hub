@@ -2874,3 +2874,38 @@ input:checked + .slider::before {
   transform: translateY(-1px) scale(1.05);
   opacity: 1;
 }
+.pipeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.interview-count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: #64748b;
+  margin-right: auto;   /* ⬅️ esto empuja los botones a la derecha */
+}
+
+.interview-count label {
+  line-height: 1.2;
+}
+
+#interviewed-count-input {
+  width: 72px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+  background: #ffffffcc;
+}
+
+#interviewed-count-input:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 1px #e2e8f0;
+}

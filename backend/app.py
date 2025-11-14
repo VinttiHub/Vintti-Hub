@@ -322,6 +322,7 @@ def data_light():
             SELECT
               a.account_id,
               a.client_name,
+              a.priority,   
               -- Recruiting (TRR)
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               -- Staffing (TSF / TSR)

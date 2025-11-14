@@ -249,6 +249,20 @@
       <div class="pipeline-header">
         <h2>Pipeline</h2>
         <div class="pipeline-actions">
+          <!-- 🔢 Small counter for interviewed candidates -->
+          <div class="interview-count">
+            <label for="interviewed-count-input">Number of interviewed candidates</label>
+            <input
+              id="interviewed-count-input"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
+              placeholder="0"
+            />
+            <span id="interviewed-count-status" class="interview-count-status"></span>
+          </div>
+
           <button id="createCandidateBtn">+ Create Candidate</button>
           <button id="signOffBtn">Sign off</button>
         </div>
