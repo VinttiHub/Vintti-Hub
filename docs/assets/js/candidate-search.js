@@ -198,11 +198,32 @@ function renderCs(items, {append=false}={}){
 function renderChips({ title, tools, years_experience, location }){
   chips.innerHTML = '';
   const items = [];
-  if (title) items.push({label:title});
-  (tools || []).forEach(t => items.push({label:t}));
-  if (Number.isFinite(years_experience)) items.push({label:`${years_experience} yrs`});
-  if (location) items.push({label:`📍 ${location}`});
-  if (!items.length){ chips.classList.add('hidden'); return; }
+
+  // 💼 Posición / título
+  if (title) {
+    items.push({ label: `💼 ${title}` });
+  }
+
+  // 🧰 Tools / skills
+  (tools || []).forEach(t => {
+    items.push({ label: `🧰 ${t}` });
+  });
+
+  // ⏳ Años de experiencia
+  if (Number.isFinite(years_experience)) {
+    items.push({ label: `⏳ ${years_experience} yrs` });
+  }
+
+  // 📍 Location (ya lo tenías)
+  if (location) {
+    items.push({ label: `📍 ${location}` });
+  }
+
+  if (!items.length){
+    chips.classList.add('hidden');
+    return;
+  }
+
   for (const it of items){
     const s = document.createElement('span');
     s.className = 'chip';
