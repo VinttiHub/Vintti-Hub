@@ -2881,43 +2881,40 @@ input:checked + .slider::before {
   flex: 1;
 }
 
-.interview-count {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 11px;
+/* 🔢 Contador de entrevistados: label + input en una fila, alineados a la izquierda */
+.pipeline-section .interview-count {
+  display: inline-flex;
+  flex-direction: row;        /* ⬅️ fila, ya no columna */
+  align-items: center;
+  gap: 10px;                  /* espacio entre label e input */
+  font-size: 13px;
   color: #64748b;
-  margin-right: auto;   /* ⬅️ esto empuja los botones a la derecha */
+  margin-right: auto;         /* empuja los botones a la derecha */
 }
 
-.interview-count label {
-  line-height: 1.2;
+.pipeline-section .interview-count label {
+  margin: 0;
+  white-space: nowrap;        /* evita que se corte en dos líneas */
 }
 
-#interviewed-count-input {
-  width: 72px;
-  padding: 3px 6px;
+/* Input estilo pill, alineado al texto */
+.pipeline-section #interviewed-count-input {
+  width: 80px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid #e2e8f0;
-  font-size: 12px;
-  text-align: center;
+  font-size: 13px;
+  text-align: left;           /* ⬅️ número pegado a la izquierda */
   outline: none;
   background: #ffffffcc;
 }
 
-#interviewed-count-input:focus {
-  border-color: #94a3b8;
-  box-shadow: 0 0 0 1px #e2e8f0;
+/* Opcional: ocultar flechitas de number para que se vea más limpio */
+.pipeline-section #interviewed-count-input::-webkit-outer-spin-button,
+.pipeline-section #interviewed-count-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
-/* Pipeline header: input a la izquierda, botones a la derecha */
-.pipeline-section .pipeline-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-  justify-content: flex-start !important; /* 👈 fuerza alineación desde la izquierda */
-}
-
-.pipeline-section .interview-count {
-  margin-right: auto; /* 👈 deja el input pegado a la izquierda y empuja los botones */
+.pipeline-section #interviewed-count-input[type="number"] {
+  -moz-appearance: textfield;
 }
