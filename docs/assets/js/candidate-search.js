@@ -31,16 +31,20 @@ async function parseQuery(q){
   if (!res.ok) throw new Error('Parse failed');
   return await res.json();
 }
-
-async function searchCandidates(tools){
+async function searchCandidates(tools, opts = {}) {
   const params = new URLSearchParams();
   if (tools && tools.length) params.set('tools', tools.join(','));
-  const full = `${API_BASE}/search/candidates?`+params.toString();
+
+  // 🔹 nuevo: pasamos la location que sacó el parser al backend
+  if (opts.location) {
+    params.set('location', opts.location);
+  }
+
+  const full = `${API_BASE}/search/candidates?` + params.toString();
   console.log('➡️ GET', full);
   const res = await fetch(full, { credentials:'include' });
   if (!res.ok) throw new Error('Search failed');
   const json = await res.json();
-  // espejo mínimo para ver cuántos items vinieron
   console.log('📦 items:', (json.items||[]).length);
   return json;
 }
@@ -259,13 +263,12 @@ async function doSearch(){
   const q = input.value.trim();
   if (!q){ input.focus(); return; }
 
-  // —— DEBUG: entrada del usuario
   console.groupCollapsed('%cAI Candidate Search','color:#6b5b95;font-weight:bold');
   console.log('🔎 Query (usuario) →', q);
 
   btn.disabled = true; btn.textContent = 'Buscando…';
   try{
-    // —— DEBUG: petición al parser
+    // 1) Parser
     console.groupCollapsed('🧠 Llamada a /ai/parse_candidate_query');
     const parsed = await parseQuery(q);
     console.log('↩️ Respuesta parser:', parsed);
@@ -273,26 +276,42 @@ async function doSearch(){
 
     renderChips(parsed);
 
-    const tools = (parsed.tools || []).map(s => String(s).toLowerCase().trim()).filter(Boolean);
+    const tools = (parsed.tools || [])
+      .map(s => String(s).toLowerCase().trim())
+      .filter(Boolean);
 
-    // —— DEBUG: tools normalizadas
-    console.groupCollapsed('🧰 Tools normalizadas para buscar');
+    const location = (parsed.location || '').trim();
+    const yearsFromParser = parsed.years_experience;
+
+    console.groupCollapsed('🧰 Filtros normalizados para Vintti Talent');
     console.log('tools →', tools);
+    console.log('location →', location);
+    console.log('years_experience →', yearsFromParser);
     console.groupEnd();
 
-    // —— DEBUG: request a /search/candidates
-    const params = new URLSearchParams();
-    if (tools.length) params.set('tools', tools.join(','));
-    const url = `${API_BASE}/search/candidates?${params.toString()}`;
+    // 2) Buscar en Vintti Talent, pasando también la location
     console.groupCollapsed('📡 Fetch /search/candidates');
-    console.log('URL →', url);
-
-    const data = await searchCandidates(tools);
+    const data = await searchCandidates(tools, { location });
     console.log('↩️ Respuesta search:', data);
+
+    // 🔹 nuevo: setear el dropdown de años según lo que detectó el parser
+    if (expFilter) {
+      if (Number.isFinite(yearsFromParser)) {
+        expFilter.value = String(yearsFromParser);   // ej: "3"
+        console.log('🎚️ exp-filter seteado a', expFilter.value);
+      } else {
+        // si no hay filtro de años en el query, dejamos el dropdown en blanco
+        expFilter.value = '';
+        console.log('🎚️ exp-filter limpiado (sin filtro de años en query)');
+      }
+    }
+
     console.groupEnd();
+
+    // Renderizamos usando el filtro actual (que ya apunta a years_experience del parser si existe)
     renderCards(data.items || []);
 
-    // —— Coresignal (preview)
+    // 3) Coresignal (se queda igual, usando parsed completo)
     _csState = { lastParsed: parsed, page: 1, hasMore: true };
     csList.innerHTML = ''; csEmpty.classList.add('hidden');
     csMore.classList.add('hidden');
@@ -301,7 +320,6 @@ async function doSearch(){
     const csItems = Array.isArray(csRes?.data) ? csRes.data : (csRes?.data?.items || []);
     renderCs(csItems, { append:false });
 
-    // control de paginación de preview (1..5)
     if (csItems.length > 0){
       csMore.classList.remove('hidden');
     }else{

@@ -238,6 +238,22 @@ def search_candidates():
 
         logging.info("🔎 [/search/candidates] qs.tools_raw=%r → tools_lc=%r", raw_tools, tools_lc)
 
+        # 🔹 nuevo: location que viene del parser (país / ciudad / región)
+        raw_location = request.args.get('location', '') or ''
+        location = raw_location.strip()
+        logging.info("🔎 [/search/candidates] qs.location_raw=%r", raw_location)
+
+        country_filter = None
+        if location:
+            # Reutilizamos la misma lógica LATAM que para Coresignal
+            if _is_latam_location(location):
+                cname = _resolve_latam_country_name(location)
+                country_filter = cname or location
+            else:
+                country_filter = location
+
+        logging.info("🔎 country_filter (normalizado)=%r", country_filter)
+
         if not tools_lc:
             logging.info("🔎 No tools provided → return empty items")
             resp = jsonify({"items":[]})
@@ -250,7 +266,7 @@ def search_candidates():
         conn = get_connection()
         cur = conn.cursor()
 
-        # Ordenamos por cantidad de tools matcheadas (hits) y luego por nombre/id
+        # Base SQL (sin filtro de country todavía)
         sql = """
         SELECT
             c.candidate_id,
@@ -275,12 +291,23 @@ def search_candidates():
         JOIN unnest(%s::text[]) AS kw
             ON lower(t.elem->>'tool') ILIKE kw
 
-        -- ❌ Excluir candidatos con english_level = 'Regular' o 'Poor'
         WHERE
-            c.english_level IS NULL
-            OR trim(c.english_level) = ''
-            OR lower(c.english_level) NOT IN ('regular', 'poor')
+            -- ❌ Excluir candidatos con english_level = 'Regular' o 'Poor'
+            (
+                c.english_level IS NULL
+                OR trim(c.english_level) = ''
+                OR lower(c.english_level) NOT IN ('regular', 'poor')
+            )
+        """
 
+        params = [patterns]
+
+        # 🔹 si el parser detectó país/location, filtramos también Vintti Talent por c.country
+        if country_filter:
+            sql += "\n        AND (c.country ILIKE %s)\n"
+            params.append(f"%{country_filter}%")
+
+        sql += """
         GROUP BY
             c.candidate_id,
             c.name,
@@ -292,21 +319,20 @@ def search_candidates():
         ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200;
         """
-        # --- Sanity checks (SEGUROS; quita en prod si quieres) ---
+
+        # --- Sanity checks (opcionales, puedes quitar en prod) ---
         try:
             cur.execute("select current_database()")
             dbname = cur.fetchone()[0]
             logging.info("🗄️ current_database=%s", dbname)
 
-            # Cuenta filas que PARECEN json array por regex (sin castear)
             cur.execute("""
                 SELECT count(*)
                 FROM resume r
-                WHERE r.tools ~ '^\s*\[.*\]\s*$'
+                WHERE r.tools ~ '^\s*\\[.*\\]\s*$'
             """)
             logging.info("🧮 resume rows with tools that look like JSON array = %s", cur.fetchone()[0])
 
-            # Muestra 1 ejemplo usando cast SOLO si pasa regex
             cur.execute("""
                 SELECT c.candidate_id,
                        array_agg(lower(t.elem->>'tool')) AS tools_lc
@@ -314,7 +340,7 @@ def search_candidates():
                 JOIN resume r ON r.candidate_id = c.candidate_id
                 CROSS JOIN LATERAL jsonb_array_elements(
                 CASE
-                    WHEN r.tools ~ '^\s*\[.*\]\s*$' THEN r.tools::jsonb
+                    WHEN r.tools ~ '^\s*\\[.*\\]\s*$' THEN r.tools::jsonb
                     ELSE '[]'::jsonb
                 END
                 ) AS t(elem)
@@ -328,7 +354,7 @@ def search_candidates():
             logging.exception("⚠️ sanity checks failed")
         # --- fin sanity checks ---
 
-        cur.execute(sql, (patterns,))
+        cur.execute(sql, tuple(params))
         rows = cur.fetchall()
         logging.info("📦 rows_found=%d", len(rows))
 
@@ -351,8 +377,6 @@ def search_candidates():
                 "hits": int(hits),
                 "years_experience": years
             })
-
-        logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 
         logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 
