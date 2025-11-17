@@ -466,7 +466,8 @@ function closePopup() {
 
   const summaryAllowed = [
     'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
-    'lara@vintti.com','agostina@vintti.com','mariano@vintti.com'
+    'lara@vintti.com','agostina@vintti.com','mariano@vintti.com',
+    'jazmin@vintti.com'
   ];
   const equipmentsAllowed = [
     'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
@@ -521,7 +522,9 @@ function closePopup() {
 // Inject Dashboard + Management Metrics for allowed users (no flicker)
 (() => {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com','bahia@vintti.com']);
+  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com','bahia@vintti.com',
+    'jazmin@vintti.com','agostina@vintti.com'
+  ]);
   if (!email || !MGMT_ALLOWED.has(email)) {
     document.getElementById('dashboardLink')?.remove();
     document.getElementById('managementMetricsLink')?.remove();

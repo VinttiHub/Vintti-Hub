@@ -266,7 +266,8 @@ function installAdvancedFilters(table) {
     'angie@vintti.com',
     'lara@vintti.com',
     'agostina@vintti.com',
-    'mariano@vintti.com'
+    'mariano@vintti.com',
+    'jazmin@vintti.com' 
   ];
 
   // Quienes ven Equipments
@@ -289,7 +290,9 @@ function installAdvancedFilters(table) {
    ====================================================================== */
 (() => {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com', 'bahia@vintti.com']);
+  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com', 'bahia@vintti.com',
+      'jazmin@vintti.com', 'agostina@vintti.com' 
+  ]);
 
   // Si no está permitido: elimina si existieran y sal
   if (!email || !MGMT_ALLOWED.has(email)) {
