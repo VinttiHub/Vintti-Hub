@@ -113,7 +113,7 @@
           <div class="field">
             <label style="display:flex; align-items:center; gap:8px;">
               <!-- NOTE: This SVG is a placeholder in source; leave as-is to avoid breaking hooks -->
-              <img src="/docs/assets/img/earth-location.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/earth-location.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
 
               <span>Country</span>
               <span id="country-flag" class="country-flag"></span>
@@ -146,14 +146,14 @@
           <div class="field" id="phone-field">
             <label style="display:flex; align-items:center; justify-content:space-between;">
               <span style="display:flex; align-items:center; gap:8px;">
-                <img src="/docs/assets/img/telephone.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+                <img src="assets/img/telephone.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
 
                 Phone number
               </span>
 
               <!-- SIN display:none -->
               <button id="wa-btn-overview" class="icon-button whatsapp" type="button" title="Open WhatsApp">
-                <img src="/docs/assets/img/whatsapp.png" alt="Phone" style="width:28px; height:28px; object-fit:contain;">
+                <img src="assets/img/whatsapp.png" alt="Phone" style="width:28px; height:28px; object-fit:contain;">
               </button>
             </label>
 
@@ -163,7 +163,7 @@
           <!-- EMAIL (contenteditable) -->
           <div class="field">
             <label>
-              <img src="/docs/assets/img/mail.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              <img src="assets/img/mail.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
               Email
             </label>
             <div id="field-email" contenteditable="true">—</div>
@@ -172,11 +172,11 @@
           <!-- LINKEDIN (editable link + external open button) -->
           <div class="field">
             <label style="display:flex; align-items:center; justify-content:space-between;">
-              <img src="/docs/assets/img/linkedin copy.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              <img src="assets/img/linkedin copy.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
               <span>LinkedIn</span>
               <!-- href is set by JS; keep blank but add rel for security when target=_blank -->
               <a id="linkedin-open-btn" class="linkedin-link" title="Open in new tab" target="_blank" rel="noopener noreferrer">
-                <img src="/docs/assets/img/external-link.png" alt="Phone" style="width:18px; height:18px; object-fit:contain;">
+                <img src="assets/img/external-link.png" alt="Phone" style="width:18px; height:18px; object-fit:contain;">
               </a>
             </label>
             <div id="field-linkedin" contenteditable="true" style="word-break: break-all;">—</div>
@@ -185,7 +185,7 @@
           <!-- ENGLISH LEVEL (select) -->
           <div class="field">
             <label>
-              <img src="/docs/assets/img/language.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/language.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
               English Level
             </label>
             <select id="field-english-level">
@@ -201,7 +201,7 @@
           <!-- MIN SALARY (contenteditable) -->
           <div class="field">
             <label>
-              <img src="/docs/assets/img/dollar.png" alt="Phone" style="width:17px; height:17px; object-fit:contain;">
+              <img src="assets/img/dollar.png" alt="Phone" style="width:17px; height:17px; object-fit:contain;">
               Min Salary
             </label>
             <div id="field-salary-range" contenteditable="true">—</div>
@@ -210,7 +210,7 @@
           <!-- CREATED BY / CREATED AT (read-only text) -->
           <div class="field">
             <label>
-              <img src="/docs/assets/img/edit.png" alt="Phone" style="width:15px; height:15px; object-fit:contain;">
+              <img src="assets/img/edit.png" alt="Phone" style="width:15px; height:15px; object-fit:contain;">
               Created by
             </label>
             <div id="field-created-by">—</div>
@@ -218,7 +218,7 @@
 
           <div class="field">
             <label>
-              <img src="/docs/assets/img/calendar.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              <img src="assets/img/calendar.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
               Created at
             </label>
             <div id="field-created-at">—</div>
@@ -229,7 +229,7 @@
           <div class="field-group">
             <div class="field textarea red-flag">
               <label for="redFlags">
-                <img src="/docs/assets/img/flag.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
+                <img src="assets/img/flag.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
                 Red Flags
               </label>
               <textarea id="redFlags" placeholder="No red flags">—</textarea>
@@ -237,7 +237,7 @@
 
             <div class="field textarea comments">
               <label for="comments">
-                <img src="/docs/assets/img/comment.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
+                <img src="assets/img/comment.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
                 Comments
               </label>
               <textarea id="comments" placeholder="No comments">—</textarea>
@@ -247,7 +247,7 @@
           <!-- CANDIDATE SUCCESS (rich toolbar + contenteditable) -->
           <div class="field textarea">
             <label>
-              <img src="/docs/assets/img/success.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
+              <img src="assets/img/success.png" alt="Phone" style="width:16px; height:16px; object-fit:contain;">
               Candidate success
             </label>
             <div class="rich-toolbar" id="candidate-succes-toolbar">
@@ -369,7 +369,7 @@
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🧠">About</h2>
             <button class="star-button" id="about-star-button" data-target="popup-about" title="Add comment">
-              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
             </button>
           </div>
           <div class="cv-card">
@@ -382,7 +382,7 @@
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="💼">Work Experience</h2>
             <button class="star-button" data-target="popup-work" title="Add comment">
-              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
             </button>
           </div>
           <div id="workExperienceList"></div>
@@ -394,7 +394,7 @@
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🎓">Education</h2>
             <button class="star-button" data-target="popup-education" title="Add comment">
-              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
             </button>
           </div>
           <div id="educationList"></div>
@@ -406,7 +406,7 @@
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🛠️">Tools</h2>
             <button class="star-button" data-target="popup-about" title="Add comment">
-              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
             </button>
           </div>
           <div class="cv-card" id="toolsList"></div>
@@ -418,7 +418,7 @@
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🌐">Languages</h2>
             <button class="star-button" data-target="popup-about" title="Add comment">
-              <img src="/docs/assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
             </button>
           </div>
           <div class="cv-card" id="languagesList"></div>
