@@ -459,12 +459,9 @@ window.allowedHRUsers = users.filter(u =>
                   referenceDate = new Date(result.latest_sourcing_date);
                 }
               }
-
               // 3) Si no hay fecha, no contamos
               if (!referenceDate) {
-                daysCell.textContent = '-';
-                daysCell.removeAttribute('title');
-                daysCell.classList.remove('red-cell');
+                colorizeSourcingCell(daysCell, null);
                 return;
               }
 
@@ -473,15 +470,8 @@ window.allowedHRUsers = users.filter(u =>
               const diffTime = today - referenceDate;
               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
 
-              // 5) Pintar valor y alerta roja si ≥ 7
-              daysCell.textContent = diffDays;
-              daysCell.title = `Days since sourcing: ${diffDays}`;
-              if (diffDays >= 7) {
-                daysCell.classList.add('red-cell');
-                daysCell.innerHTML += ' ⚠️';
-              } else {
-                daysCell.classList.remove('red-cell');
-              }
+              // 5) Pintar con semáforo (verde / amarillo / rojo)
+              colorizeSourcingCell(daysCell, diffDays);
             } catch (err) {
               console.error(`Error fetching sourcing date para opp ${oppId}:`, err);
             }
@@ -519,23 +509,15 @@ window.allowedHRUsers = users.filter(u =>
           tbody.appendChild(tr);
           tr.style.opacity = 1;
           tr.style.animation = 'none';
-          if (opp.opp_stage === 'Sourcing') {
-            const daysCell = tr.querySelector('td:last-child');
-            if (typeof opp._days_since_batch === 'number') {
-              daysCell.title = `Days since sourcing: ${opp._days_since_batch}`;
-              if (opp._days_since_batch >= 7) {
-                daysCell.classList.add('red-cell');
-                daysCell.innerHTML = `${opp._days_since_batch} ⚠️`;
+            if (opp.opp_stage === 'Sourcing') {
+              const daysCell = tr.querySelector('td:last-child');
+              if (typeof opp._days_since_batch === 'number') {
+                colorizeSourcingCell(daysCell, opp._days_since_batch);
               } else {
-                daysCell.classList.remove('red-cell');
-                daysCell.textContent = opp._days_since_batch;
+                // Sin fecha luego del enriquecimiento → usar tu fallback asíncrono existente
+                fetchDaysSinceBatch(opp, tr);
               }
-            } else {
-              // Sin fecha luego del enriquecimiento → usar tu fallback asíncrono existente
-              fetchDaysSinceBatch(opp, tr);
             }
-}
-
           if (opp.opp_stage === 'Sourcing') {
             fetchDaysSinceBatch(opp, tr);
           }
@@ -1571,6 +1553,40 @@ function computeDaysSinceBatch(refDateStr) {
   const today = new Date();
   const diffDays = Math.ceil((today - ref) / (1000 * 60 * 60 * 24)) - 1; // mismo criterio que usas
   return diffDays;
+}
+function colorizeSourcingCell(cell, days) {
+  if (!cell) return;
+
+  // Limpia clases previas
+  cell.classList.remove('green-cell', 'yellow-cell', 'red-cell');
+
+  // Si no hay días válidos, muestra guion
+  if (days == null || Number.isNaN(Number(days))) {
+    cell.textContent = '-';
+    cell.removeAttribute('title');
+    return;
+  }
+
+  const n = Number(days);
+  let label = String(n);
+
+  // 🎨 Lógica de colores:
+  // 1–2 días  → verde
+  // 3–5 días  → amarillo
+  // 6+ días   → rojo + ⚠️
+  if (n >= 6) {
+    cell.classList.add('red-cell');
+    label = `${n} ⚠️`;
+  } else if (n >= 3) {
+    cell.classList.add('yellow-cell');
+    label = `${n} ⏳`;
+  } else if (n >= 0) {
+    cell.classList.add('green-cell');
+    label = `${n} 🌱`;
+  }
+
+  cell.textContent = label;
+  cell.title = `Days since sourcing: ${n}`;
 }
 
 

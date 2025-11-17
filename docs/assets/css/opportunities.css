@@ -1727,3 +1727,14 @@ body.dark-mode .profile-tile{
   --bg2: #6ea8ff;
   --glow: rgba(110,168,255,.25);
 }
+.green-cell {
+  background-color: #e2f7e9;   /* verde pastel */
+  color: #1b6b3a;
+  font-weight: 600;
+}
+
+.yellow-cell {
+  background-color: #fff6cc;   /* amarillo pastel */
+  color: #8a6a00;
+  font-weight: 600;
+}
