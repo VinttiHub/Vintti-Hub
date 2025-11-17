@@ -466,7 +466,7 @@ function closePopup() {
 
   const summaryAllowed = [
     'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
-    'lara@vintti.com','agostina@vintti.com'
+    'lara@vintti.com','agostina@vintti.com','mariano@vintti.com'
   ];
   const equipmentsAllowed = [
     'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'

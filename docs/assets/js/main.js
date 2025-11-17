@@ -1070,7 +1070,8 @@ helloBtn.addEventListener('click', async () => {
   }
 const summaryLink = document.getElementById('summaryLink');
 const currentUserEmail = localStorage.getItem('user_email');
-const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 'lara@vintti.com','agostina@vintti.com'];
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 
+  'lara@vintti.com','agostina@vintti.com','mariano@vintti.com'];
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'block';

@@ -265,7 +265,8 @@ function installAdvancedFilters(table) {
     'bahia@vintti.com',
     'angie@vintti.com',
     'lara@vintti.com',
-    'agostina@vintti.com'
+    'agostina@vintti.com',
+    'mariano@vintti.com'
   ];
 
   // Quienes ven Equipments
