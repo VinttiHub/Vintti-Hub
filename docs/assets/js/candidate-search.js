@@ -104,14 +104,15 @@ async function coresignalSearch(parsed, page = 1, locationOverride = null){
 
 async function coresignalMultiSearch(parsed){
   const order = [
-    { tag: '🇲🇽 Mexico',    loc: 'Mexico'    },
-    { tag: '🇦🇷 Argentina', loc: 'Argentina' },
-    { tag: '🇨🇴 Colombia',  loc: 'Colombia'  },
-    { tag: '🌎 General LATAM', loc: null }   // null → sin location → gate LATAM en backend
+    { tag: '🇲🇽 Mexico',       loc: 'Mexico'    },
+    { tag: '🇦🇷 Argentina',    loc: 'Argentina' },
+    { tag: '🇨🇴 Colombia',     loc: 'Colombia'  },
+    { tag: '🌎 General LATAM', loc: null }      // null → gate LATAM en backend
   ];
 
   const seen = new Set();
-  const result = [];
+  let firstBatch = true;
+  let total = 0;
 
   for (const cfg of order){
     console.groupCollapsed(
@@ -119,10 +120,19 @@ async function coresignalMultiSearch(parsed){
       'color:#1f7a8c;font-weight:bold'
     );
 
-    const res = await coresignalSearch(parsed, 1, cfg.loc);
-    const arr = Array.isArray(res?.data) ? res.data : (res?.data?.items || []);
-    console.log(`📦 ${cfg.tag} items →`, arr.length);
+    let res, arr;
+    try {
+      res = await coresignalSearch(parsed, 1, cfg.loc);
+      arr = Array.isArray(res?.data) ? res.data : (res?.data?.items || []);
+      console.log(`📦 ${cfg.tag} items (raw) →`, arr.length);
+    } catch (err) {
+      console.error(`❌ Error en coresignalSearch para ${cfg.tag}`, err);
+      console.groupEnd();
+      continue;
+    }
 
+    // 👉 quitar duplicados entre países
+    const unique = [];
     for (const it of arr){
       const id =
         it.employee_id ||
@@ -132,16 +142,25 @@ async function coresignalMultiSearch(parsed){
         it.canonical_shorthand_name;
 
       if (!id) continue;
-      if (seen.has(id)) continue; // 👈 evita duplicados
+      if (seen.has(id)) continue;
       seen.add(id);
-      result.push(it);
+      unique.push(it);
+    }
+
+    console.log(`✅ ${cfg.tag} únicos →`, unique.length);
+
+    if (unique.length){
+      // La primera búsqueda limpia la lista, las demás solo agregan
+      renderCs(unique, { append: !firstBatch });
+      firstBatch = false;
+      total += unique.length;
     }
 
     console.groupEnd();
   }
 
-  console.log('📦 Total Coresignal combinados (sin duplicados) →', result.length);
-  return result;
+  console.log('📦 Total Coresignal combinados (sin duplicados) →', total);
+  return total;
 }
 
 function renderCs(items, {append=false}={}){
@@ -478,20 +497,17 @@ async function doSearch(){
     // Renderizamos usando el filtro actual (que ya apunta a years_experience del parser si existe)
     renderCards(data.items || []);
 
-    // 3) Coresignal (se queda igual, usando parsed completo)
-    _csState = { lastParsed: parsed, page: 1, hasMore: true };
-    csList.innerHTML = ''; csEmpty.classList.add('hidden');
-    csMore.classList.add('hidden');
+    // 3) Coresignal: multi-búsqueda (México, Argentina, Colombia, LATAM)
+    _csState = { lastParsed: parsed, page: 1, hasMore: false }; // desactivamos paginación preview
+    csList.innerHTML = '';
+    csEmpty.classList.add('hidden');
+    csMore.classList.add('hidden'); // ocultamos "Cargar más" en este modo
 
-    const csRes = await coresignalSearch(parsed, 1);
-    const csItems = Array.isArray(csRes?.data) ? csRes.data : (csRes?.data?.items || []);
-    renderCs(csItems, { append:false });
+    const totalCs = await coresignalMultiSearch(parsed);
 
-    if (csItems.length > 0){
-      csMore.classList.remove('hidden');
-    }else{
+    if (totalCs === 0){
+      // si ninguna de las 4 búsquedas devolvió nada
       csEmpty.classList.remove('hidden');
-      csMore.classList.add('hidden');
     }
 
   }catch(err){
