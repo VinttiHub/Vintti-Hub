@@ -238,19 +238,18 @@ def search_candidates():
 
         logging.info("🔎 [/search/candidates] qs.tools_raw=%r → tools_lc=%r", raw_tools, tools_lc)
 
-        # 🔹 nuevo: title que viene del parser (posición buscada)
+        # 🔹 title que viene del parser (posición buscada)
         raw_title = request.args.get('title', '') or ''
         title = raw_title.strip()
         logging.info("🔎 [/search/candidates] qs.title_raw=%r → title=%r", raw_title, title)
 
-        # 🔹 nuevo: location que viene del parser (país / ciudad / región)
+        # 🔹 location que viene del parser (país / ciudad / región)
         raw_location = request.args.get('location', '') or ''
         location = raw_location.strip()
         logging.info("🔎 [/search/candidates] qs.location_raw=%r", raw_location)
 
         country_filter = None
         if location:
-            # Reutilizamos la misma lógica LATAM que para Coresignal
             if _is_latam_location(location):
                 cname = _resolve_latam_country_name(location)
                 country_filter = cname or location
@@ -259,148 +258,185 @@ def search_candidates():
 
         logging.info("🔎 country_filter (normalizado)=%r", country_filter)
 
-        if not tools_lc:
-            logging.info("🔎 No tools provided → return empty items")
-            resp = jsonify({"items":[]})
+        # 🛑 Caso límite: sin tools y sin title → no tenemos cómo filtrar
+        if not tools_lc and not title:
+            logging.info("🔎 No tools AND no title provided → return empty items")
+            resp = jsonify({"items": []})
             return _ok_origin(resp), 200
-
-        # Preparamos patrones para coincidencia parcial
-        patterns = [f"%{t}%" for t in tools_lc]
-        logging.info("🧾 ILIKE patterns=%r", patterns)
 
         conn = get_connection()
         cur = conn.cursor()
 
-        # Base SQL (sin filtro de country ni title todavía)
-        sql = """
-        SELECT
-            c.candidate_id,
-            c.name,
-            c.country,
-            c.comments,
-            c.english_level,
-            c.salary_range,
-            COUNT(DISTINCT kw) AS hits,
-            r.work_experience
-        FROM candidates c
-        JOIN resume r ON r.candidate_id = c.candidate_id
+        items = []
 
-        -- ✅ Fix: solo castea JSON si r.tools es JSON válido
-        CROSS JOIN LATERAL jsonb_array_elements(
-            CASE
-                WHEN r.tools IS NULL OR trim(r.tools) = '' THEN '[]'::jsonb
-                WHEN r.tools ~ '^\s*\\[.*\\]\s*$' THEN r.tools::jsonb
-                ELSE '[]'::jsonb
-            END
-        ) AS t(elem)
+        # ============================
+        # 1️⃣ Rama con tools (como antes)
+        # ============================
+        if tools_lc:
+            # Preparamos patrones para coincidencia parcial
+            patterns = [f"%{t}%" for t in tools_lc]
+            logging.info("🧾 ILIKE patterns=%r", patterns)
 
-        JOIN unnest(%s::text[]) AS kw
-            ON lower(t.elem->>'tool') ILIKE kw
+            # Base SQL (con tools + hits)
+            sql = """
+            SELECT
+                c.candidate_id,
+                c.name,
+                c.country,
+                c.comments,
+                c.english_level,
+                c.salary_range,
+                COUNT(DISTINCT kw) AS hits,
+                r.work_experience
+            FROM candidates c
+            JOIN resume r ON r.candidate_id = c.candidate_id
 
-        WHERE
-            -- ❌ Excluir candidatos con english_level = 'Regular' o 'Poor'
-            (
-                c.english_level IS NULL
-                OR trim(c.english_level) = ''
-                OR lower(c.english_level) NOT IN ('regular', 'poor')
-            )
-            -- 🧱 Nuevo: excluir candidatos actualmente contratados
-            AND NOT EXISTS (
-                SELECT 1
-                FROM hire_opportunity h
-                WHERE
-                    h.candidate_id = c.candidate_id
-                    AND h.start_date IS NOT NULL
-                    AND h.end_date IS NULL
-            )
-        """
-
-        params = [patterns]
-
-        # 🔹 si el parser detectó país/location, filtramos también Vintti Talent por c.country
-        if country_filter:
-            sql += "\n        AND (c.country ILIKE %s)\n"
-            params.append(f"%{country_filter}%")
-
-        # 🔹 si el parser detectó title/posición, filtramos por work_experience
-        #    (candidatos que tengan esa posición o algo parecido en su historial)
-        if title:
-            sql += "\n        AND (r.work_experience ILIKE %s)\n"
-            params.append(f"%{title}%")
-
-        sql += """
-        GROUP BY
-            c.candidate_id,
-            c.name,
-            c.country,
-            c.comments,
-            c.english_level,
-            c.salary_range,
-            r.work_experience
-        HAVING COUNT(DISTINCT kw) >= 1
-        ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
-        LIMIT 200;
-        """
-
-
-        # --- Sanity checks (opcionales, puedes quitar en prod) ---
-        try:
-            cur.execute("select current_database()")
-            dbname = cur.fetchone()[0]
-            logging.info("🗄️ current_database=%s", dbname)
-
-            cur.execute("""
-                SELECT count(*)
-                FROM resume r
-                WHERE r.tools ~ '^\s*\\[.*\\]\s*$'
-            """)
-            logging.info("🧮 resume rows with tools that look like JSON array = %s", cur.fetchone()[0])
-
-            cur.execute("""
-                SELECT c.candidate_id,
-                       array_agg(lower(t.elem->>'tool')) AS tools_lc
-                FROM candidates c
-                JOIN resume r ON r.candidate_id = c.candidate_id
-                CROSS JOIN LATERAL jsonb_array_elements(
+            CROSS JOIN LATERAL jsonb_array_elements(
                 CASE
-                    WHEN r.tools ~ '^\s*\\[.*\\]\s*$' THEN r.tools::jsonb
+                    WHEN r.tools IS NULL OR trim(r.tools) = '' THEN '[]'::jsonb
+                    WHEN r.tools ~ '^\\s*\\[.*\\]\\s*$' THEN r.tools::jsonb
                     ELSE '[]'::jsonb
                 END
-                ) AS t(elem)
-                WHERE t.elem ? 'tool'
-                GROUP BY c.candidate_id
-                ORDER BY c.candidate_id
-                LIMIT 1;
-            """)
-            logging.info("🔎 sample tools from DB: %r", cur.fetchone())
-        except Exception:
-            logging.exception("⚠️ sanity checks failed")
-        # --- fin sanity checks ---
+            ) AS t(elem)
 
-        cur.execute(sql, tuple(params))
-        rows = cur.fetchall()
-        logging.info("📦 rows_found=%d", len(rows))
+            JOIN unnest(%s::text[]) AS kw
+                ON lower(t.elem->>'tool') ILIKE kw
 
-        cur.close(); conn.close()
+            WHERE
+                (
+                    c.english_level IS NULL
+                    OR trim(c.english_level) = ''
+                    OR lower(c.english_level) NOT IN ('regular', 'poor')
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM hire_opportunity h
+                    WHERE
+                        h.candidate_id = c.candidate_id
+                        AND h.start_date IS NOT NULL
+                        AND h.end_date IS NULL
+                )
+            """
 
-        items = []
-        for cid, name, country, comments, english_level, salary_range, hits, work_exp_raw in rows:
-            years = compute_years_experience_from_workexp(work_exp_raw)
-            logging.info(
-                "👤 candidate_id=%s → years_experience=%r, english_level=%r, salary_range=%r",
-                cid, years, english_level, salary_range
-            )
+            params = [patterns]
 
-            items.append({
-                "candidate_id": cid,
-                "name": name,
-                "country": country,
-                "comments": comments,
-                "english_level": english_level,
-                "salary_range": salary_range,
-                "hits": int(hits),
-                "years_experience": years
-            })
+            if country_filter:
+                sql += "\n            AND (c.country ILIKE %s)\n"
+                params.append(f"%{country_filter}%")
+
+            if title:
+                sql += "\n            AND (r.work_experience ILIKE %s)\n"
+                params.append(f"%{title}%")
+
+            sql += """
+            GROUP BY
+                c.candidate_id,
+                c.name,
+                c.country,
+                c.comments,
+                c.english_level,
+                c.salary_range,
+                r.work_experience
+            HAVING COUNT(DISTINCT kw) >= 1
+            ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
+            LIMIT 200;
+            """
+
+            # (sanity checks se pueden dejar aquí si quieres)
+            try:
+                cur.execute("select current_database()")
+                dbname = cur.fetchone()[0]
+                logging.info("🗄️ current_database=%s", dbname)
+
+                cur.execute("""
+                    SELECT count(*)
+                    FROM resume r
+                    WHERE r.tools ~ '^\\s*\\[.*\\]\\s*$'
+                """)
+                logging.info("🧮 resume rows with tools that look like JSON array = %s", cur.fetchone()[0])
+            except Exception:
+                logging.exception("⚠️ sanity checks failed")
+
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
+            logging.info("📦 rows_found(tools-branch)=%d", len(rows))
+
+            for cid, name, country, comments, english_level, salary_range, hits, work_exp_raw in rows:
+                years = compute_years_experience_from_workexp(work_exp_raw)
+                items.append({
+                    "candidate_id": cid,
+                    "name": name,
+                    "country": country,
+                    "comments": comments,
+                    "english_level": english_level,
+                    "salary_range": salary_range,
+                    "hits": int(hits),
+                    "years_experience": years
+                })
+
+        # ============================
+        # 2️⃣ Rama SOLO por posición (title) + country opcional
+        # ============================
+        else:
+            logging.info("🔎 title-only search branch (sin tools)")
+
+            sql = """
+            SELECT
+                c.candidate_id,
+                c.name,
+                c.country,
+                c.comments,
+                c.english_level,
+                c.salary_range,
+                r.work_experience
+            FROM candidates c
+            JOIN resume r ON r.candidate_id = c.candidate_id
+            WHERE
+                (
+                    c.english_level IS NULL
+                    OR trim(c.english_level) = ''
+                    OR lower(c.english_level) NOT IN ('regular', 'poor')
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM hire_opportunity h
+                    WHERE
+                        h.candidate_id = c.candidate_id
+                        AND h.start_date IS NOT NULL
+                        AND h.end_date IS NULL
+                )
+            """
+            params = []
+
+            if country_filter:
+                sql += "\n                AND (c.country ILIKE %s)"
+                params.append(f"%{country_filter}%")
+
+            if title:
+                sql += "\n                AND (r.work_experience ILIKE %s)"
+                params.append(f"%{title}%")
+
+            sql += "\n            ORDER BY c.name NULLS LAST, c.candidate_id ASC\n            LIMIT 200;"
+
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
+            logging.info("📦 rows_found(title-only)=%d", len(rows))
+
+            for cid, name, country, comments, english_level, salary_range, work_exp_raw in rows:
+                years = compute_years_experience_from_workexp(work_exp_raw)
+                items.append({
+                    "candidate_id": cid,
+                    "name": name,
+                    "country": country,
+                    "comments": comments,
+                    "english_level": english_level,
+                    "salary_range": salary_range,
+                    "hits": 0,  # sin tools → sin score de hits
+                    "years_experience": years
+                })
+
+        cur.close()
+        conn.close()
 
         logging.info("🪞 first_ids=%r", [it["candidate_id"] for it in items[:10]])
 

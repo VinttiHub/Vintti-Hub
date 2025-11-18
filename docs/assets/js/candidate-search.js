@@ -105,7 +105,7 @@ function renderCs(items, {append=false}={}){
 
   // 🔥 Ordenar por país: 1) México 2) Argentina 3) Colombia 4) resto
   const countryPriority = (it) => {
-    const raw = (it.country || it.location || '').toString().toLowerCase();
+    const raw = (it.country || '').toString().toLowerCase();
 
     if (!raw) return 4;
 
@@ -179,63 +179,52 @@ function renderCs(items, {append=false}={}){
       node.addEventListener('click', (e) => {
         // dejamos el comportamiento por defecto
       });
-    } else {
-      node.href = '#';
-      node.title = 'Ver detalles (intentará abrir LinkedIn)';
+      } else {
+    node.href = '#';
+    node.title = 'Ver detalles (intentará abrir LinkedIn)';
 
-      node.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!eid) return;
+    node.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (!eid) return;
 
-        const popup = window.open('', '_blank', 'noopener');
-        const hasPopup = !!popup;
+      try {
+        const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ employee_id: eid })
+        }).then(r => r.json());
 
-        (async () => {
-          try {
-            const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ employee_id: eid })
-            }).then(r => r.json());
+        console.log('🧾 collect →', det);
 
-            console.log('🧾 collect →', det);
+        const dLi =
+          det.linkedin_url || det.linkedin || det.linkedinUrl || null;
+        const dPublic =
+          det.public_identifier || det.publicIdentifier || null;
+        const dProfile =
+          det.profile_url || det.profileUrl || null;
 
-            const dLi =
-              det.linkedin_url || det.linkedin || det.linkedinUrl || null;
-            const dPublic =
-              det.public_identifier || det.publicIdentifier || null;
-            const dProfile =
-              det.profile_url || det.profileUrl || null;
+        let finalUrl = null;
 
-            let finalUrl = null;
+        if (dLi && /^https?:\/\//i.test(dLi)) {
+          finalUrl = dLi;
+        } else if (dProfile && /^https?:\/\//i.test(dProfile)) {
+          finalUrl = dProfile;
+        } else if (dPublic) {
+          finalUrl = `https://www.linkedin.com/in/${encodeURIComponent(dPublic)}`;
+        }
 
-            if (dLi && /^https?:\/\//i.test(dLi)) {
-              finalUrl = dLi;
-            } else if (dProfile && /^https?:\/\//i.test(dProfile)) {
-              finalUrl = dProfile;
-            } else if (dPublic) {
-              finalUrl = `https://www.linkedin.com/in/${encodeURIComponent(dPublic)}`;
-            }
-
-            if (finalUrl) {
-              if (hasPopup) {
-                popup.location = finalUrl;
-              } else {
-                window.open(finalUrl, '_blank', 'noopener');
-              }
-              return;
-            }
-
-            console.warn('No se encontró LinkedIn en preview ni en collect.');
-            if (hasPopup) popup.close();
-          } catch (err) {
-            console.error('collect error', err);
-            if (hasPopup) popup.close();
-          }
-        })();
-      });
-    }
+        if (finalUrl) {
+          // 👇 solo abrimos UNA pestaña con el LinkedIn
+          window.open(finalUrl, '_blank', 'noopener');
+        } else {
+          console.warn('No se encontró LinkedIn en preview ni en collect.');
+        }
+      } catch (err) {
+        console.error('collect error', err);
+      }
+    });
+  }
 
     csList.appendChild(node);
   }
