@@ -103,7 +103,48 @@ function renderCs(items, {append=false}={}){
   }
   csEmpty.classList.add('hidden');
 
-  for (const it of (items || [])){
+  // 🔥 Ordenar por país: 1) México 2) Argentina 3) Colombia 4) resto
+  const countryPriority = (it) => {
+    const raw = (it.country || it.location || '').toString().toLowerCase();
+
+    if (!raw) return 4;
+
+    // México
+    if (
+      raw.includes('mexico') ||
+      raw.includes('méxico') ||
+      raw === 'mx' ||
+      raw === 'mex'
+    ) return 1;
+
+    // Argentina
+    if (
+      raw.includes('argentina') ||
+      raw === 'ar'
+    ) return 2;
+
+    // Colombia
+    if (
+      raw.includes('colombia') ||
+      raw === 'co'
+    ) return 3;
+
+    // resto de países
+    return 4;
+  };
+
+  const sorted = [...items].sort((a, b) => {
+    const pa = countryPriority(a);
+    const pb = countryPriority(b);
+    if (pa !== pb) return pa - pb;
+    // tie-breaker suave por nombre para que no quede random
+    const na = (a.name || a.full_name || a.public_identifier || '').toLowerCase();
+    const nb = (b.name || b.full_name || b.public_identifier || '').toLowerCase();
+    return na.localeCompare(nb);
+  });
+
+  // 👇 aquí usamos sorted en lugar de items
+  for (const it of sorted){
     const node = csTpl.content.firstElementChild.cloneNode(true);
 
     // Campos típicos de preview (ajusta si tu respuesta cambia):
@@ -117,7 +158,6 @@ function renderCs(items, {append=false}={}){
     node.querySelector('.cs-card-notes').textContent = head || '—';
 
     // === LinkedIn href directo, si está en el preview ===
-    // Posibles campos: linkedin_url directo, o public_identifier para armar la URL
     const liRaw =
       it.linkedin_url || it.linkedin || it.linkedinUrl || null;
     const publicId =
@@ -130,82 +170,72 @@ function renderCs(items, {append=false}={}){
       liHref = `https://www.linkedin.com/in/${encodeURIComponent(publicId)}`;
     }
 
-    // Asegurar que abra en nueva pestaña de manera segura
     node.target = '_blank';
     node.rel = 'noopener';
 
     if (liHref) {
-      // Si ya tenemos LinkedIn, enlazamos directamente la tarjeta
       node.href = liHref;
       node.title = 'Abrir perfil en LinkedIn';
-      // (opcional): quitar cualquier handler para evitar bloquear el default
       node.addEventListener('click', (e) => {
-        // Permitir el comportamiento por defecto del <a>
+        // dejamos el comportamiento por defecto
       });
-  } else {
-    // Si no tenemos LinkedIn en el preview, usamos collect al hacer click
-    node.href = '#';
-    node.title = 'Ver detalles (intentará abrir LinkedIn)';
+    } else {
+      node.href = '#';
+      node.title = 'Ver detalles (intentará abrir LinkedIn)';
 
-    node.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!eid) return;
+      node.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!eid) return;
 
-      // 💡 Abrimos la pestaña inmediatamente (esto sí cuenta como user-initiated)
-      const popup = window.open('', '_blank', 'noopener');
-      const hasPopup = !!popup;
+        const popup = window.open('', '_blank', 'noopener');
+        const hasPopup = !!popup;
 
-      (async () => {
-        try {
-          const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ employee_id: eid })
-          }).then(r => r.json());
+        (async () => {
+          try {
+            const det = await fetch(`${API_BASE}/ext/coresignal/collect`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ employee_id: eid })
+            }).then(r => r.json());
 
-          console.log('🧾 collect →', det);
+            console.log('🧾 collect →', det);
 
-          // Intentar resolver LinkedIn desde el collect:
-          const dLi =
-            det.linkedin_url || det.linkedin || det.linkedinUrl || null;
-          const dPublic =
-            det.public_identifier || det.publicIdentifier || null;
-          const dProfile =
-            det.profile_url || det.profileUrl || null; // 👈 este es el que ves en el log
+            const dLi =
+              det.linkedin_url || det.linkedin || det.linkedinUrl || null;
+            const dPublic =
+              det.public_identifier || det.publicIdentifier || null;
+            const dProfile =
+              det.profile_url || det.profileUrl || null;
 
-          let finalUrl = null;
+            let finalUrl = null;
 
-          // 1) Si viene un URL directo (linkedin_url o profile_url)
-          if (dLi && /^https?:\/\//i.test(dLi)) {
-            finalUrl = dLi;
-          } else if (dProfile && /^https?:\/\//i.test(dProfile)) {
-            finalUrl = dProfile;
-          // 2) Si no, lo armamos con public_identifier
-          } else if (dPublic) {
-            finalUrl = `https://www.linkedin.com/in/${encodeURIComponent(dPublic)}`;
-          }
-
-          if (finalUrl) {
-            if (hasPopup) {
-              // usamos la pestaña ya abierta (no la bloquean)
-              popup.location = finalUrl;
-            } else {
-              // fallback por si el navegador bloqueó la pestaña vacía
-              window.open(finalUrl, '_blank', 'noopener');
+            if (dLi && /^https?:\/\//i.test(dLi)) {
+              finalUrl = dLi;
+            } else if (dProfile && /^https?:\/\//i.test(dProfile)) {
+              finalUrl = dProfile;
+            } else if (dPublic) {
+              finalUrl = `https://www.linkedin.com/in/${encodeURIComponent(dPublic)}`;
             }
-            return;
-          }
 
-          console.warn('No se encontró LinkedIn en preview ni en collect.');
-          if (hasPopup) popup.close();
-        } catch (err) {
-          console.error('collect error', err);
-          if (hasPopup) popup.close();
-        }
-      })();
-    });
-  }
+            if (finalUrl) {
+              if (hasPopup) {
+                popup.location = finalUrl;
+              } else {
+                window.open(finalUrl, '_blank', 'noopener');
+              }
+              return;
+            }
+
+            console.warn('No se encontró LinkedIn en preview ni en collect.');
+            if (hasPopup) popup.close();
+          } catch (err) {
+            console.error('collect error', err);
+            if (hasPopup) popup.close();
+          }
+        })();
+      });
+    }
 
     csList.appendChild(node);
   }
@@ -248,6 +278,16 @@ function renderChips({ title, tools, years_experience, location }){
   }
   chips.classList.remove('hidden');
 }
+// 👇 prioridad por país: 1) Mexico 2) Argentina 3) Colombia 4) resto
+const countryRank = (country) => {
+  const c = (country || '').toLowerCase();
+
+  if (c.includes('mexico'))   return 1; // México primero
+  if (c.includes('argentina'))return 2; // luego Argentina
+  if (c.includes('colombia')) return 3; // luego Colombia
+  return 4;                               // el resto
+};
+
 function applyExperienceFilterAndRender(){
   // Limpiamos las tarjetas
   cards.innerHTML = '';
@@ -279,7 +319,7 @@ function applyExperienceFilterAndRender(){
     return;
   }
 
-  // 2) 👇 Ordenar por salario deseado (salary_range) de menor a mayor
+  // 2) 👇 Ordenar por país (México, Argentina, Colombia, resto) y luego por salario deseado
   const parseSalary = (val) => {
     if (!val) return Infinity; // sin salario → van al final
     const str = String(val).trim();
@@ -290,10 +330,21 @@ function applyExperienceFilterAndRender(){
   };
 
   filtered.sort((a, b) => {
+    const ra = countryRank(a.country);
+    const rb = countryRank(b.country);
+
+    // 1️⃣ primero por prioridad de país
+    if (ra !== rb) return ra - rb;
+
+    // 2️⃣ dentro del mismo país, por salario deseado (menor → mayor)
     const sa = parseSalary(a.salary_range);
     const sb = parseSalary(b.salary_range);
-    if (sa === sb) return 0;
-    return sa - sb; // menor → mayor
+    if (sa !== sb) return sa - sb;
+
+    // 3️⃣ tie-breaker: nombre (para que sea estable y bonito)
+    const nameA = (a.name || '').toLowerCase();
+    const nameB = (b.name || '').toLowerCase();
+    return nameA.localeCompare(nameB);
   });
 
   empty.classList.add('hidden');
