@@ -35,9 +35,14 @@ async function searchCandidates(tools, opts = {}) {
   const params = new URLSearchParams();
   if (tools && tools.length) params.set('tools', tools.join(','));
 
-  // 🔹 nuevo: pasamos la location que sacó el parser al backend
+  // 🔹 location que sacó el parser
   if (opts.location) {
     params.set('location', opts.location);
+  }
+
+  // 🔹 nuevo: title / posición que sacó el parser
+  if (opts.title) {
+    params.set('title', opts.title);
   }
 
   const full = `${API_BASE}/search/candidates?` + params.toString();
@@ -341,12 +346,20 @@ async function doSearch(){
 
     renderChips(parsed);
 
+    const title = (parsed.title || '').trim();
     const tools = (parsed.tools || [])
       .map(s => String(s).toLowerCase().trim())
       .filter(Boolean);
 
     const location = (parsed.location || '').trim();
     const yearsFromParser = parsed.years_experience;
+
+    console.groupCollapsed('🧰 Filtros normalizados para Vintti Talent');
+    console.log('title →', title);
+    console.log('tools →', tools);
+    console.log('location →', location);
+    console.log('years_experience →', yearsFromParser);
+    console.groupEnd();
 
     console.groupCollapsed('🧰 Filtros normalizados para Vintti Talent');
     console.log('tools →', tools);
@@ -356,7 +369,7 @@ async function doSearch(){
 
     // 2) Buscar en Vintti Talent, pasando también la location
     console.groupCollapsed('📡 Fetch /search/candidates');
-    const data = await searchCandidates(tools, { location });
+    const data = await searchCandidates(tools, { location, title });
     console.log('↩️ Respuesta search:', data);
 
     // 🔹 nuevo: setear el dropdown de años según lo que detectó el parser

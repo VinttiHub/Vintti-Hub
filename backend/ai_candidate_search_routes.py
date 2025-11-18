@@ -238,6 +238,11 @@ def search_candidates():
 
         logging.info("🔎 [/search/candidates] qs.tools_raw=%r → tools_lc=%r", raw_tools, tools_lc)
 
+        # 🔹 nuevo: title que viene del parser (posición buscada)
+        raw_title = request.args.get('title', '') or ''
+        title = raw_title.strip()
+        logging.info("🔎 [/search/candidates] qs.title_raw=%r → title=%r", raw_title, title)
+
         # 🔹 nuevo: location que viene del parser (país / ciudad / región)
         raw_location = request.args.get('location', '') or ''
         location = raw_location.strip()
@@ -266,7 +271,7 @@ def search_candidates():
         conn = get_connection()
         cur = conn.cursor()
 
-        # Base SQL (sin filtro de country todavía)
+        # Base SQL (sin filtro de country ni title todavía)
         sql = """
         SELECT
             c.candidate_id,
@@ -317,6 +322,12 @@ def search_candidates():
             sql += "\n        AND (c.country ILIKE %s)\n"
             params.append(f"%{country_filter}%")
 
+        # 🔹 si el parser detectó title/posición, filtramos por work_experience
+        #    (candidatos que tengan esa posición o algo parecido en su historial)
+        if title:
+            sql += "\n        AND (r.work_experience ILIKE %s)\n"
+            params.append(f"%{title}%")
+
         sql += """
         GROUP BY
             c.candidate_id,
@@ -330,6 +341,7 @@ def search_candidates():
         ORDER BY hits DESC, c.name NULLS LAST, c.candidate_id ASC
         LIMIT 200;
         """
+
 
         # --- Sanity checks (opcionales, puedes quitar en prod) ---
         try:
