@@ -53,18 +53,25 @@ async function searchCandidates(tools, opts = {}) {
   console.log('📦 items:', (json.items||[]).length);
   return json;
 }
-async function coresignalSearch(parsed, page=1){
+async function coresignalSearch(parsed, page = 1, locationOverride = null){
   const body = {
     title: parsed.title || "",
-    skills: (parsed.tools || []).map(s => String(s).toLowerCase().trim()).filter(Boolean),
-    location: parsed.location || "",
+    skills: (parsed.tools || [])
+      .map(s => String(s).toLowerCase().trim())
+      .filter(Boolean),
+    // 👇 si viene override (México/Argentina/Colombia), lo usamos;
+    // si no, usamos la location que sacó el parser
+    location: locationOverride || parsed.location || "",
     years_min: parsed.years_experience ?? null,
     page,
     debug: true,
-    allow_fallback: true // ← activa E1→E2→E3 automáticamente
+    allow_fallback: true // ← ya lo tenías
   };
 
-  console.groupCollapsed('%c🌐 POST /ext/coresignal/search','color:#1f7a8c;font-weight:bold');
+  console.groupCollapsed(
+    `%c🌐 POST /ext/coresignal/search (page=${page}, loc=${body.location || 'LATAM gate'})`,
+    'color:#1f7a8c;font-weight:bold'
+  );
   console.log('➡️ body →', body);
 
   const res = await fetch(`${API_BASE}/ext/coresignal/search`, {
@@ -93,6 +100,48 @@ async function coresignalSearch(parsed, page=1){
   }
   console.groupEnd();
   return json;
+}
+
+async function coresignalMultiSearch(parsed){
+  const order = [
+    { tag: '🇲🇽 Mexico',    loc: 'Mexico'    },
+    { tag: '🇦🇷 Argentina', loc: 'Argentina' },
+    { tag: '🇨🇴 Colombia',  loc: 'Colombia'  },
+    { tag: '🌎 General LATAM', loc: null }   // null → sin location → gate LATAM en backend
+  ];
+
+  const seen = new Set();
+  const result = [];
+
+  for (const cfg of order){
+    console.groupCollapsed(
+      `%c🌐 Coresignal ${cfg.tag}`,
+      'color:#1f7a8c;font-weight:bold'
+    );
+
+    const res = await coresignalSearch(parsed, 1, cfg.loc);
+    const arr = Array.isArray(res?.data) ? res.data : (res?.data?.items || []);
+    console.log(`📦 ${cfg.tag} items →`, arr.length);
+
+    for (const it of arr){
+      const id =
+        it.employee_id ||
+        it.id ||
+        it.public_identifier ||
+        it.publicIdentifier ||
+        it.canonical_shorthand_name;
+
+      if (!id) continue;
+      if (seen.has(id)) continue; // 👈 evita duplicados
+      seen.add(id);
+      result.push(it);
+    }
+
+    console.groupEnd();
+  }
+
+  console.log('📦 Total Coresignal combinados (sin duplicados) →', result.length);
+  return result;
 }
 
 function renderCs(items, {append=false}={}){
