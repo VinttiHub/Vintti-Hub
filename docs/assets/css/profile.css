@@ -430,10 +430,8 @@ input:focus, select:focus, textarea:focus{
 
 /* Layout: tarjeta de contacto a la izquierda + org a la derecha */
 .org-layout{
-  display:grid;
-  grid-template-columns: minmax(260px, .9fr) minmax(0, 2.1fr);
-  gap:20px;
-  align-items:flex-start;
+  display:block;
+  width:100%;
 }
 
 /* Panel lateral de contacto */
@@ -504,41 +502,67 @@ input:focus, select:focus, textarea:focus{
   gap:8px;
 }
 
-/* Contenedor general del organigrama */
+/* --------- Org chart principal --------- */
+
 .org-grid{
   display:flex;
   flex-direction:column;
-  gap:20px;
+  gap:24px;
+  position:relative;
 }
 
-/* CEO centrado arriba */
+/* CEO centrado arriba con línea vertical hacia los equipos */
 .org-ceo{
-  display:flex;
-  justify-content:center;
+  padding-bottom:32px;
+}
+.org-ceo::after{
+  height:32px;
 }
 
-/* Columnas de equipos */
+/* Fila de columnas de equipos + línea horizontal que une todos */
 .org-columns{
+  position:relative;
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap:16px;
+  gap:32px;
+  padding-top:40px;
+}
+.org-columns::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:6%;
+  right:6%;
+  border-top:2px solid var(--border);
+  border-top:2px solid #d0d4dc;
 }
 
 /* Tarjeta de equipo */
 .org-team{
-  padding:12px 12px 14px;
-  border-radius:18px;
-  background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(248,250,252,.9));
-  border:1px solid var(--border);
-  box-shadow:0 10px 26px rgba(15,23,42,.05);
+  padding:10px 16px 16px;
+  border-radius:14px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  box-shadow:0 3px 10px rgba(0,0,0,.04);
+}
+
+/* Conector vertical desde la línea horizontal a cada equipo */
+.org-team::before{
+  content:"";
+  position:absolute;
+  top:-24px;
+  left:50%;
+  transform:translateX(-50%);
+  height:24px;
+  border-left:2px solid var(--border);
 }
 
 .org-team-head{
   display:flex;
+  flex-direction:column;
   align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  margin-bottom:10px;
+  gap:4px;
+  margin-bottom:8px;
 }
 
 .org-team-pill{
@@ -556,7 +580,12 @@ input:focus, select:focus, textarea:focus{
   font-weight:600;
 }
 
+/* “Espina dorsal” y ramitas: se ve claramente quién cuelga del equipo */
 .org-team-members{
+  margin-top:8px;
+  padding-top:6px;
+  padding-left:22px;
+  border-left:1.5px solid #dcdfe4;
   display:flex;
   flex-direction:column;
   gap:6px;
@@ -569,10 +598,10 @@ input:focus, select:focus, textarea:focus{
   align-items:center;
   gap:10px;
   width:100%;
-  border-radius:12px;
+  padding:6px 8px;
+  border-radius:10px;
   border:1px solid transparent;
   background:#fff;
-  padding:8px 9px;
   cursor:pointer;
   text-align:left;
   transition:
@@ -580,6 +609,16 @@ input:focus, select:focus, textarea:focus{
     transform .15s ease,
     box-shadow .15s ease,
     border-color .15s ease;
+}
+
+/* Conector horizontal desde la espina hasta cada persona */
+.org-team-members .org-member::before{
+  content:"";
+  position:absolute;
+  left:-22px;
+  top:50%;
+  width:22px;
+  border-top:1.5px solid #dcdfe4;
 }
 
 .org-member:hover{
@@ -595,15 +634,15 @@ input:focus, select:focus, textarea:focus{
 
 .org-member-avatar{
   flex:0 0 32px;
-  inline-size:32px;
-  block-size:32px;
   border-radius:999px;
   display:grid;
   place-items:center;
-  font-size:13px;
   font-weight:800;
   color:#fff;
   background: radial-gradient(120% 120% at 20% 20%, var(--accent) 0%, var(--accent-2) 100%);
+  inline-size:26px;
+  block-size:26px;
+  font-size:12px;
 }
 
 .org-member-main{
@@ -631,6 +670,23 @@ input:focus, select:focus, textarea:focus{
   inline-size:42px;
   block-size:42px;
   font-size:16px;
+}
+
+/* Responsive */
+@media (max-width: 980px){
+  .org-layout{
+    grid-template-columns: 1fr;
+  }
+
+  .org-columns{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px){
+  .org-columns{
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Responsive */

@@ -279,11 +279,11 @@
 
       </div>
     </section>
-    <section class="panel" id="panel-org" role="tabpanel" aria-labelledby="tab-org" hidden>
+<section class="panel" id="panel-org" role="tabpanel" aria-labelledby="tab-org" hidden>
   <header class="org-head">
     <div>
       <h2 class="org-title">Vintti Dream Team</h2>
-      <p class="org-subtitle">Today, this is how we look as a team.</p>
+      <p class="org-subtitle">Today, we look like this.</p>
     </div>
     <div class="org-metrics">
       <div class="org-chip">
@@ -298,53 +298,26 @@
   </header>
 
   <div class="org-layout">
-    <!-- Lateral: tarjeta de contacto -->
-    <aside class="org-focus" id="orgFocus">
-      <div class="org-focus-label">Need to contact someone?</div>
-      <p class="org-focus-empty">
-        Click any card in the org chart to see their email and role.
-      </p>
-
-      <div class="org-focus-body" hidden>
-        <div class="org-focus-name" id="orgFocusName">—</div>
-        <div class="org-focus-role" id="orgFocusRole">—</div>
-        <div class="org-focus-team" id="orgFocusTeam">—</div>
-
-        <a id="orgFocusEmail"
-           class="org-focus-email"
-           href="#"
-           target="_blank"
-           rel="noopener noreferrer">
-          — 
-        </a>
-
-        <div class="org-focus-actions">
-          <button type="button" class="btn" id="orgCopyEmail">Copy email</button>
-          <span id="orgCopyToast" class="toast"></span>
-        </div>
-      </div>
-    </aside>
-
     <!-- Org chart -->
     <div class="org-grid">
       <!-- CEO / Founder -->
       <div class="org-ceo">
         <button class="org-member org-member--ceo"
                 type="button"
-                data-name="CEO Name"
+                data-name="Agus"
                 data-role="CEO &amp; Founder"
                 data-team="Leadership"
-                data-email="ceo@vintti.com">
-          <div class="org-member-avatar">C</div>
+                data-email="agus@vintti.com">
+          <div class="org-member-avatar">A</div>
           <div class="org-member-main">
-            <div class="org-member-name">CEO Name</div>
+            <div class="org-member-name">Agus</div>
             <div class="org-member-role">CEO &amp; Founder</div>
             <div class="org-member-meta">Leadership</div>
           </div>
         </button>
       </div>
 
-      <!-- Equipos en columnas (rellena tú nombres/roles reales) -->
+      <!-- Equipos en columnas -->
       <div class="org-columns">
         <!-- Marketing -->
         <section class="org-team" data-team-name="Marketing">
@@ -353,21 +326,89 @@
             <span class="org-team-count"><span>0</span> people</span>
           </header>
           <div class="org-team-members">
-            <!-- Ejemplo de tarjeta; duplica y edita -->
+            <!-- Cami -->
             <button class="org-member"
                     type="button"
-                    data-name="Nombre 1"
+                    data-name="Cami"
                     data-role="Content Specialist"
                     data-team="Marketing"
-                    data-email="nombre1@vintti.com">
-              <div class="org-member-avatar">N1</div>
+                    data-email="cami@vintti.com">
+              <div class="org-member-avatar">C</div>
               <div class="org-member-main">
-                <div class="org-member-name">Nombre 1</div>
+                <div class="org-member-name">Cami</div>
                 <div class="org-member-role">Content Specialist</div>
               </div>
             </button>
 
-            <!-- agrega aquí más miembros de Marketing -->
+            <!-- Mora (depende de Cami en el gráfico, pero aquí solo listamos) -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Mora"
+                    data-role="SEO Intern"
+                    data-team="Marketing"
+                    data-email="mora@vintti.com">
+              <div class="org-member-avatar">M</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Mora</div>
+                <div class="org-member-role">SEO Intern</div>
+              </div>
+            </button>
+
+            <!-- Mia -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Mia"
+                    data-role="Growth Analyst"
+                    data-team="Marketing"
+                    data-email="mia@vintti.com">
+              <div class="org-member-avatar">M</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Mia</div>
+                <div class="org-member-role">Growth Analyst</div>
+              </div>
+            </button>
+
+            <!-- Coming Soon PR Lead -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Coming Soon"
+                    data-role="PR Lead"
+                    data-team="Marketing"
+                    data-email="">
+              <div class="org-member-avatar">PR</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Coming Soon</div>
+                <div class="org-member-role">PR Lead</div>
+              </div>
+            </button>
+
+            <!-- Emi -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Emi"
+                    data-role="PR Analyst"
+                    data-team="Marketing"
+                    data-email="emi@vintti.com">
+              <div class="org-member-avatar">E</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Emi</div>
+                <div class="org-member-role">PR Analyst</div>
+              </div>
+            </button>
+
+            <!-- Luisa -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Luisa"
+                    data-role="Community Assistant"
+                    data-team="Marketing"
+                    data-email="luisa@vintti.com">
+              <div class="org-member-avatar">L</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Luisa</div>
+                <div class="org-member-role">Community Assistant</div>
+              </div>
+            </button>
           </div>
         </section>
 
@@ -378,19 +419,61 @@
             <span class="org-team-count"><span>0</span> people</span>
           </header>
           <div class="org-team-members">
+            <!-- Jaz -->
             <button class="org-member"
                     type="button"
-                    data-name="Nombre 2"
+                    data-name="Jaz"
+                    data-role="HR &amp; Candidate Success Specialist"
+                    data-team="Account Management"
+                    data-email="jaz@vintti.com">
+              <div class="org-member-avatar">J</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Jaz</div>
+                <div class="org-member-role">HR &amp; Candidate Success Specialist</div>
+              </div>
+            </button>
+
+            <!-- Lar -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Lar"
                     data-role="Account Manager"
                     data-team="Account Management"
-                    data-email="nombre2@vintti.com">
-              <div class="org-member-avatar">N2</div>
+                    data-email="lar@vintti.com">
+              <div class="org-member-avatar">L</div>
               <div class="org-member-main">
-                <div class="org-member-name">Nombre 2</div>
+                <div class="org-member-name">Lar</div>
                 <div class="org-member-role">Account Manager</div>
               </div>
             </button>
-            <!-- más miembros -->
+
+            <!-- Prisci -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Prisci"
+                    data-role="Data Analyst"
+                    data-team="Account Management"
+                    data-email="prisci@vintti.com">
+              <div class="org-member-avatar">P</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Prisci</div>
+                <div class="org-member-role">Data Analyst</div>
+              </div>
+            </button>
+
+            <!-- Angie -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Angie"
+                    data-role="Senior Developer"
+                    data-team="Account Management"
+                    data-email="angie@vintti.com">
+              <div class="org-member-avatar">A</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Angie</div>
+                <div class="org-member-role">Senior Developer</div>
+              </div>
+            </button>
           </div>
         </section>
 
@@ -401,7 +484,75 @@
             <span class="org-team-count"><span>0</span> people</span>
           </header>
           <div class="org-team-members">
-            <!-- rellena con tus roles de Sales -->
+            <!-- Bahiu -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Bahiu"
+                    data-role="Sales Lead"
+                    data-team="Sales"
+                    data-email="bahiu@vintti.com">
+              <div class="org-member-avatar">B</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Bahiu</div>
+                <div class="org-member-role">Sales Lead</div>
+              </div>
+            </button>
+
+            <!-- Marian -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Marian"
+                    data-role="Account Executive"
+                    data-team="Sales"
+                    data-email="marian@vintti.com">
+              <div class="org-member-avatar">M</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Marian</div>
+                <div class="org-member-role">Account Executive</div>
+              </div>
+            </button>
+
+            <!-- Feli -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Feli"
+                    data-role="BDR"
+                    data-team="Sales"
+                    data-email="feli@vintti.com">
+              <div class="org-member-avatar">F</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Feli</div>
+                <div class="org-member-role">BDR</div>
+              </div>
+            </button>
+
+            <!-- Pipe -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Pipe"
+                    data-role="BDR"
+                    data-team="Sales"
+                    data-email="pipe@vintti.com">
+              <div class="org-member-avatar">P</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Pipe</div>
+                <div class="org-member-role">BDR</div>
+              </div>
+            </button>
+
+            <!-- Abril -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Abril"
+                    data-role="BDR"
+                    data-team="Sales"
+                    data-email="abril@vintti.com">
+              <div class="org-member-avatar">A</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Abril</div>
+                <div class="org-member-role">BDR</div>
+              </div>
+            </button>
           </div>
         </section>
 
@@ -412,7 +563,75 @@
             <span class="org-team-count"><span>0</span> people</span>
           </header>
           <div class="org-team-members">
-            <!-- rellena con tus roles de Operations -->
+            <!-- Agos -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Agos"
+                    data-role="Operations Lead"
+                    data-team="Operations"
+                    data-email="agos@vintti.com">
+              <div class="org-member-avatar">A</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Agos</div>
+                <div class="org-member-role">Operations Lead</div>
+              </div>
+            </button>
+
+            <!-- Pili -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Pili"
+                    data-role="Recruiter"
+                    data-team="Operations"
+                    data-email="pili@vintti.com">
+              <div class="org-member-avatar">P</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Pili</div>
+                <div class="org-member-role">Recruiter</div>
+              </div>
+            </button>
+
+            <!-- Agus (Recruiter) -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Agus"
+                    data-role="Recruiter"
+                    data-team="Operations"
+                    data-email="agus.recruiter@vintti.com">
+              <div class="org-member-avatar">A</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Agus</div>
+                <div class="org-member-role">Recruiter</div>
+              </div>
+            </button>
+
+            <!-- Piti -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Piti"
+                    data-role="Recruiter"
+                    data-team="Operations"
+                    data-email="piti@vintti.com">
+              <div class="org-member-avatar">P</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Piti</div>
+                <div class="org-member-role">Recruiter</div>
+              </div>
+            </button>
+
+            <!-- Coni -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Coni"
+                    data-role="Recruiter"
+                    data-team="Operations"
+                    data-email="coni@vintti.com">
+              <div class="org-member-avatar">C</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Coni</div>
+                <div class="org-member-role">Recruiter</div>
+              </div>
+            </button>
           </div>
         </section>
       </div>

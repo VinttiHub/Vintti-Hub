@@ -37,6 +37,7 @@ from reminders_routes import bp as reminders_bp
 from profile_routes import bp as profile_bp, users_bp as users_bp
 from ai_candidate_search_routes import bp_candidate_search
 from reset_password import register_password_reset_routes
+from send_email_endpoint import register_send_email_route
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
@@ -2440,7 +2441,6 @@ def apply_cors_headers(response):
     return response
 
 
-from send_email_endpoint import register_send_email_route
 register_send_email_route(app)
 
 @app.route('/candidates/<int:candidate_id>/salary_updates', methods=['GET'])

@@ -37,7 +37,7 @@ def _html_to_plain(html: str) -> str:
     return s.strip()
 
 def register_send_email_route(app):
-    @app.route("/send_email", methods=["POST", "OPTIONS"])
+    @app.route("/send_email", methods=["POST", "OPTIONS","GET","PUT"])
     def send_email():
         logging.info("📨 Entrando a /send_email")
         logging.info(f"🔍 Método recibido: {request.method}")
