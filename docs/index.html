@@ -8,71 +8,103 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="./assets/css/style.css">
   <link rel="preload" as="audio" href="./assets/sounds/click.mp3">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
-<link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
-<link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
-<meta name="theme-color" content="#0B3D91">
-
-
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
+  <meta name="theme-color" content="#0B3D91">
 </head>
 
 <body>
   <audio id="click-sound" src="./assets/sounds/click.mp3" preload="auto" aria-hidden="true"></audio>
+
   <div id="login-container" class="login-box">
-  <h2>Login</h2>
-  <form id="login-form">
-    <div class="input-with-avatar">
-      <input type="email" id="email" name="email" placeholder="Enter your email" autocomplete="username" required>
-      <img id="login-avatar" class="login-avatar" alt="" aria-hidden="true" loading="lazy">
-    </div>
-    <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
-    <button type="submit">Login</button>
-    <p id="chatResponse" style="margin-top: 10px; color: lime;"></p>
-  </form>
-</div>
+    <h2>Login</h2>
+    <form id="login-form">
+      <div class="input-with-avatar">
+        <input type="email" id="email" name="email" placeholder="Enter your email" autocomplete="username" required>
+        <img id="login-avatar" class="login-avatar" alt="" aria-hidden="true" loading="lazy">
+      </div>
+
+      <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+
+      <!-- 🔐 Botón para abrir popup de reset -->
+      <button type="button" id="open-reset-modal" class="link-button">
+        Forgot / Change password?
+      </button>
+
+      <button type="submit">Login</button>
+      <p id="chatResponse" style="margin-top: 10px; color: lime;"></p>
+    </form>
+  </div>
+
   <main id="welcome-container" class="main-content fade-in" style="display: none;">
     <!-- Animación post-login -->
     <div id="login-animation" class="login-animation hidden">
       <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="login-animation-logo">
       <p class="login-animation-text">Entering Vintti HUB...</p>
     </div>
-  <h1 class="welcome-title">
-    <img id="welcome-avatar" class="welcome-avatar" alt="" aria-hidden="true" loading="lazy">
-    <span id="personalized-greeting"></span>
-    Welcome to <span class="gradient-text">Vintti HUB</span>
-  </h1>
-  <a href="opportunities.html" class="main-action-button">🚀 Play hard, Execute and Push the limits.</a>
-</main>
-
+    <h1 class="welcome-title">
+      <img id="welcome-avatar" class="welcome-avatar" alt="" aria-hidden="true" loading="lazy">
+      <span id="personalized-greeting"></span>
+      Welcome to <span class="gradient-text">Vintti HUB</span>
+    </h1>
+    <a href="opportunities.html" class="main-action-button">
+      🚀 Play hard, Execute and Push the limits.
+    </a>
+  </main>
 
   <footer class="footer">
     &copy; 2025 Vintti. All rights reserved.
   </footer>
+
   <!-- Logo en esquina superior derecha -->
-<img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="corner-logo">
+  <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="corner-logo">
 
-<!-- Burbujas en esquina inferior derecha -->
-<div class="bubble-container">
-  <span class="bubble-button bubble-lime">Outsource</span>
-  <span class="bubble-button bubble-outline-blue">Grow</span>
+  <!-- Burbujas en esquina inferior derecha -->
+  <div class="bubble-container">
+    <span class="bubble-button bubble-lime">Outsource</span>
+    <span class="bubble-button bubble-outline-blue">Grow</span>
 
-  <span class="bubble-button bubble-pink">Vinttitutas</span>
-  <span class="bubble-button bubble-outline-red">Negotiate</span>
-  <span class="bubble-button bubble-red">Transformation</span>
+    <span class="bubble-button bubble-pink">Vinttitutas</span>
+    <span class="bubble-button bubble-outline-red">Negotiate</span>
+    <span class="bubble-button bubble-red">Transformation</span>
 
-  <span class="bubble-button bubble-outline-blue">Results</span>
-  <span class="bubble-button bubble-lime">Lead</span>
-  <span class="bubble-button bubble-outline-orange">Explore</span>
+    <span class="bubble-button bubble-outline-blue">Results</span>
+    <span class="bubble-button bubble-lime">Lead</span>
+    <span class="bubble-button bubble-outline-orange">Explore</span>
 
-  <span class="bubble-button bubble-dark-red">Interview</span>
-  <span class="bubble-button bubble-pink-dark">Sales-and-Ops</span>
-  <span class="bubble-button bubble-orange">Innovate</span>
+    <span class="bubble-button bubble-dark-red">Interview</span>
+    <span class="bubble-button bubble-pink-dark">Sales-and-Ops</span>
+    <span class="bubble-button bubble-orange">Innovate</span>
 
-  <span class="bubble-button bubble-green">Hire</span>
-</div>
+    <span class="bubble-button bubble-green">Hire</span>
+  </div>
+
+  <!-- 🔐 Popup para pedir email y enviar link de reset -->
+  <div id="passwordResetModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <h3>Reset your password</h3>
+      <p>Enter your Vintti email and we’ll send you a secure link to update your password.</p>
+
+      <form id="passwordResetForm">
+        <input
+          type="email"
+          id="resetEmail"
+          name="resetEmail"
+          placeholder="your.email@vintti.com"
+          required
+        />
+        <div class="modal-actions">
+          <button type="submit">Send reset link</button>
+          <button type="button" id="close-reset-modal" class="secondary-btn">Cancel</button>
+        </div>
+        <p id="resetFeedback" class="reset-feedback"></p>
+      </form>
+    </div>
+  </div>
 
   <script src="./assets/js/main.js"></script>
 </body>

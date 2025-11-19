@@ -87,154 +87,226 @@
     <div class="popup-content" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
       <span class="close-btn" onclick="closePopup()" aria-label="Close">&times;</span>
       <h2 class="popup-title" id="popupTitle">New Account</h2>
+        <form class="popup-form two-columns">
+          <!-- Company Name (ya existente, no lo tocamos) -->
+          <div class="popup-field">
+            <label>Company Name</label>
+            <input type="text" name="name" placeholder="Account name" />
+          </div>
 
-      <!-- Keep class names/structure (two-columns/full) for existing CSS/JS -->
-      <form class="popup-form two-columns">
-        <!-- Name -->
-        <div class="popup-field">
-          <label>Name</label>
-          <input type="text" name="name" placeholder="Account name" />
-        </div>
+          <!-- 🆕 Contact Name + Surname (uno al lado del otro) -->
+          <div class="popup-field">
+            <label>Name</label>
+            <input type="text" name="contact_name" placeholder="Name" />
+          </div>
 
-        <!-- Size -->
-        <div class="popup-field">
-          <label>Size</label>
-          <select name="size">
-            <option value="1-10">1-10</option>
-            <option value="11-50">11-50</option>
-            <option value="51-200">51-200</option>
-            <option value="201-500">201-500</option>
-            <option value="+500">+500</option>
-          </select>
-        </div>
+          <div class="popup-field">
+            <label>Surname</label>
+            <input type="text" name="contact_surname" placeholder="Surname" />
+          </div>
 
-        <!-- Timezone -->
-        <div class="popup-field">
-          <label>Timezone</label>
-          <select name="timezone">
-            <option>EST</option>
-            <option>CST</option>
-            <option>PST</option>
-            <option>MST</option>
-            <option>AST</option>
-            <option>HST</option>
-          </select>
-        </div>
+          <!-- 🆕 Industry -->
+          <div class="popup-field">
+            <label>Industry</label>
+            <input type="text" name="industry" placeholder="e.g. Fintech, SaaS, E-commerce" />
+          </div>
 
-        <!-- State -->
-        <div class="popup-field">
-          <label>State</label>
-          <select name="state">
-            <option>Alabama</option>
-            <option>Alaska</option>
-            <option>Arizona</option>
-            <option>Arkansas</option>
-            <option>California</option>
-            <option>Colorado</option>
-            <option>Connecticut</option>
-            <option>Delaware</option>
-            <option>Florida</option>
-            <option>Georgia</option>
-            <option>Hawaii</option>
-            <option>Idaho</option>
-            <option>Illinois</option>
-            <option>Indiana</option>
-            <option>Iowa</option>
-            <option>Kansas</option>
-            <option>Kentucky</option>
-            <option>Louisiana</option>
-            <option>Maine</option>
-            <option>Maryland</option>
-            <option>Massachusetts</option>
-            <option>Michigan</option>
-            <option>Minnesota</option>
-            <option>Mississippi</option>
-            <option>Missouri</option>
-            <option>Montana</option>
-            <option>Nebraska</option>
-            <option>Nevada</option>
-            <option>New Hampshire</option>
-            <option>New Jersey</option>
-            <option>New Mexico</option>
-            <option>New York</option>
-            <option>North Carolina</option>
-            <option>North Dakota</option>
-            <option>Ohio</option>
-            <option>Oklahoma</option>
-            <option>Oregon</option>
-            <option>Pennsylvania</option>
-            <option>Rhode Island</option>
-            <option>South Carolina</option>
-            <option>South Dakota</option>
-            <option>Tennessee</option>
-            <option>Texas</option>
-            <option>Utah</option>
-            <option>Vermont</option>
-            <option>Virginia</option>
-            <option>Washington</option>
-            <option>West Virginia</option>
-            <option>Wisconsin</option>
-            <option>Wyoming</option>
-            <option>Other</option>
-          </select>
-        </div>
+          <!-- Size -->
+          <div class="popup-field">
+            <label>Size</label>
+            <select name="size">
+              <option value="1-10">1-10</option>
+              <option value="11-50">11-50</option>
+              <option value="51-200">51-200</option>
+              <option value="201-500">201-500</option>
+              <option value="+500">+500</option>
+            </select>
+          </div>
 
-        <!-- Website -->
-        <div class="popup-field">
-          <label>Website</label>
-          <input type="text" name="website" placeholder="e.g. example.com" />
-        </div>
+          <!-- Timezone -->
+          <div class="popup-field">
+            <label>Timezone</label>
+            <select name="timezone">
+              <option>EST</option>
+              <option>CST</option>
+              <option>PST</option>
+              <option>MST</option>
+              <option>AST</option>
+              <option>HST</option>
+            </select>
+          </div>
 
-        <!-- Email -->
-        <div class="popup-field">
-          <label>Email</label>
-          <input type="email" name="mail" placeholder="e.g. hello@company.com" />
-        </div>
+          <!-- State -->
+          <div class="popup-field">
+            <label>State</label>
+            <select name="state">
+              <option>Alabama</option>
+              <option>Alaska</option>
+              <option>Arizona</option>
+              <option>Arkansas</option>
+              <option>California</option>
+              <option>Colorado</option>
+              <option>Connecticut</option>
+              <option>Delaware</option>
+              <option>Florida</option>
+              <option>Georgia</option>
+              <option>Hawaii</option>
+              <option>Idaho</option>
+              <option>Illinois</option>
+              <option>Indiana</option>
+              <option>Iowa</option>
+              <option>Kansas</option>
+              <option>Kentucky</option>
+              <option>Louisiana</option>
+              <option>Maine</option>
+              <option>Maryland</option>
+              <option>Massachusetts</option>
+              <option>Michigan</option>
+              <option>Minnesota</option>
+              <option>Mississippi</option>
+              <option>Missouri</option>
+              <option>Montana</option>
+              <option>Nebraska</option>
+              <option>Nevada</option>
+              <option>New Hampshire</option>
+              <option>New Jersey</option>
+              <option>New Mexico</option>
+              <option>New York</option>
+              <option>North Carolina</option>
+              <option>North Dakota</option>
+              <option>Ohio</option>
+              <option>Oklahoma</option>
+              <option>Oregon</option>
+              <option>Pennsylvania</option>
+              <option>Rhode Island</option>
+              <option>South Carolina</option>
+              <option>South Dakota</option>
+              <option>Tennessee</option>
+              <option>Texas</option>
+              <option>Utah</option>
+              <option>Vermont</option>
+              <option>Virginia</option>
+              <option>Washington</option>
+              <option>West Virginia</option>
+              <option>Wisconsin</option>
+              <option>Wyoming</option>
+              <option>Other</option>
+            </select>
+          </div>
 
-        <!-- LinkedIn -->
-        <div class="popup-field">
-          <label>LinkedIn</label>
-          <input type="text" name="linkedin" placeholder="LinkedIn URL" />
-        </div>
+          <!-- Website -->
+          <div class="popup-field">
+            <label>Website</label>
+            <input type="text" name="website" placeholder="e.g. example.com" />
+          </div>
 
-        <!-- Lead source -->
-        <div class="popup-field">
-          <label>Lead source</label>
-          <select name="where_come_from" required>
-            <option value="" disabled selected>Select source</option>
-            <option>SEO</option>
-            <option>AI</option>
-            <option>Slack Community</option>
-            <option>Referral</option>
-            <option>Re-target</option>
-            <option>Outbound</option>
-            <option>Linkedin - Agus</option>
-          </select>
-        </div>
+          <!-- Email -->
+          <div class="popup-field">
+            <label>Email</label>
+            <input type="email" name="mail" placeholder="e.g. hello@company.com" />
+          </div>
 
-        <!-- Referral source (shown only when Lead source = Referral) -->
-        <div class="popup-field" id="referralSourceWrapper" style="display:none">
-          <label>Referral – Client</label>
-          <input
-            type="text"
-            name="referal_source"
-            id="referralSourceInput"
-            placeholder="Type to search clients…"
-            list="referralList"
-            autocomplete="off"
-          />
-          <datalist id="referralList"></datalist>
-          <small class="muted">Choose the client who referred this account.</small>
-        </div>
+          <!-- LinkedIn -->
+          <div class="popup-field">
+            <label>LinkedIn</label>
+            <input type="text" name="linkedin" placeholder="LinkedIn URL" />
+          </div>
 
-        <!-- About -->
-        <div class="popup-field full">
-          <label>About</label>
-          <textarea name="about" placeholder="Write a description..."></textarea>
-        </div>
+          <!-- Lead source -->
+          <div class="popup-field">
+            <label>Lead source</label>
+            <select name="where_come_from" required>
+              <option value="" disabled selected>Select source</option>
+              <option>SEO</option>
+              <option>AI</option>
+              <option>Slack Community</option>
+              <option>Referral</option>
+              <option>Re-target</option>
+              <option>Outbound</option>
+              <option>Linkedin - Agus</option>
+            </select>
+          </div>
 
-        <button type="submit" class="create-btn">Create</button>
-      </form>
+          <!-- Referral source (shown only when Lead source = Referral) -->
+          <div class="popup-field" id="referralSourceWrapper" style="display:none">
+            <label>Referral – Client</label>
+            <input
+              type="text"
+              name="referal_source"
+              id="referralSourceInput"
+              placeholder="Type to search clients…"
+              list="referralList"
+              autocomplete="off"
+            />
+            <datalist id="referralList"></datalist>
+            <small class="muted">Choose the client who referred this account.</small>
+          </div>
+
+          <!-- 🆕 Outsource before (boolean) -->
+          <div class="popup-field">
+            <label>Outsource before</label>
+            <select name="outsource">
+              <option value="">Select…</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+
+          <!-- 🆕 Pain point -->
+          <div class="popup-field">
+            <label>Pain point</label>
+            <select name="pain_points">
+              <option value="na">NA</option>
+              <option value="high salary">High salary</option>
+              <option value="no real pain point">No real pain point</option>
+              <option value="cultural">Cultural</option>
+              <option value="time zone">Time zone</option>
+              <option value="knowledge">Knowledge</option>
+              <option value="no time">No time</option>
+            </select>
+          </div>
+
+          <!-- 🆕 Position -->
+          <div class="popup-field">
+            <label>Position</label>
+            <select name="position">
+              <option value="">Select…</option>
+              <option>Founder/Co-Founder</option>
+              <option>President</option>
+              <option>Vice President</option>
+              <option>CEO</option>
+              <option>COO</option>
+              <option>CFO/Finance Manager</option>
+              <option>CTO</option>
+              <option>General Manager</option>
+              <option>Hiring Manager</option>
+              <option>Talent Acquisition/Recruiter</option>
+              <option>Student/Freelancer</option>
+              <option>Unemployed</option>
+              <option>Other</option>
+              <option>Unknown</option>
+            </select>
+          </div>
+
+          <!-- 🆕 Type -->
+          <div class="popup-field">
+            <label>Type</label>
+            <select name="type">
+              <option value="NA">NA</option>
+              <option value="Firm">Firm</option>
+              <option value="SMB">SMB</option>
+              <option value="Startup">Startup</option>
+            </select>
+          </div>
+
+          <!-- About -->
+          <div class="popup-field full">
+            <label>About</label>
+            <textarea name="about" placeholder="Write a description..."></textarea>
+          </div>
+
+          <button type="submit" class="create-btn">Create</button>
+        </form>
     </div>
   </div>
 

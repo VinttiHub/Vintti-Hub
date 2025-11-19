@@ -1044,9 +1044,6 @@ def create_opportunity():
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
-    
-
-
 @app.route('/accounts', methods=['GET', 'POST'])
 def accounts():
     if request.method == 'GET':
@@ -1063,16 +1060,33 @@ def accounts():
             conn = get_connection()
             cursor = conn.cursor()
 
+            # 👉 Normalizar boolean de outsource (yes/no -> True/False/None)
+            raw_outsource = str(data.get("outsource") or "").strip().lower()
+            if raw_outsource in ("yes", "true", "1"):
+                outsource = True
+            elif raw_outsource in ("no", "false", "0"):
+                outsource = False
+            else:
+                outsource = None
+
             query = """
                 INSERT INTO account (
                     client_name, Size, timezone, state,
                     website, linkedin, comments, mail,
-                    where_come_from, referal_source
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    where_come_from, referal_source,
+                    industry, outsource, pain_points, position, type,
+                    name, surname
+                ) VALUES (
+                    %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s
+                )
             """
 
             cursor.execute(query, (
-                data.get("name"),
+                data.get("name"),             # client_name (nombre de la cuenta)
                 data.get("size"),
                 data.get("timezone"),
                 data.get("state"),
@@ -1081,9 +1095,17 @@ def accounts():
                 data.get("about"),
                 data.get("mail"),
                 data.get("where_come_from"),
-                data.get("referal_source")    # 👈 NUEVO
-            ))
+                data.get("referal_source"),
 
+                # 🆕 Nuevos campos
+                data.get("industry"),         # industry
+                outsource,                    # boolean
+                data.get("pain_points"),      # pain_points
+                data.get("position"),         # position
+                data.get("type"),             # type
+                data.get("contact_name"),     # name (en la tabla)
+                data.get("contact_surname")   # surname (en la tabla)
+            ))
 
             conn.commit()
             cursor.close()

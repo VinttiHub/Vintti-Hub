@@ -472,3 +472,92 @@ h1, h2, p {
   margin-right:8px;
   border-radius:9999px; /* por si usas fondo */
 }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-box {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px 28px;
+  max-width: 400px;
+  width: 90%;
+  font-family: 'Onest', system-ui, sans-serif;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+}
+
+.modal-box h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.modal-box p {
+  margin: 4px 0 12px;
+  font-size: 14px;
+}
+
+.modal-box input[type="email"] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.modal-actions button {
+  border-radius: 999px;
+  padding: 6px 14px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.modal-actions button[type="submit"] {
+  background: #0B3D91;
+  color: #fff;
+}
+
+.modal-actions .secondary-btn {
+  background: #f2f2f2;
+  color: #333;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  color: #0B3D91;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+  align-self: flex-start;
+}
+
+.reset-feedback {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.reset-feedback.ok {
+  color: #1a9c3e;
+}
+
+.reset-feedback.error {
+  color: #d72d2d;
+}

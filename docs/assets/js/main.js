@@ -1172,6 +1172,75 @@ async function initSidebarProfile(){
   if (cs.display === 'none') tile.style.display = 'flex';
 }
 initSidebarProfile();
+// === Password reset popup (index) ===
+const resetModal       = document.getElementById('passwordResetModal');
+const openResetBtn     = document.getElementById('open-reset-modal');
+const closeResetBtn    = document.getElementById('close-reset-modal');
+const resetForm        = document.getElementById('passwordResetForm');
+const resetEmailInput  = document.getElementById('resetEmail');
+const resetFeedback    = document.getElementById('resetFeedback');
+
+// Abrir popup
+openResetBtn?.addEventListener('click', () => {
+  // precargar email desde el campo de login si ya está
+  const loginEmail = (document.getElementById('email')?.value || '').trim();
+  if (loginEmail) resetEmailInput.value = loginEmail;
+
+  resetFeedback.textContent = '';
+  resetFeedback.className = 'reset-feedback';
+  resetModal.style.display = 'flex';
+});
+
+// Cerrar popup
+closeResetBtn?.addEventListener('click', () => {
+  resetModal.style.display = 'none';
+});
+
+// Cerrar si hacen click en el fondo
+resetModal?.addEventListener('click', (e) => {
+  if (e.target === resetModal) {
+    resetModal.style.display = 'none';
+  }
+});
+
+// Enviar petición de reset
+resetForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = resetEmailInput.value.trim().toLowerCase();
+
+  resetFeedback.textContent = '';
+  resetFeedback.className = 'reset-feedback';
+
+  if (!email) {
+    resetFeedback.textContent = 'Please enter your email.';
+    resetFeedback.classList.add('error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/password_reset_request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    // Por seguridad, aunque el email no exista el backend debe devolver 200
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error('❌ password_reset_request failed:', res.status, txt);
+      resetFeedback.textContent = 'There was an error sending the reset email. Please try again.';
+      resetFeedback.classList.add('error');
+      return;
+    }
+
+    resetFeedback.textContent = 'If this email exists, a reset link has been sent.';
+    resetFeedback.classList.add('ok');
+  } catch (err) {
+    console.error('❌ Network error in password_reset_request:', err);
+    resetFeedback.textContent = 'Network error. Please try again.';
+    resetFeedback.classList.add('error');
+  }
+});
 
 
 
