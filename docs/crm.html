@@ -88,21 +88,23 @@
       <span class="close-btn" onclick="closePopup()" aria-label="Close">&times;</span>
       <h2 class="popup-title" id="popupTitle">New Account</h2>
         <form class="popup-form two-columns">
-          <!-- Company Name (ya existente, no lo tocamos) -->
+          <!-- Company Name -->
           <div class="popup-field">
             <label>Company Name</label>
             <input type="text" name="name" placeholder="Account name" />
           </div>
-
-          <!-- 🆕 Contact Name + Surname (uno al lado del otro) -->
-          <div class="popup-field">
-            <label>Name</label>
-            <input type="text" name="contact_name" placeholder="Name" />
-          </div>
-
-          <div class="popup-field">
-            <label>Surname</label>
-            <input type="text" name="contact_surname" placeholder="Surname" />
+          <!-- Contact Name + Surname en una sola fila -->
+          <div class="popup-field full popup-inline">
+            <div class="inline-group">
+              <div class="field-half">
+                <label>Name</label>
+                <input type="text" name="contact_name" placeholder="Name" />
+              </div>
+              <div class="field-half">
+                <label>Surname</label>
+                <input type="text" name="contact_surname" placeholder="Surname" />
+              </div>
+            </div>
           </div>
 
           <!-- 🆕 Industry -->

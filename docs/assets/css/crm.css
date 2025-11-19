@@ -291,7 +291,24 @@ body {
 .chip.chip--lead:focus,
 .chip.chip--lead-lost:hover,
 .chip.chip--lead-lost:focus { filter: brightness(.985); }
+/* Name + Surname en una sola fila */
+.popup-inline .inline-group {
+  display: flex;
+  gap: 12px;
+}
 
+.popup-inline .field-half {
+  flex: 1 1 0;
+}
+
+.popup-inline .field-half label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.popup-inline .field-half input {
+  width: 85%;
+}
 
 /* ======================
    7) PRIORITY SELECT (A/B/C)
