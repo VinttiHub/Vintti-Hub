@@ -276,17 +276,36 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
       try {
         const el = document.getElementById('opportunity-id-text');
         const oppId = (el?.getAttribute('data-id') || el?.textContent || '').trim();
-        if (!oppId || oppId === '—') return;
+        console.log('🧩 Prefill entrevistados · oppId =', oppId);
 
-        const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}`, {
+        if (!oppId || oppId === '—') {
+          console.warn('⚠️ No oppId para prefill de entrevistados');
+          return;
+        }
+
+        const res = await fetch(`${API_BASE}/opportunities/${oppId}`, {
           cache: 'no-store'
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.warn('⚠️ GET /opportunities/:id no OK para prefill entrevistados', res.status);
+          return;
+        }
 
         const data = await res.json();
-        const v = data.cantidad_entrevistados;
-        interviewedInput.value =
-          v === null || v === undefined ? '' : String(v);
+        console.log('📦 Datos oportunidad para prefill entrevistados:', data);
+
+        // intenta leer el campo exactamente como viene del backend
+        const v = data.cantidad_entrevistados ?? data.candidates_interviewed ?? null;
+        console.log('🎯 cantidad_entrevistados leído del API =', v, 'typeof =', typeof v);
+
+        if (v === null || v === undefined) {
+          // no hay valor en DB -> deja vacío
+          interviewedInput.value = '';
+        } else {
+          interviewedInput.value = String(v);
+        }
+
+        console.log('✅ Valor final en interviewed-count-input =', interviewedInput.value);
       } catch (err) {
         console.warn('⚠️ Could not prefill interviewed count', err);
       }

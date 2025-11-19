@@ -967,6 +967,25 @@ document.getElementById('expected-revenue-input').addEventListener('blur', e => 
   const val = toNumOrNull(e.target.value);
   e.target.value = (val ?? '') === '' ? '' : String(val);
   updateOpportunityField('expected_revenue', val);
+  // 🔢 Number of interviewed candidates
+const interviewedInput  = document.getElementById('interviewed-count-input');
+const interviewedStatus = document.getElementById('interviewed-count-status');
+
+if (interviewedInput) {
+  interviewedInput.addEventListener('blur', e => {
+    const val = toNumOrNull(e.target.value);
+    e.target.value = (val ?? '') === '' ? '' : String(val);
+
+    // 👇 el nombre del campo debe coincidir con tu columna / backend
+    updateOpportunityField('interviewed_candidates', val);
+
+    if (interviewedStatus) {
+      interviewedStatus.textContent =
+        val == null ? '' : `Saved: ${val}`;
+    }
+  });
+}
+
 });
 
 document.getElementById('details-sales-lead').addEventListener('change', async (e) => {
@@ -2366,7 +2385,21 @@ async function loadOpportunityData() {
  const d = window.currentOpportunityData || {};
  document.getElementById('expected-fee-input').value = d.expected_fee ?? '';
  document.getElementById('expected-revenue-input').value = d.expected_revenue ?? '';
+       const interviewedInput  = document.getElementById('interviewed-count-input');
+      const interviewedStatus = document.getElementById('interviewed-count-status');
 
+      if (interviewedInput) {
+        // Intenta varios nombres por si el campo en la BD se llama distinto
+        const raw =
+          d.cantidad_entrevistados 
+          '';
+
+        interviewedInput.value = raw ?? '';
+
+        if (raw !== null && raw !== '' && interviewedStatus) {
+          interviewedStatus.textContent = `Saved: ${raw}`;
+        }
+      }
       }
 function formatDate(dateStr) {
   return toYMD(dateStr);
