@@ -40,10 +40,13 @@ def register_password_reset_routes(app):
 
         # ---- POST normal ----
         try:
-            data = request.get_json(force=True)
-            app.logger.info("📦 JSON recibido en reset_request: %s", data)
+            raw = request.data
+            app.logger.info("📦 Raw body en reset_request: %r", raw)
+
+            data = request.get_json(silent=True) or {}
+            app.logger.info("📦 JSON recibido en reset_request (parsed): %s", data)
         except Exception as e:
-            app.logger.error("❌ Invalid JSON in /password_reset_request")
+            app.logger.error("❌ Error leyendo JSON en /password_reset_request")
             app.logger.exception(e)
             return _cors_response(jsonify({"success": False, "message": "Invalid JSON"}), 400)
 
@@ -128,12 +131,14 @@ def register_password_reset_routes(app):
         if request.method == "OPTIONS":
             app.logger.info("🟡 /password_reset_confirm OPTIONS (preflight)")
             return _cors_preflight()
-
         try:
-            data = request.get_json(force=True)
-            app.logger.info("📦 JSON recibido en reset_confirm: %s", data)
+            raw = request.data
+            app.logger.info("📦 Raw body en reset_confirm: %r", raw)
+
+            data = request.get_json(silent=True) or {}
+            app.logger.info("📦 JSON recibido en reset_confirm (parsed): %s", data)
         except Exception as e:
-            app.logger.error("❌ Invalid JSON in /password_reset_confirm")
+            app.logger.error("❌ Error leyendo JSON en /password_reset_confirm")
             app.logger.exception(e)
             return _cors_response(jsonify({"success": False, "message": "Invalid JSON"}), 400)
 
