@@ -36,6 +36,8 @@ import re, html as _html
 from reminders_routes import bp as reminders_bp
 from profile_routes import bp as profile_bp, users_bp as users_bp
 from ai_candidate_search_routes import bp_candidate_search
+from reset_password import register_password_reset_routes
+
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
 def _to_bool(x):
@@ -197,6 +199,7 @@ S3_BUCKET = os.getenv('S3_BUCKET_NAME')
 
 app = Flask(__name__)
 register_ai_routes(app)
+register_password_reset_routes(app)
 CORS(
     app,
     resources={
