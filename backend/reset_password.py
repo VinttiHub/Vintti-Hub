@@ -2,6 +2,7 @@ from flask import request, jsonify, make_response
 import os, secrets, logging, traceback
 from datetime import datetime, timedelta, timezone
 from db import get_connection  
+import requests
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 FRONT_BASE_URL = os.environ.get("FRONT_BASE_URL", "https://vinttihub.vintti.com")
