@@ -18,6 +18,7 @@
         <nav class="tabs" id="tabsBar" role="tablist" aria-label="Profile tabs">
           <button class="tab active" data-tab="profile" aria-selected="true">Profile</button>
           <button class="tab" data-tab="timeoff" aria-selected="false">Request Time Off</button>
+          <button class="tab" data-tab="org" aria-selected="false">Vintti Dream Team</button>
         </nav>
     </header>
 
@@ -278,6 +279,147 @@
 
       </div>
     </section>
+    <section class="panel" id="panel-org" role="tabpanel" aria-labelledby="tab-org" hidden>
+  <header class="org-head">
+    <div>
+      <h2 class="org-title">Vintti Dream Team</h2>
+      <p class="org-subtitle">Today, this is how we look as a team.</p>
+    </div>
+    <div class="org-metrics">
+      <div class="org-chip">
+        <span id="orgTotalPeople">—</span>
+        <span>people</span>
+      </div>
+      <div class="org-chip">
+        <span id="orgTotalTeams">—</span>
+        <span>teams</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="org-layout">
+    <!-- Lateral: tarjeta de contacto -->
+    <aside class="org-focus" id="orgFocus">
+      <div class="org-focus-label">Need to contact someone?</div>
+      <p class="org-focus-empty">
+        Click any card in the org chart to see their email and role.
+      </p>
+
+      <div class="org-focus-body" hidden>
+        <div class="org-focus-name" id="orgFocusName">—</div>
+        <div class="org-focus-role" id="orgFocusRole">—</div>
+        <div class="org-focus-team" id="orgFocusTeam">—</div>
+
+        <a id="orgFocusEmail"
+           class="org-focus-email"
+           href="#"
+           target="_blank"
+           rel="noopener noreferrer">
+          — 
+        </a>
+
+        <div class="org-focus-actions">
+          <button type="button" class="btn" id="orgCopyEmail">Copy email</button>
+          <span id="orgCopyToast" class="toast"></span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Org chart -->
+    <div class="org-grid">
+      <!-- CEO / Founder -->
+      <div class="org-ceo">
+        <button class="org-member org-member--ceo"
+                type="button"
+                data-name="CEO Name"
+                data-role="CEO &amp; Founder"
+                data-team="Leadership"
+                data-email="ceo@vintti.com">
+          <div class="org-member-avatar">C</div>
+          <div class="org-member-main">
+            <div class="org-member-name">CEO Name</div>
+            <div class="org-member-role">CEO &amp; Founder</div>
+            <div class="org-member-meta">Leadership</div>
+          </div>
+        </button>
+      </div>
+
+      <!-- Equipos en columnas (rellena tú nombres/roles reales) -->
+      <div class="org-columns">
+        <!-- Marketing -->
+        <section class="org-team" data-team-name="Marketing">
+          <header class="org-team-head">
+            <div class="org-team-pill">Marketing</div>
+            <span class="org-team-count"><span>0</span> people</span>
+          </header>
+          <div class="org-team-members">
+            <!-- Ejemplo de tarjeta; duplica y edita -->
+            <button class="org-member"
+                    type="button"
+                    data-name="Nombre 1"
+                    data-role="Content Specialist"
+                    data-team="Marketing"
+                    data-email="nombre1@vintti.com">
+              <div class="org-member-avatar">N1</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Nombre 1</div>
+                <div class="org-member-role">Content Specialist</div>
+              </div>
+            </button>
+
+            <!-- agrega aquí más miembros de Marketing -->
+          </div>
+        </section>
+
+        <!-- Account Management -->
+        <section class="org-team" data-team-name="Account Management">
+          <header class="org-team-head">
+            <div class="org-team-pill">Account Management</div>
+            <span class="org-team-count"><span>0</span> people</span>
+          </header>
+          <div class="org-team-members">
+            <button class="org-member"
+                    type="button"
+                    data-name="Nombre 2"
+                    data-role="Account Manager"
+                    data-team="Account Management"
+                    data-email="nombre2@vintti.com">
+              <div class="org-member-avatar">N2</div>
+              <div class="org-member-main">
+                <div class="org-member-name">Nombre 2</div>
+                <div class="org-member-role">Account Manager</div>
+              </div>
+            </button>
+            <!-- más miembros -->
+          </div>
+        </section>
+
+        <!-- Sales -->
+        <section class="org-team" data-team-name="Sales">
+          <header class="org-team-head">
+            <div class="org-team-pill">Sales</div>
+            <span class="org-team-count"><span>0</span> people</span>
+          </header>
+          <div class="org-team-members">
+            <!-- rellena con tus roles de Sales -->
+          </div>
+        </section>
+
+        <!-- Operations -->
+        <section class="org-team" data-team-name="Operations">
+          <header class="org-team-head">
+            <div class="org-team-pill">Operations</div>
+            <span class="org-team-count"><span>0</span> people</span>
+          </header>
+          <div class="org-team-members">
+            <!-- rellena con tus roles de Operations -->
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="panel" id="panel-teampto" role="tabpanel" aria-labelledby="tab-teampto" hidden>
   <header class="teampto-head">
     <h2 class="teampto-title">Team PTO</h2>
