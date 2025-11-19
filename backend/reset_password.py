@@ -3,6 +3,7 @@ import os, secrets, logging, traceback
 from datetime import datetime, timedelta, timezone
 from db import get_connection  
 import requests
+import json
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 FRONT_BASE_URL = os.environ.get("FRONT_BASE_URL", "https://vinttihub.vintti.com")
@@ -91,16 +92,22 @@ def register_password_reset_routes(app):
         # Llamar a /send_email
         try:
             base = request.host_url.rstrip("/")
-            app.logger.info("📨 Llamando a %s/send_email ...", base)
+            url = f"{base}/send_email"
+            payload = {
+                "to": [email],
+                "subject": "Reset your Vintti HUB password",
+                "body": body,
+            }
+
+            app.logger.info("📨 Llamando a %s con payload: %s", url, payload)
+
             resp = requests.post(
-                f"{base}/send_email",
-                json={
-                    "to": [email],
-                    "subject": "Reset your Vintti HUB password",
-                    "body": body,
-                },
+                url,
+                data=json.dumps(payload),                    # 👈 cuerpo JSON explícito
+                headers={"Content-Type": "application/json"},# 👈 igual que tu fetch
                 timeout=15,
             )
+
             app.logger.info(
                 "📧 /send_email respuesta: %s %s",
                 resp.status_code,
@@ -109,6 +116,7 @@ def register_password_reset_routes(app):
         except Exception as e:
             app.logger.error("❌ Failed to call /send_email for password reset")
             app.logger.exception(e)
+
 
         # Nunca revelamos si el email existe o no
         return _cors_response(jsonify({"success": True}), 200)

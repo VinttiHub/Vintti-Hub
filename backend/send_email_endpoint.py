@@ -66,7 +66,7 @@ def register_send_email_route(app):
             data = request.get_json(force=True)
             logging.info("📦 JSON recibido: %s", data)
         except Exception as json_error:
-            logging.error("❌ Error al leer JSON")
+            logging.error("❌ Error al leer JSON en /send_email. Raw data=%r", request.data)
             traceback.print_exc()
             return jsonify({"error": "Invalid JSON", "detail": str(json_error)}), 400
 

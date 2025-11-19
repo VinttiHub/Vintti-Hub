@@ -383,328 +383,79 @@ input:focus, select:focus, textarea:focus{
   .info-grid, .form-card .grid{ grid-template-columns: 1fr; }
   .header-card{ align-items:flex-start; }
 }
-/* =============== Org Chart / Vintti Dream Team =============== */
+/* =======================
+    ORG CHART PAGE — New
+   ======================= */
 
-.org-head{
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:16px;
-  margin-bottom: 20px;
-}
-
-.org-title{
-  margin:0;
-  font-size: clamp(20px, 2.6vw, 26px);
-  font-weight:800;
+.org-container {
+  text-align: center;
+  padding: 20px 10px 40px;
 }
 
-.org-subtitle{
-  margin:4px 0 0;
-  font-size:14px;
-  color:var(--muted);
+.org-header {
+  margin-bottom: 28px;
 }
 
-.org-metrics{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
+.org-title {
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 800;
+  margin: 0;
+  color: #1d1b2e;
+  background: linear-gradient(90deg, #4f46e5, #0284c7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.org-chip{
-  display:inline-flex;
-  align-items:baseline;
-  gap:6px;
-  padding:7px 12px;
-  border-radius:999px;
-  background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(248,250,252,.8));
-  border:1px solid var(--border);
-  box-shadow:0 6px 18px rgba(15,23,42,.06);
-  font-size:12px;
-  font-weight:600;
-}
-.org-chip span:first-child{
-  font-weight:800;
-  font-size:15px;
+.org-subtitle {
+  margin-top: 6px;
+  font-size: 15px;
+  color: #475569;
+  font-weight: 500;
 }
 
-/* Layout: tarjeta de contacto a la izquierda + org a la derecha */
-.org-layout{
-  display:block;
-  width:100%;
+.org-image-card {
+  background: rgba(255,255,255,0.55);
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 10px 35px rgba(0,0,0,0.06);
+  backdrop-filter: blur(12px);
+  max-width: 1000px;
+  margin: 0 auto;
+  transition: transform .25s ease, box-shadow .25s ease;
 }
 
-/* Panel lateral de contacto */
-.org-focus{
-  padding:16px 18px;
-  border-radius:18px;
-  background: var(--glass);
-  border:1px solid var(--border);
-  box-shadow: var(--shadow);
+.org-image-card:hover {
+  transform: scale(1.01);
+  box-shadow: 0 14px 40px rgba(0,0,0,0.08);
 }
 
-.org-focus-label{
-  font-size:13px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:.12em;
-  color:var(--muted);
-  margin-bottom:4px;
+.org-img {
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
 }
 
-.org-focus-empty{
-  margin:0;
-  font-size:14px;
-  color:var(--muted);
+.org-note {
+  margin-top: 14px;
+  color: #64748b;
+  font-size: 13px;
+  font-style: italic;
 }
 
-.org-focus-body{
-  margin-top:10px;
-}
-
-.org-focus-name{
-  font-size:18px;
-  font-weight:800;
-}
-
-.org-focus-role{
-  font-size:14px;
-  color:var(--muted);
-  margin-top:2px;
-}
-
-.org-focus-team{
-  font-size:13px;
-  font-weight:600;
-  margin-top:6px;
-}
-
-.org-focus-email{
-  display:inline-flex;
-  margin-top:10px;
-  font-size:14px;
-  font-weight:600;
-  color:#111827;
-  text-decoration:none;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  background:#fff;
-}
-.org-focus-email:hover{
-  background:#f3f4f6;
-}
-
-.org-focus-actions{
-  margin-top:10px;
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-
-/* --------- Org chart principal --------- */
-
-.org-grid{
-  display:flex;
-  flex-direction:column;
-  gap:24px;
-  position:relative;
-}
-
-/* CEO centrado arriba con línea vertical hacia los equipos */
-.org-ceo{
-  padding-bottom:32px;
-}
-.org-ceo::after{
-  height:32px;
-}
-
-/* Fila de columnas de equipos + línea horizontal que une todos */
-.org-columns{
-  position:relative;
-  display:grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap:32px;
-  padding-top:40px;
-}
-.org-columns::before{
-  content:"";
-  position:absolute;
-  top:0;
-  left:6%;
-  right:6%;
-  border-top:2px solid var(--border);
-  border-top:2px solid #d0d4dc;
-}
-
-/* Tarjeta de equipo */
-.org-team{
-  padding:10px 16px 16px;
-  border-radius:14px;
-  background:#ffffff;
-  border:1px solid #e5e7eb;
-  box-shadow:0 3px 10px rgba(0,0,0,.04);
-}
-
-/* Conector vertical desde la línea horizontal a cada equipo */
-.org-team::before{
-  content:"";
-  position:absolute;
-  top:-24px;
-  left:50%;
-  transform:translateX(-50%);
-  height:24px;
-  border-left:2px solid var(--border);
-}
-
-.org-team-head{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:4px;
-  margin-bottom:8px;
-}
-
-.org-team-pill{
-  padding:6px 10px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:700;
-  background:#0f172a;
-  color:#fff;
-}
-
-.org-team-count{
-  font-size:11px;
-  color:var(--muted);
-  font-weight:600;
-}
-
-/* “Espina dorsal” y ramitas: se ve claramente quién cuelga del equipo */
-.org-team-members{
-  margin-top:8px;
-  padding-top:6px;
-  padding-left:22px;
-  border-left:1.5px solid #dcdfe4;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-
-/* Tarjetas de persona */
-.org-member{
-  position:relative;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  width:100%;
-  padding:6px 8px;
-  border-radius:10px;
-  border:1px solid transparent;
-  background:#fff;
-  cursor:pointer;
-  text-align:left;
-  transition:
-    background .15s ease,
-    transform .15s ease,
-    box-shadow .15s ease,
-    border-color .15s ease;
-}
-
-/* Conector horizontal desde la espina hasta cada persona */
-.org-team-members .org-member::before{
-  content:"";
-  position:absolute;
-  left:-22px;
-  top:50%;
-  width:22px;
-  border-top:1.5px solid #dcdfe4;
-}
-
-.org-member:hover{
-  background:#f9fafb;
-  transform:translateY(-1px);
-  box-shadow:0 6px 16px rgba(15,23,42,.06);
-}
-
-.org-member.is-active{
-  border-color:#111827;
-  box-shadow:0 0 0 1px #11182733, 0 8px 20px rgba(15,23,42,.10);
-}
-
-.org-member-avatar{
-  flex:0 0 32px;
-  border-radius:999px;
-  display:grid;
-  place-items:center;
-  font-weight:800;
-  color:#fff;
-  background: radial-gradient(120% 120% at 20% 20%, var(--accent) 0%, var(--accent-2) 100%);
-  inline-size:26px;
-  block-size:26px;
-  font-size:12px;
-}
-
-.org-member-main{
-  min-width:0;
-}
-
-.org-member-name{
-  font-size:14px;
-  font-weight:700;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-.org-member-role{
-  font-size:12px;
-  color:var(--muted);
-}
-
-/* CEO un poquito más grande */
-.org-member--ceo{
-  padding:10px 14px;
-}
-.org-member--ceo .org-member-avatar{
-  inline-size:42px;
-  block-size:42px;
-  font-size:16px;
-}
-
-/* Responsive */
-@media (max-width: 980px){
-  .org-layout{
-    grid-template-columns: 1fr;
+/* Mobile adjustments */
+@media (max-width: 720px) {
+  .org-image-card {
+    padding: 12px;
+    border-radius: 18px;
+  }
+  
+  .org-title {
+    font-size: 26px;
   }
 
-  .org-columns{
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px){
-  .org-columns{
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Responsive */
-@media (max-width: 980px){
-  .org-layout{
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px){
-  .org-columns{
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px){
-  .org-columns{
-    grid-template-columns: 1fr;
+  .org-subtitle {
+    font-size: 14px;
   }
 }
 
