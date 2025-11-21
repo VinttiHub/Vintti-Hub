@@ -1268,7 +1268,7 @@ def get_candidate_by_id(candidate_id):
                 coresignal_scrapper,
                 candidate_succes,
                 check_hr_lead,
-                adress,
+                address,
                 dni
             FROM candidates
             WHERE candidate_id = %s
@@ -1911,7 +1911,9 @@ def update_candidate_fields(candidate_id):
         'discount_dolar', 
         'discount_daterange',
         'candidate_succes',
-        'check_hr_lead'
+        'check_hr_lead',
+        'address',
+        'dni'
     ]
 
     updates = []
