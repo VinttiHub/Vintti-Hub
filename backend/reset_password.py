@@ -110,35 +110,43 @@ def register_password_reset_routes(app):
 </div>
 """.strip()
 
-        # Llamar a /send_email usando JSON (misma lógica que Negotiating)
+        # --- Enviar correo de reset DIRECTO con SendGrid (sin pasar por /send_email) ---
         try:
-            base = request.host_url.rstrip("/")
-            url = f"{base}/send_email"
-            payload = {
-                "to": [email],
-                "subject": "Reset your Vintti HUB password",
-                "body": html_body,          # /send_email lo convertirá a HTML/Texto
-                "body_html": html_body,     # por si en algún momento lo quieres usar
-                "content_type": "text/html",
-                "html": True,
-            }
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail, Email
 
-            app.logger.info("📨 Llamando a %s con payload: %s", url, payload)
+            # Versión texto plano simple (para el preview del email)
+            plain_body = f"""
+Hi there,
 
-            resp = requests.post(
-                url,
-                json=payload,                 # 👈 importante: JSON nativo, no data=
-                headers={"Content-Type": "application/json"},
-                timeout=15,
-            )
+We received a request to reset your password for Vintti HUB.
 
-            app.logger.info(
-                "📧 /send_email respuesta: %s %s",
-                resp.status_code,
-                resp.text[:300],
-            )
+You can reset it using this link:
+{reset_link}
+
+If you did not request this, you can safely ignore this email.
+
+— Vintti HUB
+""".strip()
+
+            api_key = os.environ.get("SENDGRID_API_KEY")
+            if not api_key:
+                app.logger.error("🛑 No se encontró SENDGRID_API_KEY; no se puede enviar el reset email")
+            else:
+                message = Mail(
+                    from_email=Email("hub@vintti-hub.com", name="Vintti HUB"),
+                    to_emails=[email],
+                    subject="Reset your Vintti HUB password",
+                    plain_text_content=plain_body,
+                    html_content=html_body,  # el HTML lindo que ya armaste arriba
+                )
+
+                sg = SendGridAPIClient(api_key)
+                sg_resp = sg.send(message)
+                app.logger.info("✅ Reset email enviado. Status=%s", sg_resp.status_code)
+
         except Exception as e:
-            app.logger.error("❌ Failed to call /send_email for password reset")
+            app.logger.error("❌ Failed to send password reset email")
             app.logger.exception(e)
 
 
