@@ -919,6 +919,45 @@ window.updateHireField = async function(field, value) {
 
 
       updateLinkedInUI(data.linkedin || '');
+      // === Address & DNI (tabla candidates, pestaña Hire) ===
+      const hireAddressInput = document.getElementById('hire-address');
+      const hireDniInput     = document.getElementById('hire-dni');
+      const API_CANDIDATES   = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+
+      // Pre-cargar valores desde candidates.address y candidates.dni
+      if (hireAddressInput) {
+        hireAddressInput.value = data.address || '';
+        hireAddressInput.addEventListener('blur', () => {
+          const val = hireAddressInput.value.trim();
+          fetch(`${API_CANDIDATES}/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: val || null })
+          });
+        });
+      }
+
+      if (hireDniInput) {
+        if (data.dni !== undefined && data.dni !== null) {
+          hireDniInput.value = data.dni;
+        }
+        hireDniInput.addEventListener('blur', () => {
+          const raw = hireDniInput.value.trim();
+
+          // Si está vacío, mandamos null; si es número, mandamos número; si no, string
+          let num = raw === '' ? null : Number(raw);
+          let payloadValue =
+            raw === ''            ? null :
+            Number.isFinite(num)  ? num  :
+                                    raw;
+
+          fetch(`${API_CANDIDATES}/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dni: payloadValue })
+          });
+        });
+      }
       // Mapeo de campos (overview)
       const overviewFields = {
         'field-name': 'name',

@@ -1267,7 +1267,9 @@ def get_candidate_by_id(candidate_id):
                 affinda_scrapper,
                 coresignal_scrapper,
                 candidate_succes,
-                check_hr_lead 
+                check_hr_lead,
+                adress,
+                dni
             FROM candidates
             WHERE candidate_id = %s
         """, (candidate_id,))
