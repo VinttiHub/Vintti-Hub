@@ -84,30 +84,51 @@ def register_password_reset_routes(app):
         reset_link = f"{FRONT_BASE_URL.rstrip('/')}/reset_password.html?token={token}"
         app.logger.info("🔗 Reset link: %s", reset_link)
 
-        body = (
-            "Hello,\n\n"
-            "You (or someone else) requested to reset your Vintti HUB password.\n\n"
-            f"Use this link to reset your password (valid for 1 hour):\n{reset_link}\n\n"
-            "If you did not request this, you can safely ignore this email.\n\n"
-            "— Vintti HUB"
-        )
+        # --- Email en HTML (incluye botón, link y el token como texto) ---
+        html_body = f"""
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p>Hi there 🌸</p>
+  <p>We received a request to reset your password for <strong>Vintti HUB</strong>.</p>
+  <p>You can reset it by clicking this button:</p>
+  <p style="margin:16px 0;">
+    <a href="{reset_link}"
+       style="display:inline-block;padding:10px 18px;border-radius:999px;
+              background:#6c5ce7;color:white;text-decoration:none;font-weight:600;">
+      Reset your password
+    </a>
+  </p>
+  <p>If the button doesn’t work, copy and paste this link in your browser:</p>
+  <p style="word-break:break-all;font-size:12px;color:#555;">{reset_link}</p>
+  <p>Reset token (for support):</p>
+  <p style="font-family:monospace;font-size:12px;background:#f5f5f5;padding:8px;border-radius:6px;">
+    {token}
+  </p>
+  <p style="margin-top:16px;font-size:12px;color:#777;">
+    If you did not request this, you can safely ignore this email.
+  </p>
+  <p style="margin-top:16px">— Vintti HUB</p>
+</div>
+""".strip()
 
-        # Llamar a /send_email
+        # Llamar a /send_email usando JSON (misma lógica que Negotiating)
         try:
             base = request.host_url.rstrip("/")
             url = f"{base}/send_email"
             payload = {
                 "to": [email],
                 "subject": "Reset your Vintti HUB password",
-                "body": body,
+                "body": html_body,          # /send_email lo convertirá a HTML/Texto
+                "body_html": html_body,     # por si en algún momento lo quieres usar
+                "content_type": "text/html",
+                "html": True,
             }
 
             app.logger.info("📨 Llamando a %s con payload: %s", url, payload)
 
             resp = requests.post(
                 url,
-                data=json.dumps(payload),                    # 👈 cuerpo JSON explícito
-                headers={"Content-Type": "application/json"},# 👈 igual que tu fetch
+                json=payload,                 # 👈 importante: JSON nativo, no data=
+                headers={"Content-Type": "application/json"},
                 timeout=15,
             )
 

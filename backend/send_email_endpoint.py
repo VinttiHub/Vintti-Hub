@@ -37,10 +37,10 @@ def _html_to_plain(html: str) -> str:
     return s.strip()
 
 def register_send_email_route(app):
-    @app.route("/send_email", methods=["POST", "OPTIONS","GET","PUT"])
+    @app.route("/send_email", methods=["POST", "OPTIONS"])
     def send_email():
         logging.info("📨 Entrando a /send_email")
-        logging.info(f"🔍 Método recibido: {request.method}")
+        logging.info("🔍 Método recibido: %s", request.method)
 
         if request.method == "OPTIONS":
             logging.info("🟡 OPTIONS request recibida")
@@ -52,6 +52,15 @@ def register_send_email_route(app):
             response.headers['Access-Control-Max-Age'] = '86400'
             return response
 
+        # Solo aceptamos POST reales con cuerpo JSON
+        if request.method != "POST":
+            logging.warning("⛔ Método no permitido en /send_email: %s", request.method)
+            resp = jsonify({"error": "Method not allowed"})
+            resp.status_code = 405
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp
+
         try:
             # Verificar DNS
             ip = socket.gethostbyname("sendgrid.com")
@@ -62,13 +71,28 @@ def register_send_email_route(app):
             return jsonify({"error": "DNS resolution failed", "detail": str(dns_error)}), 500
 
         try:
-            # Leer y validar JSON
-            data = request.get_json(force=True)
-            logging.info("📦 JSON recibido: %s", data)
+            raw = request.data
+            logging.info("📦 Raw body recibido en /send_email: %r", raw)
+
+            # silent=True evita que lance BadRequest y nos deje manejarlo nosotros
+            data = request.get_json(silent=True) or {}
+            logging.info("📦 JSON parseado en /send_email: %s", data)
         except Exception as json_error:
-            logging.error("❌ Error al leer JSON en /send_email. Raw data=%r", request.data)
+            logging.error("❌ Error inesperado al leer JSON en /send_email. Raw data=%r", request.data)
             traceback.print_exc()
-            return jsonify({"error": "Invalid JSON", "detail": str(json_error)}), 400
+            resp = jsonify({"error": "Invalid JSON", "detail": str(json_error)})
+            resp.status_code = 400
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp
+
+        if not data:
+            logging.warning("⚠️ /send_email llamado sin JSON o JSON vacío")
+            resp = jsonify({"error": "Empty JSON body"})
+            resp.status_code = 400
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp
 
         # Validar campos obligatorios
         to_emails = data.get('to')
