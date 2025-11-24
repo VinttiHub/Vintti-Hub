@@ -427,15 +427,33 @@ window.allowedHRUsers = users.filter(u =>
       if (grouped[stage]) {
         grouped[stage].forEach(opp => {
           let daysAgo = '';
-          if (opp.nda_signature_or_start_date) {
+
+          // 👉 Si la opp está en Close Win o Closed Lost:
+          //    Days = diferencia entre start date y close date
+          if (opp.opp_stage === 'Close Win' || opp.opp_stage === 'Closed Lost') {
+            if (opp.nda_signature_or_start_date && opp.opp_close_date) {
+              daysAgo = calculateDaysBetween(
+                opp.nda_signature_or_start_date,
+                opp.opp_close_date
+              );
+            } else if (opp.nda_signature_or_start_date) {
+              // fallback si por alguna razón no hay close_date
+              daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
+            } else {
+              daysAgo = '-';
+            }
+          }
+          // 👉 Para el resto de etapas: se mantiene la lógica actual
+          else if (opp.nda_signature_or_start_date) {
             daysAgo = calculateDaysAgo(opp.nda_signature_or_start_date);
+          } else {
+            daysAgo = '-';
           }
 
           const tr = document.createElement('tr');
           let daysSinceBatch = (opp.opp_stage === 'Sourcing' && typeof opp._days_since_batch === 'number')
-          ? opp._days_since_batch
-          : '-';
-
+            ? opp._days_since_batch
+            : '-';
 
           async function fetchDaysSinceBatch(opp, tr) {
             const oppId = opp.opportunity_id;
@@ -1614,6 +1632,21 @@ function calculateDaysAgo(dateStr) {
   const now = new Date();
   const diffTime = Math.abs(now - date);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
+  return diffDays;
+}
+function calculateDaysBetween(startStr, endStr) {
+  if (!startStr || !endStr) return '-';
+
+  const start = new Date(startStr);
+  const end   = new Date(endStr);
+
+  if (isNaN(start) || isNaN(end)) return '-';
+
+  const diffMs   = end - start;
+  const msPerDay = 1000 * 60 * 60 * 24;
+
+  // diferencia “normal” en días (0 si fue el mismo día, 1 si fue al día siguiente, etc.)
+  const diffDays = Math.floor(diffMs / msPerDay);
   return diffDays;
 }
 function computeDaysSinceBatch(refDateStr) {
