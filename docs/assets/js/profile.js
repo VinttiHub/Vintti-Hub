@@ -626,13 +626,15 @@ function showApprovalsToast(text, ok=true){
   setTimeout(()=> t.textContent = "", 3500);
 }
 function renderApprovalsTable(items){
-  const host = document.getElementById("approvalsTable");
-  if (!host) return;
+  const hostPending = document.getElementById("approvalsTable");
+  if (!hostPending) return;
+  const hostHistory = document.getElementById("approvalsHistoryTable");
 
-  host.classList.add("approvals-grid");
+  hostPending.classList.add("approvals-grid");
+  if (hostHistory) hostHistory.classList.add("approvals-grid");
 
-  // Header actualizado (7 columnas)
-  const header = `
+  // Header para la tabla de pendientes (con acciones)
+  const headerPending = `
     <div class="hdr hdr--employee">Employee</div>
     <div class="hdr hdr--request">Request Date</div>
     <div class="hdr hdr--return">Return Date</div>
@@ -642,71 +644,117 @@ function renderApprovalsTable(items){
     <div class="hdr hdr--action">Action</div>
   `;
 
-  if (!items?.length){
-    host.innerHTML = header + `
-      <div class="cell plain" style="grid-column:1/-1;justify-content:center;">No requests from your team.</div>
-    `;
-    return;
+  // Header para el histórico (sin acciones)
+  const headerHistory = `
+    <div class="hdr hdr--employee">Employee</div>
+    <div class="hdr hdr--request">Request Date</div>
+    <div class="hdr hdr--return">Return Date</div>
+    <div class="hdr hdr--days">Days</div>
+    <div class="hdr hdr--type">Type</div>
+    <div class="hdr hdr--status">Status</div>
+  `;
+
+  const pending = (items || []).filter(r => String(r.status || "").toLowerCase() === "pending");
+  const processed = (items || []).filter(r => {
+    const s = String(r.status || "").toLowerCase();
+    return s === "approved" || s === "rejected";
+  });
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(m){
+      return ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      })[m];
+    });
   }
 
- host.innerHTML = header + items.map(r=>{
-  const initials = String(r.user_name||"")
-    .trim().split(/\s+/).slice(0,2).map(p=>p[0]||"").join("").toUpperCase();
+  function buildRow(r, withActions){
+    const initials = String(r.user_name || "")
+      .trim().split(/\s+/).slice(0,2).map(p => p[0] || "").join("").toUpperCase();
 
-  const startLbl = fmtDateShort(r.start_date);
-  const endLbl   = fmtDateShort(r.end_date);
-  const days = (String(r.kind || '').toLowerCase() === 'vacation')
-  ? businessDaysBetweenISO(r.start_date, r.end_date)
-  : diffDaysInclusive(r.start_date, r.end_date);
-  const kClass   = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
-  const kLabel   = String(r.kind||"").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
-  const esc = (s) => String(s).replace(/[&<>"']/g, m => (
-  { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]
-));
+    const startLbl = fmtDateShort(r.start_date);
+    const endLbl   = fmtDateShort(r.end_date);
+    const days = (String(r.kind || '').toLowerCase() === 'vacation')
+      ? businessDaysBetweenISO(r.start_date, r.end_date)
+      : diffDaysInclusive(r.start_date, r.end_date);
 
+    const kClass = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
+    const kLabel = String(r.kind || "").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
+    const statusLower = String(r.status || "").toLowerCase();
 
-  return `
-    <div class="row ${r.status}" data-id="${r.id}">
+    const noteBtn = r.reason
+      ? '<button class="note-dot" type="button" aria-label="View note" title="' +
+          esc(r.reason) + '" data-note="' + esc(r.reason) + '">💬</button>'
+      : '';
 
-      <div class="cell col-employee">
-        <div class="avatar-min">${initials}</div>
-        <div class="uinfo">
-          <div class="uname">${r.user_name || "—"}
-          ${r.reason ? `
-            <button class="note-dot" type="button"
-                    aria-label="View note"
-                    title="${esc(r.reason)}"
-                    data-note="${esc(r.reason)}">💬</button>
-          ` : ``}
+    const actionsHtml = withActions
+      ? '<div class="cell col-actions">' +
+          '<div class="cell t-right actions">' +
+            '<button class="btn tiny approve" data-action="approve">✔️</button>' +
+            '<button class="btn tiny reject"  data-action="reject">❌</button>' +
+          '</div>' +
+        '</div>'
+      : '<div class="cell col-actions"></div>';
+
+    return `
+      <div class="row ${statusLower}" data-id="${r.id}">
+        <div class="cell col-employee">
+          <div class="avatar-min">${initials}</div>
+          <div class="uinfo">
+            <div class="uname">
+              ${r.user_name || "—"}
+              ${noteBtn}
+            </div>
+            <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
           </div>
-          <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
         </div>
+        <div class="cell col-request"><time>${startLbl}</time></div>
+        <div class="cell col-return"><time>${endLbl}</time></div>
+        <div class="cell col-days">${days} day${days===1?'':'s'}</div>
+        <div class="cell col-type"><span class="badge-soft ${kClass}">${kLabel}</span></div>
+        <div class="cell col-status"><span class="status ${statusLower}">${r.status}</span></div>
+        ${actionsHtml}
+        <div class="divider" aria-hidden="true"></div>
       </div>
-      <div class="cell col-request"><time>${startLbl}</time></div>
-      <div class="cell col-return"><time>${endLbl}</time></div>
-      <div class="cell col-days">${days} day${days===1?'':'s'}</div>
-      <div class="cell col-type"><span class="badge-soft ${kClass}">${kLabel}</span></div>
-      <div class="cell col-status"><span class="status ${r.status}">${r.status}</span></div>
-      <div class="cell col-actions">
-      <div class="cell t-right actions">
-        <button class="btn tiny approve" data-action="approve">✔️</button>
-        <button class="btn tiny reject"  data-action="reject">❌</button>
-        </div>
-      </div>
-      <div class="divider" aria-hidden="true"></div>
-    </div>
-  `;
-}).join("");
+    `;
+  }
 
-  // wire buttons
-  host.querySelectorAll("[data-action]").forEach(btn=>{
+  // === Tabla de pendientes ===
+  if (!pending.length){
+    hostPending.innerHTML = headerPending + `
+      <div class="cell plain" style="grid-column:1/-1;justify-content:center;">
+        No requests from your team.
+      </div>
+    `;
+  } else {
+    hostPending.innerHTML = headerPending + pending.map(r => buildRow(r, true)).join("");
+  }
+
+  // === Tabla de histórico ===
+  if (hostHistory){
+    if (!processed.length){
+      hostHistory.innerHTML = headerHistory + `
+        <div class="cell plain" style="grid-column:1/-1;justify-content:center;">
+          No approved or rejected requests yet.
+        </div>
+      `;
+    } else {
+      hostHistory.innerHTML = headerHistory + processed.map(r => buildRow(r, false)).join("");
+    }
+  }
+
+  // Wire de botones solo en la tabla de pendientes
+  hostPending.querySelectorAll("[data-action]").forEach(btn=>{
     btn.onclick = async ()=>{
       const row = btn.closest(".row");
       const id = row?.dataset?.id;
       const action = btn.dataset.action; // approve | reject
       if (!id) return;
 
-      // optimistic paint
       row.classList.remove("row--approved","row--rejected");
       if (action === "approve") row.classList.add("row--approved");
       if (action === "reject")  row.classList.add("row--rejected");
@@ -724,12 +772,13 @@ function renderApprovalsTable(items){
         chip.classList.remove("pending","approved","rejected");
         chip.classList.add(j.status);
         chip.textContent = j.status;
-        try { 
+
+        try {
           loadTeamPto();
+          // 🔄 recarga ambas tablas, así el item pasa de "pending" → histórico
           loadLeaderApprovals();
-         } catch {}
+        } catch {}
       }catch(err){
-        // revert tone
         row.classList.remove("row--approved","row--rejected");
         showApprovalsToast("Could not update: " + (err?.message || "error"), false);
       }

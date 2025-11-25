@@ -349,7 +349,23 @@
       <div id="calTooltip" class="cal-tooltip" aria-hidden="true"></div>
     </div>
   </section>
+  <!-- Histórico: aprobados / rechazados -->
+  <section class="approvals-history" aria-label="Processed PTO requests">
+    <header class="approvals-history-head">
+      <h3 class="approvals-history-title">Approved & Rejected</h3>
+      <p class="approvals-history-sub">Recently processed PTO requests from your team.</p>
+    </header>
 
+      <div id="approvalsHistoryTable" class="approvals-table">
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+      </div>
+    </section>
+
+    <footer class="approvals-foot">
+      <span id="approvalsToast" class="toast" role="status" aria-live="polite"></span>
+    </footer>
+  </section>
   <footer class="approvals-foot">
     <span id="approvalsToast" class="toast" role="status" aria-live="polite"></span>
   </footer>
