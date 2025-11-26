@@ -2024,9 +2024,7 @@ async function patchOppFields(oppId, payload) {
     'angie@vintti.com',
     'jazmin@vintti.com',
     'agustin@vintti.com',
-    'lara@vintti.com',
-    'jazmin@vintti.com',   
-    'agostina@vintti.com' 
+    'lara@vintti.com' 
   ];
 
   let eq = document.getElementById('equipmentsLink');
