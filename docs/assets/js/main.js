@@ -299,7 +299,8 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
     'agustina.barbero@vintti.com',
     'agustina.ferrari@vintti.com',
     'josefina@vintti.com',
-    'constanza@vintti.com'
+    'constanza@vintti.com',
+    'julieta@vintti.com'
   ]);
 
 window.allowedHRUsers = users.filter(u =>
@@ -623,7 +624,8 @@ if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
       'agustina.barbero@vintti.com',
       'agustina.ferrari@vintti.com',
       'josefina@vintti.com',
-      'constanza@vintti.com'
+      'constanza@vintti.com',
+      'julieta@vintti.com'
     ]);
     window.allowedHRUsers = users.filter(u =>
       ALLOWED_HR_EMAILS.has(String(u.email_vintti || '').toLowerCase())
@@ -1090,7 +1092,8 @@ if (candidateSearchLink) {
     'pilar@vintti.com',
     'pilar.fernandez@vintti.com',
     'angie@vintti.com',
-    'agostina@vintti.com'
+    'agostina@vintti.com',
+    'julieta@vintti.com' 
   ]);
 
   candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'block' : 'none';
@@ -2125,7 +2128,8 @@ const AVATAR_BY_EMAIL = {
   'agustina.barbero@vintti.com':        'agustina.png',
   'josefina@vintti.com':                'josefina.png',
   'constanza@vintti.com':               'constanza.png',
-  'mariano@vintti.com':                 'mariano.png'
+  'mariano@vintti.com':                 'mariano.png',
+  'julieta@vintti.com':                 'julieta.png'
 };
 
 // --- HR initials (dos letras) ---
@@ -2136,7 +2140,8 @@ const HR_INITIALS_BY_EMAIL = {
   'pilar.fernandez@vintti.com':         'PF', 
   'agustina.barbero@vintti.com':        'AB',
   'josefina@vintti.com':                'JP',
-  'constanza@vintti.com':               'CL'
+  'constanza@vintti.com':               'CL',
+  'julieta@vintti.com':                  'JG'
 };
 
 function initialsForHRLead(emailOrName) {
