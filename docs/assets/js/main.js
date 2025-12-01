@@ -2425,3 +2425,21 @@ window.patchOpportunityStage = async function(opportunityId, newStage, dropdownE
     sendNegotiatingReminder(opportunityId);
   }
 };
+// === Log out button ===
+document.addEventListener('DOMContentLoaded', () => {
+  const logoutFab = document.getElementById('logoutFab');
+  if (!logoutFab) return;
+
+  logoutFab.addEventListener('click', () => {
+    // limpiar sesión local
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_id_owner_email');
+    localStorage.removeItem('user_avatar');
+
+    sessionStorage.clear();
+
+    // redirigir al login
+    window.location.href = 'index.html';
+  });
+});

@@ -1738,3 +1738,47 @@ body.dark-mode .profile-tile{
   color: #8a6a00;
   font-weight: 600;
 }
+/* ===== Floating Logout Button (bottom-right) ===== */
+.logout-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 24px;
+  z-index: 10001;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0044ff;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.logout-fab i {
+  font-size: 14px;
+}
+
+.logout-fab:hover {
+  background: #fdf4ee;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+}
+
+.logout-fab:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+}
+
+@media (max-width: 900px) {
+  .logout-fab {
+    bottom: 16px;
+    right: 16px;
+    padding: 10px 16px;
+  }
+}
