@@ -36,6 +36,90 @@ function getCurrentUserEmail(){
     .toLowerCase()
     .trim();
 }
+// --- Email cuando se asigna / cambia HR Lead en una oportunidad ---
+async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
+  try {
+    const cleanEmail = String(hrEmail || '').toLowerCase().trim();
+    if (!cleanEmail) {
+      console.warn('⚠️ No HR Lead email to notify for opp', opportunityId);
+      return;
+    }
+
+    // 1) Traer detalles de la oportunidad
+    const r = await fetch(`${API_BASE}/opportunities/${opportunityId}`, { 
+      credentials: 'include' 
+    });
+    if (!r.ok) throw new Error(`GET opp ${opportunityId} failed ${r.status}`);
+    const opp = await r.json();
+
+    // 2) Resolver client_name bonito desde accounts
+    const clientName = await resolveAccountName(opp);
+    const position   = opp.opp_position_name || 'Role';
+    const model      = opp.opp_model || '';
+
+    // 3) Subject girly + info de client & position
+    const subject = `You’ve been assigned a new search – ${clientName} | ${position}`;
+
+    // Por si quieres usar escapeHtml del helper global
+    const esc = s => String(s || '').replace(/[&<>"]/g, ch => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]
+    ));
+
+    // 4) Cuerpo en HTML, amigable y cute
+    const htmlBody = `
+<div style="font-family: Inter, Arial, sans-serif; font-size: 14px; color: #222; line-height: 1.6;">
+  <p>Hi there 💕</p>
+
+  <p>
+    You’ve just been assigned a brand new search in Vintti Hub – how exciting! ✨
+  </p>
+
+  <p style="margin: 12px 0;">
+    <strong>Client:</strong> ${esc(clientName)}<br/>
+    <strong>Position:</strong> ${esc(position)}<br/>
+    <strong>Model:</strong> ${esc(model)}
+  </p>
+
+  <p>
+    You’re going to do amazing on this one – as always. 🌸<br/>
+    If you need anything, Angie is already in the loop and happy to help.
+  </p>
+
+  <p style="margin-top: 16px; font-size: 12px; color: #777;">
+    This is an automatic notification from Vintti Hub so you can jump in with a smile. 💌
+  </p>
+</div>
+    `.trim();
+
+    // 5) Enviar email a HR Lead + Angie
+    const payload = {
+      to: [cleanEmail, 'angie@vintti.com']
+        .filter((v, i, arr) => v && arr.indexOf(v) === i),
+      subject,
+      body: htmlBody,
+      body_html: htmlBody,
+      content_type: 'text/html',
+      html: true
+    };
+
+    const res = await fetch(`${API_BASE}/send_email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`send_email failed ${res.status}: ${errText}`);
+    }
+
+    console.info('✅ HR Lead assignment email sent to', cleanEmail, 'for opp', opportunityId);
+  } catch (err) {
+    console.error('❌ Failed to send HR Lead assignment email:', err);
+  }
+}
+
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
 // Try to get user_id from storage; if missing, resolve by email and cache it
@@ -971,16 +1055,28 @@ if (select.classList.contains('stage-dropdown')) {
   }
 });
 document.addEventListener('change', async e => {
-  if (e.target.classList.contains('hr-lead-dropdown')) {
-    const oppId   = e.target.dataset.id;
-    const newLead = e.target.value;
+  if (!e.target.classList.contains('hr-lead-dropdown')) return;
 
+  const oppId   = e.target.dataset.id;
+  const newLead = (e.target.value || '').toLowerCase().trim();
+
+  // Si por alguna razón seleccionan algo vacío o placeholder, no hacemos nada
+  if (!newLead) return;
+
+  try {
     // 1) Persistir en backend
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+    const res = await fetch(`${API_BASE}/opportunities/${oppId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ opp_hr_lead: newLead })
     });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      console.error('❌ Error updating opp_hr_lead:', res.status, txt);
+      alert('Error updating HR Lead. Please try again.');
+      return;
+    }
 
     // 2) Refrescar display (inicial + avatar) en la misma celda
     const wrap = e.target.closest('.hr-lead-cell-wrap');
@@ -988,6 +1084,13 @@ document.addEventListener('change', async e => {
       const current = wrap.querySelector('.hr-lead');
       if (current) current.outerHTML = hrDisplayHTML(newLead);
     }
+
+    // 3) Enviar email de asignación de búsqueda (HR Lead + Angie)
+    sendHRLeadAssignmentEmail(oppId, newLead);
+
+  } catch (err) {
+    console.error('❌ Network error updating HR Lead:', err);
+    alert('Network error. Please try again.');
   }
 });
 document.addEventListener('change', async e => {
