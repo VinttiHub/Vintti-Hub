@@ -32,11 +32,27 @@
   <div class="sidebar" role="navigation" aria-label="Primary">
     <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
     <a class="menu-item" href="candidates.html">Candidates</a>
+
     <a class="menu-item active" href="crm.html">CRM</a>
     <a class="menu-item" href="opportunities.html">Opportunities</a>
+    <!-- 🔹 NUEVO: Candidate Search, se muestra según permisos via JS -->
+    <a class="menu-item" id="candidateSearchLink" href="candidate-search.html" style="display:none;">
+      Candidate Search
+    </a>
     <!-- Hidden links are toggled by app logic -->
-    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display: none;">📊 Opportunities Summary</a>
-    <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">🧰 Equipments</a>
+    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display: none;">Opportunities Summary</a>
+    <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">Equipments</a>
+    <!-- Profile tile (bottom-left) -->
+    <a href="profile.html" class="profile-tile" id="sidebarProfile">
+      <span class="profile-avatar">
+        <img id="profileAvatarImg" alt="" />
+        <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
+      </span>
+      <span class="profile-meta">
+        <span id="profileName" class="profile-name"></span>
+        <span id="profileEmail" class="profile-email"></span>
+      </span>
+    </a>
   </div>
 
   <!-- Sidebar wow toggle (kept ids/classes) -->
@@ -341,7 +357,11 @@
       </div>
     </div>
   </div>
-
+  <!-- Botón flotante de Log out -->
+ <button type="button" class="logout-fab" id="logoutFab">
+    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+    <span>Log out</span>
+  </button>
   <!-- ====================== SCRIPTS ====================== -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>

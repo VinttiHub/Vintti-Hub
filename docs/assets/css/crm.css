@@ -309,7 +309,227 @@ body {
 .popup-inline .field-half input {
   width: 85%;
 }
+/* ===== Floating Logout Button (bottom-right) ===== */
+.logout-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 24px;
+  z-index: 10001;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0044ff;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
 
+.logout-fab i {
+  font-size: 14px;
+}
+
+.logout-fab:hover {
+  background: #fdf4ee;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+}
+
+.logout-fab:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+}
+
+@media (max-width: 900px) {
+  .logout-fab {
+    bottom: 16px;
+    right: 16px;
+    padding: 10px 16px;
+  }
+}
+/* Sidebar needs to be a column so the profile can pin to bottom */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Profile tile styles */
+.profile-tile{
+  margin-top: auto;               /* pins to bottom of the column */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease, background .3s ease;
+  background: rgba(255,255,255,.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 4px 14px rgba(0,0,0,.08) inset, 0 2px 10px rgba(0,0,0,.04);
+  color: inherit;
+}
+body.dark-mode .profile-tile{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.18);
+}
+.profile-tile:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.10);
+}
+
+/* Avatar circle */
+.profile-avatar{
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 42px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(255,255,255,.35));
+  border: 1px solid rgba(255,255,255,.5);
+}
+.profile-avatar img{
+  width: 100%;
+  height: 100%;
+  display: none;          /* toggled ON by JS if we have an avatar */
+  object-fit: cover;
+}
+.profile-initials{
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  letter-spacing: .3px;
+  user-select: none;
+}
+
+/* Name + email */
+.profile-meta{ display:flex; flex-direction:column; line-height: 1.1; }
+.profile-name{ font-weight: 700; font-size: 14px; }
+.profile-email{ font-size: 12px; opacity: .75; }
+
+/* Respect your sidebar collapse if you have one */
+.custom-sidebar-hidden .profile-tile{ display: none; }
+
+/* Si *algo* lo oculta, que al menos el tile se vea */
+.profile-tile { display: flex !important; }
+/* Sidebar: full-height column pinned to the viewport */
+.sidebar{
+  position: sticky;      /* stays put while main content scrolls */
+  top: 0;
+  height: 100vh;         /* fill viewport height */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;      /* sidebar scrolls if it has a lot of items */
+  padding-bottom: 14px;  /* breathing room for the sticky tile */
+}
+/* Profile tile: always visible at bottom-left of the sidebar */
+.profile-tile{
+  position: sticky;
+  bottom: 12px;          /* distance from the bottom edge */
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease, background .3s ease;
+  background: rgba(255,255,255,.22);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 4px 14px rgba(0,0,0,.08) inset, 0 2px 10px rgba(0,0,0,.04);
+  color: inherit;
+  z-index: 1;            /* sit above sidebar content if it overlaps */
+}
+
+/* If your sidebar can collapse, keep hiding it there */
+.custom-sidebar-hidden .profile-tile{ display:none; }
+/* —— Cute initials avatar —— */
+.profile-tile .profile-avatar{
+  --size: 42px;
+  --radius: 999px;
+  --ring: 2px;
+  --bg1: #5da8ff;         /* top-left gradient */
+  --bg2: #2563eb;         /* bottom-right gradient (brand blue) */
+  --glow: rgba(37,99,235,.28);
+
+  width: var(--size);
+  height: var(--size);
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: radial-gradient(120% 120% at 20% 15%, var(--bg1), var(--bg2));
+  box-shadow:
+    0 8px 24px var(--glow),
+    inset 0 1px 0 rgba(255,255,255,.35);
+  transform: translateZ(0); /* smoother */
+}
+
+/* subtle glass ring */
+.profile-tile .profile-avatar::before{
+  content:"";
+  position:absolute; inset:0;
+  border-radius: inherit;
+  padding: var(--ring);
+  background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.25));
+  -webkit-mask:
+    radial-gradient(#000 70%, transparent 71%) content-box,
+    radial-gradient(#000 70%, transparent 71%);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events:none;
+}
+
+/* tiny glossy highlight */
+.profile-tile .profile-avatar::after{
+  content:"";
+  position:absolute;
+  inset:auto 6px 55% 6px;
+  height: 36%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0));
+  filter: blur(1px);
+  pointer-events:none;
+}
+
+/* initials */
+.profile-tile .profile-initials{
+  display:grid; place-items:center;
+  width:100%; height:100%;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: .6px;
+  color:#fff;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,.15),
+    0 8px 18px rgba(0,0,0,.18);
+  user-select:none;
+}
+
+/* never show image */
+.profile-tile .profile-avatar img{ display:none !important; }
+
+/* gentle micro-interaction */
+.profile-tile .profile-tile:hover .profile-avatar,
+.profile-tile:hover .profile-avatar{
+  transform: translateY(-1px);
+  box-shadow:
+    0 12px 28px var(--glow),
+    inset 0 1px 0 rgba(255,255,255,.38);
+}
 /* ======================
    7) PRIORITY SELECT (A/B/C)
    ====================== */

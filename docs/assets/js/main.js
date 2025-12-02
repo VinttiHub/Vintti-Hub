@@ -92,7 +92,7 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
 
     // 5) Enviar email a HR Lead + Angie
     const payload = {
-      to: [cleanEmail, 'angie@vintti.com']
+      to: [cleanEmail]
         .filter((v, i, arr) => v && arr.indexOf(v) === i),
       subject,
       body: htmlBody,
@@ -184,7 +184,6 @@ async function getCurrentUserId({ force = false } = {}) {
 window.getCurrentUserId = getCurrentUserId;
 // ——— API helper que SIEMPRE intenta enviar el usuario ———
 async function api(path, opts = {}) {
-  // path ej: "/profile/me" o "/time_off_requests"
   const uid = await window.getCurrentUserId(); // puede ser null
   const url = `${API_BASE}${path}`;
 
