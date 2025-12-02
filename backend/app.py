@@ -28,8 +28,8 @@ from db import get_connection
 from coresignal_routes import bp as coresignal_bp
 from psycopg2.extras import RealDictCursor, execute_values
 from flask_cors import CORS
+from datetime import date
 
-# Affinda (opcional)
 from affinda import AffindaAPI, TokenCredential
 
 import re, html as _html
@@ -2318,9 +2318,7 @@ def handle_candidate_hire_data(candidate_id):
             'referral_dolar': 'referral_dolar',
             'referral_daterange': 'referral_daterange',
             'buyout_dolar': 'buyout_dolar',
-            'buyout_daterange': 'buyout_daterange',
-            'carga_active': 'carga_active',
-            'carga_inactive': 'carga_inactive'
+            'buyout_daterange': 'buyout_daterange'
         }
 
         set_cols, set_vals = [], []
@@ -2328,6 +2326,15 @@ def handle_candidate_hire_data(candidate_id):
             if k in data:
                 set_cols.append(f"{col} = %s")
                 set_vals.append(data[k])
+
+        # 👇 lógica especial para las fechas de carga
+        if 'start_date' in data:
+            set_cols.append("carga_active = %s")
+            set_vals.append(date.today())   # solo fecha actual
+
+        if 'end_date' in data:
+            set_cols.append("carga_inactive = %s")
+            set_vals.append(date.today())
 
         created = False
         updated = False
