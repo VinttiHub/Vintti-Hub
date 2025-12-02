@@ -52,12 +52,12 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
     if (!r.ok) throw new Error(`GET opp ${opportunityId} failed ${r.status}`);
     const opp = await r.json();
 
-    // 2) Resolver client_name bonito desde accounts
+    // 2) Resolver client_name desde accounts
     const clientName = await resolveAccountName(opp);
     const position   = opp.opp_position_name || 'Role';
     const model      = opp.opp_model || '';
 
-    // 3) Subject girly + info de client & position
+    // 3) Subject info de client & position
     const subject = `You’ve been assigned a new search – ${clientName} | ${position}`;
 
     // Por si quieres usar escapeHtml del helper global
@@ -82,11 +82,10 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
 
   <p>
     You’re going to do amazing on this one – as always. 🌸<br/>
-    If you need anything, Angie is already in the loop and happy to help.
   </p>
 
   <p style="margin-top: 16px; font-size: 12px; color: #777;">
-    This is an automatic notification from Vintti Hub so you can jump in with a smile. 💌
+    - Vintti Hub
   </p>
 </div>
     `.trim();
