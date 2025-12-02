@@ -2208,6 +2208,7 @@ def handle_candidate_hire_data(candidate_id):
                     referral_daterange,
                     buyout_dolar,
                     buyout_daterange,
+                    carga_active,
                     carga_inactive
                 FROM hire_opportunity
                 WHERE candidate_id = %s AND opportunity_id = %s
@@ -2257,6 +2258,7 @@ def handle_candidate_hire_data(candidate_id):
                 'referral_daterange': row['referral_daterange'],
                 'buyout_dolar': row['buyout_dolar'],
                 'buyout_daterange': row['buyout_daterange'],
+                'carga_active': row['carga_active'],
                 'carga_inactive': row['carga_inactive']
             })
 
@@ -2316,7 +2318,9 @@ def handle_candidate_hire_data(candidate_id):
             'referral_dolar': 'referral_dolar',
             'referral_daterange': 'referral_daterange',
             'buyout_dolar': 'buyout_dolar',
-            'buyout_daterange': 'buyout_daterange'
+            'buyout_daterange': 'buyout_daterange',
+            'carga_active': 'carga_active',
+            'carga_inactive': 'carga_inactive'
         }
 
         set_cols, set_vals = [], []

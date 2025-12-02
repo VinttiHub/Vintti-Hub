@@ -894,22 +894,67 @@ window.updateHireField = async function(field, value) {
   (function restoreHireDates() {
     const hostStart = document.getElementById('hire-start-picker');
     const hostEnd   = document.getElementById('hire-end-picker');
+
+    // Montar inputs nativos si no existen
     if (hostStart && !hostStart.querySelector('input[type="date"]')) {
       hostStart.innerHTML = '<input type="date" id="hire-start-date" />';
     }
     if (hostEnd && !hostEnd.querySelector('input[type="date"]')) {
       hostEnd.innerHTML = '<input type="date" id="hire-end-date" />';
     }
+
     const startInp = document.getElementById('hire-start-date');
     const endInp   = document.getElementById('hire-end-date');
-   if (startInp) startInp.addEventListener('change', () => {
-     const ymd = startInp.value || '';
-     updateHireField('start_date', ymd ? normalizeDateForAPI(ymd) : '');
-  });
-   if (endInp) endInp.addEventListener('change', () => {
-     const ymd = endInp.value || '';
-     updateHireField('end_date', ymd ? normalizeDateForAPI(ymd) : '');
-   });
+
+    // ⬅️ cuando cambia START_DATE → guardar start_date y carga_active_date
+    if (startInp) {
+      startInp.addEventListener('change', async () => {
+        const ymd = startInp.value || '';
+
+        // 1) actualiza start_date normal
+        await updateHireField(
+          'start_date',
+          ymd ? normalizeDateForAPI(ymd) : ''
+        );
+
+        // 2) registra la “fecha de carga active”
+        //    (usa hoy; si prefieres usar la misma ymd, cambia todayYmd() por ymd)
+        if (ymd) {
+          const today = todayYmd();
+          await updateHireField(
+            'carga_active',    
+            normalizeDateForAPI(today)
+          );
+        } else {
+          // si borran la fecha, limpiamos el campo de carga
+          await updateHireField('carga_active', '');
+        }
+      });
+    }
+
+    // ⬅️ cuando cambia END_DATE → guardar end_date y carga_inactive_date
+    if (endInp) {
+      endInp.addEventListener('change', async () => {
+        const ymd = endInp.value || '';
+
+        // 1) actualiza end_date normal
+        await updateHireField(
+          'end_date',
+          ymd ? normalizeDateForAPI(ymd) : ''
+        );
+
+        // 2) registra la “fecha de carga inactive”
+        if (ymd) {
+          const today = todayYmd();
+          await updateHireField(
+            'carga_inactive',  
+            normalizeDateForAPI(today)
+          );
+        } else {
+          await updateHireField('carga_inactive', '');
+        }
+      });
+    }
   })();
 
   // --- Overview: cargar datos del candidato ---
