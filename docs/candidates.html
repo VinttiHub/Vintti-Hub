@@ -32,15 +32,22 @@
 
 <body class="light-mode">
   <!-- ======================== Sidebar ======================== -->
-  <aside class="sidebar" aria-label="Primary">
-    <!-- Logo kept; lazy to avoid blocking first paint -->
-    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" loading="lazy" />
-    <a class="menu-item active" href="candidates.html" aria-current="page">Candidates</a>
-    <a class="menu-item" href="crm.html">CRM</a>
-    <a class="menu-item" href="opportunities.html">Opportunities</a>
-    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display:none;">📊 Opportunities Summary</a>
-    <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">🧰 Equipments</a>
-  </aside>
+<aside class="sidebar" aria-label="Primary">
+  <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" loading="lazy" />
+  <a class="menu-item active" href="candidates.html" aria-current="page">Candidates</a>
+  <a class="menu-item" href="crm.html">CRM</a>
+  <a class="menu-item" id="opportunitiesLink" href="opportunities.html">Opportunities</a>
+
+  <a class="menu-item" id="candidateSearchLink" href="candidate-search.html" style="display:none;">
+    Candidate Search
+  </a>
+  <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display:none;">
+    Opportunities Summary
+  </a>
+  <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">
+    Equipments
+  </a>
+</aside>
 
   <!-- Sidebar toggle (kept IDs/classes) -->
   <div class="sidebar-wow-toggle" id="sidebarToggle" role="button" aria-label="Toggle sidebar" tabindex="0">
@@ -111,7 +118,10 @@
     </div>
     <!-- ====================== /Candidates Table ====================== -->
   </main>
-
+  <button id="logoutFab" class="logout-fab" title="Log out">
+    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+    <span>Log out</span>
+  </button>
   <!-- ======================== Scripts (order preserved; deferred) ======================== -->
   <!-- jQuery first (required by DataTables) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js" defer></script>
@@ -120,6 +130,8 @@
   <!-- Font Awesome JS (icons) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" defer></script>
   <!-- App JS (kept filename/path) -->
+  <script src="./assets/js/main.js" defer></script>
+  <!-- JS específico de Candidates -->
   <script src="./assets/js/candidate.js" defer></script>
 
   <!-- SFX (kept id/src). Preload left as-is; controls hidden for UX -->
