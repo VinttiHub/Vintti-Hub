@@ -284,6 +284,133 @@ function installAdvancedFilters(table) {
   if (summaryLink)     summaryLink.style.display     = summaryAllowed.includes(email)     ? '' : 'none';
   if (equipmentsLink)  equipmentsLink.style.display  = equipmentsAllowed.includes(email)  ? '' : 'none';
 })();
+// --- Candidate Search button visibility ---
+const candidateSearchLink = document.getElementById('candidateSearchLink');
+
+if (candidateSearchLink) {
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  const CANDIDATE_SEARCH_ALLOWED = new Set([
+    'agustina.barbero@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com',
+    'constanza@vintti.com',
+    'pilar@vintti.com',
+    'pilar.fernandez@vintti.com',
+    'angie@vintti.com',
+    'agostina@vintti.com',
+    'julieta@vintti.com' 
+  ]);
+
+  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'block' : 'none';
+}
+/* =========================================================================
+   Profile
+   ====================================================================== */
+async function initSidebarProfileCandidates(){
+  // helpers
+  function initialsFromName(name=""){
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '—';
+    const a = (parts[0]?.[0]||'').toUpperCase();
+    const b = (parts[1]?.[0]||'').toUpperCase();
+    return (a + b) || a || '—';
+  }
+  function initialsFromEmail(email=""){
+    const local = String(email).split('@')[0] || '';
+    if (!local) return '—';
+    const bits = local.split(/[._-]+/).filter(Boolean);
+    return (bits.length >= 2)
+      ? (bits[0][0] + bits[1][0]).toUpperCase()
+      : local.slice(0,2).toUpperCase();
+  }
+
+  let tile = document.getElementById('sidebarProfile');
+  const sidebar = document.querySelector('.sidebar');
+  if (!tile && sidebar){
+    sidebar.insertAdjacentHTML('beforeend', `
+      <a href="profile.html" class="profile-tile" id="sidebarProfile">
+        <span class="profile-avatar">
+          <img id="profileAvatarImg" alt="" />
+          <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
+        </span>
+        <span class="profile-meta">
+          <span id="profileName" class="profile-name">Profile</span>
+          <span id="profileEmail" class="profile-email"></span>
+        </span>
+      </a>
+    `);
+    tile = document.getElementById('sidebarProfile');
+  }
+  if (!tile) return;
+
+  const $init   = document.getElementById('profileAvatarInitials');
+  const $name   = document.getElementById('profileName');
+  const $emailE = document.getElementById('profileEmail');
+  const $img    = document.getElementById('profileAvatarImg');
+
+  // nunca mostrar foto
+  if ($img) { 
+    $img.removeAttribute('src'); 
+    $img.style.display = 'none'; 
+  }
+
+  // nunca mostrar email en el profile (igual que main)
+  if ($emailE) { 
+    $emailE.textContent = ''; 
+    $emailE.style.display = 'none'; 
+  }
+
+  // resolver uid igual que en main
+  let uid = null;
+  try {
+    uid = (typeof window.getCurrentUserId === 'function')
+      ? (await window.getCurrentUserId())
+      : (Number(localStorage.getItem('user_id')) || null);
+  } catch {
+    uid = Number(localStorage.getItem('user_id')) || null;
+  }
+
+  // link al profile con user_id
+  const base = 'profile.html';
+  tile.href = uid != null ? `${base}?user_id=${encodeURIComponent(uid)}` : base;
+
+  // iniciales rápidas con el email mientras carga
+  const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase();
+  if ($init) $init.textContent = initialsFromEmail(email);
+
+  // intentar /users/<uid>, fallback a /profile/me
+  let user = null;
+  try {
+    if (uid != null) {
+      const r = await fetch(`${API_BASE}/users/${encodeURIComponent(uid)}?user_id=${encodeURIComponent(uid)}`, { credentials:'include' });
+      if (r.ok) user = await r.json();
+      else console.debug('[sidebar CRM] /users/<uid> failed:', r.status);
+    }
+    if (!user) {
+      const r2 = await fetch(`${API_BASE}/profile/me${uid!=null?`?user_id=${encodeURIComponent(uid)}`:''}`, { credentials:'include' });
+      if (r2.ok) user = await r2.json();
+      else console.debug('[sidebar CRM] /profile/me failed:', r2.status);
+    }
+  } catch (e) {
+    console.debug('[sidebar CRM] fetch error:', e);
+  }
+
+  const userName = user?.user_name || '';
+  if (userName) {
+    if ($name) $name.textContent = userName;
+    if ($init) $init.textContent = initialsFromName(userName);
+  } else {
+    if ($name) $name.textContent = 'Profile'; // fallback
+  }
+
+  // aseguramos que se vea
+  const cs = window.getComputedStyle(tile);
+  if (cs.display === 'none') tile.style.display = 'flex';
+}
+
+// mantener este listener tal cual
+document.addEventListener('DOMContentLoaded', initSidebarProfileCandidates);
 
 /* =========================================================================
    Dashboard + Management Metrics (cross-pages)
