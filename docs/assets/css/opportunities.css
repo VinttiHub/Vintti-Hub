@@ -1782,3 +1782,121 @@ body.dark-mode .profile-tile{
     padding: 10px 16px;
   }
 }
+/* ==== Close Lost popup: layout + estilos pastel ==== */
+#closeLostPopup .close-lost-popup{
+  max-width: 460px;
+  width: 90%;
+  padding: 20px 22px 24px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+#closeLostPopup .popup-title{
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 32px 6px;
+  text-align: center;
+}
+
+#closeLostPopup .popup-field{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#closeLostPopup label{
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Campos: redonditos, fondo blanco, mismo look que otros inputs */
+#closeLostPopup input[type="date"],
+#closeLostPopup select,
+#closeLostPopup textarea{
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid #e6e6eb;
+  background: #ffffff;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+#closeLostPopup textarea{
+  min-height: 80px;
+  resize: vertical;
+}
+
+#closeLostPopup input[type="date"]:focus,
+#closeLostPopup select:focus,
+#closeLostPopup textarea:focus{
+  border-color: #bfc7ff;
+  box-shadow: 0 0 0 3px rgba(0,40,255,.08);
+}
+
+/* Select: flechita custom, fondo blanco, redondo */
+#closeLostPopup select{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='black' height='16' viewBox='0 0 24 24' width='16' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px;
+}
+
+/* X de cerrar: sin fondo azul, solo iconito sobre fondo blanco del modal */
+#closeLostPopup .close-btn{
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;   /* quita el fondo azul */
+  box-shadow: none;
+  color: #0044ff;            /* color del icono */
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+#closeLostPopup .close-btn:hover{
+  background: #f2f4ff;
+}
+
+/* Botón Save: pasteli, centrado, no se ve como la X */
+#closeLostPopup #saveCloseLost{
+  margin-top: 8px;
+  align-self: stretch;
+  border-radius: 999px;
+  background-color: #0044ff;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .2s, transform .1s;
+}
+
+/* Evitar que la regla general .popup-content button lo pinte distinto */
+#closeLostPopup .close-lost-popup > button#saveCloseLost{
+  background-color: #0044ff;
+}
+
+#closeLostPopup #saveCloseLost:hover{
+  background-color: #0032c7;
+  transform: translateY(-1px);
+}

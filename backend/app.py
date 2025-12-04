@@ -1347,7 +1347,7 @@ def update_opportunity_fields(opportunity_id):
         'candidato_contratado',
         'cantidad_entrevistados',
 
-        # 👇 Career Site
+        # Career Site
         'career_job_id',
         'career_job',
         'career_country',
@@ -1364,7 +1364,8 @@ def update_opportunity_fields(opportunity_id):
         'career_additional_info',
         'career_published',
         'expected_fee',
-        'expected_revenue'
+        'expected_revenue',
+        'details_close_lost'
     ]
 
     # 🔹 Normaliza HTML ruidoso de Career Site / Webflow antes de persistir

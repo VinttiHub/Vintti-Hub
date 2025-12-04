@@ -261,16 +261,22 @@
       <button id="saveNewSourcing" type="button">Save</button>
     </div>
   </div>
+<!-- Closed Lost -->
+<div id="closeLostPopup" class="popup-overlay" style="display:none;" 
+     role="dialog" aria-modal="true" aria-labelledby="closeLostTitle">
+  <div class="popup-content close-lost-popup">
+    <button class="close-btn" type="button" onclick="closeCloseLostPopup()" aria-label="Close">
+      &times;
+    </button>
 
-  <!-- Closed Lost -->
-  <div id="closeLostPopup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="closeLostTitle">
-    <div class="popup-content">
-      <button class="close-btn" type="button" onclick="closeCloseLostPopup()" aria-label="Close">&times;</button>
-      <h2 id="closeLostTitle">Closed Lost Details</h2>
+    <h2 id="closeLostTitle" class="popup-title">Closed Lost Details</h2>
 
+    <div class="popup-field">
       <label for="closeLostDate">Close Date:</label>
       <input type="date" id="closeLostDate" />
+    </div>
 
+    <div class="popup-field">
       <label for="closeLostReason">Reason:</label>
       <select id="closeLostReason">
         <option value="">Select reason</option>
@@ -279,12 +285,19 @@
         <option value="Shopping">Shopping</option>
         <option value="Competencia">Competencia</option>
         <option value="Timing">Timing</option>
-        <option value="Timing">Vintti’s Fault</option>
+        <option value="Vinttis Fault">Vintti’s Fault</option>
       </select>
-
-      <button id="saveCloseLost" type="button">Save</button>
     </div>
+
+    <div class="popup-field">
+      <label for="closeLostDetails">Details:</label>
+      <textarea id="closeLostDetails" rows="3" 
+        placeholder="Add some context…"></textarea>
+    </div>
+
+    <button id="saveCloseLost" type="button">Save</button>
   </div>
+</div>
 
   <!-- Stage toast -->
   <div id="stage-toast" role="status" aria-live="polite">✨ Stage updated!</div>

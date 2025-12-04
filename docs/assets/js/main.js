@@ -2078,21 +2078,30 @@ function openCloseLostPopup(opportunityId, dropdownElement) {
   const saveBtn = document.getElementById('saveCloseLost');
   saveBtn.onclick = async () => {
     const closeDate = document.getElementById('closeLostDate').value;
-    const motive = document.getElementById('closeLostReason').value;
+    const motive    = document.getElementById('closeLostReason').value;
+    const details   = (document.getElementById('closeLostDetails')?.value || '').trim();
 
     if (!closeDate || !motive) {
       alert("Please fill in both date and reason.");
       return;
     }
 
+    // Construimos el payload
+    const payload = {
+      opp_close_date:   closeDate,
+      motive_close_lost: motive
+    };
+
+    // Solo mandamos details si hay algo escrito (opcional)
+    if (details) {
+      payload.details_close_lost = details;
+    }
+
     // Guardar en DB
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/fields`, {
+    await fetch(`${API_BASE}/opportunities/${opportunityId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        opp_close_date: closeDate,
-        motive_close_lost: motive
-      })
+      body: JSON.stringify(payload)
     });
 
     await patchOpportunityStage(opportunityId, 'Closed Lost', dropdownElement);
