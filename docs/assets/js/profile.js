@@ -1057,6 +1057,9 @@ function _fmtDays(n){ const v = Math.max(0, n); return `${v} day${v===1?'':'s'}`
 function _toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function _fmtDays(n){ const v = Math.max(0, n); return `${v} day${v===1?'':'s'}`; }
 
+// ——— Time Off Balances (read-only) ———
+function _toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
+
 function renderBalances({
   // VACATION
   vacaciones_acumuladas = 0,
@@ -1065,106 +1068,44 @@ function renderBalances({
   // VINTTI DAYS
   vintti_days = 0,
   vintti_days_consumidos = 0,
-  // HOLIDAYS (DB: feriados_totales, feriados_consumidos)
+  // HOLIDAYS
   feriados_totales = 0,
   feriados_consumidos = 0,
-}){
-  // Vacation
-  const acc = _toNum(vacaciones_acumuladas);
-  const work = _toNum(vacaciones_habiles);
-  const usedVac = _toNum(vacaciones_consumidas);
-  const totalVac = Math.max(0, acc + work);
-  const availVac = Math.max(0, totalVac - usedVac);
-
-  // Vintti Days
-  const totalVD = _toNum(vintti_days);
-  const usedVD  = _toNum(vintti_days_consumidos);
-  const availVD = Math.max(0, totalVD - usedVD);
-
-  // Holidays
-  const holAvail = _toNum(feriados_totales);       // “Holiday Available” (DB: feriados_totales)
-  const holUsed  = _toNum(feriados_consumidos);    // “Holiday Used”      (DB: feriados_consumidos)
-  const holTotal = Math.max(0, holAvail - holUsed);// “Holiday Total” (remaining)
-
+} = {}){
   const host = document.getElementById('balancesTable');
   if (!host) return;
+
+  // Vacation total = acumuladas + hábiles
+  const acc      = _toNum(vacaciones_acumuladas);
+  const work     = _toNum(vacaciones_habiles);
+  const totalVac = Math.max(0, acc + work);
+
+  // Vintti Days available = total - usados
+  const totalVD  = _toNum(vintti_days);
+  const usedVD   = _toNum(vintti_days_consumidos);
+  const availVD  = Math.max(0, totalVD - usedVD);
+
+  // Holiday available: usamos feriados_totales como disponible
+  const holAvail = _toNum(feriados_totales);
 
   host.innerHTML = `
     <div class="th">Metric</div>
     <div class="th t-right">Days</div>
 
-    <!-- Vacation -->
+    <!-- 🔹 1. Total Vacations -->
     <div class="row">
       <div class="cell">
         <div class="metric">
           <span class="badge-soft badge--vac">Vacation</span>
-          <span class="name">Accrued Vacation</span>
+          <span class="name">Vacations Available</span>
         </div>
       </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(acc)}</span></div>
-    </div>
-
-    <div class="row">
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft badge--vac">Vacation</span>
-          <span class="name">Current year Vacation</span>
-        </div>
+      <div class="cell t-right">
+        <span class="kpi chip">${totalVac} Days</span>
       </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(work)}</span></div>
     </div>
 
-    <div class="row">
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft badge--vac">Vacation</span>
-          <span class="name">Total Vacation</span>
-        </div>
-      </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(totalVac)}</span></div>
-    </div>
-
-    <div class="row">
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft badge--vac">Vacation</span>
-          <span class="name">Vacation Used</span>
-        </div>
-      </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(usedVac)}</span></div>
-    </div>
-
-    <div class="row">
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft badge--vac">Vacation</span>
-          <span class="name">Vacation Available</span>
-        </div>
-      </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(availVac)}</span></div>
-    </div>
-
-    <!-- Vintti Days -->
-    <div class="row">
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft badge--vd">Vintti Days</span>
-          <span class="name">Total Vintti Days</span>
-        </div>
-      </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(totalVD)}</span></div>
-    </div>
-
-    <div class="row">
-      <div class="cell">
-        <div class="metric">
-          <span class="badge-soft badge--vd">Vintti Days</span>
-          <span class="name">Vintti Days Used</span>
-        </div>
-      </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(usedVD)}</span></div>
-    </div>
-
+    <!-- 🔹 2. Vintti Days Available -->
     <div class="row">
       <div class="cell">
         <div class="metric">
@@ -1172,46 +1113,27 @@ function renderBalances({
           <span class="name">Vintti Days Available</span>
         </div>
       </div>
-      <div class="cell t-right"><span class="kpi chip">${_fmtDays(availVD)}</span></div>
+      <div class="cell t-right">
+        <span class="kpi chip">${availVD} Days</span>
+      </div>
     </div>
 
-    <!-- Holidays -->
-<div class="row">
-  <div class="cell">
-    <div class="metric">
-      <span class="badge-soft badge--hol">Holiday</span>
-      <span class="name">Holiday Available</span>
+    <!-- 🔹 3. Holiday Available -->
+    <div class="row">
+      <div class="cell">
+        <div class="metric">
+          <span class="badge-soft badge--hol">Holiday</span>
+          <span class="name">Holiday Available</span>
+        </div>
+      </div>
+      <div class="cell t-right">
+        <span class="kpi chip">${holAvail} Days</span>
+      </div>
     </div>
-  </div>
-  <div class="cell t-right"><span class="kpi chip">${_fmtDays(holAvail)}</span></div>
-</div>
-
-<div class="row">
-  <div class="cell">
-    <div class="metric">
-      <span class="badge-soft badge--hol">Holiday</span>
-      <span class="name">Holiday Used</span>
-    </div>
-  </div>
-  <div class="cell t-right"><span class="kpi chip">${_fmtDays(holUsed)}</span></div>
-</div>
-
-<div class="row">
-  <div class="cell">
-    <div class="metric">
-      <span class="badge-soft badge--hol">Holiday</span>
-      <span class="name">Holiday Total</span>
-    </div>
-  </div>
-  <div class="cell t-right"><span class="kpi chip">${_fmtDays(holTotal)}</span></div>
-</div>
-
   `;
 }
 
 async function loadBalances(uid){
-  const host = document.getElementById('balancesTable');
-  if (host) host.innerHTML = `<div class="skeleton-row"></div><div class="skeleton-row"></div><div class="skeleton-row"></div>`;
   try{
     const r = await api(`/users/${encodeURIComponent(uid)}`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
@@ -1222,14 +1144,11 @@ async function loadBalances(uid){
       vacaciones_consumidas: u.vacaciones_consumidas,
       vintti_days: u.vintti_days,
       vintti_days_consumidos: u.vintti_days_consumidos,
-      feriados_totales: u.feriados_totales,           // NEW
-      feriados_consumidos: u.feriados_consumidos      // NEW
+      feriados_totales: u.feriados_totales,
+      feriados_consumidos: u.feriados_consumidos
     });
   }catch(err){
     console.error('loadBalances error:', err);
-    if (host) host.innerHTML = `
-      <div class="th">Metric</div><div class="th t-right">Days</div>
-      <div class="cell" style="grid-column:1/-1; justify-content:center">Could not load balances.</div>`;
   }
 }
 

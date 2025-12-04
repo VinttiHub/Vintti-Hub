@@ -202,11 +202,22 @@
           <span class="balances-caption">Read-only</span>
         </header>
 
-        <div class="balances-table" id="balancesTable">
-          <!-- Filled by JS: loadBalances(uid) -->
-          <div class="skeleton-row"></div>
-          <div class="skeleton-row"></div>
-          <div class="skeleton-row"></div>
+        <!-- Tarjetas en lugar de tabla -->
+        <div class="balances-cards" id="balancesTable">
+          <article class="balance-card balance-card--vac">
+            <h3 class="balance-label">Vacations Available</h3>
+            <p class="balance-value" id="balVacTotal">—</p>
+          </article>
+
+          <article class="balance-card balance-card--vd">
+            <h3 class="balance-label">Vintti Days Available</h3>
+            <p class="balance-value" id="balVdAvailable">—</p>
+          </article>
+
+          <article class="balance-card balance-card--hol">
+            <h3 class="balance-label">Holiday Available</h3>
+            <p class="balance-value" id="balHolAvailable">—</p>
+          </article>
         </div>
       </section>
       
