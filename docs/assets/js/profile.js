@@ -634,25 +634,26 @@ function renderApprovalsTable(items){
   if (hostHistory) hostHistory.classList.add("approvals-grid");
 
   // Header para la tabla de pendientes (con acciones)
-  const headerPending = `
-    <div class="hdr hdr--employee">Employee</div>
-    <div class="hdr hdr--request">Request Date</div>
-    <div class="hdr hdr--return">Return Date</div>
-    <div class="hdr hdr--days">Days</div>
-    <div class="hdr hdr--type">Type</div>
-    <div class="hdr hdr--status">Status</div>
-    <div class="hdr hdr--action">Action</div>
-  `;
+const headerPending = `
+  <div class="hdr hdr--employee">Employee</div>
+  <div class="hdr hdr--request">Request Date</div>
+  <div class="hdr hdr--return">Return Date</div>
+  <div class="hdr hdr--days">Days</div>
+  <div class="hdr hdr--type">Type</div>
+  <div class="hdr hdr--status">Status</div>
+  <div class="hdr hdr--action">Action</div>
+`;
 
-  // Header para el histórico (sin acciones)
-  const headerHistory = `
-    <div class="hdr hdr--employee">Employee</div>
-    <div class="hdr hdr--request">Request Date</div>
-    <div class="hdr hdr--return">Return Date</div>
-    <div class="hdr hdr--days">Days</div>
-    <div class="hdr hdr--type">Type</div>
-    <div class="hdr hdr--status">Status</div>
-  `;
+// Histórico: 6 columnas (sin Action)
+const headerHistory = `
+  <div class="hdr hdr--employee">Employee</div>
+  <div class="hdr hdr--request">Request Date</div>
+  <div class="hdr hdr--return">Return Date</div>
+  <div class="hdr hdr--days">Days</div>
+  <div class="hdr hdr--type">Type</div>
+  <div class="hdr hdr--status">Status</div>
+`;
+
 
   const pending = (items || []).filter(r => String(r.status || "").toLowerCase() === "pending");
   const processed = (items || []).filter(r => {
@@ -672,56 +673,58 @@ function renderApprovalsTable(items){
     });
   }
 
-  function buildRow(r, withActions){
-    const initials = String(r.user_name || "")
-      .trim().split(/\s+/).slice(0,2).map(p => p[0] || "").join("").toUpperCase();
+function buildRow(r, withActions){
+  const initials = String(r.user_name || "")
+    .trim().split(/\s+/).slice(0,2).map(p => p[0] || "").join("").toUpperCase();
 
-    const startLbl = fmtDateShort(r.start_date);
-    const endLbl   = fmtDateShort(r.end_date);
-    const days = (String(r.kind || '').toLowerCase() === 'vacation')
-      ? businessDaysBetweenISO(r.start_date, r.end_date)
-      : diffDaysInclusive(r.start_date, r.end_date);
+  const startLbl = fmtDateShort(r.start_date);
+  const endLbl   = fmtDateShort(r.end_date);
+  const days = (String(r.kind || '').toLowerCase() === 'vacation')
+    ? businessDaysBetweenISO(r.start_date, r.end_date)
+    : diffDaysInclusive(r.start_date, r.end_date);
 
-    const kClass = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
-    const kLabel = String(r.kind || "").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
-    const statusLower = String(r.status || "").toLowerCase();
+  const kClass = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
+  const kLabel = String(r.kind || "").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
+  const statusLower = String(r.status || "").toLowerCase();
 
-    const noteBtn = r.reason
-      ? '<button class="note-dot" type="button" aria-label="View note" title="' +
-          esc(r.reason) + '" data-note="' + esc(r.reason) + '">💬</button>'
-      : '';
+  const noteBtn = r.reason
+    ? '<button class="note-dot" type="button" aria-label="View note" title="' +
+        esc(r.reason) + '" data-note="' + esc(r.reason) + '">💬</button>'
+    : '';
 
-    const actionsHtml = withActions
-      ? '<div class="cell col-actions">' +
-          '<div class="cell t-right actions">' +
-            '<button class="btn tiny approve" data-action="approve">✔️</button>' +
-            '<button class="btn tiny reject"  data-action="reject">❌</button>' +
-          '</div>' +
-        '</div>'
-      : '<div class="cell col-actions"></div>';
-
-    return `
-      <div class="row ${statusLower}" data-id="${r.id}">
-        <div class="cell col-employee">
-          <div class="avatar-min">${initials}</div>
-          <div class="uinfo">
-            <div class="uname">
-              ${r.user_name || "—"}
-              ${noteBtn}
-            </div>
-            <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
-          </div>
+  // 👉 sólo agregamos columna de acciones si withActions === true
+  const actionsCell = withActions
+    ? `
+      <div class="cell col-actions">
+        <div class="actions t-right">
+          <button class="btn tiny approve" data-action="approve">✔️</button>
+          <button class="btn tiny reject"  data-action="reject">❌</button>
         </div>
-        <div class="cell col-request"><time>${startLbl}</time></div>
-        <div class="cell col-return"><time>${endLbl}</time></div>
-        <div class="cell col-days">${days} day${days===1?'':'s'}</div>
-        <div class="cell col-type"><span class="badge-soft ${kClass}">${kLabel}</span></div>
-        <div class="cell col-status"><span class="status ${statusLower}">${r.status}</span></div>
-        ${actionsHtml}
-        <div class="divider" aria-hidden="true"></div>
       </div>
-    `;
-  }
+    `
+    : "";   // histórico: nada
+
+  return `
+    <div class="row ${statusLower}" data-id="${r.id}">
+      <div class="cell col-employee">
+        <div class="avatar-min">${initials}</div>
+        <div class="uinfo">
+          <div class="uname">
+            ${r.user_name || "—"}
+            ${noteBtn}
+          </div>
+          <div class="uteam">${r.team ? "Team: " + r.team : ""}</div>
+        </div>
+      </div>
+      <div class="cell col-request"><time>${startLbl}</time></div>
+      <div class="cell col-return"><time>${endLbl}</time></div>
+      <div class="cell col-days">${days} day${days===1?'':'s'}</div>
+      <div class="cell col-type"><span class="badge-soft ${kClass}">${kLabel}</span></div>
+      <div class="cell col-status"><span class="status ${statusLower}">${r.status}</span></div>
+      ${actionsCell}
+    </div>
+  `;
+}
 
   // === Tabla de pendientes ===
   if (!pending.length){
