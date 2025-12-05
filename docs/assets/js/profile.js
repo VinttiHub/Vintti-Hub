@@ -1301,9 +1301,16 @@ let PROFILE_CACHE = null;
 
 function fmtLongDateSafe(v){
   if (!v) return "—";
-  const d = new Date(v);
-  if (isNaN(d)) return "—";
-  return d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"2-digit" });
+
+  // si viene como "YYYY-MM-DD" la parseamos en local
+  const d = _ISO_ONLY.test(v) ? parseISODateLocal(v) : new Date(v);
+
+  if (!d || isNaN(d)) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
 }
 
 function renderProfileView(me){
