@@ -1094,8 +1094,8 @@ function renderBalances({
   const usedVD    = _toNum(vintti_days_consumidos);
   const availVD   = Math.max(0, totalVD - usedVD);
 
-  // 🔹 Holidays (total fijo = 2)
-  const totalHol  = 2;
+  // 🔹 Holidays (total fijo = 4)
+  const totalHol  = 4;
   const usedHol   = _toNum(feriados_consumidos);
   const availHol  = Math.max(0, totalHol - usedHol);
 
