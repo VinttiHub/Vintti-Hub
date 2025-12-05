@@ -1225,8 +1225,8 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     const r = await fetch(
       `${API_BASE}/users/${encodeURIComponent(CURRENT_USER_ID)}?user_id=${encodeURIComponent(CURRENT_USER_ID)}`,
       {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" }, // <- sin X-User-Id
+        method: "PATCH",                      
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(payload)
       }

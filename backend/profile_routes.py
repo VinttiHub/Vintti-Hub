@@ -136,7 +136,7 @@ def get_user(user_id: int):
     if not row: return jsonify({"error":"user not found"}), 404
     return jsonify(_row_to_json(dict(row)))
 
-@users_bp.put("/users/<int:user_id>")
+@users_bp.patch("/users/<int:user_id>")
 def update_user(user_id: int):
     data = request.get_json(silent=True) or {}
     caller = _current_user_id()
@@ -195,6 +195,7 @@ def me():
     conn.close()
     if not row: return jsonify({"error":"not found"}), 404
     return jsonify(_row_to_json(dict(row)))
+
 @bp.get("/leader/time_off_requests")
 def leader_list_timeoff():
     """Return requests for users whose 'lider' == current leader."""
