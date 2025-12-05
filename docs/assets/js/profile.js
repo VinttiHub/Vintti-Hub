@@ -141,15 +141,16 @@ function calcVacation(user){
   return { acc, work, total, used, avail };
 }
 function calcVintti(user){
-  const total = _nz(user.vintti_days);
   const used  = _nz(user.vintti_days_consumidos);
-  const avail = Math.max(0, total - used);
+  const total = 2;                          
+  const avail = Math.max(0, total - used);  
   return { total, used, avail };
 }
+
 function calcHoliday(user){
-  const total = _nz(user.feriados_totales);
   const used  = _nz(user.feriados_consumidos);
-  const avail = Math.max(0, total - used);
+  const total = 2;                          
+  const avail = Math.max(0, total - used);  
   return { total, used, avail };
 }
 
@@ -488,11 +489,18 @@ function renderUserQuick(u){
   $("#uqBirth").textContent = fmtLongDate(u.fecha_nacimiento);
   $("#uqStart").textContent = fmtLongDate(u.ingreso_vintti_date);
 
-  // totals: Vacation total = accrued + current (habiles); VD total = vintti_days; Holiday total = feriados_totales
+  // Vacation available = acumuladas + hábiles - consumidas
   const vacTotal = _nz(u.vacaciones_acumuladas) + _nz(u.vacaciones_habiles);
-  $("#uqVacTotal").textContent = String(vacTotal);
-  $("#uqVdTotal").textContent  = String(_nz(u.vintti_days));
-  $("#uqHolTotal").textContent = String(_nz(u.feriados_totales));
+  const vacAvail = Math.max(0, vacTotal - _nz(u.vacaciones_consumidas || 0));
+  $("#uqVacTotal").textContent = String(vacAvail);
+
+  // Vintti Days: total fijo = 2
+  const vdTotal = 2;
+  $("#uqVdTotal").textContent  = String(vdTotal);
+
+  // Holidays: total fijo = 2
+  const holTotal = 2;
+  $("#uqHolTotal").textContent = String(holTotal);
 
   setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url });
 }
@@ -514,8 +522,11 @@ document.addEventListener("click", async (e)=>{
       emergency_contact: "—",
       fecha_nacimiento: null,
       ingreso_vintti_date: null,
-      vacaciones_acumuladas: 0, vacaciones_habiles: 0,
-      vintti_days: 0, feriados_totales: 0,
+      vacaciones_acumuladas: 0,
+      vacaciones_habiles: 0,
+      vacaciones_consumidas: 0,
+      vintti_days_consumidos: 0,
+      feriados_consumidos: 0,
       avatar_url: null
     });
     openUserQuick();
@@ -562,11 +573,9 @@ async function loadTeamPto(){
       vacaciones_acumuladas: u.vacaciones_acumuladas,
       vacaciones_habiles: u.vacaciones_habiles,
       vacaciones_consumidas: u.vacaciones_consumidas,
-      // Vintti Days
-      vintti_days: u.vintti_days,
+      // Vintti Days (solo consumidos)
       vintti_days_consumidos: u.vintti_days_consumidos,
-      // Holidays
-      feriados_totales: u.feriados_totales,
+      // Holidays (solo consumidos)
       feriados_consumidos: u.feriados_consumidos,
     }));
 
@@ -1066,33 +1075,35 @@ function renderBalances({
   vacaciones_habiles = 0,
   vacaciones_consumidas = 0,
   // VINTTI DAYS
-  vintti_days = 0,
   vintti_days_consumidos = 0,
   // HOLIDAYS
-  feriados_totales = 0,
   feriados_consumidos = 0,
 } = {}){
   const host = document.getElementById('balancesTable');
   if (!host) return;
 
-  // Vacation total = acumuladas + hábiles
-  const acc      = _toNum(vacaciones_acumuladas);
-  const work     = _toNum(vacaciones_habiles);
-  const totalVac = Math.max(0, acc + work);
+  // 🔹 Vacations
+  const acc       = _toNum(vacaciones_acumuladas);
+  const work      = _toNum(vacaciones_habiles);
+  const usedVac   = _toNum(vacaciones_consumidas);
+  const totalVac  = Math.max(0, acc + work);
+  const availVac  = Math.max(0, totalVac - usedVac);  // <-- fórmula que quieres
 
-  // Vintti Days available = total - usados
-  const totalVD  = _toNum(vintti_days);
-  const usedVD   = _toNum(vintti_days_consumidos);
-  const availVD  = Math.max(0, totalVD - usedVD);
+  // 🔹 Vintti Days (total fijo = 2)
+  const totalVD   = 2;
+  const usedVD    = _toNum(vintti_days_consumidos);
+  const availVD   = Math.max(0, totalVD - usedVD);
 
-  // Holiday available: usamos feriados_totales como disponible
-  const holAvail = _toNum(feriados_totales);
+  // 🔹 Holidays (total fijo = 2)
+  const totalHol  = 2;
+  const usedHol   = _toNum(feriados_consumidos);
+  const availHol  = Math.max(0, totalHol - usedHol);
 
   host.innerHTML = `
     <div class="th">Metric</div>
     <div class="th t-right">Days</div>
 
-    <!-- 🔹 1. Total Vacations -->
+    <!-- 🔹 1. Vacations Available -->
     <div class="row">
       <div class="cell">
         <div class="metric">
@@ -1101,7 +1112,7 @@ function renderBalances({
         </div>
       </div>
       <div class="cell t-right">
-        <span class="kpi chip">${totalVac} Days</span>
+        <span class="kpi chip">${availVac} Days</span>
       </div>
     </div>
 
@@ -1127,7 +1138,7 @@ function renderBalances({
         </div>
       </div>
       <div class="cell t-right">
-        <span class="kpi chip">${holAvail} Days</span>
+        <span class="kpi chip">${availHol} Days</span>
       </div>
     </div>
   `;
@@ -1142,9 +1153,7 @@ async function loadBalances(uid){
       vacaciones_acumuladas: u.vacaciones_acumuladas,
       vacaciones_habiles: u.vacaciones_habiles,
       vacaciones_consumidas: u.vacaciones_consumidas,
-      vintti_days: u.vintti_days,
       vintti_days_consumidos: u.vintti_days_consumidos,
-      feriados_totales: u.feriados_totales,
       feriados_consumidos: u.feriados_consumidos
     });
   }catch(err){

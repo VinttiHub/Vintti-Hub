@@ -120,13 +120,11 @@ def get_user(user_id: int):
     SELECT
       user_id, user_name, email_vintti, role, emergency_contact,
       ingreso_vintti_date, fecha_nacimiento, avatar_url,
-      COALESCE(vacaciones_acumuladas, 0) AS vacaciones_acumuladas,
-      COALESCE(vacaciones_habiles, 0)    AS vacaciones_habiles,
-      COALESCE(vacaciones_consumidas, 0) AS vacaciones_consumidas,
-      COALESCE(vintti_days, 0)           AS vintti_days,
-      COALESCE(vintti_days_consumidos,0) AS vintti_days_consumidos,
-      COALESCE(feriados_totales, 0)        AS feriados_totales,      
-      COALESCE(feriados_consumidos, 0)     AS feriados_consumidos 
+      COALESCE(vacaciones_acumuladas, 0)    AS vacaciones_acumuladas,
+      COALESCE(vacaciones_habiles, 0)       AS vacaciones_habiles,
+      COALESCE(vacaciones_consumidas, 0)    AS vacaciones_consumidas,
+      COALESCE(vintti_days_consumidos, 0)   AS vintti_days_consumidos,
+      COALESCE(feriados_consumidos, 0)      AS feriados_consumidos
     FROM users
     WHERE user_id = %s
     """
@@ -309,49 +307,42 @@ def leader_update_timeoff(req_id: int):
                     uid = int(rec["user_id"])
 
                     if k == "vacation":
-                        # Regla: restar primero de vacaciones_acumuladas hasta 0, resto de vacaciones_habiles
-                        # y sumar a vacaciones_consumidas
+                        # ✅ Nueva regla vacaciones:
+                        #   - SOLO sumar a vacaciones_consumidas
+                        #   - vacations_available será derivado en el frontend
                         cur.execute("""
                             UPDATE users
-                               SET
-                                 vacaciones_acumuladas = GREATEST(
-                                     0,
-                                     COALESCE(vacaciones_acumuladas,0)
-                                     - LEAST(COALESCE(vacaciones_acumuladas,0), %s)
-                                 ),
-                                 vacaciones_habiles = GREATEST(
-                                     0,
-                                     COALESCE(vacaciones_habiles,0)
-                                     - GREATEST(%s - LEAST(COALESCE(vacaciones_acumuladas,0), %s), 0)
-                                 ),
-                                 vacaciones_consumidas = COALESCE(vacaciones_consumidas,0) + %s,
-                                 updated_at = NOW() AT TIME ZONE 'UTC'
-                             WHERE user_id = %s
-                        """, (total_days, total_days, total_days, total_days, uid))
+                            SET
+                                vacaciones_consumidas = COALESCE(vacaciones_consumidas, 0) + %s,
+                                updated_at = NOW() AT TIME ZONE 'UTC'
+                            WHERE user_id = %s
+                        """, (total_days, uid))
 
                     elif k == "vintti_day":
-                        # Regla: restar de vintti_days y sumar a vintti_days_consumidos
+                        # ✅ Nueva regla Vintti Day:
+                        #   - NO tocar vintti_days
+                        #   - SOLO sumar a vintti_days_consumidos
                         cur.execute("""
                             UPDATE users
                                SET
-                                 vintti_days = GREATEST(0, COALESCE(vintti_days,0) - %s),
                                  vintti_days_consumidos = COALESCE(vintti_days_consumidos,0) + %s,
                                  updated_at = NOW() AT TIME ZONE 'UTC'
                              WHERE user_id = %s
-                        """, (total_days, total_days, uid))
+                        """, (total_days, uid))
 
                     elif k == "holiday":
-                        # Regla: restar de feriados_totales y sumar a feriados_consumidos
+                        # ✅ Nueva regla Holiday:
+                        #   - NO tocar feriados_totales
+                        #   - SOLO sumar a feriados_consumidos
                         cur.execute("""
                             UPDATE users
                                SET
-                                 feriados_totales = GREATEST(0, COALESCE(feriados_totales,0) - %s),
                                  feriados_consumidos = COALESCE(feriados_consumidos,0) + %s,
                                  updated_at = NOW() AT TIME ZONE 'UTC'
                              WHERE user_id = %s
-                        """, (total_days, total_days, uid))
+                        """, (total_days, uid))
                     else:
-                        # Kinds desconocidos no descuentan (pero tu API solo usa 3)
+                        # Kinds desconocidos no descuentan
                         pass
 
         conn.commit()
