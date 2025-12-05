@@ -203,21 +203,28 @@
         </header>
 
         <!-- Tarjetas en lugar de tabla -->
-        <div class="balances-cards" id="balancesTable">
-          <article class="balance-card balance-card--vac">
-            <h3 class="balance-label">Vacations Available</h3>
-            <p class="balance-value" id="balVacTotal">—</p>
-          </article>
+      <div class="balances-cards" id="balancesTable">
+        <!-- Las tarjetas se generan desde JS con renderBalances() -->
+      </div>
 
-          <article class="balance-card balance-card--vd">
-            <h3 class="balance-label">Vintti Days Available</h3>
-            <p class="balance-value" id="balVdAvailable">—</p>
-          </article>
-
-          <article class="balance-card balance-card--hol">
-            <h3 class="balance-label">Holiday Available</h3>
-            <p class="balance-value" id="balHolAvailable">—</p>
-          </article>
+        <!-- 🔹 Tabla genérica con 3 columnas (se muestra al hacer click en una tarjeta) -->
+        <div id="balancesDetails" class="balances-details" hidden>
+          <table class="balances-details-table">
+            <thead>
+              <tr>
+                <th>Column 1</th>
+                <th>Column 2</th>
+                <th>Column 3</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>—</td>
+                <td>—</td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
       

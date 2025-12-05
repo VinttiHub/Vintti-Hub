@@ -1,3 +1,5 @@
+// cache de los últimos balances calculados para la tabla de detalles
+let LAST_BALANCES = null;
 // ===== Utilities =====
 const $ = (sel, root=document) => root.querySelector(sel);
 const $all = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -1087,7 +1089,7 @@ function renderBalances({
   const work      = _toNum(vacaciones_habiles);
   const usedVac   = _toNum(vacaciones_consumidas);
   const totalVac  = Math.max(0, acc + work);
-  const availVac  = Math.max(0, totalVac - usedVac);  // <-- fórmula que quieres
+  const availVac  = Math.max(0, totalVac - usedVac);
 
   // 🔹 Vintti Days (total fijo = 2)
   const totalVD   = 2;
@@ -1099,12 +1101,28 @@ function renderBalances({
   const usedHol   = _toNum(feriados_consumidos);
   const availHol  = Math.max(0, totalHol - usedHol);
 
+  // 👉 guardamos todo para usarlo al hacer click en las tarjetas
+  LAST_BALANCES = {
+    vac_acc: acc,
+    vac_work: work,
+    vac_available: availVac,
+
+    vd_total: totalVD,
+    vd_used: usedVD,
+    vd_available: availVD,
+
+    hol_total: totalHol,
+    hol_used: usedHol,
+    hol_available: availHol,
+  };
+
+  // 👇 estructura igual que antes (solo añadimos data-kind en cada .row)
   host.innerHTML = `
     <div class="th">Metric</div>
     <div class="th t-right">Days</div>
 
     <!-- 🔹 1. Vacations Available -->
-    <div class="row">
+    <div class="row" data-kind="vacation">
       <div class="cell">
         <div class="metric">
           <span class="badge-soft badge--vac">Vacation</span>
@@ -1117,7 +1135,7 @@ function renderBalances({
     </div>
 
     <!-- 🔹 2. Vintti Days Available -->
-    <div class="row">
+    <div class="row" data-kind="vintti_day">
       <div class="cell">
         <div class="metric">
           <span class="badge-soft badge--vd">Vintti Days</span>
@@ -1130,7 +1148,7 @@ function renderBalances({
     </div>
 
     <!-- 🔹 3. Holiday Available -->
-    <div class="row">
+    <div class="row" data-kind="holiday">
       <div class="cell">
         <div class="metric">
           <span class="badge-soft badge--hol">Holiday</span>
@@ -1250,6 +1268,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     await loadMe(uid);
     await loadMyRequests(uid);
     await loadBalances(uid);
+    setupBalanceCardTables();
 
     // Existing: enable Team PTO for certain user_ids
     if (TEAM_ALLOWED.has(Number(uid))) {
@@ -1385,3 +1404,83 @@ PROFILE_CACHE = {
 // Repinta tarjeta y vuelve a modo vista
 renderProfileView(PROFILE_CACHE);
 showProfileView();
+// —— Tabla genérica al hacer click en las tarjetas de Time Off Balances —— //
+function setupBalanceCardTables(){
+  const container = document.getElementById("balancesTable");
+  const details   = document.getElementById("balancesDetails");
+  if (!container || !details) return;
+
+  const theadRow = details.querySelector("thead tr");
+  const tbody    = details.querySelector("tbody");
+  if (!theadRow || !tbody) return;
+
+  // usamos data-current-kind para saber qué tarjeta está abierta
+  details.dataset.currentKind = details.dataset.currentKind || "";
+
+  container.addEventListener("click", (ev) => {
+    const row = ev.target.closest(".row");
+    if (!row || !container.contains(row)) return;
+    if (!LAST_BALANCES) return;
+
+    const kind = row.dataset.kind; // vacation | vintti_day | holiday
+    if (!kind) return;
+
+    const current = details.dataset.currentKind || "";
+
+    // 👉 si ya está visible y se vuelve a hacer click en la misma tarjeta, ocultamos
+    if (!details.hidden && current === kind){
+      details.hidden = true;
+      details.dataset.currentKind = "";
+      return;
+    }
+
+    let headers = [];
+    let values  = [];
+
+    if (kind === "vacation"){
+      headers = [
+        "Vacaciones acumuladas",
+        "Vacaciones hábiles",
+        "Vacaciones disponibles"
+      ];
+      values = [
+        LAST_BALANCES.vac_acc,
+        LAST_BALANCES.vac_work,
+        LAST_BALANCES.vac_available
+      ];
+    } else if (kind === "vintti_day"){
+      headers = [
+        "Vintti Days totales",
+        "Vintti Days consumidas",
+        "Vintti Days disponibles"
+      ];
+      values = [
+        LAST_BALANCES.vd_total,
+        LAST_BALANCES.vd_used,
+        LAST_BALANCES.vd_available
+      ];
+    } else if (kind === "holiday"){
+      headers = [
+        "Holidays totales",
+        "Holidays consumidos",
+        "Holidays disponibles"
+      ];
+      values = [
+        LAST_BALANCES.hol_total,
+        LAST_BALANCES.hol_used,
+        LAST_BALANCES.hol_available
+      ];
+    }
+
+    // rellenar head y body (3 columnas siempre)
+    theadRow.innerHTML = headers.map(h => `<th>${h}</th>`).join("");
+    tbody.innerHTML = `
+      <tr>
+        ${values.map(v => `<td>${v}</td>`).join("")}
+      </tr>
+    `;
+
+    details.hidden = false;
+    details.dataset.currentKind = kind;
+  });
+}

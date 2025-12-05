@@ -2398,3 +2398,16 @@ input:focus, select:focus, textarea:focus{
   #approvalsCalendar .cal-badge::before{ inline-size:7px; block-size:16px; }
   #approvalsCalendar .cal-badge .kind{ padding:5px 10px; font-size:11px; }
 }
+.balances-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.balances-details-table th,
+.balances-details-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  text-align: left;
+  font-size: 0.9rem;
+}
