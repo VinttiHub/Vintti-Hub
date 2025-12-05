@@ -561,3 +561,12 @@ h1, h2, p {
 .reset-feedback.error {
   color: #d72d2d;
 }
+.holiday-mini-message {
+  text-align: left;
+  margin: -5px 0 25px 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #2e2e2e; /* rosadito Vintti */
+  opacity: 0.9;
+  display: block;
+}
