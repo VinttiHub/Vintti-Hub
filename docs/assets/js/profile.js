@@ -149,7 +149,7 @@ function calcVintti(user){
 
 function calcHoliday(user){
   const used  = _nz(user.feriados_consumidos);
-  const total = 2;                          
+  const total = 4;                          
   const avail = Math.max(0, total - used);  
   return { total, used, avail };
 }
