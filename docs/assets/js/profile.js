@@ -1,5 +1,6 @@
 // cache de los últimos balances calculados para la tabla de detalles
-let LAST_BALANCES = null;
+let LAST_BALANCES = null
+let MY_REQUESTS = [];
 // ===== Utilities =====
 const $ = (sel, root=document) => root.querySelector(sel);
 const $all = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -558,7 +559,6 @@ async function loadTeamPto(){
     const r = await api(`/users`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
-
     // include vacation, vintti days AND holidays
     const slim = arr.map(u => ({
       user_id: u.user_id,
@@ -1006,9 +1006,8 @@ async function loadMyRequests(uid){
     const r = await api(`/time_off_requests`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
-
+    MY_REQUESTS = arr || [];
     // 🔸 5 columnas: Type | Request Date | Return Date | Days | Status
-    // Header con iconos (no usa comillas dentro, solo texto plano)
   const header = `
     <div class="th icon icon--type">Type</div>
     <div class="th icon icon--request">Request Date</div>
@@ -1105,6 +1104,7 @@ function renderBalances({
   LAST_BALANCES = {
     vac_acc: acc,
     vac_work: work,
+    vac_used: usedVac,         
     vac_available: availVac,
 
     vd_total: totalVD,
@@ -1414,6 +1414,10 @@ function setupBalanceCardTables(){
   const tbody    = details.querySelector("tbody");
   if (!theadRow || !tbody) return;
 
+  // 👉 nueva tabla de historial
+  const histTable = details.querySelector("#balancesHistoryTable");
+  const histBody  = histTable ? histTable.querySelector("tbody") : null;
+
   // usamos data-current-kind para saber qué tarjeta está abierta
   details.dataset.currentKind = details.dataset.currentKind || "";
 
@@ -1441,11 +1445,13 @@ function setupBalanceCardTables(){
       headers = [
         "Vacaciones acumuladas",
         "Vacaciones hábiles",
+        "Vacaciones consumidas",     // 👈 NUEVA COLUMNA
         "Vacaciones disponibles"
       ];
       values = [
         LAST_BALANCES.vac_acc,
         LAST_BALANCES.vac_work,
+        LAST_BALANCES.vac_used,      // 👈 usa vacaciones_consumidas
         LAST_BALANCES.vac_available
       ];
     } else if (kind === "vintti_day"){
@@ -1479,6 +1485,40 @@ function setupBalanceCardTables(){
         ${values.map(v => `<td>${v}</td>`).join("")}
       </tr>
     `;
+
+    // 🔹 rellenar historial con días aprobados de ese tipo
+    if (histBody){
+      const kindLower = String(kind).toLowerCase();
+      const approvedOfKind = (MY_REQUESTS || []).filter(r =>
+        String(r.kind || "").toLowerCase() === kindLower &&
+        String(r.status || "").toLowerCase() === "approved"
+      );
+
+      if (!approvedOfKind.length){
+        histBody.innerHTML = `
+          <tr>
+            <td colspan="3">No approved ${kindLower.replace("_"," ")} days yet.</td>
+          </tr>
+        `;
+      } else {
+        const rowsHtml = approvedOfKind.map(r => {
+          const startLabel = fmtDateNice(r.start_date);
+          const endLabel   = fmtDateNice(r.end_date);
+          const days = (kindLower === "vacation")
+            ? businessDaysBetweenISO(r.start_date, r.end_date)
+            : diffDaysInclusive(r.start_date, r.end_date);
+
+          return `
+            <tr>
+              <td>${startLabel}</td>
+              <td>${endLabel}</td>
+              <td class="t-right">${days}</td>
+            </tr>
+          `;
+        }).join("");
+        histBody.innerHTML = rowsHtml;
+      }
+    }
 
     details.hidden = false;
     details.dataset.currentKind = kind;

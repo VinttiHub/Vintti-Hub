@@ -2411,3 +2411,96 @@ input:focus, select:focus, textarea:focus{
   text-align: left;
   font-size: 0.9rem;
 }
+:root{
+  --vac-color: #b26cc8;        /* texto y acentos */
+  --vac-bg: #f7ecfa;           /* fondo pastel */
+  --vac-border: #e8c9f0;
+
+  --vd-color: #4585ff;
+  --vd-bg: #eef5ff;
+  --vd-border: #cddcff;
+
+  --hol-color: #389943;
+  --hol-bg: #efffe9;
+  --hol-border: #c9f3c9;
+}
+/* =============================================
+   Fancy pastel tables matching category cards
+   ============================================= */
+
+#balancesDetails{
+  margin-top: 1.75rem;
+  padding: 1.75rem;
+  border-radius: 22px;
+  background: white;
+  border: 1px solid var(--category-border, rgba(0,0,0,0.06));
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  transition: 0.25s ease;
+}
+
+/* Header cells */
+#balancesDetails thead th{
+  padding: 0.8rem 1rem;
+  font-weight: 700;
+  color: var(--category-color, #444);
+  background: var(--category-bg, rgba(0,0,0,0.03));
+  border-bottom: 2px solid var(--category-border, rgba(0,0,0,0.08));
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+/* Body cells */
+#balancesDetails tbody td{
+  padding: 0.75rem 1rem;
+  color: #0f172a;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.7);
+}
+
+#balancesDetails tbody tr:nth-child(odd){
+  background: var(--category-row, rgba(0,0,0,0.02));
+}
+
+#balancesDetails tbody tr:hover{
+  background: var(--category-row-hover, rgba(0,0,0,0.05));
+  transition: 0.25s;
+}
+
+/* Right–aligned numbers */
+#balancesDetails td:last-child,
+#balancesDetails td.t-right{
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =============================================
+   CATEGORY THEMES derived from your cards
+   ============================================= */
+
+/* 💜 VACATION */
+#balancesDetails[data-current-kind="vacation"]{
+  --category-bg: var(--vac-bg);
+  --category-color: var(--vac-color);
+  --category-border: var(--vac-border);
+  --category-row: rgba(178,108,200,0.08);
+  --category-row-hover: rgba(178,108,200,0.16);
+}
+
+/* 💙 VINTTI DAYS */
+#balancesDetails[data-current-kind="vintti_day"]{
+  --category-bg: var(--vd-bg);
+  --category-color: var(--vd-color);
+  --category-border: var(--vd-border);
+  --category-row: rgba(69,133,255,0.08);
+  --category-row-hover: rgba(69,133,255,0.16);
+}
+
+/* 💚 HOLIDAY */
+#balancesDetails[data-current-kind="holiday"]{
+  --category-bg: var(--hol-bg);
+  --category-color: var(--hol-color);
+  --category-border: var(--hol-border);
+  --category-row: rgba(56,153,67,0.08);
+  --category-row-hover: rgba(56,153,67,0.16);
+}

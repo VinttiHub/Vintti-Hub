@@ -208,24 +208,43 @@
       </div>
 
         <!-- 🔹 Tabla genérica con 3 columnas (se muestra al hacer click en una tarjeta) -->
-        <div id="balancesDetails" class="balances-details" hidden>
-          <table class="balances-details-table">
+      <div id="balancesDetails" class="balances-details" hidden>
+        <table class="balances-details-table">
+          <thead>
+            <tr>
+              <th>Column 1</th>
+              <th>Column 2</th>
+              <th>Column 3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- 🔹 nuevo historial de días consumidos -->
+        <div class="balances-history">
+          <h4 class="balances-history-title">Approved days used</h4>
+          <table class="balances-details-table" id="balancesHistoryTable">
             <thead>
               <tr>
-                <th>Column 1</th>
-                <th>Column 2</th>
-                <th>Column 3</th>
+                <th>Start date</th>
+                <th>End date</th>
+                <th>Days used</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>—</td>
-                <td>—</td>
-                <td>—</td>
+                <td colspan="3">Select a card to see your used days.</td>
               </tr>
             </tbody>
           </table>
         </div>
+      </div>
       </section>
       
 
