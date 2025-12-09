@@ -71,7 +71,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS rn
             FROM opportunity o
             LEFT JOIN users u
-                ON u.email = o.opp_hr_lead   -- ⬅️ join con users
+                ON u.email_vintti = o.opp_hr_lead   -- ⬅️ join con users
             WHERE o.opp_hr_lead IS NOT NULL
         ),
         agg AS (
