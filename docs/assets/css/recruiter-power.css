@@ -1,0 +1,248 @@
+/* ===== Base ===== */
+:root {
+  --bg-gradient: radial-gradient(circle at top left, #ffe4f2 0%, #f9f4ff 35%, #fdf4ee 70%, #ffffff 100%);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(255, 216, 235, 0.9);
+  --shadow-soft: 0 18px 45px rgba(203, 162, 233, 0.25);
+  --text-main: #1c1235;
+  --text-muted: #7a6e8f;
+
+  --win: #4cafc9;
+  --win-soft: #e1f7fb;
+  --lost: #f06292;
+  --lost-soft: #ffe4f0;
+  --conv: #b388ff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text-main);
+}
+
+/* ===== Layout ===== */
+
+.metrics-page {
+  min-height: 100vh;
+  padding: 2.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.metrics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.metrics-title-block {
+  max-width: 520px;
+}
+
+.metrics-title {
+  margin: 0 0 0.5rem;
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.metrics-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+/* ===== Filter ===== */
+
+.metrics-filter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.filter-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.filter-select {
+  min-width: 220px;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(179, 136, 255, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(179, 136, 255, 0.18);
+  font-size: 0.9rem;
+  outline: none;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #b388ff 50%),
+    linear-gradient(135deg, #b388ff 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* ===== Cards ===== */
+
+.metrics-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1.2rem;
+}
+
+.metric-card {
+  background: var(--card-bg);
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-soft);
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Soft gradient accents */
+.metric-win-month::before,
+.metric-win-total::before,
+.metric-lost-month::before,
+.metric-lost-total::before,
+.metric-conversion::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.25;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.6), transparent 55%);
+}
+
+.metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* Pills */
+.metric-pill {
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.metric-pill-win {
+  background-color: var(--win);
+  color: #ffffff;
+}
+
+.metric-pill-lost {
+  background-color: var(--lost);
+  color: #ffffff;
+}
+
+.metric-pill-win-soft {
+  background-color: var(--win-soft);
+  color: var(--win);
+}
+
+.metric-pill-lost-soft {
+  background-color: var(--lost-soft);
+  color: var(--lost);
+}
+
+.metric-pill-conv {
+  background: linear-gradient(90deg, #b388ff, #f48fb1);
+  color: #ffffff;
+}
+
+/* Values */
+.metric-value {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-top: 0.2rem;
+}
+
+.metric-conversion .metric-value {
+  font-size: 2.1rem;
+}
+
+/* Caption */
+.metric-caption {
+  margin: 0;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* ===== Footer meta ===== */
+
+.meta-footer {
+  margin-top: 0.5rem;
+}
+
+.meta-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 1200px) {
+  .metrics-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .metrics-page {
+    padding: 1.8rem 1.4rem 2.4rem;
+  }
+
+  .metrics-header {
+    align-items: flex-start;
+  }
+
+  .metrics-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .metrics-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metrics-filter {
+    align-items: flex-start;
+  }
+
+  .filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+}
