@@ -455,51 +455,6 @@ function closePopup() {
   popup.classList.remove('show');
   setTimeout(() => { popup.style.display = 'none'; }, 300);
 }
-
-/* =========================
-   9) Role/visibility toggles
-   ========================= */
-
-// Summary / Equipments visibility
-(() => {
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-
-  const summaryAllowed = [
-    'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
-    'lara@vintti.com','agostina@vintti.com','mariano@vintti.com',
-    'jazmin@vintti.com'
-  ];
-  const equipmentsAllowed = [
-    'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
-  ];
-
-  const summaryLink = document.getElementById('summaryLink');
-  const equipmentsLink = document.getElementById('equipmentsLink');
-
-  if (summaryLink)   summaryLink.style.display   = summaryAllowed.includes(email)   ? '' : 'none';
-  if (equipmentsLink) equipmentsLink.style.display = equipmentsAllowed.includes(email) ? '' : 'none';
-})();
-/* === Candidate Search button visibility (igual que en main) === */
-(() => {
-  const candidateSearchLink = document.getElementById('candidateSearchLink');
-  if (!candidateSearchLink) return;
-
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-
-  const CANDIDATE_SEARCH_ALLOWED = new Set([
-    'agustina.barbero@vintti.com',
-    'agustin@vintti.com',
-    'lara@vintti.com',
-    'constanza@vintti.com',
-    'pilar@vintti.com',
-    'pilar.fernandez@vintti.com',
-    'angie@vintti.com',
-    'agostina@vintti.com',
-    'julieta@vintti.com'
-  ]);
-
-  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'block' : 'none';
-})();
 /* =========================
    Sidebar profile tile 
    ========================= */
@@ -648,56 +603,103 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   }
 })();
 
-// Inject Dashboard + Management Metrics for allowed users (no flicker)
+// Inject Dashboard + Management Metrics for allowed users 
+// --- Equipments(visibilidad por email) ---
 (() => {
-  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
-  const MGMT_ALLOWED = new Set(['agustin@vintti.com', 'angie@vintti.com', 'lara@vintti.com','bahia@vintti.com',
-    'jazmin@vintti.com','agostina@vintti.com'
+  const eq = document.getElementById('equipmentsLink');
+  if (!eq) return;
+
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
+  const equipmentsAllowed = [
+    'angie@vintti.com',
+    'jazmin@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com'
+  ];
+
+  eq.style.display = equipmentsAllowed.includes(currentUserEmail) ? 'flex' : 'none';
+})();
+// --- Dashboard + Management Metrics (usar botones del HTML con iconos) ---
+(() => {
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
+  const DASH_ALLOWED = new Set([
+    'agustin@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com',
+    'bahia@vintti.com',
+    'agostina@vintti.com'
   ]);
-  if (!email || !MGMT_ALLOWED.has(email)) {
-    document.getElementById('dashboardLink')?.remove();
-    document.getElementById('managementMetricsLink')?.remove();
+
+  const dash = document.getElementById('dashboardLink');
+  const mgmt = document.getElementById('managementMetricsLink');
+
+  if (!DASH_ALLOWED.has(currentUserEmail)) {
+    if (dash) dash.style.display = 'none';
+    if (mgmt) mgmt.style.display = 'none';
     return;
   }
 
-  const summary = document.getElementById('summaryLink')
-    || document.querySelector('.sidebar a[href*="opportunities-summary"]')
-    || document.querySelector('.sidebar a[href*="summary"]');
-
-  const opportunities = document.getElementById('opportunitiesLink')
-    || document.querySelector('.sidebar a[href*="opportunities.html"]');
-
-  const equipments = document.getElementById('equipmentsLink')
-    || document.querySelector('.sidebar a[href*="equipments.html"]');
-
-  const anchor = equipments || summary || opportunities
-    || document.querySelector('.sidebar a, nav a, .menu a');
-  if (!anchor) return;
-
-  const baseClass = (document.getElementById('summaryLink')?.className) || anchor.className || 'menu-item';
-
-  if (!document.getElementById('dashboardLink')) {
-    const a = document.createElement('a');
-    a.id = 'dashboardLink';
-    a.className = baseClass;
-    a.textContent = 'Dashboard';
-    a.href = 'https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue';
-    a.target = '_blank'; a.rel = 'noopener';
-    anchor.insertAdjacentElement('afterend', a);
-  }
-  if (!document.getElementById('managementMetricsLink')) {
-    const a = document.createElement('a');
-    a.id = 'managementMetricsLink';
-    a.className = baseClass;
-    a.textContent = 'Management Metrics';
-    a.href = 'control-dashboard.html';
-    (document.getElementById('dashboardLink') || anchor).insertAdjacentElement('afterend', a);
-  }
-
-  document.getElementById('dashboardLink')?.setAttribute('aria-hidden', 'false');
-  document.getElementById('managementMetricsLink')?.setAttribute('aria-hidden', 'false');
+  if (dash) dash.style.display = 'flex';
+  if (mgmt) mgmt.style.display = 'flex';
 })();
+// --- Recruiter Power (visibilidad por email) ---
+(() => {
+  const link = document.getElementById('recruiterPowerLink');
+  if (!link) return;
 
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  // 👉 Edita esta lista con los correos que deben verlo
+  const RECRUITER_POWER_ALLOWED = new Set([
+    'angie@vintti.com',
+    'agostina@vintti.com',
+    'agostin@vintti.com',
+    'lara@vintti.com'
+  ]);
+
+  // Mantener flex para icono + texto alineados
+  link.style.display = RECRUITER_POWER_ALLOWED.has(email) ? 'flex' : 'none';
+})();
+/* === Candidate Search button visibility (igual que en main) === */
+(() => {
+  const candidateSearchLink = document.getElementById('candidateSearchLink');
+  if (!candidateSearchLink) return;
+
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  const CANDIDATE_SEARCH_ALLOWED = new Set([
+    'agustina.barbero@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com',
+    'constanza@vintti.com',
+    'pilar@vintti.com',
+    'pilar.fernandez@vintti.com',
+    'angie@vintti.com',
+    'agostina@vintti.com',
+    'julieta@vintti.com'
+  ]);
+
+  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';
+})();
+// Summary / Equipments visibility
+(() => {
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+
+  const summaryAllowed = [
+    'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
+    'lara@vintti.com','agostina@vintti.com','mariano@vintti.com',
+    'jazmin@vintti.com'
+  ];
+  const equipmentsAllowed = [
+    'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
+  ];
+
+  const summaryLink = document.getElementById('summaryLink');
+  const equipmentsLink = document.getElementById('equipmentsLink');
+
+  if (summaryLink)   summaryLink.style.display   = summaryAllowed.includes(email)   ? '' : 'none';
+  if (equipmentsLink) equipmentsLink.style.display = equipmentsAllowed.includes(email) ? '' : 'none';
+})();
 /* =========================
    10) Sidebar toggle with memory
    ========================= */

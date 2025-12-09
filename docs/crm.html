@@ -29,31 +29,80 @@
 
 <body>
   <!-- ====================== SIDEBAR ====================== -->
-  <div class="sidebar" role="navigation" aria-label="Primary">
-    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
-    <a class="menu-item" href="candidates.html">Candidates</a>
+<aside class="sidebar">
+  <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
 
-    <a class="menu-item active" href="crm.html">CRM</a>
-    <a class="menu-item" href="opportunities.html">Opportunities</a>
-    <!-- 🔹 NUEVO: Candidate Search, se muestra según permisos via JS -->
+  <nav class="sidebar-nav">
+    <!-- Sección 1: Core -->
+    <p class="sidebar-section-label">CORE</p>
+
+    <a class="menu-item" href="candidates.html">
+      <span class="menu-icon"><i class="fa-solid fa-user-group"></i></span>
+      <span class="menu-label">Candidates</span>
+    </a>
+
+    <a class="menu-item active" href="crm.html">
+      <span class="menu-icon"><i class="fa-solid fa-building"></i></span>
+      <span class="menu-label">CRM</span>
+    </a>
+
+    <a class="menu-item" href="opportunities.html">
+      <span class="menu-icon"><i class="fa-solid fa-chart-line"></i></span>
+      <span class="menu-label">Opportunities</span>
+    </a>
+
     <a class="menu-item" id="candidateSearchLink" href="candidate-search.html" style="display:none;">
-      Candidate Search
+      <span class="menu-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+      <span class="menu-label">Candidate Search</span>
     </a>
-    <!-- Hidden links are toggled by app logic -->
-    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display: none;">Opportunities Summary</a>
-    <a class="menu-item" id="equipmentsLink" href="equipments.html" style="display:none;">Equipments</a>
-    <!-- Profile tile (bottom-left) -->
-    <a href="profile.html" class="profile-tile" id="sidebarProfile">
-      <span class="profile-avatar">
-        <img id="profileAvatarImg" alt="" />
-        <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
-      </span>
-      <span class="profile-meta">
-        <span id="profileName" class="profile-name"></span>
-        <span id="profileEmail" class="profile-email"></span>
-      </span>
+
+    <a class="menu-item" href="equipments.html" id="equipmentsLink">
+      <span class="menu-icon"><i class="fa-solid fa-laptop"></i></span>
+      <span class="menu-label">Equipments</span>
     </a>
-  </div>
+
+    <!-- Sección 2: Insights -->
+    <p class="sidebar-section-label">INSIGHTS</p>
+
+    <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display:none;">
+      <span class="menu-icon"><i class="fa-solid fa-chart-column"></i></span>
+      <span class="menu-label">Opportunities Summary</span>
+    </a>
+
+    <a
+      class="menu-item"
+      id="dashboardLink"
+      href="https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue"
+      target="_blank"
+      rel="noopener"
+    >
+      <span class="menu-icon"><i class="fa-solid fa-gauge-high"></i></span>
+      <span class="menu-label">Dashboard</span>
+    </a>
+
+    <a class="menu-item" href="control-dashboard.html" id="managementMetricsLink">
+      <span class="menu-icon"><i class="fa-solid fa-chart-bar"></i></span>
+      <span class="menu-label">Management Metrics</span>
+    </a>
+
+    <a class="menu-item" id="recruiterPowerLink" href="recruiter-power.html" style="display:none;">
+      <span class="menu-icon"><i class="fa-solid fa-bolt"></i></span>
+      <span class="menu-label">Recruiter Power</span>
+    </a>
+  </nav>
+
+  <!-- Profile tile SIEMPRE pegado abajo -->
+  <a href="profile.html" class="profile-tile" id="sidebarProfile">
+    <span class="profile-avatar">
+      <img id="profileAvatarImg" alt="" />
+      <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
+    </span>
+    <span class="profile-meta">
+      <span id="profileName" class="profile-name">-</span>
+      <span id="profileEmail" class="profile-email"></span>
+    </span>
+  </a>
+</aside>
 
   <!-- Sidebar wow toggle (kept ids/classes) -->
   <div class="sidebar-wow-toggle" id="sidebarToggle" role="button" aria-label="Toggle sidebar" tabindex="0">

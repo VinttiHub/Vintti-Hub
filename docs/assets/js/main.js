@@ -326,22 +326,37 @@ function getReplacementCandidateId() {
   return Number.isInteger(id) ? id : null;
 }
 
-const toggleSidebarButton = document.getElementById("sidebarToggleUnique");
-const sidebar = document.querySelector(".sidebar");
-const mainContent = document.querySelector(".main-content");
+/* =========================
+   10) Sidebar toggle with memory
+   ========================= */
 
-if (toggleSidebarButton && sidebar && mainContent) {
-  toggleSidebarButton.addEventListener("click", () => {
-    const isHidden = sidebar.classList.toggle("custom-sidebar-hidden");
-    mainContent.classList.toggle("custom-main-expanded", isHidden);
+(() => {
+  const sidebarToggleBtn = document.getElementById('sidebarToggle');
+  const sidebarToggleIcon = document.getElementById('sidebarToggleIcon');
+  const sidebarEl = document.querySelector('.sidebar');
+  const mainContentEl = document.querySelector('.main-content');
+  if (!sidebarToggleBtn || !sidebarToggleIcon || !sidebarEl || !mainContentEl) return;
 
-    const icon = toggleSidebarButton.querySelector("i");
-    if (icon) {
-      icon.classList.toggle("fa-chevron-left", !isHidden);
-      icon.classList.toggle("fa-chevron-right", isHidden);
-    }
+  const isSidebarHidden = localStorage.getItem('sidebarHidden') === 'true';
+  if (isSidebarHidden) {
+    sidebarEl.classList.add('custom-sidebar-hidden');
+    mainContentEl.classList.add('custom-main-expanded');
+    sidebarToggleIcon.classList.remove('fa-chevron-left');
+    sidebarToggleIcon.classList.add('fa-chevron-right');
+    sidebarToggleBtn.style.left = '12px';
+  } else {
+    sidebarToggleBtn.style.left = '220px';
+  }
+
+  sidebarToggleBtn.addEventListener('click', () => {
+    const hidden = sidebarEl.classList.toggle('custom-sidebar-hidden');
+    mainContentEl.classList.toggle('custom-main-expanded', hidden);
+    sidebarToggleIcon.classList.toggle('fa-chevron-left', !hidden);
+    sidebarToggleIcon.classList.toggle('fa-chevron-right', hidden);
+    sidebarToggleBtn.style.left = hidden ? '12px' : '220px';
+    localStorage.setItem('sidebarHidden', hidden);
   });
-}
+})();
 
 
 document.querySelectorAll('.filter-header').forEach(header => {
@@ -1177,7 +1192,7 @@ const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.c
   'lara@vintti.com','agostina@vintti.com','mariano@vintti.com','jazmin@vintti.com'];
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
-  summaryLink.style.display = 'block';
+  summaryLink.style.display = 'flex';  // o '' para usar el de CSS
 }
 // --- Candidate Search button visibility ---
 const candidateSearchLink = document.getElementById('candidateSearchLink');
@@ -1197,7 +1212,7 @@ if (candidateSearchLink) {
     'julieta@vintti.com' 
   ]);
 
-  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'block' : 'none';
+  candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';
 }
 
 async function initSidebarProfile(){
@@ -2126,94 +2141,61 @@ async function patchOppFields(oppId, payload) {
   }
   try { return JSON.parse(text); } catch { return text; }
 }
-// --- Equipments button (debajo de Opportunities Summary + visibilidad por email) ---
+// --- Equipments(visibilidad por email) ---
 (() => {
-  // Debe existir el link de Opportunities Summary en el menú lateral.
-  const summary = document.getElementById('summaryLink');
-  if (!summary) return; // Si no existe (ej. index), no creamos el botón.
+  const eq = document.getElementById('equipmentsLink');
+  if (!eq) return;
 
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const equipmentsAllowed = [
     'angie@vintti.com',
     'jazmin@vintti.com',
     'agustin@vintti.com',
-    'lara@vintti.com' 
+    'lara@vintti.com'
   ];
 
-  let eq = document.getElementById('equipmentsLink');
-  if (!eq) {
-    eq = document.createElement('a');
-    eq.id = 'equipmentsLink';
-    eq.href = 'equipments.html';
-    eq.textContent = 'Equipments';
-
-    // Usa exactamente las mismas clases/estilos del link de Opportunities Summary del menú lateral
-    eq.className = summary.className;
-    eq.style.display = 'none';
-
-    // Insertar justo debajo de Opportunities Summary en el menú lateral
-    summary.insertAdjacentElement('afterend', eq);
-  }
-
-  // Mostrar solo para emails permitidos
-  eq.style.display = equipmentsAllowed.includes(currentUserEmail) ? '' : 'none';
+  eq.style.display = equipmentsAllowed.includes(currentUserEmail) ? 'flex' : 'none';
 })();
-// --- Dashboard + Management Metrics (después de Equipments) ---
+// --- Dashboard + Management Metrics (usar botones del HTML con iconos) ---
 (() => {
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const DASH_ALLOWED = new Set([
     'agustin@vintti.com',
     'angie@vintti.com',
-    'lara@vintti.com', 'bahia@vintti.com', 'agostina@vintti.com' 
+    'lara@vintti.com',
+    'bahia@vintti.com',
+    'agostina@vintti.com'
   ]);
 
-  // Si no está permitido, oculta si existieran y sal.
+  const dash = document.getElementById('dashboardLink');
+  const mgmt = document.getElementById('managementMetricsLink');
+
   if (!DASH_ALLOWED.has(currentUserEmail)) {
-    document.getElementById('dashboardLink')?.style && (document.getElementById('dashboardLink').style.display = 'none');
-    document.getElementById('managementMetricsLink')?.style && (document.getElementById('managementMetricsLink').style.display = 'none');
+    if (dash) dash.style.display = 'none';
+    if (mgmt) mgmt.style.display = 'none';
     return;
   }
 
-  // Referencias en el sidebar
-  const summary = document.getElementById('summaryLink');               // 📊 Opportunities Summary
-  const opps    = document.getElementById('opportunitiesLink')
-                || document.querySelector('.sidebar a[href*="opportunities.html"]');
+  if (dash) dash.style.display = 'flex';
+  if (mgmt) mgmt.style.display = 'flex';
+})();
+// --- Recruiter Power (visibilidad por email) ---
+(() => {
+  const link = document.getElementById('recruiterPowerLink');
+  if (!link) return;
 
-  // Asegúrate de tener/crear el equipmentsLink primero (arriba en tu código)
-  let eq = document.getElementById('equipmentsLink');
+  const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
-  // Punto de inserción: después de Equipments; si no, después de Summary; si no, después de Opportunities.
-  const anchor = eq || summary || opps;
-  if (!anchor) return;
+  // 👉 Edita esta lista con los correos que deben verlo
+  const RECRUITER_POWER_ALLOWED = new Set([
+    'angie@vintti.com',
+    'agostina@vintti.com',
+    'agostin@vintti.com',
+    'lara@vintti.com'
+  ]);
 
-  // Plantilla de clase para que se vean igual que Summary
-  const baseClass = (summary && summary.className) || 'menu-item';
-
-  // 1) Dashboard (abre en nueva pestaña)
-  let dash = document.getElementById('dashboardLink');
-  if (!dash) {
-    dash = document.createElement('a');
-    dash.id = 'dashboardLink';
-    dash.className = baseClass;
-    dash.textContent = 'Dashboard';
-    dash.href = 'https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue';
-    dash.target = '_blank';
-    dash.rel = 'noopener';
-    anchor.insertAdjacentElement('afterend', dash);
-  }
-  dash.style.display = ''; // asegurar visibilidad para permitidos
-
-  // 2) Management Metrics (misma pestaña)
-  let mgmt = document.getElementById('managementMetricsLink');
-  if (!mgmt) {
-    mgmt = document.createElement('a');
-    mgmt.id = 'managementMetricsLink';
-    mgmt.className = baseClass;
-    mgmt.textContent = 'Management Metrics';
-    mgmt.href = 'control-dashboard.html';
-    dash.insertAdjacentElement('afterend', mgmt);
-  }
-  mgmt.style.display = ''; // asegurar visibilidad para permitidos
+  // Mantener flex para icono + texto alineados
+  link.style.display = RECRUITER_POWER_ALLOWED.has(email) ? 'flex' : 'none';
 })();
 
 window.addEventListener('pageshow', () => {
