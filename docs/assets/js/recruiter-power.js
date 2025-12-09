@@ -1,5 +1,4 @@
-// recruiter_metrics.js
-
+const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 const metricsState = {
   byLead: {}, // { hr_lead: { ...metrics } }
   orderedLeads: [],
@@ -107,7 +106,7 @@ function updatePeriodInfo() {
 
 async function fetchMetrics() {
   try {
-    const resp = await fetch("/api/recruiter-metrics");
+    const resp = await fetch("${API_BASE}/recruiter-metrics");
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
     }

@@ -24,8 +24,7 @@ def _current_month_bounds():
 
 
 def register_recruiter_metrics_routes(app):
-
-    @app.route("/api/recruiter-metrics", methods=["GET"])
+    @app.route("/recruiter-metrics", methods=["GET"])
     def api_recruiter_metrics():
         """
         Devuelve métricas agregadas por opp_hr_lead:
