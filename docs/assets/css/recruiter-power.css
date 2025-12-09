@@ -171,3 +171,10 @@ body {
   background: rgba(216, 204, 255, 0.25);
   border-color: rgba(180, 160, 255, 0.35);
 }
+.metrics-page .meta-text {
+  margin: -0.5rem auto 1.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #b2a7c8;
+  max-width: 520px;
+}

@@ -1,10 +1,31 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+
+// 🔸 Correos que NO deben aparecer nunca en el dropdown
+const EXCLUDED_EMAILS = new Set([
+  "sol@vintti.com",
+  "agustin@vintti.com",
+  "bahia@vintti.com",
+  "agustina.ferrari@vintti.com",
+]);
+
+// 🔸 Personas que sólo deben ver SU propia opción
+const RESTRICTED_EMAILS = new Set([
+  "agustina.barbero@vintti.com",
+  "constanza@vintti.com",
+  "pilar@vintti.com",
+  "pilar.fernandez@vintti.com",
+  "agostina@vintti.com",
+  "julieta@vintti.com",
+]);
+
 const metricsState = {
-  byLead: {}, // { hr_lead: { ...metrics } }
-  orderedLeads: [],
+  byLead: {},            // { email: { ...metrics } }
+  orderedLeadEmails: [], // [ email, email, ... ]
   monthStart: null,
   monthEnd: null,
+  currentUserEmail: null,
 };
+
 function computeTrend(current, previous) {
   if (previous == null || previous === 0) {
     return { label: "–", className: "neutral" };
@@ -44,8 +65,15 @@ function formatDateISO(iso) {
   return `${day}/${month}/${year}`;
 }
 
-function updateCardsForLead(hrLead) {
-  const m = metricsState.byLead[hrLead];
+// 🔹 helper para el label: muestra el user_name si existe
+function getLeadLabel(email) {
+  const row = metricsState.byLead[email];
+  if (!row) return email;
+  return row.hr_lead_name || row.hr_lead || email;
+}
+
+function updateCardsForLead(hrLeadEmail) {
+  const m = metricsState.byLead[hrLeadEmail];
 
   const winMonthEl = $("#closedWinMonthValue");
   const lostMonthEl = $("#closedLostMonthValue");
@@ -102,6 +130,8 @@ function updateCardsForLead(hrLead) {
 
 function populateDropdown() {
   const select = $("#hrLeadSelect");
+  if (!select) return;
+
   select.innerHTML = "";
 
   // Option placeholder
@@ -112,16 +142,44 @@ function populateDropdown() {
   defaultOpt.selected = true;
   select.appendChild(defaultOpt);
 
-  metricsState.orderedLeads.forEach((lead) => {
+  let emails = metricsState.orderedLeadEmails.slice();
+  const currentEmail = (metricsState.currentUserEmail || "").toLowerCase();
+
+  // 🔒 Si el usuario está en la lista restringida, sólo ve su propia opción
+  if (currentEmail && RESTRICTED_EMAILS.has(currentEmail)) {
+    emails = emails.filter((e) => e.toLowerCase() === currentEmail);
+  }
+
+  // Ordenamos por nombre visible (user_name)
+  emails.sort((a, b) =>
+    getLeadLabel(a).localeCompare(getLeadLabel(b), undefined, {
+      sensitivity: "base",
+    })
+  );
+
+  emails.forEach((email) => {
     const opt = document.createElement("option");
-    opt.value = lead;
-    opt.textContent = lead;
+    opt.value = email;              // clave = email
+    opt.textContent = getLeadLabel(email); // label = user_name
     select.appendChild(opt);
   });
 
+  // Si es usuario restringido y su opción existe, la seleccionamos por defecto
+  if (currentEmail && RESTRICTED_EMAILS.has(currentEmail)) {
+    const ownOption = [...select.options].find(
+      (o) => o.value.toLowerCase() === currentEmail
+    );
+    if (ownOption) {
+      ownOption.selected = true;
+      defaultOpt.disabled = true;
+      defaultOpt.hidden = true;
+      updateCardsForLead(ownOption.value);
+    }
+  }
+
   select.addEventListener("change", (ev) => {
-    const hrLead = ev.target.value;
-    updateCardsForLead(hrLead);
+    const hrLeadEmail = ev.target.value;
+    updateCardsForLead(hrLeadEmail);
   });
 }
 
@@ -135,7 +193,7 @@ function updatePeriodInfo() {
   }
   const prettyStart = formatDateISO(monthStart);
   const prettyEnd = formatDateISO(monthEnd);
-  el.textContent = `Current month period: ${prettyStart} — ${prettyEnd} (opp_close_date in this range).`;
+  el.textContent = `Current month period: ${prettyStart} — ${prettyEnd}`;
 }
 
 async function fetchMetrics() {
@@ -151,19 +209,25 @@ async function fetchMetrics() {
 
     metricsState.monthStart = data.month_start;
     metricsState.monthEnd = data.month_end;
+    metricsState.currentUserEmail = data.current_user_email || null;
 
     const byLead = {};
-    const leads = [];
+    const emails = [];
+
     for (const row of data.metrics || []) {
-      const lead = row.hr_lead || "Unassigned";
-      byLead[lead] = row;
-      leads.push(lead);
+      // soporte backward: si no viniera hr_lead_email usamos hr_lead
+      const email = (row.hr_lead_email || row.hr_lead || "").toLowerCase();
+      if (!email) continue;
+
+      // ⛔ excluir ciertos correos del dropdown
+      if (EXCLUDED_EMAILS.has(email)) continue;
+
+      byLead[email] = row;
+      emails.push(email);
     }
 
     metricsState.byLead = byLead;
-    metricsState.orderedLeads = leads.sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" })
-    );
+    metricsState.orderedLeadEmails = emails;
 
     populateDropdown();
     updatePeriodInfo();
