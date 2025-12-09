@@ -141,3 +141,33 @@ body {
 .metric-conversion::before {
   background: radial-gradient(circle at top right, rgba(210, 185, 255, 0.45), transparent 55%);
 }
+.metric-compare {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(200, 170, 255, 0.35);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.metric-compare.up {
+  color: #3fb6a8;
+  background: rgba(160, 230, 215, 0.25);
+  border-color: rgba(63, 182, 168, 0.35);
+}
+
+.metric-compare.down {
+  color: #d6759c;
+  background: rgba(255, 190, 215, 0.25);
+  border-color: rgba(214, 117, 156, 0.35);
+}
+
+.metric-compare.neutral {
+  color: #9a8cc5;
+  background: rgba(216, 204, 255, 0.25);
+  border-color: rgba(180, 160, 255, 0.35);
+}
