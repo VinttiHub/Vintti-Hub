@@ -156,3 +156,4 @@ def register_recruiter_metrics_routes(app):
                 "metrics": metrics,
             }
         )
+    

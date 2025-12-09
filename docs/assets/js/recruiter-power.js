@@ -106,7 +106,7 @@ function updatePeriodInfo() {
 
 async function fetchMetrics() {
   try {
-    const resp = await fetch("${API_BASE}/recruiter-metrics");
+    const resp = await fetch(`${API_BASE}/recruiter-metrics`);
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
     }
