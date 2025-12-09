@@ -83,7 +83,7 @@ def register_recruiter_metrics_routes(app):
                 COUNT(*) FILTER (
                     WHERE close_date >= %(month_start)s
                     AND close_date < %(month_end)s
-                    AND opp_stage = 'Closed Win'
+                    AND opp_stage = 'Close Win'
                 ) AS closed_win_month,
 
                 COUNT(*) FILTER (
@@ -96,7 +96,7 @@ def register_recruiter_metrics_routes(app):
                 COUNT(*) FILTER (
                     WHERE close_date >= %(prev_month_start)s
                     AND close_date < %(prev_month_end)s
-                    AND opp_stage = 'Closed Win'
+                    AND opp_stage = 'Close Win'
                 ) AS prev_closed_win_month,
 
                 COUNT(*) FILTER (
@@ -107,7 +107,7 @@ def register_recruiter_metrics_routes(app):
 
                 -- ✅ TOTALES
                 COUNT(*) FILTER (
-                    WHERE opp_stage = 'Closed Win'
+                    WHERE opp_stage = 'Close Win'
                 ) AS closed_win_total,
 
                 COUNT(*) FILTER (
@@ -126,10 +126,10 @@ def register_recruiter_metrics_routes(app):
             SELECT
                 opp_hr_lead,
                 COUNT(*) AS last_20_count,
-                COUNT(*) FILTER (WHERE opp_stage = 'Closed Win') AS last_20_win,
+                COUNT(*) FILTER (WHERE opp_stage = 'Close Win') AS last_20_win,
                 CASE
                     WHEN COUNT(*) = 0 THEN NULL
-                    ELSE COUNT(*) FILTER (WHERE opp_stage = 'Closed Win')::decimal
+                    ELSE COUNT(*) FILTER (WHERE opp_stage = 'Close Win')::decimal
                         / COUNT(*)
                 END AS conversion_rate_last_20
             FROM last_20
