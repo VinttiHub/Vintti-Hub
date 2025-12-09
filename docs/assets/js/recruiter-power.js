@@ -85,6 +85,52 @@ function getLeadLabel(email) {
   return row.hr_lead_name || row.hr_lead || email;
 }
 
+/* 🌟 NUEVO: helpers de animación numérica */
+function parseIntSafe(text) {
+  const n = parseInt(String(text).replace(/[^\d-]/g, ""), 10);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function parsePercentSafe(text) {
+  const n = parseFloat(String(text).replace("%", "").trim());
+  if (Number.isNaN(n)) return 0;
+  return n / 100; // lo devolvemos como 0–1
+}
+
+function animateValue(el, from, to, { duration = 650, formatter }) {
+  if (!el) return;
+  if (from === to) {
+    // nada que animar
+    el.textContent = formatter ? formatter(to) : to;
+    return;
+  }
+
+  const start = performance.now();
+
+  function frame(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic 💅
+    const current = from + (to - from) * eased;
+    el.textContent = formatter ? formatter(current) : Math.round(current);
+
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function animateCardsFlash() {
+  const cards = document.querySelectorAll(".metric-card");
+  cards.forEach((card) => {
+    card.classList.remove("is-updating");
+    // fuerza reflow para reiniciar animación
+    void card.offsetWidth;
+    card.classList.add("is-updating");
+  });
+}
+
 function updateCardsForLead(hrLeadEmail) {
   const m = metricsState.byLead[hrLeadEmail];
 
@@ -106,10 +152,23 @@ function updateCardsForLead(hrLeadEmail) {
     return;
   }
 
-  winMonthEl.textContent = m.closed_win_month ?? 0;
-  lostMonthEl.textContent = m.closed_lost_month ?? 0;
+  /* 🌟 NUEVO: animamos los números en vez de cambiarlos brusco */
 
-  /* ✅ COMPARACIÓN CON MES ANTERIOR*/
+  // --- Closed Win · This Month ---
+  const newWinMonth = m.closed_win_month ?? 0;
+  const fromWinMonth = parseIntSafe(winMonthEl.textContent);
+  animateValue(winMonthEl, fromWinMonth, newWinMonth, {
+    formatter: (v) => Math.round(v),
+  });
+
+  // --- Closed Lost · This Month ---
+  const newLostMonth = m.closed_lost_month ?? 0;
+  const fromLostMonth = parseIntSafe(lostMonthEl.textContent);
+  animateValue(lostMonthEl, fromLostMonth, newLostMonth, {
+    formatter: (v) => Math.round(v),
+  });
+
+  /* ✅ COMPARACIÓN CON MES ANTERIOR (texto, sin animación numérica) */
   const winCompareEl = $("#winMonthCompare");
   const lostCompareEl = $("#lostMonthCompare");
 
@@ -126,10 +185,31 @@ function updateCardsForLead(hrLeadEmail) {
   lostCompareEl.textContent = lostTrend.label;
   lostCompareEl.className = `metric-compare ${lostTrend.className}`;
 
-  winTotalEl.textContent = m.closed_win_total ?? 0;
-  lostTotalEl.textContent = m.closed_lost_total ?? 0;
+  // --- Total Closed Win ---
+  const newWinTotal = m.closed_win_total ?? 0;
+  const fromWinTotal = parseIntSafe(winTotalEl.textContent);
+  animateValue(winTotalEl, fromWinTotal, newWinTotal, {
+    formatter: (v) => Math.round(v),
+  });
 
-  convEl.textContent = formatPercent(m.conversion_rate_last_20);
+  // --- Total Closed Lost ---
+  const newLostTotal = m.closed_lost_total ?? 0;
+  const fromLostTotal = parseIntSafe(lostTotalEl.textContent);
+  animateValue(lostTotalEl, fromLostTotal, newLostTotal, {
+    formatter: (v) => Math.round(v),
+  });
+
+  // --- Conversion · Last 20 ---
+  const newConv = m.conversion_rate_last_20;
+  if (newConv == null) {
+    convEl.textContent = "–";
+  } else {
+    const fromConv = parsePercentSafe(convEl.textContent); // 0–1
+    animateValue(convEl, fromConv, newConv, {
+      duration: 750,
+      formatter: (v) => formatPercent(v),
+    });
+  }
 
   const total = m.last_20_count ?? 0;
   const wins = m.last_20_win ?? 0;
@@ -139,6 +219,9 @@ function updateCardsForLead(hrLeadEmail) {
   } else {
     helperEl.textContent = `Last 20 closed opportunities: ${wins} Closed Win out of ${total}.`;
   }
+
+  // ✨ pequeño “glow” en todas las cards cuando cambian
+  animateCardsFlash();
 }
 
 function populateDropdown() {

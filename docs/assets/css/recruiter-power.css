@@ -64,28 +64,6 @@ body {
   grid-auto-rows: 220px;
   gap: 2rem;
 }
-.metric-card {
-  background: var(--card-bg);
-  border-radius: 26px;
-  border: 1px solid var(--card-border);
-  box-shadow: var(--shadow-soft);
-  padding: 2.2rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.7rem;
-  position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(18px);
-}
-.metric-value {
-  font-size: 3rem;
-  font-weight: 900;
-  margin-top: 0.3rem;
-}
-.metric-conversion .metric-value {
-  font-size: 3.2rem;
-}
 .metric-pill {
   padding: 0.28rem 0.8rem;
   border-radius: 999px;
@@ -120,8 +98,6 @@ body {
   color: #6f3fa4;
 }
 
-.filter-select { min-width: 220px; padding: 0.55rem 1rem; border-radius: 999px; border: 1px solid rgba(179, 136, 255, 0.35); background: rgba(255, 255, 255, 0.9); box-shadow: 0 10px 24px rgba(179, 136, 255, 0.18); font-size: 0.9rem; outline: none; appearance: none; background-image: linear-gradient(45deg, transparent 50%, #b388ff 50%), linear-gradient(135deg, #b388ff 50%, transparent 50%); background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 13px) calc(50% - 3px); background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; }
-.filter-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
 .metric-win-month::before {
   background: radial-gradient(circle at top right, rgba(143, 214, 255, 0.35), transparent 55%);
 }
@@ -177,4 +153,116 @@ body {
   font-size: 0.85rem;
   color: #b2a7c8;
   max-width: 520px;
+}
+body {
+  margin: 0;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* 💫 Cards con hover suave y micro interacciones */
+.metric-card {
+  background: var(--card-bg);
+  border-radius: 26px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-soft);
+  padding: 2.2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.7rem;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(18px);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 26px 60px rgba(190, 160, 240, 0.28);
+  border-color: rgba(190, 160, 240, 0.55);
+}
+
+/* 🌟 cuando cambias de recruiter, las cards hacen un glow sutil */
+.metric-card.is-updating {
+  animation: cardGlow 0.5s ease;
+}
+
+@keyframes cardGlow {
+  0% {
+    box-shadow: var(--shadow-soft);
+    transform: translateY(0);
+  }
+  40% {
+    box-shadow: 0 0 0 2px rgba(190, 160, 240, 0.35),
+      0 26px 60px rgba(190, 160, 240, 0.35);
+    transform: translateY(-3px);
+  }
+  100% {
+    box-shadow: var(--shadow-soft);
+    transform: translateY(0);
+  }
+}
+
+/* Números con micro transición al cambiar (acompaña al JS) */
+.metric-value {
+  font-size: 3rem;
+  font-weight: 900;
+  margin-top: 0.3rem;
+  line-height: 1;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.metric-card.is-updating .metric-value {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+/* Dropdown más “premium” */
+.filter-select {
+  min-width: 220px;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(179, 136, 255, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(179, 136, 255, 0.18);
+  font-size: 0.9rem;
+  outline: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #b388ff 50%),
+    linear-gradient(135deg, #b388ff 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.filter-select:hover,
+.filter-select:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(179, 136, 255, 0.35);
+  border-color: rgba(179, 136, 255, 0.85);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+/* Label del filtro un poquito más chic */
+.filter-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  display: inline-block;
 }
