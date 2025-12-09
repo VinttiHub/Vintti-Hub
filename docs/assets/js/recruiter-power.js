@@ -26,7 +26,7 @@ const metricsState = {
   currentUserEmail: null,
 };
 
-function computeTrend(current, previous) {
+function computeTrend(current, previous, goodWhenHigher = true) {
   if (previous == null || previous === 0) {
     return { label: "–", className: "neutral" };
   }
@@ -34,13 +34,26 @@ function computeTrend(current, previous) {
   const diff = current - previous;
   const pct = Math.round((diff / previous) * 100);
 
-  if (pct > 0) {
-    return { label: `↑ ${pct}%`, className: "up" };
-  } else if (pct < 0) {
-    return { label: `↓ ${Math.abs(pct)}%`, className: "down" };
-  } else {
+  if (pct === 0) {
     return { label: "→ 0%", className: "neutral" };
   }
+
+  const arrow = pct > 0 ? "↑" : "↓";
+  const absPct = Math.abs(pct);
+
+  // 👉 “mejora” depende de si es mejor que suba o que baje
+  let isImprovement;
+  if (goodWhenHigher) {
+    // ejemplo: Closed Win → más es mejor
+    isImprovement = pct > 0;
+  } else {
+    // ejemplo: Closed Lost → menos es mejor
+    isImprovement = pct < 0;
+  }
+
+  const cls = isImprovement ? "up" : "down";
+
+  return { label: `${arrow} ${absPct}%`, className: cls };
 }
 
 function $(sel, root = document) {
@@ -103,13 +116,13 @@ function updateCardsForLead(hrLeadEmail) {
   const prevWin = m.prev_closed_win_month ?? null;
   const prevLost = m.prev_closed_lost_month ?? null;
 
-  // WIN
-  const winTrend = computeTrend(m.closed_win_month ?? 0, prevWin);
+  // WIN → más es mejor
+  const winTrend = computeTrend(m.closed_win_month ?? 0, prevWin, true);
   winCompareEl.textContent = winTrend.label;
   winCompareEl.className = `metric-compare ${winTrend.className}`;
 
-  // LOST
-  const lostTrend = computeTrend(m.closed_lost_month ?? 0, prevLost);
+  // LOST → menos es mejor
+  const lostTrend = computeTrend(m.closed_lost_month ?? 0, prevLost, false);
   lostCompareEl.textContent = lostTrend.label;
   lostCompareEl.className = `metric-compare ${lostTrend.className}`;
 
