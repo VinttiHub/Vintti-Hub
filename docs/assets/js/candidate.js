@@ -298,12 +298,18 @@ function installAdvancedFilters(table) {
 
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
-  // 👉 Edita esta lista con los correos que deben verlo
+
   const RECRUITER_POWER_ALLOWED = new Set([
     'angie@vintti.com',
     'agostina@vintti.com',
     'agostin@vintti.com',
-    'lara@vintti.com'
+    'agustina.barbero@vintti.com',
+    'agustin@vintti.com',
+    'lara@vintti.com',
+    'constanza@vintti.com',
+    'pilar@vintti.com',
+    'pilar.fernandez@vintti.com',
+    'julieta@vintti.com'
   ]);
 
   // Mantener flex para icono + texto alineados

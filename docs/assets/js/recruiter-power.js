@@ -25,6 +25,82 @@ const metricsState = {
   monthEnd: null,
   currentUserEmail: null,
 };
+// ===== user_id helpers (copiados de Profile, versión mini) =====
+function getUidFromQuery() {
+  try {
+    const q = new URLSearchParams(location.search).get("user_id");
+    return q && /^\d+$/.test(q) ? Number(q) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureUserIdInURL() {
+  let uid = getUidFromQuery();
+  if (!uid) uid = Number(localStorage.getItem("user_id")) || null;
+
+  // si existe un resolver global, lo usamos (como en otras páginas)
+  if (!uid && typeof window.getCurrentUserId === "function") {
+    try {
+      uid = await window.getCurrentUserId();
+    } catch {
+      uid = null;
+    }
+  }
+
+  if (!uid) {
+    console.warn(
+      "[recruiter-metrics] No user_id available (no URL, no cache, no resolver)"
+    );
+    return null;
+  }
+
+  localStorage.setItem("user_id", String(uid));
+
+  const url = new URL(location.href);
+  if (url.searchParams.get("user_id") !== String(uid)) {
+    url.searchParams.set("user_id", String(uid));
+    history.replaceState(null, "", url.toString());
+  }
+
+  console.debug("[recruiter-metrics] using user_id =", uid);
+  return uid;
+}
+
+// --- API helper: añade ?user_id= y credentials: 'include'
+async function api(path, opts = {}) {
+  const url = new URL(API_BASE + path);
+  const uid = Number(localStorage.getItem("user_id")) || getUidFromQuery();
+
+  if (uid && !url.searchParams.has("user_id")) {
+    url.searchParams.set("user_id", String(uid));
+  }
+
+  return fetch(url.toString(), {
+    credentials: "include",
+    ...opts,
+    headers: {
+      ...(opts.headers || {}),
+    },
+  });
+}
+
+async function loadCurrentUserEmail() {
+  try {
+    const resp = await api("/profile/me", { method: "GET" });
+    if (!resp.ok) throw new Error(await resp.text());
+    const me = await resp.json();
+
+    metricsState.currentUserEmail = (me.email_vintti || "").toLowerCase();
+    console.debug(
+      "[recruiter-metrics] current user:",
+      metricsState.currentUserEmail
+    );
+  } catch (err) {
+    console.warn("[recruiter-metrics] Could not resolve current user email:", err);
+    metricsState.currentUserEmail = null;
+  }
+}
 
 function computeTrend(current, previous, goodWhenHigher = true) {
   if (previous == null) {
@@ -297,7 +373,9 @@ function updatePeriodInfo() {
 
 async function fetchMetrics() {
   try {
-    const resp = await fetch(`${API_BASE}/recruiter-metrics`);
+    const resp = await fetch(`${API_BASE}/recruiter-metrics`, {
+      credentials: "include",    // 🔑 envía cookies al backend
+    });
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
     }
@@ -308,13 +386,16 @@ async function fetchMetrics() {
 
     metricsState.monthStart = data.month_start;
     metricsState.monthEnd = data.month_end;
-    metricsState.currentUserEmail = data.current_user_email || null;
+
+    // opcional: solo si NO logramos leer /profile/me
+    if (!metricsState.currentUserEmail && data.current_user_email) {
+      metricsState.currentUserEmail = data.current_user_email.toLowerCase();
+    }
 
     const byLead = {};
     const emails = [];
 
     for (const row of data.metrics || []) {
-      // soporte backward: si no viniera hr_lead_email usamos hr_lead
       const email = (row.hr_lead_email || row.hr_lead || "").toLowerCase();
       if (!email) continue;
 
@@ -346,5 +427,15 @@ async function fetchMetrics() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  fetchMetrics();
+  (async () => {
+    const uid = await ensureUserIdInURL(); // resuelve user_id (como en Profile)
+    if (!uid) {
+      // sin user_id no podemos saber si es restringido; mostramos todo
+      await fetchMetrics();
+      return;
+    }
+
+    await loadCurrentUserEmail(); // llena metricsState.currentUserEmail
+    await fetchMetrics();         // arma dropdown y aplica RESTRICTED_EMAILS
+  })();
 });
