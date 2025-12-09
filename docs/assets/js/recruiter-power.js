@@ -27,33 +27,36 @@ const metricsState = {
 };
 
 function computeTrend(current, previous, goodWhenHigher = true) {
-  if (previous == null || previous === 0) {
+  if (previous == null) {
     return { label: "–", className: "neutral" };
   }
 
   const diff = current - previous;
-  const pct = Math.round((diff / previous) * 100);
 
-  if (pct === 0) {
-    return { label: "→ 0%", className: "neutral" };
+  if (diff === 0) {
+    return { label: "same", className: "neutral" };
   }
 
-  const arrow = pct > 0 ? "↑" : "↓";
-  const absPct = Math.abs(pct);
+  const arrow = diff > 0 ? "↑" : "↓";
+  const absDiff = Math.abs(diff);
 
-  // 👉 “mejora” depende de si es mejor que suba o que baje
   let isImprovement;
   if (goodWhenHigher) {
-    // ejemplo: Closed Win → más es mejor
-    isImprovement = pct > 0;
+    isImprovement = diff > 0;
   } else {
-    // ejemplo: Closed Lost → menos es mejor
-    isImprovement = pct < 0;
+    isImprovement = diff < 0;
   }
 
   const cls = isImprovement ? "up" : "down";
+  const verb = diff > 0 ? "up" : "down";
 
-  return { label: `${arrow} ${absPct}%`, className: cls };
+  // Ejemplos:
+  // "↑ up 3"
+  // "↓ down 2"
+  return {
+    label: `${arrow} ${verb} ${absDiff}`,
+    className: cls,
+  };
 }
 
 function $(sel, root = document) {
