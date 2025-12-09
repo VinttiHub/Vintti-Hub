@@ -704,6 +704,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    position: relative;
+    z-index: 0;
+    overflow: visible;
   }
 
   .candidate-card {
@@ -868,12 +871,6 @@ body {
 }
 
 .column {
-  position: relative;
-  z-index: 0;
-  overflow: visible;
-}
-
-.card-container {
   position: relative;
   z-index: 0;
   overflow: visible;
@@ -2918,3 +2915,31 @@ input:checked + .slider::before {
 .pipeline-section #interviewed-count-input[type="number"] {
   -moz-appearance: textfield;
 }
+/* 1) Aseguramos que cada columna se estire verticalmente */
+.pipeline-section {
+  min-height: 100vh;
+}
+
+.pipeline-columns {
+  align-items: stretch;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 2) El contenedor donde sueltas las cards ocupa todo el alto disponible */
+.card-container {
+  flex: 1 1 auto;
+  min-height: calc(100vh - 250px); /* ajusta 250px según lo que ocupe tu header */
+}
+
+/* 3) Extra “colchón” invisible al final para que el drop funcione incluso más abajo */
+.card-container::after {
+  content: "";
+  display: block;
+  height: 40vh;    /* zona extra de drop debajo de las últimas cards */
+  min-height: 120px;
+}
+
