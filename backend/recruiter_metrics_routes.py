@@ -42,7 +42,7 @@ def register_recruiter_metrics_routes(app):
         sql = """
         WITH base AS (
             SELECT
-                id,
+                opportunity_id,
                 opp_hr_lead,
                 opp_stage,
                 (opp_close_date)::date AS close_date,
