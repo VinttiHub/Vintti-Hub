@@ -4,7 +4,6 @@ import os
 import re
 import json
 import uuid
-import calendar
 import logging
 import traceback
 from datetime import datetime
@@ -18,9 +17,6 @@ from psycopg2.extras import RealDictCursor
 from googleapiclient.discovery import build
 import boto3
 import openai
-import psycopg2
-import psycopg2.extras
-import requests
 import html as _html
 
 from ai_routes import register_ai_routes

@@ -29,9 +29,8 @@ def _current_month_bounds():
 def recruiter_metrics_page():
     """
     Página HTML del dashboard de recruiters.
-    Asegúrate de que el template recruiter_metrics.html exista en /templates.
     """
-    return render_template("recruiter_metrics.html")
+    return render_template("recruiter-power.html")
 
 
 @bp_recruiter_metrics.route("/api/recruiter-metrics", methods=["GET"])
