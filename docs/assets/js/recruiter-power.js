@@ -5,6 +5,22 @@ const metricsState = {
   monthStart: null,
   monthEnd: null,
 };
+function computeTrend(current, previous) {
+  if (previous == null || previous === 0) {
+    return { label: "–", className: "neutral" };
+  }
+
+  const diff = current - previous;
+  const pct = Math.round((diff / previous) * 100);
+
+  if (pct > 0) {
+    return { label: `↑ ${pct}%`, className: "up" };
+  } else if (pct < 0) {
+    return { label: `↓ ${Math.abs(pct)}%`, className: "down" };
+  } else {
+    return { label: "→ 0%", className: "neutral" };
+  }
+}
 
 function $(sel, root = document) {
   return root.querySelector(sel);
@@ -51,6 +67,24 @@ function updateCardsForLead(hrLead) {
 
   winMonthEl.textContent = m.closed_win_month ?? 0;
   lostMonthEl.textContent = m.closed_lost_month ?? 0;
+
+  /* ✅ COMPARACIÓN CON MES ANTERIOR*/
+  const winCompareEl = $("#winMonthCompare");
+  const lostCompareEl = $("#lostMonthCompare");
+
+  const prevWin = m.prev_closed_win_month ?? null;
+  const prevLost = m.prev_closed_lost_month ?? null;
+
+  // WIN
+  const winTrend = computeTrend(m.closed_win_month ?? 0, prevWin);
+  winCompareEl.textContent = winTrend.label;
+  winCompareEl.className = `metric-compare ${winTrend.className}`;
+
+  // LOST
+  const lostTrend = computeTrend(m.closed_lost_month ?? 0, prevLost);
+  lostCompareEl.textContent = lostTrend.label;
+  lostCompareEl.className = `metric-compare ${lostTrend.className}`;
+
   winTotalEl.textContent = m.closed_win_total ?? 0;
   lostTotalEl.textContent = m.closed_lost_total ?? 0;
 

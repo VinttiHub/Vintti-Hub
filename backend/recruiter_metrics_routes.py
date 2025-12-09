@@ -22,6 +22,17 @@ def _current_month_bounds():
         month_end = date(now.year, now.month + 1, 1)
     return month_start, month_end
 
+def _previous_month_bounds():
+    """Devuelve (prev_month_start, prev_month_end) en fecha."""
+    now = datetime.now(BOGOTA_TZ).date()
+    first_of_this_month = date(now.year, now.month, 1)
+    prev_month_end = first_of_this_month
+    if now.month == 1:
+        prev_month_start = date(now.year - 1, 12, 1)
+    else:
+        prev_month_start = date(now.year, now.month - 1, 1)
+    return prev_month_start, prev_month_end
+
 
 def register_recruiter_metrics_routes(app):
     @app.route("/recruiter-metrics", methods=["GET"])
@@ -38,6 +49,7 @@ def register_recruiter_metrics_routes(app):
         - conversion_rate_last_20 (0-1)
         """
         month_start, month_end = _current_month_bounds()
+        prev_month_start, prev_month_end = _previous_month_bounds()
 
         sql = """
         WITH base AS (
@@ -56,22 +68,42 @@ def register_recruiter_metrics_routes(app):
         agg AS (
             SELECT
                 opp_hr_lead,
+
+                -- ✅ MES ACTUAL
                 COUNT(*) FILTER (
                     WHERE close_date >= %(month_start)s
-                      AND close_date < %(month_end)s
-                      AND opp_stage = 'Closed Win'
+                    AND close_date < %(month_end)s
+                    AND opp_stage = 'Closed Win'
                 ) AS closed_win_month,
+
                 COUNT(*) FILTER (
                     WHERE close_date >= %(month_start)s
-                      AND close_date < %(month_end)s
-                      AND opp_stage = 'Closed Lost'
+                    AND close_date < %(month_end)s
+                    AND opp_stage = 'Closed Lost'
                 ) AS closed_lost_month,
+
+                -- ✅ MES ANTERIOR (NUEVO)
+                COUNT(*) FILTER (
+                    WHERE close_date >= %(prev_month_start)s
+                    AND close_date < %(prev_month_end)s
+                    AND opp_stage = 'Closed Win'
+                ) AS prev_closed_win_month,
+
+                COUNT(*) FILTER (
+                    WHERE close_date >= %(prev_month_start)s
+                    AND close_date < %(prev_month_end)s
+                    AND opp_stage = 'Closed Lost'
+                ) AS prev_closed_lost_month,
+
+                -- ✅ TOTALES
                 COUNT(*) FILTER (
                     WHERE opp_stage = 'Closed Win'
                 ) AS closed_win_total,
+
                 COUNT(*) FILTER (
                     WHERE opp_stage = 'Closed Lost'
                 ) AS closed_lost_total
+
             FROM base
             GROUP BY opp_hr_lead
         ),
@@ -88,7 +120,7 @@ def register_recruiter_metrics_routes(app):
                 CASE
                     WHEN COUNT(*) = 0 THEN NULL
                     ELSE COUNT(*) FILTER (WHERE opp_stage = 'Closed Win')::decimal
-                         / COUNT(*)
+                        / COUNT(*)
                 END AS conversion_rate_last_20
             FROM last_20
             GROUP BY opp_hr_lead
@@ -97,6 +129,8 @@ def register_recruiter_metrics_routes(app):
             a.opp_hr_lead,
             a.closed_win_month,
             a.closed_lost_month,
+            a.prev_closed_win_month,
+            a.prev_closed_lost_month,
             a.closed_win_total,
             a.closed_lost_total,
             c.last_20_count,
@@ -108,6 +142,7 @@ def register_recruiter_metrics_routes(app):
         ORDER BY a.opp_hr_lead;
         """
 
+
         try:
             conn = get_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -116,6 +151,8 @@ def register_recruiter_metrics_routes(app):
                     {
                         "month_start": month_start,
                         "month_end": month_end,
+                        "prev_month_start": prev_month_start,
+                        "prev_month_end": prev_month_end,
                     },
                 )
                 rows = cur.fetchall()
@@ -144,7 +181,9 @@ def register_recruiter_metrics_routes(app):
                     "closed_lost_total": r["closed_lost_total"] or 0,
                     "last_20_count": r["last_20_count"] or 0,
                     "last_20_win": r["last_20_win"] or 0,
-                    "conversion_rate_last_20": conversion,  # 0-1 o None
+                    "conversion_rate_last_20": conversion, 
+                    "prev_closed_win_month": r["prev_closed_win_month"] or 0,
+                    "prev_closed_lost_month": r["prev_closed_lost_month"] or 0,
                 }
             )
 
