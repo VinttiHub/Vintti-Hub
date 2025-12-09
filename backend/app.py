@@ -38,6 +38,7 @@ from profile_routes import bp as profile_bp, users_bp as users_bp
 from ai_candidate_search_routes import bp_candidate_search
 from reset_password import register_password_reset_routes
 from send_email_endpoint import register_send_email_route
+from recruiter_metrics_routes import bp_recruiter_metrics
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
