@@ -2,16 +2,14 @@
 import logging
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Blueprint, jsonify, render_template
+from flask import jsonify, render_template
 from psycopg2.extras import RealDictCursor
 
-from db import get_connection  # igual que en tus otros módulos
+from db import get_connection
 
 logger = logging.getLogger(__name__)
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
-
-bp_recruiter_metrics = Blueprint("recruiter_metrics", __name__)
 
 
 def _current_month_bounds():
@@ -25,143 +23,137 @@ def _current_month_bounds():
     return month_start, month_end
 
 
-@bp_recruiter_metrics.route("/recruiter-metrics")
-def recruiter_metrics_page():
-    """
-    Página HTML del dashboard de recruiters.
-    """
-    return render_template("recruiter-power.html")
+def register_recruiter_metrics_routes(app):
 
+    @app.route("/api/recruiter-metrics", methods=["GET"])
+    def api_recruiter_metrics():
+        """
+        Devuelve métricas agregadas por opp_hr_lead:
 
-@bp_recruiter_metrics.route("/api/recruiter-metrics", methods=["GET"])
-def api_recruiter_metrics():
-    """
-    Devuelve métricas agregadas por opp_hr_lead:
+        - closed_win_month
+        - closed_lost_month
+        - closed_win_total
+        - closed_lost_total
+        - last_20_count
+        - last_20_win
+        - conversion_rate_last_20 (0-1)
+        """
+        month_start, month_end = _current_month_bounds()
 
-    - closed_win_month
-    - closed_lost_month
-    - closed_win_total
-    - closed_lost_total
-    - last_20_count
-    - last_20_win
-    - conversion_rate_last_20 (0-1)
-    """
-    month_start, month_end = _current_month_bounds()
-
-    sql = """
-    WITH base AS (
-        SELECT
-            id,
-            opp_hr_lead,
-            opp_stage,
-            (opp_close_date)::date AS close_date,
-            ROW_NUMBER() OVER (
-                PARTITION BY opp_hr_lead
-                ORDER BY (opp_close_date) DESC
-            ) AS rn
-        FROM opportunity
-        WHERE opp_hr_lead IS NOT NULL
-    ),
-    agg AS (
-        SELECT
-            opp_hr_lead,
-            COUNT(*) FILTER (
-                WHERE close_date >= %(month_start)s
-                  AND close_date < %(month_end)s
-                  AND opp_stage = 'Closed Win'
-            ) AS closed_win_month,
-            COUNT(*) FILTER (
-                WHERE close_date >= %(month_start)s
-                  AND close_date < %(month_end)s
-                  AND opp_stage = 'Closed Lost'
-            ) AS closed_lost_month,
-            COUNT(*) FILTER (
-                WHERE opp_stage = 'Closed Win'
-            ) AS closed_win_total,
-            COUNT(*) FILTER (
-                WHERE opp_stage = 'Closed Lost'
-            ) AS closed_lost_total
-        FROM base
-        GROUP BY opp_hr_lead
-    ),
-    last_20 AS (
-        SELECT *
-        FROM base
-        WHERE rn <= 20
-    ),
-    conv AS (
-        SELECT
-            opp_hr_lead,
-            COUNT(*) AS last_20_count,
-            COUNT(*) FILTER (WHERE opp_stage = 'Closed Win') AS last_20_win,
-            CASE
-                WHEN COUNT(*) = 0 THEN NULL
-                ELSE COUNT(*) FILTER (WHERE opp_stage = 'Closed Win')::decimal
-                     / COUNT(*)
-            END AS conversion_rate_last_20
-        FROM last_20
-        GROUP BY opp_hr_lead
-    )
-    SELECT
-        a.opp_hr_lead,
-        a.closed_win_month,
-        a.closed_lost_month,
-        a.closed_win_total,
-        a.closed_lost_total,
-        c.last_20_count,
-        c.last_20_win,
-        c.conversion_rate_last_20
-    FROM agg a
-    LEFT JOIN conv c
-        ON c.opp_hr_lead = a.opp_hr_lead
-    ORDER BY a.opp_hr_lead;
-    """
-
-    try:
-        conn = get_connection()
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(
-                sql,
-                {
-                    "month_start": month_start,
-                    "month_end": month_end,
-                },
-            )
-            rows = cur.fetchall()
-    except Exception as e:
-        logger.exception("Error fetching recruiter metrics")
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-    metrics = []
-    for r in rows:
-        conversion = (
-            float(r["conversion_rate_last_20"])
-            if r["conversion_rate_last_20"] is not None
-            else None
+        sql = """
+        WITH base AS (
+            SELECT
+                id,
+                opp_hr_lead,
+                opp_stage,
+                (opp_close_date)::date AS close_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY opp_hr_lead
+                    ORDER BY (opp_close_date) DESC
+                ) AS rn
+            FROM opportunity
+            WHERE opp_hr_lead IS NOT NULL
+        ),
+        agg AS (
+            SELECT
+                opp_hr_lead,
+                COUNT(*) FILTER (
+                    WHERE close_date >= %(month_start)s
+                      AND close_date < %(month_end)s
+                      AND opp_stage = 'Closed Win'
+                ) AS closed_win_month,
+                COUNT(*) FILTER (
+                    WHERE close_date >= %(month_start)s
+                      AND close_date < %(month_end)s
+                      AND opp_stage = 'Closed Lost'
+                ) AS closed_lost_month,
+                COUNT(*) FILTER (
+                    WHERE opp_stage = 'Closed Win'
+                ) AS closed_win_total,
+                COUNT(*) FILTER (
+                    WHERE opp_stage = 'Closed Lost'
+                ) AS closed_lost_total
+            FROM base
+            GROUP BY opp_hr_lead
+        ),
+        last_20 AS (
+            SELECT *
+            FROM base
+            WHERE rn <= 20
+        ),
+        conv AS (
+            SELECT
+                opp_hr_lead,
+                COUNT(*) AS last_20_count,
+                COUNT(*) FILTER (WHERE opp_stage = 'Closed Win') AS last_20_win,
+                CASE
+                    WHEN COUNT(*) = 0 THEN NULL
+                    ELSE COUNT(*) FILTER (WHERE opp_stage = 'Closed Win')::decimal
+                         / COUNT(*)
+                END AS conversion_rate_last_20
+            FROM last_20
+            GROUP BY opp_hr_lead
         )
-        metrics.append(
+        SELECT
+            a.opp_hr_lead,
+            a.closed_win_month,
+            a.closed_lost_month,
+            a.closed_win_total,
+            a.closed_lost_total,
+            c.last_20_count,
+            c.last_20_win,
+            c.conversion_rate_last_20
+        FROM agg a
+        LEFT JOIN conv c
+            ON c.opp_hr_lead = a.opp_hr_lead
+        ORDER BY a.opp_hr_lead;
+        """
+
+        try:
+            conn = get_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    sql,
+                    {
+                        "month_start": month_start,
+                        "month_end": month_end,
+                    },
+                )
+                rows = cur.fetchall()
+        except Exception as e:
+            logger.exception("Error fetching recruiter metrics")
+            return jsonify({"status": "error", "message": str(e)}), 500
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        metrics = []
+        for r in rows:
+            conversion = (
+                float(r["conversion_rate_last_20"])
+                if r["conversion_rate_last_20"] is not None
+                else None
+            )
+            metrics.append(
+                {
+                    "hr_lead": r["opp_hr_lead"],
+                    "closed_win_month": r["closed_win_month"] or 0,
+                    "closed_lost_month": r["closed_lost_month"] or 0,
+                    "closed_win_total": r["closed_win_total"] or 0,
+                    "closed_lost_total": r["closed_lost_total"] or 0,
+                    "last_20_count": r["last_20_count"] or 0,
+                    "last_20_win": r["last_20_win"] or 0,
+                    "conversion_rate_last_20": conversion,  # 0-1 o None
+                }
+            )
+
+        return jsonify(
             {
-                "hr_lead": r["opp_hr_lead"],
-                "closed_win_month": r["closed_win_month"] or 0,
-                "closed_lost_month": r["closed_lost_month"] or 0,
-                "closed_win_total": r["closed_win_total"] or 0,
-                "closed_lost_total": r["closed_lost_total"] or 0,
-                "last_20_count": r["last_20_count"] or 0,
-                "last_20_win": r["last_20_win"] or 0,
-                "conversion_rate_last_20": conversion,  # 0-1 o None
+                "status": "ok",
+                "month_start": month_start.isoformat(),
+                "month_end": month_end.isoformat(),
+                "metrics": metrics,
             }
         )
-
-    return jsonify(
-        {
-            "status": "ok",
-            "month_start": month_start.isoformat(),
-            "month_end": month_end.isoformat(),
-            "metrics": metrics,
-        }
-    )

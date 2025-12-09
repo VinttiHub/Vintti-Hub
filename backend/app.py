@@ -34,7 +34,7 @@ from profile_routes import bp as profile_bp, users_bp as users_bp
 from ai_candidate_search_routes import bp_candidate_search
 from reset_password import register_password_reset_routes
 from send_email_endpoint import register_send_email_route
-from recruiter_metrics_routes import bp_recruiter_metrics
+from recruiter_metrics_routes import register_recruiter_metrics_routes
 
 _ALLOWED_TAGS = ('p','ul','ol','li','br','b','strong','i','em','a')
 
@@ -215,7 +215,7 @@ app.register_blueprint(coresignal_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(bp_candidate_search, url_prefix="")
-app.register_blueprint(bp_recruiter_metrics, url_prefix="")
+register_recruiter_metrics_routes(app)
 # --- enum canonicals para el Sheet ---
 _CANON = {
     "career_job_type": {
