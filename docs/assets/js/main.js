@@ -2208,7 +2208,7 @@ window.addEventListener('pageshow', () => {
   }
 });
  // === Avatares por email ===
-const AVATAR_BASE = './assets/img/'; // cambia si tus imágenes viven en otra ruta
+const AVATAR_BASE = './assets/img/'; 
 const AVATAR_BY_EMAIL = {
   'agostina@vintti.com':                'agos.png',
   'bahia@vintti.com':                   'bahia.png',
