@@ -17,11 +17,11 @@
 </head>
 <body>
   <main class="metrics-page">
-      <header class="metrics-header">
-        <div class="metrics-title-block" style="width: 100%;">
+    <header class="metrics-header">
+      <div class="metrics-title-block" style="width: 100%;">
         <h1 class="metrics-title">Recruiter Performance Dashboard</h1>
         <p class="metrics-subtitle">
-          Track monthly wins, losses and conversion rate per HR lead.
+          Track wins, losses and conversion rate per HR lead (last 30 days and lifetime).
         </p>
       </div>
 
@@ -36,23 +36,23 @@
     <section class="metrics-cards" aria-live="polite">
       <article class="metric-card metric-win-month">
         <div class="metric-header">
-          <span class="metric-label">Closed Win · This Month</span>
+          <span class="metric-label">Closed Win · Last 30 Days</span>
           <span class="metric-compare" id="winMonthCompare">–</span>
         </div>
         <div class="metric-value" id="closedWinMonthValue">–</div>
         <p class="metric-caption">
-          Opportunities marked as <strong>Closed Win</strong> in the current month.
+          Opportunities marked as <strong>Closed Win</strong> in the last 30 days.
         </p>
       </article>
 
       <article class="metric-card metric-lost-month">
         <div class="metric-header">
-          <span class="metric-label">Closed Lost · This Month</span>
+          <span class="metric-label">Closed Lost · Last 30 Days</span>
           <span class="metric-compare" id="lostMonthCompare">–</span>
         </div>
         <div class="metric-value" id="closedLostMonthValue">–</div>
         <p class="metric-caption">
-          Opportunities marked as <strong>Closed Lost</strong> in the current month.
+          Opportunities marked as <strong>Closed Lost</strong> in the last 30 days.
         </p>
       </article>
 
@@ -80,12 +80,23 @@
 
       <article class="metric-card metric-conversion">
         <div class="metric-header">
-          <span class="metric-label">Conversion · Last 20</span>
+          <span class="metric-label">Conversion · Last 30 Days</span>
           <span class="metric-pill metric-pill-conv">%</span>
         </div>
         <div class="metric-value" id="conversionRateValue">–</div>
         <p class="metric-caption" id="conversionHelper">
-          Percentage of <strong>Closed Win</strong> in the last 20 closed opportunities.
+          Percentage of <strong>Closed Win</strong> among closed opportunities in the last 30 days.
+        </p>
+      </article>
+
+      <article class="metric-card metric-conversion-lifetime">
+        <div class="metric-header">
+          <span class="metric-label">Conversion · Lifetime</span>
+          <span class="metric-pill metric-pill-conv">%</span>
+        </div>
+        <div class="metric-value" id="conversionLifetimeValue">–</div>
+        <p class="metric-caption">
+          Lifetime share of <strong>Closed Win</strong> over all closed opportunities.
         </p>
       </article>
     </section>

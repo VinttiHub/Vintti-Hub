@@ -34,7 +34,17 @@ function getUidFromQuery() {
     return null;
   }
 }
+function updateCardsForLead(hrLeadEmail) {
+  const m = metricsState.byLead[hrLeadEmail];
 
+  const winMonthEl = $("#closedWinMonthValue");
+  const lostMonthEl = $("#closedLostMonthValue");
+  const winTotalEl = $("#closedWinTotalValue");
+  const lostTotalEl = $("#closedLostTotalValue");
+  const convEl = $("#conversionRateValue");
+  const helperEl = $("#conversionHelper");
+  const convLifetimeEl = $("#conversionLifetimeValue"); // 🌟 NUEVO
+}
 async function ensureUserIdInURL() {
   let uid = getUidFromQuery();
   if (!uid) uid = Number(localStorage.getItem("user_id")) || null;
@@ -228,6 +238,7 @@ function updateCardsForLead(hrLeadEmail) {
     convEl.textContent = "–";
     helperEl.textContent =
       "No data available for this recruiter yet. Keep an eye on new opportunities!";
+    if (convLifetimeEl) convLifetimeEl.textContent = "–";
     return;
   }
 
@@ -278,7 +289,7 @@ function updateCardsForLead(hrLeadEmail) {
     formatter: (v) => Math.round(v),
   });
 
-  // --- Conversion · Last 20 ---
+  // --- Conversion · Last 30 days (antes “Last 20”) ---
   const newConv = m.conversion_rate_last_20;
   if (newConv == null) {
     convEl.textContent = "–";
@@ -294,9 +305,23 @@ function updateCardsForLead(hrLeadEmail) {
   const wins = m.last_20_win ?? 0;
   if (total === 0) {
     helperEl.textContent =
-      "No closed opportunities yet to compute the last 20 conversion rate.";
+      "No closed opportunities in the last 30 days to compute this rate.";
   } else {
-    helperEl.textContent = `Last 20 closed opportunities: ${wins} Closed Win out of ${total}.`;
+    helperEl.textContent = `Last 30 days: ${wins} Closed Win out of ${total} closed opportunities.`;
+  }
+
+  // --- 🌟 NUEVO: Conversion · Lifetime ---
+  if (convLifetimeEl) {
+    const newConvLifetime = m.conversion_rate_lifetime;
+    if (newConvLifetime == null) {
+      convLifetimeEl.textContent = "–";
+    } else {
+      const fromConvLifetime = parsePercentSafe(convLifetimeEl.textContent);
+      animateValue(convLifetimeEl, fromConvLifetime, newConvLifetime, {
+        duration: 750,
+        formatter: (v) => formatPercent(v),
+      });
+    }
   }
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
@@ -366,9 +391,33 @@ function updatePeriodInfo() {
     el.textContent = "";
     return;
   }
-  const prettyStart = formatDateISO(monthStart);
-  const prettyEnd = formatDateISO(monthEnd);
-  el.textContent = `Current month period: ${prettyStart} — ${prettyEnd}`;
+
+  // Parseamos como fechas locales
+  const startD = new Date(monthStart);
+  const endD = new Date(monthEnd);
+  if (Number.isNaN(startD.getTime()) || Number.isNaN(endD.getTime())) {
+    el.textContent = "";
+    return;
+  }
+
+  // month_end es exclusivo → mostramos el día anterior
+  endD.setDate(endD.getDate() - 1);
+
+  const prettyStart =
+    String(startD.getDate()).padStart(2, "0") +
+    "/" +
+    String(startD.getMonth() + 1).padStart(2, "0") +
+    "/" +
+    startD.getFullYear();
+
+  const prettyEnd =
+    String(endD.getDate()).padStart(2, "0") +
+    "/" +
+    String(endD.getMonth() + 1).padStart(2, "0") +
+    "/" +
+    endD.getFullYear();
+
+  el.textContent = `Rolling 30-day window: ${prettyStart} — ${prettyEnd}`;
 }
 
 async function fetchMetrics() {
