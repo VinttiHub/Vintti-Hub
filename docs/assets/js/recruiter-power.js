@@ -6,6 +6,7 @@ const EXCLUDED_EMAILS = new Set([
   "agustin@vintti.com",
   "bahia@vintti.com",
   "agustina.ferrari@vintti.com",
+  "jazmin@vintti.com",
 ]);
 
 // 🔸 Personas que sólo deben ver SU propia opción
@@ -34,17 +35,7 @@ function getUidFromQuery() {
     return null;
   }
 }
-function updateCardsForLead(hrLeadEmail) {
-  const m = metricsState.byLead[hrLeadEmail];
 
-  const winMonthEl = $("#closedWinMonthValue");
-  const lostMonthEl = $("#closedLostMonthValue");
-  const winTotalEl = $("#closedWinTotalValue");
-  const lostTotalEl = $("#closedLostTotalValue");
-  const convEl = $("#conversionRateValue");
-  const helperEl = $("#conversionHelper");
-  const convLifetimeEl = $("#conversionLifetimeValue"); // 🌟 NUEVO
-}
 async function ensureUserIdInURL() {
   let uid = getUidFromQuery();
   if (!uid) uid = Number(localStorage.getItem("user_id")) || null;
@@ -229,6 +220,7 @@ function updateCardsForLead(hrLeadEmail) {
   const lostTotalEl = $("#closedLostTotalValue");
   const convEl = $("#conversionRateValue");
   const helperEl = $("#conversionHelper");
+  const convLifetimeEl = $("#conversionLifetimeValue");
 
   if (!m) {
     winMonthEl.textContent = "–";
