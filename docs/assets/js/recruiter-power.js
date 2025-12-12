@@ -31,7 +31,34 @@ const metricsState = {
   monthStart: null,
   monthEnd: null,
   currentUserEmail: null,
+  rangeStart: null, // YYYY-MM-DD inclusive
+  rangeEnd: null,   // YYYY-MM-DD inclusive
+
 };
+function isoToYMD(iso) {
+  if (!iso) return "";
+  return String(iso).slice(0, 10);
+}
+
+function showRangeError(msg) {
+  const el = document.getElementById("rangeError");
+  if (!el) return;
+  if (!msg) {
+    el.style.display = "none";
+    el.textContent = "";
+    return;
+  }
+  el.textContent = msg;
+  el.style.display = "";
+}
+
+function setRangeInputs(startYMD, endYMD) {
+  const s = document.getElementById("rangeStart");
+  const e = document.getElementById("rangeEnd");
+  if (s) s.value = startYMD || "";
+  if (e) e.value = endYMD || "";
+}
+
 // ===== user_id helpers (copiados de Profile, versión mini) =====
 function getUidFromQuery() {
   try {
@@ -114,6 +141,18 @@ function toggleRecruiterLabButton() {
 
   const email = (metricsState.currentUserEmail || "").toLowerCase();
   btn.style.display = email && RECRUITER_POWER_ALLOWED.has(email) ? "" : "none";
+}
+function updateDynamicRangeLabels() {
+  const a = document.getElementById("winRangeLabel");
+  const b = document.getElementById("lostRangeLabel");
+  const c = document.getElementById("convRangeLabel");
+
+  if (!metricsState.rangeStart || !metricsState.rangeEnd) return;
+
+  const txt = "Selected Range";
+  if (a) a.textContent = `Closed Win · ${txt}`;
+  if (b) b.textContent = `Closed Lost · ${txt}`;
+  if (c) c.textContent = `Conversion · ${txt}`;
 }
 
 function computeTrend(current, previous, goodWhenHigher = true) {
@@ -312,7 +351,7 @@ function updateCardsForLead(hrLeadEmail) {
     helperEl.textContent =
       "No closed opportunities in the last 30 days to compute this rate.";
   } else {
-    helperEl.textContent = `Last 30 days: ${wins} Closed Win out of ${total} closed opportunities.`;
+    helperEl.textContent = `Selected range: ${wins} Closed Win out of ${total} closed opportunities.`;
   }
 
   // --- 🌟 NUEVO: Conversion · Lifetime ---
@@ -391,57 +430,51 @@ function populateDropdown() {
 function updatePeriodInfo() {
   const el = $("#periodInfo");
   if (!el) return;
-  const { monthStart, monthEnd } = metricsState;
-  if (!monthStart || !monthEnd) {
+
+  const start = metricsState.rangeStart;
+  const end = metricsState.rangeEnd;
+
+  if (!start || !end) {
     el.textContent = "";
     return;
   }
 
-  // Parseamos como fechas locales
-  const startD = new Date(monthStart);
-  const endD = new Date(monthEnd);
-  if (Number.isNaN(startD.getTime()) || Number.isNaN(endD.getTime())) {
-    el.textContent = "";
-    return;
-  }
+  // start/end son YYYY-MM-DD inclusive
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
 
-  // month_end es exclusivo → mostramos el día anterior
-  endD.setDate(endD.getDate() - 1);
+  const prettyStart = String(sd).padStart(2, "0") + "/" + String(sm).padStart(2, "0") + "/" + sy;
+  const prettyEnd = String(ed).padStart(2, "0") + "/" + String(em).padStart(2, "0") + "/" + ey;
 
-  const prettyStart =
-    String(startD.getDate()).padStart(2, "0") +
-    "/" +
-    String(startD.getMonth() + 1).padStart(2, "0") +
-    "/" +
-    startD.getFullYear();
-
-  const prettyEnd =
-    String(endD.getDate()).padStart(2, "0") +
-    "/" +
-    String(endD.getMonth() + 1).padStart(2, "0") +
-    "/" +
-    endD.getFullYear();
-
-  el.textContent = `Rolling 30-day window: ${prettyStart} — ${prettyEnd}`;
+  el.textContent = `Selected window: ${prettyStart} — ${prettyEnd}`;
 }
 
-async function fetchMetrics() {
+async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
   try {
-    const resp = await fetch(`${API_BASE}/recruiter-metrics`, {
-      credentials: "include",    // 🔑 envía cookies al backend
-    });
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
-    }
-    const data = await resp.json();
-    if (data.status !== "ok") {
-      throw new Error(data.message || "Unexpected response");
+    showRangeError(null);
+
+    const url = new URL(`${API_BASE}/recruiter-metrics`);
+    if (rangeStartYMD && rangeEndYMD) {
+      url.searchParams.set("start", rangeStartYMD);
+      url.searchParams.set("end", rangeEndYMD);
     }
 
-    metricsState.monthStart = data.month_start;
+    const resp = await fetch(url.toString(), {
+      credentials: "include",
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.status !== "ok") throw new Error(data.message || "Unexpected response");
+
+    metricsState.monthStart = data.month_start; // exclusivo end viene del backend
     metricsState.monthEnd = data.month_end;
 
-    // opcional: solo si NO logramos leer /profile/me
+    metricsState.rangeStart = data.range_start || isoToYMD(data.month_start);
+    metricsState.rangeEnd = data.range_end || null;
+
+    setRangeInputs(metricsState.rangeStart, metricsState.rangeEnd);
+
     if (!metricsState.currentUserEmail && data.current_user_email) {
       metricsState.currentUserEmail = data.current_user_email.toLowerCase();
     }
@@ -452,10 +485,7 @@ async function fetchMetrics() {
     for (const row of data.metrics || []) {
       const email = (row.hr_lead_email || row.hr_lead || "").toLowerCase();
       if (!email) continue;
-
-      // ⛔ excluir ciertos correos del dropdown
       if (EXCLUDED_EMAILS.has(email)) continue;
-
       byLead[email] = row;
       emails.push(email);
     }
@@ -465,8 +495,10 @@ async function fetchMetrics() {
 
     populateDropdown();
     updatePeriodInfo();
+    updateDynamicRangeLabels();
   } catch (err) {
     console.error("Error loading recruiter metrics:", err);
+    showRangeError("Couldn’t load metrics for that range. Try again.");
     const select = $("#hrLeadSelect");
     if (select) {
       select.innerHTML = "";
@@ -490,6 +522,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
     await loadCurrentUserEmail(); 
     toggleRecruiterLabButton(); 
-    await fetchMetrics();        
+    await fetchMetrics();    
+    function wireRangePicker() {
+  const btn = document.getElementById("applyRangeBtn");
+  const s = document.getElementById("rangeStart");
+  const e = document.getElementById("rangeEnd");
+  if (!btn || !s || !e) return;
+
+  btn.addEventListener("click", async () => {
+    const start = (s.value || "").trim();
+    const end = (e.value || "").trim();
+
+    if (!start || !end) {
+      showRangeError("Pick both start and end dates.");
+      return;
+    }
+    if (end < start) {
+      showRangeError("End date must be after start date.");
+      return;
+    }
+
+    metricsState.rangeStart = start;
+    metricsState.rangeEnd = end;
+
+    await fetchMetrics(start, end);
+
+    // si ya hay recruiter seleccionado, refrescamos cards con el mismo
+    const sel = document.getElementById("hrLeadSelect");
+    if (sel && sel.value) updateCardsForLead(sel.value);
+  });
+}    
+wireRangePicker();
   })();
 });

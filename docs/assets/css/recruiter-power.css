@@ -391,3 +391,124 @@ body {
   animation-duration: 1.2s;
   transform: rotate(-12deg);
 }
+.metrics-filter-row{
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.date-range{
+  display:flex;
+  gap:.65rem;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+.date-chip{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  padding: .5rem .85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(179, 136, 255, 0.35);
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 10px 24px rgba(179, 136, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.date-chip-label{
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.date-chip input[type="date"]{
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 800;
+  font-size: .9rem;
+  color: var(--text-main);
+}
+
+.apply-range-btn{
+  padding: .55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(190,160,240,.55);
+  background: linear-gradient(90deg, rgba(230,215,255,.95), rgba(255,214,234,.95));
+  color: #5b2f93;
+  font-weight: 900;
+  letter-spacing: .02em;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(190,160,240,.22);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.apply-range-btn:hover{
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 18px 40px rgba(190,160,240,.30);
+  filter: brightness(1.02);
+}
+
+.range-error{
+  margin-top: .5rem;
+  font-size: .85rem;
+  font-weight: 800;
+  color: #a13460;
+  background: rgba(255,190,215,.25);
+  border: 1px solid rgba(214,117,156,.35);
+  padding: .55rem .8rem;
+  border-radius: 14px;
+}
+.metrics-header{
+  display: block; /* ya no grid */
+  text-align: center;
+}
+
+.metrics-title-block{
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.metrics-title{
+  font-size: clamp(2.8rem, 4vw, 3.6rem); /* 🔥 más grande */
+  line-height: 1.02;
+}
+
+.metrics-subtitle{
+  max-width: 680px;
+  margin: 0.7rem auto 0;
+}
+
+/* ✅ fila de filtros debajo del título */
+.metrics-filters{
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 1.25rem;
+  align-items: end;
+}
+
+@media (max-width: 900px){
+  .metrics-filters{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* opcional: que el dropdown se sienta centrado en desktop */
+.metrics-filters .metrics-filter{
+  justify-self: center;
+  width: 100%;
+}
+
+.metrics-filters .filter-select{
+  width: min(360px, 100%);
+}

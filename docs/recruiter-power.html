@@ -28,26 +28,50 @@
 </a>
 <body>
   <main class="metrics-page">
-    <header class="metrics-header">
-      <div class="metrics-title-block" style="width: 100%;">
-        <h1 class="metrics-title">Recruiter Performance Dashboard</h1>
-        <p class="metrics-subtitle">
-          Track wins, losses and conversion rate per HR lead (last 30 days and lifetime).
-        </p>
-      </div>
+<header class="metrics-header">
+  <div class="metrics-title-block">
+    <h1 class="metrics-title">Recruiter Performance Dashboard</h1>
+    <p class="metrics-subtitle">
+      Track wins, losses and conversion rate per HR lead (custom date range + lifetime).
+    </p>
+  </div>
+</header>
 
-      <div class="metrics-filter">
-        <label for="hrLeadSelect" class="filter-label">Recruiter</label>
-        <select id="hrLeadSelect" class="filter-select">
-          <option value="">Loading recruiters...</option>
-        </select>
-      </div>
-    </header>
+<!-- ✅ filtros debajo del título -->
+<section class="metrics-filters" aria-label="Filters">
+  <div class="metrics-filter">
+    <label for="hrLeadSelect" class="filter-label">Recruiter</label>
+    <select id="hrLeadSelect" class="filter-select">
+      <option value="">Loading recruiters...</option>
+    </select>
+  </div>
 
+  <div class="metrics-filter">
+    <span class="filter-label">Date range</span>
+
+    <div class="date-range">
+      <label class="date-chip">
+        <span class="date-chip-label">From</span>
+        <input id="rangeStart" type="date" />
+      </label>
+
+      <label class="date-chip">
+        <span class="date-chip-label">To</span>
+        <input id="rangeEnd" type="date" />
+      </label>
+
+      <button id="applyRangeBtn" class="apply-range-btn" type="button">
+        Apply
+      </button>
+    </div>
+
+    <div id="rangeError" class="range-error" style="display:none;"></div>
+  </div>
+</section>
     <section class="metrics-cards" aria-live="polite">
       <article class="metric-card metric-win-month">
         <div class="metric-header">
-          <span class="metric-label">Closed Win · Last 30 Days</span>
+          <span class="metric-label" id="winRangeLabel">Closed Win · Last 30 Days</span>
           <span class="metric-compare" id="winMonthCompare">–</span>
         </div>
         <div class="metric-value" id="closedWinMonthValue">–</div>
@@ -58,7 +82,7 @@
 
       <article class="metric-card metric-lost-month">
         <div class="metric-header">
-          <span class="metric-label">Closed Lost · Last 30 Days</span>
+         <span class="metric-label" id="lostRangeLabel">Closed Lost · Last 30 Days</span>
           <span class="metric-compare" id="lostMonthCompare">–</span>
         </div>
         <div class="metric-value" id="closedLostMonthValue">–</div>
@@ -91,7 +115,7 @@
 
       <article class="metric-card metric-conversion">
         <div class="metric-header">
-          <span class="metric-label">Conversion · Last 30 Days</span>
+          <span class="metric-label" id="convRangeLabel">Conversion · Last 30 Days</span>
           <span class="metric-pill metric-pill-conv">%</span>
         </div>
         <div class="metric-value" id="conversionRateValue">–</div>
