@@ -2179,6 +2179,26 @@ async function patchOppFields(oppId, payload) {
   if (dash) dash.style.display = 'flex';
   if (mgmt) mgmt.style.display = 'flex';
 })();
+// --- Sales Metrics ---
+(() => {
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
+  const SALES_ALLOWED = new Set([
+    'agustin@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com',
+    'bahia@vintti.com',
+    'mariano@vintti.com'
+  ]);
+
+  const sales = document.getElementById('salesLink');
+
+  if (!SALES_ALLOWED.has(currentUserEmail)) {
+    if (sales) sales.style.display = 'none';
+    return;
+  }
+
+  if (sales) sales.style.display = 'flex';
+})();
 // --- Recruiter Power (visibilidad por email) ---
 (() => {
   const link = document.getElementById('recruiterPowerLink');

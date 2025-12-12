@@ -315,6 +315,26 @@ function installAdvancedFilters(table) {
   // Mantener flex para icono + texto alineados
   link.style.display = RECRUITER_POWER_ALLOWED.has(email) ? 'flex' : 'none';
 })();
+// --- Sales Metrics ---
+(() => {
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
+  const SALES_ALLOWED = new Set([
+    'agustin@vintti.com',
+    'angie@vintti.com',
+    'lara@vintti.com',
+    'bahia@vintti.com',
+    'mariano@vintti.com'
+  ]);
+
+  const sales = document.getElementById('salesLink');
+
+  if (!SALES_ALLOWED.has(currentUserEmail)) {
+    if (sales) sales.style.display = 'none';
+    return;
+  }
+
+  if (sales) sales.style.display = 'flex';
+})();
 /* === Candidate Search button visibility (igual que en main) === */
 (() => {
   const candidateSearchLink = document.getElementById('candidateSearchLink');
