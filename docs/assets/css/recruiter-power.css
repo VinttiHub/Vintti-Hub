@@ -266,3 +266,128 @@ body {
   margin-bottom: 0.35rem;
   display: inline-block;
 }
+.recruiter-lab-btn{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9999;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  padding: 12px 16px;
+  border-radius: 999px;
+
+  font-family: 'Onest', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .2px;
+  text-decoration: none;
+
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(225,190,255,.55);
+  box-shadow: 0 18px 45px rgba(190,160,240,.25);
+  color: var(--text-main);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  transform: translateY(0);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+/* ===============================
+   Recruiter Lab – Floating Button
+   =============================== */
+
+.recruiter-lab-btn{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9999;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 13px 18px;
+  border-radius: 999px;
+
+  font-family: 'Onest', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .2px;
+  text-decoration: none;
+
+  color: var(--text-main);
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,.96),
+    rgba(245,238,255,.96)
+  );
+
+  border: 1px solid rgba(190,160,240,.55);
+  box-shadow:
+    0 12px 30px rgba(190,160,240,.22),
+    0 0 0 rgba(190,160,240,0);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  animation: labPulse 3.6s ease-in-out infinite;
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease,
+    border-color .25s ease;
+}
+
+/* ✨ pulso suave tipo “energía” */
+@keyframes labPulse {
+  0% {
+    box-shadow:
+      0 12px 30px rgba(190,160,240,.22),
+      0 0 0 0 rgba(190,160,240,.35);
+  }
+  70% {
+    box-shadow:
+      0 16px 42px rgba(190,160,240,.32),
+      0 0 0 10px rgba(190,160,240,0);
+  }
+  100% {
+    box-shadow:
+      0 12px 30px rgba(190,160,240,.22),
+      0 0 0 0 rgba(190,160,240,0);
+  }
+}
+
+/* 🧪 emoji flotante */
+.lab-emoji{
+  display: inline-block;
+  font-size: 18px;
+  animation: labFloat 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* movimiento visible pero elegante */
+@keyframes labFloat {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-4px) rotate(-6deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* Hover = modo experimento activo */
+.recruiter-lab-btn:hover{
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(160,120,255,.75);
+  box-shadow:
+    0 20px 55px rgba(190,160,240,.4),
+    0 0 0 12px rgba(190,160,240,0);
+}
+
+/* al hover, el emoji reacciona */
+.recruiter-lab-btn:hover .lab-emoji{
+  animation-duration: 1.2s;
+  transform: rotate(-12deg);
+}

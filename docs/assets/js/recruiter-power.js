@@ -18,6 +18,12 @@ const RESTRICTED_EMAILS = new Set([
   "agostina@vintti.com",
   "julieta@vintti.com",
 ]);
+const RECRUITER_POWER_ALLOWED = new Set([
+  "angie@vintti.com",
+  "agostina@vintti.com",
+  "agustin@vintti.com",
+  "lara@vintti.com",
+]);
 
 const metricsState = {
   byLead: {},            // { email: { ...metrics } }
@@ -101,6 +107,13 @@ async function loadCurrentUserEmail() {
     console.warn("[recruiter-metrics] Could not resolve current user email:", err);
     metricsState.currentUserEmail = null;
   }
+}
+function toggleRecruiterLabButton() {
+  const btn = document.getElementById("recruiterLabBtn");
+  if (!btn) return;
+
+  const email = (metricsState.currentUserEmail || "").toLowerCase();
+  btn.style.display = email && RECRUITER_POWER_ALLOWED.has(email) ? "" : "none";
 }
 
 function computeTrend(current, previous, goodWhenHigher = true) {
@@ -469,14 +482,14 @@ async function fetchMetrics() {
 
 document.addEventListener("DOMContentLoaded", () => {
   (async () => {
-    const uid = await ensureUserIdInURL(); // resuelve user_id (como en Profile)
+    const uid = await ensureUserIdInURL();
     if (!uid) {
-      // sin user_id no podemos saber si es restringido; mostramos todo
       await fetchMetrics();
       return;
     }
 
-    await loadCurrentUserEmail(); // llena metricsState.currentUserEmail
-    await fetchMetrics();         // arma dropdown y aplica RESTRICTED_EMAILS
+    await loadCurrentUserEmail(); 
+    toggleRecruiterLabButton(); 
+    await fetchMetrics();        
   })();
 });
