@@ -1151,8 +1151,8 @@ function renderBalances({
     <div class="row" data-kind="holiday">
       <div class="cell">
         <div class="metric">
-          <span class="badge-soft badge--hol">Holiday</span>
-          <span class="name">Holiday Available</span>
+          <span class="badge-soft badge--hol">Public Holidays</span>
+          <span class="name">Public Holidays Available</span>
         </div>
       </div>
       <div class="cell t-right">

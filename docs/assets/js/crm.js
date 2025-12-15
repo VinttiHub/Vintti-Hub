@@ -12,7 +12,7 @@ const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 // Emails allowed for extra UI (priority col, summary link, etc.)
 const allowedEmails = [
   'agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com',
-  'lara@vintti.com','agostina@vintti.com'
+  'lara@vintti.com','agostina@vintti.com', 'mariano@vintti.com'
 ];
 
 /* =========================
@@ -627,7 +627,8 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'angie@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
-    'agostina@vintti.com'
+    'agostina@vintti.com',
+    'mia@vintti.com'
   ]);
 
   const dash = document.getElementById('dashboardLink');

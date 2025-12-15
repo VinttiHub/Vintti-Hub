@@ -276,7 +276,8 @@ function installAdvancedFilters(table) {
     'angie@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
-    'agostina@vintti.com'
+    'agostina@vintti.com',
+    'mia@vintti.com'
   ]);
 
   const dash = document.getElementById('dashboardLink');
