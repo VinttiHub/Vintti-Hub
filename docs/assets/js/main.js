@@ -1,3 +1,79 @@
+// =========================
+// Interviewing popup
+// =========================
+let _interviewingOppId = null;
+let _interviewingDropdownEl = null;
+
+function openInterviewingPopup(opportunityId, dropdownElement) {
+  _interviewingOppId = Number(opportunityId);
+  _interviewingDropdownEl = dropdownElement;
+
+  const popup = document.getElementById('interviewingPopup');
+  const input = document.getElementById('interviewingStartDate');
+  const saveBtn = document.getElementById('saveInterviewingStartDate');
+
+  if (!popup || !input || !saveBtn) {
+    console.error('❌ Interviewing popup elements not found in HTML');
+    return;
+  }
+
+  // reset
+  input.value = '';
+
+  popup.style.display = 'flex';
+
+  // IMPORTANT: asignar onclick para no duplicar listeners
+  saveBtn.onclick = async () => {
+    const date = (input.value || '').trim();
+    if (!date) {
+      alert('Please select a start date.');
+      return;
+    }
+
+    try {
+      // 1) Insert en tabla interviewing
+      const res = await fetch(`${API_BASE}/interviewing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          opportunity_id: _interviewingOppId,
+          since_interviewing: date
+        })
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        console.error('❌ /interviewing failed:', res.status, txt);
+        alert('Error saving interviewing start date. Please try again.');
+        return;
+      }
+
+      // 2) Cambiar stage
+      await patchOpportunityStage(_interviewingOppId, 'Interviewing', _interviewingDropdownEl);
+
+      // 3) Cerrar
+      closeInterviewingPopup();
+
+    } catch (err) {
+      console.error('❌ Interviewing save error:', err);
+      alert('Network error. Please try again.');
+    }
+  };
+}
+
+function closeInterviewingPopup() {
+  const popup = document.getElementById('interviewingPopup');
+  if (popup) popup.style.display = 'none';
+  _interviewingOppId = null;
+  _interviewingDropdownEl = null;
+}
+
+// (Opcional) cerrar al clickear el overlay (background)
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('interviewingPopup');
+  if (overlay && e.target === overlay) closeInterviewingPopup();
+});
 // === Helper: traer el nombre del cliente desde accounts usando account_id ===
 async function resolveAccountName(opp) {
   // si ya viene correcto, úsalo
@@ -1042,8 +1118,11 @@ document.addEventListener('change', async (e) => {
     if (newStage === 'Sourcing') {
       openSourcingPopup(opportunityId, e.target);
       return;
+    }    
+    if (newStage === 'Interviewing') {
+      openInterviewingPopup(opportunityId, e.target);
+      return;
     }
-
     if (newStage === 'Close Win') {
       openCloseWinPopup(opportunityId, e.target);
       return;

@@ -276,7 +276,10 @@
       </form>
     </div>
   </div>
-
+  <!-- =========================================================
+       popups cambio de stage
+    ========================================================== -->
+    
   <!-- Set Sourcing Date -->
   <div id="sourcingPopup" class="popup-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sourcingTitle">
     <div class="popup-content">
@@ -319,6 +322,7 @@
       <button id="saveNewSourcing" type="button">Save</button>
     </div>
   </div>
+
 <!-- Closed Lost -->
 <div id="closeLostPopup" class="popup-overlay" style="display:none;" 
      role="dialog" aria-modal="true" aria-labelledby="closeLostTitle">
@@ -355,6 +359,25 @@
     </div>
 
     <button id="saveCloseLost" type="button">Save</button>
+  </div>
+</div>
+
+<!-- Interviewing Start Date -->
+<div id="interviewingPopup" class="popup-overlay" style="display:none;"
+     role="dialog" aria-modal="true" aria-labelledby="interviewingTitle">
+  <div class="popup-content">
+    <button class="close-btn" type="button" onclick="closeInterviewingPopup()" aria-label="Close">
+      &times;
+    </button>
+
+    <h2 id="interviewingTitle" class="popup-title">Interviewing start date</h2>
+
+    <div class="popup-field">
+      <label for="interviewingStartDate">Start date</label>
+      <input type="date" id="interviewingStartDate" />
+    </div>
+
+    <button id="saveInterviewingStartDate" type="button">Save</button>
   </div>
 </div>
 

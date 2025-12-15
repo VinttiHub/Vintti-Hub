@@ -1984,3 +1984,16 @@ body.dark-mode .profile-tile{
 .profile-tile{
   position: static;
 }
+#interviewingPopup .popup-content h2 {
+  margin-top: 0;
+}
+
+#saveInterviewingStartDate {
+  margin-top: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
