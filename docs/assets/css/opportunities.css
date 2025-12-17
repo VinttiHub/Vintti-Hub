@@ -2153,3 +2153,61 @@ body.dark-mode .profile-tile{
   color: #2a1f4a;
   transform: scale(1.15);
 }
+/* =========================================================
+   FIX SOLO para #popup (New Opportunity)
+   No afecta otras popups
+   ========================================================= */
+#popup .popup-content{
+  width: 100%;
+  max-width: 520px;           /* un poquito más ancho para que respire */
+  box-sizing: border-box;
+}
+
+/* Layout 2 columnas arriba (Client + Model) */
+#popup .popup-row{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+}
+
+/* En móvil: 1 columna */
+@media (max-width: 520px){
+  #popup .popup-row{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Campos: que NO se centren */
+#popup .popup-form .popup-field{
+  align-items: stretch !important;  /* pisa el align-items:center global */
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* Labels a la izquierda */
+#popup .popup-form label{
+  text-align: left !important;
+  align-self: flex-start !important;
+  width: 100%;
+  margin: 0 0 6px;
+}
+
+/* Inputs/selects full width y consistentes */
+#popup .popup-form input[type="text"],
+#popup .popup-form select,
+#popup .popup-form input[type="date"]{
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Tu wrapper del datalist/search: que ocupe TODO el ancho */
+#popup .popup-form .input-with-button{
+  width: 100% !important;     /* pisa el 92% */
+  box-sizing: border-box;
+}
+
+/* (Opcional) que el placeholder no se vea “corrido” */
+#popup input::placeholder{
+  opacity: .6;
+}
