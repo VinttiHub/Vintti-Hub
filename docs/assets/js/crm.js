@@ -389,8 +389,8 @@ function getAccountSalesLeadCell(item) {
 
 function managerEmailForStatus(statusText='') {
   const s = (statusText || '').toLowerCase().trim();
-  if (s === 'active client')   return 'lara@vintti.com';
-  if (s === 'lead in process') return 'bahia@vintti.com';
+  if (s === 'active client') return 'lara@vintti.com';
+  // lead in process => se resuelve por endpoint (mayoría)
   return null;
 }
 
@@ -878,36 +878,75 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Auto-assign managers by status (Active/Lead in Process)
-      await (async function assignManagersFromStatus() {
-        const tasks = [];
+await (async function assignManagersFromStatus() {
+  const tasks = [];
 
-        for (const [idStr, obj] of Object.entries(summary || {})) {
-          const accountId = Number(idStr);
-          const status = obj?.status || '';
-          const targetEmail = managerEmailForStatus(status);
-          if (!targetEmail) continue;
+  for (const [idStr, obj] of Object.entries(summary || {})) {
+    const accountId = Number(idStr);
+    const status = (obj?.status || '').toLowerCase().trim();
 
-          const row = rowById.get(accountId);
+    // 1) Active client -> fijo como antes
+    if (status === 'active client') {
+      const targetEmail = 'lara@vintti.com';
+      const row = rowById.get(accountId);
+
+      const currentCellEmail = (() => {
+        if (!row) return '';
+        const hiddenName = row.querySelector('.sales-lead-cell .sr-only');
+        return (hiddenName?.textContent || '').toLowerCase().trim();
+      })();
+
+      if (currentCellEmail !== targetEmail) {
+        tasks.push(async () => {
+          try {
+            await patchAccountManager(accountId, targetEmail);
+            paintManagerCell(row, targetEmail);
+          } catch (e) {
+            console.warn(`⚠️ Could not assign manager to ${accountId}:`, e);
+          } finally {
+            updateSortToast(1);
+          }
+        });
+      }
+      continue;
+    }
+
+    // 2) Lead in process -> mayoría de opp_sales_lead
+    if (status === 'lead in process') {
+      const row = rowById.get(accountId);
+
+      tasks.push(async () => {
+        try {
+          const r = await fetch(`${API_BASE}/accounts/${accountId}/sales-lead/suggest`);
+          const json = r.ok ? await r.json() : null;
+          const suggested = (json?.suggested_sales_lead || '').toLowerCase().trim();
+
+          if (!suggested) return; // si no hay opp_sales_lead en opps, no asigna
+
           const currentCellEmail = (() => {
             if (!row) return '';
             const hiddenName = row.querySelector('.sales-lead-cell .sr-only');
             return (hiddenName?.textContent || '').toLowerCase().trim();
           })();
-          if (currentCellEmail === targetEmail) continue;
 
-          tasks.push(async () => {
-            try {
-              await patchAccountManager(accountId, targetEmail);
-              paintManagerCell(row, targetEmail);
-            } catch (e) {
-              console.warn(`⚠️ Could not assign manager to ${accountId}:`, e);
-            } finally {
-              updateSortToast(1);
-            }
-          });
+          if (currentCellEmail === suggested) return;
+
+          await patchAccountManager(accountId, suggested);
+          paintManagerCell(row, suggested);
+
+        } catch (e) {
+          console.warn(`⚠️ Could not assign majority sales lead to ${accountId}:`, e);
+        } finally {
+          updateSortToast(1);
         }
-        if (tasks.length) await runWithConcurrency(tasks, 6);
-      })();
+      });
+
+      continue;
+    }
+  }
+
+  if (tasks.length) await runWithConcurrency(tasks, 6);
+})();
 
       // Initialize DataTable (hook first draw to finish progress)
       let _finalized = false;

@@ -1552,6 +1552,113 @@ def update_account_fields(account_id):
     except Exception as e:
         print("Error updating account fields:", e)
         return jsonify({'error': str(e)}), 500
+@app.route('/accounts/sales-lead/suggest/bulk', methods=['POST'])
+def suggest_sales_lead_bulk():
+    payload = request.get_json(silent=True) or {}
+    account_ids = payload.get("account_ids") or []
+    # normaliza ints
+    ids = []
+    for x in account_ids:
+        try:
+            ids.append(int(x))
+        except Exception:
+            pass
+
+    if not ids:
+        return jsonify({}), 200
+
+    try:
+        conn = get_connection()
+        out = {}
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # 1) breakdown completo por account
+            cur.execute("""
+                SELECT
+                    o.account_id::int AS account_id,
+                    LOWER(TRIM(o.opp_sales_lead)) AS opp_sales_lead,
+                    COUNT(*)::int AS cnt,
+                    MAX(o.opportunity_id)::int AS last_opportunity_id
+                FROM opportunity o
+                WHERE o.account_id = ANY(%s)
+                  AND o.opp_sales_lead IS NOT NULL
+                  AND TRIM(o.opp_sales_lead) <> ''
+                GROUP BY 1, 2
+                ORDER BY account_id ASC, cnt DESC, last_opportunity_id DESC, opp_sales_lead ASC;
+            """, (ids,))
+            rows = cur.fetchall() or []
+
+        conn.close()
+
+        # arma breakdown por account y elige top1
+        by_acc = {}
+        for r in rows:
+            acc = r["account_id"]
+            by_acc.setdefault(acc, []).append({
+                "opp_sales_lead": r["opp_sales_lead"],
+                "cnt": r["cnt"],
+                "last_opportunity_id": r["last_opportunity_id"],
+            })
+
+        for acc_id in ids:
+            br = by_acc.get(acc_id, [])
+            suggested = br[0]["opp_sales_lead"] if br else None
+            out[str(acc_id)] = {
+                "suggested_sales_lead": suggested,
+                "breakdown": br
+            }
+
+        return jsonify(out), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+from flask import jsonify, request
+from psycopg2.extras import RealDictCursor
+
+@app.route('/accounts/<int:account_id>/sales-lead/suggest', methods=['GET'])
+def suggest_sales_lead_for_account(account_id: int):
+    """
+    Devuelve el sales lead sugerido basado en las opportunities del account:
+    - majority winner por opp_sales_lead
+    - tie-break: last_opportunity_id más alto
+    Response:
+      {
+        "account_id": 123,
+        "suggested_sales_lead": "bahia@vintti.com",
+        "breakdown": [
+          {"opp_sales_lead":"bahia@vintti.com","cnt":4,"last_opportunity_id":98},
+          {"opp_sales_lead":"lara@vintti.com","cnt":2,"last_opportunity_id":77}
+        ]
+      }
+    """
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT
+                    LOWER(TRIM(o.opp_sales_lead)) AS opp_sales_lead,
+                    COUNT(*)::int AS cnt,
+                    MAX(o.opportunity_id)::int AS last_opportunity_id
+                FROM opportunity o
+                WHERE o.account_id = %s
+                  AND o.opp_sales_lead IS NOT NULL
+                  AND TRIM(o.opp_sales_lead) <> ''
+                GROUP BY 1
+                ORDER BY cnt DESC, last_opportunity_id DESC, opp_sales_lead ASC;
+            """, (account_id,))
+            rows = cur.fetchall() or []
+
+        conn.close()
+
+        suggested = rows[0]["opp_sales_lead"] if rows else None
+        return jsonify({
+            "account_id": account_id,
+            "suggested_sales_lead": suggested,
+            "breakdown": rows
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/opportunities/<int:opportunity_id>/candidates/<int:candidate_id>/stage', methods=['PATCH'])
 def update_stage_pipeline(opportunity_id, candidate_id):
