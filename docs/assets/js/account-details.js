@@ -201,8 +201,6 @@ document.getElementById('account-trr').textContent = `$${data.trr ?? 0}`;
 
 }
 
-
-
 function fillOpportunitiesTable(opportunities) {
   const tbody = document.querySelector('#overview .accordion-section:nth-of-type(2) tbody');
   tbody.innerHTML = '';
@@ -211,6 +209,9 @@ function fillOpportunitiesTable(opportunities) {
     tbody.innerHTML = `<tr><td colspan="3">No opportunities found</td></tr>`;
     return;
   }
+
+  // helper: agarra el id aunque cambie el nombre del campo
+  const getOppId = (opp) => opp.opportunity_id ;
 
   opportunities.forEach(opp => {
     const hireContent = opp.candidate_name
@@ -223,6 +224,18 @@ function fillOpportunitiesTable(opportunities) {
       <td>${opp.opp_stage || '—'}</td>
       <td>${hireContent}</td>
     `;
+
+    const oppId = getOppId(opp);
+    if (oppId) {
+      row.style.cursor = 'pointer';
+
+      row.addEventListener('click', () => {
+        // tu URL final:
+        window.location.href = `https://vinttihub.vintti.com/opportunity-detail.html?id=${encodeURIComponent(oppId)}`;
+
+      });
+    }
+
     tbody.appendChild(row);
   });
 }

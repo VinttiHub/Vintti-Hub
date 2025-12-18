@@ -1053,7 +1053,7 @@ host.innerHTML = header + arr.map(x=>{
       <div class="cell t-center">${actionCell}</div>
     </div>
   `;
-}).join("");s
+}).join("");
 
   }catch(err){
     console.error(err);

@@ -327,7 +327,8 @@ window.AVATAR_BY_EMAIL = Object.assign(
     'jazmin@vintti.com':   'jaz.png',
     'pilar@vintti.com':    'pilar.png',
     'agustin@vintti.com':  'agus.png',
-    'agustina.barbero@vintti.com': 'agustina.png'
+    'agustina.barbero@vintti.com': 'agustina.png',
+    'mariano@vintti.com': 'mariano.png' 
   },
   window.AVATAR_BY_EMAIL || {}
 );
@@ -346,20 +347,25 @@ function initialsForSalesLead(key='') {
   if (s.includes('bahia'))   return 'BL';
   if (s.includes('lara'))    return 'LR';
   if (s.includes('agustin')) return 'AM';
+  if (s.includes('mariano')) return 'MS';   // ✅ ADD
   return '--';
 }
+
 function badgeClassForSalesLead(key='') {
   const s = key.toLowerCase();
   if (s.includes('bahia'))   return 'bl';
   if (s.includes('lara'))    return 'lr';
   if (s.includes('agustin')) return 'am';
+  if (s.includes('mariano')) return 'ms';   // ✅ ADD
   return '';
 }
+
 function emailFromNameGuess(name='') {
   const s = name.toLowerCase();
   if (s.includes('bahia'))   return 'bahia@vintti.com';
   if (s.includes('lara'))    return 'lara@vintti.com';
   if (s.includes('agustin')) return 'agustin@vintti.com';
+  if (s.includes('mariano')) return 'mariano@vintti.com'; // ✅ ADD
   return '';
 }
 

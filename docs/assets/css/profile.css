@@ -379,10 +379,6 @@ input:focus, select:focus, textarea:focus{
 .field input:focus{ outline: none; border-color:#111827; box-shadow: 0 0 0 3px rgba(17,24,39,.1); }
 .form-card .actions{ display:flex; gap:12px; justify-content:flex-end; margin-top:16px; }
 
-@media (max-width: 720px){
-  .info-grid, .form-card .grid{ grid-template-columns: 1fr; }
-  .header-card{ align-items:flex-start; }
-}
 /* =======================
     ORG CHART PAGE — New
    ======================= */
@@ -443,21 +439,6 @@ input:focus, select:focus, textarea:focus{
   font-style: italic;
 }
 
-/* Mobile adjustments */
-@media (max-width: 720px) {
-  .org-image-card {
-    padding: 12px;
-    border-radius: 18px;
-  }
-  
-  .org-title {
-    font-size: 26px;
-  }
-
-  .org-subtitle {
-    font-size: 14px;
-  }
-}
 /* =========================================================
    Approvals History — Approved & Rejected (6 columnas limpias)
    ========================================================= */
@@ -649,39 +630,6 @@ input:focus, select:focus, textarea:focus{
   filter:brightness(0.99);
 }
 
-/* ---------- Responsive ---------- */
-@media (max-width: 980px){
-  .approvals-history .approvals-table{
-    grid-template-columns:
-      minmax(200px, 1.5fr)
-      minmax(120px, 1fr)
-      minmax(120px, 1fr)
-      minmax(110px, .9fr)
-      minmax(110px, .9fr)
-      minmax(80px,  .6fr);
-  }
-}
-@media (max-width: 720px){
-  /* en mobile lo pasamos a 2 columnas para que quepa */
-  .approvals-history .approvals-table{
-    grid-template-columns: 1.4fr 1.1fr;
-  }
-  .approvals-history .approvals-table .hdr,
-  .approvals-history .approvals-table .cell{
-    font-size:13px;
-    padding:10px 12px;
-  }
-}
-@media (max-width: 520px){
-  /* ultra-compacto: 1 columna tipo “cards” */
-  .approvals-history .approvals-table{
-    grid-template-columns: 1fr;
-  }
-  .approvals-history .approvals-table .hdr,
-  .approvals-history .approvals-table .cell{
-    grid-column:1 / -1;
-  }
-}
 
 /* ---------- Pretty pill select for "Type" ---------- */
 #kind{
@@ -796,33 +744,6 @@ input:focus, select:focus, textarea:focus{
 .status.approved{ background:#dcfce7; color:#166534; border-color:#86efac; } /* green */
 .status.rejected{ background:#fee2e2; color:#991b1b; border-color:#fca5a5; } /* red */
 
-/* ---------- Responsive ---------- */
-@media (max-width: 860px){
-  .grid{ grid-template-columns: 1fr; }
-  .grid-compact{ grid-template-columns: 1fr; }
-  .balances-table{ grid-template-columns: 1fr 136px; }
-
-  .requests .requests-table{
-    grid-template-columns: 160px 1fr 120px;
-  }
-}
-@media (max-width: 560px){
-  #btnOpenTimeoff{
-    right: 16px; bottom: 16px;
-    padding: 14px 18px; font-size: 15px;
-  }
-
-  /* Stack requests table into 2 cols; hide Type/Status headers */
-  .requests .requests-table{
-    grid-template-columns: 1fr 1fr;
-  }
-  .requests .requests-table .th:nth-child(1),
-  .requests .requests-table .th:nth-child(3){ display:none; }
-  /* Type / Dates on first row, Status full width on second row */
-  .requests .requests-table .cell.plain:nth-child(3n-2){ grid-column:1/2; } /* Type */
-  .requests .requests-table .cell.plain:nth-child(3n-1){ grid-column:2/3; } /* Dates */
-  .requests .requests-table .cell.plain:nth-child(3n){ grid-column:1/-1; justify-content:flex-end; } /* Status */
-}
 /* =========================================================
    Team PTO table — clean, compact, no hard boxes
    ========================================================= */
@@ -835,11 +756,7 @@ input:focus, select:focus, textarea:focus{
 }
 .teampto-caption{ font-size:11px; color:var(--muted); }
 
-/* Responsive: horizontal scroll if needed */
-@media (max-width: 980px){
-  #panel-teampto{ overflow-x:auto; }
-  #teamPtoTable{ min-width: 1080px; }
-}
+
 /* =========================================================
    Approvals tab (leaders)
    ========================================================= */
@@ -958,10 +875,7 @@ input:focus, select:focus, textarea:focus{
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .qkpi .caption{ font-size: 11px; color: var(--muted); font-weight:700; }
-@media (max-width: 640px){
-  .quick-body{ grid-template-columns: 1fr; }
-  .quick-avatar{ width: 104px; height:104px; justify-self:center; }
-}
+
 /* make names feel tappable but still clean */
 .name-link{
   all: unset;
@@ -1061,13 +975,6 @@ input:focus, select:focus, textarea:focus{
   width:10px; height:10px; background:#0b1220; rotate:45deg; border-radius:2px;
   border-right:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08);
 }
-
-/* compact on small screens */
-@media (max-width: 760px){
-  .cal-cell{ min-height: 72px; padding:6px; }
-  .cal-badge{ font-size:10px; padding:3px 7px; }
-}
-
 
 
 
@@ -2524,4 +2431,151 @@ input:focus, select:focus, textarea:focus{
   --category-border: var(--hol-border);
   --category-row: rgba(56,153,67,0.08);
   --category-row-hover: rgba(56,153,67,0.16);
+}
+/* =========================================================
+   My Requests — FIX REAL (Action a la derecha, Safari-proof)
+   SOLO #requestsTable
+   ========================================================= */
+
+#requestsTable.requests-table{
+  --req-cols:
+    minmax(140px, 1fr)    /* Type */
+    minmax(160px, 1.2fr)  /* Request */
+    minmax(160px, 1.2fr)  /* Return */
+    minmax(90px,  0.6fr)  /* Days */
+    minmax(120px, 0.9fr)  /* Status */
+    minmax(72px,  0.4fr); /* Action */
+
+  display: grid !important;
+  grid-template-columns: var(--req-cols) !important;
+  gap: 10px;
+  width: 100%;
+
+  background: #fff;
+  border: 1px solid rgba(15,23,42,.08);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(15,23,42,.06);
+}
+
+/* Header: los .th siguen usando el grid del contenedor */
+#requestsTable.requests-table > .th{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:14px 16px;
+  font-size:12px;
+  font-weight:800;
+  color:#0f172a;
+  background:#f5f7fb;
+  border-bottom:1px solid #e5e7eb;
+}
+
+/* 👇 CLAVE: en esta tabla NO usamos display:contents */
+#requestsTable.requests-table .row{
+  grid-column: 1 / -1;                 /* cada fila ocupa todo el ancho */
+  display: grid !important;
+  grid-template-columns: var(--req-cols) !important;
+  gap: 10px;
+}
+
+/* celdas */
+#requestsTable.requests-table .cell{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:16px;
+  font-size:14px;
+  background:#ffffff;
+  border-bottom:1px solid #eef2f7;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  border-radius: 14px;                 /* look más “card” como tu screenshot */
+}
+
+/* alineaciones por columna */
+#requestsTable.requests-table .row .cell:nth-child(4){ justify-content:flex-end; } /* Days */
+#requestsTable.requests-table .row .cell:nth-child(5){ justify-content:center; }  /* Status */
+#requestsTable.requests-table .row .cell:nth-child(6){ justify-content:center; }  /* Action */
+
+/* tint por estado (tu JS pone row--approved/rejected/pending) */
+#requestsTable.requests-table .row--approved .cell{ background:#f0fdf4; }
+#requestsTable.requests-table .row--rejected .cell{ background:#fef2f2; }
+#requestsTable.requests-table .row--pending  .cell{ background:#f6f7fb; }
+/* =========================================================
+   My Requests — Visual polish (headers + continuous rows)
+   ========================================================= */
+
+/* ---------- HEADER: centrado + padding ---------- */
+#requestsTable.requests-table > .th{
+  justify-content: center;
+  text-align: center;
+  padding: 16px 18px;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: #f6f8fc;
+}
+
+/* el header de Action también centrado */
+#requestsTable.requests-table > .th:nth-child(6){
+  justify-content: center;
+}
+
+/* ---------- ROWS: que se vean como UNA sola línea ---------- */
+#requestsTable.requests-table .row{
+  gap: 0; /* 🔑 elimina separación entre celdas */
+  margin: 0;
+}
+
+/* celdas como parte de una fila continua */
+#requestsTable.requests-table .cell{
+  border-radius: 0;                 /* ❌ no más tarjetas */
+  border-bottom: 1px solid #eef2f7;
+  border-right: 1px solid #eef2f7;
+  padding: 16px 18px;
+  background: transparent;          /* el color vive en la fila */
+}
+
+/* quitar borde derecho en la última columna */
+#requestsTable.requests-table .row .cell:last-child{
+  border-right: 0;
+}
+
+/* ---------- FILA COMPLETA (color de fondo unificado) ---------- */
+#requestsTable.requests-table .row{
+  background: #ffffff;
+  transition: background-color .15s ease;
+}
+
+/* tint por estado (una sola banda) */
+#requestsTable.requests-table .row--approved{
+  background: #f0fdf4;
+}
+#requestsTable.requests-table .row--rejected{
+  background: #fef2f2;
+}
+#requestsTable.requests-table .row--pending{
+  background: #f6f7fb;
+}
+
+/* hover suave */
+#requestsTable.requests-table .row:hover{
+  filter: brightness(0.985);
+}
+
+/* ---------- ALINEACIONES ---------- */
+#requestsTable.requests-table .row .cell:nth-child(1){
+  justify-content: flex-start; /* Type */
+}
+
+#requestsTable.requests-table .row .cell:nth-child(4){
+  justify-content: flex-end;   /* Days */
+  font-weight: 800;
+}
+
+#requestsTable.requests-table .row .cell:nth-child(5),
+#requestsTable.requests-table .row .cell:nth-child(6){
+  justify-content: center;     /* Status + Action */
 }
