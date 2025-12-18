@@ -1008,13 +1008,14 @@ async function loadMyRequests(uid){
     const arr = await r.json();
     MY_REQUESTS = arr || [];
     // 🔸 5 columnas: Type | Request Date | Return Date | Days | Status
-  const header = `
-    <div class="th icon icon--type">Type</div>
-    <div class="th icon icon--request">Request Date</div>
-    <div class="th icon icon--return">Return Date</div>
-    <div class="th icon icon--days">Days</div>
-    <div class="th icon icon--status">Status</div>
-  `;
+const header = `
+  <div class="th icon icon--type">Type</div>
+  <div class="th icon icon--request">Request Date</div>
+  <div class="th icon icon--return">Return Date</div>
+  <div class="th icon icon--days">Days</div>
+  <div class="th icon icon--status">Status</div>
+  <div class="th icon icon--action">Action</div>
+`;
 
 
     if (!arr.length){
@@ -1024,17 +1025,24 @@ async function loadMyRequests(uid){
       return;
     }
 
-    host.innerHTML = header + arr.map(x=>{
+host.innerHTML = header + arr.map(x=>{
   const start = fmtDateNice(x.start_date);
   const end   = fmtDateNice(x.end_date);
+
   const days = (String(x.kind || '').toLowerCase() === 'vacation')
-  ? businessDaysBetweenISO(x.start_date, x.end_date)
-  : diffDaysInclusive(x.start_date, x.end_date);
-  const statusCls = String(x.status || '').toLowerCase();  // approved | rejected | pending
+    ? businessDaysBetweenISO(x.start_date, x.end_date)
+    : diffDaysInclusive(x.start_date, x.end_date);
+
+  const statusCls = String(x.status || '').toLowerCase(); // approved | rejected | pending
   const rowCls = statusCls ? `row--${statusCls}` : '';
 
+  const canDelete = statusCls === "pending"; // 👈 solo pending
+  const actionCell = canDelete
+    ? `<button class="btn-delete" type="button" data-delete-req="${x.id}" aria-label="Delete request" title="Delete">🗑️</button>`
+    : `<span class="muted">—</span>`;
+
   return `
-    <div class="row ${rowCls}">
+    <div class="row ${rowCls}" data-req-id="${x.id}">
       <div class="cell">
         <span class="badge-soft ${kindClass(x.kind)}">${kindLabel(x.kind)}</span>
       </div>
@@ -1042,9 +1050,10 @@ async function loadMyRequests(uid){
       <div class="cell"><time datetime="${x.end_date}">${end}</time></div>
       <div class="cell t-right"><b class="days">${days} day${days===1?'':'s'}</b></div>
       <div class="cell t-center"><span class="status ${statusCls}">${x.status}</span></div>
+      <div class="cell t-center">${actionCell}</div>
     </div>
   `;
-}).join("");
+}).join("");s
 
   }catch(err){
     console.error(err);
@@ -1531,3 +1540,34 @@ function setupBalanceCardTables(){
     details.dataset.currentKind = kind;
   });
 }
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-delete-req]");
+  if (!btn) return;
+
+  const reqId = btn.getAttribute("data-delete-req");
+  if (!reqId) return;
+
+  if (!confirm("Delete this request?")) return;
+
+  btn.disabled = true;
+
+  try{
+    const r = await api(`/time_off_requests/${encodeURIComponent(reqId)}`, {
+      method: "DELETE"
+    });
+
+    if (r.status === 409) {
+      alert("This request can’t be deleted anymore.");
+      return;
+    }
+    if (!r.ok) throw new Error(await r.text());
+
+    // Refresh table
+    await loadMyRequests(CURRENT_USER_ID);
+  }catch(err){
+    console.error("delete request error:", err);
+    alert("Could not delete request.");
+  }finally{
+    btn.disabled = false;
+  }
+});

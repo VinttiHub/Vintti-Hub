@@ -614,3 +614,44 @@ def create_time_off():
         return jsonify({"ok": True, "id": new_id, "email_warning": str(e)}), 201
 
     return jsonify({"ok": True, "id": new_id}), 201
+@bp.delete("/time_off_requests/<int:req_id>")
+def delete_time_off_request(req_id: int):
+    """Requester can delete ONLY their own pending request."""
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"error": "unauthorized"}), 401
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, user_id, status
+                FROM time_off_requests
+                WHERE id = %s
+            """, (req_id,))
+            row = cur.fetchone()
+
+            if not row:
+                return jsonify({"error": "not found"}), 404
+
+            if int(row["user_id"]) != int(user_id):
+                return jsonify({"error": "forbidden"}), 403
+
+            status = str(row["status"] or "").lower()
+            if status != "pending":
+                # 409 = conflicto de estado (ya aprobado/rechazado)
+                return jsonify({"error": "cannot delete (not pending)"}), 409
+
+            cur.execute("""
+                DELETE FROM time_off_requests
+                WHERE id = %s AND status = 'pending'
+            """, (req_id,))
+
+        conn.commit()
+        return jsonify({"ok": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": "db error", "detail": str(e)}), 500
+    finally:
+        try: conn.close()
+        except: pass

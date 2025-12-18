@@ -487,6 +487,27 @@ input:focus, select:focus, textarea:focus{
   color: var(--muted);
   font-weight: 500;
 }
+/* Only My Requests table */
+#requestsTable .btn-delete{
+  border: 1px solid rgba(225,190,255,0.55);
+  background: rgba(255,255,255,0.95);
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+  box-shadow: 0 10px 22px rgba(190,160,240,0.14);
+  line-height: 1;
+}
+#requestsTable .btn-delete:hover{
+  transform: translateY(-1px);
+}
+#requestsTable .btn-delete:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+}
+#requestsTable .muted{
+  opacity: .55;
+}
 
 /* ---------- Tabla: 6 columnas fijas ---------- */
 /* Orden esperado:
