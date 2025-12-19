@@ -576,6 +576,24 @@ function fillEmployeesTables(candidates) {
           updateCandidateField(candidateId, 'discount_dolar', value);
         });
       }
+// === Start/End date (hire_opportunity) — STAFFING ===
+const startInputS = row.querySelector('.start-date-input');
+if (startInputS) {
+  startInputS.addEventListener('change', () => {
+    const candidateId = startInputS.dataset.candidateId;
+    const oppId = startInputS.dataset.opportunityId;
+    updateCandidateField(candidateId, 'start_date', startInputS.value || null, oppId);
+  });
+}
+
+const endInputS = row.querySelector('.end-date-input');
+if (endInputS) {
+  endInputS.addEventListener('change', () => {
+    const candidateId = endInputS.dataset.candidateId;
+    const oppId = endInputS.dataset.opportunityId;
+    updateCandidateField(candidateId, 'end_date', endInputS.value || null, oppId);
+  });
+}
 
       staffingTableBody.appendChild(row);
       hasStaffing = true;

@@ -2445,33 +2445,42 @@ def handle_candidate_hire_data(candidate_id):
             'buyout_dolar': 'buyout_dolar',
             'buyout_daterange': 'buyout_daterange'
         }
-        if 'start_date' in data and data.get('start_date') is not None:
-            set_cols.append("carga_active = %s")
-            set_vals.append(date.today())   # fecha actual
 
-        if 'end_date' in data:
-            # si end_date se setea a una fecha -> marca carga_inactive
-            if data.get('end_date') is not None:
+        set_cols, set_vals = [], []
+
+        for k, col in mapping.items():
+            if k in data:
+                v = data.get(k)
+
+                # normaliza start_date / end_date
+                if k in ("start_date", "end_date"):
+                    try:
+                        v = _clean_date(v)
+                    except ValueError as ve:
+                        return jsonify({"error": str(ve)}), 400
+
+                set_cols.append(f"{col} = %s")
+                set_vals.append(v)
+
+        # 👇 lógica especial para las fechas de carga (solo cuando hay start/end en el payload)
+        if "start_date" in data:
+            # si setean start_date a una fecha real -> marca carga_active, si lo limpian -> null
+            if _clean_date(data.get("start_date")) is not None:
+                set_cols.append("carga_active = %s")
+                set_vals.append(date.today())
+            else:
+                set_cols.append("carga_active = %s")
+                set_vals.append(None)
+
+        if "end_date" in data:
+            # si setean end_date a una fecha real -> marca carga_inactive, si lo limpian -> null
+            if _clean_date(data.get("end_date")) is not None:
                 set_cols.append("carga_inactive = %s")
                 set_vals.append(date.today())
             else:
-                 set_cols.append("carga_inactive = %s")
-                 set_vals.append(None)
+                set_cols.append("carga_inactive = %s")
+                set_vals.append(None)
 
-        set_cols, set_vals = [], []
-        for k, col in mapping.items():
-            if k in data:
-                set_cols.append(f"{col} = %s")
-                set_vals.append(data[k])
-
-        # 👇 lógica especial para las fechas de carga
-        if 'start_date' in data:
-            set_cols.append("carga_active = %s")
-            set_vals.append(date.today())   # solo fecha actual
-
-        if 'end_date' in data:
-            set_cols.append("carga_inactive = %s")
-            set_vals.append(date.today())
 
         created = False
         updated = False
