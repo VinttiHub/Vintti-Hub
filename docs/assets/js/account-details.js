@@ -279,8 +279,25 @@ function fillEmployeesTables(candidates) {
             ${candidate.name || '—'}
           </a>
         </td>
-        <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${fmtISODate(candidate.end_date)}</td>
+        <td>
+          <input
+            type="date"
+            class="start-date-input input-chip"
+            value="${isRealISODate(candidate.start_date) ? candidate.start_date : ''}"
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+          />
+        </td>
+
+        <td>
+          <input
+            type="date"
+            class="end-date-input input-chip"
+            value="${isRealISODate(candidate.end_date) ? candidate.end_date : ''}"
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+          />
+        </td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>$${candidate.employee_fee ?? '—'}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -596,8 +613,25 @@ function fillEmployeesTables(candidates) {
             ${candidate.name || '—'}
           </a>
         </td>
-        <td>${candidate.start_date ? new Date(candidate.start_date).toLocaleDateString('en-US') : '—'}</td>
-        <td>${candidate.end_date ? new Date(candidate.end_date).toLocaleDateString('en-US') : '—'}</td>
+        <td>
+          <input
+            type="date"
+            class="start-date-input input-chip"
+            value="${isRealISODate(candidate.start_date) ? candidate.start_date : ''}"
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+          />
+        </td>
+
+        <td>
+          <input
+            type="date"
+            class="end-date-input input-chip"
+            value="${isRealISODate(candidate.end_date) ? candidate.end_date : ''}"
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+          />
+        </td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
         <td>$${candidate.employee_salary ?? '—'}</td>
@@ -671,6 +705,24 @@ function fillEmployeesTables(candidates) {
         if (startDateR && endDateR) { options.startDate = startDateR; options.endDate = endDateR; }
         new Litepicker(options);
       }
+// === Start/End date (hire_opportunity) ===
+const startInput = row.querySelector('.start-date-input');
+if (startInput) {
+  startInput.addEventListener('change', () => {
+    const candidateId = startInput.dataset.candidateId;
+    const oppId = startInput.dataset.opportunityId;
+    updateCandidateField(candidateId, 'start_date', startInput.value || null, oppId);
+  });
+}
+
+const endInput = row.querySelector('.end-date-input');
+if (endInput) {
+  endInput.addEventListener('change', () => {
+    const candidateId = endInput.dataset.candidateId;
+    const oppId = endInput.dataset.opportunityId;
+    updateCandidateField(candidateId, 'end_date', endInput.value || null, oppId);
+  });
+}
 
       recruitingTableBody.appendChild(row);
       hasRecruiting = true;
@@ -818,7 +870,8 @@ function updateCandidateField(candidateId, field, value, opportunityId) {
   const hireFields = new Set([
     'discount_dolar','discount_daterange',
     'referral_dolar','referral_daterange',
-    'buyout_dolar','buyout_daterange'
+    'buyout_dolar','buyout_daterange',
+    'start_date','end_date'
   ]);
 
   if (hireFields.has(field)) {

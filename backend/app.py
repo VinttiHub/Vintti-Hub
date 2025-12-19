@@ -2374,6 +2374,22 @@ def handle_candidate_hire_data(candidate_id):
         # ---------- PATCH ----------
         data = request.get_json() or {}
         opportunity_id = data.get('opportunity_id', None)
+        # --- helpers date-only ---
+        def _clean_date(v):
+            # acepta 'YYYY-MM-DD', '' o None
+            if v is None: 
+                return None
+            s = str(v).strip()
+            if s == "" or s.lower() == "null":
+                return None
+            # no rompas si viene un datetime; corta a YYYY-MM-DD si empieza así
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+                return s
+            if re.match(r"^\d{4}-\d{2}-\d{2}T", s):
+                return s[:10]
+            # si viene algo raro, mejor error 400 (para que no se guarde basura)
+            raise ValueError("Date must be YYYY-MM-DD or null")
+
         if not opportunity_id:
             return jsonify({'error': 'opportunity_id is required in PATCH body'}), 400
 
@@ -2429,6 +2445,18 @@ def handle_candidate_hire_data(candidate_id):
             'buyout_dolar': 'buyout_dolar',
             'buyout_daterange': 'buyout_daterange'
         }
+        if 'start_date' in data and data.get('start_date') is not None:
+            set_cols.append("carga_active = %s")
+            set_vals.append(date.today())   # fecha actual
+
+        if 'end_date' in data:
+            # si end_date se setea a una fecha -> marca carga_inactive
+            if data.get('end_date') is not None:
+                set_cols.append("carga_inactive = %s")
+                set_vals.append(date.today())
+            else:
+                 set_cols.append("carga_inactive = %s")
+                 set_vals.append(None)
 
         set_cols, set_vals = [], []
         for k, col in mapping.items():
