@@ -1,11 +1,11 @@
 import json
 import re
-from typing import List
+from typing import List, Optional
 
 from utils.services import S3_BUCKET, s3_client
 
 
-def _extract_account_pdf_key(value: str | None) -> str | None:
+def _extract_account_pdf_key(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     match = re.search(r"accounts%2F(.+?\.pdf)", value)
@@ -56,7 +56,7 @@ def make_account_pdf_payload(keys):
     return pdfs
 
 
-def _extract_cv_key_from_url(value: str | None) -> str | None:
+def _extract_cv_key_from_url(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     match = re.search(r"cvs%2F(.+?\.(?:pdf|png|jpg|jpeg|webp))", value, re.IGNORECASE)
