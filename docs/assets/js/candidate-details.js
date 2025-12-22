@@ -384,6 +384,61 @@ function normalizeDateForAPI(ymd) {
   return `${s}T12:00:00`;
 }
 
+const INACTIVE_EMAIL_TO = ('lara@vintti.com', 'angie@vintti.com');
+const SEND_EMAIL_ENDPOINT = 'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email';
+let candidateOverviewData = null;
+
+function notifyCandidateInactiveEmail({
+  candidateId,
+  candidateName,
+  clientName,
+  roleName,
+  endDate,
+  opportunityId
+}) {
+  if (!endDate) return Promise.resolve();
+
+  const displayName = (candidateName || '').trim() || `Candidate #${candidateId}`;
+  const subject = `Inactive candidate – ${displayName}`;
+  const contextLines = [
+    clientName ? `Client: ${clientName}` : '',
+    roleName ? `Role: ${roleName}` : '',
+    opportunityId ? `Opportunity ID: ${opportunityId}` : ''
+  ].filter(Boolean);
+
+  const bodyLines = [
+'Hi Lara,',
+'',
+`${displayName} has just been marked as inactive.`,
+`End date: ${endDate}`,
+...contextLines,
+'',
+'Please proceed with billing adjustments and coordinate the laptop pickup.',
+'',
+'Thanks,',
+'Vintti Hub'
+  ].filter(Boolean);
+
+  return fetch(SEND_EMAIL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: [INACTIVE_EMAIL_TO],
+      subject,
+      body: bodyLines.join('\n')
+    })
+  })
+  .then(res => {
+    if (!res.ok) {
+      return res.text().then(text => {
+        throw new Error(`send_email failed ${res.status}: ${text}`);
+      });
+    }
+    console.log(`📨 Notified Lara about inactive candidate ${candidateId}`);
+  })
+  .catch(err => console.error('❌ Failed to notify Lara about inactive candidate', err));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
   // --- URL / Candidate id ---
@@ -905,6 +960,9 @@ window.updateHireField = async function(field, value) {
 
     const startInp = document.getElementById('hire-start-date');
     const endInp   = document.getElementById('hire-end-date');
+    if (endInp) {
+      endInp.dataset.previousEndDate = endInp.value || '';
+    }
 
     // ⬅️ cuando cambia START_DATE → guardar start_date y carga_active_date
     if (startInp) {
@@ -936,6 +994,8 @@ window.updateHireField = async function(field, value) {
     if (endInp) {
       endInp.addEventListener('change', async () => {
         const ymd = endInp.value || '';
+        const prevValue = endInp.dataset.previousEndDate || '';
+        const shouldNotify = !prevValue && !!ymd;
 
         // 1) actualiza end_date normal
         await updateHireField(
@@ -953,6 +1013,37 @@ window.updateHireField = async function(field, value) {
         } else {
           await updateHireField('carga_inactive', '');
         }
+
+        if (shouldNotify) {
+          let oppIdForEmail = null;
+          try {
+            oppIdForEmail = await ensureCurrentOppId(candidateId);
+          } catch (err) {
+            console.error('Missing opportunity_id while preparing inactive email', err);
+          }
+
+          const clientName =
+            candidateOverviewData?.account_name ||
+            candidateOverviewData?.client_name ||
+            candidateOverviewData?.account ||
+            '';
+          const roleName =
+            candidateOverviewData?.opp_position_name ||
+            candidateOverviewData?.current_position ||
+            candidateOverviewData?.title ||
+            '';
+
+          await notifyCandidateInactiveEmail({
+            candidateId,
+            candidateName: candidateOverviewData?.name,
+            clientName,
+            roleName,
+            endDate: ymd,
+            opportunityId: oppIdForEmail
+          });
+        }
+
+        endInp.dataset.previousEndDate = ymd;
       });
     }
   })();
@@ -961,6 +1052,7 @@ window.updateHireField = async function(field, value) {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`)
     .then(r => r.json())
     .then(data => {
+      candidateOverviewData = data;
 
 
       updateLinkedInUI(data.linkedin || '');
@@ -1591,7 +1683,11 @@ if (hireRevenue){
         const startInp = document.getElementById('hire-start-date');
         const endInp   = document.getElementById('hire-end-date');
         if (startInp) startInp.value = (data.start_date || '').slice(0,10);
-        if (endInp)   endInp.value   = (data.end_date   || '').slice(0,10);
+        if (endInp) {
+          const endVal = (data.end_date || '').slice(0,10);
+          endInp.value = endVal;
+          endInp.dataset.previousEndDate = endVal || '';
+        }
 
         const model = document.getElementById('opp-model-pill')?.textContent?.toLowerCase();
         if (model?.includes('recruiting')) {

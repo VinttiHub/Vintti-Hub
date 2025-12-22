@@ -1,3 +1,22 @@
+function dateInputValue(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+
+  // ya viene bien
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // si viene timestamp "YYYY-MM-DDTHH:MM:SS..."
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+
+  // último intento: parse
+  const d = new Date(s);
+  if (isNaN(d)) return '';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 document.addEventListener('DOMContentLoaded', () => {
 document.body.style.backgroundColor = 'var(--bg)';
 
@@ -272,6 +291,9 @@ function fillEmployeesTables(candidates) {
     // ---------- STAFFING ----------
     if (candidate.opp_model === 'Staffing') {
       const row = document.createElement('tr');
+      console.log('end_date raw:', candidate.end_date, 'candidate:', candidate.candidate_id);
+      const startVal = dateInputValue(candidate.start_date);
+const endVal   = dateInputValue(candidate.end_date);
       row.innerHTML = `
         <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
         <td>
@@ -280,23 +302,24 @@ function fillEmployeesTables(candidates) {
           </a>
         </td>
         <td>
-          <input
-            type="date"
-            class="start-date-input input-chip"
-            value="${isRealISODate(candidate.start_date) ? candidate.start_date : ''}"
-            data-candidate-id="${candidate.candidate_id}"
-            data-opportunity-id="${candidate.opportunity_id}"
-          />
+<input
+  type="date"
+  class="start-date-input input-chip"
+  ${startVal ? `value="${startVal}"` : ``}
+  data-candidate-id="${candidate.candidate_id}"
+  data-opportunity-id="${candidate.opportunity_id}"
+/>
         </td>
 
         <td>
-          <input
-            type="date"
-            class="end-date-input input-chip"
-            value="${isRealISODate(candidate.end_date) ? candidate.end_date : ''}"
-            data-candidate-id="${candidate.candidate_id}"
-            data-opportunity-id="${candidate.opportunity_id}"
-          />
+<input
+  type="date"
+  class="end-date-input input-chip"
+  ${endVal ? `value="${endVal}"` : ``}
+  data-candidate-id="${candidate.candidate_id}"
+  data-opportunity-id="${candidate.opportunity_id}"
+/>
+
         </td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>$${candidate.employee_fee ?? '—'}</td>
@@ -377,6 +400,19 @@ function fillEmployeesTables(candidates) {
          </div>
         </td>
       `;
+      const recruitingEndEl = row.querySelector('.end-date-input');
+      if (recruitingEndEl) {
+        recruitingEndEl.dataset.previousEndDate = dateInputValue(candidate.end_date) || '';
+      }
+// Safari safety: force-clear if empty
+const endEl = row.querySelector('.end-date-input');
+if (endEl) {
+  if (!endVal) {
+    endEl.value = '';
+    endEl.valueAsDate = null;
+  }
+  endEl.dataset.previousEndDate = endVal || '';
+}
 
       // ----- Lógica de Discount SOLO para Staffing -----
       const monthsCell    = row.children[10]; // Discount Months
@@ -591,7 +627,27 @@ if (endInputS) {
   endInputS.addEventListener('change', () => {
     const candidateId = endInputS.dataset.candidateId;
     const oppId = endInputS.dataset.opportunityId;
-    updateCandidateField(candidateId, 'end_date', endInputS.value || null, oppId);
+    const newValue = endInputS.value || '';
+    const patchValue = newValue || null;
+    const prevValue = endInputS.dataset.previousEndDate || '';
+    const shouldNotify = !prevValue && !!newValue;
+    const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
+    const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
+
+    updatePromise.then(() => {
+      if (shouldNotify) {
+        notifyCandidateInactiveEmail({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          endDate: newValue,
+          opportunityId: oppId
+        });
+      }
+    }).finally(() => {
+      endInputS.dataset.previousEndDate = newValue;
+    });
   });
 }
 
@@ -635,7 +691,7 @@ if (endInputS) {
           <input
             type="date"
             class="start-date-input input-chip"
-            value="${isRealISODate(candidate.start_date) ? candidate.start_date : ''}"
+            value="${dateInputValue(candidate.start_date)}"
             data-candidate-id="${candidate.candidate_id}"
             data-opportunity-id="${candidate.opportunity_id}"
           />
@@ -645,7 +701,7 @@ if (endInputS) {
           <input
             type="date"
             class="end-date-input input-chip"
-            value="${isRealISODate(candidate.end_date) ? candidate.end_date : ''}"
+            value="${dateInputValue(candidate.end_date)}"
             data-candidate-id="${candidate.candidate_id}"
             data-opportunity-id="${candidate.opportunity_id}"
           />
@@ -738,7 +794,27 @@ if (endInput) {
   endInput.addEventListener('change', () => {
     const candidateId = endInput.dataset.candidateId;
     const oppId = endInput.dataset.opportunityId;
-    updateCandidateField(candidateId, 'end_date', endInput.value || null, oppId);
+    const newValue = endInput.value || '';
+    const patchValue = newValue || null;
+    const prevValue = endInput.dataset.previousEndDate || '';
+    const shouldNotify = !prevValue && !!newValue;
+    const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
+    const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
+
+    updatePromise.then(() => {
+      if (shouldNotify) {
+        notifyCandidateInactiveEmail({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          endDate: newValue,
+          opportunityId: oppId
+        });
+      }
+    }).finally(() => {
+      endInput.dataset.previousEndDate = newValue;
+    });
   });
 }
 
@@ -905,10 +981,10 @@ function updateCandidateField(candidateId, field, value, opportunityId) {
     // Si por alguna razón no viene, mejor loguearlo (para no mandar 400 silencioso)
     if (!opportunityId) {
       console.error('Missing opportunity_id for hire field update:', { candidateId, field, value });
-      return;
+      return Promise.resolve();
     }
 
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+    return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -923,11 +999,10 @@ function updateCandidateField(candidateId, field, value, opportunityId) {
       }
     })
     .catch(err => console.error('❌ Failed to save field:', explainFetchError(err)));
-    return;
   }
 
   // Fallback candidates table
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+  return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ [field]: value })
@@ -937,6 +1012,66 @@ function updateCandidateField(candidateId, field, value, opportunityId) {
     console.log(`💾 ${field} saved for candidate ${candidateId}`);
   })
   .catch(err => console.error('❌ Failed to save field:', err));
+}
+
+const INACTIVE_EMAIL_TO = ('lara@vintti.com', 'angie@vintti.com');
+const SEND_EMAIL_ENDPOINT = 'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email';
+
+function getCurrentAccountName() {
+  const input = document.getElementById('account-client-name');
+  return input ? (input.value || '').trim() : '';
+}
+
+function notifyCandidateInactiveEmail({
+  candidateId,
+  candidateName,
+  clientName,
+  roleName,
+  endDate,
+  opportunityId
+}) {
+  if (!endDate) return Promise.resolve();
+
+  const displayName = (candidateName || '').trim() || `Candidate #${candidateId}`;
+  const subject = `Inactive candidate – ${displayName}`;
+
+  const contextLines = [
+    clientName ? `Client: ${clientName}` : '',
+    roleName ? `Role: ${roleName}` : '',
+    opportunityId ? `Opportunity ID: ${opportunityId}` : ''
+  ].filter(Boolean);
+
+  const bodyLines = [
+'Hi Lara,',
+'',
+`${displayName} has just been marked as inactive.`,
+`End date: ${endDate}`,
+...contextLines,
+'',
+'Please proceed with billing adjustments and coordinate the laptop pickup.',
+'',
+'Thanks,',
+'Vintti Hub'
+  ].filter(Boolean);
+
+  return fetch(SEND_EMAIL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: [INACTIVE_EMAIL_TO],
+      subject,
+      body: bodyLines.join('\n')
+    })
+  })
+  .then(res => {
+    if (!res.ok) {
+      return res.text().then(text => {
+        throw new Error(`send_email failed ${res.status}: ${text}`);
+      });
+    }
+    console.log(`📨 Notified Lara about inactive candidate ${candidateId}`);
+  })
+  .catch(err => console.error('❌ Failed to notify Lara about inactive candidate', err));
 }
 
 function explainFetchError(err) {
