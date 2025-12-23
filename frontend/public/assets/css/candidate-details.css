@@ -1,0 +1,3844 @@
+:root {
+  --bg: #f9fafb;
+  --text: #111827;
+  --card: #ffffff;
+  --label: #4b5563;
+  --tab-bg: #e5e7eb;
+  --tab-active: #3b82f6;
+  --shadow: rgba(0, 0, 0, 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  padding: 40px;
+}
+/* .tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+.tab {
+  padding: 10px 20px;
+  background-color: var(--tab-bg);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+} */
+#linkedin-open-btn {
+  font-size: 20px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tab:hover {
+  opacity: 0.9;
+}
+
+.tab.active {
+  background-color: var(--tab-active);
+  color: white;
+  font-weight: bold;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 28px 32px;
+  padding: 40px;
+  background-color: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 6px 16px var(--shadow);
+  row-gap: 36px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.field.full {
+  grid-column: 1 / -1;
+}
+
+label {
+  font-weight: 500;
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: var(--label);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.field div {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.field.textarea {
+  grid-column: 1 / -1;
+  align-self: start;
+  background-color: transparent;
+  padding: 0;
+}
+
+.field.textarea textarea {
+  resize: vertical;
+  width: 95%;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  background-color: rgba(0, 0, 0, 0.03);
+  color: var(--text);
+  transition: all 0.2s ease-in-out;
+  min-height: 100px;
+}
+
+.field.textarea textarea:focus {
+  outline: none;
+  background-color: #fff;
+  box-shadow: 0 0 0 2px var(--tab-active);
+}
+
+.field.textarea:hover {
+  background-color: transparent;
+}
+a:hover {
+  text-decoration: none;
+  color: #2563eb;
+}
+
+a {
+  color: var(--tab-active);
+  text-decoration: underline;
+}
+.field.textarea textarea#redFlags {
+  background-color: rgba(239, 68, 68, 0.07); /* rojo suave */
+}
+
+.field.textarea textarea#comments {
+  background-color: rgba(59, 130, 246, 0.05); /* azul suave */
+}
+
+.field-group {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px; /* MUCHO MÁS ESPACIO entre cuadros */
+  margin-top: 32px;
+  align-items: flex-start; /* evita que se alineen por el centro si son de diferente altura */
+}
+
+.field-group .field {
+  flex: 1 1 300px;
+}
+.field {
+  background-color: rgba(0, 0, 0, 0.015);
+  padding: 12px 16px;
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+.field:hover {
+  background-color: rgba(0, 0, 0, 0.035);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: middle;
+  stroke: var(--label);
+  fill: none;
+  stroke-width: 2;
+}
+
+.field label {
+  display: flex;
+  flex-direction: row; /* ✅ Horizontal */
+  align-items: center; /* ✅ Centrado vertical */
+  gap: 6px;
+  font-weight: 500;
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: var(--label);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+#overview .field label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+
+.linkedin-link {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  color: var(--tab-active);
+}
+
+.linkedin-link:hover {
+  background: rgba(59, 130, 246, 0.1);
+  cursor: pointer;
+}
+
+
+#ai-popup label {
+  text-transform: none;
+  letter-spacing: 0;
+}
+#ai-popup input[type="text"]:focus,
+#ai-popup textarea:focus {
+  border: 2px solid #fbbbd3;
+  outline: none;
+  box-shadow: 0 0 0 2px #ffe0ec88;
+}
+#ai-popup button#ai-lets-go {
+  background: linear-gradient(to right, #c084fc, #f472b6);
+  color: white;
+  font-weight: 600;
+}
+
+#ai-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fdfcfc;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  padding: 30px 40px;
+  width: 90%;
+  max-width: 600px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 2px solid #fde4e8;
+  font-family: 'Onest', sans-serif;
+  animation: fadeIn 0.2s ease-out;
+}
+
+#ai-popup.hidden {
+  display: none;
+}
+
+#ai-popup h2 {
+  margin: 0 0 10px 0;
+  font-family: 'Onest', sans-serif;
+  color: #24222b;
+  font-size: 24px;
+  text-align: center;
+}
+
+#ai-popup label {
+  font-size: 14px;
+  color: #4a4e69;
+  margin-bottom: 4px;
+  font-family: 'Onest', sans-serif;
+}
+
+#ai-popup input[type="text"],
+#ai-popup input[type="file"],
+#ai-popup textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+#ai-popup textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+#ai-popup button#ai-lets-go {
+  background-color: #7f5af0;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: 'Onest', sans-serif;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+#ai-popup button#ai-lets-go:hover {
+  background-color: #5a35c8;
+}
+
+/* Botón de cierre ❌ */
+#ai-popup .close-btn {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+  font-weight: bold;
+  background: none;
+  border: none;
+}
+
+#ai-popup .close-btn:hover {
+  color: #333;
+}
+
+/* Animación suave */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -55%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+
+/* 🍏 Estilo Apple-style Notification */
+.apple-hire-notice {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(245, 245, 245, 0.95);
+  color: #111;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  padding: 20px 30px;
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  text-align: center;
+  z-index: 9999;
+  opacity: 0;
+  animation: fadeInOutApple 6s ease-in-out forwards;
+}
+
+@keyframes fadeInOutApple {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  90% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+
+@keyframes puffOut {
+  0% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scale(1.3);
+    opacity: 0;
+  }
+}
+/* Salary Updates Section */
+#salary-updates-box {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  margin-bottom: 1.5rem;
+}
+
+.salary-entry {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2fr 1fr;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
+  font-family: 'Onest', sans-serif;
+  align-items: center;
+}
+
+.salary-entry span {
+  white-space: nowrap;
+}
+
+.salary-entry:last-child {
+  border-bottom: none;
+}
+
+.salary-entry button {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.salary-entry button:hover {
+  transform: scale(1.2);
+}
+
+.salary-entry button {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #d14b4b;
+}
+
+/* Add New Update Button */
+#add-salary-update {
+  background-color: #9ed6b5;
+  color: #1f4437;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+
+#add-salary-update:hover {
+  background-color: #81c7a1;
+}
+
+
+/* Hidden Utility */
+.hidden {
+  display: none !important;
+}
+.pill {
+  background-color: #e0e0e0;
+  color: #333;
+  padding: 6px 12px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+/* ===== Tweaks visuales para Salary Updates (solo diseño) ===== */
+
+/* Caja principal más “card” */
+#salary-updates-box {
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+/* Fila base: mismas columnas, más espacio y mejor alineado */
+.salary-entry {
+  display: grid;
+  grid-template-columns: 2fr 2fr 2fr auto; /* Salary | Fee | Date | Botón */
+  align-items: center;
+  column-gap: 16px;
+  padding: 14px 28px;
+  font-size: 15px;
+  font-family: 'Onest', sans-serif;
+  color: #111827;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.salary-entry span {
+  white-space: nowrap;
+}
+
+.salary-entry:last-child {
+  border-bottom: none;
+}
+
+/* Primera fila como “header” (si la estás usando para títulos) */
+#salary-updates-box .salary-entry:first-child {
+  background: #f9fafb;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#salary-updates-box .salary-entry:first-child span {
+  color: #0f172a;
+}
+
+/* Ocultar el botón en el header pero dejar la columna para alinear */
+#salary-updates-box .salary-entry:first-child button {
+  visibility: hidden;
+}
+
+/* Hover suave en filas de datos */
+#salary-updates-box .salary-entry:not(:first-child):hover {
+  background-color: #f9fafb;
+}
+
+/* Botón de borrar tipo pill azul, alineado a la derecha */
+.salary-entry button {
+  justify-self: end;
+  background-color: transparent !important;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 26px;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.salary-entry button:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
+}
+
+/* Por si el botón tiene ícono img o svg adentro */
+.salary-entry button img,
+.salary-entry button svg {
+  width: 18px;
+  height: 18px;
+}
+
+
+/* Popup un pelín más limpio */
+#salary-update-popup {
+  background: #f8f9ff;
+  border-radius: 18px;
+  border: 1px solid #e5d5c6;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
+}
+
+#salary-update-popup input {
+  border-radius: 10px;
+  border: 1px solid #f8f9ff;
+}
+
+
+#salary-update-popup button:hover {
+  background-color: #6C38FF;
+}
+
+/* ====== POPUP: New Salary Update (override visual) ====== */
+
+#salary-update-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #f8f9ff;
+  padding: 24px 24px 20px;
+  border: 1px solid #6d38ff36;
+  border-radius: 18px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, 90vw);
+  font-family: 'Onest', sans-serif;
+}
+
+/* Título del popup */
+#salary-update-popup h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Labels encima de los inputs */
+#salary-update-popup label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  margin-top: 6px;
+}
+
+/* Inputs */
+#salary-update-popup input {
+  margin-top: 4px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid #faf8ff;
+  font-size: 14px;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+#salary-update-popup input:focus {
+  outline: none;
+  border-color: #faf8ff;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.25);
+  background-color: #fffaf5;
+}
+
+/* Botón principal: Save */
+#salary-update-popup #save-salary-update {
+  margin-top: 16px;
+  width: 100%;
+  background: #003BFF;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 0;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+
+}
+
+#salary-update-popup #save-salary-update:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+/* Botón de cerrar (la X) arriba a la derecha */
+#salary-update-popup #close-salary-update {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+#salary-update-popup #close-salary-update:hover {
+  background-color: #f3f4f6;
+  color: #4b5563;
+  transform: translateY(-1px);
+}
+
+/* ===== BOTÓN “NEW UPDATE” – VIOLETA BRILLANTE CON ICONO “+” ===== */
+#add-salary-update {
+  margin-top: 22px;
+  background: linear-gradient(90deg, #003BFF 0%, #003BFF 100%);
+  color: #ffffff;
+  padding: 12px 34px 12px 46px;
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ✨ Efecto de brillo animado (destello diagonal) */
+#add-salary-update::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.05) 100%);
+  transform: skewX(-25deg);
+  transition: 0.6s;
+}
+
+#add-salary-update:hover::before {
+  left: 120%;
+}
+
+/* 🔹 Ícono "+" decorativo (pseudo-elemento) */
+#add-salary-update::after {
+  content: "+";
+  position: absolute;
+  left: 18px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  transition: transform 0.3s ease, text-shadow 0.3s ease;
+}
+
+/* Hover: brillo más intenso + animación + */
+#add-salary-update:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: linear-gradient(90deg, #003BFF 0%, #003BFF 100%);
+}
+
+#add-salary-update:hover::after {
+  transform: rotate(90deg) scale(1.2);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+}
+
+/* Glow constante (resplandor alrededor) */
+#add-salary-update:before,
+#add-salary-update:after {
+  z-index: 1;
+}
+
+#add-salary-update span {
+  position: relative;
+  z-index: 2;
+}
+
+
+
+
+/* === NUEVO CSS para Resume estilo limpio tipo Notion / LinkedIn === */
+
+.cv-container {
+  padding: 40px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.cv-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cv-heading {
+  font-size: 18px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  color: #000;
+  letter-spacing: 0.15em;
+  margin-bottom: 12px;
+  position: relative;
+  padding-left: 26px;
+  font-family: 'Onest', sans-serif;
+}
+
+.cv-heading::before {
+  content: attr(data-icon);
+  position: absolute;
+  left: 0;
+  top: -5px;
+  font-size: 18px;
+}
+
+.cv-card {
+  padding: 16px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background-color: #f9fafb;
+}
+
+.cv-card-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.cv-card-entry input,
+.cv-card-entry textarea,
+.cv-card-entry select {
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #f3f4f6;
+  color: #111827;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.cv-card-entry input,
+.cv-card-entry textarea,
+.cv-card-entry select {
+  border: none;
+  border-bottom: 1px solid #d1d5db;
+  background-color: #f3f4f6;
+}
+
+.cv-card-entry input:focus,
+.cv-card-entry textarea:focus,
+.cv-card-entry select:focus {
+  border-bottom: 2px solid #3b82f6;
+  background-color: #ffffff;
+}
+.cv-card-entry input[type="date"] {
+  background-color: #f3f4f6;
+  border: none;
+  border-bottom: 1px solid transparent; /* sin barra gris visible */
+  border-radius: 0;
+  padding: 10px 0;
+  font-size: 14px;
+  font-family: inherit;
+  width: 100%;
+  color: #111827;
+  box-sizing: border-box;
+  transition: border-bottom 0.2s ease, background-color 0.2s ease;
+}
+
+.cv-card-entry input[type="date"]:focus {
+  outline: none;
+  border-bottom: 2px solid #3b82f6;
+  background-color: #ffffff;
+}
+
+
+
+.cv-card-entry textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.cv-card-entry {
+  position: relative;
+}
+
+.tool-entry {
+  position: relative;
+}
+
+.cv-card-entry .remove-entry,
+.tool-entry .remove-entry {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  border: none;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.cv-card-entry .remove-entry:hover,
+.tool-entry .remove-entry:hover {
+  background-color: #e5e7eb;
+  color: #ef4444;
+  transform: scale(1.05);
+}
+
+
+.cv-section button {
+  align-self: start;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cv-section button:hover {
+  background-color: #2563eb;
+}
+
+.cv-card input[type="text"] {
+  border: none;
+  background-color: transparent;
+  color: #374151;
+  font-size: 14px;
+  width: 100%;
+}
+
+.cv-card input[type="text"]:focus {
+  outline: none;
+  border-bottom: 1px solid #3b82f6;
+  background-color: #fff;
+}
+/* === Tools Section - Estilo limpio y profesional === */
+
+
+.cv-card-entry input.edu-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  border: none;
+  background-color: transparent;
+  padding: 0;
+  margin-bottom: 6px;
+  line-height: 1.4;
+  width: 80%;
+  font-family: inherit;
+}
+
+.cv-card-entry input.edu-title:focus {
+  outline: none;
+  border-bottom: 1px solid #3b82f6;
+  background-color: #fff;
+}
+.cv-card-entry input.work-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  border: none;
+  background-color: transparent;
+  padding: 0;
+  margin-bottom: 4px;
+  line-height: 1.4;
+  width: 100%;
+  font-family: inherit;
+}
+
+.cv-card-entry input.work-title:focus {
+  outline: none;
+  border-bottom: 1px solid #3b82f6;
+  background-color: #fff;
+}
+.cv-card-entry input.work-company {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  border: none;
+  background-color: transparent;
+  padding: 0;
+  margin-bottom: 8px;
+  line-height: 1.4;
+  width: 100%;
+  font-family: inherit;
+}
+
+.cv-card-entry input.work-company:focus {
+  outline: none;
+  border-bottom: 1px solid #3b82f6;
+  background-color: #fff;
+}
+
+.cv-card-entry .edu-current {
+  width: 18px;
+  height: 18px;
+  accent-color: #3b82f6;
+  cursor: pointer;
+  margin-right: 6px;
+  transform: translateY(1px);
+}
+
+.cv-card-entry label[for="current"],
+.cv-card-entry label:has(.edu-current),
+.cv-card-entry label:has(.work-current) {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  letter-spacing: 0.3px;
+  text-transform: none; /* 👈 sin mayúsculas feas */
+}
+
+
+/* .cv-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+}
+
+.cv-switch input[type="checkbox"] {
+  appearance: none;
+  width: 40px;
+  height: 20px;
+  background: #d1d5db;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.cv-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 2px;
+  left: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.cv-switch input[type="checkbox"]:checked {
+  background: #3b82f6;
+}
+
+.cv-switch input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
+} */
+.cv-card-entry .edu-current {
+  appearance: none;
+  width: 42px;
+  height: 22px;
+  background-color: #d1d5db;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.cv-card-entry .edu-current::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.cv-card-entry .edu-current:checked {
+  background-color: #3b82f6;
+}
+
+.cv-card-entry .edu-current:checked::before {
+  transform: translateX(20px);
+}
+.cv-card-entry .work-current {
+  appearance: none;
+  width: 42px;
+  height: 22px;
+  background-color: #d1d5db;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.cv-card-entry .work-current::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.cv-card-entry .work-current:checked {
+  background-color: #3b82f6;
+}
+
+.cv-card-entry .work-current:checked::before {
+  transform: translateX(20px);
+}
+#toolsSection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between; /* 👈 agrega esta línea */
+}
+
+.tool-entry {
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 12px 16px;
+  width: calc(50% - 8px);
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: box-shadow 0.2s ease;
+}
+.tool-entry select,
+.cv-card-entry select,
+select {
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background-color: #f9fafb;
+  color: #111827;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg fill='%239ca3af' height='20' viewBox='0 0 20 20' width='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tool-entry select:focus,
+.cv-card-entry select:focus,
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  background-color: #ffffff;
+}
+
+
+.tool-entry:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.tool-entry input[type="text"],
+.tool-entry select {
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #111827;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none; /* 🔸 elimina flechita fea por defecto */
+  background-image: url("data:image/svg+xml,%3Csvg fill='%239ca3af' height='16' viewBox='0 0 20 20' width='16' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+.ai-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: white;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.ai-fullscreen h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+
+.ai-fullscreen label {
+  font-weight: 600;
+  margin-top: 20px;
+  align-self: flex-start;
+}
+
+.ai-fullscreen textarea {
+  width: 90%;
+  max-width: 1000px;
+  min-height: 120px;
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.ai-fullscreen button#ai-lets-go {
+  margin-top: 30px;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 10px;
+  background: black;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ai-fullscreen button#ai-lets-go:hover {
+  background: #333;
+}
+#ai-loader {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #e6f0fa; /* azul muy suave */
+  padding: 12px 24px;
+  border-radius: 30px;
+  border: 2px solid #a3c7f5; /* borde azul pastel */
+  font-weight: 600;
+  font-family: 'Onest', sans-serif;
+  color: #1a4d8f; /* azul más oscuro para texto */
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 9999;
+  box-shadow: 0 0 12px rgba(26, 77, 143, 0.15);
+}
+
+#ai-loader.hidden {
+  display: none;
+}
+
+#ai-loader .dot {
+  animation: blink 1.2s infinite;
+  color: #1a4d8f;
+}
+
+#ai-loader .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+#ai-loader .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+#ai-loader .dot:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.star-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #f0f7ff; /* azul muy suave */
+  border-radius: 16px;
+  border: 2px solid #a3c7f5;
+  padding: 24px;
+  z-index: 9999;
+  width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  font-family: 'Onest', sans-serif;
+}
+
+.star-popup textarea {
+  width: 80%;
+  margin: 12px auto;
+  height: 100px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  font-family: 'Onest', sans-serif;
+  display: block;
+}
+
+.star-popup .generate-btn {
+  background-color: #90caf9; /* azul pastel */
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease;
+  display: block;
+  margin: 12px auto 0;
+  text-align: center;
+}
+
+.star-popup .generate-btn:hover {
+  background-color: #ff8fa3;
+}
+
+.star-popup.hidden {
+  display: none;
+}
+.star-popup .close-star-popup {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #2c2c2c;
+}
+.cv-heading-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-right: 0;
+}
+
+.star-button {
+  font-size: 16px;
+  border-radius: 12px;
+  padding: 6px 10px;
+  background-color: #fff !important;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+}
+
+.star-button:hover {
+  transform: scale(1.1);
+
+}
+.ai-loader {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f0f0ff;
+  border: 1px solid #d4d4f8;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-family: 'Onest', sans-serif;
+  color: #7f5af0;
+  font-size: 16px;
+  z-index: 9999;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.ai-loader .dot {
+  animation: blink 1s infinite;
+}
+
+.ai-loader .dot:nth-child(2) { animation-delay: 0.2s; }
+.ai-loader .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+.hidden {
+  display: none;
+}
+.star-popup .reminder {
+  font-size: 0.85rem;
+  color: #666;
+  background: #f4f4f4;
+  padding: 8px 12px;
+  border-left: 4px solid #c7d2fe; /* soft blue-violet border */
+  border-radius: 6px;
+  margin: 10px 0;
+  font-style: italic;
+}
+.disabled-star {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: auto;
+  position: relative;
+}
+
+.star-tooltip {
+  position: absolute;
+  top: -35px;
+  right: 0;
+  background: #fefefe;
+  color: #333;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  z-index: 999;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.input-tooltip {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rich-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rich-toolbar button {
+  background: #e5e7eb; /* gris claro pero no blanco */
+  color: #1f2937; /* texto más oscuro */
+  border: 1px solid #d1d5db;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rich-toolbar button:hover {
+  background-color: #d1d5db;
+}
+
+.rich-toolbar button.active {
+  background-color: #3b82f6;
+  color: white;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+
+.rich-input {
+  min-height: 100px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  background: white;
+  overflow-y: auto;
+}
+.go-back-button {
+  top: 1px;
+  left: 25px;
+  width: 100px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #e6f3ff;
+  color: #003BFF;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s, transform 0.2s;
+  z-index: 1000;
+  margin-left: 15px;
+}
+.go-back-button:hover {
+  background-color: #d0eaff;
+  transform: scale(1.05);
+}
+#opportunitiesTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  font-size: 14px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+#opportunitiesTable thead {
+  background-color: #f3f4f6;
+  color: #374151;
+  text-align: left;
+}
+
+#opportunitiesTable th, #opportunitiesTable td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+#opportunitiesTable tbody tr:hover {
+  background-color: #f9fafb;
+  cursor: pointer;
+}
+
+#opportunitiesTable td {
+  color: #111827;
+}
+
+.linkedin-link:hover {
+  transform: scale(1.2);
+}
+/* Go Back button */
+.go-back-button{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(214, 222, 248, 0.58);
+  color: #003BFF;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-family: "Onest", system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: background .2s ease, color .2s ease;
+}
+
+.go-back-button:hover{
+  background: #e5e9ff;
+  color: #0a3ad1;
+}
+
+.country-flag {
+  margin-left: 8px;
+  font-size: 20px;
+  vertical-align: middle;
+}
+#overview .field {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+  transition: transform 0.2s;
+}
+
+#field-country {
+  margin-top: 6px;
+  background-color: #ffffff;
+}
+#linkedin-open-btn {
+  display: inline-block !important;
+  visibility: visible;
+  opacity: 1;
+  margin-left: 6px;
+  font-size: 18px;
+}
+/*botones */
+#ai-action-button {
+  position: fixed;
+  right: 10px;
+  width: 170px;
+  height: 50px;
+  background-color: #9b5de5; /* morado vibrante */
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 15px;
+  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  text-decoration: none;
+  cursor: pointer;
+  z-index: 999;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+/* HOVER */
+#ai-action-button:hover,
+#client-version-btn:hover {
+  background-color: #7b2cbf;
+  transform: scale(1.05);
+}
+
+
+
+.resume-loader {
+  position: fixed;
+  z-index: 9999;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  font-family: 'Onest', sans-serif;
+}
+
+.resume-loader-box {
+  background: white;
+  padding: 50px 40px;
+  border-radius: 20px;
+  max-width: 600px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(0,0,0,0.2);
+  animation: popIn 0.4s ease-out;
+}
+
+.resume-loader-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #5c33cc;
+}
+
+.resume-loader-phrase {
+  font-size: 20px;
+  font-weight: 500;
+  color: #333;
+  min-height: 48px;
+  transition: opacity 0.4s;
+}
+
+.resume-loader-dots {
+  font-size: 36px;
+  color: #5c33cc;
+  margin-top: 20px;
+  animation: blinkDots 1.5s infinite;
+}
+
+.resume-loader-dots span {
+  animation: blink 1.5s infinite;
+}
+
+.resume-loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+.resume-loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0; }
+  40% { opacity: 1; }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+#hire input,
+#hire select {
+  border-radius: 12px;
+  background-color: #ffffff;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  font-size: 14px;
+  font-family: 'Onest', sans-serif;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: all 0.2s ease;
+}
+
+#hire input:focus,
+#hire select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+#hire .field {
+  background-color: #ffffff;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+}
+#opp-model-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background-color: #f3f4f6; /* gris suave */
+  border: 1px solid #e5e7eb;
+  color: #374151; /* gris oscuro */
+  font-size: 13px;
+  font-weight: 500;
+  font-family: 'Onest', sans-serif;
+  margin-bottom: 20px;
+  letter-spacing: 0.2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.full-width-salary-updates {
+  grid-column: 1 / -1;
+  width: 96%;
+}
+.cv-card-entry input[type="month"] {
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  background-color: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 6px !important;
+  padding: 10px 12px !important;
+}
+.disabled-hover {
+  position: relative;
+  pointer-events: auto; /* Necesario para permitir el hover en disabled */
+}
+
+.disabled-hover:hover::after {
+  content: "You can't edit revenue manually. It's auto-calculated.";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 240px;
+  background: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+input, select, textarea, .rich-input, [contenteditable="true"] {
+  font-family: 'Onest', sans-serif !important;
+  font-size: 14px !important;
+  color: #333 !important;
+  font-weight: 400 !important;
+}
+
+.rich-input * {
+  font-family: 'Onest', sans-serif !important;
+  font-size: 14px !important;
+  color: #333 !important;
+  font-weight: 400 !important;
+}
+
+/* Acción pequeña a la derecha del label */
+#cv-card .value{ display:flex; flex-direction:column; gap:10px; }
+
+.cv-drop{
+  border:2px dashed var(--accent-strong);
+  border-radius:12px;
+  padding:16px;
+  text-align:center;
+  background:var(--bg);
+  transition:border-color .2s ease, background-color .2s ease, transform .15s ease;
+}
+.cv-drop.dragover{ border-color:var(--primary); background:var(--highlight); transform:scale(0.998); }
+
+.cv-cta{ font-size:13px; }
+.cv-hint{ font-size:12px; opacity:.7; margin-top:4px; }
+
+.cv-list{ display:grid; grid-template-columns:1fr; gap:8px; }
+.cv-item{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:10px 12px; border:1px solid var(--border); background:var(--bg); border-radius:10px;
+}
+.cv-name{ font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cv-actions{ display:flex; gap:6px; }
+
+/* Botones dentro de la lista */
+.cv-actions .btn{
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:6px 10px;
+  background:var(--card);
+  cursor:pointer;
+  font-size:12px;
+}
+.cv-actions .btn.danger{ border-color:#ffdddd; background:#fff5f5; }
+
+/* Botones Apple-like reutilizables */
+.btn-sm{ font-size:12px; line-height:1; padding:8px 12px; border-radius:999px; }
+.btn-soft{
+  border:1px solid var(--border);
+  background:var(--highlight);
+  border-radius:999px; padding:8px 12px;
+  display:inline-flex; align-items:center; gap:8px;
+  cursor:pointer; user-select:none;
+  transition:background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .12s ease, opacity .2s ease;
+}
+.btn-soft:hover{ background:var(--highlight); border-color:var(--accent-strong); }
+.btn-soft:active{ transform:scale(.98); }
+.btn-soft:focus-visible{ outline:0; box-shadow:0 0 0 3px rgba(108,99,255,.25); }
+.btn-soft[disabled]{ opacity:.55; cursor:not-allowed; }
+
+.btn-primary{
+  border:0;
+  background:linear-gradient(180deg, var(--primary), #5a53e6);
+  color:#fff;
+  border-radius:999px; padding:8px 14px;
+  display:inline-flex; align-items:center; gap:8px;
+  cursor:pointer; user-select:none;
+  transition:filter .2s ease, box-shadow .2s ease, transform .12s ease, opacity .2s ease;
+  box-shadow:0 6px 16px rgba(0,0,0,.06);
+}
+.btn-primary:hover{ filter:brightness(1.04); box-shadow:0 8px 20px rgba(0,0,0,.08); }
+.btn-primary:active{ transform:translateY(1px) scale(.99); }
+.btn-primary:focus-visible{ outline:0; box-shadow:0 0 0 3px rgba(108,99,255,.25); }
+
+.btn-icon{ display:inline-block; font-size:14px; line-height:1; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+.btn-icon.spin{ animation:spin .6s linear; }
+/* === Mini indicador CV (no bloqueante) === */
+.cv-indicator {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 9999px;
+  background: var(--card, #f9f9f9);
+  color: var(--text, #1a1a1a);
+  border: 1px solid var(--border, #dcdcdc);
+  box-shadow: 0 6px 24px rgba(0,0,0,.08);
+  font-size: 12px;
+  z-index: 2000;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;           /* no bloquea clics de la página */
+  transition: opacity .18s ease, transform .18s ease;
+}
+.cv-indicator.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.cv-indicator .spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.2);
+  border-top-color: currentColor;
+  animation: cvspin .8s linear infinite;
+}
+@keyframes cvspin { to { transform: rotate(360deg); } }
+
+.cv-indicator .check {
+  width: 10px;
+  height: 6px;
+  border: 2px solid currentColor;
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(45deg);
+  margin-left: 2px;
+}
+.cv-indicator .msg { white-space: nowrap; }
+.modal-close{
+  position:absolute; top:10px; right:12px; 
+  font-size:20px; line-height:1; border:0; background:transparent; cursor:pointer;
+  opacity:.6;
+}
+.modal-close:hover{ opacity:1; }
+/* fila de dos tarjetas a lo ancho */
+.doc-row{
+  grid-column: 1 / -1;           /* ocupa todo el ancho de la grid padre */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* tarjetas de documentos */
+.doc-card{
+  display: flex;
+  flex-direction: column;
+}
+.doc-card-label{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap:10px;
+}
+.value.two-by-two{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* responsive: apilar en pantallas estrechas */
+@media (max-width: 980px){
+  .doc-row{ grid-template-columns: 1fr; }
+}
+
+/* opcional: lista de archivos consistente */
+.cv-list .cv-item{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:8px 10px; border:1px solid #eee; border-radius:10px;
+  background:#fff;
+}
+.cv-list .cv-name{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 60%;
+}
+
+/* === NUCLEAR OVERRIDE — Month/Year selects white & rounded === */
+#resume .cv-card-entry .month-year select,
+#resume .mr-entry .month-year select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  height: 34px !important;
+  padding: 6px 12px !important;
+  padding-right: 28px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background-clip: padding-box !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20'%3E%3Cpath fill='%239ca3af' d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 16px 16px !important;
+}
+
+/* Compactar anchos */
+html body .cv-card-entry .month-year select.month { min-width: 64px !important; width: auto !important; }
+html body .cv-card-entry .month-year select.year  { min-width: 60px !important; width: auto !important; font-variant-numeric: tabular-nums !important; }
+
+/* Tiny "clear" pill — BLUE */
+#resume .month-year .btn-clear{
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  background: var(--tab-active) !important;   /* azul */
+  color: #fff !important;
+  border: 1px solid var(--tab-active) !important;
+
+  height: 20px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;                  /* mini pill */
+  line-height: 18px !important;
+  border-radius: 999px !important;
+
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: lowercase !important;       /* muestra "clear" tal cual */
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  box-shadow: none !important;
+  outline: none !important;
+}
+#hire .month-year select { all: revert !important; }
+
+html body .month-year .btn-clear:hover{
+  filter: brightness(1.06) !important;
+}
+
+html body .month-year .btn-clear:active{
+  transform: scale(0.98) !important;
+}
+/* --- Aislar estilos de fechas: Resume ≠ Hire --- */
+#hire .month-year select {
+  all: revert;
+}
+
+/* 3) Estilo limpio del input nativo en Hire (día/mes/año) */
+#hire input[type="date"] {
+  -webkit-appearance: menulist;
+  appearance: auto;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+#hire input[type="date"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+/* === Multi-Roles (Work Experience) === */
+.mr-wrap{margin-top:12px;display:none}
+.mr-wrap.active{display:block}
+.mr-list{display:flex;flex-direction:column;gap:12px}
+.mr-entry{position:relative;background:#f3f4f6;border:1px solid #d1d5db;border-radius:8px;padding:14px}
+.mr-entry .remove-entry{position:absolute;top:10px;right:10px;background:#f3f4f6;color:#9ca3af;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer}
+.mr-entry .remove-entry:hover{background:#e5e7eb;color:#ef4444}
+.mr-row{display:flex;gap:16px;flex-wrap:wrap}
+.mr-row .mr-col{flex:1 1 280px;min-width:280px}
+.mr-title{width:100%;font-size:16px;font-weight:700;border:none;background:transparent;border-bottom:1px solid #d1d5db;padding:6px 0}
+.mr-toolbar{display:flex;gap:8px;margin:8px 0}
+.mr-desc{min-height:140px;border:1px solid #d1d5db;border-radius:8px;background:#fff;padding:10px;overflow:auto}
+.mr-add{margin-top:6px}
+.mr-hidden{display:none !important}
+.mr-hidden { display: none !important; }
+/* Fila de una mini-tarjeta en cuadrícula: Título | Start | End | Current */
+.mr-row{
+  display:grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap:12px;
+  align-items:end; /* alinea las labels y selects abajo */
+}
+
+/* Asegura que los selects de Month/Year queden en línea */
+.month-year{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:nowrap;
+}
+.month-year .mini-select{
+  min-width:110px;
+  height:36px;
+}
+.month-year .btn-clear{
+  height:32px;
+  padding:0 8px;
+}
+/* Deja lugar al botón eliminar y evita overflow en mini-rol */
+.mr-entry{
+  padding-right: 56px;      /* espacio para el botón 🗑️ */
+  box-sizing: border-box;
+}
+
+/* Grid más estable para la fila del mini-rol */
+.mr-row{
+  grid-template-columns: minmax(180px,2fr) 1fr 1fr max-content;
+  align-items: end;
+}
+
+.mr-row .mr-col{ min-width: 0; }          /* permite que las columnas encojan */
+.mr-row .mr-col:last-child{ justify-self: end; }
+
+/* Responsive: que no se corte en pantallas chicas */
+@media (max-width: 720px){
+  .mr-row{ grid-template-columns: 1fr 1fr; }
+  .mr-row .mr-col:last-child{ grid-column: 1 / -1; justify-self: start; }
+}
+#resume .cv-card-entry > div .month-year{ 
+  flex-wrap: wrap; 
+  row-gap: 6px;
+}
+#resume .cv-card-entry > div .month-year .btn-clear{
+  flex: 0 0 auto;
+  order: 3;               /* cae a la siguiente línea si no entra */
+  margin-top: 2px;
+}
+#resume .mr-entry .month-year{ flex-wrap: nowrap; } /* mini-rol sigue compacto */
+/* ✅ Fija layout del "Current" en mini-roles (no afecta a tarjetas principales) */
+.mr-entry { overflow: hidden; }
+
+.mr-entry .mr-col:last-child {
+  min-width: 120px;
+  justify-self: end;
+}
+
+.mr-entry .mr-col:last-child label {
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+
+/* Switch compacto SOLO para mini-roles */
+.mr-entry .mr-current {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  background: #d1d5db;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+
+.mr-entry .mr-current::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+.mr-entry .mr-current:checked {
+  background: #3b82f6;
+}
+
+.mr-entry .mr-current:checked::before {
+  transform: translateX(16px);
+}
+/* 📍 Coloca el botón debajo del Client Version (que está en top:64px) */
+#ai-action-button {
+  display: flex;           /* centra el emoji y el texto */
+  top: 120px;              /* justo debajo del client-version-btn */
+}
+
+/* Por si algún otro estilo lo oculta, asegúrate que quitar .hidden lo muestre */
+#ai-action-button.hidden { display: none !important; }
+.rich-input ul { list-style: disc; padding-left: 1.25rem; margin: .25rem 0 .5rem; }
+.rich-input ol { list-style: decimal; padding-left: 1.25rem; margin: .25rem 0 .5rem; }
+.rich-input li { margin-left: .25rem; }
+.rich-input p  { margin: .25rem 0; }
+/* === Salary Update Popup: inputs del mismo tamaño === */
+#salary-update-popup input[type="number"],
+#salary-update-popup input[type="date"] {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d8c4b4;
+  font-size: 14px;
+  box-sizing: border-box;
+  line-height: 1.2;
+}
+
+/* Quitar spinners de number */
+#salary-update-popup input[type="number"]::-webkit-outer-spin-button,
+#salary-update-popup input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#salary-update-popup input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Safari tiende a inflar el date; fuerza altura consistente */
+@supports (-webkit-touch-callout: none) {
+  #salary-update-popup input[type="date"] {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* Botón de cierre clickeable siempre encima */
+#salary-update-popup .modal-close{
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  cursor: pointer;
+}
+/* === Salary Update Popup: inputs del mismo tamaño === */
+#salary-update-popup input[type="number"],
+#salary-update-popup input[type="date"] {
+  width: 100%;
+  height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d8c4b4;
+  font-size: 14px;
+  box-sizing: border-box;
+  line-height: 1.2;
+}
+
+/* Quitar spinners de number */
+#salary-update-popup input[type="number"]::-webkit-outer-spin-button,
+#salary-update-popup input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#salary-update-popup input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Safari tiende a inflar el date; fuerza altura consistente */
+@supports (-webkit-touch-callout: none) {
+  #salary-update-popup input[type="date"] {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* Botón de cierre clickeable siempre encima */
+#salary-update-popup .modal-close{
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  cursor: pointer;
+}
+/* Hire: que todos los inputs (incluyendo number) llenen el ancho y tengan misma altura */
+#hire .field { align-items: stretch; }          /* el contenedor deja estirar al input */
+
+#hire input,
+#hire select {
+  width: 100%;               /* ← asegura ancho completo */
+  height: 44px;              /* ← altura consistente */
+  box-sizing: border-box;
+}
+
+#hire input[type="number"]{
+  -webkit-appearance: none;  /* Safari */
+  appearance: textfield;
+}
+
+/* por si Safari infla el date: */
+@supports (-webkit-touch-callout: none){
+  #hire input[type="number"],
+  #hire input[type="date"]{ height: 44px; }
+}
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--glass-bg1, rgba(240,240,255,0.5));
+  border: 1px solid rgba(140, 120, 255, 0.20);
+  box-shadow: 0 2px 6px rgba(120, 100, 255, 0.08);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.equip-chip { backdrop-filter: blur(8px); }
+
+.pill-link {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(230,236,255,.6);
+  border: 1px solid rgba(120, 140, 255, .25);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .1s ease, box-shadow .2s ease;
+}
+.pill-link:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(120, 140, 255, .15); }
+
+/* Rich input (ya lo usas en Hire/References) — por si falta */
+.rich-toolbar { display:flex; gap:8px; margin-bottom:6px; }
+.rich-toolbar button {
+  border: 1px solid #e8e6f5;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.rich-input {
+  min-height: 92px;
+  border: 1px solid #ece8f5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+}
+/* ——— Reminders: full-width como References, pero compacta ——— */
+#hire .reminders-card {
+  grid-column: 1 / -1;           /* ← mismo ancho horizontal que References */
+  padding: 12px 16px;            /* menos padding para reducir altura */
+  gap: 8px;
+}
+
+/* Título más compacto */
+#hire .reminders-card > label {
+  margin-bottom: 2px;
+}
+
+/* Cuerpo en una sola línea: checks a la izquierda, botón a la derecha */
+#hire .reminders-body {
+  display: grid;
+  grid-template-columns: 1fr max-content;  /* lista | botón */
+  align-items: center;
+  gap: 10px 16px;
+}
+
+/* Lista de 3 checks en una fila, con wrap si no entra */
+#hire .reminders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* “Pills” muy bajitas */
+#hire .rem-chk {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+/* Checkbox visual pequeñito */
+#hire .rem-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+}
+
+/* Texto compacto */
+#hire .rem-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+#hire #btn-send-reminders.btn-blue {
+  padding: 8px 16px;
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 999px;
+  white-space: normal;          /* ← permite saltos de línea */
+  text-align: center;           /* ← centra el texto */
+  align-self: center;
+  max-width: 150px;             /* ajusta el ancho del botón */
+  word-break: keep-all;
+  background-color: #003BFF;
+}
+
+
+/* Hint opcional (si lo usas), aún más chico y debajo en móviles */
+#hire .rem-hint {
+  grid-column: 1 / -1;
+  margin-top: -4px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* Responsive: en pantallas angostas, botón baja a la segunda fila */
+@media (max-width: 720px) {
+  #hire .reminders-body {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  #hire #btn-send-reminders.btn-blue {
+    justify-self: start;
+  }
+}
+/* Reminders card */
+.reminders-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: 'Onest', sans-serif;
+  
+}
+
+.reminders-card label {
+  letter-spacing: .3px;
+}
+
+.reminders-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reminders-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.rem-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s ease, border-color .2s ease, transform .06s ease;
+}
+.rem-chk:hover { background: #f1f5f9; }
+.rem-chk:active { transform: scale(.99); }
+
+.rem-chk input {
+  appearance: none;
+  width: 0; height: 0;
+  position: absolute; left: -9999px;
+}
+
+.rem-box {
+  width: 18px; height: 18px;
+  border-radius: 6px;
+  border: 2px solid #9ca3af;
+  display: inline-block;
+  position: relative;
+  flex: 0 0 18px;
+  transition: border-color .2s ease, background-color .2s ease;
+}
+
+.rem-chk input:checked + .rem-box {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+.rem-chk input:checked + .rem-box::after {
+  content: "";
+  position: absolute;
+  left: 4px; top: 1px;
+  width: 6px; height: 10px;
+  border: 2px solid #fff;
+  border-top: 0; border-left: 0;
+  transform: rotate(45deg);
+}
+
+.rem-name { font-weight: 600; color: #1f2937; }
+
+.btn-blue {
+  border: 0;
+  background: linear-gradient(180deg, #003BFF, #003BFF);
+  color: #fff;
+  border-radius: 999px;
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .25);
+  cursor: pointer;
+  transition: filter .2s ease, transform .06s ease;
+}
+.btn-blue:hover { filter: brightness(1.05); }
+.btn-blue:active { transform: translateY(1px); }
+
+.rem-hint {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ===========================
+   INTERNAL FOLLOW-UPS (nuevo)
+   =========================== */
+
+/* Contenedor principal */
+.reminders-card {
+  background: #f9fafb;
+  border-radius: 22px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Título */
+.reminders-card > label {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+/* Cuerpo general */
+.reminders-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* === GRID de 3 columnas === */
+.reminders-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+/* === Cada tarjeta individual === */
+.reminders-list li {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reminders-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
+}
+
+/* === Encabezado (check + nombre) === */
+.rem-chk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rem-chk input {
+  appearance: none;
+  position: absolute;
+  opacity: 0;
+}
+
+/* Check redondo azul */
+.rem-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  border: 2px solid #93c5fd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 0 0 0 transparent;
+}
+
+.rem-box::after {
+  content: "";
+  width: 6px;
+  height: 10px;
+  border: 2px solid transparent;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Estado checked */
+.rem-chk input:checked + .rem-box {
+  background: linear-gradient(145deg, #2563eb, #3b82f6);
+  border-color: #2563eb;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+}
+
+.rem-chk input:checked + .rem-box::after {
+  opacity: 1;
+}
+
+/* Nombre */
+.rem-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+
+/* === Mensajes internos === */
+.rem-countdown,
+.rem-msg {
+  font-size: 12.5px;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.rem-countdown::before,
+.rem-msg::before {
+  font-size: 13px;
+}
+
+/* Ocultar si están vacíos */
+.rem-countdown:empty,
+.rem-msg:empty {
+  display: none;
+}
+
+/* === Botón azul final === */
+.btn-blue {
+  align-self: flex-end;
+  border: 0;
+  background: linear-gradient(90deg, #003BFF, #003BFF);
+  color: #fff;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-blue:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px rgba(37, 99, 235, 0.45);
+}
+
+.btn-blue:active {
+  transform: translateY(1px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3);
+}
+
+/* === Responsive === */
+@media (max-width: 960px) {
+  .reminders-list { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .reminders-list { grid-template-columns: 1fr; }
+}
+
+.fireworks-pop {
+  position: fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background: rgba(0,0,0,.35); z-index: 9999; backdrop-filter: blur(2px);
+}
+.fireworks-pop .bubble {
+  background:#fff; padding:18px 22px; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  text-align:center;
+}
+.fireworks-pop img { width:160px; height:auto; display:block; margin:8px auto 12px; }
+/* Pill editable estilo input, centrado */
+#field-phone.editable-pill[contenteditable="true"]{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height: 30px;      /* ↓ antes 44px */
+  padding: 4px 14px;     /* ↓ menos alto, misma anchura */
+  border: transparent;
+
+  background:#fff;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  line-height: 1.1;      /* compacto */
+  letter-spacing: .2px;
+  text-align:center;
+}
+.icon-button.whatsapp{
+  width: 32px;   /* antes 36 */
+  height: 32px;  /* antes 36 */
+}
+
+/* Botón WhatsApp redondo */
+.icon-button.whatsapp{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:36px; height:36px;
+  border-radius:999px;
+  background:#25D366;
+  color:#fff;
+  border:none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  cursor:pointer;
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease;
+  opacity:0; pointer-events:none; /* por defecto oculto; JS lo habilita */
+}
+.icon-button.whatsapp:hover{ transform: scale(1.05); filter: saturate(1.1); }
+.icon-button.whatsapp.is-visible{ opacity:1; pointer-events:auto; }
+.icon-button.whatsapp {
+  opacity: 1; /* visible por defecto */
+  pointer-events: auto;
+}
+
+/* ===== Cute doc-check makeover ===== */
+.doc-check.cute{
+  --glass: rgba(255,255,255,.65);
+  --stroke: rgba(125,144,170,.25);
+  --shadow: 0 8px 30px rgba(16,24,40,.06);
+  --accent: #7c3aed; /* tu violeta suave */
+  --accent-2: #9b8cff;
+  --bg-gradient: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.6));
+  background: var(--bg-gradient);
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: saturate(140%) blur(6px);
+}
+
+/* banda sutil arriba */
+.doc-check.cute::before{
+  content:"";
+  position:absolute; inset:0 0 auto 0; height:3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  opacity:.35;
+}
+
+/* header */
+.doc-check__head{
+  display:flex; align-items:center; gap:12px;
+}
+.doc-check__emoji{
+  font-size:20px; line-height:1; transform: translateY(1px);
+}
+.doc-check__titlewrap{ display:flex; flex-direction:column; }
+.doc-check__title{
+  font-weight:600; letter-spacing:.2px; font-size:15px; color:#111827;
+}
+.doc-check__subtitle{
+  font-size:12px; color:#6b7280; margin-top:2px;
+}
+
+/* fila del checkbox */
+.doc-check .check-row{
+  display:flex; align-items:center; gap:12px; margin-top:12px;
+}
+
+/* pretty checkbox – versión cute */
+.pretty-check{
+  display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none;
+  font-size:14px; color:#374151;
+}
+.pretty-check input{
+  appearance:none; -webkit-appearance:none;
+  width:22px; height:22px; border-radius:8px;
+  border:1.5px solid #d9dfe8; background:#fff;
+  display:grid; place-items:center; outline:none;
+  transition: transform .14s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+  box-shadow: 0 2px 8px rgba(17,24,39,.06) inset;
+}
+.pretty-check input:hover{ transform: translateY(-1px); }
+.pretty-check input:active{ transform: scale(.96); }
+
+.pretty-check input::before{
+  content:"";
+  width:12px; height:12px; transform: scale(0);
+  transition: transform .18s ease;
+  clip-path: polygon(14% 44%, 0 65%, 46% 100%, 100% 16%, 82% 0, 43% 62%);
+  background:#fff;
+}
+
+/* caja visual que permite sparkles */
+.pretty-check .box{
+  pointer-events:none; position:absolute; width:0; height:0;
+}
+
+/* estado checked con gradiente pastel y sparkles */
+.pretty-check input:checked{
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  box-shadow: 0 6px 18px rgba(124,58,237,.25);
+}
+.pretty-check input:checked::before{ transform: scale(1); }
+
+/* sparkles */
+.pretty-check input:checked + .box::after{
+  content:"✨"; position:absolute; font-size:12px; left:28px; top:-4px;
+  animation: twinkle .9s ease-out forwards;
+  filter: saturate(1.2);
+}
+@keyframes twinkle{
+  0% { opacity:0; transform: translateY(4px) scale(.8); }
+  40%{ opacity:1; transform: translateY(-2px) scale(1); }
+  100%{ opacity:0; transform: translateY(-8px) scale(.9); }
+}
+
+.pretty-check .txt{ line-height:1.35; }
+.u-muted{ color:#8b97a7; font-style:italic; }
+
+/* ===== Cute toast (auto-oculto) ===== */
+.cute-toast{
+  position: fixed; right: 18px; bottom: 18px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(125,144,170,.25);
+  box-shadow: 0 14px 40px rgba(16,24,40,.16);
+  backdrop-filter: blur(8px) saturate(140%);
+  padding: 12px 14px; border-radius: 14px; max-width: 320px;
+  font-size: 14px; color:#111827; display:none; z-index: 10000;
+}
+.cute-toast.show{ display:block; animation: toastIn .25s ease-out; }
+@keyframes toastIn{
+  from{ transform: translateY(8px); opacity:0; }
+  to{ transform: translateY(0); opacity:1; }
+}
+.cute-toast .tiny{
+  display:block; font-size:12px; color:#6b7280; margin-top:4px;
+}
+
+
+
+
+
+
+
+/* -------------/*-------------/* overview -------------/*-------------/* /
+
+/* Contenedor: izquierda (main) + derecha (sidebar) */
+#overview .overview-layout{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 360px; /* main flexible | sidebar fija */
+  gap: 24px;
+  align-items:start;
+}
+
+/* Grid interna SOLO para los campos de la izquierda (2 columnas) */
+#overview .overview-layout > .grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(280px,1fr));
+  gap: 18px 20px;
+}
+
+/* bloques que deben abarcar ambas columnas de la izquierda */
+#overview .overview-layout > .grid .field.full,
+#overview .overview-layout > .grid .field-group,
+#overview .overview-layout > .grid .field.textarea,
+#overview .overview-layout > .grid .field:has(.rich-toolbar){
+  grid-column: 1 / -1;
+}
+
+/* Sidebar fija y apilada, SIN afectar la altura de filas del main */
+#overview .overview-layout > .sidebar{
+  position: sticky;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+/* Responsive: todo apilado */
+@media (max-width: 1024px){
+  #overview .overview-layout{
+    grid-template-columns: 1fr;
+  }
+  #overview .overview-layout > .sidebar{
+    position: static;
+  }
+}
+
+
+/* -------------/*-------------/* header -------------/*-------------/*/
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  height: 80px;
+  background:#003BFF;            /* azul del mock */
+  color:#fff;
+  border-radius:20px;
+  padding-left: 25px;
+  padding-right: 25px;
+  box-shadow:0 14px 34px rgba(0,0,0,.12);
+  margin-bottom: 20px;
+}
+
+/* Botón "Go Back" dentro del topbar */
+.topbar .back{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:transparent;
+  border:0;
+  color:#fff;
+  font-weight:700;               /* bold fuerte como el mock */
+  font-size:16px;
+  letter-spacing:.2px;
+  cursor:pointer;
+  border-radius:12px;
+  transition:background .15s ease, transform .06s ease;
+}
+.topbar .back:hover{ background:rgba(255,255,255,.12); }
+.topbar .back:active{ transform:translateY(1px); }
+
+
+/* ===== Header bar (Go Back + Tabs aligned) ===== */
+.header-bar{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* header */
+.tabs{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f9fafb;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 40px;
+  padding: 1px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  margin-bottom: 1px;
+}
+
+.tabs .tab{
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 22px;
+  font-family: "Onest", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #374151;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+
+.tabs .tab:hover{
+  background: #f1f2f4;
+  color: #111827;
+}
+
+.tabs .tab.active{
+  background: #000;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Responsive */
+@media (max-width: 720px){
+  .header-bar{
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+}
+
+/* fila del header */
+.header-row{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:16px;
+  width:100%;
+  padding:8px 20px;
+  box-sizing:border-box;
+  margin-top: -10px;
+  text-align:initial !important; /* por si el padre tenía text-align:center */
+}
+
+
+/* FORZAR tabs a la derecha (rompe centrados previos) */
+.header-row .tabs{
+  margin-left:auto !important;
+  margin-right:10px !important;
+  position:static !important;
+  left:auto !important;
+  transform:none !important;
+}
+
+/* (opcional) ancho mínimo para que no “salten” */
+.header-row .tabs .tab{ white-space:nowrap; }
+
+/* ---------- Tabs ---------- */
+.tabs {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.8);
+  border-radius: 25px;
+  box-shadow: 0 4px 20px rgba(15,23,42,0.05);
+  backdrop-filter: saturate(1.3) blur(10px);
+}
+
+/* ---------- Layout ---------- */
+.overview-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 28px;
+  padding: 20px 40px 60px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+/* ---------- Field Cards ---------- */
+.field {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: 0.2s ease;
+}
+.field:hover {
+  box-shadow: 0 6px 18px rgba(15,23,42,0.08);
+  transform: translateY(-2px);
+}
+
+/* ---------- Labels ---------- */
+.field label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Editable & Inputs ---------- */
+.field [contenteditable="true"],
+.field select,
+.field textarea {
+  border: none;
+  outline: none;
+  font-size: 15px;
+  font-weight: 500;
+  background: transparent;
+  color: #0f172a;
+  resize: none;
+}
+.field select {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.field textarea {
+  min-height: 70px;
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 8px 10px;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.doc-card {
+  border: 1px solid rgba(0,0,0,0.06);
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+}
+.doc-card-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.cv-drop {
+  background: #f8fafc;
+  border: 2px dashed rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  color: #475569;
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+.cv-drop:hover {
+  border-color: #a5b4fc;
+  background: #f1f5ff;
+}
+.cv-hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+/* ---------- Rich Editor ---------- */
+.rich-toolbar {
+  display: flex;
+  gap: 6px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 4px;
+}
+.rich-toolbar button {
+  background: transparent;
+  border: none;
+  color: #475569;
+  font-size: 13px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.rich-toolbar button:hover {
+  background: #e2e8f0;
+}
+.rich-input {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.05);
+  padding: 10px;
+  min-height: 80px;
+}
+
+/* ---------- WhatsApp Button ---------- */
+.icon-button.whatsapp {
+  background: #25D366;
+  color: #fff;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.25s;
+}
+.icon-button.whatsapp:hover {
+  background: #1da851;
+}
+
+/* ===== Nombre como header editable (sin card) ===== */
+/* Quita background/borde/sombra SOLO al field que contiene #field-name */
+.field:has(#field-name){
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  
+ 
+  font-size: 30px;
+}
+
+/* El contenido editable luce como título */
+#field-name{
+  display: block;
+  margin-top: 1px;
+  margin-left: 27px;
+  margin-right: 27px;
+  line-height: 1.25;
+  font-size: 30px !important;
+  font-weight: 700;
+  color: #111827;
+  border-radius: 10px;
+  outline: none;
+  background: transparent;
+  white-space: pre-wrap;
+  word-break: break-word;
+  transition: box-shadow .2s ease, background .2s ease, transform .06s ease;
+}
+
+#field-name:focus{
+  background: rgba(2,6,23,.055);
+  box-shadow: inset 0 0 0 2px rgba(99,102,241,.18), 0 1px 0 rgba(2,6,23,.03);
+}
+
+/* Selección de texto más visible */
+#field-name::selection{
+  background: #e5e7ff;
+}
+
+/* Cursor y feedback al teclear */
+#field-name:focus-visible{
+  outline: none;
+}
+#field-name:active{
+  transform: translateY(0);
+}
+
+#field-name{
+  color: #111827;
+  font-weight: 700;
+}
+#field-name:empty::before{
+  content: "—";
+  color: #94a3b8;
+}
+
+.field:has(#field-name){
+  margin-bottom: 1px !important;  
+  padding-bottom: 0 !important;
+  margin-top: 1px !important;
+}
+
+/* === PATCH: alinear icono + texto y mandar acciones a la derecha === */
+
+/* Base: los cards pueden tener elementos absolutos */
+#overview .field{ position:relative; }
+
+/* 1) Label compacto (sin space-between) */
+#overview .field > label{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:8px !important;
+  padding-right:44px;                /* reserva espacio para acción derecha si existe */
+}
+
+/* 2) PHONE: botón WhatsApp pegado a la derecha */
+#overview #phone-field > label #wa-btn-overview{
+  position:absolute !important;
+  top:25% !important;
+  right:14px !important;
+  transform:translateY(-50%) !important;
+  margin:0 !important;
+}
+#overview #phone-field #field-phone{
+  display:flex; align-items:center; justify-content:flex-start;
+  padding-right:50px;                /* evita que el texto choque con el botón */
+  text-align:left;
+}
+
+/* 3) LINKEDIN: botón 🔗 a la derecha, texto alineado normal */
+#overview .field > label #linkedin-open-btn{
+  position:absolute !important;
+  top:25% !important;
+  right:14px !important;
+  transform:translateY(-50%) !important;
+  margin:0 !important;
+}
+#overview #field-linkedin{ padding-right:50px; }
+
+/* 4) COUNTRY: oculta el SVG placeholder que abre hueco y ajusta la banderita */
+#overview .field label .icon{ display:none; }          /* placeholder vacío */
+#overview .country-flag{
+  font-size:16px; margin-left:6px; transform:translateY(1px);
+}
+
+/* 5) Imágenes de icono: sin margen extra */
+#overview .field label img{ display:inline-block; vertical-align:middle; }
+
+
+
+
+
+
+
+/* === Sidebar docs – CV / Resignation: lista limpia y compacta === */
+
+/* Espacio entre dropzone y lista */
+#cv-card .cv-drop,
+#resig-card .cv-drop{
+  margin-bottom: 1px;
+}
+
+/* La lista en columna con gap consistente */
+#cv-card .cv-list,
+#resig-card .cv-list{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Cada item de la lista (sirve aunque el JS inserte <div>, <li>, etc.) */
+#cv-card .cv-list > *,
+#resig-card .cv-list > *{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 10px 12px;
+  border: 1px solid #e7ecf3;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(15,23,42,.05);
+
+  /* que no se pegue al borde del card */
+  margin: 0 4px;
+}
+
+/* El nombre del archivo: una sola línea con elipsis */
+#cv-card .cv-list > *{
+  overflow: hidden;        /* para que funcione elipsis con text node */
+}
+#cv-card .cv-list > * > .cv-name,
+#resig-card .cv-list > * > .cv-name{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Si NO tienes .cv-name y el texto va suelto, el <a> “Open” se va a la derecha */
+#cv-card .cv-list > * > a:first-of-type,
+#resig-card .cv-list > * > a:first-of-type{
+  margin-left: auto;     /* empuja acciones a la derecha */
+}
+
+/* Botón/enlace Open */
+#cv-card .cv-list a,
+#resig-card .cv-list a{
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* Botón Delete sin agresivo, redondeado */
+#cv-card .cv-list button,
+#resig-card .cv-list button{
+  border: 0;
+  background: #fdecec;
+  color: #b42318;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter .2s ease, transform .06s ease;
+}
+#cv-card .cv-list button:hover,
+#resig-card .cv-list button:hover{
+  filter: brightness(0.98);
+}
+#cv-card .cv-list button:active,
+#resig-card .cv-list button:active{
+  transform: translateY(1px);
+}
+
+/* Card visual más compacto y consistente */
+.sidebar .doc-card{
+  border: 1px solid #e7ecf3 !important;
+  padding: 16px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 20px rgba(15,23,42,.06) !important;
+}
+
+/* Dropzone normal */
+#cv-card .cv-drop,
+#resig-card .cv-drop {
+  border: 2px dashed rgba(0,0,0,.08);
+  background: #f8fafc;
+  border-radius: 14px;
+  transition: all 0.25s ease; /* animación suave */
+}
+
+/* Hover del dropzone */
+#cv-card .cv-drop:hover,
+#resig-card .cv-drop:hover {
+  border-color: #2564eb97;           
+  background: #eff6ff;             
+  box-shadow: 0 0 0 3px #dbeafe;   
+}
+
+
+/* Etiqueta de card (título + refresh) alineada y con espaciado */
+.doc-card-label{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+
+/* 1. layout correcto */
+#overview .overview-layout{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 360px;
+  gap: 24px;
+  align-items:start;
+}
+
+/* 2. grid izquierda en 2 columnas fijas */
+#overview .overview-layout > .grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(280px,1fr));
+  gap: 18px 20px;
+}
+
+/* 3. solo sidebar con cards */
+#overview .overview-layout > .sidebar .field {
+  background:#fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+/* (opcional) quita esto si ya estaba */
+/* .overview-layout { ... } */
+/* .grid { ... } */
+
+
+
+
+
+/* =======================================================
+   RESUME V2 – TODO UNIFICADO (Work, Education, Tools, Langs)
+   ======================================================= */
+
+/* ---------- Layout base del resume ---------- */
+html body #resume .cv-container {
+  padding: 32px 36px !important;
+  background: #ffffff !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(15,23,42,0.06) !important;
+  max-width: 960px !important;
+  margin: 0 auto 40px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 40px !important;
+}
+
+html body #resume .cv-section {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+}
+
+
+
+/* ---------- CARD genérico (About, Video, contenedor Tools/Langs) ---------- */
+html body #resume .cv-card {
+  background: #f9fafb !important;
+  border-radius: 14px !important;
+  border: 1px solid #e5e7eb !important;
+  padding: 16px 18px !important;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04) !important;
+}
+
+/* =======================================================
+   Work Experience + Education – tarjetas unificadas
+   ======================================================= */
+
+
+/* Tarjeta base para cada experiencia/educación */
+html body #resume #workExperienceSection .cv-card-entry,
+html body #resume #educationSection      .cv-card-entry {
+  display: grid !important;
+  grid-template-columns: minmax(0, 2fr) minmax(230px, 1fr) !important;
+  column-gap: 24px !important;
+  row-gap: 8px !important;
+
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+  padding: 18px 22px !important;
+  position: relative !important;
+}
+
+/* Títulos (puesto y estudios) */
+html body #resume #workExperienceSection .cv-card-entry input.work-title,
+html body #resume #educationSection      .cv-card-entry input.edu-title {
+  grid-column: 1 / 2 !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 0 2px 0 !important;
+}
+
+/* Subtítulo / empresa / programa */
+html body #resume #workExperienceSection .cv-card-entry input.work-company,
+html body #resume #educationSection      .cv-card-entry input[type="text"]:not(.edu-title) {
+  grid-column: 1 / 2 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #4b5563 !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 0 8px 0 !important;
+}
+
+/* Select de país en Education también en la columna izquierda */
+html body #resume #educationSection .cv-card-entry select {
+  grid-column: 1 / 2 !important;
+}
+
+/* ---------- Fechas (START / END) + Clear ---------- */
+html body #resume #workExperienceSection .cv-card-entry .month-year,
+html body #resume #educationSection      .cv-card-entry .month-year {
+  grid-column: 2 / 3 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* Selects de mes y año como pills blancas */
+html body #resume #workExperienceSection .cv-card-entry .month-year select,
+html body #resume #educationSection      .cv-card-entry .month-year select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  min-width: 88px !important;
+  height: 34px !important;
+  padding: 6px 12px !important;
+
+  border-radius: 999px !important;
+  border: 1px solid #e5e7eb !important;
+  background-color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #111827 !important;
+
+  box-shadow: 0 1px 2px rgba(15,23,42,0.06) !important;
+}
+
+/* Botón CLEAR como mini-pill link morado */
+html body #resume #workExperienceSection .month-year .btn-clear,
+html body #resume #educationSection      .month-year .btn-clear {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 8px !important;
+  margin-left: 4px !important;
+  height: auto !important;
+
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #3b82f6 !important;
+  border-radius: 999px !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+}
+
+html body #resume #workExperienceSection .month-year .btn-clear:hover,
+html body #resume #educationSection      .month-year .btn-clear:hover {
+  background-color: rgba(59,130,246,0.08) !important;
+}
+
+
+/* ---------- Descripción (toolbar + texto) ---------- */
+html body #resume #workExperienceSection .cv-card-entry .rich-toolbar,
+html body #resume #educationSection      .cv-card-entry .rich-toolbar,
+html body #resume #workExperienceSection .cv-card-entry .rich-input,
+html body #resume #educationSection      .cv-card-entry .rich-input {
+  grid-column: 1 / -1 !important;
+}
+
+html body #resume #workExperienceSection .cv-card-entry .rich-toolbar,
+html body #resume #educationSection      .cv-card-entry .rich-toolbar {
+  margin-top: 6px !important;
+  background: #f3f4f6 !important;
+  border-radius: 8px !important;
+  padding: 4px 6px !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+html body #resume #workExperienceSection .cv-card-entry .rich-input,
+html body #resume #educationSection      .cv-card-entry .rich-input {
+  margin-top: 4px !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: 60px !important;
+  font-size: 14px !important;
+  color: #374151 !important;
+}
+
+/* =======================================================
+   Tools & Languages – chips con nivel
+   ======================================================= */
+
+/* Contenedor tipo “línea de chips” */
+html body #resume #toolsSection #toolsList,
+html body #resume #languagesSection #languagesList {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  padding: 6px 2px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+
+
+/* Nombre de la tool / language */
+html body #resume #toolsSection .tool-entry input[type="text"],
+html body #resume #languagesSection .tool-entry input[type="text"],
+html body #resume #languagesSection .language-entry input[type="text"] {
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #111827 !important;
+}
+
+/* Nivel como mini-pill gris */
+html body #resume #toolsSection .tool-entry select,
+html body #resume #languagesSection .tool-entry select,
+html body #resume #languagesSection .language-entry select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  border: none !important;
+  background-color: #f3f4f6 !important;
+  border-radius: 999px !important;
+  padding: 3px 8px !important;
+
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #4b5563 !important;
+
+  width: auto !important;
+  min-width: 0 !important;
+
+  background-image: url("data:image/svg+xml,%3Csvg fill='%239ca3af' height='14' viewBox='0 0 20 20' width='14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5.23 7.21a.75.75 0 011.06.02L10 11.293l3.71-4.06a.75.75 0 111.1 1.02l-4.25 4.65a.75.75 0 01-1.1 0l-4.25-4.65a.75.75 0 01.02-1.06z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 4px center !important;
+  background-size: 12px 12px !important;
+}
+
+/* Botón eliminar pequeño dentro del chip */
+html body #resume #toolsSection .tool-entry .remove-entry,
+html body #resume #languagesSection .tool-entry .remove-entry,
+html body #resume #languagesSection .language-entry .remove-entry {
+  position: static !important;
+  margin-left: 4px !important;
+
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 999px !important;
+
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  font-size: 14px !important;
+  color: #9ca3af !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+/* === Botones ADD unificados tipo ghost suave (tu estilo) === */
+#resume #addWorkExperienceBtn,
+#resume #addEducationBtn,
+#resume #addToolBtn,
+#resume #addLanguageBtn {
+  margin-top: 10px !important;
+  padding: 8px 14px !important;
+  border-radius: 999px !important;
+  border: 1px dashed #cbd5f5 !important;
+  background: transparent !important;
+  font-size: 13px !important;
+  color: #4f46e5 !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+/* hover morado pastel */
+#resume #addWorkExperienceBtn:hover,
+#resume #addEducationBtn:hover,
+#resume #addToolBtn:hover,
+#resume #addLanguageBtn:hover {
+  background: #eef2ff !important;
+}
+
+/* anular el "+" que agregamos antes */
+#resume #addWorkExperienceBtn::before,
+#resume #addEducationBtn::before,
+#resume #addToolBtn::before,
+#resume #addLanguageBtn::before {
+  content: "" !important;
+}
+
+/* =======================================================
+   ALIGN + ESTILO: Clear / Current / Basurero
+   (Work Experience + Education)
+   ======================================================= */
+
+/* ---------- CLEAR: hacerlos link-pill pequeños ---------- */
+/* cualquier botón dentro de una tarjeta, excepto el basurero y los Add */
+#resume #workExperienceSection .cv-card-entry button:not(.remove-entry),
+#resume #educationSection      .cv-card-entry button:not(.remove-entry) {
+  background: transparent !important;
+  border: none !important;
+  color: #6366f1 !important;          /* morado tipo Clear/link */
+  padding: 4px 10px !important;
+  margin-top: 6px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#resume #workExperienceSection .cv-card-entry button:not(.remove-entry):hover,
+#resume #educationSection      .cv-card-entry button:not(.remove-entry):hover {
+  background: #eef2ff !important;     /* morado pastel */
+  color: #4f46e5 !important;
+}
+
+
+/* ============================
+   Work Experience & Education en 2 columnas tipo cards
+   ============================ */
+
+/* El contenedor pasa a ser fila con wrap */
+#resume #workExperienceSection #workExperienceList,
+#resume #educationSection      #educationList {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 24px !important;
+  align-items: flex-start !important;
+}
+
+/* Cada tarjeta ocupa media fila en desktop */
+#resume #workExperienceSection #workExperienceList .cv-card-entry,
+#resume #educationSection      #educationList .cv-card-entry {
+  flex: 1 1 380px !important;                 /* base ~380px */
+  max-width: calc(50% - 12px) !important;     /* 2 columnas */
+  box-sizing: border-box !important;
+}
+
+/* Responsive: en pantallas chicas se apilan de nuevo en 1 columna */
+@media (max-width: 960px) {
+  #resume #workExperienceSection #workExperienceList .cv-card-entry,
+  #resume #educationSection      #educationList .cv-card-entry {
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+}
+
+
+
+
+/* Permitir que los títulos largos hagan wrap o se expandan correctamente */
+html body #resume #workExperienceSection .cv-card-entry input.work-title,
+html body #resume #educationSection      .cv-card-entry input.edu-title {
+  white-space: normal !important;   /* permite salto de línea */
+  word-break: break-word !important; /* corta palabras si es necesario */
+  overflow-wrap: break-word !important;
+  width: 100% !important;
+}
+
+/* 2) Títulos largos: permitir salto de línea y que no se corten */
+#resume #workExperienceSection .cv-card-entry input.work-title,
+#resume #educationSection      .cv-card-entry input.edu-title {
+  white-space: normal !important;      /* permite varias líneas */
+  word-break: break-word !important;   /* corta palabras si son muy largas */
+  overflow-wrap: break-word !important;
+  width: 100% !important;
+}
+
+/* ==== FORCE: toggle "Current" pegado a la izquierda ==== */
+#resume .cv-card-entry .cv-switch,
+#resume .cv-card-entry label:has(.work-current),
+#resume .cv-card-entry label:has(.edu-current) {
+  grid-column: 1 / -1 !important;   /* ocupa toda la fila pero anclado a la izquierda */
+  justify-self: flex-start !important;
+  text-align: left !important;
+
+  display: inline-flex !important;  /* que no se estire al ancho completo */
+  align-items: center !important;
+  width: auto !important;
+
+  margin-top: 8px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;    /* truco para que se pegue a la izquierda en flex */
+}
+
+.cv-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.cv-buttons .pill {
+  background: #eef2ff;
+  color: #4338ca;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid #c7d2fe;
+  transition: all 0.2s ease;
+}
+
+.cv-buttons .pill:hover {
+  background: #c7d2fe;
+  color: #1e1b4b;
+}
+
+#equipments-card .pill-link {
+  background: none;
+  border: none;
+  color: #6C38FF;
+  font-weight: 600;
+  position: relative;
+  padding-bottom: 2px;
+  margin-left: 65px;
+
+}
+#equipments-card .pill-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0%;
+  background: #6C38FF;
+  transition: width 0.3s ease;
+}
+#equipments-card .pill-link:hover::after {
+  width: 100%;
+}
+
+
+
+
+
+/* === Nueva fila de botones (bajo el menú de tabs) === */
+.header-buttons-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 24px 0 24px; /* separación del menú y del contenido */
+}
+
+/* Reutiliza el estilo morado, pero ya no fijo */
+#client-version-btn,
+#ai-action-button {
+  position: static;
+  background-color: #003BFF;
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 15px;
+  font-family: 'Arial Rounded MT Bold', 'Poppins', sans-serif;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+#client-version-btn:hover,
+#ai-action-button:hover {
+  background-color: #003BFF;
+  transform: scale(1.05);
+}
+
+/* ===== Mantener el menú fijo al hacer scroll ===== */
+.header-row {
+  position: sticky;
+  top: 0;                   /* se queda pegado al borde superior */
+  z-index: 100;             /* por encima del contenido */
+  background: #f9fafc;      /* color de fondo (ajústalo al tuyo) */
+  padding: 16px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+/* Evita que el contenido se esconda detrás */
+.main-content {
+  scroll-padding-top: 100px; /* agrega margen virtual para los anchors */
+}
+

@@ -1,0 +1,611 @@
+/* ===== Base ===== */
+:root{
+  /* Pasteles por stage */
+  --neg-bg: #fce3ec;  --neg-text:#7a2a52;  --neg-veil: rgba(252,227,236,.45);
+  --int-bg: #edf5ff;  --int-text:#0b2e71;  --int-veil: rgba(237,245,255,.45);
+  --src-bg: #e6fff5;  --src-text:#0a6847;  --src-veil: rgba(230,255,245,.45);
+  --dd-bg:  #f3e6ff;  --dd-text:#6b2fb8;  --dd-veil:  rgba(243,230,255,.45);
+  --nda-bg: #fff4e6;  --nda-text:#9a4f00;  --nda-veil: rgba(255,244,230,.45);
+
+  /* Glass tech */
+  --glass-bg1: rgba(255,255,255,.65);
+  --glass-bg2: rgba(255,255,255,.38);
+  --glass-border1: rgba(79,70,229,.28);
+  --glass-border2: rgba(56,189,248,.22);
+  --glass-shadow: 0 24px 50px rgba(17,24,39,.14);
+  --radius: 18px;
+}
+/* ——— Asegurar que el degradé llene toda la página ——— */
+html, body { height: 100%; }
+body {
+  min-height: 100vh;
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
+  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
+  background-attachment: fixed; /* mantiene el gradiente hasta el fondo */
+  color: #333;
+}
+
+/* ——— Glass Tech SIN borde ——— */
+.opportunity-summary-table{
+  position: relative;
+  padding: 1.4rem;
+  border-radius: 18px;
+  border: none;                     /* ⬅️ sin borde */
+  background: linear-gradient(180deg, var(--glass-bg1), var(--glass-bg2)); /* solo el fill frosted */
+  backdrop-filter: blur(12px) saturate(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+
+.summary-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+/* Header */
+.summary-header {
+  text-align: center;
+  margin-bottom: 2.2rem;
+  padding: 0 1rem;
+}
+.summary-header h1 {
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg,#4f46e5,#38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 .5rem;
+}
+.summary-header p {
+  font-size: 1.06rem;
+  color: #505a6b;
+  max-width: 640px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+
+/* Tabla */
+#summaryTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  text-align: center;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Thead “frosted” + glow */
+#summaryTable thead {
+  position: relative;
+}
+#summaryTable thead::after{
+  content:"";
+  position:absolute; left:0; right:0; bottom:-12px; height:20px;
+  filter: blur(10px);
+  background: radial-gradient(80% 100% at 50% 0%, rgba(79,70,229,.20), transparent 60%);
+  pointer-events:none;
+}
+
+/* Celdas */
+#summaryTable th, #summaryTable td {
+  padding: 16px;
+  font-size: .96rem;
+  color: #1f2937;
+  background: rgba(255,255,255,.65);
+}
+#summaryTable td { border-bottom: 1px solid rgba(0,0,0,.04); }
+#summaryTable tr:last-child td { border-bottom: none; }
+
+/* Primera columna (HR Lead) – nunca click */
+#summaryTable tbody td:first-child{
+  text-align: left;
+  font-weight: 600;
+  letter-spacing: .2px;
+  color:#0f172a;
+  background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.6));
+  cursor: default !important;
+}
+
+/* Celdas clickeables (solo números, se añade por JS) */
+#summaryTable td.is-clickable{
+  cursor: pointer;
+  transition: transform .03s ease, box-shadow .15s ease;
+}
+#summaryTable td.is-clickable:active{
+  transform: translateY(1px);
+}
+
+/* ===== Stage header chips con gradiente + glow ===== */
+#summaryTable thead th.stage-title{
+  position: relative;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-radius: 12px;
+  padding: 14px 10px;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.06);
+}
+
+/* Negotiating */
+#summaryTable thead th.stage-title-negotiating{
+  color: var(--neg-text);
+  background: linear-gradient(135deg, var(--neg-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-negotiating::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--neg-veil); filter: blur(10px); border-radius: 999px;
+}
+/* Interviewing */
+#summaryTable thead th.stage-title-interviewing{
+  color: var(--int-text);
+  background: linear-gradient(135deg, var(--int-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-interviewing::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--int-veil); filter: blur(10px); border-radius: 999px;
+}
+/* Sourcing */
+#summaryTable thead th.stage-title-sourcing{
+  color: var(--src-text);
+  background: linear-gradient(135deg, var(--src-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-sourcing::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--src-veil); filter: blur(10px); border-radius: 999px;
+}
+/* Deep Dive */
+#summaryTable thead th.stage-title-deep-dive{
+  color: var(--dd-text);
+  background: linear-gradient(135deg, var(--dd-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-deep-dive::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--dd-veil); filter: blur(10px); border-radius: 999px;
+}
+/* NDA Sent */
+#summaryTable thead th.stage-title-nda-sent{
+  color: var(--nda-text);
+  background: linear-gradient(135deg, var(--nda-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-nda-sent::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--nda-veil); filter: blur(10px); border-radius: 999px;
+}
+
+/* Ajustes de head row */
+#summaryTable thead tr { background: transparent !important; }
+
+/* ===== Hover de columna con velo del color del stage ===== */
+/* Mapeamos el índice de columna (2..6) a un velo distinto */
+#summaryTable[data-hover-col="2"] th:nth-child(2),
+#summaryTable[data-hover-col="2"] td:nth-child(2){
+  box-shadow: inset 0 0 0 100vmax var(--neg-veil);
+}
+#summaryTable[data-hover-col="3"] th:nth-child(3),
+#summaryTable[data-hover-col="3"] td:nth-child(3){
+  box-shadow: inset 0 0 0 100vmax var(--int-veil);
+}
+#summaryTable[data-hover-col="4"] th:nth-child(4),
+#summaryTable[data-hover-col="4"] td:nth-child(4){
+  box-shadow: inset 0 0 0 100vmax var(--src-veil);
+}
+#summaryTable[data-hover-col="5"] th:nth-child(5),
+#summaryTable[data-hover-col="5"] td:nth-child(5){
+  box-shadow: inset 0 0 0 100vmax var(--dd-veil);
+}
+#summaryTable[data-hover-col="6"] th:nth-child(6),
+#summaryTable[data-hover-col="6"] td:nth-child(6){
+  box-shadow: inset 0 0 0 100vmax var(--nda-veil);
+}
+
+/* Animación de entrada sutil */
+.opportunity-summary-table {
+  animation: fadeSlideIn .7s ease forwards;
+  opacity: 0; transform: translateY(18px);
+}
+@keyframes fadeSlideIn { to { opacity:1; transform: translateY(0); } }
+
+/* Last updated + botón back */
+.last-updated {
+  text-align: center;
+  margin-top: 1.6rem;
+  color: #6b7280;
+  font-size: .86rem; font-style: italic;
+}
+.go-back-button {
+  position: absolute;
+  top: 24px; left: 32px;
+  background: transparent; border: none; font-size: 1rem;
+  color: #4f46e5; font-weight: 600; cursor: pointer;
+  padding: .5rem 1rem; border-radius: 10px; transition: .2s;
+}
+.go-back-button:hover {
+  background-color: rgba(79,70,229,.08);
+  transform: translateX(-2px);
+}
+
+/* Desglose prioridad (chips) */
+.priority-breakdown{
+  display:flex; gap:6px; margin-top:6px; justify-content:center;
+  font-size:12px; font-weight:700;
+}
+.priority{ padding:2px 6px; border-radius:12px; color:#fff; }
+.priority.A{ background:#a8e6cf; color:#2d7a52; }
+.priority.B{ background:#fff9c4; color:#9f8f00; }
+.priority.C{ background:#ffccbc; color:#9f4a3c; }
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .summary-header h1 { font-size: 2rem; }
+  .summary-header p  { font-size: .98rem; }
+  #summaryTable th, #summaryTable td { padding: 12px; font-size: .9rem; }
+}
+/* === Layout: centrar contenido === */
+html, body { height: 100%; }
+
+body{
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto; /* fila 1: contenido centrado / fila 2: last-updated */
+  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
+  background-attachment: fixed;
+}
+
+/* Centra el bloque principal (titulo + tabla) */
+.summary-container{
+  align-self: center;     /* centra verticalmente dentro de la fila 1 */
+  justify-self: center;   /* centra horizontalmente */
+  margin: 0 auto;
+  width: min(1200px, 92vw);
+  padding: 3rem 2rem;
+}
+
+/* Mantén el "Last updated" en la parte baja y centrado */
+#lastUpdated{
+  justify-self: center;
+  align-self: end;
+  margin: 1.6rem 0 2.4rem;
+}
+
+/* El botón Go Back ya es absolute, no se ve afectado */
+.go-back-button{ position: absolute; top: 24px; left: 32px; }
+/* ===== Drilldown (tabla detalle) ===== */
+.drilldown.hidden { display:none; }
+.drilldown{
+  margin-top: 18px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--glass-bg1), var(--glass-bg2));
+  backdrop-filter: blur(12px) saturate(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(1.05);
+  box-shadow: var(--glass-shadow);
+  border: none;
+  overflow: hidden;
+  animation: fadeSlideIn .5s ease forwards;
+}
+
+.drilldown-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.drilldown-header h3{
+  margin:0; font-size:1.1rem; font-weight:800;
+  letter-spacing:.01em;
+  background: linear-gradient(90deg,#4f46e5,#38bdf8);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.drilldown-sub{ margin:.2rem 0 0; color:#526070; font-size:.9rem; }
+
+.btn-clear{
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 1.05rem; line-height: 1; padding: 6px 10px;
+  border-radius: 10px; color:#334155;
+}
+.btn-clear:hover{ background: rgba(79,70,229,.08); }
+
+.drilldown-table-wrapper{ width:100%; overflow:auto; }
+
+.dd-table{
+  width:100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.dd-table thead th{
+  position: sticky; top: 0; z-index: 1;
+  text-align:left; font-weight:800; letter-spacing:.02em;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.dd-table tbody td{
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+  background: rgba(255,255,255,.55);
+  color:#111827;
+}
+.dd-table tbody tr.dd-row{
+  cursor: pointer;
+  transition: transform .06s ease, background .2s ease, box-shadow .2s ease;
+}
+.dd-table tbody tr.dd-row:hover{
+  background: rgba(0,0,0,.03);
+  transform: translateY(-1px);
+}
+.dd-empty{
+  padding: 18px; text-align:center; color:#6b7280;
+}
+.hidden{ display:none; }
+
+/* Badges por stage (usa tu paleta pastel) */
+.dd-badge{
+  display:inline-block; padding:6px 10px; border-radius:999px;
+  font-size:.75rem; font-weight:800; letter-spacing:.02em;
+}
+.dd-badge-neg{ color:var(--neg-text);  background:var(--neg-bg); }
+.dd-badge-int{ color:var(--int-text);  background:var(--int-bg); }
+.dd-badge-src{ color:var(--src-text);  background:var(--src-bg); }
+.dd-badge-dd { color:var(--dd-text);   background:var(--dd-bg); }
+.dd-badge-nda{ color:var(--nda-text);  background:var(--nda-bg); }
+
+/* Marca la celda activa */
+#summaryTable td.is-selected{
+  box-shadow: inset 0 0 0 999px rgba(56,189,248,.13);
+  border-radius: 8px;
+}
+/* Chips pastel para Position / Account */
+.chip{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:999px; font-weight:700;
+  font-size:.88rem; letter-spacing:.01em;
+  background: rgba(79,70,229,.06);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.04);
+}
+.chip .emoji{ font-size:1rem; line-height:1; }
+.chip-position{ background:#f1f0ff; color:#4f46e5; }
+.chip-account{  background:#eaf6ff; color:#0b2e71; }
+
+/* Zebra muy sutil para filas */
+.dd-table tbody tr:nth-child(odd) td{ background: rgba(255,255,255,.58); }
+.dd-table tbody tr:nth-child(even) td{ background: rgba(255,255,255,.72); }
+
+/* Títulos de celdas en detalle */
+.dd-title{ font-weight:800; letter-spacing:.01em; }
+
+/* Emojis en headers de stage (tabla principal) */
+#summaryTable thead th.stage-title-negotiating::before { content:"🤝 "; }
+#summaryTable thead th.stage-title-interviewing::before{ content:"🎤 "; }
+#summaryTable thead th.stage-title-sourcing::before    { content:"🧭 "; }
+#summaryTable thead th.stage-title-deep-dive::before   { content:"🔎 "; }
+#summaryTable thead th.stage-title-nda-sent::before    { content:"📝 "; }
+/* Header: aseguramos que se vea el texto y el emoji insertados por JS */
+#summaryTable thead th .stage-emoji{ margin-right:.4rem; }
+#summaryTable thead th .stage-label{ font-weight:800; }
+
+/* Si antes usabas ::before para el emoji, lo anulamos para evitar doble icono */
+#summaryTable thead th[class*="stage-title-"]::before { content: none !important; }
+
+/* Hover de columna SOLO en header (no en filas) */
+#summaryTable[data-hover-col="2"] th:nth-child(2){ box-shadow: inset 0 0 0 100vmax var(--neg-veil); }
+#summaryTable[data-hover-col="3"] th:nth-child(3){ box-shadow: inset 0 0 0 100vmax var(--int-veil); }
+#summaryTable[data-hover-col="4"] th:nth-child(4){ box-shadow: inset 0 0 0 100vmax var(--src-veil); }
+#summaryTable[data-hover-col="5"] th:nth-child(5){ box-shadow: inset 0 0 0 100vmax var(--dd-veil); }
+#summaryTable[data-hover-col="6"] th:nth-child(6){ box-shadow: inset 0 0 0 100vmax var(--nda-veil); }
+
+/* Chips de desglose A/B/C: neutros (sin color) */
+.priority-breakdown{ display:flex; gap:6px; margin-top:6px; justify-content:center; font-size:12px; font-weight:700; }
+.priority{ padding:2px 6px; border-radius:12px; background: rgba(0,0,0,.06); color:#334155; border: 1px solid rgba(0,0,0,.08); }
+
+/* Chips de la tabla detalle: neutros (sin emojis y sin colores vivos) */
+.chip{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px;
+       font-weight:600; font-size:.88rem; letter-spacing:.01em;
+       background: rgba(0,0,0,.04); color:#0f172a; box-shadow: inset 0 -1px 0 rgba(0,0,0,.04); }
+.chip-position, .chip-account{ background: rgba(0,0,0,.04); color:#0f172a; }
+
+/* Celdas del detalle: fondo claro neutro (no pasteles) */
+.dd-table tbody td{ background: rgba(255,255,255,.72); }
+.dd-table tbody tr.dd-row:hover{ background: rgba(0,0,0,.03); }
+
+/* (Opcional) si tenías zebra con colores, déjala neutra o elimínala */
+.dd-table tbody tr:nth-child(odd) td{ background: rgba(255,255,255,.72); }
+.dd-table tbody tr:nth-child(even) td{ background: rgba(255,255,255,.86); }
+/* === FIX 1: el badge del stage debe mostrar texto aunque el h3 tenga gradiente === */
+.drilldown-header h3 .dd-badge{
+  -webkit-text-fill-color: initial !important; /* anula el transparente heredado */
+}
+
+/* (opcional pero recomendable) si el nombre en <strong> quedara pálido, fuerza color normal: */
+.drilldown-header h3 strong{
+  -webkit-text-fill-color: initial !important;
+  color: #111827;
+}
+
+/* === FIX 2: quitar los “globos” grises en la tabla de detalle === */
+.dd-table .chip,
+.dd-table .chip-position,
+.dd-table .chip-account{
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: #111827 !important;
+  font-weight: 600;
+}
+/* Selección por stage (relleno pastel y texto del color del stage) */
+#summaryTable td.is-selected{ border-radius:8px; }
+#summaryTable td.is-selected-neg{ box-shadow: inset 0 0 0 999px var(--neg-veil); color: var(--neg-text); }
+#summaryTable td.is-selected-int{ box-shadow: inset 0 0 0 999px var(--int-veil); color: var(--int-text); }
+#summaryTable td.is-selected-src{ box-shadow: inset 0 0 0 999px var(--src-veil); color: var(--src-text); }
+#summaryTable td.is-selected-dd { box-shadow: inset 0 0 0 999px var(--dd-veil);  color: var(--dd-text); }
+#summaryTable td.is-selected-nda{ box-shadow: inset 0 0 0 999px var(--nda-veil); color: var(--nda-text); }
+/* Solo el header en negrilla; filas normales */
+.dd-table thead th{ font-weight: 800; }
+.dd-table tbody td,
+.dd-table tbody .dd-title{ font-weight: 400 !important; }
+
+/* Zebra pastel (nude/rose casi blanco) */
+:root{
+  --zebra-1: #fffefe;  /* blanco apenas cálido */
+  --zebra-2: #fbf7f9;  /* rosa nude MUY suave */
+}
+
+.dd-table tbody tr:nth-child(odd)  td{ background: var(--zebra-1) !important; }
+.dd-table tbody tr:nth-child(even) td{ background: var(--zebra-2) !important; }
+
+/* Quita “chips/globos” y cualquier sombra/realce en filas */
+.dd-table .chip,
+.dd-table .chip-position,
+.dd-table .chip-account{
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  color: #111827 !important;
+  font-weight: 400 !important; /* sin negrilla */
+}
+
+/* Mantén el hover discreto */
+.dd-table tbody tr.dd-row:hover{
+  background: rgba(0,0,0,.03) !important;
+  transform: translateY(-1px);
+}
+/* ===== Columna Total (neutra “glass tech”) ===== */
+#summaryTable thead th.total-title{
+  color: #0f172a;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-radius: 12px;
+  padding: 14px 10px;
+  background: linear-gradient(135deg, #ffffff, rgba(0,0,0,.02));
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.06);
+}
+
+#summaryTable tbody td.total-cell{
+  font-weight: 800;
+  color: #111827;
+  background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.6));
+}
+
+/* Sin hover pastel en Total (no agregamos reglas de veil para su columna) */
+/* == Overrides: títulos de columnas (header) == */
+#summaryTable thead th {
+  font-size: .84rem;               /* más pequeño */
+  line-height: 1.1;                /* compacta vertical */
+}
+
+/* Chips de stage: alinear emoji + texto y reducir peso */
+#summaryTable thead th.stage-title{
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: 10px 12px;              /* un poco menos altos */
+  font-weight: 700;                /* menos pesado que 800 */
+  letter-spacing: .04em;
+}
+#summaryTable thead th .stage-emoji{
+  font-size: 1rem;                 /* tamaño fijo, queda alineado */
+  line-height: 1;
+}
+#summaryTable thead th .stage-label{
+  font-weight: 700;                /* consistente con el th */
+}
+/* == Overrides: columna TOTAL (neutra y sin negrilla) == */
+:root{
+  --total-bg1: #f4f7fb;            /* azul-gris MUY suave, no se confunde con stages */
+  --total-bg2: #eef2f7;
+  --total-text: #334155;           /* slate */
+}
+
+/* Header TOTAL */
+#summaryTable thead th.total-title{
+  background: linear-gradient(135deg, var(--total-bg1), var(--total-bg2));
+  color: var(--total-text);
+  font-weight: 600;                /* ya no es negrilla pesada */
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-radius: 12px;
+  padding: 10px 12px;              /* igual que las de stage */
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.06);
+}
+
+/* Celdas TOTAL */
+#summaryTable tbody td.total-cell{
+  background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(255,255,255,.62));
+  color: var(--total-text);
+  font-weight: 500;                /* sin negrilla */
+}
+
+/* Asegura que TOTAL nunca reciba velo/hover de colores */
+#summaryTable[data-hover-col="7"] th:nth-child(7),
+#summaryTable[data-hover-col="7"] td:nth-child(7){
+  box-shadow: none !important;
+}
+/* == Overrides: zebra azul claro en drilldown == */
+:root{
+  --zebra-blue-1: #f2f7ff;         /* azul muy claro */
+  --zebra-blue-2: #e9f2ff;         /* un pasito más intenso */
+}
+
+/* Aplica zebra azul y mantiene hover discreto */
+.dd-table tbody tr:nth-child(odd)  td{ 
+  background: var(--zebra-blue-1) !important; 
+}
+.dd-table tbody tr:nth-child(even) td{ 
+  background: var(--zebra-blue-2) !important; 
+}
+.dd-table tbody tr.dd-row:hover{
+  background: rgba(59,130,246,.08) !important; /* leve tinte azul al hover */
+  transform: translateY(-1px);
+}
+/* ——— FIX header: mantener una sola fila ——— */
+#summaryTable thead tr{
+  display: table-row !important;   /* evita flex/block accidentales */
+}
+#summaryTable thead th{
+  display: table-cell !important;  /* asegura flujo tabular */
+  vertical-align: middle;          /* centra contenido */
+  white-space: nowrap;             /* evita saltos dentro del chip */
+}
+/* ===== Fila de totales por columna (tfoot) ===== */
+#summaryTable tfoot .totals-row th,
+#summaryTable tfoot .totals-row td{
+  padding: 14px 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,255,255,.68));
+  border-top: 1px solid rgba(0,0,0,.06);
+  font-size: .95rem;
+}
+
+#summaryTable tfoot .totals-title{
+  text-align: left;
+  font-weight: 700;
+  color: #0f172a;
+  background: linear-gradient(135deg, var(--total-bg1), var(--total-bg2));
+  border-radius: 12px 0 0 12px;
+}
+
+#summaryTable tfoot .total-col{
+  font-weight: 600;
+  color: var(--total-text);
+  background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(255,255,255,.62));
+}
+
+/* Última celda: mismo look de la columna Total */
+#summaryTable tfoot .grand-total{
+  font-weight: 600;
+  color: var(--total-text);
+  background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(255,255,255,.62));
+  border-radius: 0 12px 12px 0;
+}
+
+/* Evitá velo de hover en el tfoot */
+#summaryTable tfoot .totals-row th,
+#summaryTable tfoot .totals-row td{ box-shadow: none !important; }

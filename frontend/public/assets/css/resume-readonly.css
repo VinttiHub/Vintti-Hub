@@ -1,0 +1,344 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f6f7;
+  color: #111827;
+  line-height: 1.6;
+}
+
+/* ========================= HEADER ========================= */
+.cv-header {
+  max-width: 900px;
+  margin: 30px auto 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.vintti-logo {
+  height: 50px;
+  margin-left: 35px;
+}
+
+.cv-subtitle {
+  color: #003BFF;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}
+
+/* ========================= CONTENEDOR PRINCIPAL ========================= */
+.cv-container {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
+  max-width: 1000px;
+  margin: 20px auto 40px;
+  padding: 40px 50px;
+}
+
+/* ========================= CABECERA DE NOMBRE ========================= */
+.cv-title {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.02em;
+}
+
+.cv-country {
+  font-size: 15px;
+  color: #6b7280;
+  margin-top: 4px;
+  margin-bottom: 24px;
+}
+
+/* ========================= ENCABEZADOS DE SECCIogN ========================= */
+.cv-heading {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #003BFF;
+  letter-spacing: 0.15em;
+  margin-bottom: 12px;
+  position: relative;
+  padding-left: 26px;
+}
+
+.cv-heading::before {
+  content: attr(data-icon);
+  position: absolute;
+  left: 0;
+  top: -2px;
+  font-size: 16px;
+}
+
+/* ========================= SECCIONES ========================= */
+.cv-section {
+  margin-bottom: 28px;
+}
+
+.cv-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 18px 20px;
+  font-size: 14px;
+  color: #1f2937;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+
+/* ========================= WORK EXPERIENCE ========================= */
+#workExperienceList .entry-meta {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+#workExperienceList .entry-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+#workExperienceList .entry-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #003BFF;
+  margin-bottom: 6px;
+}
+
+#workExperienceList ul {
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
+
+#workExperienceList li {
+  margin-left: 22px;
+}
+
+/* Quitar borde y sombra de las secciones que son timeline */
+#workExperienceList.cv-card,
+#educationList.cv-card {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;         /* dejamos que .timeline mande */
+}
+
+
+/* ========================= TOOLS / LANGUAGES EN DOS COLUMNAS ========================= */
+
+#toolsList,
+#languagesList {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* ✅ dos columnas */
+  gap: 10px 40px; /* vertical, horizontal */
+  align-items: center;
+}
+
+/* cada fila individual */
+.skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  font-size: 14px;
+  color: #111827;
+}
+
+/* nombre (izquierda) */
+.skill-name {
+  font-weight: 600;
+  min-width: 90px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* nivel (centro) */
+.skill-level {
+  font-weight: 500;
+  font-size: 13px;
+  color: #4b5563;
+  min-width: 75px;
+  text-transform: capitalize;
+}
+
+/* puntos (derecha) */
+.skill-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.level-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: transparent;
+}
+
+.level-dot.filled {
+  background: #003BFF;
+  border-color: #003BFF;
+}
+
+/* responsive – una sola columna en móviles */
+@media (max-width: 700px) {
+  #toolsList,
+  #languagesList {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================= FOOTER ========================= */
+.cv-footer {
+  text-align: center;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 24px;
+}
+
+.cv-footer a {
+  color: #003BFF;
+  text-decoration: none;
+}
+.cv-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ================================ TIMELINE ================================ */
+
+/* Contenedor general (Work Experience / Education) */
+.timeline {
+  position: relative;
+  border: none;
+  padding: 0;
+}
+
+/* Línea vertical */
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 140px;      /* x de la línea */
+  top: 28px;        /* empieza un poco debajo del heading */
+  bottom: 28px;     /* termina un poco antes del final */
+  width: 2px;
+  background: #e5e7eb;
+}
+
+/* Cada entrada (job / educación) */
+.cv-entry {
+  display: grid;
+  grid-template-columns: 130px 1fr;  /* 130px para fecha/lugar */
+  column-gap: 24px;
+  position: relative;
+  padding: 20px 0;
+}
+
+/* ================================ DOTS ================================ */
+.cv-entry::before {
+  content: "";
+  position: absolute;
+  left: 135px;          /* un poquito a la izquierda de la línea (140) */
+  top: 0.85em;          /* altura del texto de la fecha */
+  transform: none;      /* ❗ quitamos el translateY(-50%) */
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #003BFF;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #003BFF;
+  z-index: 2;
+}
+
+/* Columna izquierda: fechas bien pegadas a la izquierda,
+   separadas de la línea */
+.cv-entry-left {
+  text-align: right;
+  padding-right: 20px;        /* espacio entre texto y línea */
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.cv-entry-date {
+  font-weight: 600;
+  display: block;
+  margin-right: -8px;
+}
+
+.cv-entry-location {
+  display: block;
+  margin-top: 2px;
+}
+
+/* Columna derecha: rol, empresa, descripción */
+.cv-entry-right {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.cv-entry-role {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.cv-entry-company {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #003BFF;
+  margin-bottom: 4px;
+}
+
+.cv-entry-summary {
+  margin: 4px 0 8px;
+}
+
+.cv-entry-bullets {
+  margin: 0 0 0 18px;
+  padding: 0;
+}
+
+.cv-entry-bullets li {
+  margin-bottom: 4px;
+  list-style-type: disc;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .timeline::before {
+    left: 24px;
+  }
+  .cv-entry {
+    grid-template-columns: 1fr;
+    padding-left: 32px;
+  }
+  .cv-entry-left {
+    text-align: left;
+    padding-right: 0;
+  }
+  .cv-entry::before {
+    left: 19px;
+  }
+}
+
+
+
+
+

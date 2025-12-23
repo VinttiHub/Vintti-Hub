@@ -1,0 +1,322 @@
+/* ========================
+   1) VARIABLES (merged)
+   ======================== */
+:root{
+  /* Glass / base palette */
+  --glass-bg: rgba(255,255,255,.65);
+  --glass-brd: rgba(110,123,247,.18);
+  --ink: #0a1f44;
+  --muted: #5c6a86;
+
+  /* Greens (financial) */
+  --money-1:#eafff2;
+  --money-2:#16a34a;
+  --money-3:#0c7a36;
+
+  /* Accents */
+  --acc-1:#7c3aed; /* purple */
+  --acc-2:#6366f1; /* indigo */
+
+  /* Table colors */
+  --thead-bg:#f7f7fb;
+  --row-alt:#fafbff;
+  --total-bg:#f2f7ff;
+
+  /* TSR/TSF chart */
+  --tsr: #2563eb;               /* blue */
+  --tsr-fill: rgba(37,99,235,.10);
+  --tsf: #16a34a;               /* green */
+  --tsf-fill: rgba(22,163,74,.10);
+  --grid: rgba(0,0,0,.08);
+
+  /* Expected card accents */
+  --exp-border-1:#ffd66b;   /* warm */
+  --exp-border-2:#8fd3f4;   /* cool */
+  --exp-chip-fee:#ffe9b3;
+  --exp-chip-rev:#c8f3ff;
+  --exp-text-strong:#0a1f44;
+  --exp-muted:#6b7280;
+}
+
+/* ========================
+   2) BASE / RESET
+   ======================== */
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(1200px 800px at 10% -10%, #f6f1ff 0%, #ffffff 55%) fixed;
+}
+.page{ max-width:1200px; margin:0 auto; padding:28px 20px 60px; }
+
+/* ========================
+   3) LAYOUT: Topbar / Content
+   ======================== */
+.topbar{
+  position: sticky; top:0; z-index:5;
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+  padding:16px 0; margin:0 0 24px;
+  background:transparent; backdrop-filter:none; border-bottom:none;
+}
+.topbar .spacer{ width:100%; height:1px; visibility:hidden; }
+.topbar h1{
+  margin:0; justify-self:center; text-align:center;
+  font-size:2.4rem; font-weight:800; letter-spacing:.2px;
+  background: linear-gradient(90deg,#6d28d9,#6366f1,#22c55e);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.btn-refresh{
+  justify-self:end; background:#fff; border:1px solid #e8e6ff; border-radius:14px;
+  padding:10px 14px; font-weight:600; cursor:pointer;
+  transition: transform .15s ease, box-shadow .2s ease;
+  box-shadow: 0 6px 18px rgba(124,58,237,.08);
+}
+.btn-refresh:hover{ transform: translateY(-1px); box-shadow:0 10px 22px rgba(124,58,237,.14); }
+
+.content{ display:grid; grid-template-columns:1fr; gap:22px; }
+
+/* ========================
+   4) CARDS (generic)
+   ======================== */
+.card{
+  border:1px solid var(--glass-brd);
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  border-radius:22px;
+  box-shadow:0 20px 60px rgba(15,23,42,.08);
+  overflow:hidden;
+}
+.card-head{
+  display:flex; justify-content:space-between; align-items:end;
+  padding:18px 20px 8px;
+  border-bottom:1px dashed #e8e6ff;
+}
+.card-head h2{ margin:0 0 6px; font-size:1.15rem; font-weight:800; }
+.muted{ color:var(--muted); font-size:.92rem; }
+.table-wrap{ padding:16px 20px 22px; overflow:auto; }
+
+/* neutral cell wrapper (keeps naming for consistency) */
+.cell{ border-radius:12px; }
+
+/* ========================
+   5) TABLES (crystal rows)
+   ======================== */
+.v-table{ width:100%; border-collapse:separate; border-spacing:0 10px; font-variant-numeric:tabular-nums; }
+.v-table thead th{
+  background:var(--thead-bg); font-weight:700; text-align:center; padding:10px 12px;
+  border-radius:12px; box-shadow: inset 0 -1px 0 rgba(99,102,241,.08); position:relative;
+}
+/* sticky first column (e.g., Model) */
+.v-table .sticky-col{ position:sticky; left:0; z-index:2; background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,255,255,.68)); backdrop-filter:blur(6px); box-shadow:6px 0 12px -6px rgba(15,23,42,.10); }
+
+/* row = glass card */
+.v-table tbody tr{
+  background: linear-gradient(180deg, rgba(255,255,255,.66), rgba(255,255,255,.58));
+  border:1px solid var(--glass-brd);
+  border-radius:16px; overflow:hidden; box-shadow:0 14px 36px rgba(15,23,42,.06);
+}
+.v-table tbody tr:hover{ box-shadow:0 18px 48px rgba(15,23,42,.10); }
+
+.v-table tbody th.row-head{ text-align:left; font-weight:800; padding:14px 14px; }
+.v-table tbody td{
+  padding:14px 12px; text-align:center;
+  background: linear-gradient(to right, rgba(99,102,241,.08), rgba(99,102,241,0)) 0 0/1px 100% no-repeat;
+}
+.v-table tbody td:first-of-type{ background:none; }
+.v-table .total-col{ font-weight:800; }
+
+/* TFOOT Total row */
+.v-table tfoot .row-total{
+  background: linear-gradient(180deg, rgba(246,249,255,.9), rgba(245,248,255,.9));
+  border:1px solid rgba(99,102,241,.16);
+  border-radius:16px;
+  box-shadow: inset 0 0 0 1px rgba(99,102,241,.10), inset 0 0 0 2px rgba(124,58,237,.06), 0 18px 48px rgba(15,23,42,.08);
+}
+.v-table tfoot th, .v-table tfoot td{ padding:14px 12px; text-align:center; }
+.v-table tfoot th.sticky-col{ background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,255,255,.75)); box-shadow:6px 0 12px -6px rgba(15,23,42,.10); text-align:center; }
+
+/* optional widths */
+.col-model{ width:34%; }
+.col-new, .col-repl{ width:22%; }
+.col-total{ width:22%; }
+
+/* compact variant */
+.v-table.compact td, .v-table.compact th{ padding:8px 10px; }
+.v-table .num{ text-align:right; font-variant-numeric:tabular-nums; }
+
+/* Center specific headings as requested */
+.v-table tbody th.row-head{ text-align:center; }
+
+/* ========================
+   6) MONEY CARD (MRR-like)
+   ======================== */
+.money{ background: radial-gradient(600px 260px at 10% -60%, var(--money-1), transparent 60%), var(--glass-bg); }
+.money-head{ display:flex; gap:16px; align-items:center; }
+.money-grid{ display:grid; grid-template-columns:repeat(2,minmax(220px,1fr)); gap:16px; padding:20px; }
+
+/* base KPI tile (neutral, overridden per context) */
+.kpi{ position:relative; overflow:hidden; border-radius:18px; padding:18px 16px; }
+
+/* Money-specific accents */
+.money .kpi{ border:1px solid #e6f4ea; background:#fbfffd; box-shadow:0 14px 36px rgba(16,185,129,.10); }
+.money .kpi::before{
+  content:""; position:absolute; inset:-40px -60px auto auto; height:160px; width:160px;
+  background: conic-gradient(from 160deg,#dcfce7,#86efac,#bbf7d0,#dcfce7);
+  filter: blur(24px); opacity:.35; border-radius:50%;
+}
+.money .kpi-label{ color:#0b5f2b; font-weight:700; letter-spacing:.2px; margin-bottom:6px; }
+.money .kpi-value{ font-size:2rem; font-weight:800; color:var(--money-2); }
+
+/* Optional visual container */
+.money-visual{ position:relative; width:170px; height:90px; display:flex; align-items:center; }
+.gif-circle{ width:92px; height:92px; border-radius:999px; overflow:hidden; background:#fff; border:1px solid rgba(22,163,74,.18); box-shadow:0 8px 24px rgba(16,185,129,.18), inset 0 1px 0 rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; }
+.money-gif{ width:100%; height:100%; object-fit:cover; display:block; }
+
+/* ========================
+   7) EXPECTED CARD (distinct look)
+   ======================== */
+.card.expected{
+  position:relative; overflow:hidden; border-radius:20px;
+  background: rgba(255,255,255,.5); backdrop-filter:blur(8px);
+  box-shadow:0 10px 30px rgba(255,214,107,.10), 0 6px 16px rgba(143,211,244,.12);
+  border:1px solid rgba(255,255,255,.6);
+}
+.card.expected::before{
+  content:""; position:absolute; inset:0; border-radius:20px; padding:1px;
+  background: linear-gradient(135deg,var(--exp-border-1),var(--exp-border-2));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;         /* Safari */
+          mask-composite: exclude;     /* Others */
+  pointer-events:none;
+}
+.expected-head{ display:grid; grid-template-columns:auto 1fr; align-items:center; gap:12px; padding:18px 18px 6px; }
+.expected-icon{
+  width:44px; height:44px; border-radius:50%; display:grid; place-items:center; font-size:22px;
+  background: radial-gradient(120% 120% at 20% 20%, #fff 0%, #fff6 60%, #fff0 100%), linear-gradient(135deg, #fff8, #fff0);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), 0 4px 10px rgba(0,0,0,.06);
+}
+.expected-title{
+  margin:0; font-size:clamp(16px,2.3vw,18px); font-weight:800;
+  background: linear-gradient(90deg,#1f3a8a,#155e75); -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.card.expected .muted{ color:var(--exp-muted); font-size:12px; }
+
+/* Grid of KPIs */
+.expected-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:12px 18px 18px; background:none !important; }
+.card.expected .kpi{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:120px; background: linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.58)), linear-gradient(135deg,#eef6ff 0%,#e8f0ff 45%,#eaf7ff 100%); border:1px solid rgba(143,211,244,.45); box-shadow:0 10px 28px rgba(99,102,241,.10); transition: transform .15s ease, box-shadow .15s ease; }
+.card.expected .kpi:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(16,24,40,.08); }
+.card.expected .kpi .kpi-label{ display:flex; align-items:center; justify-content:center; gap:6px; text-align:center; font-size:12px; font-weight:700; letter-spacing:.02em; color:var(--exp-muted); margin-bottom:4px; }
+.card.expected .kpi .kpi-value{ margin-top:4px; font-variant-numeric:tabular-nums; letter-spacing:.2px; color:var(--exp-text-strong); font-weight:900; font-size:clamp(22px,4vw,30px); line-height:1.05; }
+
+/* Fee/Rev subtle chips */
+.kpi--fee{ background: linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4)), linear-gradient(135deg,var(--exp-chip-fee),#ffffff); }
+.kpi--rev{ background: linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.4)), linear-gradient(135deg,var(--exp-chip-rev),#ffffff); }
+
+/* Model-specific color hints */
+.badge-model{ display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:800; line-height:1.2; border:1px solid rgba(255,255,255,.9); background:#fff; box-shadow:0 2px 8px rgba(16,24,40,.06); }
+.badge-staff{ color:#14532d; background:#dcfce7; }
+.badge-rec{   color:#0c4a6e; background:#cff0ff; }
+
+/* Pretty layout helpers */
+.expected-grid--pretty{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:14px 18px 18px; }
+.kpi--span2{ grid-column:1 / -1; }
+.kpi--rec.kpi--span2{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:120px; }
+.kpi--rec.kpi--span2 .kpi-label{ justify-content:center; text-align:center; font-size:13px; }
+.kpi--rec.kpi--span2 .kpi-value{ font-size:clamp(28px,4.2vw,38px); line-height:1.02; }
+
+/* Remove MRR-style halo inside Expected */
+.card.expected .kpi::before{ content:none !important; }
+
+/* ========================
+   8) TSR/TSF CHART STYLING
+   ======================== */
+#tsHistoryCard .chart-wrap{ padding:12px 12px 6px; position:relative; }
+#tsHistoryChart{ width:100%; height:auto; display:block; color:var(--ink); }
+
+/* Legend */
+.chart-legend{ display:flex; gap:10px; align-items:center; justify-content:center; padding:6px 8px 10px; }
+.legend-item{
+  border:1px solid #e8e6ff; background:#fff; border-radius:999px; padding:8px 10px; font-weight:600; cursor:pointer;
+  box-shadow:0 8px 20px rgba(99,102,241,.08); display:flex; align-items:center; gap:8px;
+  opacity:.95; transition: transform .15s ease, opacity .15s ease, box-shadow .2s ease;
+}
+.legend-item:hover{ transform:translateY(-1px); opacity:1; box-shadow:0 12px 24px rgba(99,102,241,.14); }
+.legend-item.off{ opacity:.45; }
+.legend-dot{ width:10px; height:10px; border-radius:999px; display:inline-block; box-shadow: inset 0 0 0 2px rgba(255,255,255,.6); }
+.legend-dot--tsr{ background:var(--tsr); }
+.legend-dot--tsf{ background:var(--tsf); }
+.legend-item:focus-visible{ outline:3px solid #c7d2fe; outline-offset:2px; }
+
+/* Tooltip (single source of truth) */
+.chart-tooltip{
+  position:absolute; pointer-events:none; transform:translate(-50%,-110%);
+  background:#fff; border:1px solid #e8e6ff; border-radius:12px; padding:10px 12px;
+  font-size:.9rem; box-shadow:0 12px 32px rgba(15,23,42,.12); display:none;
+  min-width:190px; z-index:2;
+}
+.chart-tooltip.below{ transform:translate(-50%,12%); }
+.chart-tooltip .tt-title{ font-weight:800; margin-bottom:6px; }
+.chart-tooltip .row{ display:flex; justify-content:space-between; gap:12px; }
+.chart-tooltip .badge{ display:inline-flex; align-items:center; gap:6px; font-weight:700; }
+.chart-tooltip .dot{ width:8px; height:8px; border-radius:999px; display:inline-block; }
+.chart-tooltip .dot.tsr{ background:var(--tsr); }
+.chart-tooltip .dot.tsf{ background:var(--tsf); }
+.chart-tooltip .muted{ font-size:.8rem; color:var(--muted); margin-top:6px; }
+
+/* ========================
+   9) TITLES / UTILITIES
+   ======================== */
+.title-with-info{ display:inline-flex; align-items:center; gap:8px; }
+.card-head--center{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+.card-head--center h2{ margin:0; text-align:center; font-weight:600; letter-spacing:.2px; }
+
+/* gradient title variant */
+.h2--bluegrad{
+  --title-grad: linear-gradient(90deg,#0b1f44 0%, #3347d8 45%, #3aa0ff 100%);
+  background: var(--title-grad);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter: saturate(.95) brightness(.98);
+}
+
+/* info chip */
+.info-ghost{
+  border:none; background:transparent; padding:0 6px; line-height:1; color:#5b6aa6;
+  font-weight:700; border-radius:999px; cursor:help; box-shadow: inset 0 0 0 1px rgba(99,102,241,.18);
+  opacity:.8; transition: opacity .15s, box-shadow .15s;
+}
+.info-ghost:hover{ opacity:1; box-shadow: inset 0 0 0 1px rgba(99,102,241,.28); }
+
+/* ========================
+   10) RESPONSIVE
+   ======================== */
+@media (prefers-reduced-motion:no-preference){
+  .h2--bluegrad{ background-size:180% 100%; animation: gradSlide 12s ease-in-out infinite alternate; }
+  @keyframes gradSlide{ from{ background-position:0% 50%; } to{ background-position:100% 50%; } }
+}
+
+@media (max-width:720px){
+  /* Expected */
+  .expected-grid{ grid-template-columns:1fr; }
+  .expected-head{ gap:10px; padding:16px 14px 6px; }
+  .card.expected .kpi{ min-height:106px; }
+
+  /* Expected pretty */
+  .expected-grid--pretty{ grid-template-columns:1fr; }
+  .kpi--span2{ grid-column:auto; }
+  .kpi--rec.kpi--span2{ min-height:110px; }
+
+  /* Money */
+  .money-grid{ grid-template-columns:1fr; }
+
+  /* Table → stacked cards */
+  .v-table thead{ display:none; }
+  .v-table, .v-table tbody, .v-table tr, .v-table th, .v-table td{ display:block; width:100%; }
+  .v-table tbody tr{ padding:10px 12px; border-radius:18px; }
+  .v-table tbody th.row-head{ padding:6px 2px 10px; font-size:1rem; }
+  .v-table tbody td{ position:relative; padding:10px 2px 14px; margin-top:6px; background:none; text-align:left; font-weight:700; }
+  .v-table tbody td::before{ content:attr(data-label); display:block; font-size:.82rem; color:var(--muted); font-weight:600; margin-bottom:4px; }
+  .v-table tbody td.total-col{ border-top:1px dashed rgba(99,102,241,.18); padding-top:12px; margin-top:10px; font-weight:800; }
+  .v-table tfoot .row-total{ padding:10px 12px; }
+}

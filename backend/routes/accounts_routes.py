@@ -961,6 +961,50 @@ def link_or_create_candidate(opportunity_id):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+@bp.route('/opportunities/<int:opportunity_id>/candidates/link', methods=['POST'])
+def link_existing_candidate_to_opportunity(opportunity_id):
+    """
+    Inserta exclusivamente en opportunity_candidates sin crear registros nuevos.
+    Se utiliza desde el pipeline cuando se selecciona un candidato ya existente.
+    """
+    data = request.get_json() or {}
+    candidate_id = data.get('candidate_id')
+    stage_pipeline = (data.get('stage') or data.get('stage_pipeline') or 'Contactado').strip() or 'Contactado'
+
+    if not candidate_id:
+        return jsonify({"error": "candidate_id is required"}), 400
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT 1
+            FROM opportunity_candidates
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (opportunity_id, candidate_id))
+        if cursor.fetchone():
+            return jsonify({"error": "Candidate is already linked to this opportunity."}), 409
+
+        cursor.execute("""
+            INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
+            VALUES (%s, %s, %s)
+        """, (opportunity_id, candidate_id, stage_pipeline))
+
+        conn.commit()
+        return jsonify({"message": "Candidate linked successfully"}), 201
+    except Exception as exc:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 @bp.route('/opportunity_candidates/stage_batch', methods=['PATCH'])
 def update_stage_batch():
     data = request.get_json()

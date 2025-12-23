@@ -83,6 +83,57 @@ def get_candidates():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@bp.route('/candidates', methods=['POST'])
+def create_candidate_without_opportunity():
+    data = request.get_json() or {}
+
+    name = data.get('name')
+    email = (data.get('email') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    linkedin = (data.get('linkedin') or '').strip()
+    country = data.get('country')
+    red_flags = data.get('red_flags')
+    comments = data.get('comments')
+    english_level = data.get('english_level')
+    salary_range = data.get('salary_range')
+    stage = data.get('stage') or 'Contactado'
+    created_by = data.get('created_by')
+
+    if not email or not phone or not linkedin:
+        return jsonify({"error": "Missing required fields: email, phone and linkedin"}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) + 1 FROM candidates")
+        new_candidate_id = cursor.fetchone()[0]
+
+        cursor.execute("""
+            INSERT INTO candidates (
+                candidate_id, name, email, phone, linkedin,
+                red_flags, comments, english_level, salary_range,
+                country, stage, created_by, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (
+            new_candidate_id, name, email, phone, linkedin,
+            red_flags, comments, english_level, salary_range,
+            country, stage, created_by
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "message": "Candidate created successfully",
+            "candidate_id": new_candidate_id
+        }), 201
+    except Exception as exc:
+        logging.exception("❌ Error creating candidate without opportunity")
+        return jsonify({"error": str(exc)}), 500
+
 def search_candidates():
     q = (request.args.get('search') or '').strip()
     if len(q) < 2:
@@ -1460,15 +1511,24 @@ def candidates_search_alias():
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT candidate_id, name
+            SELECT candidate_id, name, email, linkedin, country
             FROM candidates
-            WHERE name ILIKE %s
+            WHERE name ILIKE %s OR linkedin ILIKE %s
             ORDER BY LOWER(name) ASC
-            LIMIT 10
-        """, (f"%{q}%",))
+            LIMIT 15
+        """, (f"%{q}%", f"%{q}%"))
         rows = cur.fetchall()
         cur.close(); conn.close()
-        return jsonify([{"candidate_id": r[0], "name": r[1]} for r in rows])
+        return jsonify([
+            {
+                "candidate_id": r[0],
+                "name": r[1],
+                "email": r[2],
+                "linkedin": r[3],
+                "country": r[4]
+            }
+            for r in rows
+        ])
     except Exception as e:
         return jsonify([]), 200
 

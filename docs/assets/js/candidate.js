@@ -1,117 +1,194 @@
 const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const PHONE_CODE_BY_COUNTRY = {
+  Argentina: '54',
+  Bolivia: '591',
+  Brazil: '55',
+  Chile: '56',
+  Colombia: '57',
+  'Costa Rica': '506',
+  Cuba: '53',
+  Ecuador: '593',
+  'El Salvador': '503',
+  Guatemala: '502',
+  Honduras: '504',
+  Mexico: '52',
+  Nicaragua: '505',
+  Panama: '507',
+  Paraguay: '595',
+  Peru: '51',
+  'Puerto Rico': '1',
+  'Dominican Republic': '1',
+  Uruguay: '598',
+  Venezuela: '58',
+  'United States': '1'
+};
+
+const candidateState = {
+  tbody: null,
+  tableEl: null,
+  data: [],
+  dataTable: null,
+  searchBound: false,
+  duplicateMatch: null,
+  duplicateDetailsCache: new Map()
+};
+
+const candidateModalRefs = {
+  overlay: null,
+  form: null,
+  submitBtn: null,
+  errorBox: null,
+  duplicateBox: null,
+  duplicateFields: null,
+  toast: null,
+  nameInput: null,
+  emailInput: null,
+  countrySelect: null,
+  phoneCodeSelect: null,
+  phoneInput: null,
+  linkedinInput: null,
+  openExistingBtn: null
+};
+
+let nameSearchDebounce = null;
+let toastTimer = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-  /* --------------------------------------
-   * 0) Theme boot
-   * ------------------------------------ */
   document.body.classList.add('light-mode');
 
-  /* --------------------------------------
-   * 1) Constants & DOM refs
-   * ------------------------------------ */
-  const tbody    = document.getElementById('candidatesTableBody');
-  const tableEl  = document.getElementById('candidatesTable');
+  candidateState.tbody = document.getElementById('candidatesTableBody');
+  candidateState.tableEl = document.getElementById('candidatesTable');
 
-/* --------------------------------------
- * 2) Fetch + render candidates
- * ------------------------------------ */
-fetch(`${API_BASE}/candidates/light_fast`)
-  .then(r => r.json())
-  .then(data => {
-    if (!Array.isArray(data) || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5">No data available</td></tr>`;
-      return;
-    }
+  loadCandidates();
+  setupRowNavigation();
+  setupSidebarToggle();
+  setupCandidateModal();
+});
 
-    const frag = document.createDocumentFragment();
+async function loadCandidates() {
+  try {
+    const res = await fetch(`${API_BASE}/candidates/light_fast`, { cache: 'no-store' });
+    const data = await res.json();
+    candidateState.data = Array.isArray(data) ? data : [];
+    paintCandidateRows(candidateState.data);
+  } catch (err) {
+    console.error('❌ Error al obtener candidatos:', err);
+    candidateState.data = [];
+    paintCandidateRows(candidateState.data);
+  }
+}
 
-    for (const candidate of data) {
-      const tr = document.createElement('tr');
-      tr.dataset.id     = candidate.candidate_id || '';
-      tr.dataset.status = (candidate.status || '').toLowerCase();                // 'active' | 'unhired'
-      tr.dataset.model  = (candidate.opp_model || '').trim();                    // 'Recruiting' | 'Staffing' | ''
+function buildCandidateRow(candidate) {
+  const tr = document.createElement('tr');
+  tr.dataset.id = candidate.candidate_id || '';
+  tr.dataset.status = (candidate.status || '').toLowerCase();
+  tr.dataset.model = (candidate.opp_model || '').trim();
 
-      const rawPhone = candidate.phone ? String(candidate.phone) : '';
-      const phone    = rawPhone.replace(/\D/g, '');
-      const linkedin = candidate.linkedin || '';
+  const rawPhone = candidate.phone ? String(candidate.phone) : '';
+  const phone = rawPhone.replace(/\D/g, '');
+  const linkedin = candidate.linkedin || '';
 
-      const condition = tr.dataset.status || 'unhired';
-      const chipClass = {
-        active:  'status-active',
-        unhired: 'status-unhired'
-      }[condition] || 'status-unhired';
+  const condition = tr.dataset.status || 'unhired';
+  const chipClass = {
+    active: 'status-active',
+    unhired: 'status-unhired'
+  }[condition] || 'status-unhired';
 
-      tr.innerHTML = `
-        <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
-        <td>${candidate.name || '—'}</td>
-        <td>${candidate.country || '—'}</td>
-        <td>
-          ${
-            phone
-              ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
-                   <i class='fab fa-whatsapp'></i>
-                 </button>`
-              : '—'
-          }
-        </td>
-        <td>
-          ${
-            linkedin
-              ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
-                   <i class='fab fa-linkedin-in'></i>
-                 </button>`
-              : '—'
-          }
-        </td>
-      `;
-      frag.appendChild(tr);
-    }
-
-    tbody.replaceChildren(frag);
-
-    /* --------------------------------------
-     * 3) DataTable setup
-     * ------------------------------------ */
-    const table = $('#candidatesTable').DataTable({
-      responsive: true,
-      pageLength: 50,
-      dom: 'lrtip',
-      lengthMenu: [[50, 100, 150], [50, 100, 150]],
-      language: {
-        search: "🔍 Buscar:",
-        lengthMenu: "Mostrar _MENU_ registros por página",
-        zeroRecords: "No se encontraron resultados",
-        info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-        paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
+  tr.innerHTML = `
+    <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
+    <td>${candidate.name || '—'}</td>
+    <td>${candidate.country || '—'}</td>
+    <td>
+      ${
+        phone
+          ? `<button class="icon-button whatsapp" onclick="event.stopPropagation(); window.open('https://wa.me/${phone}', '_blank')">
+               <i class='fab fa-whatsapp'></i>
+             </button>`
+          : '—'
       }
-    });
+    </td>
+    <td>
+      ${
+        linkedin
+          ? `<button class="icon-button linkedin" onclick="event.stopPropagation(); window.open('${linkedin}', '_blank')">
+               <i class='fab fa-linkedin-in'></i>
+             </button>`
+          : '—'
+      }
+    </td>
+  `;
 
-    // Mover selector de length
-    const dataTableLength = document.querySelector('.dataTables_length');
-    const wrapper = document.getElementById('datatable-wrapper');
-    if (dataTableLength && wrapper) wrapper.appendChild(dataTableLength);
+  return tr;
+}
 
-    // Búsqueda por nombre (columna 1) con debounce
-    const searchInput = document.getElementById('searchByName');
-    if (searchInput) {
-      let t;
-      searchInput.addEventListener('input', function () {
-        clearTimeout(t);
-        const v = this.value;
-        t = setTimeout(() => table.column(1).search(v).draw(), 150);
-      });
+function buildEmptyRow() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td colspan="5">No data available</td>`;
+  return tr;
+}
+
+function paintCandidateRows(data) {
+  if (!candidateState.tbody) return;
+  const rows = (Array.isArray(data) && data.length ? data.map(buildCandidateRow) : [buildEmptyRow()]);
+
+  if (!candidateState.dataTable) {
+    const frag = document.createDocumentFragment();
+    rows.forEach(row => frag.appendChild(row));
+    candidateState.tbody.replaceChildren(frag);
+    initDataTable();
+    return;
+  }
+
+  candidateState.dataTable.clear();
+  rows.forEach(row => candidateState.dataTable.row.add(row));
+  candidateState.dataTable.draw();
+}
+
+function initDataTable() {
+  if (!candidateState.tableEl) return;
+  candidateState.dataTable = $('#candidatesTable').DataTable({
+    responsive: true,
+    pageLength: 50,
+    dom: 'lrtip',
+    lengthMenu: [[50, 100, 150], [50, 100, 150]],
+    language: {
+      search: "🔍 Buscar:",
+      lengthMenu: "Mostrar _MENU_ registros por página",
+      zeroRecords: "No se encontraron resultados",
+      info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+      paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
     }
+  });
 
-    /* --------------------------------------
-     * 4) Filtros: Status + Model
-     * ------------------------------------ */
-    installAdvancedFilters(table);
-  })
-  .catch(err => console.error('❌ Error al obtener candidatos:', err));
+  moveLengthControl();
+  bindNameSearchInput(candidateState.dataTable);
+  installAdvancedFilters(candidateState.dataTable);
+}
 
-  /* --------------------------------------
-   * 5) Row navigation (click fila -> details)
-   * ------------------------------------ */
-  tbody.addEventListener('click', (e) => {
+function moveLengthControl() {
+  const wrapper = document.getElementById('datatable-wrapper');
+  const dataTableLength = document.querySelector('.dataTables_length');
+  if (wrapper && dataTableLength && !wrapper.contains(dataTableLength)) {
+    wrapper.appendChild(dataTableLength);
+  }
+}
+
+function bindNameSearchInput(table) {
+  if (candidateState.searchBound) return;
+  const searchInput = document.getElementById('searchByName');
+  if (!searchInput) return;
+
+  searchInput.addEventListener('input', function () {
+    clearTimeout(nameSearchDebounce);
+    const value = this.value;
+    nameSearchDebounce = setTimeout(() => table.column(1).search(value).draw(), 150);
+  });
+  candidateState.searchBound = true;
+}
+
+function setupRowNavigation() {
+  if (!candidateState.tbody) return;
+  candidateState.tbody.addEventListener('click', (e) => {
     const row = e.target.closest('tr');
     if (!row) return;
     const id = row.dataset.id;
@@ -125,35 +202,363 @@ fetch(`${API_BASE}/candidates/light_fast`)
       window.location.href = `candidate-details.html?id=${id}`;
     }
   });
+}
 
-  /* --------------------------------------
-   * 6) Sidebar toggle (persistente en localStorage)
-   * ------------------------------------ */
-  const sidebar      = document.querySelector('.sidebar');
-  const mainContent  = document.querySelector('.main-content');
+function setupSidebarToggle() {
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('.main-content');
   const toggleButton = document.getElementById('sidebarToggle');
-  const toggleIcon   = document.getElementById('sidebarToggleIcon');
+  const toggleIcon = document.getElementById('sidebarToggleIcon');
+  if (!sidebar || !mainContent || !toggleButton || !toggleIcon) return;
 
-  if (sidebar && mainContent && toggleButton && toggleIcon) {
-    const savedState = localStorage.getItem('sidebarHidden') === 'true';
-    applySidebarState(savedState);
-
-    toggleButton.addEventListener('click', () => {
-      const isHidden = !sidebar.classList.contains('custom-sidebar-hidden');
-      applySidebarState(isHidden);
-      localStorage.setItem('sidebarHidden', isHidden);
-    });
-  }
-
-  function applySidebarState(isHidden) {
+  const applySidebarState = (isHidden) => {
     sidebar.classList.toggle('custom-sidebar-hidden', isHidden);
     mainContent.classList.toggle('custom-main-expanded', isHidden);
     toggleIcon.classList.toggle('fa-chevron-left', !isHidden);
     toggleIcon.classList.toggle('fa-chevron-right', isHidden);
-    // Mantener posiciones existentes del toggle sin cambiar estilos globales
     toggleButton.style.left = isHidden ? '12px' : '220px';
+  };
+
+  applySidebarState(localStorage.getItem('sidebarHidden') === 'true');
+  toggleButton.addEventListener('click', () => {
+    const isHidden = !sidebar.classList.contains('custom-sidebar-hidden');
+    applySidebarState(isHidden);
+    localStorage.setItem('sidebarHidden', isHidden);
+  });
+}
+
+function setupCandidateModal() {
+  candidateModalRefs.overlay = document.getElementById('candidateCreateModal');
+  candidateModalRefs.form = document.getElementById('candidateCreateForm');
+  candidateModalRefs.submitBtn = document.getElementById('candidateModalSubmit');
+  candidateModalRefs.errorBox = document.getElementById('candidateFormError');
+  candidateModalRefs.duplicateBox = document.getElementById('candidateDuplicateBox');
+  candidateModalRefs.duplicateFields = document.getElementById('candidateDuplicateFields');
+  candidateModalRefs.toast = document.getElementById('candidateCreateToast');
+  candidateModalRefs.nameInput = document.getElementById('candidateFullName');
+  candidateModalRefs.emailInput = document.getElementById('candidateEmail');
+  candidateModalRefs.countrySelect = document.getElementById('candidateCountry');
+  candidateModalRefs.phoneCodeSelect = document.getElementById('candidatePhoneCode');
+  candidateModalRefs.phoneInput = document.getElementById('candidatePhone');
+  candidateModalRefs.linkedinInput = document.getElementById('candidateLinkedin');
+  candidateModalRefs.openExistingBtn = document.getElementById('openExistingCandidateBtn');
+
+  const openBtn = document.getElementById('openCandidateModalBtn');
+  const closeBtn = document.getElementById('candidateModalCloseBtn');
+  if (!candidateModalRefs.overlay || !candidateModalRefs.form || !openBtn) return;
+
+  openBtn.addEventListener('click', openCandidateModal);
+  closeBtn?.addEventListener('click', closeCandidateModal);
+  candidateModalRefs.overlay.addEventListener('click', (e) => {
+    if (e.target === candidateModalRefs.overlay) closeCandidateModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && candidateModalRefs.overlay.getAttribute('aria-hidden') === 'false') {
+      closeCandidateModal();
+    }
+  });
+
+  candidateModalRefs.form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await handleCandidateSubmit();
+  });
+
+  candidateModalRefs.form.addEventListener('input', () => {
+    hideFormError();
+    hideDuplicateWarning();
+    clearInputErrors();
+  });
+
+  candidateModalRefs.openExistingBtn?.addEventListener('click', () => {
+    const id = candidateState.duplicateMatch?.candidate_id;
+    if (id) {
+      window.location.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(id)}`;
+    }
+  });
+}
+
+function openCandidateModal() {
+  resetCandidateForm();
+  hideDuplicateWarning();
+  hideFormError();
+  candidateModalRefs.overlay.removeAttribute('hidden');
+  candidateModalRefs.overlay.setAttribute('aria-hidden', 'false');
+  candidateModalRefs.nameInput?.focus();
+}
+
+function closeCandidateModal() {
+  candidateModalRefs.overlay.setAttribute('aria-hidden', 'true');
+  candidateModalRefs.overlay.setAttribute('hidden', '');
+}
+
+function resetCandidateForm() {
+  candidateModalRefs.form?.reset();
+  candidateState.duplicateMatch = null;
+  clearInputErrors();
+}
+
+function clearInputErrors() {
+  [
+    candidateModalRefs.nameInput,
+    candidateModalRefs.emailInput,
+    candidateModalRefs.countrySelect,
+    candidateModalRefs.phoneInput,
+    candidateModalRefs.linkedinInput
+  ].forEach(input => input?.classList.remove('input-error'));
+}
+
+async function handleCandidateSubmit() {
+  if (!candidateModalRefs.form || !candidateModalRefs.submitBtn) return;
+  hideFormError();
+  hideDuplicateWarning();
+  clearInputErrors();
+
+  const formValues = gatherCandidateFormValues();
+  const validationMsg = validateCandidateForm(formValues);
+  if (validationMsg) {
+    showFormError(validationMsg);
+    return;
   }
-});
+
+  const duplicate = findDuplicateCandidate(formValues);
+  if (duplicate) {
+    await showDuplicateWarning(duplicate);
+    return;
+  }
+
+  await submitCandidate(formValues);
+}
+
+function gatherCandidateFormValues() {
+  const name = candidateModalRefs.nameInput?.value.trim() || '';
+  const email = candidateModalRefs.emailInput?.value.trim() || '';
+  const country = candidateModalRefs.countrySelect?.value || '';
+  const phoneCode = candidateModalRefs.phoneCodeSelect?.value || '';
+  const rawPhone = candidateModalRefs.phoneInput?.value || '';
+  const linkedinRaw = candidateModalRefs.linkedinInput?.value.trim() || '';
+
+  const phoneDigits = normalizePhoneDigits(rawPhone, phoneCode);
+  const normalizedLinkedin = normalizeLinkedin(linkedinRaw);
+  const linkedinForSubmit = formatLinkedinForSubmit(linkedinRaw);
+
+  return {
+    name,
+    email,
+    country,
+    phoneCode,
+    rawPhone,
+    phoneDigits,
+    linkedinRaw,
+    normalizedLinkedin,
+    linkedinForSubmit
+  };
+}
+
+function validateCandidateForm(values) {
+  let error = '';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!values.email || !emailRegex.test(values.email)) {
+    error = 'Enter a valid email address.';
+    candidateModalRefs.emailInput?.classList.add('input-error');
+  }
+
+  if (!values.phoneDigits) {
+    error = error || 'Enter a valid phone number.';
+    candidateModalRefs.phoneInput?.classList.add('input-error');
+  }
+
+  if (!values.normalizedLinkedin.includes('linkedin.com')) {
+    error = error || 'LinkedIn URL must point to linkedin.com.';
+    candidateModalRefs.linkedinInput?.classList.add('input-error');
+  }
+
+  return error;
+}
+
+function showFormError(message) {
+  if (!candidateModalRefs.errorBox) return;
+  candidateModalRefs.errorBox.textContent = message;
+  candidateModalRefs.errorBox.hidden = false;
+}
+
+function hideFormError() {
+  if (candidateModalRefs.errorBox) candidateModalRefs.errorBox.hidden = true;
+}
+
+async function showDuplicateWarning(match) {
+  candidateState.duplicateMatch = match.candidate;
+  if (!candidateModalRefs.duplicateBox || !candidateModalRefs.duplicateFields) return;
+
+  candidateModalRefs.duplicateBox.hidden = false;
+  candidateModalRefs.duplicateFields.textContent = 'Loading candidate information…';
+
+  const details = await resolveDuplicateDetails(match.candidate.candidate_id);
+  const merged = Object.assign({}, match.candidate, details || {});
+  renderDuplicateFields(merged, match.fields);
+}
+
+function hideDuplicateWarning() {
+  if (candidateModalRefs.duplicateBox) candidateModalRefs.duplicateBox.hidden = true;
+  candidateState.duplicateMatch = null;
+}
+
+async function resolveDuplicateDetails(candidateId) {
+  if (!candidateId) return null;
+  if (candidateState.duplicateDetailsCache.has(candidateId)) {
+    return candidateState.duplicateDetailsCache.get(candidateId);
+  }
+  try {
+    const res = await fetch(`${API_BASE}/candidates/${candidateId}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    candidateState.duplicateDetailsCache.set(candidateId, data);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function renderDuplicateFields(candidate, fieldsUsed = []) {
+  if (!candidateModalRefs.duplicateFields) return;
+  const fragment = document.createDocumentFragment();
+
+  if (fieldsUsed.length) {
+    const matchLine = document.createElement('div');
+    matchLine.textContent = `Matched on: ${fieldsUsed.join(', ')}`;
+    fragment.appendChild(matchLine);
+  }
+
+  const infoLines = [];
+  if (candidate.name) infoLines.push(`Name: ${candidate.name}`);
+  if (candidate.email) infoLines.push(`Email: ${candidate.email}`);
+  if (candidate.phone) infoLines.push(`Phone: ${candidate.phone}`);
+  if (candidate.linkedin) infoLines.push(`LinkedIn: ${candidate.linkedin}`);
+
+  infoLines.forEach(line => {
+    const div = document.createElement('div');
+    div.textContent = line;
+    fragment.appendChild(div);
+  });
+
+  candidateModalRefs.duplicateFields.innerHTML = '';
+  candidateModalRefs.duplicateFields.appendChild(fragment);
+}
+
+function findDuplicateCandidate(values) {
+  if (!Array.isArray(candidateState.data) || !candidateState.data.length) return null;
+  const normalizedName = normalizeName(values.name);
+  const phoneDigits = values.phoneDigits;
+  const linkedinNormalized = values.normalizedLinkedin;
+
+  for (const candidate of candidateState.data) {
+    const duplicates = [];
+    if (normalizedName && normalizeName(candidate.name) === normalizedName) {
+      duplicates.push('name');
+    }
+
+    const existingPhone = normalizeStoredPhone(candidate.phone, candidate.country);
+    if (phoneDigits && existingPhone && phoneDigits === existingPhone) {
+      duplicates.push('phone');
+    }
+
+    if (linkedinNormalized && normalizeLinkedin(candidate.linkedin) === linkedinNormalized) {
+      duplicates.push('linkedin');
+    }
+
+    if (duplicates.length) {
+      return { candidate, fields: duplicates };
+    }
+  }
+
+  return null;
+}
+
+function normalizeName(name) {
+  return (name || '').toString().trim().toLowerCase();
+}
+
+function normalizeLinkedin(url) {
+  if (!url) return '';
+  let clean = url.trim().toLowerCase();
+  clean = clean.replace(/^https?:\/\//, '');
+  clean = clean.replace(/^www\./, '');
+  clean = clean.replace(/\/+$/, '');
+  return clean;
+}
+
+function formatLinkedinForSubmit(url) {
+  if (!url) return '';
+  let clean = url.trim();
+  if (!/^https?:\/\//i.test(clean)) {
+    clean = `https://${clean.replace(/^\/+/, '')}`;
+  }
+  return clean;
+}
+
+function normalizePhoneDigits(rawPhone, phoneCode) {
+  const digits = (rawPhone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  const code = (phoneCode || '').replace(/\D/g, '');
+  if (code && !digits.startsWith(code)) {
+    return code + digits;
+  }
+  return digits;
+}
+
+function normalizeStoredPhone(phone, country) {
+  const digits = (phone || '').toString().replace(/\D/g, '');
+  if (!digits) return '';
+  const code = PHONE_CODE_BY_COUNTRY[country] || '';
+  if (code && !digits.startsWith(code) && digits.length <= 11) {
+    return code + digits;
+  }
+  return digits;
+}
+
+async function submitCandidate(values) {
+  const payload = {
+    name: values.name || null,
+    email: values.email,
+    phone: values.phoneDigits,
+    linkedin: values.linkedinForSubmit,
+    country: values.country || null,
+    stage: 'Contactado',
+    created_by: localStorage.getItem('user_email')
+  };
+
+  candidateModalRefs.submitBtn.disabled = true;
+  candidateModalRefs.submitBtn.textContent = 'Creating...';
+
+  try {
+    const res = await fetch(`${API_BASE}/candidates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to create candidate');
+
+    closeCandidateModal();
+    showCandidateToast('Candidate created');
+    await loadCandidates();
+  } catch (err) {
+    console.error('❌ Error creating candidate:', err);
+    showFormError(err.message || 'Failed to create candidate');
+  } finally {
+    candidateModalRefs.submitBtn.disabled = false;
+    candidateModalRefs.submitBtn.textContent = 'Create Candidate';
+  }
+}
+
+function showCandidateToast(message) {
+  if (!candidateModalRefs.toast) return;
+  candidateModalRefs.toast.textContent = message;
+  candidateModalRefs.toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    if (candidateModalRefs.toast) candidateModalRefs.toast.hidden = true;
+  }, 3200);
+}
 
 /* =========================================================================
    Column filters (tipo Excel) — Global (usado por UI existente)

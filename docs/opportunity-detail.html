@@ -263,7 +263,7 @@
             <span id="interviewed-count-status" class="interview-count-status"></span>
           </div>
 
-          <button id="createCandidateBtn">+ Create Candidate</button>
+          <button id="pipelineAddCandidateBtn">+ Add Candidate</button>
           <button id="signOffBtn">Sign off</button>
         </div>
       </div>
@@ -323,6 +323,7 @@
           <h2>Candidates</h2>
           <p class="subtitle">See the final candidates for this opportunity.</p>
         </div>
+        <button id="createCandidateBtn" class="header-btn">+ Create Candidate</button>
       </div>
 
       <!-- Batches table -->
@@ -448,6 +449,25 @@
       </div>
 
       <button id="popupAddExistingBtn" style="display:none;">Add Candidate to Pipeline</button>
+    </div>
+  </div>
+
+  <div id="pipelineSearchPopup" class="popup hidden">
+    <div class="popup-content">
+      <span class="close-btn" id="closePipelineSearchPopup">&times;</span>
+      <h2>Add Candidate to Pipeline</h2>
+      <input
+        type="text"
+        id="pipeline-search-input"
+        placeholder="Search by name or LinkedIn…"
+        autocomplete="off"
+      />
+      <p id="pipeline-search-start" class="search-hint" style="font-size:0.9rem; color:#555;">Type at least 2 characters to search existing candidates.</p>
+      <p id="pipeline-search-loading" class="search-hint" style="display:none; font-size:0.9rem; color:#555;">Searching…</p>
+      <p id="pipeline-search-empty" class="search-hint" style="display:none; font-size:0.9rem; color:#555;">No matches found.</p>
+      <p id="pipeline-search-error" class="search-hint" style="display:none; color:#b3261e; font-weight:500;"></p>
+      <p id="pipeline-search-success" class="search-hint" style="display:none; color:#007a5a; font-weight:500;"></p>
+      <ul id="pipeline-search-results" class="search-results-list"></ul>
     </div>
   </div>
 

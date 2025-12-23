@@ -1,0 +1,514 @@
+:root {
+  /* Fondo pastel tech */
+  --bg-main: radial-gradient(circle at top, #fdf6fb 0%, #f5f2ff 35%, #f8fbff 70%, #ffffff 100%);
+
+  /* Cards */
+  --card-bg: rgba(255, 255, 255, 0.98);
+  --card-border: rgba(225, 190, 255, 0.35);
+  --shadow-soft: 0 22px 55px rgba(190, 160, 240, 0.18);
+
+  /* Texto */
+  --text-main: #2a1f4a;
+  --text-muted: #7b6f99;
+
+  /* Estados pastel */
+  --win: #6fd3e8;
+  --win-soft: #e9f8fc;
+
+  --lost: #f7a4c3;
+  --lost-soft: #fde8f2;
+
+  --conv: #c8a8ff;
+}
+
+body {
+  margin: 0;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+.metrics-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2rem;
+}
+
+.metrics-title-block {
+  max-width: 100%;
+  text-align: center;
+}
+
+.metrics-title {
+  margin: 0 0 0.6rem;
+  font-size: 2.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.metrics-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+.metrics-page {
+  min-height: 100vh;
+  padding: 3rem 4rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+.metrics-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 220px;
+  gap: 2rem;
+}
+.metric-pill {
+  padding: 0.28rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+}
+
+.metric-pill-win {
+  background-color: var(--win-soft);
+  color: #2a7f91;
+}
+
+.metric-pill-lost {
+  background-color: var(--lost-soft);
+  color: #a13460;
+}
+
+.metric-pill-win-soft {
+  background-color: #edf9fd;
+  color: #4caec6;
+}
+
+.metric-pill-lost-soft {
+  background-color: #fff0f6;
+  color: #d36695;
+}
+
+.metric-pill-conv {
+  background: linear-gradient(90deg, #e6d7ff, #ffd6ea);
+  color: #6f3fa4;
+}
+
+.metric-win-month::before {
+  background: radial-gradient(circle at top right, rgba(143, 214, 255, 0.35), transparent 55%);
+}
+
+.metric-lost-month::before {
+  background: radial-gradient(circle at top right, rgba(255, 180, 210, 0.35), transparent 55%);
+}
+
+.metric-win-total::before {
+  background: radial-gradient(circle at top right, rgba(200, 170, 255, 0.35), transparent 55%);
+}
+
+.metric-lost-total::before {
+  background: radial-gradient(circle at top right, rgba(255, 210, 226, 0.35), transparent 55%);
+}
+
+.metric-conversion::before {
+  background: radial-gradient(circle at top right, rgba(210, 185, 255, 0.45), transparent 55%);
+}
+.metric-compare {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(200, 170, 255, 0.35);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.metric-compare.up {
+  color: #3fb6a8;
+  background: rgba(160, 230, 215, 0.25);
+  border-color: rgba(63, 182, 168, 0.35);
+}
+
+.metric-compare.down {
+  color: #d6759c;
+  background: rgba(255, 190, 215, 0.25);
+  border-color: rgba(214, 117, 156, 0.35);
+}
+
+.metric-compare.neutral {
+  color: #9a8cc5;
+  background: rgba(216, 204, 255, 0.25);
+  border-color: rgba(180, 160, 255, 0.35);
+}
+.metrics-page .meta-text {
+  margin: -0.5rem auto 1.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #b2a7c8;
+  max-width: 520px;
+}
+body {
+  margin: 0;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* 💫 Cards con hover suave y micro interacciones */
+.metric-card {
+  background: var(--card-bg);
+  border-radius: 26px;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-soft);
+  padding: 2.2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.7rem;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(18px);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 26px 60px rgba(190, 160, 240, 0.28);
+  border-color: rgba(190, 160, 240, 0.55);
+}
+
+/* 🌟 cuando cambias de recruiter, las cards hacen un glow sutil */
+.metric-card.is-updating {
+  animation: cardGlow 0.5s ease;
+}
+
+@keyframes cardGlow {
+  0% {
+    box-shadow: var(--shadow-soft);
+    transform: translateY(0);
+  }
+  40% {
+    box-shadow: 0 0 0 2px rgba(190, 160, 240, 0.35),
+      0 26px 60px rgba(190, 160, 240, 0.35);
+    transform: translateY(-3px);
+  }
+  100% {
+    box-shadow: var(--shadow-soft);
+    transform: translateY(0);
+  }
+}
+
+/* Números con micro transición al cambiar (acompaña al JS) */
+.metric-value {
+  font-size: 3rem;
+  font-weight: 900;
+  margin-top: 0.3rem;
+  line-height: 1;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.metric-card.is-updating .metric-value {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+/* Dropdown más “premium” */
+.filter-select {
+  min-width: 220px;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(179, 136, 255, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(179, 136, 255, 0.18);
+  font-size: 0.9rem;
+  outline: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #b388ff 50%),
+    linear-gradient(135deg, #b388ff 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 13px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.filter-select:hover,
+.filter-select:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(179, 136, 255, 0.35);
+  border-color: rgba(179, 136, 255, 0.85);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+/* Label del filtro un poquito más chic */
+.filter-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  display: inline-block;
+}
+.recruiter-lab-btn{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9999;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  padding: 12px 16px;
+  border-radius: 999px;
+
+  font-family: 'Onest', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .2px;
+  text-decoration: none;
+
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(225,190,255,.55);
+  box-shadow: 0 18px 45px rgba(190,160,240,.25);
+  color: var(--text-main);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  transform: translateY(0);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+/* ===============================
+   Recruiter Lab – Floating Button
+   =============================== */
+
+.recruiter-lab-btn{
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 9999;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 13px 18px;
+  border-radius: 999px;
+
+  font-family: 'Onest', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: .2px;
+  text-decoration: none;
+
+  color: var(--text-main);
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,.96),
+    rgba(245,238,255,.96)
+  );
+
+  border: 1px solid rgba(190,160,240,.55);
+  box-shadow:
+    0 12px 30px rgba(190,160,240,.22),
+    0 0 0 rgba(190,160,240,0);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  animation: labPulse 3.6s ease-in-out infinite;
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease,
+    border-color .25s ease;
+}
+
+/* ✨ pulso suave tipo “energía” */
+@keyframes labPulse {
+  0% {
+    box-shadow:
+      0 12px 30px rgba(190,160,240,.22),
+      0 0 0 0 rgba(190,160,240,.35);
+  }
+  70% {
+    box-shadow:
+      0 16px 42px rgba(190,160,240,.32),
+      0 0 0 10px rgba(190,160,240,0);
+  }
+  100% {
+    box-shadow:
+      0 12px 30px rgba(190,160,240,.22),
+      0 0 0 0 rgba(190,160,240,0);
+  }
+}
+
+/* 🧪 emoji flotante */
+.lab-emoji{
+  display: inline-block;
+  font-size: 18px;
+  animation: labFloat 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* movimiento visible pero elegante */
+@keyframes labFloat {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-4px) rotate(-6deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* Hover = modo experimento activo */
+.recruiter-lab-btn:hover{
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(160,120,255,.75);
+  box-shadow:
+    0 20px 55px rgba(190,160,240,.4),
+    0 0 0 12px rgba(190,160,240,0);
+}
+
+/* al hover, el emoji reacciona */
+.recruiter-lab-btn:hover .lab-emoji{
+  animation-duration: 1.2s;
+  transform: rotate(-12deg);
+}
+.metrics-filter-row{
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.date-range{
+  display:flex;
+  gap:.65rem;
+  align-items:center;
+  flex-wrap: wrap;
+}
+
+.date-chip{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  padding: .5rem .85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(179, 136, 255, 0.35);
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 10px 24px rgba(179, 136, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.date-chip-label{
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.date-chip input[type="date"]{
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 800;
+  font-size: .9rem;
+  color: var(--text-main);
+}
+
+.apply-range-btn{
+  padding: .55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(190,160,240,.55);
+  background: linear-gradient(90deg, rgba(230,215,255,.95), rgba(255,214,234,.95));
+  color: #5b2f93;
+  font-weight: 900;
+  letter-spacing: .02em;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(190,160,240,.22);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+.apply-range-btn:hover{
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 18px 40px rgba(190,160,240,.30);
+  filter: brightness(1.02);
+}
+
+.range-error{
+  margin-top: .5rem;
+  font-size: .85rem;
+  font-weight: 800;
+  color: #a13460;
+  background: rgba(255,190,215,.25);
+  border: 1px solid rgba(214,117,156,.35);
+  padding: .55rem .8rem;
+  border-radius: 14px;
+}
+.metrics-header{
+  display: block; /* ya no grid */
+  text-align: center;
+}
+
+.metrics-title-block{
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.metrics-title{
+  font-size: clamp(2.8rem, 4vw, 3.6rem); /* 🔥 más grande */
+  line-height: 1.02;
+}
+
+.metrics-subtitle{
+  max-width: 680px;
+  margin: 0.7rem auto 0;
+}
+
+/* ✅ fila de filtros debajo del título */
+.metrics-filters{
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 1.25rem;
+  align-items: end;
+}
+
+@media (max-width: 900px){
+  .metrics-filters{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* opcional: que el dropdown se sienta centrado en desktop */
+.metrics-filters .metrics-filter{
+  justify-self: center;
+  width: 100%;
+}
+
+.metrics-filters .filter-select{
+  width: min(360px, 100%);
+}

@@ -1,0 +1,343 @@
+/* =============== 1) Design Tokens / Variables =============== */
+:root{
+  --bg: #f6f7f9;
+  --text: #0a0a0a;
+  --muted: #6b7280;
+  --card: #ffffff;
+  --line: #e5e7eb;
+  --brand: #0a84ff;
+  --brand-press: #0066cc;
+  --shadow: 0 10px 30px rgba(0,0,0,.08);
+  --radius: 18px;
+}
+
+/* =============== 2) Base / Reset =============== */
+*{ box-sizing: border-box; }
+html, body{ height: 100%; }
+body{
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, system-ui, Arial;
+  color: var(--text);
+  background: linear-gradient(180deg, #fafafa, #f3f5f7);
+}
+
+/* =============== 3) Page Layout & Header =============== */
+.page{
+  /* Wider page, keeping side gutters; merged duplicates */
+  max-width: min(1400px, calc(100vw - 64px));
+  margin: 28px auto 48px;
+  padding: 0 24px;
+  position: relative;
+}
+
+/* Header block (centered like screenshot) */
+.header{
+  position: relative;
+  padding-top: 8px;
+  margin-bottom: 44px; /* extra spacing before table (merged tweak) */
+}
+.header-left{ display:block; text-align:center; }
+.header-left h1{
+  margin: 0 0 6px 0;
+  font-size: 42px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+
+  /* Gradient title (requested tweak) */
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+.sub{
+  margin: 0 auto;
+  color: var(--muted);
+  max-width: 720px;
+  font-size: 16px;
+}
+
+/* Back link top-left */
+#backBtn{
+  position: absolute; left: 0; top: 0;
+  background: transparent; border: none; color:#475569;
+  padding: 4px 0; font-size: 14px; border-radius: 8px; box-shadow:none;
+}
+#backBtn .icon{ font-weight: 600; margin-right: 6px; }
+#backBtn:hover{ color:#0f172a; text-decoration: underline; }
+
+/* Optional "New" button top-right */
+.header-right #newBtn{ position:absolute; right:0; top:-2px; }
+
+/* =============== 4) Buttons =============== */
+.btn{
+  display: inline-flex; align-items: center; gap: .5rem;
+  border: 1px solid transparent; background:#f8f9fb; color:#0b0b0b;
+  padding: .6rem .9rem; border-radius: 12px; cursor: pointer;
+  transition: all .2s ease; box-shadow: 0 1px 0 rgba(0,0,0,.04) inset;
+}
+.btn .icon{ font-weight: 600; }
+.btn:hover{ transform: translateY(-1px); }
+.btn:active{ transform: translateY(0); }
+.btn.primary{ background: var(--brand); color:#fff; }
+.btn.primary:hover{ background: var(--brand-press); }
+.btn.ghost{ background:#fff; border:1px solid var(--line); }
+.btn.icon-only{ padding:.4rem .6rem; background:transparent; border:none; font-size:18px; }
+
+/* Small & Danger variants (kept) */
+.btn.sm { padding: 6px 10px; font-size: 12px; border-radius: 10px; }
+.btn.danger { background:#ef4444; color:#fff; }
+
+/* =============== 5) Card / Table =============== */
+.card{
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.table-wrap{ overflow: auto; }
+
+/* Table scaffold */
+.pretty-table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1040px; /* consolidated (was 920/760/1040; chose the comfy 1040) */
+}
+
+/* Sticky header + subtle frost */
+.pretty-table thead th{
+  position: sticky; top: 0; z-index: 2; /* stays above body; below modal */
+  background: #fbfcfe;
+  backdrop-filter: saturate(180%) blur(10px);
+  text-align: left; font-weight: 700;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+  color: #334155;
+}
+
+/* Body cells */
+.pretty-table tbody td{
+  padding: 16px 24px;
+  border-bottom: 1px solid #f0f2f5;
+  vertical-align: middle;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.pretty-table tbody tr:hover{ background: #f8fbff; }
+.pretty-table tbody tr:last-child td{ border-bottom: none; }
+.pretty-table tbody td.compact{ white-space: nowrap; }
+
+/* Extra air on edges */
+.pretty-table thead th:first-child,
+.pretty-table tbody td:first-child{ padding-left: 28px; }
+.pretty-table thead th:last-child,
+.pretty-table tbody td:last-child{ padding-right: 28px; }
+
+/* Right-align 10th column (numeric board-like column) */
+.pretty-table tbody td:nth-child(10),
+.pretty-table thead th:nth-child(10){
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Column width helpers (avoid cramped cells) */
+.pretty-table td[data-col="provider"]{ min-width: 160px; }
+.pretty-table td[data-col="pais"]{ min-width: 140px; }
+
+/* =============== 6) Badges / Status =============== */
+.badge{
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .25rem .6rem; border-radius: 999px; font-size: 12px;
+  border: 1px solid var(--line); background: #fff;
+}
+.badge.new{    border-color:#a7d3ff; background:#eef6ff; }
+.badge.used{   border-color:#e5c07b; background:#fff8e6; }
+.badge.stocked{border-color:#b7e1c0; background:#f2fff5; }
+
+/* IMPORTANT: Disable left accent bar by status (keep only the override) */
+.pretty-table tbody tr::before,
+.pretty-table tbody tr[data-status]::before{
+  content: none !important;
+  display: none !important;
+}
+
+/* =============== 7) Links (neutral, clickable) =============== */
+.pretty-table .cell-link{
+  display: inline-block;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  margin: -2px -4px;
+  border-radius: 10px;
+  transition: background .15s ease, color .15s ease, box-shadow .15s ease, transform .05s ease;
+}
+.pretty-table .cell-link:visited{ color: var(--text); }
+.pretty-table .cell-link:hover{
+  background: rgba(10,132,255,.10);
+  color: var(--brand);
+}
+.pretty-table .cell-link:active{
+  transform: translateY(1px);
+  color: var(--brand-press);
+}
+.pretty-table .cell-link:focus-visible{
+  outline: 2px solid rgba(10,132,255,.35);
+  outline-offset: 2px;
+  background: rgba(10,132,255,.10);
+}
+.pretty-table .cell-link::after{
+  content: "↗";
+  opacity: 0;
+  margin-left: 4px;
+  font-size: 12px;
+  transform: translateY(-1px);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.pretty-table .cell-link:hover::after{ opacity: .9; transform: translateY(0); }
+
+/* =============== 8) Inline Cell Utilities =============== */
+.inline-cell{
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/* Icon micro-utilities */
+.cell-ico{ font-size: 14px; opacity: .85; margin-right: 10px; }
+.flag{ margin-right: 10px; }
+.eq-emoji{ margin-right: 10px; }
+.dot{ display:inline-block; width:8px; height:8px; border-radius:999px; margin-right:10px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.05) inset; }
+.dot.quipteams{ background:#3b82f6; } /* blue */
+.dot.bord{      background:#8b5cf6; } /* violet */
+.date-txt{ color:#374151; }
+
+/* Cost semantic hues */
+td[data-col="costo"] .cost.low  { color:#059669; }
+td[data-col="costo"] .cost.mid  { color:#a16207; }
+td[data-col="costo"] .cost.high { color:#b91c1c; }
+
+/* Single, consistent declaration (was duplicated) */
+.actions{ white-space: nowrap; }
+
+/* =============== 9) Modal (consolidated + top z-index) =============== */
+.modal{
+  position: fixed; inset: 0;
+  display: none;
+  z-index: 9999; /* ensure it overlays the sticky table header */
+}
+.modal[open], .modal.show{ display:block; }
+.modal-backdrop{ position:absolute; inset:0; background: rgba(0,0,0,.24); }
+.modal-card{
+  position: absolute; left:50%; top:50%; transform: translate(-50%,-50%);
+  width: min(900px, 92vw);
+  background:#fff; border-radius: 22px; border: 1px solid var(--line);
+  box-shadow: var(--shadow); padding: 18px 18px 16px; z-index:1;
+}
+.modal-header{ display:flex; align-items:center; justify-content: space-between; padding: 6px 6px 10px; }
+.modal-header h2{ margin: 0; }
+
+/* Form blocks inside modal */
+.form{ padding: 8px 6px; }
+.grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-2 .full{ grid-column: 1 / -1; }
+.field{ display:flex; flex-direction:column; gap: 6px; }
+.field span{ font-size: 12px; color:#475569; }
+input, select{
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fcfdff;
+  outline: none;
+  font-size: 14px;
+}
+input:focus, select:focus{
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(10,132,255,.15);
+}
+
+/* Suggestions dropdown */
+.suggestions{
+  position: relative;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  max-height: 240px;
+  overflow: auto;
+  box-shadow: var(--shadow);
+}
+.suggestions .opt{ padding: 10px 12px; cursor: pointer; }
+.suggestions .opt:hover{ background: #f6f9ff; }
+.suggestions .hint{ padding: 10px 12px; color: var(--muted); font-size: 13px; }
+
+.modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+
+/* =============== 10) Toast =============== */
+.toast{
+  position: fixed; left:50%; bottom:24px; transform: translateX(-50%);
+  background:#111827; color:#fff;
+  padding: 10px 14px; border-radius: 12px;
+  box-shadow: var(--shadow); font-size: 14px;
+}
+
+/* =============== 11) Multiselect (ms-*) =============== */
+.ms-root{
+  display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+  min-height:40px; padding:8px;
+  border:1px solid var(--line); border-radius:12px;
+  background: var(--card);
+  position: relative; cursor: text;
+}
+.ms-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px; border-radius:999px;
+  background:#f3f4f6; border:1px solid #e5e7eb;
+  font-size:.9rem; white-space:nowrap;
+}
+.ms-chip .x{ margin-left:2px; cursor:pointer; opacity:.6; }
+.ms-plus{ font-size:.9rem; opacity:.7; }
+.ms-input{ border:none; outline:none; min-width:90px; font:inherit; background:transparent; }
+.ms-dd{
+  position:absolute; top:calc(100% + 6px); left:0; right:0;
+  max-height:260px; overflow:auto;
+  border:1px solid var(--line); border-radius:12px; background:#fff;
+  box-shadow:0 12px 32px rgba(0,0,0,.08); z-index:10;
+}
+.ms-opt{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-bottom:1px dashed #f1f5f9; cursor:pointer;
+}
+.ms-opt:last-child{ border-bottom:none; }
+.ms-opt input{ pointer-events:none; }
+.ms-emoji{ width:22px; text-align:center; }
+
+/* =============== 12) Equipment chips (eq-*) =============== */
+.eq-list{ display:flex; gap:6px; flex-wrap:wrap; }
+.eq-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px; border-radius:999px;
+  background:#f8fafc; border:1px solid #e2e8f0; font-size:.9rem;
+}
+.eq-more{ opacity:.7; }
+
+/* =============== 13) Responsive =============== */
+@media (max-width: 720px){
+  .header-left h1{ font-size: 34px; }
+  .sub{ font-size: 15px; }
+  #backBtn{ top: -6px; }
+
+  .grid-2{ grid-template-columns: 1fr; }
+  .page{ max-width: calc(100vw - 32px); } /* 16px sides */
+  .pretty-table{ min-width: 760px; }
+  .pretty-table thead th,
+  .pretty-table tbody td{ padding: 14px 18px; }
+}

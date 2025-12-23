@@ -97,6 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     let draggedCard = null;
+    setupPipelineCandidateSearch();
   
     // Activar drag para tarjetas iniciales
     document.querySelectorAll(".candidate-card").forEach(enableDrag);
@@ -174,6 +175,9 @@ document.getElementById("closePopup").addEventListener("click", () => {
 });
 
 
+// Legacy pipeline creation flow: this handler builds the payload posted to
+// POST /opportunities/<opportunity_id>/candidates, which creates the candidate
+// and immediately links it to the opportunity.
 document.getElementById("popupcreateCandidateBtn").addEventListener("click", async () => {
   const opportunityId = document.getElementById('opportunity-id-text').getAttribute('data-id');
   const name = document.getElementById("candidate-name").value;
@@ -597,4 +601,260 @@ function getFlagEmoji(country) {
     "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
   };
   return flags[country] || "";
+}
+
+const pipelineSearchUI = {
+  popup: null,
+  input: null,
+  closeBtn: null,
+  results: null,
+  start: null,
+  loading: null,
+  empty: null,
+  error: null,
+  success: null,
+  openBtn: null
+};
+let pipelineSearchAbortController = null;
+let pipelineSearchDebounced = null;
+
+function setupPipelineCandidateSearch() {
+  pipelineSearchUI.popup = document.getElementById('pipelineSearchPopup');
+  pipelineSearchUI.input = document.getElementById('pipeline-search-input');
+  pipelineSearchUI.closeBtn = document.getElementById('closePipelineSearchPopup');
+  pipelineSearchUI.results = document.getElementById('pipeline-search-results');
+  pipelineSearchUI.start = document.getElementById('pipeline-search-start');
+  pipelineSearchUI.loading = document.getElementById('pipeline-search-loading');
+  pipelineSearchUI.empty = document.getElementById('pipeline-search-empty');
+  pipelineSearchUI.error = document.getElementById('pipeline-search-error');
+  pipelineSearchUI.success = document.getElementById('pipeline-search-success');
+  pipelineSearchUI.openBtn = document.getElementById('pipelineAddCandidateBtn');
+
+  if (!pipelineSearchUI.popup || !pipelineSearchUI.input || !pipelineSearchUI.results || !pipelineSearchUI.openBtn) {
+    return;
+  }
+
+  pipelineSearchDebounced = debounce(runPipelineCandidateSearch, 320);
+
+  pipelineSearchUI.openBtn.addEventListener('click', openPipelineSearchPopup);
+  pipelineSearchUI.closeBtn?.addEventListener('click', closePipelineSearchPopup);
+  pipelineSearchUI.popup.addEventListener('click', (evt) => {
+    if (evt.target === pipelineSearchUI.popup) {
+      closePipelineSearchPopup();
+    }
+  });
+
+  pipelineSearchUI.input.addEventListener('input', (e) => {
+    const term = (e.target.value || '').trim();
+    if (term.length < 2) {
+      pipelineSearchUI.results.innerHTML = '';
+      showPipelineSearchNotice('start');
+      if (pipelineSearchAbortController) {
+        pipelineSearchAbortController.abort();
+        pipelineSearchAbortController = null;
+      }
+      return;
+    }
+    pipelineSearchDebounced(term);
+  });
+
+  // Estado inicial
+  showPipelineSearchNotice('start');
+}
+
+function openPipelineSearchPopup() {
+  if (!pipelineSearchUI.popup) return;
+  pipelineSearchUI.popup.classList.remove('hidden');
+  pipelineSearchUI.results.innerHTML = '';
+  pipelineSearchUI.input.value = '';
+  showPipelineSearchNotice('start');
+  requestAnimationFrame(() => pipelineSearchUI.input?.focus());
+}
+
+function closePipelineSearchPopup() {
+  if (!pipelineSearchUI.popup) return;
+  pipelineSearchUI.popup.classList.add('hidden');
+  pipelineSearchUI.results.innerHTML = '';
+  pipelineSearchUI.input.value = '';
+  showPipelineSearchNotice('start');
+  if (pipelineSearchAbortController) {
+    pipelineSearchAbortController.abort();
+    pipelineSearchAbortController = null;
+  }
+}
+
+function hidePipelineSearchNotices() {
+  ['start', 'loading', 'empty', 'error', 'success'].forEach((key) => {
+    const el = pipelineSearchUI[key];
+    if (el) el.style.display = 'none';
+  });
+}
+
+function showPipelineSearchNotice(type, message) {
+  hidePipelineSearchNotices();
+  const el = pipelineSearchUI[type];
+  if (!el) return;
+  if (typeof message === 'string') {
+    el.textContent = message;
+  }
+  el.style.display = 'block';
+}
+
+async function runPipelineCandidateSearch(term) {
+  if (!pipelineSearchUI.results) return;
+  try {
+    showPipelineSearchNotice('loading');
+    pipelineSearchUI.results.innerHTML = '';
+    if (pipelineSearchAbortController) {
+      pipelineSearchAbortController.abort();
+    }
+    pipelineSearchAbortController = new AbortController();
+    const res = await fetch(`${API_BASE}/candidates/search?q=${encodeURIComponent(term)}`, {
+      signal: pipelineSearchAbortController.signal,
+      cache: 'no-store'
+    });
+    if (!res.ok) {
+      throw new Error(`Search failed ${res.status}`);
+    }
+    const items = await res.json();
+    pipelineSearchAbortController = null;
+    if (!Array.isArray(items) || !items.length) {
+      showPipelineSearchNotice('empty');
+      return;
+    }
+    hidePipelineSearchNotices();
+    renderPipelineSearchResults(items);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('Error searching candidates:', err);
+    showPipelineSearchNotice('error', 'Could not search candidates. Please try again.');
+  }
+}
+
+function renderPipelineSearchResults(items) {
+  pipelineSearchUI.results.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+  items.forEach((candidate) => {
+    const li = document.createElement('li');
+    li.className = 'search-result-item';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'search-result-item-content';
+
+    const details = document.createElement('div');
+    details.className = 'search-result-details';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'search-result-name';
+    nameEl.textContent = candidate.name || '(no name)';
+    const linkedinEl = document.createElement('div');
+    linkedinEl.className = 'search-result-meta';
+    linkedinEl.textContent = candidate.linkedin ? formatLinkedInPreview(candidate.linkedin) : 'LinkedIn not available';
+    const emailEl = document.createElement('div');
+    emailEl.className = 'search-result-meta';
+    emailEl.textContent = candidate.email || 'Email not available';
+
+    details.appendChild(nameEl);
+    details.appendChild(linkedinEl);
+    details.appendChild(emailEl);
+
+    const actionBtn = document.createElement('button');
+    actionBtn.type = 'button';
+    actionBtn.className = 'pipeline-add-btn';
+    actionBtn.textContent = 'Add';
+    actionBtn.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+      linkCandidateToPipeline(candidate.candidate_id, actionBtn);
+    });
+
+    wrapper.appendChild(details);
+    wrapper.appendChild(actionBtn);
+    li.appendChild(wrapper);
+    li.addEventListener('click', () => {
+      linkCandidateToPipeline(candidate.candidate_id, actionBtn);
+    });
+    fragment.appendChild(li);
+  });
+  pipelineSearchUI.results.appendChild(fragment);
+}
+
+// Pipeline search uses this helper to call POST /opportunities/<id>/candidates/link,
+// which only inserts the relationship row in opportunity_candidates.
+async function linkCandidateToPipeline(candidateId, triggerButton) {
+  const opportunityEl = document.getElementById('opportunity-id-text');
+  const opportunityId = opportunityEl?.getAttribute('data-id') || opportunityEl?.textContent || '';
+  if (!candidateId || !opportunityId || opportunityId === '—') {
+    showPipelineSearchNotice('error', 'Opportunity ID not found.');
+    return;
+  }
+
+  setCandidateLinkButtonState(triggerButton, true);
+  try {
+    const payload = {
+      candidate_id: candidateId,
+      stage: 'Contactado',
+      created_by: localStorage.getItem('user_email') || undefined
+    };
+
+    const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.status === 409) {
+      showPipelineSearchNotice('error', 'Candidate is already in this opportunity.');
+      return;
+    }
+    if (!res.ok) {
+      throw new Error(`Link failed ${res.status}`);
+    }
+
+    showPipelineSearchNotice('success', 'Candidate added to pipeline.');
+    pipelineSearchUI.results.innerHTML = '';
+    if (typeof loadPipelineCandidates === 'function') {
+      loadPipelineCandidates();
+    }
+    setTimeout(() => {
+      closePipelineSearchPopup();
+    }, 900);
+  } catch (err) {
+    console.error('Error linking candidate:', err);
+    showPipelineSearchNotice('error', 'Could not add candidate. Please try again.');
+  } finally {
+    setCandidateLinkButtonState(triggerButton, false);
+  }
+}
+
+function setCandidateLinkButtonState(btn, isLoading) {
+  if (!btn) return;
+  btn.disabled = Boolean(isLoading);
+  btn.textContent = isLoading ? 'Adding…' : 'Add';
+}
+
+function formatLinkedInPreview(url) {
+  if (!url) return '';
+  let clean = url.trim();
+  if (!clean) return '';
+  if (!/^https?:\/\//i.test(clean)) {
+    clean = `https://${clean}`;
+  }
+  try {
+    const parsed = new URL(clean);
+    const host = parsed.hostname.replace(/^www\./, '');
+    let path = parsed.pathname.replace(/\/$/, '');
+    if (path.length > 25) {
+      path = `${path.slice(0, 25)}…`;
+    }
+    return `${host}${path}`;
+  } catch {
+    return clean.length > 30 ? `${clean.slice(0, 30)}…` : clean;
+  }
+}
+
+function debounce(fn, wait = 300) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(null, args), wait);
+  };
 }
