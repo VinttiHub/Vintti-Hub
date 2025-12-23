@@ -19,6 +19,10 @@
   --lost-soft: #fde8f2;
 
   --conv: #c8a8ff;
+  --churn: #ffcf9b;
+  --churn-soft: #fff3e3;
+  --early-churn: #ffd6c7;
+  --early-churn-soft: #fff1eb;
 }
 
 body {
@@ -98,6 +102,16 @@ body {
   color: #6f3fa4;
 }
 
+.metric-pill-churn {
+  background-color: var(--churn-soft);
+  color: #b9631a;
+}
+
+.metric-pill-early {
+  background-color: var(--early-churn-soft);
+  color: #b05024;
+}
+
 .metric-win-month::before {
   background: radial-gradient(circle at top right, rgba(143, 214, 255, 0.35), transparent 55%);
 }
@@ -116,6 +130,14 @@ body {
 
 .metric-conversion::before {
   background: radial-gradient(circle at top right, rgba(210, 185, 255, 0.45), transparent 55%);
+}
+
+.metric-churn-l30::before {
+  background: radial-gradient(circle at top right, rgba(255, 205, 155, 0.4), transparent 55%);
+}
+
+.metric-early-churn::before {
+  background: radial-gradient(circle at top right, rgba(255, 214, 199, 0.45), transparent 55%);
 }
 .metric-compare {
   font-size: 0.75rem;
@@ -221,6 +243,30 @@ body {
 .metric-card.is-updating .metric-value {
   transform: translateY(-2px);
   opacity: 0.95;
+}
+
+.metric-value-combo {
+  font-size: 2.1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.metric-label-inline {
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.metric-number {
+  font-weight: 800;
+}
+
+.metric-percent {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 /* Dropdown más “premium” */

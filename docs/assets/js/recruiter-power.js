@@ -273,6 +273,12 @@ function updateCardsForLead(hrLeadEmail) {
   const convEl = $("#conversionRateValue");
   const helperEl = $("#conversionHelper");
   const convLifetimeEl = $("#conversionLifetimeValue");
+  const churnCountEl = $("#churnL30Count");
+  const churnRateEl = $("#churnL30Rate");
+  const churnHelperEl = $("#churnL30Helper");
+  const earlyCountEl = $("#earlyChurnL90Count");
+  const earlyRateEl = $("#earlyChurnL90Rate");
+  const earlyHelperEl = $("#earlyChurnL90Helper");
 
   if (!m) {
     winMonthEl.textContent = "–";
@@ -283,6 +289,14 @@ function updateCardsForLead(hrLeadEmail) {
     helperEl.textContent =
       "No data available for this recruiter yet. Keep an eye on new opportunities!";
     if (convLifetimeEl) convLifetimeEl.textContent = "–";
+    if (churnCountEl) churnCountEl.textContent = "–";
+    if (churnRateEl) churnRateEl.textContent = "–";
+    if (churnHelperEl)
+      churnHelperEl.textContent =
+        "Active: – · Hires: –";
+    if (earlyCountEl) earlyCountEl.textContent = "–";
+    if (earlyRateEl) earlyRateEl.textContent = "–";
+    if (earlyHelperEl) earlyHelperEl.textContent = "Hires (L90): –";
     return;
   }
 
@@ -366,6 +380,45 @@ function updateCardsForLead(hrLeadEmail) {
         formatter: (v) => formatPercent(v),
       });
     }
+  }
+
+  // --- Churn · Last 30 days ---
+  if (churnCountEl && churnRateEl && churnHelperEl) {
+    const newChurnCount = m.churn_count_l30 ?? 0;
+    const fromChurnCount = parseIntSafe(churnCountEl.textContent);
+    animateValue(churnCountEl, fromChurnCount, newChurnCount, {
+      formatter: (v) => Math.round(v),
+    });
+
+    const newChurnRate = m.churn_rate_l30 ?? 0;
+    const fromChurnRate = parsePercentSafe(churnRateEl.textContent);
+    animateValue(churnRateEl, fromChurnRate, newChurnRate, {
+      duration: 750,
+      formatter: (v) => formatPercent(v),
+    });
+
+    const active = m.churn_active_l30 ?? 0;
+    const total = m.churn_hires_l30 ?? 0;
+    churnHelperEl.textContent = `Active: ${active} · Hires: ${total}`;
+  }
+
+  // --- Early churn · Last 90 days ---
+  if (earlyCountEl && earlyRateEl && earlyHelperEl) {
+    const newEarlyCount = m.early_churn_count_l90 ?? 0;
+    const fromEarlyCount = parseIntSafe(earlyCountEl.textContent);
+    animateValue(earlyCountEl, fromEarlyCount, newEarlyCount, {
+      formatter: (v) => Math.round(v),
+    });
+
+    const newEarlyRate = m.early_churn_rate_l90 ?? 0;
+    const fromEarlyRate = parsePercentSafe(earlyRateEl.textContent);
+    animateValue(earlyRateEl, fromEarlyRate, newEarlyRate, {
+      duration: 750,
+      formatter: (v) => formatPercent(v),
+    });
+
+    const hires90 = m.early_churn_hires_l90 ?? 0;
+    earlyHelperEl.textContent = `Hires (L90): ${hires90}`;
   }
 
   // ✨ pequeño “glow” en todas las cards cuando cambian

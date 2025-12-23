@@ -128,6 +128,39 @@ def register_recruiter_metrics_routes(app):
                 ) AS last_20_win
             FROM base
             GROUP BY opp_hr_lead
+        ),
+        hire_base AS (
+            SELECT
+                b.opp_hr_lead,
+                h.start_date::date AS start_date,
+                h.end_date::date AS end_date
+            FROM base b
+            JOIN hire_opportunity h
+                ON h.opportunity_id = b.opportunity_id
+            WHERE b.opp_stage = 'Close Win'
+              AND h.start_date IS NOT NULL
+        ),
+        churn_l30 AS (
+            SELECT
+                opp_hr_lead,
+                COUNT(*) AS churn_hires_l30,
+                COUNT(*) FILTER (WHERE end_date IS NULL) AS churn_active_l30,
+                COUNT(*) FILTER (WHERE end_date IS NOT NULL) AS churn_count_l30
+            FROM hire_base
+            WHERE start_date >= CURRENT_DATE - INTERVAL '30 days'
+            GROUP BY opp_hr_lead
+        ),
+        early_churn_l90 AS (
+            SELECT
+                opp_hr_lead,
+                COUNT(*) AS early_churn_hires_l90,
+                COUNT(*) FILTER (
+                    WHERE end_date IS NOT NULL
+                      AND (end_date - start_date) < INTERVAL '90 days'
+                ) AS early_churn_count_l90
+            FROM hire_base
+            WHERE start_date >= CURRENT_DATE - INTERVAL '90 days'
+            GROUP BY opp_hr_lead
         )
         SELECT
             a.opp_hr_lead,
@@ -148,10 +181,27 @@ def register_recruiter_metrics_routes(app):
                 WHEN (a.closed_win_total + a.closed_lost_total) = 0 THEN NULL
                 ELSE a.closed_win_total::decimal
                      / (a.closed_win_total + a.closed_lost_total)
-            END AS conversion_rate_lifetime
+            END AS conversion_rate_lifetime,
+            COALESCE(cl30.churn_hires_l30, 0) AS churn_hires_l30,
+            COALESCE(cl30.churn_active_l30, 0) AS churn_active_l30,
+            COALESCE(cl30.churn_count_l30, 0) AS churn_count_l30,
+            CASE
+                WHEN COALESCE(cl30.churn_hires_l30, 0) = 0 THEN 0
+                ELSE cl30.churn_count_l30::decimal / cl30.churn_hires_l30
+            END AS churn_rate_l30,
+            COALESCE(e90.early_churn_hires_l90, 0) AS early_churn_hires_l90,
+            COALESCE(e90.early_churn_count_l90, 0) AS early_churn_count_l90,
+            CASE
+                WHEN COALESCE(e90.early_churn_hires_l90, 0) = 0 THEN 0
+                ELSE e90.early_churn_count_l90::decimal / e90.early_churn_hires_l90
+            END AS early_churn_rate_l90
         FROM agg a
         LEFT JOIN conv c
             ON c.opp_hr_lead = a.opp_hr_lead
+        LEFT JOIN churn_l30 cl30
+            ON cl30.opp_hr_lead = a.opp_hr_lead
+        LEFT JOIN early_churn_l90 e90
+            ON e90.opp_hr_lead = a.opp_hr_lead
         ORDER BY a.opp_hr_lead;
         """
 
@@ -181,6 +231,8 @@ def register_recruiter_metrics_routes(app):
         for r in rows:
             conversion_range = float(r["conversion_rate_last_20"]) if r["conversion_rate_last_20"] is not None else None
             conversion_lifetime = float(r["conversion_rate_lifetime"]) if r["conversion_rate_lifetime"] is not None else None
+            churn_rate_l30 = float(r["churn_rate_l30"]) if r["churn_rate_l30"] is not None else 0.0
+            early_churn_rate_l90 = float(r["early_churn_rate_l90"]) if r["early_churn_rate_l90"] is not None else 0.0
 
             email = r["opp_hr_lead"]
             name = r.get("user_name") or email
@@ -204,6 +256,13 @@ def register_recruiter_metrics_routes(app):
                     "prev_closed_lost_month": r["prev_closed_lost_month"] or 0,
 
                     "conversion_rate_lifetime": conversion_lifetime,
+                    "churn_hires_l30": r["churn_hires_l30"] or 0,
+                    "churn_active_l30": r["churn_active_l30"] or 0,
+                    "churn_count_l30": r["churn_count_l30"] or 0,
+                    "churn_rate_l30": churn_rate_l30,
+                    "early_churn_hires_l90": r["early_churn_hires_l90"] or 0,
+                    "early_churn_count_l90": r["early_churn_count_l90"] or 0,
+                    "early_churn_rate_l90": early_churn_rate_l90,
                 }
             )
 
