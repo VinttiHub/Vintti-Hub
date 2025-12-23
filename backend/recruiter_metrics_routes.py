@@ -156,7 +156,7 @@ def register_recruiter_metrics_routes(app):
                 COUNT(*) AS early_churn_hires_l90,
                 COUNT(*) FILTER (
                     WHERE end_date IS NOT NULL
-                      AND (end_date - start_date) < INTERVAL '90 days'
+                      AND end_date < start_date + INTERVAL '90 days'
                 ) AS early_churn_count_l90
             FROM hire_base
             WHERE start_date >= CURRENT_DATE - INTERVAL '90 days'
