@@ -472,7 +472,7 @@ function OpportunitiesPage() {
       });
       await linkCandidateHire(closeWinSearch.selected.candidate_id, opportunity.opportunity_id);
       await patchStage(opportunity.opportunity_id, 'Close Win');
-      window.location.href = `candidate-details.html?id=${closeWinSearch.selected.candidate_id}#hire`;
+      window.location.href = `/candidates/${closeWinSearch.selected.candidate_id}#hire`;
     } catch (error) {
       alert(error.message);
     } finally {

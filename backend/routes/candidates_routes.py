@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
 from db import get_connection
-from utils.services import DOC_TYPE_ID, S3_BUCKET, WORKSPACE_ID, affinda_client, s3_client
+from utils import services
 from utils.storage_utils import get_cv_keys, list_s3_with_prefix, make_cv_payload, set_cv_keys
 from utils.types import to_bool
 
@@ -203,9 +203,9 @@ def upload_candidate_cv(candidate_id):
         }.get(ext, 'application/octet-stream')
 
         # Subir a S3
-        s3_client.upload_fileobj(
+        services.s3_client.upload_fileobj(
             f,
-            S3_BUCKET,
+            services.S3_BUCKET,
             s3_key,
             ExtraArgs={'ContentType': content_type}
         )
@@ -214,7 +214,7 @@ def upload_candidate_cv(candidate_id):
         # 🆕 NUEVO: correr Affinda y guardar en candidates.affinda_scrapper
         # =========================
         affinda_json = None
-        if ext == 'pdf' and affinda_client:
+        if ext == 'pdf' and services.affinda_client:
             try:
                 try:
                     f.stream.seek(0)
@@ -223,10 +223,10 @@ def upload_candidate_cv(candidate_id):
                     f.seek(0)
                     file_for_affinda = f
 
-                doc = affinda_client.create_document(
+                doc = services.affinda_client.create_document(
                     file=file_for_affinda,
-                    workspace=WORKSPACE_ID,
-                    document_type=DOC_TYPE_ID,
+                    workspace=services.WORKSPACE_ID,
+                    document_type=services.DOC_TYPE_ID,
                     wait=True
                 )
                 data = doc.data
@@ -239,7 +239,7 @@ def upload_candidate_cv(candidate_id):
                         affinda_json = json.dumps(getattr(data, "__dict__", {"raw": str(data)}))
             except Exception:
                 logging.exception("Affinda extraction failed (candidate_id=%s, key=%s)", candidate_id, s3_key)
-        elif ext == 'pdf' and not affinda_client:
+        elif ext == 'pdf' and not services.affinda_client:
             logging.warning("Affinda no configurado; omitiendo extracción.")
         # =========================
 
@@ -289,7 +289,7 @@ def delete_candidate_cv(candidate_id):
             return jsonify({"error": "Key not found for this candidate"}), 404
 
         # Eliminar en S3
-        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+        services.s3_client.delete_object(Bucket=services.S3_BUCKET, Key=key)
 
         # Actualizar lista
         keys = [k for k in keys if k != key]
@@ -1166,8 +1166,8 @@ def upload_resignation(candidate_id):
 
     try:
         s3_key = f"resignations/resignation-letter_{candidate_id}_{uuid.uuid4()}.pdf"
-        s3_client.upload_fileobj(
-            f, S3_BUCKET, s3_key,
+        services.s3_client.upload_fileobj(
+            f, services.S3_BUCKET, s3_key,
             ExtraArgs={
                 'ContentType': 'application/pdf',
                 # 👇 ayuda a que el navegador lo abra inline:
@@ -1187,7 +1187,7 @@ def delete_resignation(candidate_id):
     if not key or not key.startswith(f"resignations/resignation-letter_{candidate_id}_"):
         return jsonify({"error": "Missing or invalid key"}), 400
     try:
-        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+        services.s3_client.delete_object(Bucket=services.S3_BUCKET, Key=key)
         # devolver lista actualizada
         prefix = f"resignations/resignation-letter_{candidate_id}_"
         items = list_s3_with_prefix(prefix)

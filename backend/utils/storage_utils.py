@@ -2,7 +2,7 @@ import json
 import re
 from typing import List, Optional
 
-from utils.services import S3_BUCKET, s3_client
+from utils import services
 
 
 def _extract_account_pdf_key(value: Optional[str]) -> Optional[str]:
@@ -43,9 +43,9 @@ def set_account_pdf_keys(cursor, account_id, keys):
 def make_account_pdf_payload(keys):
     pdfs = []
     for key in keys:
-        url = s3_client.generate_presigned_url(
+        url = services.s3_client.generate_presigned_url(
             'get_object',
-            Params={'Bucket': S3_BUCKET, 'Key': key},
+            Params={'Bucket': services.S3_BUCKET, 'Key': key},
             ExpiresIn=604800
         )
         pdfs.append({
@@ -101,9 +101,9 @@ def set_cv_keys(cursor, candidate_id: int, keys: List[str]):
 def make_cv_payload(keys: List[str]):
     items = []
     for key in keys:
-        url = s3_client.generate_presigned_url(
+        url = services.s3_client.generate_presigned_url(
             'get_object',
-            Params={'Bucket': S3_BUCKET, 'Key': key},
+            Params={'Bucket': services.S3_BUCKET, 'Key': key},
             ExpiresIn=604800
         )
         items.append({
@@ -116,13 +116,13 @@ def make_cv_payload(keys: List[str]):
 
 def list_s3_with_prefix(prefix, expires=3600):
     out = []
-    resp = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+    resp = services.s3_client.list_objects_v2(Bucket=services.S3_BUCKET, Prefix=prefix)
     for obj in resp.get('Contents', []):
         key = obj['Key']
-        url = s3_client.generate_presigned_url(
+        url = services.s3_client.generate_presigned_url(
             'get_object',
             Params={
-                'Bucket': S3_BUCKET,
+                'Bucket': services.S3_BUCKET,
                 'Key': key,
                 'ResponseContentType': 'application/pdf',
                 'ResponseContentDisposition': 'inline; filename="resignation-letter.pdf"'

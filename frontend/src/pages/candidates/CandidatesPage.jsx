@@ -110,10 +110,10 @@ function CandidatesPage() {
         // ignore
       }
       setTimeout(() => {
-        window.location.href = `candidate-details.html?id=${candidateId}`;
+        window.location.href = `/candidates/${candidateId}`;
       }, 120);
     } else {
-      window.location.href = `candidate-details.html?id=${candidateId}`;
+      window.location.href = `/candidates/${candidateId}`;
     }
   }
 
@@ -430,7 +430,7 @@ function CandidateModal({ formState, submitting, formError, duplicateInfo, onCha
               id="openExistingCandidateBtn"
               onClick={() => {
                 if (duplicateInfo?.candidate?.candidate_id) {
-                  window.location.href = `candidate-details.html?id=${encodeURIComponent(duplicateInfo.candidate.candidate_id)}`;
+                  window.location.href = `/candidates/${encodeURIComponent(duplicateInfo.candidate.candidate_id)}`;
                 }
               }}
             >

@@ -155,7 +155,7 @@ function CandidateSearchPage() {
                 <a
                   key={candidate.candidate_id}
                   className="card"
-                  href={`https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(candidate.candidate_id)}`}
+                  href={`/candidates/${encodeURIComponent(candidate.candidate_id)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import SidebarLayout from '../../components/layout/SidebarLayout.jsx';
 import LogoutFab from '../../components/common/LogoutFab.jsx';
 import usePageStylesheet from '../../hooks/usePageStylesheet.js';
@@ -49,6 +50,7 @@ const positions = [
 const statusOrder = ['Active Client', 'Lead in Process', 'Lead', 'Inactive Client', 'Lead Lost', '—'];
 
 function CrmPage() {
+  const navigate = useNavigate();
   usePageStylesheet('/assets/css/crm.css');
   const [accounts, setAccounts] = useState([]);
   const [referralOptions, setReferralOptions] = useState([]);
@@ -293,14 +295,15 @@ function CrmPage() {
                   <td colSpan={priorityVisible ? 8 : 7}>No data available</td>
                 </tr>
               )}
-              {filteredAccounts.map((account) => (
-                <AccountRow
-                  key={account.account_id}
-                  account={account}
-                  priorityVisible={priorityVisible}
-                  onPriorityChange={handlePriorityChange}
-                />
-              ))}
+                {filteredAccounts.map((account) => (
+                  <AccountRow
+                    key={account.account_id}
+                    account={account}
+                    priorityVisible={priorityVisible}
+                    onPriorityChange={handlePriorityChange}
+                    onNavigate={(accountId) => navigate(`/accounts/${accountId}`)}
+                  />
+                ))}
             </tbody>
           </table>
         )}
@@ -322,7 +325,7 @@ function CrmPage() {
   );
 }
 
-function AccountRow({ account, priorityVisible, onPriorityChange }) {
+function AccountRow({ account, priorityVisible, onPriorityChange, onNavigate }) {
   const status = account.computed_status || '—';
   const priority = (account.priority || '').trim().toUpperCase();
   const showPriority = priorityVisible;
@@ -333,8 +336,7 @@ function AccountRow({ account, priorityVisible, onPriorityChange }) {
 
   const handleRowClick = (event) => {
     if (event.target.closest('select')) return;
-    const url = `account-details.html?id=${account.account_id}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    if (typeof onNavigate === 'function') onNavigate(account.account_id);
   };
 
   return (

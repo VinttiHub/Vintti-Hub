@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor, execute_values
 
 from db import get_connection
-from utils.services import S3_BUCKET, s3_client
+from utils import services
 from utils.storage_utils import (
     get_account_pdf_keys,
     make_account_pdf_payload,
@@ -1175,9 +1175,9 @@ def upload_account_pdf(account_id):
         filename = f"accounts/{account_id}_{uuid.uuid4()}.pdf"
 
         # Subir a S3
-        s3_client.upload_fileobj(
+        services.s3_client.upload_fileobj(
             pdf_file,
-            S3_BUCKET,
+            services.S3_BUCKET,
             filename,
             ExtraArgs={'ContentType': 'application/pdf'}
         )
@@ -1241,7 +1241,7 @@ def delete_account_pdf_v2(account_id):
             return jsonify({"error": "Key not found for this account"}), 404
 
         # Eliminar de S3
-        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+        services.s3_client.delete_object(Bucket=services.S3_BUCKET, Key=key)
 
         # Quitar de la lista y persistir
         keys = [k for k in keys if k != key]
@@ -1274,7 +1274,7 @@ def delete_account_pdf(account_id):
             return jsonify({"error": "Invalid S3 key"}), 400
 
         s3_key = f"accounts/{match.group(1)}"
-        s3_client.delete_object(Bucket=S3_BUCKET, Key=s3_key)
+        services.s3_client.delete_object(Bucket=services.S3_BUCKET, Key=s3_key)
 
         cursor.execute("UPDATE account SET pdf_s3 = NULL WHERE account_id = %s", (account_id,))
         conn.commit()
@@ -1326,14 +1326,14 @@ def rename_account_pdf(account_id):
             return jsonify({"error": "A file with that name already exists"}), 409
 
         # Renombrar en S3: copy -> delete
-        s3_client.copy_object(
-            Bucket=S3_BUCKET,
-            CopySource={'Bucket': S3_BUCKET, 'Key': key},
+        services.s3_client.copy_object(
+            Bucket=services.S3_BUCKET,
+            CopySource={'Bucket': services.S3_BUCKET, 'Key': key},
             Key=dest_key,
             ContentType='application/pdf',
             MetadataDirective='REPLACE'
         )
-        s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+        services.s3_client.delete_object(Bucket=services.S3_BUCKET, Key=key)
 
         # Reemplazar en la lista persistida
         new_keys = [dest_key if k == key else k for k in keys]
