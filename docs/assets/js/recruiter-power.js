@@ -33,7 +33,7 @@ const metricsState = {
   currentUserEmail: null,
   rangeStart: null, // YYYY-MM-DD inclusive
   rangeEnd: null,   // YYYY-MM-DD inclusive
-
+  selectedLead: "",
 };
 function isoToYMD(iso) {
   if (!iso) return "";
@@ -376,6 +376,8 @@ function populateDropdown() {
   const select = $("#hrLeadSelect");
   if (!select) return;
 
+  const previousSelection = metricsState.selectedLead || "";
+
   select.innerHTML = "";
 
   // Option placeholder
@@ -408,6 +410,8 @@ function populateDropdown() {
     select.appendChild(opt);
   });
 
+  let shouldRefreshCards = false;
+
   // Si es usuario restringido y su opción existe, la seleccionamos por defecto
   if (currentEmail && RESTRICTED_EMAILS.has(currentEmail)) {
     const ownOption = [...select.options].find(
@@ -417,14 +421,34 @@ function populateDropdown() {
       ownOption.selected = true;
       defaultOpt.disabled = true;
       defaultOpt.hidden = true;
-      updateCardsForLead(ownOption.value);
+      metricsState.selectedLead = ownOption.value;
+      shouldRefreshCards = true;
     }
+  } else if (previousSelection) {
+    const existing = [...select.options].find(
+      (opt) => opt.value === previousSelection
+    );
+    if (existing) {
+      existing.selected = true;
+      defaultOpt.selected = false;
+      metricsState.selectedLead = previousSelection;
+      shouldRefreshCards = true;
+    } else {
+      metricsState.selectedLead = "";
+    }
+  } else {
+    metricsState.selectedLead = "";
   }
 
-  select.addEventListener("change", (ev) => {
+  select.onchange = (ev) => {
     const hrLeadEmail = ev.target.value;
+    metricsState.selectedLead = hrLeadEmail;
     updateCardsForLead(hrLeadEmail);
-  });
+  };
+
+  if (shouldRefreshCards) {
+    updateCardsForLead(metricsState.selectedLead);
+  }
 }
 
 function updatePeriodInfo() {
