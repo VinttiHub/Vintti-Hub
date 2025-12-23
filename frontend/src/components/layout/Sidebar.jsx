@@ -176,25 +176,20 @@ function Sidebar({ collapsed }) {
           <span className="menu-label">Dashboard</span>
         </a>
 
-        <a className="menu-item" href="control-dashboard.html">
+        <NavLink to="/management-metrics" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
           <span className="menu-icon"><i className="fa-solid fa-chart-bar" /></span>
           <span className="menu-label">Management Metrics</span>
-        </a>
+        </NavLink>
 
         <NavLink to="/recruiter-power" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
           <span className="menu-icon"><i className="fa-solid fa-bolt" /></span>
           <span className="menu-label">Recruiter Power</span>
         </NavLink>
 
-        <a
-          className="menu-item"
-          href="https://dashboard.vintti.com/public/dashboard/8e7a1373-cfc1-4549-81da-24566d81c9d3?month_ndacw=&month_ndas="
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <NavLink to="/sales-force" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
           <span className="menu-icon"><i className="fa-solid fa-rocket" /></span>
           <span className="menu-label">Sales Force</span>
-        </a>
+        </NavLink>
       </nav>
 
       <a href={profile.href} className="profile-tile" id="sidebarProfile">

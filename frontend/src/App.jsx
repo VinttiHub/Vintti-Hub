@@ -4,13 +4,14 @@ import MigrationPlaceholder from './pages/MigrationPlaceholder.jsx';
 import OpportunitiesPage from './pages/opportunities/OpportunitiesPage.jsx';
 import CandidatesPage from './pages/candidates/CandidatesPage.jsx';
 import CrmPage from './pages/crm/CrmPage.jsx';
+import CandidateSearchPage from './pages/candidateSearch/CandidateSearchPage.jsx';
+import OpportunitiesSummaryPage from './pages/opportunitiesSummary/OpportunitiesSummaryPage.jsx';
+import RecruiterPowerPage from './pages/recruiterPower/RecruiterPowerPage.jsx';
+import MainDashboardRedirect from './pages/redirects/MainDashboardRedirect.jsx';
+import ControlDashboardRedirect from './pages/redirects/ControlDashboardRedirect.jsx';
+import SalesForceRedirect from './pages/redirects/SalesForceRedirect.jsx';
 
-const placeholderRoutes = [
-  { path: '/candidate-search', title: 'Candidate Search', description: 'Advanced search filters will be ported shortly.' },
-  { path: '/dashboard', title: 'Dashboard', description: 'Reporting widgets will be ported after the core flows.' },
-  { path: '/opportunities-summary', title: 'Opportunities Summary', description: 'Summary dashboards will land after pipeline parity.' },
-  { path: '/recruiter-power', title: 'Recruiter Power', description: 'Recruiter metrics are still being migrated.' },
-];
+const placeholderRoutes = [];
 
 function App() {
   return (
@@ -19,6 +20,12 @@ function App() {
       <Route path="/opportunities" element={<OpportunitiesPage />} />
       <Route path="/candidates" element={<CandidatesPage />} />
       <Route path="/crm" element={<CrmPage />} />
+      <Route path="/candidate-search" element={<CandidateSearchPage />} />
+      <Route path="/opportunities-summary" element={<OpportunitiesSummaryPage />} />
+      <Route path="/recruiter-power" element={<RecruiterPowerPage />} />
+      <Route path="/dashboard" element={<MainDashboardRedirect />} />
+      <Route path="/management-metrics" element={<ControlDashboardRedirect />} />
+      <Route path="/sales-force" element={<SalesForceRedirect />} />
       {placeholderRoutes.map(route => (
         <Route
           key={route.path}
