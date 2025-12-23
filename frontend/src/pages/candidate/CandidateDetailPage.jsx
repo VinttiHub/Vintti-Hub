@@ -37,6 +37,7 @@ function CandidateDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [resumeFrameKey, setResumeFrameKey] = useState(0);
 
   useEffect(() => {
     if (!candidateId) return;
@@ -162,6 +163,8 @@ function CandidateDetailPage() {
                 candidateId={candidateId}
                 candidate={candidate}
                 onOpenAi={() => setAiModalOpen(true)}
+                onRefresh={() => setResumeFrameKey((prev) => prev + 1)}
+                frameKey={resumeFrameKey}
               />
             )}
 
@@ -186,8 +189,12 @@ function CandidateDetailPage() {
       <AiAssistantModal
         open={aiModalOpen}
         candidateId={candidateId}
+        candidate={candidate}
         onClose={() => setAiModalOpen(false)}
-        onResumeReady={() => setTab('resume')}
+        onResumeReady={() => {
+          setTab('resume');
+          setResumeFrameKey((prev) => prev + 1);
+        }}
       />
     </SidebarLayout>
   );

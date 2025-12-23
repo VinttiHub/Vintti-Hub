@@ -28,6 +28,9 @@ const PHONE_CODE_BY_COUNTRY = {
   'United States': '1',
 };
 
+const COUNTRY_NAMES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
+const DEFAULT_PHONE_COUNTRY = 'Argentina';
+
 const STATUS_OPTIONS = [
   { value: '', label: 'Status: All' },
   { value: 'active', label: 'Active' },
@@ -44,7 +47,8 @@ const DEFAULT_FORM = {
   name: '',
   email: '',
   country: '',
-  phoneCode: '54',
+  phoneCountry: DEFAULT_PHONE_COUNTRY,
+  phoneCode: PHONE_CODE_BY_COUNTRY[DEFAULT_PHONE_COUNTRY],
   phone: '',
   linkedin: '',
 };
@@ -57,7 +61,7 @@ function CandidatesPage() {
   const [modelFilter, setModelFilter] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [formState, setFormState] = useState(DEFAULT_FORM);
+  const [formState, setFormState] = useState(() => ({ ...DEFAULT_FORM }));
   const [formError, setFormError] = useState('');
   const [duplicateInfo, setDuplicateInfo] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -130,7 +134,7 @@ function CandidatesPage() {
   }
 
   function openModal() {
-    setFormState(DEFAULT_FORM);
+    setFormState({ ...DEFAULT_FORM });
     setFormError('');
     setDuplicateInfo(null);
     setModalOpen(true);
@@ -146,8 +150,18 @@ function CandidatesPage() {
     const { name, value } = event.target;
     setFormState((prev) => {
       if (name === 'country') {
+        if (!value) {
+          return { ...prev, country: value };
+        }
+        const nextCode = PHONE_CODE_BY_COUNTRY[value];
+        if (!nextCode) {
+          return { ...prev, country: value };
+        }
+        return { ...prev, country: value, phoneCountry: value, phoneCode: nextCode };
+      }
+      if (name === 'phoneCountry') {
         const nextCode = PHONE_CODE_BY_COUNTRY[value] || prev.phoneCode;
-        return { ...prev, country: value, phoneCode: nextCode };
+        return { ...prev, phoneCountry: value, phoneCode: nextCode };
       }
       return { ...prev, [name]: value };
     });
@@ -403,6 +417,16 @@ function CandidatesPage() {
 }
 
 function CandidateModal({ formState, submitting, formError, duplicateInfo, onChange, onClose, onSubmit }) {
+  const [countrySearch, setCountrySearch] = useState('');
+  const filteredCountries = useMemo(() => {
+    const term = countrySearch.trim().toLowerCase();
+    const base = term ? COUNTRY_NAMES.filter((country) => country.toLowerCase().includes(term)) : COUNTRY_NAMES;
+    if (formState.country && !base.includes(formState.country)) {
+      return [formState.country, ...base];
+    }
+    return base;
+  }, [countrySearch, formState.country]);
+
   return (
     <div id="candidateCreateModal" className="candidate-modal-overlay" role="dialog" aria-modal="true">
       <div className="candidate-modal">
@@ -469,19 +493,33 @@ function CandidateModal({ formState, submitting, formError, duplicateInfo, onCha
 
           <label className="candidate-field">
             <span>Country</span>
-            <select
-              id="candidateCountry"
-              name="country"
-              value={formState.country}
-              onChange={onChange}
-            >
-              <option value="">Select country…</option>
-              {Object.keys(PHONE_CODE_BY_COUNTRY).map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
+            <div className="select-with-search">
+              <input
+                type="text"
+                className="select-search-input"
+                placeholder="Search country…"
+                value={countrySearch}
+                onChange={(event) => setCountrySearch(event.target.value)}
+                aria-label="Search country"
+              />
+              <select
+                id="candidateCountry"
+                name="country"
+                value={formState.country}
+                onChange={onChange}
+              >
+                <option value="">Select country…</option>
+                {filteredCountries.length === 0 ? (
+                  <option disabled>No countries match</option>
+                ) : (
+                  filteredCountries.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
           </label>
 
           <div className="candidate-field">
@@ -489,15 +527,18 @@ function CandidateModal({ formState, submitting, formError, duplicateInfo, onCha
             <div className="phone-split">
               <select
                 id="candidatePhoneCode"
-                name="phoneCode"
-                value={formState.phoneCode}
+                name="phoneCountry"
+                value={formState.phoneCountry}
                 onChange={onChange}
               >
-                {Object.entries(PHONE_CODE_BY_COUNTRY).map(([country, code]) => (
-                  <option key={country} value={code}>
-                    {country} +{code}
-                  </option>
-                ))}
+                {COUNTRY_NAMES.map((country) => {
+                  const code = PHONE_CODE_BY_COUNTRY[country];
+                  return (
+                    <option key={country} value={country}>
+                      {country} +{code}
+                    </option>
+                  );
+                })}
               </select>
               <input
                 type="tel"

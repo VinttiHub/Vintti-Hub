@@ -65,3 +65,61 @@ export async function fetchCandidateEquipments(candidateId) {
   if (!res.ok) throw new Error('Failed to load equipments');
   return res.json();
 }
+
+export async function updateCandidateScrap(candidateId, payload) {
+  const res = await fetch(`${API_BASE_URL}/candidates/${candidateId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to save candidate data');
+  return res.json();
+}
+
+export async function fetchCandidateCvs(candidateId) {
+  const res = await fetch(`${API_BASE_URL}/candidates/${candidateId}/cvs`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to load candidate CVs');
+  return res.json();
+}
+
+export async function fetchResumeRecord(candidateId) {
+  const res = await fetch(`${API_BASE_URL}/resumes/${candidateId}`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to load resume');
+  return res.json();
+}
+
+export async function generateResumeFields(candidateId, payload) {
+  const res = await fetch(`${API_BASE_URL}/generate_resume_fields`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ candidate_id: candidateId, ...payload }),
+  });
+  if (!res.ok) throw new Error('Failed to generate resume');
+  return res.json();
+}
+
+export async function improveAbout(candidateId, prompt) {
+  return genericImprove('/ai/improve_about', candidateId, prompt);
+}
+
+export async function improveEducation(candidateId, prompt) {
+  return genericImprove('/ai/improve_education', candidateId, prompt);
+}
+
+export async function improveWorkExperience(candidateId, prompt) {
+  return genericImprove('/ai/improve_work_experience', candidateId, prompt);
+}
+
+export async function improveTools(candidateId, prompt) {
+  return genericImprove('/ai/improve_tools', candidateId, prompt);
+}
+
+async function genericImprove(path, candidateId, prompt) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ candidate_id: candidateId, user_prompt: prompt }),
+  });
+  if (!res.ok) throw new Error('Failed to improve resume section');
+  return res.json();
+}

@@ -261,6 +261,11 @@ body {
   color: #1a1a1a;
   gap: 6px;
 }
+.select-with-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .candidate-field input,
 .candidate-field select {
   border-radius: 12px;
@@ -290,7 +295,7 @@ body {
   gap: 10px;
 }
 .phone-split select {
-  width: 120px;
+  width: 170px;
 }
 .phone-split input {
   flex: 1;

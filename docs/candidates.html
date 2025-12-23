@@ -126,10 +126,10 @@
 
   <!-- ======================== Main ======================== -->
   <main class="main-content">
-    <div class="filters-top-bar">
+    <header class="page-header">
       <h1 class="page-title">Candidates</h1>
       <button class="new-btn" type="button" id="openCandidateModalBtn">New</button>
-    </div>
+    </header>
 
     <!-- Controls: left (DataTables UI) + right (name search) -->
     <div class="table-controls-wrapper" role="region" aria-label="Table controls">
@@ -222,58 +222,28 @@
 
         <label class="candidate-field">
           <span>Country</span>
-          <select id="candidateCountry" name="country">
-            <option value="" selected>Select country…</option>
-            <option value="Argentina">🇦🇷 Argentina</option>
-            <option value="Bolivia">🇧🇴 Bolivia</option>
-            <option value="Brazil">🇧🇷 Brazil</option>
-            <option value="Chile">🇨🇱 Chile</option>
-            <option value="Colombia">🇨🇴 Colombia</option>
-            <option value="Costa Rica">🇨🇷 Costa Rica</option>
-            <option value="Cuba">🇨🇺 Cuba</option>
-            <option value="Ecuador">🇪🇨 Ecuador</option>
-            <option value="El Salvador">🇸🇻 El Salvador</option>
-            <option value="Guatemala">🇬🇹 Guatemala</option>
-            <option value="Honduras">🇭🇳 Honduras</option>
-            <option value="Mexico">🇲🇽 Mexico</option>
-            <option value="Nicaragua">🇳🇮 Nicaragua</option>
-            <option value="Panama">🇵🇦 Panama</option>
-            <option value="Paraguay">🇵🇾 Paraguay</option>
-            <option value="Peru">🇵🇪 Peru</option>
-            <option value="Puerto Rico">🇵🇷 Puerto Rico</option>
-            <option value="Dominican Republic">🇩🇴 Dominican Republic</option>
-            <option value="Uruguay">🇺🇾 Uruguay</option>
-            <option value="Venezuela">🇻🇪 Venezuela</option>
-            <option value="United States">🇺🇸 United States</option>
-          </select>
+          <div class="searchable-select" data-target="candidateCountry">
+            <button type="button" class="searchable-select__display" id="candidateCountryDisplay">
+              Select country…
+            </button>
+            <div class="searchable-select__dropdown" id="candidateCountryDropdown" hidden>
+              <input
+                type="text"
+                class="searchable-select__search"
+                id="candidateCountrySearch"
+                placeholder="Search country…"
+                aria-label="Search country"
+              />
+              <div class="searchable-select__options" id="candidateCountryOptions" role="listbox"></div>
+            </div>
+          </div>
+          <select id="candidateCountry" name="country" hidden></select>
         </label>
 
         <div class="candidate-field">
           <span>Phone <span class="required-marker">*</span></span>
           <div class="phone-split">
-            <select id="candidatePhoneCode" name="phone_code">
-              <option value="54" selected>🇦🇷 +54</option>
-              <option value="591">🇧🇴 +591</option>
-              <option value="55">🇧🇷 +55</option>
-              <option value="56">🇨🇱 +56</option>
-              <option value="57">🇨🇴 +57</option>
-              <option value="506">🇨🇷 +506</option>
-              <option value="53">🇨🇺 +53</option>
-              <option value="593">🇪🇨 +593</option>
-              <option value="503">🇸🇻 +503</option>
-              <option value="502">🇬🇹 +502</option>
-              <option value="504">🇭🇳 +504</option>
-              <option value="52">🇲🇽 +52</option>
-              <option value="505">🇳🇮 +505</option>
-              <option value="507">🇵🇦 +507</option>
-              <option value="595">🇵🇾 +595</option>
-              <option value="51">🇵🇪 +51</option>
-              <option value="1">🇵🇷 +1</option>
-              <option value="1">🇩🇴 +1</option>
-              <option value="598">🇺🇾 +598</option>
-              <option value="58">🇻🇪 +58</option>
-              <option value="1">🇺🇸 +1</option>
-            </select>
+            <select id="candidatePhoneCode" name="phone_code"></select>
             <input type="tel" id="candidatePhone" name="phone" placeholder="Phone number *" autocomplete="tel" required />
           </div>
         </div>

@@ -23,6 +23,33 @@ const PHONE_CODE_BY_COUNTRY = {
   'United States': '1'
 };
 
+const COUNTRY_FLAG_BY_NAME = {
+  Argentina: '🇦🇷',
+  Bolivia: '🇧🇴',
+  Brazil: '🇧🇷',
+  Chile: '🇨🇱',
+  Colombia: '🇨🇴',
+  'Costa Rica': '🇨🇷',
+  Cuba: '🇨🇺',
+  Ecuador: '🇪🇨',
+  'El Salvador': '🇸🇻',
+  Guatemala: '🇬🇹',
+  Honduras: '🇭🇳',
+  Mexico: '🇲🇽',
+  Nicaragua: '🇳🇮',
+  Panama: '🇵🇦',
+  Paraguay: '🇵🇾',
+  Peru: '🇵🇪',
+  'Puerto Rico': '🇵🇷',
+  'Dominican Republic': '🇩🇴',
+  Uruguay: '🇺🇾',
+  Venezuela: '🇻🇪',
+  'United States': '🇺🇸'
+};
+
+const COUNTRY_NAMES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
+const DEFAULT_PHONE_COUNTRY = 'Argentina';
+
 const candidateState = {
   tbody: null,
   tableEl: null,
@@ -44,6 +71,10 @@ const candidateModalRefs = {
   nameInput: null,
   emailInput: null,
   countrySelect: null,
+  countrySearchInput: null,
+  countryDisplayButton: null,
+  countryDropdown: null,
+  countryOptionsList: null,
   phoneCodeSelect: null,
   phoneInput: null,
   linkedinInput: null,
@@ -238,6 +269,10 @@ function setupCandidateModal() {
   candidateModalRefs.nameInput = document.getElementById('candidateFullName');
   candidateModalRefs.emailInput = document.getElementById('candidateEmail');
   candidateModalRefs.countrySelect = document.getElementById('candidateCountry');
+  candidateModalRefs.countrySearchInput = document.getElementById('candidateCountrySearch');
+  candidateModalRefs.countryDisplayButton = document.getElementById('candidateCountryDisplay');
+  candidateModalRefs.countryDropdown = document.getElementById('candidateCountryDropdown');
+  candidateModalRefs.countryOptionsList = document.getElementById('candidateCountryOptions');
   candidateModalRefs.phoneCodeSelect = document.getElementById('candidatePhoneCode');
   candidateModalRefs.phoneInput = document.getElementById('candidatePhone');
   candidateModalRefs.linkedinInput = document.getElementById('candidateLinkedin');
@@ -275,6 +310,44 @@ function setupCandidateModal() {
       window.location.href = `https://vinttihub.vintti.com/candidate-details.html?id=${encodeURIComponent(id)}`;
     }
   });
+
+  renderPhoneCountryOptions();
+  renderNativeCountryOptions();
+  updateCountryDisplay('');
+  renderCountrySelectOptions('');
+
+  candidateModalRefs.countrySearchInput?.addEventListener('input', (event) => {
+    renderCountrySelectOptions(event.target.value || '');
+  });
+  candidateModalRefs.countrySearchInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      closeCountryDropdown();
+    }
+  });
+
+  candidateModalRefs.countryDisplayButton?.addEventListener('click', () => {
+    toggleCountryDropdown();
+  });
+  candidateModalRefs.countryDisplayButton?.setAttribute('aria-haspopup', 'listbox');
+  candidateModalRefs.countryDisplayButton?.setAttribute('aria-expanded', 'false');
+  candidateModalRefs.countryDisplayButton?.addEventListener('keydown', (event) => {
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      toggleCountryDropdown();
+    }
+    if (event.key === 'Escape') {
+      closeCountryDropdown();
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!candidateModalRefs.countryDropdown || candidateModalRefs.countryDropdown.hidden) return;
+    const within = event.target.closest('.searchable-select');
+    if (!within) {
+      closeCountryDropdown();
+    }
+  });
 }
 
 function openCandidateModal() {
@@ -289,12 +362,25 @@ function openCandidateModal() {
 function closeCandidateModal() {
   candidateModalRefs.overlay.setAttribute('aria-hidden', 'true');
   candidateModalRefs.overlay.setAttribute('hidden', '');
+  closeCountryDropdown();
 }
 
 function resetCandidateForm() {
   candidateModalRefs.form?.reset();
   candidateState.duplicateMatch = null;
   clearInputErrors();
+  if (candidateModalRefs.countrySearchInput) {
+    candidateModalRefs.countrySearchInput.value = '';
+  }
+  if (candidateModalRefs.countrySelect) {
+    candidateModalRefs.countrySelect.value = '';
+  }
+  renderCountrySelectOptions(candidateModalRefs.countrySearchInput?.value || '');
+  updateCountryDisplay('');
+  closeCountryDropdown();
+  if (candidateModalRefs.phoneCodeSelect) {
+    candidateModalRefs.phoneCodeSelect.value = DEFAULT_PHONE_COUNTRY;
+  }
 }
 
 function clearInputErrors() {
@@ -333,7 +419,8 @@ function gatherCandidateFormValues() {
   const name = candidateModalRefs.nameInput?.value.trim() || '';
   const email = candidateModalRefs.emailInput?.value.trim() || '';
   const country = candidateModalRefs.countrySelect?.value || '';
-  const phoneCode = candidateModalRefs.phoneCodeSelect?.value || '';
+  const phoneCountry = candidateModalRefs.phoneCodeSelect?.value || DEFAULT_PHONE_COUNTRY;
+  const phoneCode = PHONE_CODE_BY_COUNTRY[phoneCountry] || '';
   const rawPhone = candidateModalRefs.phoneInput?.value || '';
   const linkedinRaw = candidateModalRefs.linkedinInput?.value.trim() || '';
 
@@ -345,6 +432,7 @@ function gatherCandidateFormValues() {
     name,
     email,
     country,
+    phoneCountry,
     phoneCode,
     rawPhone,
     phoneDigits,
@@ -513,6 +601,141 @@ function normalizeStoredPhone(phone, country) {
     return code + digits;
   }
   return digits;
+}
+
+function renderPhoneCountryOptions() {
+  if (!candidateModalRefs.phoneCodeSelect) return;
+  const fragment = document.createDocumentFragment();
+  COUNTRY_NAMES.forEach(country => {
+    const option = document.createElement('option');
+    option.value = country;
+    option.dataset.code = PHONE_CODE_BY_COUNTRY[country];
+    option.textContent = `${getCountryLabel(country)} +${PHONE_CODE_BY_COUNTRY[country]}`;
+    fragment.appendChild(option);
+  });
+  candidateModalRefs.phoneCodeSelect.innerHTML = '';
+  candidateModalRefs.phoneCodeSelect.appendChild(fragment);
+  candidateModalRefs.phoneCodeSelect.value = DEFAULT_PHONE_COUNTRY;
+}
+
+function renderCountrySelectOptions(searchValue = '') {
+  if (!candidateModalRefs.countryOptionsList) return;
+  const normalizedTerm = (searchValue || '').trim().toLowerCase();
+  const currentValue = candidateModalRefs.countrySelect?.value || '';
+  let matches = normalizedTerm
+    ? COUNTRY_NAMES.filter(country => country.toLowerCase().includes(normalizedTerm))
+    : COUNTRY_NAMES.slice();
+  if (currentValue && normalizedTerm && !matches.includes(currentValue)) {
+    matches = [currentValue, ...matches];
+  }
+
+  const fragment = document.createDocumentFragment();
+  const clearButton = document.createElement('button');
+  clearButton.type = 'button';
+  clearButton.className = 'searchable-select__option';
+  clearButton.textContent = '— No country —';
+  clearButton.setAttribute('role', 'option');
+  if (!currentValue) {
+    clearButton.setAttribute('aria-selected', 'true');
+  }
+  clearButton.addEventListener('click', () => handleCountrySelection(''));
+  fragment.appendChild(clearButton);
+
+  if (!matches.length) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'searchable-select__empty';
+    emptyDiv.textContent = 'No countries match';
+    fragment.appendChild(emptyDiv);
+  } else {
+    matches.forEach(country => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'searchable-select__option';
+      button.textContent = getCountryLabel(country);
+      button.setAttribute('role', 'option');
+      if (country === currentValue) {
+        button.setAttribute('aria-selected', 'true');
+      }
+      button.addEventListener('click', () => handleCountrySelection(country));
+      fragment.appendChild(button);
+    });
+  }
+
+  candidateModalRefs.countryOptionsList.innerHTML = '';
+  candidateModalRefs.countryOptionsList.appendChild(fragment);
+}
+
+function getCountryLabel(country) {
+  const flag = COUNTRY_FLAG_BY_NAME[country];
+  return flag ? `${flag} ${country}` : country;
+}
+
+function syncPhoneCountryToSelected(country) {
+  if (!country || !candidateModalRefs.phoneCodeSelect) return;
+  if (!COUNTRY_NAMES.includes(country)) return;
+  candidateModalRefs.phoneCodeSelect.value = country;
+}
+
+function handleCountrySelection(country) {
+  if (!candidateModalRefs.countrySelect) return;
+  candidateModalRefs.countrySelect.value = country || '';
+  updateCountryDisplay(country);
+  if (country) {
+    syncPhoneCountryToSelected(country);
+  } else if (candidateModalRefs.phoneCodeSelect) {
+    candidateModalRefs.phoneCodeSelect.value = DEFAULT_PHONE_COUNTRY;
+  }
+  closeCountryDropdown();
+}
+
+function renderNativeCountryOptions() {
+  if (!candidateModalRefs.countrySelect) return;
+  const fragment = document.createDocumentFragment();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Select country…';
+  fragment.appendChild(placeholder);
+
+  COUNTRY_NAMES.forEach(country => {
+    const option = document.createElement('option');
+    option.value = country;
+    option.textContent = getCountryLabel(country);
+    fragment.appendChild(option);
+  });
+
+  candidateModalRefs.countrySelect.innerHTML = '';
+  candidateModalRefs.countrySelect.appendChild(fragment);
+}
+
+function updateCountryDisplay(country) {
+  if (!candidateModalRefs.countryDisplayButton) return;
+  candidateModalRefs.countryDisplayButton.textContent = country ? getCountryLabel(country) : 'Select country…';
+}
+
+function openCountryDropdown() {
+  if (!candidateModalRefs.countryDropdown) return;
+  candidateModalRefs.countryDropdown.hidden = false;
+  candidateModalRefs.countryDisplayButton?.setAttribute('aria-expanded', 'true');
+  if (candidateModalRefs.countrySearchInput) {
+    candidateModalRefs.countrySearchInput.value = '';
+    candidateModalRefs.countrySearchInput.focus();
+  }
+  renderCountrySelectOptions('');
+}
+
+function closeCountryDropdown() {
+  if (!candidateModalRefs.countryDropdown) return;
+  candidateModalRefs.countryDropdown.hidden = true;
+  candidateModalRefs.countryDisplayButton?.setAttribute('aria-expanded', 'false');
+}
+
+function toggleCountryDropdown() {
+  if (!candidateModalRefs.countryDropdown) return;
+  if (candidateModalRefs.countryDropdown.hidden) {
+    openCountryDropdown();
+  } else {
+    closeCountryDropdown();
+  }
 }
 
 async function submitCandidate(values) {

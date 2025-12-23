@@ -109,18 +109,25 @@ body {
 }
 
 /* =========================================================================
-   TOP BAR (Nuevo candidato)
+   PAGE HEADER (Title + New button)
    ========================================================================= */
-.filters-top-bar {
+.page-header {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 20px;
+  justify-content: space-between;
+  align-items: center;
   background-color: #0044ff;
+  color: #fff;
   border-radius: 20px;
   padding: 20px 30px;
+  margin-bottom: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-.filters-top-bar .new-btn {
+.page-header .page-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+.page-header .new-btn {
   background-color: #cdff30;
   color: #000;
   font-weight: bold;
@@ -131,22 +138,8 @@ body {
   font-size: 16px;
   transition: background-color 0.3s;
 }
-.filters-top-bar .new-btn:hover { background-color: #b6ea2a; }
-
-/* =========================================================================
-   TÍTULO DE PÁGINA
-   ========================================================================= */
-.title-container {
-  background-color: #0044ff;
-  border-radius: 20px;
-  padding: 20px 30px;
-  margin-bottom: 20px;
-}
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
+.page-header .new-btn:hover {
+  background-color: #b6ea2a;
 }
 
 /* =========================================================================
@@ -261,6 +254,82 @@ body {
   color: #1a1a1a;
   gap: 6px;
 }
+.searchable-select {
+  position: relative;
+  width: 100%;
+}
+.searchable-select__display {
+  width: 100%;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid #dfe4ea;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.searchable-select__display::after {
+  content: '▾';
+  font-size: 12px;
+  color: #666;
+}
+.searchable-select__display:focus-visible {
+  outline: 2px solid rgba(10, 92, 255, 0.4);
+}
+.searchable-select__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #dfe4ea;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+  padding: 10px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.searchable-select__dropdown[hidden] {
+  display: none;
+}
+.searchable-select__search {
+  border-radius: 10px;
+  border: 1px solid #dfe4ea;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.searchable-select__options {
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 10px;
+}
+.searchable-select__option {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.searchable-select__option:hover,
+.searchable-select__option[aria-selected="true"] {
+  background: #f0f4ff;
+}
+.searchable-select__empty {
+  font-size: 13px;
+  color: #7a7a7a;
+  padding: 6px 2px;
+}
 .candidate-field input,
 .candidate-field select {
   border-radius: 12px;
@@ -290,7 +359,7 @@ body {
   gap: 10px;
 }
 .phone-split select {
-  width: 120px;
+  width: 170px;
 }
 .phone-split input {
   flex: 1;
