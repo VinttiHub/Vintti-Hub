@@ -200,10 +200,7 @@ def register_recruiter_metrics_routes(app):
 
                 -- Promedios: close date usa el mismo filtro del dashboard; open cae al start_date documentado
                 AVG(
-                    DATE_PART(
-                        'day',
-                        b.close_date - b.start_reference_date
-                    )
+                    (b.close_date - b.start_reference_date)::numeric
                 ) FILTER (
                     WHERE b.close_date >= %(win_start)s
                       AND b.close_date <  %(win_end)s
@@ -213,10 +210,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS avg_days_to_close_win,
 
                 AVG(
-                    DATE_PART(
-                        'day',
-                        b.close_date - b.start_reference_date
-                    )
+                    (b.close_date - b.start_reference_date)::numeric
                 ) FILTER (
                     WHERE b.close_date >= %(win_start)s
                       AND b.close_date <  %(win_end)s
@@ -226,10 +220,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS avg_days_to_close_lost,
 
                 AVG(
-                    DATE_PART(
-                        'day',
-                        fb.first_batch_date - b.start_reference_date
-                    )
+                    (fb.first_batch_date - b.start_reference_date)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
@@ -239,10 +230,7 @@ def register_recruiter_metrics_routes(app):
                 ) AS avg_days_to_first_batch_open,
 
                 AVG(
-                    DATE_PART(
-                        'day',
-                        fb.first_batch_date - b.start_reference_date
-                    )
+                    (fb.first_batch_date - b.start_reference_date)::numeric
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL

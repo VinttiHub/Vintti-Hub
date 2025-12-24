@@ -96,6 +96,59 @@ html, body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.03);
 }
 
+.video-link-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.video-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: #e8edff;
+  color: #003BFF;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  border: 1px solid rgba(0, 59, 255, 0.2);
+  box-shadow: 0 6px 16px rgba(0, 59, 255, 0.12);
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.video-link-button:hover {
+  background: #003BFF;
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(0, 59, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.video-link-button:focus-visible {
+  outline: 2px solid #003BFF;
+  outline-offset: 3px;
+}
+
+.video-link-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: rgba(0, 59, 255, 0.15);
+  color: #003BFF;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.video-link-button:hover .video-link-icon {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
 /* ========================= WORK EXPERIENCE ========================= */
 #workExperienceList .entry-meta {
   font-size: 13px;
@@ -337,7 +390,6 @@ html, body {
     left: 19px;
   }
 }
-
 
 
 

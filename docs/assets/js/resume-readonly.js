@@ -407,17 +407,24 @@ if (languages.length === 0) {
 }
 
 // 📹 Video Link
+const videoSection = document.getElementById("videoLinkSection");
 const videoDiv = document.getElementById("readonly-video-link");
 if (data.video_link && data.video_link.trim() !== "") {
-  const link = document.createElement("a");
-      link.href = data.video_link;
-      link.target = "_blank";
-      link.textContent = data.video_link;
-      videoDiv.innerHTML = "";
-      videoDiv.appendChild(link);
-    } else {
-      videoDiv.closest(".cv-section").style.display = "none";
-    }
+  const button = document.createElement("a");
+  button.href = data.video_link;
+  button.target = "_blank";
+  button.rel = "noopener noreferrer";
+  button.className = "video-link-button";
+  button.setAttribute("aria-label", "Watch candidate introduction video");
+  button.innerHTML = `
+    <span class="video-link-icon" aria-hidden="true">▶</span>
+    <span>Watch video</span>
+  `;
+  videoDiv.innerHTML = "";
+  videoDiv.appendChild(button);
+} else if (videoSection) {
+  videoSection.style.display = "none";
+}
   } catch (error) {
     console.error("❌ Error loading resume data:", error);
   }
@@ -494,4 +501,3 @@ function getFlagEmoji(countryName) {
   };
   return flags[countryName] || '';
 }
-
