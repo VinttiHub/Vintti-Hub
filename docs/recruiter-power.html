@@ -135,6 +135,74 @@
         </p>
       </article>
 
+      <article class="metric-card metric-close-win-avg">
+        <div class="metric-header">
+          <span class="metric-label">Average days to close (Win)</span>
+          <span class="metric-pill metric-pill-win-soft">Selected range</span>
+        </div>
+        <div class="metric-value" id="avgCloseWinValue">–</div>
+        <p class="metric-caption">
+          From start date (NDA/sourcing) to <strong>Closed Win</strong> within the selected range.
+        </p>
+      </article>
+
+      <article class="metric-card metric-close-lost-avg">
+        <div class="metric-header">
+          <span class="metric-label">Average days to close (Lost)</span>
+          <span class="metric-pill metric-pill-lost-soft">Selected range</span>
+        </div>
+        <div class="metric-value" id="avgCloseLostValue">–</div>
+        <p class="metric-caption">
+          From start date to <strong>Closed Lost</strong> within the selected range.
+        </p>
+      </article>
+
+      <article class="metric-card metric-batch-open">
+        <div class="metric-header">
+          <span class="metric-label">Average days to first batch (Open)</span>
+          <span class="metric-pill metric-pill-conv">Active opps</span>
+        </div>
+        <div class="metric-value" id="avgBatchOpenValue">–</div>
+        <p class="metric-caption">
+          Open opportunities starting within the range. <span class="metric-caption-subtle">No data → “—”.</span>
+        </p>
+      </article>
+
+      <article class="metric-card metric-batch-closed">
+        <div class="metric-header">
+          <span class="metric-label">Average days to first batch (Closed)</span>
+          <span class="metric-pill metric-pill-conv">Closed opps</span>
+        </div>
+        <div class="metric-value" id="avgBatchClosedValue">–</div>
+        <p class="metric-caption">
+          Closed opportunities where the first batch landed before closing.
+        </p>
+      </article>
+
+      <article class="metric-card metric-interview-rate">
+        <div class="metric-header">
+          <span class="metric-label">Interview rate</span>
+          <span class="metric-pill metric-pill-conv">Interviewed / Sent</span>
+        </div>
+        <div class="metric-value" id="interviewRateValue">–</div>
+        <p class="metric-caption">
+          Share of sent candidates that reached interview stages.
+        </p>
+        <p class="metric-caption metric-caption-subtle" id="interviewRateHelper">(— / —)</p>
+      </article>
+
+      <article class="metric-card metric-hire-rate">
+        <div class="metric-header">
+          <span class="metric-label">Hire rate</span>
+          <span class="metric-pill metric-pill-conv">Hired / Sent</span>
+        </div>
+        <div class="metric-value" id="hireRateValue">–</div>
+        <p class="metric-caption">
+          Sent candidates that converted into hires in the selected range.
+        </p>
+        <p class="metric-caption metric-caption-subtle" id="hireRateHelper">(— / —)</p>
+      </article>
+
       <article class="metric-card metric-churn-range">
         <div class="metric-header">
           <span class="metric-label">Total churn · Selected range</span>

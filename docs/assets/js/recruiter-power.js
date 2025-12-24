@@ -225,10 +225,29 @@ function parseIntSafe(text) {
   return Number.isNaN(n) ? 0 : n;
 }
 
+function parseFloatSafe(text) {
+  const n = parseFloat(String(text).replace(/[^\d.-]/g, ""));
+  return Number.isNaN(n) ? 0 : n;
+}
+
 function parsePercentSafe(text) {
   const n = parseFloat(String(text).replace("%", "").trim());
   if (Number.isNaN(n)) return 0;
   return n / 100; // lo devolvemos como 0–1
+}
+
+function formatDaysValue(value) {
+  if (value == null || Number.isNaN(value)) return "–";
+  const rounded = Math.round(value * 10) / 10;
+  const text = Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1);
+  return `${text} d`;
+}
+
+function formatRatioSubtext(numerator, denominator) {
+  if (!denominator) return "(— / —)";
+  const safeNum = Number(numerator || 0).toLocaleString("en-US");
+  const safeDen = Number(denominator || 0).toLocaleString("en-US");
+  return `(${safeNum} / ${safeDen})`;
 }
 
 function animateValue(el, from, to, { duration = 650, formatter }) {
@@ -367,6 +386,14 @@ function updateCardsForLead(hrLeadEmail) {
   const left90CountEl = $("#left90Count");
   const left90RateEl = $("#left90Rate");
   const left90HelperEl = $("#left90Helper");
+  const avgCloseWinEl = $("#avgCloseWinValue");
+  const avgCloseLostEl = $("#avgCloseLostValue");
+  const avgBatchOpenEl = $("#avgBatchOpenValue");
+  const avgBatchClosedEl = $("#avgBatchClosedValue");
+  const interviewRateEl = $("#interviewRateValue");
+  const interviewHelperEl = $("#interviewRateHelper");
+  const hireRateEl = $("#hireRateValue");
+  const hireHelperEl = $("#hireRateHelper");
 
   if (!m) {
     winMonthEl.textContent = "–";
@@ -384,6 +411,14 @@ function updateCardsForLead(hrLeadEmail) {
     if (left90RateEl) left90RateEl.textContent = "–";
     if (left90HelperEl)
       left90HelperEl.textContent = "Based on – churned hires with a start date.";
+    if (avgCloseWinEl) avgCloseWinEl.textContent = "–";
+    if (avgCloseLostEl) avgCloseLostEl.textContent = "–";
+    if (avgBatchOpenEl) avgBatchOpenEl.textContent = "–";
+    if (avgBatchClosedEl) avgBatchClosedEl.textContent = "–";
+    if (interviewRateEl) interviewRateEl.textContent = "–";
+    if (interviewHelperEl) interviewHelperEl.textContent = "(— / —)";
+    if (hireRateEl) hireRateEl.textContent = "–";
+    if (hireHelperEl) hireHelperEl.textContent = "(— / —)";
     renderChurnDetailsForLead(hrLeadEmail);
     return;
   }
@@ -468,6 +503,91 @@ function updateCardsForLead(hrLeadEmail) {
         formatter: (v) => formatPercent(v),
       });
     }
+  }
+
+  // --- Average days to close ---
+  if (avgCloseWinEl) {
+    const newAvgWin = m.avg_days_to_close_win;
+    if (newAvgWin == null) {
+      avgCloseWinEl.textContent = "–";
+    } else {
+      const fromAvgWin = parseFloatSafe(avgCloseWinEl.textContent);
+      animateValue(avgCloseWinEl, fromAvgWin, newAvgWin, {
+        formatter: (v) => formatDaysValue(v),
+      });
+    }
+  }
+
+  if (avgCloseLostEl) {
+    const newAvgLost = m.avg_days_to_close_lost;
+    if (newAvgLost == null) {
+      avgCloseLostEl.textContent = "–";
+    } else {
+      const fromAvgLost = parseFloatSafe(avgCloseLostEl.textContent);
+      animateValue(avgCloseLostEl, fromAvgLost, newAvgLost, {
+        formatter: (v) => formatDaysValue(v),
+      });
+    }
+  }
+
+  // --- Average days to first batch ---
+  if (avgBatchOpenEl) {
+    const newBatchOpen = m.avg_days_to_first_batch_open;
+    if (newBatchOpen == null) {
+      avgBatchOpenEl.textContent = "–";
+    } else {
+      const fromBatchOpen = parseFloatSafe(avgBatchOpenEl.textContent);
+      animateValue(avgBatchOpenEl, fromBatchOpen, newBatchOpen, {
+        formatter: (v) => formatDaysValue(v),
+      });
+    }
+  }
+
+  if (avgBatchClosedEl) {
+    const newBatchClosed = m.avg_days_to_first_batch_closed;
+    if (newBatchClosed == null) {
+      avgBatchClosedEl.textContent = "–";
+    } else {
+      const fromBatchClosed = parseFloatSafe(avgBatchClosedEl.textContent);
+      animateValue(avgBatchClosedEl, fromBatchClosed, newBatchClosed, {
+        formatter: (v) => formatDaysValue(v),
+      });
+    }
+  }
+
+  // --- Interview / Hire rates (ratios) ---
+  if (interviewRateEl && interviewHelperEl) {
+    const interviewRate = m.interview_rate || {};
+    const newInterviewPct =
+      typeof interviewRate.pct === "number" ? interviewRate.pct : null;
+    if (newInterviewPct == null) {
+      interviewRateEl.textContent = "–";
+    } else {
+      const fromInterviewPct = parsePercentSafe(interviewRateEl.textContent);
+      animateValue(interviewRateEl, fromInterviewPct, newInterviewPct, {
+        duration: 750,
+        formatter: (v) => formatPercent(v),
+      });
+    }
+    interviewHelperEl.textContent = formatRatioSubtext(
+      interviewRate.interviewed,
+      interviewRate.sent
+    );
+  }
+
+  if (hireRateEl && hireHelperEl) {
+    const hireRate = m.hire_rate || {};
+    const newHirePct = typeof hireRate.pct === "number" ? hireRate.pct : null;
+    if (newHirePct == null) {
+      hireRateEl.textContent = "–";
+    } else {
+      const fromHirePct = parsePercentSafe(hireRateEl.textContent);
+      animateValue(hireRateEl, fromHirePct, newHirePct, {
+        duration: 750,
+        formatter: (v) => formatPercent(v),
+      });
+    }
+    hireHelperEl.textContent = formatRatioSubtext(hireRate.hired, hireRate.sent);
   }
 
   // --- Churn · Selected range ---

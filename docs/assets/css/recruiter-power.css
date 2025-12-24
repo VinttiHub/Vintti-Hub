@@ -132,6 +132,30 @@ body {
   background: radial-gradient(circle at top right, rgba(210, 185, 255, 0.45), transparent 55%);
 }
 
+.metric-close-win-avg::before {
+  background: radial-gradient(circle at top right, rgba(111, 211, 232, 0.32), transparent 55%);
+}
+
+.metric-close-lost-avg::before {
+  background: radial-gradient(circle at top right, rgba(247, 164, 195, 0.38), transparent 55%);
+}
+
+.metric-batch-open::before {
+  background: radial-gradient(circle at top right, rgba(200, 168, 255, 0.32), transparent 55%);
+}
+
+.metric-batch-closed::before {
+  background: radial-gradient(circle at top right, rgba(255, 210, 180, 0.35), transparent 55%);
+}
+
+.metric-interview-rate::before {
+  background: radial-gradient(circle at top right, rgba(119, 218, 191, 0.35), transparent 55%);
+}
+
+.metric-hire-rate::before {
+  background: radial-gradient(circle at top right, rgba(255, 223, 158, 0.35), transparent 55%);
+}
+
 .metric-churn-range::before {
   background: radial-gradient(circle at top right, rgba(255, 205, 155, 0.4), transparent 55%);
 }
@@ -243,6 +267,19 @@ body {
 .metric-card.is-updating .metric-value {
   transform: translateY(-2px);
   opacity: 0.95;
+}
+
+.metric-caption {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.metric-caption-subtle {
+  font-size: 0.85rem;
+  color: #a79cc3;
+  margin-top: -0.2rem;
 }
 
 .metric-value-combo {

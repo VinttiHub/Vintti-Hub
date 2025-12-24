@@ -65,6 +65,15 @@ def _iso_date_or_none(value):
     return str(value)
 
 
+def _float_or_none(value):
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def register_recruiter_metrics_routes(app):
     @app.route("/recruiter-metrics", methods=["GET"])
     def api_recruiter_metrics():
@@ -79,49 +88,173 @@ def register_recruiter_metrics_routes(app):
                 o.opp_hr_lead,
                 u.user_name,
                 o.opp_stage,
-                (o.opp_close_date)::date AS close_date
+                (o.opp_close_date)::date AS close_date,
+                -- usamos NDA/start_date como proxy de inicio y caemos al close_date si no existe
+                COALESCE(
+                    o.nda_signature_or_start_date::date,
+                    o.opp_close_date::date
+                ) AS start_reference_date
             FROM opportunity o
             LEFT JOIN users u
                 ON u.email_vintti = o.opp_hr_lead
             WHERE o.opp_hr_lead IS NOT NULL
         ),
-        agg AS (
+        first_batches AS (
+            SELECT
+                b.opportunity_id,
+                MIN(b.presentation_date)::date AS first_batch_date
+            FROM batch b
+            WHERE b.presentation_date IS NOT NULL
+            GROUP BY b.opportunity_id
+        ),
+        sent_candidates AS (
+            SELECT
+                b.opp_hr_lead,
+                b.opportunity_id,
+                cb.candidate_id,
+                MIN(bt.presentation_date)::date AS first_sent_date
+            FROM base b
+            JOIN batch bt
+                ON bt.opportunity_id = b.opportunity_id
+            JOIN candidates_batches cb
+                ON cb.batch_id = bt.batch_id
+            WHERE cb.candidate_id IS NOT NULL
+              AND bt.presentation_date IS NOT NULL
+            GROUP BY b.opp_hr_lead, b.opportunity_id, cb.candidate_id
+        ),
+        sent_in_window AS (
+            SELECT
+                *
+            FROM sent_candidates
+            WHERE first_sent_date >= %(win_start)s
+              AND first_sent_date <  %(win_end)s  -- rango aplicado al evento “batch enviado”
+        ),
+        sent_enriched AS (
+            SELECT
+                s.opp_hr_lead,
+                s.opportunity_id,
+                s.candidate_id,
+                s.first_sent_date,
+                LOWER(COALESCE(oc.stage_pipeline, '')) AS stage_pipeline
+            FROM sent_in_window s
+            LEFT JOIN opportunity_candidates oc
+                ON oc.opportunity_id = s.opportunity_id
+               AND oc.candidate_id = s.candidate_id
+        ),
+        pipeline_rates AS (
             SELECT
                 opp_hr_lead,
-                MAX(user_name) AS user_name,
+                COUNT(*) AS sent_candidate_count,
+                COUNT(*) FILTER (
+                    WHERE stage_pipeline IN ('primera entrevista', 'en proceso con cliente')
+                       OR stage_pipeline LIKE 'segunda entrevista%%'
+                       OR stage_pipeline LIKE '%%entrevist%%'
+                ) AS interviewed_candidate_count
+            FROM sent_enriched
+            GROUP BY opp_hr_lead
+        ),
+        hired_by_lead AS (
+            SELECT
+                s.opp_hr_lead,
+                COUNT(DISTINCT (s.opportunity_id::text || '-' || s.candidate_id::text)) AS hired_candidate_count
+            FROM sent_enriched s
+            JOIN hire_opportunity h
+                ON h.opportunity_id = s.opportunity_id
+               AND h.candidate_id = s.candidate_id
+            GROUP BY s.opp_hr_lead
+        ),
+        agg AS (
+            SELECT
+                b.opp_hr_lead,
+                MAX(b.user_name) AS user_name,
 
                 -- ✅ RANGO SELECCIONADO
                 COUNT(*) FILTER (
-                    WHERE close_date >= %(win_start)s
-                      AND close_date <  %(win_end)s
-                      AND opp_stage = 'Close Win'
+                    WHERE b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                      AND b.opp_stage = 'Close Win'
                 ) AS closed_win_month,
 
                 COUNT(*) FILTER (
-                    WHERE close_date >= %(win_start)s
-                      AND close_date <  %(win_end)s
-                      AND opp_stage = 'Closed Lost'
+                    WHERE b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                      AND b.opp_stage = 'Closed Lost'
                 ) AS closed_lost_month,
 
                 -- ✅ RANGO ANTERIOR (mismo tamaño) para comparación
                 COUNT(*) FILTER (
-                    WHERE close_date >= %(prev_start)s
-                      AND close_date <  %(prev_end)s
-                      AND opp_stage = 'Close Win'
+                    WHERE b.close_date >= %(prev_start)s
+                      AND b.close_date <  %(prev_end)s
+                      AND b.opp_stage = 'Close Win'
                 ) AS prev_closed_win_month,
 
                 COUNT(*) FILTER (
-                    WHERE close_date >= %(prev_start)s
-                      AND close_date <  %(prev_end)s
-                      AND opp_stage = 'Closed Lost'
+                    WHERE b.close_date >= %(prev_start)s
+                      AND b.close_date <  %(prev_end)s
+                      AND b.opp_stage = 'Closed Lost'
                 ) AS prev_closed_lost_month,
 
                 -- ✅ TOTALES LIFETIME
-                COUNT(*) FILTER (WHERE opp_stage = 'Close Win')  AS closed_win_total,
-                COUNT(*) FILTER (WHERE opp_stage = 'Closed Lost') AS closed_lost_total
+                COUNT(*) FILTER (WHERE b.opp_stage = 'Close Win')  AS closed_win_total,
+                COUNT(*) FILTER (WHERE b.opp_stage = 'Closed Lost') AS closed_lost_total,
 
-            FROM base
-            GROUP BY opp_hr_lead
+                -- Promedios: close date usa el mismo filtro del dashboard; open cae al start_date documentado
+                AVG(
+                    DATE_PART(
+                        'day',
+                        b.close_date - b.start_reference_date
+                    )
+                ) FILTER (
+                    WHERE b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                      AND b.opp_stage = 'Close Win'
+                      AND b.close_date IS NOT NULL
+                      AND b.start_reference_date IS NOT NULL
+                ) AS avg_days_to_close_win,
+
+                AVG(
+                    DATE_PART(
+                        'day',
+                        b.close_date - b.start_reference_date
+                    )
+                ) FILTER (
+                    WHERE b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                      AND b.opp_stage = 'Closed Lost'
+                      AND b.close_date IS NOT NULL
+                      AND b.start_reference_date IS NOT NULL
+                ) AS avg_days_to_close_lost,
+
+                AVG(
+                    DATE_PART(
+                        'day',
+                        fb.first_batch_date - b.start_reference_date
+                    )
+                ) FILTER (
+                    WHERE fb.first_batch_date IS NOT NULL
+                      AND b.start_reference_date IS NOT NULL
+                      AND b.opp_stage NOT IN ('Close Win', 'Closed Lost')
+                      AND b.start_reference_date >= %(win_start)s
+                      AND b.start_reference_date <  %(win_end)s
+                ) AS avg_days_to_first_batch_open,
+
+                AVG(
+                    DATE_PART(
+                        'day',
+                        fb.first_batch_date - b.start_reference_date
+                    )
+                ) FILTER (
+                    WHERE fb.first_batch_date IS NOT NULL
+                      AND b.start_reference_date IS NOT NULL
+                      AND b.opp_stage IN ('Close Win', 'Closed Lost')
+                      AND b.close_date >= %(win_start)s
+                      AND b.close_date <  %(win_end)s
+                ) AS avg_days_to_first_batch_closed
+
+            FROM base b
+            LEFT JOIN first_batches fb
+                ON fb.opportunity_id = b.opportunity_id
+            GROUP BY b.opp_hr_lead
         ),
         conv AS (
             -- ✅ Conversión sobre oportunidades cerradas en el rango seleccionado
@@ -148,8 +281,15 @@ def register_recruiter_metrics_routes(app):
             a.prev_closed_lost_month,
             a.closed_win_total,
             a.closed_lost_total,
+            a.avg_days_to_close_win,
+            a.avg_days_to_close_lost,
+            a.avg_days_to_first_batch_open,
+            a.avg_days_to_first_batch_closed,
             c.last_20_count,
             c.last_20_win,
+            pr.sent_candidate_count,
+            pr.interviewed_candidate_count,
+            hb.hired_candidate_count,
             CASE
                 WHEN c.last_20_count = 0 THEN NULL
                 ELSE c.last_20_win::decimal / c.last_20_count
@@ -162,13 +302,17 @@ def register_recruiter_metrics_routes(app):
         FROM agg a
         LEFT JOIN conv c
             ON c.opp_hr_lead = a.opp_hr_lead
+        LEFT JOIN pipeline_rates pr
+            ON pr.opp_hr_lead = a.opp_hr_lead
+        LEFT JOIN hired_by_lead hb
+            ON hb.opp_hr_lead = a.opp_hr_lead
         ORDER BY a.opp_hr_lead;
         """
 
         churn_details_sql = """
         WITH churned AS (
             SELECT
-                h.hire_opportunity_id,
+                h.hire_opp_id,
                 h.candidate_id,
                 h.opportunity_id,
                 h.account_id,
@@ -261,6 +405,18 @@ def register_recruiter_metrics_routes(app):
             conversion_range = float(r["conversion_rate_last_20"]) if r["conversion_rate_last_20"] is not None else None
             conversion_lifetime = float(r["conversion_rate_lifetime"]) if r["conversion_rate_lifetime"] is not None else None
 
+            avg_days_close_win = _float_or_none(r.get("avg_days_to_close_win"))
+            avg_days_close_lost = _float_or_none(r.get("avg_days_to_close_lost"))
+            avg_days_batch_open = _float_or_none(r.get("avg_days_to_first_batch_open"))
+            avg_days_batch_closed = _float_or_none(r.get("avg_days_to_first_batch_closed"))
+
+            sent_candidates = int(r.get("sent_candidate_count") or 0)
+            interviewed_candidates = int(r.get("interviewed_candidate_count") or 0)
+            hired_candidates = int(r.get("hired_candidate_count") or 0)
+
+            interview_pct = (interviewed_candidates / sent_candidates) if sent_candidates else None
+            hire_pct = (hired_candidates / sent_candidates) if sent_candidates else None
+
             email = r["opp_hr_lead"]
             name = r.get("user_name") or email
 
@@ -283,6 +439,21 @@ def register_recruiter_metrics_routes(app):
                     "prev_closed_lost_month": r["prev_closed_lost_month"] or 0,
 
                     "conversion_rate_lifetime": conversion_lifetime,
+                    "avg_days_to_close_win": avg_days_close_win,
+                    "avg_days_to_close_lost": avg_days_close_lost,
+                    "avg_days_to_first_batch_open": avg_days_batch_open,
+                    "avg_days_to_first_batch_closed": avg_days_batch_closed,
+                    "interview_rate": {
+                        "pct": interview_pct,
+                        "interviewed": interviewed_candidates,
+                        "sent": sent_candidates,
+                    },
+                    "hire_rate": {
+                        "pct": hire_pct,
+                        "hired": hired_candidates,
+                        "sent": sent_candidates,
+                    },
+
                     # placeholders updated once churn details are computed
                     "churn_total": 0,
                     "churn_within_90": 0,
