@@ -1,8 +1,11 @@
 from flask import Blueprint, jsonify, request
 
+from admin_access import ensure_admin_user_access_table
 from db import get_connection
 
 bp = Blueprint('auth', __name__)
+
+ensure_admin_user_access_table()
 
 
 @bp.route('/login', methods=['POST', 'OPTIONS'])
@@ -19,8 +22,12 @@ def login():
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT nickname FROM users
-            WHERE email_vintti = %s AND password = %s
+            SELECT u.nickname
+            FROM users u
+            LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+            WHERE LOWER(u.email_vintti) = LOWER(%s)
+              AND u.password = %s
+              AND COALESCE(aua.is_active, TRUE)
             """,
             (email, password)
         )

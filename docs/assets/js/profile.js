@@ -133,6 +133,15 @@ function initialsFromName(name=""){
 }
 // ===== Team PTO (helpers) =====
 const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
+const ADMIN_ALLOWED_EMAILS = new Set([
+  "agustin@vintti.com",
+  "lara@vintti.com",
+  "bahia@vintti.com",
+  "agostina@vintti.com",
+  "jazmin@vintti.com"
+]);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+let ADMIN_STATUS_TIMER = null;
 const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
 function calcVacation(user){
@@ -864,6 +873,99 @@ function enableTeamTab(){
   wireTabs(); // rebind events including this new tab
 }
 
+function enableAdminTab(){
+  const tabsBar = document.getElementById('tabsBar');
+  const panel = document.getElementById('panel-admin');
+  if (!tabsBar || !panel) return;
+  if (tabsBar.querySelector('[data-tab="admin"]')) return;
+
+  const btn = document.createElement('button');
+  btn.className = 'tab';
+  btn.dataset.tab = 'admin';
+  btn.id = 'tab-admin';
+  btn.type = 'button';
+  btn.setAttribute('aria-selected', 'false');
+  btn.textContent = 'Admin';
+  tabsBar.appendChild(btn);
+  wireTabs();
+}
+
+function setupAdminForm(){
+  const form = document.getElementById("adminCreateForm");
+  if (!form || form.dataset.bound) return;
+  form.addEventListener("submit", onAdminCreateSubmit);
+  form.dataset.bound = "1";
+}
+
+function setAdminStatus(text, ok=true){
+  const toast = document.getElementById("adminStatus");
+  if (!toast) return;
+  toast.textContent = text;
+  toast.style.color = ok ? "#0f766e" : "#b91c1c";
+  if (ADMIN_STATUS_TIMER){
+    clearTimeout(ADMIN_STATUS_TIMER);
+  }
+  if (text){
+    ADMIN_STATUS_TIMER = setTimeout(()=> {
+      toast.textContent = "";
+    }, 4500);
+  }
+}
+
+async function onAdminCreateSubmit(ev){
+  ev.preventDefault();
+  const form = ev.currentTarget;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const fullName = (document.getElementById("adminFullName")?.value || "").trim();
+  const email = (document.getElementById("adminEmail")?.value || "").trim().toLowerCase();
+  const role = (document.getElementById("adminRole")?.value || "").trim();
+  const active = document.getElementById("adminActive")?.checked ?? true;
+  const sendInviteInput = document.getElementById("adminSendInvite");
+  const shouldInvite = active ? (sendInviteInput?.checked ?? true) : false;
+
+  if (!fullName){
+    setAdminStatus("Enter the person's full name.", false);
+    return;
+  }
+  if (!email || !EMAIL_RE.test(email)){
+    setAdminStatus("Enter a valid email address.", false);
+    return;
+  }
+
+  const payload = {
+    full_name: fullName,
+    email,
+    role: role || undefined,
+    is_active: Boolean(active),
+    send_invite: Boolean(shouldInvite)
+  };
+
+  if (submitBtn) submitBtn.disabled = true;
+  setAdminStatus("Creating user…", true);
+
+  try{
+    const res = await api(`/admin/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(()=>null);
+    if (!res.ok || !data?.ok){
+      const msg = data?.error || data?.message || "Could not create user.";
+      throw new Error(msg);
+    }
+    form.reset();
+    document.getElementById("adminActive").checked = true;
+    document.getElementById("adminSendInvite").checked = true;
+    setAdminStatus(data.message || "User created.", true);
+  }catch(err){
+    console.error("admin create error:", err);
+    setAdminStatus(err?.message || "Could not create user.", false);
+  }finally{
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
 // --- API helper (SIN headers custom; añade ?user_id= si existe) ---
 async function api(path, opts={}){
   const url = new URL(API_BASE + path);
@@ -1377,6 +1479,12 @@ async function loadMe(uid){
   $("#emergency_contact").value = PROFILE_CACHE.emergency_contact;
   $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
   $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+
+  const normalizedEmail = (PROFILE_CACHE.email_vintti || "").toLowerCase();
+  if (ADMIN_ALLOWED_EMAILS.has(normalizedEmail)){
+    enableAdminTab();
+    setupAdminForm();
+  }
 
   // Vista
   renderProfileView(PROFILE_CACHE);

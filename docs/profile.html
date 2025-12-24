@@ -408,6 +408,52 @@
   </footer>
 </section>
 
+<section class="panel" id="panel-admin" role="tabpanel" aria-labelledby="tab-admin" hidden>
+  <div class="admin-card">
+    <header class="admin-card__head">
+      <div>
+        <p class="eyebrow">Access manager</p>
+        <h2 class="admin-card__title">Invite teammates to Vintti Hub</h2>
+        <p class="admin-card__sub">Create a profile, choose if it should be active, and optionally send the password setup email.</p>
+      </div>
+      <span class="admin-chip">Admins only</span>
+    </header>
+
+    <form id="adminCreateForm" class="admin-form">
+      <div class="grid">
+        <label class="field">
+          <span class="label">Full name</span>
+          <input id="adminFullName" name="full_name" placeholder="Alex Recruiter" required />
+        </label>
+        <label class="field">
+          <span class="label">Email</span>
+          <input id="adminEmail" name="email" type="email" placeholder="name@vintti.com" required />
+        </label>
+        <label class="field field-span">
+          <span class="label">Role (optional)</span>
+          <input id="adminRole" name="role" placeholder="e.g. Recruiter" />
+        </label>
+      </div>
+
+      <div class="admin-form__toggles">
+        <label class="toggle">
+          <input type="checkbox" id="adminActive" checked />
+          <span>Active immediately</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="adminSendInvite" checked />
+          <span>Send invite email</span>
+        </label>
+      </div>
+
+      <div class="admin-foot">
+        <button type="submit" class="btn primary">Create user</button>
+        <span id="adminStatus" class="toast" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+  </div>
+</section>
+
   </main>
   <!-- ——— Modal: Quick Profile ——— -->
 <div id="userQuickModal" class="modal" aria-hidden="true">

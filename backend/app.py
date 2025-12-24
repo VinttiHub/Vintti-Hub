@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from flask import Flask, request
 from flask_cors import CORS
 
+from admin_routes import bp as admin_bp
 from ai_candidate_search_routes import bp_candidate_search
 from ai_routes import register_ai_routes
 from coresignal_routes import bp as coresignal_bp
@@ -62,6 +63,7 @@ def create_app() -> Flask:
     app.register_blueprint(coresignal_bp)
     app.register_blueprint(profile_bp)
     app.register_blueprint(profile_users_bp)
+    app.register_blueprint(admin_bp)
     app.register_blueprint(bp_candidate_search, url_prefix="")
 
     @app.after_request
