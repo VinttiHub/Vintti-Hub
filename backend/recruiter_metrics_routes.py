@@ -314,8 +314,8 @@ def register_recruiter_metrics_routes(app):
                 END AS tenure_days
             FROM hire_opportunity h
             WHERE h.end_date IS NOT NULL
-              AND h.end_date >= %(win_start)s
-              AND h.end_date <  %(win_end)s
+              AND h.end_date::date >= %(win_start)s
+              AND h.end_date::date <  %(win_end)s
         )
         SELECT
             cd.hire_opportunity_id,
