@@ -300,7 +300,7 @@ def register_recruiter_metrics_routes(app):
         churn_details_sql = """
         WITH churned AS (
             SELECT
-                h.hire_opp_id,
+                h.hire_opp_id AS hire_opportunity_id,
                 h.candidate_id,
                 h.opportunity_id,
                 h.account_id,
