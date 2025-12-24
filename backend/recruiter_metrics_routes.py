@@ -55,6 +55,16 @@ def _parse_date_range_args():
     return start, window_end_excl, prev_start, prev_end_excl, start, end_inclusive, None
 
 
+def _iso_date_or_none(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
 def register_recruiter_metrics_routes(app):
     @app.route("/recruiter-metrics", methods=["GET"])
     def api_recruiter_metrics():
@@ -128,39 +138,6 @@ def register_recruiter_metrics_routes(app):
                 ) AS last_20_win
             FROM base
             GROUP BY opp_hr_lead
-        ),
-        hire_base AS (
-            SELECT
-                b.opp_hr_lead,
-                h.start_date::date AS start_date,
-                h.end_date::date AS end_date
-            FROM base b
-            JOIN hire_opportunity h
-                ON h.opportunity_id = b.opportunity_id
-            WHERE b.opp_stage = 'Close Win'
-              AND h.start_date IS NOT NULL
-        ),
-        churn_l30 AS (
-            SELECT
-                opp_hr_lead,
-                COUNT(*) AS churn_hires_l30,
-                COUNT(*) FILTER (WHERE end_date IS NULL) AS churn_active_l30,
-                COUNT(*) FILTER (WHERE end_date IS NOT NULL) AS churn_count_l30
-            FROM hire_base
-            WHERE start_date >= CURRENT_DATE - INTERVAL '30 days'
-            GROUP BY opp_hr_lead
-        ),
-        early_churn_l90 AS (
-            SELECT
-                opp_hr_lead,
-                COUNT(*) AS early_churn_hires_l90,
-                COUNT(*) FILTER (
-                    WHERE end_date IS NOT NULL
-                      AND end_date < start_date + INTERVAL '90 days'
-                ) AS early_churn_count_l90
-            FROM hire_base
-            WHERE start_date >= CURRENT_DATE - INTERVAL '90 days'
-            GROUP BY opp_hr_lead
         )
         SELECT
             a.opp_hr_lead,
@@ -181,30 +158,73 @@ def register_recruiter_metrics_routes(app):
                 WHEN (a.closed_win_total + a.closed_lost_total) = 0 THEN NULL
                 ELSE a.closed_win_total::decimal
                      / (a.closed_win_total + a.closed_lost_total)
-            END AS conversion_rate_lifetime,
-            COALESCE(cl30.churn_hires_l30, 0) AS churn_hires_l30,
-            COALESCE(cl30.churn_active_l30, 0) AS churn_active_l30,
-            COALESCE(cl30.churn_count_l30, 0) AS churn_count_l30,
-            CASE
-                WHEN COALESCE(cl30.churn_hires_l30, 0) = 0 THEN 0
-                ELSE cl30.churn_count_l30::decimal / cl30.churn_hires_l30
-            END AS churn_rate_l30,
-            COALESCE(e90.early_churn_hires_l90, 0) AS early_churn_hires_l90,
-            COALESCE(e90.early_churn_count_l90, 0) AS early_churn_count_l90,
-            CASE
-                WHEN COALESCE(e90.early_churn_hires_l90, 0) = 0 THEN 0
-                ELSE e90.early_churn_count_l90::decimal / e90.early_churn_hires_l90
-            END AS early_churn_rate_l90
+            END AS conversion_rate_lifetime
         FROM agg a
         LEFT JOIN conv c
             ON c.opp_hr_lead = a.opp_hr_lead
-        LEFT JOIN churn_l30 cl30
-            ON cl30.opp_hr_lead = a.opp_hr_lead
-        LEFT JOIN early_churn_l90 e90
-            ON e90.opp_hr_lead = a.opp_hr_lead
         ORDER BY a.opp_hr_lead;
         """
 
+        churn_details_sql = """
+        WITH churned AS (
+            SELECT
+                h.hire_opportunity_id,
+                h.candidate_id,
+                h.opportunity_id,
+                h.account_id,
+                h.start_date::date AS start_date,
+                h.end_date::date AS end_date,
+                CASE
+                    WHEN h.start_date IS NOT NULL
+                         AND h.end_date IS NOT NULL
+                    THEN GREATEST(0, (h.end_date::date - h.start_date::date))::int
+                    ELSE NULL
+                END AS tenure_days
+            FROM hire_opportunity h
+            WHERE h.end_date IS NOT NULL
+              AND h.end_date >= %(win_start)s
+              AND h.end_date <  %(win_end)s
+        )
+        SELECT
+            cd.hire_opportunity_id,
+            cd.candidate_id,
+            c.name AS candidate_name,
+            c.email AS candidate_email,
+            cd.opportunity_id,
+            o.opp_hr_lead AS hr_lead_email,
+            u.user_name AS hr_lead_name,
+            cd.start_date,
+            cd.end_date,
+            cd.tenure_days,
+            CASE
+                WHEN cd.tenure_days IS NOT NULL
+                     AND cd.tenure_days < 90
+                THEN TRUE
+                ELSE FALSE
+            END AS left_within_90_days,
+            o.opp_stage AS opportunity_stage,
+            o.opp_stage AS opportunity_status,
+            o.opp_model AS opportunity_model,
+            o.opp_type AS opportunity_type,
+            COALESCE(
+                o.nda_signature_or_start_date::date,
+                o.opp_close_date::date
+            ) AS opportunity_created_date,
+            a.client_name AS opportunity_client_name,
+            o.opp_position_name AS opportunity_title
+        FROM churned cd
+        LEFT JOIN candidates c
+            ON c.candidate_id = cd.candidate_id
+        LEFT JOIN opportunity o
+            ON o.opportunity_id = cd.opportunity_id
+        LEFT JOIN account a
+            ON a.account_id = o.account_id
+        LEFT JOIN users u
+            ON LOWER(u.email_vintti) = LOWER(o.opp_hr_lead)
+        ORDER BY cd.end_date DESC NULLS LAST, cd.hire_opportunity_id DESC;
+        """
+
+        churn_detail_rows = []
         try:
             conn = get_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -218,6 +238,15 @@ def register_recruiter_metrics_routes(app):
                     },
                 )
                 rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    churn_details_sql,
+                    {
+                        "win_start": window_start,
+                        "win_end": window_end,
+                    },
+                )
+                churn_detail_rows = cur.fetchall()
         except Exception as e:
             logger.exception("Error fetching recruiter metrics")
             return jsonify({"status": "error", "message": str(e)}), 500
@@ -231,8 +260,6 @@ def register_recruiter_metrics_routes(app):
         for r in rows:
             conversion_range = float(r["conversion_rate_last_20"]) if r["conversion_rate_last_20"] is not None else None
             conversion_lifetime = float(r["conversion_rate_lifetime"]) if r["conversion_rate_lifetime"] is not None else None
-            churn_rate_l30 = float(r["churn_rate_l30"]) if r["churn_rate_l30"] is not None else 0.0
-            early_churn_rate_l90 = float(r["early_churn_rate_l90"]) if r["early_churn_rate_l90"] is not None else 0.0
 
             email = r["opp_hr_lead"]
             name = r.get("user_name") or email
@@ -256,15 +283,97 @@ def register_recruiter_metrics_routes(app):
                     "prev_closed_lost_month": r["prev_closed_lost_month"] or 0,
 
                     "conversion_rate_lifetime": conversion_lifetime,
-                    "churn_hires_l30": r["churn_hires_l30"] or 0,
-                    "churn_active_l30": r["churn_active_l30"] or 0,
-                    "churn_count_l30": r["churn_count_l30"] or 0,
-                    "churn_rate_l30": churn_rate_l30,
-                    "early_churn_hires_l90": r["early_churn_hires_l90"] or 0,
-                    "early_churn_count_l90": r["early_churn_count_l90"] or 0,
-                    "early_churn_rate_l90": early_churn_rate_l90,
+                    # placeholders updated once churn details are computed
+                    "churn_total": 0,
+                    "churn_within_90": 0,
+                    "churn_tenure_known": 0,
+                    "churn_tenure_unknown": 0,
+                    "churn_within_90_rate": None,
                 }
             )
+
+        churn_details = []
+        churn_summary_by_lead = {}
+        overall_churn_summary = {
+            "total": 0,
+            "within_90": 0,
+            "tenure_known": 0,
+            "tenure_unknown": 0,
+        }
+
+        for row in churn_detail_rows:
+            tenure_days = row.get("tenure_days")
+            if tenure_days is not None:
+                try:
+                    tenure_days = int(tenure_days)
+                except (TypeError, ValueError):
+                    pass
+
+            detail = {
+                "hire_opportunity_id": row.get("hire_opportunity_id"),
+                "candidate_id": row.get("candidate_id"),
+                "candidate_name": row.get("candidate_name"),
+                "candidate_email": row.get("candidate_email"),
+                "opportunity_id": row.get("opportunity_id"),
+                "opportunity_title": row.get("opportunity_title"),
+                "opportunity_stage": row.get("opportunity_stage"),
+                "opportunity_status": row.get("opportunity_status"),
+                "opportunity_model": row.get("opportunity_model"),
+                "opportunity_type": row.get("opportunity_type"),
+                "opportunity_created_at": _iso_date_or_none(row.get("opportunity_created_date")),
+                "opportunity_client_name": row.get("opportunity_client_name"),
+                "hr_lead_email": row.get("hr_lead_email"),
+                "hr_lead_name": row.get("hr_lead_name"),
+                "start_date": _iso_date_or_none(row.get("start_date")),
+                "end_date": _iso_date_or_none(row.get("end_date")),
+                "tenure_days": tenure_days,
+                "left_within_90_days": bool(row.get("left_within_90_days")),
+            }
+            churn_details.append(detail)
+
+            overall_churn_summary["total"] += 1
+            if tenure_days is not None:
+                overall_churn_summary["tenure_known"] += 1
+                if detail["left_within_90_days"]:
+                    overall_churn_summary["within_90"] += 1
+            else:
+                overall_churn_summary["tenure_unknown"] += 1
+
+            lead_key = (detail["hr_lead_email"] or "").lower()
+            if not lead_key:
+                continue
+            summary = churn_summary_by_lead.setdefault(
+                lead_key,
+                {"total": 0, "within_90": 0, "tenure_known": 0, "tenure_unknown": 0},
+            )
+            summary["total"] += 1
+            if tenure_days is not None:
+                summary["tenure_known"] += 1
+                if detail["left_within_90_days"]:
+                    summary["within_90"] += 1
+            else:
+                summary["tenure_unknown"] += 1
+
+        for item in metrics:
+            lead_key = (item.get("hr_lead_email") or item.get("hr_lead") or "").lower()
+            summary = churn_summary_by_lead.get(lead_key)
+            if not summary:
+                continue
+            item["churn_total"] = summary["total"]
+            item["churn_within_90"] = summary["within_90"]
+            item["churn_tenure_known"] = summary["tenure_known"]
+            item["churn_tenure_unknown"] = summary["tenure_unknown"]
+            if summary["tenure_known"]:
+                item["churn_within_90_rate"] = summary["within_90"] / summary["tenure_known"]
+            else:
+                item["churn_within_90_rate"] = None
+
+        if overall_churn_summary["tenure_known"]:
+            overall_churn_summary["within_90_rate"] = (
+                overall_churn_summary["within_90"] / overall_churn_summary["tenure_known"]
+            )
+        else:
+            overall_churn_summary["within_90_rate"] = None
 
         current_user_email = getattr(g, "user_email", None)
 
@@ -278,6 +387,12 @@ def register_recruiter_metrics_routes(app):
                 "range_start": disp_start.isoformat(),
                 "range_end": disp_end.isoformat(),  # inclusive
                 "metrics": metrics,
+                # Churn data is requested by the non-React Recruiter Power UI:
+                #  - summary counts live in each metric row (per recruiter)
+                #  - churn_details drives the detail table (per hire/opportunity)
+                #  - churn_summary gives overall totals for the selected window
+                "churn_details": churn_details,
+                "churn_summary": overall_churn_summary,
                 "current_user_email": current_user_email,
             }
         )

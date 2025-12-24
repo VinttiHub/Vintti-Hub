@@ -33,6 +33,8 @@ const metricsState = {
   currentUserEmail: null,
   rangeStart: null, // YYYY-MM-DD inclusive
   rangeEnd: null,   // YYYY-MM-DD inclusive
+  churnDetails: [],
+  churnSummary: null,
   selectedLead: "",
 };
 function isoToYMD(iso) {
@@ -263,6 +265,93 @@ function animateCardsFlash() {
   });
 }
 
+function renderChurnDetailsForLead(hrLeadEmail) {
+  const section = document.getElementById("churnDetailsSection");
+  const tbody = document.getElementById("churnDetailsTableBody");
+  const empty = document.getElementById("churnDetailsEmpty");
+  if (!section || !tbody || !empty) return;
+
+  tbody.innerHTML = "";
+  const email = (hrLeadEmail || "").toLowerCase();
+
+  if (!email) {
+    section.classList.add("is-empty");
+    empty.textContent = "Select a recruiter to see churn details.";
+    empty.style.display = "";
+    return;
+  }
+
+  const rows = (metricsState.churnDetails || []).filter(
+    (row) => (row.hr_lead_email || "").toLowerCase() === email
+  );
+
+  if (!rows.length) {
+    section.classList.add("is-empty");
+    empty.textContent = "No churn recorded for this recruiter in the selected range.";
+    empty.style.display = "";
+    return;
+  }
+
+  section.classList.remove("is-empty");
+  empty.style.display = "none";
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    const candidateName = row.candidate_name || `Candidate #${row.candidate_id || "—"}`;
+    const candidateEmail = row.candidate_email
+      ? `<div class="cell-subtle">${row.candidate_email}</div>`
+      : "";
+
+    const opportunityClient = row.opportunity_client_name || "No client";
+    const opportunityTitle = row.opportunity_title || "—";
+    const opportunityLink = row.opportunity_id
+      ? `<a href="./opportunity-detail.html?id=${encodeURIComponent(
+          row.opportunity_id
+        )}" target="_blank" rel="noopener">${opportunityClient}</a>`
+      : `<span>${opportunityClient}</span>`;
+    const roleLine = opportunityTitle ? `<div class="cell-subtle">${opportunityTitle}</div>` : "";
+
+    const start = isoToYMD(row.start_date) || "—";
+    const end = isoToYMD(row.end_date) || "—";
+    const tenure =
+      row.tenure_days == null ? "–" : `${row.tenure_days} day${row.tenure_days === 1 ? "" : "s"}`;
+    const badge = row.left_within_90_days
+      ? '<span class="tenure-badge">Left within 90 days</span>'
+      : "";
+
+    const hrLeadName = row.hr_lead_name || row.hr_lead_email || "—";
+    const hrLeadEmailText = row.hr_lead_email
+      ? `<div class="cell-subtle">${row.hr_lead_email}</div>`
+      : "";
+
+    tr.innerHTML = `
+      <td>
+        <div class="cell-main">${candidateName}</div>
+        ${candidateEmail}
+      </td>
+      <td>
+        <div class="opportunity-cell">
+          ${opportunityLink}
+          ${roleLine}
+        </div>
+      </td>
+      <td>${start}</td>
+      <td>${end}</td>
+      <td>
+        <div class="tenure-cell">
+          <span>${tenure}</span>
+          ${badge}
+        </div>
+      </td>
+      <td>
+        <div class="cell-main">${hrLeadName}</div>
+        ${hrLeadEmailText}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function updateCardsForLead(hrLeadEmail) {
   const m = metricsState.byLead[hrLeadEmail];
 
@@ -273,12 +362,11 @@ function updateCardsForLead(hrLeadEmail) {
   const convEl = $("#conversionRateValue");
   const helperEl = $("#conversionHelper");
   const convLifetimeEl = $("#conversionLifetimeValue");
-  const churnCountEl = $("#churnL30Count");
-  const churnRateEl = $("#churnL30Rate");
-  const churnHelperEl = $("#churnL30Helper");
-  const earlyCountEl = $("#earlyChurnL90Count");
-  const earlyRateEl = $("#earlyChurnL90Rate");
-  const earlyHelperEl = $("#earlyChurnL90Helper");
+  const churnTotalEl = $("#churnRangeCount");
+  const churnTotalHelperEl = $("#churnRangeHelper");
+  const left90CountEl = $("#left90Count");
+  const left90RateEl = $("#left90Rate");
+  const left90HelperEl = $("#left90Helper");
 
   if (!m) {
     winMonthEl.textContent = "–";
@@ -289,14 +377,14 @@ function updateCardsForLead(hrLeadEmail) {
     helperEl.textContent =
       "No data available for this recruiter yet. Keep an eye on new opportunities!";
     if (convLifetimeEl) convLifetimeEl.textContent = "–";
-    if (churnCountEl) churnCountEl.textContent = "–";
-    if (churnRateEl) churnRateEl.textContent = "–";
-    if (churnHelperEl)
-      churnHelperEl.textContent =
-        "Active: – · Hires: –";
-    if (earlyCountEl) earlyCountEl.textContent = "–";
-    if (earlyRateEl) earlyRateEl.textContent = "–";
-    if (earlyHelperEl) earlyHelperEl.textContent = "Hires (L90): –";
+    if (churnTotalEl) churnTotalEl.textContent = "–";
+    if (churnTotalHelperEl)
+      churnTotalHelperEl.textContent = "People who left within the selected dates.";
+    if (left90CountEl) left90CountEl.textContent = "–";
+    if (left90RateEl) left90RateEl.textContent = "–";
+    if (left90HelperEl)
+      left90HelperEl.textContent = "Based on – churned hires with a start date.";
+    renderChurnDetailsForLead(hrLeadEmail);
     return;
   }
 
@@ -382,47 +470,48 @@ function updateCardsForLead(hrLeadEmail) {
     }
   }
 
-  // --- Churn · Last 30 days ---
-  if (churnCountEl && churnRateEl && churnHelperEl) {
-    const newChurnCount = m.churn_count_l30 ?? 0;
-    const fromChurnCount = parseIntSafe(churnCountEl.textContent);
-    animateValue(churnCountEl, fromChurnCount, newChurnCount, {
+  // --- Churn · Selected range ---
+  if (churnTotalEl && churnTotalHelperEl) {
+    const newChurnTotal = m.churn_total ?? 0;
+    const fromChurnTotal = parseIntSafe(churnTotalEl.textContent);
+    animateValue(churnTotalEl, fromChurnTotal, newChurnTotal, {
       formatter: (v) => Math.round(v),
     });
 
-    const newChurnRate = m.churn_rate_l30 ?? 0;
-    const fromChurnRate = parsePercentSafe(churnRateEl.textContent);
-    animateValue(churnRateEl, fromChurnRate, newChurnRate, {
-      duration: 750,
-      formatter: (v) => formatPercent(v),
-    });
-
-    const active = m.churn_active_l30 ?? 0;
-    const total = m.churn_hires_l30 ?? 0;
-    churnHelperEl.textContent = `Active: ${active} · Hires: ${total}`;
+    const known = m.churn_tenure_known ?? 0;
+    const missing = m.churn_tenure_unknown ?? 0;
+    churnTotalHelperEl.textContent = `Start date available: ${known} · Missing: ${missing}`;
   }
 
-  // --- Early churn · Last 90 days ---
-  if (earlyCountEl && earlyRateEl && earlyHelperEl) {
-    const newEarlyCount = m.early_churn_count_l90 ?? 0;
-    const fromEarlyCount = parseIntSafe(earlyCountEl.textContent);
-    animateValue(earlyCountEl, fromEarlyCount, newEarlyCount, {
+  // --- Left within 90 days ---
+  if (left90CountEl && left90RateEl && left90HelperEl) {
+    const newLeftCount = m.churn_within_90 ?? 0;
+    const fromLeftCount = parseIntSafe(left90CountEl.textContent);
+    animateValue(left90CountEl, fromLeftCount, newLeftCount, {
       formatter: (v) => Math.round(v),
     });
 
-    const newEarlyRate = m.early_churn_rate_l90 ?? 0;
-    const fromEarlyRate = parsePercentSafe(earlyRateEl.textContent);
-    animateValue(earlyRateEl, fromEarlyRate, newEarlyRate, {
-      duration: 750,
-      formatter: (v) => formatPercent(v),
-    });
+    const newLeftRate = m.churn_within_90_rate;
+    if (newLeftRate == null) {
+      left90RateEl.textContent = "–";
+    } else {
+      const fromLeftRate = parsePercentSafe(left90RateEl.textContent);
+      animateValue(left90RateEl, fromLeftRate, newLeftRate, {
+        duration: 750,
+        formatter: (v) => formatPercent(v),
+      });
+    }
 
-    const hires90 = m.early_churn_hires_l90 ?? 0;
-    earlyHelperEl.textContent = `Hires (L90): ${hires90}`;
+    const known = m.churn_tenure_known ?? 0;
+    left90HelperEl.textContent =
+      known === 0
+        ? "No start dates available for this range."
+        : `Based on ${known} churned hires with a start date.`;
   }
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
   animateCardsFlash();
+  renderChurnDetailsForLead(hrLeadEmail);
 }
 
 function populateDropdown() {
@@ -569,6 +658,8 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
 
     metricsState.byLead = byLead;
     metricsState.orderedLeadEmails = emails;
+    metricsState.churnDetails = Array.isArray(data.churn_details) ? data.churn_details : [];
+    metricsState.churnSummary = data.churn_summary || null;
 
     populateDropdown();
     updatePeriodInfo();
@@ -589,18 +680,7 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  (async () => {
-    const uid = await ensureUserIdInURL();
-    if (!uid) {
-      await fetchMetrics();
-      return;
-    }
-
-    await loadCurrentUserEmail(); 
-    toggleRecruiterLabButton(); 
-    await fetchMetrics();    
-    function wireRangePicker() {
+function wireRangePicker() {
   const btn = document.getElementById("applyRangeBtn");
   const s = document.getElementById("rangeStart");
   const e = document.getElementById("rangeEnd");
@@ -624,11 +704,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     await fetchMetrics(start, end);
 
-    // si ya hay recruiter seleccionado, refrescamos cards con el mismo
     const sel = document.getElementById("hrLeadSelect");
     if (sel && sel.value) updateCardsForLead(sel.value);
+    else renderChurnDetailsForLead("");
   });
-}    
-wireRangePicker();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderChurnDetailsForLead("");
+  (async () => {
+    const uid = await ensureUserIdInURL();
+    if (!uid) {
+      await fetchMetrics();
+      return;
+    }
+
+    await loadCurrentUserEmail(); 
+    toggleRecruiterLabButton(); 
+    await fetchMetrics();
+    wireRangePicker();
   })();
 });

@@ -135,31 +135,57 @@
         </p>
       </article>
 
-      <article class="metric-card metric-churn-l30">
+      <article class="metric-card metric-churn-range">
         <div class="metric-header">
-          <span class="metric-label">Churn · Last 30 Days</span>
-          <span class="metric-pill metric-pill-churn">Churn</span>
+          <span class="metric-label">Total churn · Selected range</span>
+          <span class="metric-pill metric-pill-churn">End date based</span>
         </div>
-        <div class="metric-value metric-value-combo" id="churnL30Value">
-          <span class="metric-label-inline">Churn:</span>
-          <span class="metric-number" id="churnL30Count">–</span>
-          <span class="metric-percent">( <span id="churnL30Rate">–</span> )</span>
-        </div>
-        <p class="metric-caption" id="churnL30Helper">Active: – · Hires: –</p>
+        <div class="metric-value" id="churnRangeCount">–</div>
+        <p class="metric-caption" id="churnRangeHelper">
+          People who left within the selected dates.
+        </p>
       </article>
 
       <article class="metric-card metric-early-churn">
         <div class="metric-header">
-          <span class="metric-label">Early Churn &lt; 90 days</span>
-          <span class="metric-pill metric-pill-early">Last 90 days</span>
+          <span class="metric-label">Left within 90 days</span>
+          <span class="metric-pill metric-pill-early">Tenure insight</span>
         </div>
-        <div class="metric-value metric-value-combo" id="earlyChurnL90Value">
-          <span class="metric-label-inline">Early churn:</span>
-          <span class="metric-number" id="earlyChurnL90Count">–</span>
-          <span class="metric-percent">( <span id="earlyChurnL90Rate">–</span> )</span>
+        <div class="metric-value metric-value-combo" id="left90Value">
+          <span class="metric-number" id="left90Count">–</span>
+          <span class="metric-percent" id="left90Rate">–</span>
         </div>
-        <p class="metric-caption" id="earlyChurnL90Helper">Hires (L90): –</p>
+        <p class="metric-caption">People who left before reaching 90 days.</p>
+        <p class="metric-caption" id="left90Helper">Based on – churned hires with a start date.</p>
       </article>
+    </section>
+
+    <section class="churn-details" id="churnDetailsSection">
+      <div class="churn-details-head">
+        <div>
+          <h2>Churn details</h2>
+          <p>See which hires left, when they started and which opportunity they belonged to.</p>
+        </div>
+        <p class="churn-details-note">Churn is calculated when a hire end date is recorded.</p>
+      </div>
+      <div class="churn-details-table-wrapper">
+        <table class="churn-table">
+          <thead>
+            <tr>
+              <th>Candidate</th>
+              <th>Opportunity</th>
+              <th>Started</th>
+              <th>Ended</th>
+              <th>Tenure</th>
+              <th>HR Lead</th>
+            </tr>
+          </thead>
+          <tbody id="churnDetailsTableBody"></tbody>
+        </table>
+        <div class="churn-details-empty" id="churnDetailsEmpty">
+          Select a recruiter to see churn details.
+        </div>
+      </div>
     </section>
 
     <section class="meta-footer">

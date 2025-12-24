@@ -132,7 +132,7 @@ body {
   background: radial-gradient(circle at top right, rgba(210, 185, 255, 0.45), transparent 55%);
 }
 
-.metric-churn-l30::before {
+.metric-churn-range::before {
   background: radial-gradient(circle at top right, rgba(255, 205, 155, 0.4), transparent 55%);
 }
 
@@ -557,4 +557,128 @@ body {
 
 .metrics-filters .filter-select{
   width: min(360px, 100%);
+}
+
+/* ===============================
+   Churn detail table
+   =============================== */
+.churn-details{
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 32px;
+  box-shadow: var(--shadow-soft);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.churn-details-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.churn-details-head h2{
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.churn-details-head p{
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+}
+
+.churn-details-note{
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.churn-details-table-wrapper{
+  width: 100%;
+  overflow-x: auto;
+}
+
+.churn-table{
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.churn-table th,
+.churn-table td{
+  text-align: left;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgba(220,210,255,0.45);
+}
+
+.churn-table th{
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.churn-table tbody tr:hover{
+  background: rgba(255,255,255,0.85);
+}
+
+.cell-main{
+  font-weight: 700;
+}
+
+.cell-subtle{
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.opportunity-cell a{
+  color: var(--text-main);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.opportunity-cell span{
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.opportunity-cell a:hover{
+  text-decoration: underline;
+}
+
+.tenure-cell{
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.tenure-badge{
+  display: inline-flex;
+  padding: 0.15rem 0.55rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: var(--early-churn-soft);
+  color: #b05024;
+  border: 1px solid rgba(255,214,199,0.85);
+}
+
+.churn-details-empty{
+  display: none;
+  text-align: center;
+  padding: 1rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.churn-details.is-empty .churn-table{
+  display: none;
+}
+
+.churn-details.is-empty .churn-details-empty{
+  display: block;
 }
