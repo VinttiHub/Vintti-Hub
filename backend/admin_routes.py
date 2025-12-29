@@ -111,13 +111,16 @@ def create_hub_user():
                 return _friendly_error("That email is already linked to a Vintti Hub profile.", 409)
 
             nickname = (full_name.split() or [""])[0] or candidate_email.split("@")[0]
+            cur.execute("SELECT COALESCE(MAX(user_id), 0) + 1 AS next_id FROM users")
+            row = cur.fetchone()
+            next_user_id = row["next_id"] if row and row.get("next_id") else 1
             cur.execute(
                 """
-                INSERT INTO users (user_name, email_vintti, role, nickname, password, updated_at)
-                VALUES (%s, %s, %s, %s, NULL, NOW()::date)
+                INSERT INTO users (user_id, user_name, email_vintti, role, nickname, password, updated_at)
+                VALUES (%s, %s, %s, %s, %s, NULL, NOW()::date)
                 RETURNING user_id, user_name, email_vintti, role
                 """,
-                (full_name, candidate_email, role, nickname),
+                (next_user_id, full_name, candidate_email, role, nickname),
             )
             new_user = cur.fetchone()
             if not new_user:
