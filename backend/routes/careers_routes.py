@@ -68,9 +68,72 @@ CANON = {
 GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
 GOOGLE_SHEETS_RANGE = os.getenv("GOOGLE_SHEETS_RANGE") or "Open Positions!A:Z"
 
+SHEET_JOB_ID_HEADERS = ["Job ID", "Item ID", "Job", "JobID", "ID"]
+SHEET_ACTION_HEADERS = [
+    "Action",
+    "Action (Hub)",
+    "Action Hub",
+    "Action HUB",
+    "Accion",
+    "Acción",
+    "Status",
+    "Status Hub",
+    "Estado",
+    "Estado Hub",
+]
+
 IMPORT_SPREADSHEET_ID = os.getenv("IMPORT_SPREADSHEET_ID") or "1Jn9xDhu08-eEL2zn9mg_VCXqCdYBdYWiy2FenU2Lmf8"
 IMPORT_SHEET_GID = os.getenv("IMPORT_SHEET_GID") or "0"
 IMPORT_SHEET_TITLE = os.getenv("IMPORT_SHEET_TITLE") or ""
+
+
+def _sheet_title_from_range(range_value: str) -> str:
+    sheet_part = (range_value or "Open Positions!A:Z").split("!")[0].strip()
+    if len(sheet_part) >= 2 and sheet_part[0] == sheet_part[-1] == "'":
+        sheet_part = sheet_part[1:-1]
+    return sheet_part or "Open Positions"
+
+
+def _find_column_index(headers, candidates) -> int:
+    if not headers:
+        return -1
+    lowered = [str(h or "").strip().lower() for h in headers]
+    for candidate in candidates:
+        key = str(candidate or "").strip().lower()
+        if not key:
+            continue
+        for idx, header in enumerate(lowered):
+            if header == key:
+                return idx
+    return -1
+
+
+def _column_index_to_a1(idx: int) -> str:
+    if idx < 0:
+        raise ValueError("Column index must be >= 0")
+    idx += 1
+    label = ""
+    while idx > 0:
+        idx, remainder = divmod(idx - 1, 26)
+        label = chr(65 + remainder) + label
+    return label
+
+
+def _resolve_career_job_id(opportunity_id: int) -> str:
+    job_id = str(opportunity_id)
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT career_job_id FROM opportunity WHERE opportunity_id = %s", (opportunity_id,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    candidate = str(row[0]).strip()
+                    if candidate:
+                        job_id = candidate
+    except Exception:
+        logging.exception("⚠️ Unable to fetch career_job_id for opportunity %s", opportunity_id)
+    return job_id
 
 
 @bp.route('/careers/<int:opportunity_id>/publish', methods=['POST'])
@@ -113,10 +176,7 @@ def publish_career_to_sheet(opportunity_id):
         reqs_html = clean_html_for_webflow(data.get("sheet_requirements_html", ""))
         addi_html = clean_html_for_webflow(data.get("sheet_additional_html", ""))
 
-        sheet_part = (GOOGLE_SHEETS_RANGE or "Open Positions!A:Z").split("!")[0].strip()
-        if len(sheet_part) >= 2 and sheet_part[0] == sheet_part[-1] == "'":
-            sheet_part = sheet_part[1:-1]
-        sheet_title = sheet_part
+        sheet_title = _sheet_title_from_range(GOOGLE_SHEETS_RANGE or "Open Positions!A:Z")
 
         headers = get_sheet_headers(svc, GOOGLE_SHEETS_SPREADSHEET_ID, sheet_title)
 
@@ -249,45 +309,131 @@ def publish_career_to_sheet(opportunity_id):
 @bp.route('/careers/<int:opportunity_id>/sheet_action', methods=['POST'])
 def set_career_sheet_action(opportunity_id):
     try:
+        if not GOOGLE_SHEETS_SPREADSHEET_ID:
+            return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
+
         svc = sheets_service()
         payload = request.get_json(silent=True) or {}
-        action = payload.get("action")
+        action = (payload.get("action") or "").strip()
+        if not action:
+            return jsonify({"error": "Missing action"}), 400
+
+        # Permite overrides manuales, pero generalmente usamos career_job_id
+        explicit_job_id = (payload.get("job_id") or "").strip()
+        job_id = explicit_job_id or _resolve_career_job_id(opportunity_id)
+
+        sheet_title = _sheet_title_from_range(GOOGLE_SHEETS_RANGE or "Open Positions!A:Z")
+        quoted_title = a1_quote(sheet_title)
+
+        meta = svc.spreadsheets().get(spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID).execute()
+        sheet_id = None
+        for s in meta.get("sheets", []):
+            props = s.get("properties", {})
+            if props.get("title") == sheet_title:
+                sheet_id = props.get("sheetId")
+                break
+
+        if sheet_id is None:
+            return jsonify({"error": f"Sheet '{sheet_title}' not found"}), 500
+
         row_number = payload.get("row_number")
-        sheet_id = payload.get("sheet_id")
+        needs_lookup = (not row_number) or action != "wrap_row"
 
-        if not (row_number and sheet_id and action):
-            return jsonify({"error": "Missing parameters"}), 400
+        headers = []
+        rows = []
+        if needs_lookup:
+            values_resp = svc.spreadsheets().values().get(
+                spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+                range=f"{quoted_title}!A:AZ"
+            ).execute()
+            rows = values_resp.get("values", [])
+            if not rows:
+                return jsonify({"error": "Sheet appears empty"}), 400
+            headers = rows[0]
 
-        batch_requests = []
+        if row_number:
+            try:
+                target_rows = [int(row_number)]
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid row_number"}), 400
+        else:
+            job_col = _find_column_index(headers, SHEET_JOB_ID_HEADERS)
+            if job_col < 0:
+                return jsonify({"error": "Job ID column not found"}), 500
+            job_norm = str(job_id or "").strip().lower()
+            fallback_norm = str(opportunity_id).strip().lower()
+            target_rows = []
+            for idx, row in enumerate(rows[1:], start=2):
+                cell = row[job_col] if job_col < len(row) else ""
+                cell_norm = str(cell or "").strip().lower()
+                if not cell_norm:
+                    continue
+                if cell_norm == job_norm or (fallback_norm and cell_norm == fallback_norm):
+                    target_rows.append(idx)
+            target_rows = sorted(set(target_rows))
+
+        if not target_rows:
+            return jsonify({"error": f"No rows found for Job ID {job_id}"}), 404
 
         if action == "wrap_row":
-            start_row = row_number - 1
-            end_row = row_number
-            batch_requests.append({
-                "repeatCell": {
-                    "range": {
-                        "sheetId": sheet_id,
-                        "startRowIndex": start_row,
-                        "endRowIndex": end_row
-                    },
-                    "cell": {
-                        "userEnteredFormat": {
-                            "wrapStrategy": "WRAP"
-                        }
-                    },
-                    "fields": "userEnteredFormat.wrapStrategy"
+            batch_requests = []
+            for rn in target_rows:
+                start_row = rn - 1
+                batch_requests.append({
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": start_row,
+                            "endRowIndex": rn
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "wrapStrategy": "WRAP"
+                            }
+                        },
+                        "fields": "userEnteredFormat.wrapStrategy"
+                    }
+                })
+
+            svc.spreadsheets().batchUpdate(
+                spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+                body={"requests": batch_requests}
+            ).execute()
+
+            return jsonify({"updated": len(batch_requests), "action": action, "rows": target_rows}), 200
+
+        if action in {"Archived", "Borrar"}:
+            action_col = _find_column_index(headers, SHEET_ACTION_HEADERS)
+            if action_col < 0:
+                return jsonify({"error": "Action column not found"}), 400
+
+            updates = []
+            for rn in target_rows:
+                col_letter = _column_index_to_a1(action_col)
+                updates.append({
+                    "range": f"{quoted_title}!{col_letter}{rn}",
+                    "values": [[action]]
+                })
+
+            if not updates:
+                return jsonify({"error": "Nothing to update"}), 400
+
+            svc.spreadsheets().values().batchUpdate(
+                spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+                body={
+                    "valueInputOption": "USER_ENTERED",
+                    "data": updates
                 }
-            })
+            ).execute()
 
-        if not batch_requests:
-            return jsonify({"error": "Unsupported action"}), 400
+            return jsonify({
+                "updated": len(updates),
+                "action": action,
+                "job_id": job_id,
+                "rows": target_rows
+            }), 200
 
-        svc.spreadsheets().batchUpdate(
-            spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
-            body={"requests": batch_requests}
-        ).execute()
-
-        return jsonify({"updated": len(batch_requests), "action": action}), 200
+        return jsonify({"error": "Unsupported action"}), 400
 
     except Exception as exc:
         logging.exception("❌ set_career_sheet_action failed")
