@@ -31,6 +31,7 @@ DEFAULT_VACACIONES_ACUMULADAS = 0
 DEFAULT_VACACIONES_HABILES = 15
 DEFAULT_VACACIONES_CONSUMIDAS = 0
 DEFAULT_VINTTI_DAYS_CONSUMIDOS = 0
+DEFAULT_FERIADOS_CONSUMIDOS = 0
 
 
 def _int_or_none(value: Optional[str]) -> Optional[int]:
@@ -145,12 +146,14 @@ def create_hub_user():
                     vacaciones_acumuladas,
                     vacaciones_habiles,
                     vacaciones_consumidas,
-                    vintti_days_consumidos
+                    vintti_days_consumidos,
+                    feriados_consumidos
                 )
                 VALUES (
                     %s, %s, %s, %s, %s,
                     NULL,
                     NOW()::date,
+                    %s,
                     %s,
                     %s,
                     %s,
@@ -170,6 +173,7 @@ def create_hub_user():
                     DEFAULT_VACACIONES_HABILES,
                     DEFAULT_VACACIONES_CONSUMIDAS,
                     DEFAULT_VINTTI_DAYS_CONSUMIDOS,
+                    DEFAULT_FERIADOS_CONSUMIDOS
                 ),
             )
             new_user = cur.fetchone()
