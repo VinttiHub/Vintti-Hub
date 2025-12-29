@@ -27,6 +27,11 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 ensure_admin_user_access_table()
 
+DEFAULT_VACACIONES_ACUMULADAS = 0
+DEFAULT_VACACIONES_HABILES = 15
+DEFAULT_VACACIONES_CONSUMIDAS = 0
+DEFAULT_VINTTI_DAYS_CONSUMIDOS = 0
+
 
 def _int_or_none(value: Optional[str]) -> Optional[int]:
     try:
@@ -78,6 +83,8 @@ def create_hub_user():
     role = (payload.get("role") or "").strip() or None
     send_invite = _as_bool(payload.get("send_invite"), True)
     is_active = _as_bool(payload.get("is_active"), True)
+    leader_value = payload.get("leader_user_id") or payload.get("leader_id") or payload.get("lider")
+    leader_user_id = _int_or_none(leader_value)
 
     if not full_name:
         return _friendly_error("Full name is required.")
@@ -110,17 +117,60 @@ def create_hub_user():
             if duplicate:
                 return _friendly_error("That email is already linked to a Vintti Hub profile.", 409)
 
+            leader_row = None
+            if leader_user_id:
+                cur.execute(
+                    "SELECT user_id, user_name FROM users WHERE user_id = %s",
+                    (leader_user_id,),
+                )
+                leader_row = cur.fetchone()
+                if not leader_row:
+                    return _friendly_error("The selected leader no longer exists. Refresh and try again.")
+
             nickname = (full_name.split() or [""])[0] or candidate_email.split("@")[0]
             cur.execute("SELECT COALESCE(MAX(user_id), 0) + 1 AS next_id FROM users")
             row = cur.fetchone()
             next_user_id = row["next_id"] if row and row.get("next_id") else 1
             cur.execute(
                 """
-                INSERT INTO users (user_id, user_name, email_vintti, role, nickname, password, updated_at)
-                VALUES (%s, %s, %s, %s, %s, NULL, NOW()::date)
+                INSERT INTO users (
+                    user_id,
+                    user_name,
+                    email_vintti,
+                    role,
+                    nickname,
+                    password,
+                    updated_at,
+                    lider,
+                    vacaciones_acumuladas,
+                    vacaciones_habiles,
+                    vacaciones_consumidas,
+                    vintti_days_consumidos
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    NULL,
+                    NOW()::date,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
                 RETURNING user_id, user_name, email_vintti, role
                 """,
-                (next_user_id, full_name, candidate_email, role, nickname),
+                (
+                    next_user_id,
+                    full_name,
+                    candidate_email,
+                    role,
+                    nickname,
+                    leader_row["user_id"] if leader_row else None,
+                    DEFAULT_VACACIONES_ACUMULADAS,
+                    DEFAULT_VACACIONES_HABILES,
+                    DEFAULT_VACACIONES_CONSUMIDAS,
+                    DEFAULT_VINTTI_DAYS_CONSUMIDOS,
+                ),
             )
             new_user = cur.fetchone()
             if not new_user:

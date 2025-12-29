@@ -142,6 +142,9 @@ const ADMIN_ALLOWED_EMAILS = new Set([
 ]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
+const ADMIN_LEADER_LOOKUP = new Map();
+let ADMIN_LEADER_OPTIONS = [];
+let ADMIN_LEADER_LOADED = false;
 const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
 function calcVacation(user){
@@ -890,11 +893,66 @@ function enableAdminTab(){
   wireTabs();
 }
 
+function buildLeaderLabel(user){
+  const name = (user?.user_name || "").trim() || "—";
+  const email = (user?.email_vintti || "").trim().toLowerCase();
+  return email ? `${name} · ${email}` : name;
+}
+
+function syncAdminLeaderSelection(){
+  const input = document.getElementById("adminLeaderInput");
+  const hidden = document.getElementById("adminLeaderUserId");
+  if (!input || !hidden) return;
+  const key = (input.value || "").trim().toLowerCase();
+  const leaderId = ADMIN_LEADER_LOOKUP.get(key);
+  hidden.value = leaderId ? String(leaderId) : "";
+}
+
+function wireAdminLeaderInput(){
+  const input = document.getElementById("adminLeaderInput");
+  if (!input || input.dataset.bound) return;
+  input.addEventListener("input", syncAdminLeaderSelection);
+  input.addEventListener("change", syncAdminLeaderSelection);
+  input.dataset.bound = "1";
+}
+
+async function ensureAdminLeaderOptions(force=false){
+  if (ADMIN_LEADER_LOADED && !force) return;
+  const listEl = document.getElementById("adminLeaderOptions");
+  const input = document.getElementById("adminLeaderInput");
+  if (!listEl || !input) return;
+  try{
+    const res = await api(`/users`, { method: "GET" });
+    if (!res.ok) throw new Error("Could not load leaders");
+    const rows = await res.json();
+    ADMIN_LEADER_OPTIONS = Array.isArray(rows) ? rows : [];
+    ADMIN_LEADER_LOOKUP.clear();
+    listEl.replaceChildren();
+    const frag = document.createDocumentFragment();
+    ADMIN_LEADER_OPTIONS.forEach((user)=>{
+      if (!user?.user_id) return;
+      const label = buildLeaderLabel(user);
+      ADMIN_LEADER_LOOKUP.set(label.toLowerCase(), Number(user.user_id));
+      const opt = document.createElement("option");
+      opt.value = label;
+      frag.appendChild(opt);
+    });
+    listEl.appendChild(frag);
+    ADMIN_LEADER_LOADED = true;
+    syncAdminLeaderSelection();
+  }catch(err){
+    console.error("admin leader options error:", err);
+    ADMIN_LEADER_LOADED = false;
+  }
+}
+
 function setupAdminForm(){
   const form = document.getElementById("adminCreateForm");
   if (!form || form.dataset.bound) return;
   form.addEventListener("submit", onAdminCreateSubmit);
   form.dataset.bound = "1";
+  wireAdminLeaderInput();
+  ensureAdminLeaderOptions();
 }
 
 function setAdminStatus(text, ok=true){
@@ -922,6 +980,10 @@ async function onAdminCreateSubmit(ev){
   const active = document.getElementById("adminActive")?.checked ?? true;
   const sendInviteInput = document.getElementById("adminSendInvite");
   const shouldInvite = active ? (sendInviteInput?.checked ?? true) : false;
+  const leaderInput = document.getElementById("adminLeaderInput");
+  const leaderIdInput = document.getElementById("adminLeaderUserId");
+  const typedLeader = (leaderInput?.value || "").trim();
+  const leaderId = Number(leaderIdInput?.value) || null;
 
   if (!fullName){
     setAdminStatus("Enter the person's full name.", false);
@@ -931,13 +993,19 @@ async function onAdminCreateSubmit(ev){
     setAdminStatus("Enter a valid email address.", false);
     return;
   }
+  if (typedLeader && !leaderId){
+    setAdminStatus("Please pick a leader from the suggestions.", false);
+    leaderInput?.focus();
+    return;
+  }
 
   const payload = {
     full_name: fullName,
     email,
     role: role || undefined,
     is_active: Boolean(active),
-    send_invite: Boolean(shouldInvite)
+    send_invite: Boolean(shouldInvite),
+    leader_user_id: leaderId || undefined
   };
 
   if (submitBtn) submitBtn.disabled = true;
@@ -957,7 +1025,11 @@ async function onAdminCreateSubmit(ev){
     form.reset();
     document.getElementById("adminActive").checked = true;
     document.getElementById("adminSendInvite").checked = true;
+    if (leaderIdInput) leaderIdInput.value = "";
+    if (leaderInput) leaderInput.value = "";
+    syncAdminLeaderSelection();
     setAdminStatus(data.message || "User created.", true);
+    await ensureAdminLeaderOptions(true);
   }catch(err){
     console.error("admin create error:", err);
     setAdminStatus(err?.message || "Could not create user.", false);

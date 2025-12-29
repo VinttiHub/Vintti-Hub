@@ -433,6 +433,12 @@
           <span class="label">Role (optional)</span>
           <input id="adminRole" name="role" placeholder="e.g. Recruiter" />
         </label>
+        <label class="field field-span">
+          <span class="label">Leader</span>
+          <input id="adminLeaderInput" name="leader_display" placeholder="Start typing a name" list="adminLeaderOptions" autocomplete="off" />
+          <input type="hidden" id="adminLeaderUserId" name="leader_user_id" />
+          <datalist id="adminLeaderOptions"></datalist>
+        </label>
       </div>
 
       <div class="admin-form__toggles">
