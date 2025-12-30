@@ -5,7 +5,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Iterable, Optional
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
@@ -86,6 +86,27 @@ def create_hub_user():
     is_active = _as_bool(payload.get("is_active"), True)
     leader_value = payload.get("leader_user_id") or payload.get("leader_id") or payload.get("lider")
     leader_user_id = _int_or_none(leader_value)
+    raw_reports = (
+        payload.get("leader_of_user_ids")
+        or payload.get("leader_of")
+        or payload.get("leads_user_ids")
+        or payload.get("reports")
+    )
+
+    def _parse_id_iter(values: Iterable) -> list[int]:
+        parsed: list[int] = []
+        for val in values:
+            parsed_val = _int_or_none(val)
+            if parsed_val:
+                parsed.append(parsed_val)
+        return parsed
+
+    leader_of_ids: list[int] = []
+    if isinstance(raw_reports, list):
+        leader_of_ids = _parse_id_iter(raw_reports)
+    elif isinstance(raw_reports, str) and raw_reports.strip():
+        leader_of_ids = _parse_id_iter([piece.strip() for piece in raw_reports.split(",")])
+    leader_of_ids = sorted(set(leader_of_ids))
 
     if not full_name:
         return _friendly_error("Full name is required.")
@@ -127,6 +148,16 @@ def create_hub_user():
                 leader_row = cur.fetchone()
                 if not leader_row:
                     return _friendly_error("The selected leader no longer exists. Refresh and try again.")
+
+            if leader_of_ids:
+                cur.execute(
+                    "SELECT user_id FROM users WHERE user_id = ANY(%s)",
+                    (leader_of_ids,),
+                )
+                existing_reports = {int(row["user_id"]) for row in cur.fetchall()}
+                missing_reports = [str(i) for i in leader_of_ids if i not in existing_reports]
+                if missing_reports:
+                    return _friendly_error("Some selected reports are no longer available. Refresh the page.")
 
             nickname = (full_name.split() or [""])[0] or candidate_email.split("@")[0]
             cur.execute("SELECT COALESCE(MAX(user_id), 0) + 1 AS next_id FROM users")
@@ -191,6 +222,17 @@ def create_hub_user():
                 """,
                 (new_user["user_id"], is_active, requester.get("email_vintti")),
             )
+
+            if leader_of_ids:
+                cur.execute(
+                    """
+                    UPDATE users
+                       SET lider = %s,
+                           updated_at = NOW() AT TIME ZONE 'UTC'
+                     WHERE user_id = ANY(%s)
+                    """,
+                    (new_user["user_id"], leader_of_ids),
+                )
 
             if send_invite and is_active:
                 invite_token = secrets.token_urlsafe(32)

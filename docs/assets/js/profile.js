@@ -125,6 +125,15 @@ document.addEventListener("click", (e)=>{
   const t = e.target;
   if (t.matches("#btnOpenTimeoff")) { e.preventDefault(); openTimeoffModal(); }
   if (t.matches("[data-close-modal]")) { e.preventDefault(); closeTimeoffModal(); }
+  const removeBtn = t.closest?.("[data-leaderof-remove]");
+  if (removeBtn){
+    e.preventDefault();
+    const id = Number(removeBtn.getAttribute("data-leaderof-remove"));
+    if (id){
+      ADMIN_LEADER_OF_SELECTED.delete(id);
+      renderLeaderOfTags();
+    }
+  }
 });
 
 function initialsFromName(name=""){
@@ -143,6 +152,8 @@ const ADMIN_ALLOWED_EMAILS = new Set([
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
 const ADMIN_LEADER_LOOKUP = new Map();
+const ADMIN_LEADER_BY_ID = new Map();
+const ADMIN_LEADER_OF_SELECTED = new Map();
 let ADMIN_LEADER_OPTIONS = [];
 let ADMIN_LEADER_LOADED = false;
 const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
@@ -899,6 +910,58 @@ function buildLeaderLabel(user){
   return email ? `${name} · ${email}` : name;
 }
 
+function renderLeaderOfTags(){
+  const host = document.getElementById("adminLeaderOfTags");
+  const hidden = document.getElementById("adminLeaderOfUserIds");
+  if (hidden){
+    const ids = Array.from(ADMIN_LEADER_OF_SELECTED.keys());
+    hidden.value = ids.length ? ids.join(",") : "";
+  }
+  if (!host) return;
+  host.innerHTML = "";
+  ADMIN_LEADER_OF_SELECTED.forEach((label, id)=>{
+    const pill = document.createElement("span");
+    pill.className = "leader-tag";
+    const text = document.createElement("span");
+    text.textContent = label;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("data-leaderof-remove", String(id));
+    btn.setAttribute("aria-label", `Remove ${label}`);
+    btn.textContent = "×";
+    pill.append(text, btn);
+    host.appendChild(pill);
+  });
+}
+
+function clearLeaderOfSelection(){
+  ADMIN_LEADER_OF_SELECTED.clear();
+  renderLeaderOfTags();
+  const input = document.getElementById("adminLeaderOfInput");
+  if (input) input.value = "";
+}
+
+function addLeaderOfById(candidateId){
+  const idNum = Number(candidateId);
+  if (!idNum || ADMIN_LEADER_OF_SELECTED.has(idNum)) return false;
+  const label = ADMIN_LEADER_BY_ID.get(idNum) || `ID ${idNum}`;
+  ADMIN_LEADER_OF_SELECTED.set(idNum, label);
+  renderLeaderOfTags();
+  return true;
+}
+
+function commitLeaderOfSelection(){
+  const input = document.getElementById("adminLeaderOfInput");
+  if (!input) return;
+  const raw = (input.value || "").trim();
+  if (!raw) return;
+  const id = ADMIN_LEADER_LOOKUP.get(raw.toLowerCase());
+  if (!id) return;
+  if (addLeaderOfById(id)){
+    input.value = "";
+  }
+}
+
 function syncAdminLeaderSelection(){
   const input = document.getElementById("adminLeaderInput");
   const hidden = document.getElementById("adminLeaderUserId");
@@ -910,10 +973,24 @@ function syncAdminLeaderSelection(){
 
 function wireAdminLeaderInput(){
   const input = document.getElementById("adminLeaderInput");
-  if (!input || input.dataset.bound) return;
-  input.addEventListener("input", syncAdminLeaderSelection);
-  input.addEventListener("change", syncAdminLeaderSelection);
-  input.dataset.bound = "1";
+  if (input && !input.dataset.bound){
+    input.addEventListener("input", syncAdminLeaderSelection);
+    input.addEventListener("change", syncAdminLeaderSelection);
+    input.dataset.bound = "1";
+  }
+  const multi = document.getElementById("adminLeaderOfInput");
+  if (multi && !multi.dataset.bound){
+    const commit = () => commitLeaderOfSelection();
+    multi.addEventListener("change", commit);
+    multi.addEventListener("blur", commit);
+    multi.addEventListener("keydown", (ev)=>{
+      if (ev.key === "Enter" || ev.key === ","){
+        ev.preventDefault();
+        commit();
+      }
+    });
+    multi.dataset.bound = "1";
+  }
 }
 
 async function ensureAdminLeaderOptions(force=false){
@@ -927,12 +1004,15 @@ async function ensureAdminLeaderOptions(force=false){
     const rows = await res.json();
     ADMIN_LEADER_OPTIONS = Array.isArray(rows) ? rows : [];
     ADMIN_LEADER_LOOKUP.clear();
+    ADMIN_LEADER_BY_ID.clear();
     listEl.replaceChildren();
     const frag = document.createDocumentFragment();
     ADMIN_LEADER_OPTIONS.forEach((user)=>{
       if (!user?.user_id) return;
       const label = buildLeaderLabel(user);
-      ADMIN_LEADER_LOOKUP.set(label.toLowerCase(), Number(user.user_id));
+      const idNum = Number(user.user_id);
+      ADMIN_LEADER_LOOKUP.set(label.toLowerCase(), idNum);
+      ADMIN_LEADER_BY_ID.set(idNum, label);
       const opt = document.createElement("option");
       opt.value = label;
       frag.appendChild(opt);
@@ -940,6 +1020,21 @@ async function ensureAdminLeaderOptions(force=false){
     listEl.appendChild(frag);
     ADMIN_LEADER_LOADED = true;
     syncAdminLeaderSelection();
+    const current = Array.from(ADMIN_LEADER_OF_SELECTED.entries());
+    let changed = false;
+    current.forEach(([id, label])=>{
+      if (!ADMIN_LEADER_BY_ID.has(id)){
+        ADMIN_LEADER_OF_SELECTED.delete(id);
+        changed = true;
+      }else{
+        const canonical = ADMIN_LEADER_BY_ID.get(id);
+        if (canonical && canonical !== label){
+          ADMIN_LEADER_OF_SELECTED.set(id, canonical);
+          changed = true;
+        }
+      }
+    });
+    if (changed) renderLeaderOfTags();
   }catch(err){
     console.error("admin leader options error:", err);
     ADMIN_LEADER_LOADED = false;
@@ -952,6 +1047,7 @@ function setupAdminForm(){
   form.addEventListener("submit", onAdminCreateSubmit);
   form.dataset.bound = "1";
   wireAdminLeaderInput();
+  renderLeaderOfTags();
   ensureAdminLeaderOptions();
 }
 
@@ -984,6 +1080,7 @@ async function onAdminCreateSubmit(ev){
   const leaderIdInput = document.getElementById("adminLeaderUserId");
   const typedLeader = (leaderInput?.value || "").trim();
   const leaderId = Number(leaderIdInput?.value) || null;
+  const leaderOfIds = Array.from(ADMIN_LEADER_OF_SELECTED.keys());
 
   if (!fullName){
     setAdminStatus("Enter the person's full name.", false);
@@ -1005,7 +1102,8 @@ async function onAdminCreateSubmit(ev){
     role: role || undefined,
     is_active: Boolean(active),
     send_invite: Boolean(shouldInvite),
-    leader_user_id: leaderId || undefined
+    leader_user_id: leaderId || undefined,
+    leader_of_user_ids: leaderOfIds.length ? leaderOfIds : undefined
   };
 
   if (submitBtn) submitBtn.disabled = true;
@@ -1028,6 +1126,7 @@ async function onAdminCreateSubmit(ev){
     if (leaderIdInput) leaderIdInput.value = "";
     if (leaderInput) leaderInput.value = "";
     syncAdminLeaderSelection();
+    clearLeaderOfSelection();
     setAdminStatus(data.message || "User created.", true);
     await ensureAdminLeaderOptions(true);
   }catch(err){

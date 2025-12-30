@@ -439,6 +439,14 @@
           <input type="hidden" id="adminLeaderUserId" name="leader_user_id" />
           <datalist id="adminLeaderOptions"></datalist>
         </label>
+        <label class="field field-span">
+          <span class="label">Leads (optional)</span>
+          <div class="admin-multiselect" id="adminLeaderOfBox">
+            <div id="adminLeaderOfTags" class="admin-multiselect__tags" aria-live="polite"></div>
+            <input id="adminLeaderOfInput" name="leader_of_display" placeholder="Type a teammate name" list="adminLeaderOptions" autocomplete="off" />
+          </div>
+          <input type="hidden" id="adminLeaderOfUserIds" name="leader_of_user_ids" />
+        </label>
       </div>
 
       <div class="admin-form__toggles">
