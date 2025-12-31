@@ -7,6 +7,16 @@ const $all = (sel, root=document) => [...root.querySelectorAll(sel)];
 // --- Date-only helpers (local, sin UTC) ---
 const _ISO_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+// Local avatar overrides for the profile page.
+// Images live in docs/assets/img — map lowercase emails or numeric IDs to filenames.
+const PROFILE_AVATAR_BASE = (typeof AVATAR_BASE === "string" ? AVATAR_BASE : "./assets/img/");
+const PROFILE_AVATAR_BY_EMAIL = {
+  // 'name@vintti.com': 'avatar.png',
+};
+const PROFILE_AVATAR_BY_USER_ID = {
+  // 123: 'avatar.png',
+};
+
 function parseISODateLocal(s){
   if (!s) return null;
   if (_ISO_ONLY.test(s)) {
@@ -483,12 +493,38 @@ function renderApprovalsCalendarFromRows(rows){
   draw();
 }
 
+function resolveProfileAvatarSource({ avatar_url, email_vintti, user_id }){
+  const direct = typeof avatar_url === "string" ? avatar_url.trim() : "";
+  if (direct) return direct;
+
+  const emailKey = String(email_vintti || "").trim().toLowerCase();
+  if (emailKey){
+    if (PROFILE_AVATAR_BY_EMAIL[emailKey]){
+      return PROFILE_AVATAR_BASE + PROFILE_AVATAR_BY_EMAIL[emailKey];
+    }
+    if (typeof resolveAvatar === "function"){
+      const resolved = resolveAvatar(emailKey);
+      if (resolved) return resolved;
+    } else if (typeof AVATAR_BY_EMAIL !== "undefined" && AVATAR_BY_EMAIL[emailKey]){
+      return PROFILE_AVATAR_BASE + AVATAR_BY_EMAIL[emailKey];
+    }
+  }
+
+  if (user_id !== undefined && user_id !== null){
+    const idKey = String(user_id);
+    const filename = PROFILE_AVATAR_BY_USER_ID[idKey] || PROFILE_AVATAR_BY_USER_ID[user_id];
+    if (filename) return PROFILE_AVATAR_BASE + filename;
+  }
+
+  return "";
+}
+
 // —— Quick Profile helpers —— //
 function openUserQuick(){ const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
 function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
 
 // Avatar for quick card
-function setQuickAvatar({ user_name, avatar_url, initials }){
+function setQuickAvatar({ user_name, avatar_url, initials, email_vintti, user_id }){
   const img = $("#uqAvatarImg");
   const ini = $("#uqAvatarInitials");
   if (!img || !ini) return;
@@ -503,7 +539,8 @@ function setQuickAvatar({ user_name, avatar_url, initials }){
 
   ini.textContent = resolved;
 
-  const trimmed = typeof avatar_url === "string" ? avatar_url.trim() : "";
+  const finalSrc = resolveProfileAvatarSource({ avatar_url, email_vintti, user_id });
+  const trimmed = typeof finalSrc === "string" ? finalSrc.trim() : "";
   if (trimmed){
     img.alt = user_name || "User avatar";
     img.loading = "lazy";
@@ -556,7 +593,7 @@ function renderUserQuick(u){
   const holTotal = 2;
   $("#uqHolTotal").textContent = String(holTotal);
 
-  setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials });
+  setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials, email_vintti: u.email_vintti, user_id: u.user_id });
 }
 
 // Click on a name → fetch + open
@@ -756,12 +793,13 @@ const headerHistory = `
     });
   }
 
-  function avatarMarkup(name, avatarUrl, initials){
+  function avatarMarkup(name, avatarUrl, initials, email, userId){
     const fallback = resolveInitials(name || "", initials);
-    if (!avatarUrl){
+    const resolvedUrl = resolveProfileAvatarSource({ avatar_url: avatarUrl, email_vintti: email, user_id: userId });
+    if (!resolvedUrl){
       return `<div class="avatar-min">${esc(fallback)}</div>`;
     }
-    const safeUrl = esc(avatarUrl);
+    const safeUrl = esc(resolvedUrl);
     const safeName = esc(name || "User avatar");
     const safeInitials = esc(fallback);
     return `
@@ -773,7 +811,7 @@ const headerHistory = `
   }
 
 function buildRow(r, withActions){
-  const avatar = avatarMarkup(r.user_name, r.avatar_url, r.initials);
+  const avatar = avatarMarkup(r.user_name, r.avatar_url, r.initials, r.email_vintti, r.user_id);
 
   const startLbl = fmtDateShort(r.start_date);
   const endLbl   = fmtDateShort(r.end_date);
@@ -1232,7 +1270,7 @@ async function api(path, opts={}){
   });
 }
 
-function setAvatar({ user_name, avatar_url, initials }){
+function setAvatar({ user_name, avatar_url, initials, email_vintti, user_id }){
   const img = $("#avatarImg");
   const ini = $("#avatarInitials");
   if (!img || !ini) return;
@@ -1247,7 +1285,8 @@ function setAvatar({ user_name, avatar_url, initials }){
 
   ini.textContent = resolved;
 
-  const trimmed = typeof avatar_url === "string" ? avatar_url.trim() : "";
+  const finalSrc = resolveProfileAvatarSource({ avatar_url, email_vintti, user_id });
+  const trimmed = typeof finalSrc === "string" ? finalSrc.trim() : "";
   if (trimmed){
     img.alt = user_name || "User avatar";
     img.loading = "lazy";
@@ -1362,7 +1401,13 @@ async function loadMe(uid){
   $("#ingreso_vintti_date").value = toInputDate(me.ingreso_vintti_date);
   $("#fecha_nacimiento").value = toInputDate(me.fecha_nacimiento);
 
-  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url, initials: me.initials });
+  setAvatar({
+    user_name: me.user_name,
+    avatar_url: me.avatar_url,
+    initials: me.initials,
+    email_vintti: me.email_vintti,
+    user_id: me.user_id
+  });
 }
 
 // ——— Time Off: listar ———
@@ -1742,7 +1787,13 @@ function renderProfileView(me){
   $("#v_birth")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.fecha_nacimiento)));
 
   // Avatar
-  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url, initials: me.initials });
+  setAvatar({
+    user_name: me.user_name,
+    avatar_url: me.avatar_url,
+    initials: me.initials,
+    email_vintti: me.email_vintti,
+    user_id: me.user_id
+  });
 }
 
 function showProfileView(){
