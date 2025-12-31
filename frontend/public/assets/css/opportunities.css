@@ -1679,8 +1679,6 @@ body.dark-mode .profile-tile{
 }
 
 /* never show image */
-.profile-tile .profile-avatar img{ display:none !important; }
-
 /* gentle micro-interaction */
 .profile-tile .profile-tile:hover .profile-avatar,
 .profile-tile:hover .profile-avatar{
