@@ -58,7 +58,9 @@ const candidateState = {
   searchBound: false,
   duplicateMatch: null,
   duplicateDetailsCache: new Map(),
-  blacklistFilter: 'all'
+  blacklistFilter: 'all',
+  loadingOverlay: null,
+  loadingText: null
 };
 
 const candidateModalRefs = {
@@ -90,7 +92,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   candidateState.tbody = document.getElementById('candidatesTableBody');
   candidateState.tableEl = document.getElementById('candidatesTable');
+  candidateState.loadingOverlay = document.getElementById('candidatesLoadingOverlay');
+  candidateState.loadingText = document.querySelector('.candidates-loading-text');
 
+  initCandidatesLoadingOverlay();
+  lockSidebarWidth();
   setupBlacklistFilterControl();
   loadCandidates();
   setupRowNavigation();
@@ -98,7 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
   setupCandidateModal();
 });
 
-async function loadCandidates() {
+async function loadCandidates(options = {}) {
+  const { showLoader = true, loaderMessage = 'Loading candidates…' } = options;
+  if (showLoader) toggleCandidatesLoading(true, loaderMessage);
+
   const filter = candidateState.blacklistFilter || 'all';
   const url = new URL(`${API_BASE}/candidates/light_fast`);
   url.searchParams.set('blacklist_filter', filter);
@@ -112,7 +121,25 @@ async function loadCandidates() {
     console.error('❌ Error al obtener candidatos:', err);
     candidateState.data = [];
     paintCandidateRows(candidateState.data);
+  } finally {
+    if (showLoader) toggleCandidatesLoading(false);
   }
+}
+
+function initCandidatesLoadingOverlay() {
+  if (!candidateState.loadingOverlay) return;
+  candidateState.loadingOverlay.classList.add('hidden');
+  candidateState.loadingOverlay.setAttribute('aria-hidden', 'true');
+}
+
+function toggleCandidatesLoading(show, message) {
+  if (!candidateState.loadingOverlay) return;
+  if (message && candidateState.loadingText) {
+    candidateState.loadingText.textContent = message;
+  }
+  candidateState.loadingOverlay.classList.toggle('hidden', !show);
+  candidateState.loadingOverlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+  candidateState.loadingOverlay.setAttribute('aria-busy', show ? 'true' : 'false');
 }
 
 function buildCandidateRow(candidate) {
@@ -259,7 +286,7 @@ function setupBlacklistFilterControl() {
     const nextValue = normalizeValue(select.value);
     if (candidateState.blacklistFilter === nextValue) return;
     candidateState.blacklistFilter = nextValue;
-    loadCandidates();
+    loadCandidates({ loaderMessage: 'Applying blacklist filter…' });
   });
 }
 
@@ -302,6 +329,20 @@ function setupSidebarToggle() {
     applySidebarState(isHidden);
     localStorage.setItem('sidebarHidden', isHidden);
   });
+}
+
+function lockSidebarWidth() {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+  const rootStyles = getComputedStyle(document.documentElement);
+  let sidebarWidth = rootStyles.getPropertyValue('--sidebar-width');
+  sidebarWidth = sidebarWidth ? sidebarWidth.trim() : '';
+  if (!sidebarWidth) {
+    sidebarWidth = `${sidebar.offsetWidth || 250}px`;
+  }
+  sidebar.style.flex = `0 0 ${sidebarWidth}`;
+  sidebar.style.minWidth = sidebarWidth;
+  sidebar.style.maxWidth = sidebarWidth;
 }
 
 function setupCandidateModal() {
@@ -810,7 +851,7 @@ async function submitCandidate(values) {
 
     closeCandidateModal();
     showCandidateToast('Candidate created');
-    await loadCandidates();
+    await loadCandidates({ loaderMessage: 'Refreshing candidates…' });
   } catch (err) {
     console.error('❌ Error creating candidate:', err);
     showFormError(err.message || 'Failed to create candidate');

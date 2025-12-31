@@ -1077,6 +1077,7 @@ window.updateHireField = async function(field, value) {
           statusText.textContent = isBlacklisted
             ? 'Candidate is currently blacklisted.'
             : 'Candidate is not blacklisted.';
+          statusText.style.display = 'block';
         }
       }
 
@@ -1877,6 +1878,10 @@ function wireVideoLinkDedupe() {
   if (!checkbox || !card) return;
 
   const statusText = document.getElementById('blacklist-status-text');
+  const cardTitle = card.querySelector('.blacklist-card-title');
+  const cardDescription = card.querySelector('.blacklist-card-description');
+  const defaultTitleCopy = cardTitle ? cardTitle.textContent.trim() : '';
+  const defaultDescriptionCopy = cardDescription ? cardDescription.textContent.trim() : '';
   const params = new URLSearchParams(window.location.search);
   const candidateParam = params.get('id');
   const candidateId = candidateParam ? Number(candidateParam) : NaN;
@@ -1884,7 +1889,10 @@ function wireVideoLinkDedupe() {
 
   if (!candidateParam || Number.isNaN(candidateId)) {
     checkbox.disabled = true;
-    if (statusText) statusText.textContent = 'Missing candidate id.';
+    if (statusText) {
+      statusText.textContent = 'Missing candidate id.';
+      statusText.style.display = 'block';
+    }
     return;
   }
 
@@ -1896,7 +1904,9 @@ function wireVideoLinkDedupe() {
   };
 
   function setStatusMessage(message) {
-    if (statusText) statusText.textContent = message;
+    if (!statusText) return;
+    statusText.textContent = message;
+    statusText.style.display = message ? 'block' : 'none';
   }
 
   function paintState() {
@@ -1904,7 +1914,21 @@ function wireVideoLinkDedupe() {
     checkbox.checked = checked;
     card.classList.toggle('is-blacklisted', checked);
     card.classList.toggle('not-blacklisted', !checked);
-    setStatusMessage(checked ? 'Candidate is currently blacklisted.' : 'Candidate is not blacklisted.');
+    if (cardTitle) {
+      cardTitle.textContent = checked
+        ? defaultTitleCopy || 'Blacklist (dangerous)'
+        : 'Candidate is not blacklisted.';
+    }
+    if (cardDescription) {
+      if (checked) {
+        cardDescription.textContent = defaultDescriptionCopy || 'Keep risky candidates hidden from searches.';
+        cardDescription.style.display = 'block';
+      } else {
+        cardDescription.textContent = '';
+        cardDescription.style.display = 'none';
+      }
+    }
+    setStatusMessage(checked ? 'Candidate is currently blacklisted.' : '');
   }
 
   window.__applyBlacklistState = function applyBlacklistState(payload) {
