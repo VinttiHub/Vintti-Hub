@@ -17,7 +17,15 @@
     'josefina@vintti.com':         'josefina.png',
     'constanza@vintti.com':        'constanza.png',
     'mariano@vintti.com':          'mariano.png',
-    'julieta@vintti.com':          'julieta.png'
+    'julieta@vintti.com':          'julieta.png',
+    'felicitas@vintti.com':        'felicitas.png',
+    'pgonzales@vintti.com':        'pri.png',
+    'mora@vintti.com':             'mora.png',
+    'mia@vintti.com':              'mia.png',
+    'luisa@vintti.com':            'luisa.png',
+    'camila@vintti.com':           'camila.png',
+    'felipe@vintti.com':           'felipe.png',
+    'abril@vintti.com':            'abril.png',
   };
   const AVATAR_BY_USER_ID = {
     // '123': 'avatar.png',
