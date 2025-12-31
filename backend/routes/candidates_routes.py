@@ -213,6 +213,29 @@ def _find_blacklist_match(cursor, candidate_id, linkedin_value, fallback_to_cand
 
     return match, linkedin_norm
 
+
+def _bulk_update_candidate_blacklist(cursor, candidate_ids, flag=True):
+    """
+    Ensure candidates.blacklist matches the provided flag for the given ids.
+    Returns the number of rows touched so callers can decide whether to commit.
+    """
+    unique_ids = sorted({cid for cid in candidate_ids if cid is not None})
+    if not unique_ids:
+        return 0
+
+    placeholders = ', '.join(['%s'] * len(unique_ids))
+    params = [flag, *unique_ids, flag]
+    cursor.execute(
+        f"""
+        UPDATE candidates
+        SET blacklist = %s
+        WHERE candidate_id IN ({placeholders})
+          AND COALESCE(blacklist, FALSE) <> %s
+        """,
+        params
+    )
+    return cursor.rowcount
+
 @bp.route('/candidates/light')
 def get_candidates_light():
     try:
@@ -276,6 +299,13 @@ def get_candidates_light():
         """)
 
         rows = cursor.fetchall()
+        updated = _bulk_update_candidate_blacklist(
+            cursor,
+            [row.get('candidate_id') for row in rows if row.get('is_blacklisted')],
+            True
+        )
+        if updated:
+            conn.commit()
         cursor.close(); conn.close()
         return jsonify(rows)
     except Exception as e:
@@ -343,6 +373,13 @@ def get_candidates():
         """)
 
         rows = cur.fetchall()
+        updated = _bulk_update_candidate_blacklist(
+            cur,
+            [row.get('candidate_id') for row in rows if row.get('is_blacklisted')],
+            True
+        )
+        if updated:
+            conn.commit()
         cur.close(); conn.close()
         return jsonify(rows)
     except Exception as e:
@@ -1576,6 +1613,13 @@ def get_candidates_light_fast():
         """, params)
 
         rows = cur.fetchall()
+        updated = _bulk_update_candidate_blacklist(
+            cur,
+            [row.get('candidate_id') for row in rows if row.get('is_blacklisted')],
+            True
+        )
+        if updated:
+            conn.commit()
         cur.close(); conn.close()
         return jsonify(rows)
     except Exception as e:
@@ -2170,6 +2214,7 @@ def create_blacklist_entry():
             values
         )
         created_row = cursor.fetchone()
+        _bulk_update_candidate_blacklist(cursor, [candidate_id], True)
         conn.commit()
         return jsonify(created_row), 201
     except Exception as exc:
@@ -2187,13 +2232,23 @@ def delete_blacklist_entry(blacklist_id):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute(
-            "DELETE FROM blacklist WHERE blacklist_id = %s RETURNING blacklist_id",
+            "DELETE FROM blacklist WHERE blacklist_id = %s RETURNING blacklist_id, candidate_id",
             (blacklist_id,)
         )
         deleted = cursor.fetchone()
         if not deleted:
             conn.rollback()
             return jsonify({'error': 'Blacklist entry not found'}), 404
+
+        candidate_id = deleted.get('candidate_id')
+        if candidate_id is not None:
+            cursor.execute(
+                "SELECT 1 FROM blacklist WHERE candidate_id = %s LIMIT 1",
+                (candidate_id,)
+            )
+            still_blacklisted = cursor.fetchone()
+            if not still_blacklisted:
+                _bulk_update_candidate_blacklist(cursor, [candidate_id], False)
 
         conn.commit()
         return jsonify({'status': 'deleted', 'blacklist_id': deleted['blacklist_id']})

@@ -416,15 +416,25 @@ window.generateSalesOptions = function generateSalesOptions(currentValue) {
 
 window.generateHROptions = function generateHROptions(currentValue) {
   const normalized = String(currentValue || '').trim().toLowerCase();
-  const allowedEmails = new Set((window.allowedHRUsers || []).map(u => u.email_vintti));
+  const visibleHrUsers = (window.allowedHRUsers || []).filter((user) => !HIDDEN_HR_FILTER_EMAILS.has(user.email_vintti));
+  const allowedEmails = new Set(visibleHrUsers.map((u) => u.email_vintti));
   const isKnown = !!normalized && allowedEmails.has(normalized);
+  const isHiddenSelection = !!normalized && HIDDEN_HR_FILTER_EMAILS.has(normalized);
 
-  let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign HR Lead</option>`;
-  (window.allowedHRUsers || []).forEach(user => {
+  const shouldSelectDefault = !isKnown && (!normalized || isHiddenSelection);
+  let html = `<option disabled ${shouldSelectDefault ? 'selected' : ''}>Assign HR Lead</option>`;
+  visibleHrUsers.forEach((user) => {
     const email = user.email_vintti;
-    const selected = (isKnown && email === normalized) ? 'selected' : '';
+    const selected = normalized && email === normalized ? 'selected' : '';
     html += `<option value="${email}" ${selected}>${escapeHtml(user.user_name)}</option>`;
   });
+
+  if (normalized && !isKnown && !isHiddenSelection) {
+    const fallbackLabel = displayNameForHR(normalized) || prettyNameFromEmail(normalized);
+    if (fallbackLabel && fallbackLabel !== 'Assign HR Lead') {
+      html += `<option value="${normalized}" selected>${escapeHtml(fallbackLabel)}</option>`;
+    }
+  }
   return html;
 };
 
@@ -1038,6 +1048,7 @@ function nameToEmail(label, isHR){
     if (lower.includes('bahia'))   return 'bahia@vintti.com';
     if (lower.includes('lara'))    return 'lara@vintti.com';
     if (lower.includes('agustin')) return 'agustin@vintti.com';
+    if (lower.includes('mariano')) return 'mariano@vintti.com';
   }
 
   return '';
