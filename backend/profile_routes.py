@@ -126,6 +126,25 @@ def _normalize_avatar_url(raw: Optional[Any]) -> Optional[str]:
         raise ValueError("avatar_url must be an http(s) URL")
     return value
 
+def _initials_from_name(name: Optional[Any]) -> str:
+    text = str(name or "").strip()
+    if not text:
+        return ""
+    parts = [p for p in text.split() if p]
+    if not parts:
+        return ""
+    first = parts[0][0] if parts[0] else ""
+    if len(parts) > 1 and parts[-1]:
+        second = parts[-1][0]
+    else:
+        second = parts[0][1] if len(parts[0]) > 1 else ""
+    return (first + (second or "")).upper()
+
+def _add_initials(row: Dict[str, Any], name_key: str = "user_name") -> Dict[str, Any]:
+    if isinstance(row, dict):
+        row["initials"] = _initials_from_name(row.get(name_key))
+    return row
+
 # ---------- USERS ----------
 @users_bp.get("/users/<int:user_id>")
 def get_user(user_id: int):
@@ -147,7 +166,7 @@ def get_user(user_id: int):
         row = cur.fetchone()
     conn.close()
     if not row: return jsonify({"error":"user not found"}), 404
-    return jsonify(_row_to_json(dict(row)))
+    return jsonify(_add_initials(_row_to_json(dict(row))))
 
 @users_bp.patch("/users/<int:user_id>")
 def update_user(user_id: int):
@@ -223,7 +242,7 @@ def me():
         row = cur.fetchone()
     conn.close()
     if not row: return jsonify({"error":"not found"}), 404
-    return jsonify(_row_to_json(dict(row)))
+    return jsonify(_add_initials(_row_to_json(dict(row))))
 
 @bp.get("/leader/time_off_requests")
 def leader_list_timeoff():
@@ -267,7 +286,10 @@ def leader_list_timeoff():
         """, (leader_id,))
         rows = cur.fetchall()
     conn.close()
-    return jsonify([_row_to_json(dict(r)) for r in rows])
+    payload = []
+    for r in rows:
+        payload.append(_add_initials(_row_to_json(dict(r))))
+    return jsonify(payload)
 
 
 @bp.patch("/leader/time_off_requests/<int:req_id>")
@@ -499,7 +521,10 @@ def list_users():
             cur.execute("SELECT * FROM users")
         rows = cur.fetchall()
     conn.close()
-    return jsonify(rows)
+    payload = []
+    for row in rows:
+        payload.append(_add_initials(_row_to_json(dict(row))))
+    return jsonify(payload)
 
 @bp.post("/time_off_requests")
 def create_time_off():

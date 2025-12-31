@@ -647,11 +647,6 @@ function updateRowSalesLead(rowEl, email, displayName) {
   return meta;
 }
 
-// Quick UI repaint of the manager cell
-function paintManagerCell(rowEl, email) {
-  updateRowSalesLead(rowEl, email, email);
-}
-
 async function assignManagersFromStatus(summary = {}, rowById = new Map(), onProgress) {
   if (!summary || !rowById) return 0;
   const tasks = [];
@@ -1090,24 +1085,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initCrmFilterControls();
   loadSalesLeadFilterOptions();
   updateCrmEmptyState(null);
+  toggleCrmLoading(true, 'Loading CRM accounts…');
 
-  // Filters panel toggle
-  const toggleButton = document.getElementById('toggleFilters');
-  const filtersCard = document.getElementById('filtersCard');
-  if (toggleButton && filtersCard) {
-    toggleButton.addEventListener('click', () => {
-      const expanded = filtersCard.classList.contains('expanded');
-      filtersCard.classList.toggle('expanded', !expanded);
-      filtersCard.classList.toggle('hidden', expanded);
-      toggleButton.textContent = expanded ? '🔍 Filters' : '❌ Close Filters';
-      toggleButton.setAttribute('aria-expanded', String(!expanded));
-    });
-  }
+  (async function loadCrmAccounts() {
+    try {
+      const res = await fetch(`${API_BASE}/data/light`);
+      const data = await res.json();
 
-  // Fetch and render accounts (light dataset)
-  fetch(`${API_BASE}/data/light`)
-    .then(res => res.json())
-    .then(async (data) => {
       if ($.fn.DataTable.isDataTable('#accountTable')) {
         $('#accountTable').DataTable().destroy();
         accountTableInstance = null;
@@ -1119,22 +1103,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!Array.isArray(data) || data.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="7">No data found</td></tr>';
+        populateContractFilter([]);
+        populateStatusFilter([]);
+        toggleCrmLoading(false);
         return;
       }
 
       const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase().trim();
       const showPriorityColumn = allowedEmails.includes(currentUserEmail);
 
-      // Fast rows render in a single innerHTML
       const rowsHtml = data.map(item => {
         const contractTxt = item.contract || '<span class="placeholder">No hires yet</span>';
         const trrTxt = fmtMoney(item.trr) || '<span class="placeholder">$0</span>';
         const tsfTxt = fmtMoney(item.tsf) || '<span class="placeholder">$0</span>';
         const tsrTxt = fmtMoney(item.tsr) || '<span class="placeholder">$0</span>';
         const priorityRaw   = (item.priority || '').toString().trim();
-        const priorityUpper = priorityRaw.toUpperCase();   // 'a ' -> 'A'
+        const priorityUpper = priorityRaw.toUpperCase();
         const priorityClass = priorityUpper
-          ? 'priority-' + priorityUpper.toLowerCase()      // 'A' -> 'priority-a'
+          ? 'priority-' + priorityUpper.toLowerCase()
           : 'priority-empty';
         return `
           <tr data-id="${item.account_id}">
@@ -1182,20 +1168,17 @@ document.addEventListener('DOMContentLoaded', () => {
       populateContractFilter(Array.from(contractLabels));
       augmentSalesLeadFilterWithData(data);
 
-      // Ensure column header name
       const th3 = document.querySelector('#accountTable thead tr th:nth-child(3)');
       if (th3) th3.textContent = 'Sales Lead';
 
-      // Add header "Priority" if visible
       if (showPriorityColumn) {
         const th = document.createElement('th');
         th.textContent = 'Priority';
         document.querySelector('#accountTable thead tr').appendChild(th);
       }
 
-      // Row navigation (ignore clicks on interactive controls)
-      const $tbody = document.getElementById('accountTableBody');
-      $tbody.addEventListener('click', (e) => {
+      const tbodyEl = tableBody;
+      tbodyEl.addEventListener('click', (e) => {
         if (e.target.closest('select.priority-select, option, input, button, a, label')) return;
         const row = e.target.closest('tr[data-id]');
         if (!row) return;
@@ -1204,110 +1187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = `account-details.html?id=${id}`;
         window.open(url, '_blank', 'noopener,noreferrer');
       });
-      // Stop bubbling when opening the priority select
-      $tbody.addEventListener('mousedown', (e) => {
+      tbodyEl.addEventListener('mousedown', (e) => {
         if (e.target.closest('select.priority-select')) e.stopPropagation();
       });
 
-      // Show progress toast (reserve +1 tick for final draw)
-      showSortToast(ids.length + 1);
+      const statusWorkflowPromise = kickoffCrmStatusPipeline({ ids, rowById });
 
-      // Compute & paint statuses (with progress)
-      const summary = await computeAndPaintAccountStatuses({
-        ids,
-        rowById,
-        onProgress: (inc) => updateSortToast(inc)
-      });
-
-      const statusLabels = new Set();
-      ids.forEach(id => {
-        const status = summary?.[id]?.status || '—';
-        if (status && status !== '—') statusLabels.add(status);
-      });
-      populateStatusFilter(Array.from(statusLabels));
-
-      // Auto-assign managers by status (Active/Lead in Process)
-await (async function assignManagersFromStatus() {
-  const tasks = [];
-
-  for (const [idStr, obj] of Object.entries(summary || {})) {
-    const accountId = Number(idStr);
-    const status = (obj?.status || '').toLowerCase().trim();
-
-    // 1) Active client -> fijo como antes
-    if (status === 'active client') {
-      const targetEmail = 'lara@vintti.com';
-      const row = rowById.get(accountId);
-
-      const currentCellEmail = (() => {
-        if (!row) return '';
-        const hiddenName = row.querySelector('.sales-lead-cell .sr-only');
-        return (hiddenName?.textContent || '').toLowerCase().trim();
-      })();
-
-      if (currentCellEmail !== targetEmail) {
-        tasks.push(async () => {
-          try {
-            await patchAccountManager(accountId, targetEmail);
-            paintManagerCell(row, targetEmail);
-          } catch (e) {
-            console.warn(`⚠️ Could not assign manager to ${accountId}:`, e);
-          } finally {
-            updateSortToast(1);
-          }
-        });
-      }
-      continue;
-    }
-
-    // 2) Lead in process -> mayoría de opp_sales_lead
-    if (status === 'lead in process') {
-      const row = rowById.get(accountId);
-
-      tasks.push(async () => {
-        try {
-          const r = await fetch(`${API_BASE}/accounts/${accountId}/sales-lead/suggest`);
-          const json = r.ok ? await r.json() : null;
-          const suggested = (json?.suggested_sales_lead || '').toLowerCase().trim();
-
-          if (!suggested) return; // si no hay opp_sales_lead en opps, no asigna
-
-          const currentCellEmail = (() => {
-            if (!row) return '';
-            const hiddenName = row.querySelector('.sales-lead-cell .sr-only');
-            return (hiddenName?.textContent || '').toLowerCase().trim();
-          })();
-
-          if (currentCellEmail === suggested) return;
-
-          await patchAccountManager(accountId, suggested);
-          paintManagerCell(row, suggested);
-
-        } catch (e) {
-          console.warn(`⚠️ Could not assign majority sales lead to ${accountId}:`, e);
-        } finally {
-          updateSortToast(1);
-        }
-      });
-
-      continue;
-    }
-  }
-
-  if (tasks.length) await runWithConcurrency(tasks, 6);
-})();
-
-      // Initialize DataTable (hook first draw to finish progress)
-      let _finalized = false;
-      const finalizeToast = () => {
-        if (_finalized) return;
-        _finalized = true;
-        updateSortToast(1);
-        setTimeout(hideSortToast, 400);
-      };
       const $tbl = $('#accountTable');
-      $tbl.one('draw.dt', finalizeToast);
-
       const table = $tbl.DataTable({
         responsive: true,
         pageLength: 50,
@@ -1318,12 +1204,22 @@ await (async function assignManagersFromStatus() {
         language: {
           search: "🔍 Buscar:",
           lengthMenu: "Mostrar _MENU_ registros por página",
-          zeroRecords: "",
-          emptyTable: "",
-          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-          paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
+          paginate: {
+            previous: "Anterior",
+            next: "Siguiente"
+          }
         },
-        initComplete: finalizeToast
+        initComplete() {
+          accountTableInstance = this.api();
+          updateCrmEmptyState(accountTableInstance);
+          toggleCrmLoading(false);
+          statusWorkflowPromise.then(({ assignments, summary }) => {
+            if (accountTableInstance) {
+              accountTableInstance.rows().invalidate('dom');
+              accountTableInstance.order([1, 'asc']).draw(false);
+            }
+          });
+        }
       });
 
       accountTableInstance = table;
@@ -1331,12 +1227,10 @@ await (async function assignManagersFromStatus() {
       $tbl.on('draw.dt', () => updateCrmEmptyState(table));
       updateCrmEmptyState(table);
 
-      // Move length menu to custom container
       const lengthMenu = document.querySelector('#accountTable_length');
-      const customLengthContainer = document.getElementById('datatable-length-container');
+      const customLengthContainer = document.getElementById('dataTablesLengthTarget');
       if (lengthMenu && customLengthContainer) customLengthContainer.appendChild(lengthMenu);
 
-      // Single, deduplicated client-name search
       const clientSearchInput = document.getElementById('searchClientInput');
       if (clientSearchInput) {
         clientSearchInput.addEventListener('input', function () {
@@ -1344,8 +1238,7 @@ await (async function assignManagersFromStatus() {
         });
       }
 
-      // Priority change (delegated)
-      document.getElementById('accountTableBody').addEventListener('change', async (e) => {
+      tbodyEl.addEventListener('change', async (e) => {
         const select = e.target.closest('.priority-select');
         if (!select) return;
 
@@ -1369,10 +1262,11 @@ await (async function assignManagersFromStatus() {
           console.error('❌ Error updating priority:', error);
         }
       });
-    })
-    .catch(err => {
+    } catch (err) {
       console.error('Error fetching account data:', err);
-    });
+      toggleCrmLoading(false);
+    }
+  })();
 
   /* ---------- New account form (create) ---------- */
   const form = document.querySelector('.popup-form');

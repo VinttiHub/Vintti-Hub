@@ -140,6 +140,11 @@ function initialsFromName(name=""){
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   return (parts[0]?.[0]||"").toUpperCase() + (parts[1]?.[0]||"").toUpperCase();
 }
+function resolveInitials(name="", provided=""){
+  const clean = String(provided || "").trim();
+  if (clean) return clean.toUpperCase();
+  return initialsFromName(name);
+}
 // ===== Team PTO (helpers) =====
 const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
 const ADMIN_ALLOWED_EMAILS = new Set([
@@ -483,20 +488,20 @@ function openUserQuick(){ const m = $("#userQuickModal"); m?.classList.add("acti
 function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
 
 // Avatar for quick card
-function setQuickAvatar({ user_name, avatar_url }){
+function setQuickAvatar({ user_name, avatar_url, initials }){
   const img = $("#uqAvatarImg");
   const ini = $("#uqAvatarInitials");
   if (!img || !ini) return;
 
-  const initials = initialsFromName(user_name) || "";
+  const resolved = resolveInitials(user_name, initials);
   const showInitials = ()=>{
     img.style.display = "none";
     img.removeAttribute("src");
     ini.style.display = "grid";
-    ini.textContent = initials;
+    ini.textContent = resolved;
   };
 
-  ini.textContent = initials;
+  ini.textContent = resolved;
 
   const trimmed = typeof avatar_url === "string" ? avatar_url.trim() : "";
   if (trimmed){
@@ -551,7 +556,7 @@ function renderUserQuick(u){
   const holTotal = 2;
   $("#uqHolTotal").textContent = String(holTotal);
 
-  setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url });
+  setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials });
 }
 
 // Click on a name → fetch + open
@@ -616,6 +621,7 @@ async function loadTeamPto(){
       fecha_nacimiento: u.fecha_nacimiento,
       ingreso_vintti_date: u.ingreso_vintti_date,
       avatar_url: u.avatar_url,
+      initials: u.initials,
 
       // Vacation
       vacaciones_acumuladas: u.vacaciones_acumuladas,
@@ -689,7 +695,7 @@ function hydrateAvatarImages(root){
     const fallback = img.nextElementSibling;
     const showFallback = ()=>{
       img.style.display = "none";
-      if (fallback) fallback.style.display = "block";
+      if (fallback) fallback.style.display = "grid";
     };
     img.onload = ()=>{
       img.style.display = "block";
@@ -750,24 +756,24 @@ const headerHistory = `
     });
   }
 
-  function avatarMarkup(name, avatarUrl){
-    const initials = initialsFromName(name || "") || "";
+  function avatarMarkup(name, avatarUrl, initials){
+    const fallback = resolveInitials(name || "", initials);
     if (!avatarUrl){
-      return `<div class="avatar-min">${esc(initials)}</div>`;
+      return `<div class="avatar-min">${esc(fallback)}</div>`;
     }
     const safeUrl = esc(avatarUrl);
     const safeName = esc(name || "User avatar");
-    const safeInitials = esc(initials);
+    const safeInitials = esc(fallback);
     return `
       <div class="avatar-min">
-        <img data-avatar-img src="${safeUrl}" alt="${safeName}" loading="lazy" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />
+        <img data-avatar-img class="avatar-img" src="${safeUrl}" alt="${safeName}" loading="lazy" />
         <span class="avatar-fallback" aria-hidden="true" style="display:none;">${safeInitials}</span>
       </div>
     `;
   }
 
 function buildRow(r, withActions){
-  const avatar = avatarMarkup(r.user_name, r.avatar_url);
+  const avatar = avatarMarkup(r.user_name, r.avatar_url, r.initials);
 
   const startLbl = fmtDateShort(r.start_date);
   const endLbl   = fmtDateShort(r.end_date);
@@ -1226,20 +1232,20 @@ async function api(path, opts={}){
   });
 }
 
-function setAvatar({ user_name, avatar_url }){
+function setAvatar({ user_name, avatar_url, initials }){
   const img = $("#avatarImg");
   const ini = $("#avatarInitials");
   if (!img || !ini) return;
 
-  const initials = initialsFromName(user_name) || "";
+  const resolved = resolveInitials(user_name, initials);
   const showInitials = ()=>{
     img.style.display = "none";
     img.removeAttribute("src");
-    ini.style.display = "block";
-    ini.textContent = initials;
+    ini.style.display = "grid";
+    ini.textContent = resolved;
   };
 
-  ini.textContent = initials;
+  ini.textContent = resolved;
 
   const trimmed = typeof avatar_url === "string" ? avatar_url.trim() : "";
   if (trimmed){
@@ -1356,7 +1362,7 @@ async function loadMe(uid){
   $("#ingreso_vintti_date").value = toInputDate(me.ingreso_vintti_date);
   $("#fecha_nacimiento").value = toInputDate(me.fecha_nacimiento);
 
-  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url });
+  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url, initials: me.initials });
 }
 
 // ——— Time Off: listar ———
@@ -1656,7 +1662,8 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       emergency_contact: payload.emergency_contact,
       ingreso_vintti_date: payload.ingreso_vintti_date,
       fecha_nacimiento: payload.fecha_nacimiento,
-      avatar_url: payload.avatar_url
+      avatar_url: payload.avatar_url,
+      initials: resolveInitials(payload.user_name)
     };
     renderProfileView(PROFILE_CACHE);
   }catch(err){
@@ -1735,7 +1742,7 @@ function renderProfileView(me){
   $("#v_birth")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.fecha_nacimiento)));
 
   // Avatar
-  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url });
+  setAvatar({ user_name: me.user_name, avatar_url: me.avatar_url, initials: me.initials });
 }
 
 function showProfileView(){
@@ -1765,7 +1772,8 @@ async function loadMe(uid){
     emergency_contact: me.emergency_contact || "",
     ingreso_vintti_date: me.ingreso_vintti_date || null, // RAW
     fecha_nacimiento: me.fecha_nacimiento || null,       // RAW
-    avatar_url: me.avatar_url || null
+    avatar_url: me.avatar_url || null,
+    initials: resolveInitials(me.user_name, me.initials)
   };
 
   // Inputs con formato input-date
@@ -1823,7 +1831,8 @@ PROFILE_CACHE = {
   // guardamos las fechas como las entrega el <input type="date"> (YYYY-MM-DD)
   ingreso_vintti_date: $("#ingreso_vintti_date").value || null,
   fecha_nacimiento: $("#fecha_nacimiento").value || null,
-  avatar_url: (_avatarFieldInit ? _avatarFieldInit.value.trim() : "") || null
+  avatar_url: (_avatarFieldInit ? _avatarFieldInit.value.trim() : "") || null,
+  initials: resolveInitials($("#user_name").value.trim())
 };
 
 // Repinta tarjeta y vuelve a modo vista

@@ -8,6 +8,30 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    .avatar-img{
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 6px 16px rgba(15,23,42,0.18);
+      background: #f8fafc;
+    }
+    .avatar-min .avatar-img,
+    .quick-avatar .avatar-img{
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .avatar-fallback{
+      display: none;
+      width: 100%;
+      height: 100%;
+      font-weight: 800;
+      color: white;
+      letter-spacing: .5px;
+    }
+  </style>
 
 </head>
 <body>
@@ -80,7 +104,7 @@
         <div class="card header-card">
           <div class="header-left">
             <div class="avatar" id="avatar">
-              <img id="avatarImg" alt="User avatar" />
+              <img id="avatarImg" class="avatar-img" alt="User avatar" />
               <span id="avatarInitials" aria-hidden="true"></span>
             </div>
             <div class="who">
@@ -488,7 +512,7 @@
 
     <div class="quick-body">
       <div class="quick-avatar">
-        <img id="uqAvatarImg" alt="User avatar" />
+        <img id="uqAvatarImg" class="avatar-img" alt="User avatar" />
         <span id="uqAvatarInitials" aria-hidden="true"></span>
       </div>
 
