@@ -140,6 +140,34 @@
       />
     </div>
 
+    <section class="crm-filters-wrapper" aria-label="Table filters">
+      <button type="button" class="filters-toggle-btn" id="toggleFilters" aria-expanded="false">
+        🔍 Filters
+      </button>
+      <div class="filters-card hidden" id="filtersCard">
+        <div class="filters-grid">
+          <label class="filter-field">
+            <span>Sales Lead</span>
+            <select id="salesLeadFilter" data-filter-key="salesLead" aria-label="Filter by Sales Lead">
+              <option value="">All Sales Leads</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Status</span>
+            <select id="statusFilter" data-filter-key="status" aria-label="Filter by Status">
+              <option value="">All Statuses</option>
+            </select>
+          </label>
+          <label class="filter-field">
+            <span>Contract</span>
+            <select id="contractFilter" data-filter-key="contract" aria-label="Filter by Contract">
+              <option value="">All Contracts</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </section>
+
     <!-- Accounts table (DataTables enhances this) -->
     <table id="accountTable">
       <thead>
@@ -155,6 +183,9 @@
       </thead>
       <tbody id="accountTableBody"><!-- rows rendered by JS --></tbody>
     </table>
+    <p id="crmEmptyState" class="crm-empty-state" role="status" aria-live="polite">
+      No results match these filters.
+    </p>
   </div>
 
   <!-- ====================== POPUP (Create Account) ====================== -->

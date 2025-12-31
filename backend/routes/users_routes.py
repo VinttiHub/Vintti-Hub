@@ -55,3 +55,42 @@ def users_list_or_by_email():
         import traceback
         print(traceback.format_exc())
         return jsonify({"error": str(exc)}), 500
+
+
+def _list_users_by_role(role_type: str):
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    u.user_id,
+                    u.user_name,
+                    u.email_vintti,
+                    ur.role_type
+                FROM user_roles ur
+                JOIN users u ON u.user_id = ur.user_id
+                LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                WHERE ur.role_type = %s
+                  AND COALESCE(aua.is_active, TRUE)
+                ORDER BY LOWER(u.user_name), LOWER(u.email_vintti)
+                """,
+                (role_type,),
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify(rows)
+    except Exception as exc:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/users/recruiters')
+def list_recruiters():
+    return _list_users_by_role('recruiter')
+
+
+@bp.route('/users/sales-leads')
+def list_sales_leads():
+    return _list_users_by_role('sales_lead')

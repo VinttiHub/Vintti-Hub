@@ -15,6 +15,12 @@ const allowedEmails = [
   'lara@vintti.com','agostina@vintti.com', 'mariano@vintti.com'
 ];
 
+const CRM_UNASSIGNED_SALES_LEAD_VALUE = '__unassigned__';
+const CRM_FILTER_STATE = { salesLead: '', status: '', contract: '' };
+const CRM_SALES_LEAD_OPTIONS = new Map();
+let accountTableInstance = null;
+let crmDataTableFilterRegistered = false;
+
 /* =========================
    1) Generic helpers
    ========================= */
@@ -93,6 +99,203 @@ function statusRank(statusText){
   if (s === 'inactive client') return 3;
   if (s === 'lead lost')       return 4;
   return 5;
+}
+
+function initCrmFilterControls() {
+  document
+    .querySelectorAll('select[data-filter-key]')
+    .forEach(select => {
+      const key = select.dataset.filterKey;
+      if (!key || !(key in CRM_FILTER_STATE)) return;
+      select.value = '';
+      select.addEventListener('change', handleCrmFilterChange);
+    });
+  renderSalesLeadOptions();
+}
+
+function handleCrmFilterChange(event) {
+  const select = event?.currentTarget || event?.target;
+  const key = select?.dataset?.filterKey;
+  if (!key || !(key in CRM_FILTER_STATE)) return;
+  CRM_FILTER_STATE[key] = select.value;
+  if (accountTableInstance) {
+    accountTableInstance.draw();
+    updateCrmEmptyState(accountTableInstance);
+  }
+}
+
+function registerAccountTableFilters(table) {
+  if (crmDataTableFilterRegistered) return;
+  $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
+    if (!settings?.nTable || settings.nTable.id !== 'accountTable') return true;
+    const api = new $.fn.dataTable.Api(settings);
+    const row = api.row(dataIndex).node();
+    if (!row) return true;
+    return doesRowMatchCrmFilters(row);
+  });
+  crmDataTableFilterRegistered = true;
+}
+
+function doesRowMatchCrmFilters(row) {
+  const ds = row?.dataset || {};
+  if (CRM_FILTER_STATE.salesLead) {
+    const code = ds.salesLeadCode || CRM_UNASSIGNED_SALES_LEAD_VALUE;
+    if (code !== CRM_FILTER_STATE.salesLead) return false;
+  }
+  if (CRM_FILTER_STATE.status) {
+    const statusCode = ds.statusCode || '';
+    if (statusCode !== CRM_FILTER_STATE.status) return false;
+  }
+  if (CRM_FILTER_STATE.contract) {
+    const contractCode = ds.contractCode || '';
+    if (contractCode !== CRM_FILTER_STATE.contract) return false;
+  }
+  return true;
+}
+
+function updateCrmEmptyState(table) {
+  const emptyState = document.getElementById('crmEmptyState');
+  if (!emptyState) return;
+  if (!table) {
+    emptyState.classList.remove('visible');
+    return;
+  }
+  const visibleRows = table.rows({ filter: 'applied' }).data().length;
+  emptyState.classList.toggle('visible', visibleRows === 0);
+}
+
+function createOption(value, label) {
+  const opt = document.createElement('option');
+  opt.value = value;
+  opt.textContent = label;
+  return opt;
+}
+
+function renderSalesLeadOptions() {
+  const select = document.getElementById('salesLeadFilter');
+  if (!select) return;
+  const prevValue = select.value;
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(createOption('', 'All Sales Leads'));
+  fragment.appendChild(createOption(CRM_UNASSIGNED_SALES_LEAD_VALUE, 'Unassigned'));
+  const entries = Array.from(CRM_SALES_LEAD_OPTIONS.entries())
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  entries.forEach(([value, label]) => {
+    fragment.appendChild(createOption(value, label || value));
+  });
+  select.replaceChildren(fragment);
+
+  const desired = CRM_FILTER_STATE.salesLead || prevValue;
+  const hasDesired = Array.from(select.options).some(opt => opt.value === desired);
+  select.value = hasDesired ? desired : (CRM_FILTER_STATE.salesLead || '');
+}
+
+function upsertSalesLeadOption(value, label) {
+  const key = (value || '').toLowerCase().trim();
+  if (!key) return false;
+  const display = (label || '').trim() || value;
+  const prev = CRM_SALES_LEAD_OPTIONS.get(key);
+  if (prev === display) return false;
+  CRM_SALES_LEAD_OPTIONS.set(key, display);
+  return true;
+}
+
+async function loadSalesLeadFilterOptions() {
+  renderSalesLeadOptions();
+  try {
+    const res = await fetch(`${API_BASE}/users/sales-leads`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    let added = false;
+    (Array.isArray(payload) ? payload : []).forEach(lead => {
+      const email = (lead?.email || lead?.email_vintti || '').toLowerCase().trim();
+      const name = (lead?.user_name || lead?.name || '').trim();
+      if (email) added = upsertSalesLeadOption(email, name || email) || added;
+    });
+    if (added) renderSalesLeadOptions();
+  } catch (err) {
+    console.warn('⚠️ Could not load sales lead list:', err);
+  }
+}
+
+function augmentSalesLeadFilterWithData(items = []) {
+  let added = false;
+  for (const item of items) {
+    const meta = deriveSalesLeadMeta(item);
+    if (!meta || !meta.code || meta.code === CRM_UNASSIGNED_SALES_LEAD_VALUE) continue;
+    added = upsertSalesLeadOption(meta.code, meta.label) || added;
+  }
+  if (added) renderSalesLeadOptions();
+}
+
+function deriveSalesLeadMeta(item = {}) {
+  const email = (item.account_manager || '').toString().toLowerCase().trim();
+  const name = (item.account_manager_name || '').toString().trim();
+  if (email) {
+    return { code: email, label: name || item.account_manager || email };
+  }
+  if (name) {
+    return { code: `name:${norm(name)}`, label: name };
+  }
+  return { code: CRM_UNASSIGNED_SALES_LEAD_VALUE, label: 'Unassigned' };
+}
+
+function decorateRowFilterMeta(row, item) {
+  if (!row) return null;
+  const contractLabel = deriveContractLabel(item?.contract);
+  row.dataset.contractLabel = contractLabel;
+  row.dataset.contractCode = norm(contractLabel);
+
+  const leadMeta = deriveSalesLeadMeta(item);
+  row.dataset.salesLeadLabel = leadMeta.label;
+  row.dataset.salesLeadCode = leadMeta.code;
+
+  row.dataset.statusLabel = row.dataset.statusLabel || '';
+  row.dataset.statusCode = row.dataset.statusCode || '';
+  return { contractLabel, leadMeta };
+}
+
+function deriveContractLabel(contractRaw) {
+  const txt = (contractRaw || '').toString().trim();
+  return txt || 'No Contract';
+}
+
+function populateContractFilter(values = []) {
+  const select = document.getElementById('contractFilter');
+  if (!select) return;
+  const prev = select.value;
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(createOption('', 'All Contracts'));
+  Array.from(new Set(values))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(label => {
+      fragment.appendChild(createOption(norm(label), label));
+    });
+  select.replaceChildren(fragment);
+
+  const desired = CRM_FILTER_STATE.contract || prev;
+  const hasDesired = Array.from(select.options).some(opt => opt.value === desired);
+  select.value = hasDesired ? desired : (CRM_FILTER_STATE.contract || '');
+}
+
+function populateStatusFilter(values = []) {
+  const select = document.getElementById('statusFilter');
+  if (!select) return;
+  const prev = select.value;
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(createOption('', 'All Statuses'));
+  Array.from(new Set(values))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach(label => {
+      fragment.appendChild(createOption(norm(label), label));
+    });
+  select.replaceChildren(fragment);
+
+  const desired = CRM_FILTER_STATE.status || prev;
+  const hasDesired = Array.from(select.options).some(opt => opt.value === desired);
+  select.value = hasDesired ? desired : (CRM_FILTER_STATE.status || '');
 }
 
 /* =========================
@@ -769,6 +972,9 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
    ========================= */
 
 document.addEventListener('DOMContentLoaded', () => {
+  initCrmFilterControls();
+  loadSalesLeadFilterOptions();
+  updateCrmEmptyState(null);
 
   // Filters panel toggle
   const toggleButton = document.getElementById('toggleFilters');
@@ -779,6 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
       filtersCard.classList.toggle('expanded', !expanded);
       filtersCard.classList.toggle('hidden', expanded);
       toggleButton.textContent = expanded ? '🔍 Filters' : '❌ Close Filters';
+      toggleButton.setAttribute('aria-expanded', String(!expanded));
     });
   }
 
@@ -844,6 +1051,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
       tableBody.innerHTML = rowsHtml;
 
+      const rowById = new Map(
+        [...document.querySelectorAll('#accountTableBody tr')].map(r => [Number(r.dataset.id), r])
+      );
+      const ids = data.map(x => Number(x.account_id)).filter(Boolean);
+
+      const contractLabels = new Set();
+      data.forEach(item => {
+        const row = rowById.get(Number(item.account_id));
+        const meta = decorateRowFilterMeta(row, item);
+        if (meta?.contractLabel) contractLabels.add(meta.contractLabel);
+      });
+      populateContractFilter(Array.from(contractLabels));
+      augmentSalesLeadFilterWithData(data);
+
       // Ensure column header name
       const th3 = document.querySelector('#accountTable thead tr th:nth-child(3)');
       if (th3) th3.textContent = 'Sales Lead';
@@ -872,8 +1093,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Show progress toast (reserve +1 tick for final draw)
-      const ids = data.map(x => Number(x.account_id)).filter(Boolean);
-      const rowById = new Map([...document.querySelectorAll('#accountTableBody tr')].map(r => [Number(r.dataset.id), r]));
       showSortToast(ids.length + 1);
 
       // Compute & paint statuses (with progress)

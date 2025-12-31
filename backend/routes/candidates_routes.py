@@ -138,6 +138,25 @@ def _get_blacklist_columns(conn):
         cur.close()
 
 
+def _has_blacklist_linkedin_normalized(conn):
+    if conn is None:
+        return False
+    try:
+        columns = _get_blacklist_columns(conn)
+    except Exception:
+        return False
+    return 'linkedin_normalized' in columns
+
+
+def _blacklist_linkedin_source_expr(has_linkedin_normalized, table_alias=None):
+    prefix = f"{table_alias}." if table_alias else ""
+    base_column = f"{prefix}linkedin"
+    if has_linkedin_normalized:
+        normalized_column = f"{prefix}linkedin_normalized"
+        return f"COALESCE(NULLIF(BTRIM({normalized_column}), ''), {base_column})"
+    return base_column
+
+
 def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm):
     columns = _get_blacklist_columns(conn)
     insert_columns = []
@@ -164,13 +183,16 @@ def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm):
 def _find_blacklist_match(cursor, candidate_id, linkedin_value, fallback_to_candidate_id=False):
     linkedin_norm = _normalize_linkedin(linkedin_value)
     match = None
+    conn = getattr(cursor, 'connection', None)
+    has_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
+    linkedin_source_sql = _blacklist_linkedin_source_expr(has_linkedin_normalized)
 
     if linkedin_norm:
         cursor.execute(
             f"""
             SELECT *
             FROM blacklist
-            WHERE {_linkedin_normalize_sql('linkedin')} = %s
+            WHERE {_linkedin_normalize_sql(linkedin_source_sql)} = %s
             LIMIT 1
             """,
             (linkedin_norm,)
@@ -197,8 +219,10 @@ def get_candidates_light():
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
+        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
         c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_linkedin_norm = _linkedin_normalize_sql('b.linkedin')
+        b_linkedin_source = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized, 'b')
+        b_linkedin_norm = _linkedin_normalize_sql(b_linkedin_source)
         cursor.execute(f"""
             WITH normalized_candidates AS (
               SELECT
@@ -266,8 +290,10 @@ def get_candidates():
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
+        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
         c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_linkedin_norm = _linkedin_normalize_sql('b.linkedin')
+        b_linkedin_source = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized, 'b')
+        b_linkedin_norm = _linkedin_normalize_sql(b_linkedin_source)
         cur.execute(f"""
             WITH normalized_candidates AS (
               SELECT
@@ -349,13 +375,15 @@ def create_candidate_without_opportunity():
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
 
         if linkedin_normalized:
+            linkedin_source_sql = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized)
             cursor.execute(
                 f"""
                 SELECT blacklist_id, candidate_id, name, linkedin
                 FROM blacklist
-                WHERE {_linkedin_normalize_sql('linkedin')} = %s
+                WHERE {_linkedin_normalize_sql(linkedin_source_sql)} = %s
                 LIMIT 1
                 """,
                 (linkedin_normalized,)
@@ -1425,7 +1453,7 @@ def get_candidates_light_fast():
         has_normalized_column = 'linkedin_normalized' in blacklist_columns
 
         c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_column = 'b.linkedin_normalized' if has_normalized_column else 'b.linkedin'
+        b_column = _blacklist_linkedin_source_expr(has_normalized_column, 'b')
         b_linkedin_norm = _linkedin_normalize_sql(b_column)
 
         params = [blacklist_filter, blacklist_filter, blacklist_filter]

@@ -5,7 +5,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Set
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
@@ -71,6 +71,73 @@ def _friendly_error(message: str, status: int = 400):
     return jsonify({"error": message}), status
 
 
+ROLE_KEYWORDS = {
+    "recruiter": {"recruiter", "talent_acquisition", "talent_acquisition_recruiter", "hr_lead", "hrlead"},
+    "sales_lead": {"sales_lead", "saleslead", "sales_lead_team"},
+}
+
+
+def _canonical_role_slug(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    cleaned = (
+        str(value)
+        .strip()
+        .lower()
+        .replace("-", "_")
+        .replace("/", "_")
+    )
+    cleaned = "_".join(piece for piece in cleaned.split())
+    if not cleaned:
+        return None
+    for slug, keywords in ROLE_KEYWORDS.items():
+        if cleaned in keywords:
+            return slug
+    if "recruit" in cleaned:
+        return "recruiter"
+    if "sales_lead" in cleaned or "saleslead" in cleaned:
+        return "sales_lead"
+    return None
+
+
+def _detect_user_roles(payload: dict) -> Set[str]:
+    detected: Set[str] = set()
+    roles_field = payload.get("roles")
+    if isinstance(roles_field, list):
+        for value in roles_field:
+            slug = _canonical_role_slug(value)
+            if slug:
+                detected.add(slug)
+
+    if _as_bool(payload.get("is_recruiter"), False) or _as_bool(payload.get("is_hr_lead"), False):
+        detected.add("recruiter")
+    if _as_bool(payload.get("is_sales_lead"), False):
+        detected.add("sales_lead")
+
+    free_text_role = (payload.get("role") or "").lower()
+    if free_text_role:
+        if "recruit" in free_text_role or "talent acquisition" in free_text_role or "hr lead" in free_text_role:
+            detected.add("recruiter")
+        if "sales lead" in free_text_role or "saleslead" in free_text_role:
+            detected.add("sales_lead")
+    return detected
+
+
+def _insert_user_roles(cur, user_id: int, roles: Iterable[str]) -> None:
+    unique_roles = sorted({role for role in roles if role in {"recruiter", "sales_lead"}})
+    if not unique_roles:
+        return
+    for role in unique_roles:
+        cur.execute(
+            """
+            INSERT INTO user_roles (user_id, role_type)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id, role_type) DO NOTHING
+            """,
+            (user_id, role),
+        )
+
+
 @bp.post("/users")
 def create_hub_user():
     requester_id = _current_user_id()
@@ -82,6 +149,7 @@ def create_hub_user():
     raw_email = payload.get("email") or payload.get("email_vintti") or ""
     candidate_email = normalize_email(raw_email)
     role = (payload.get("role") or "").strip() or None
+    role_flags = _detect_user_roles(payload)
     send_invite = _as_bool(payload.get("send_invite"), True)
     is_active = _as_bool(payload.get("is_active"), True)
     leader_value = payload.get("leader_user_id") or payload.get("leader_id") or payload.get("lider")
@@ -210,6 +278,9 @@ def create_hub_user():
             new_user = cur.fetchone()
             if not new_user:
                 raise RuntimeError("User insert returned no data")
+
+            if role_flags:
+                _insert_user_roles(cur, int(new_user["user_id"]), role_flags)
 
             cur.execute(
                 """
