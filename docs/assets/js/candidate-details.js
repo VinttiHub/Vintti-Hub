@@ -1065,6 +1065,20 @@ window.updateHireField = async function(field, value) {
     .then(r => r.json())
     .then(data => {
       candidateOverviewData = data;
+      const isBlacklisted = Boolean(data && data.is_blacklisted);
+      if (typeof window.__applyBlacklistState === 'function') {
+        window.__applyBlacklistState({
+          is_blacklisted: isBlacklisted,
+          blacklist_id: data && data.blacklist_id ? data.blacklist_id : null
+        });
+      } else {
+        const statusText = document.getElementById('blacklist-status-text');
+        if (statusText) {
+          statusText.textContent = isBlacklisted
+            ? 'Candidate is currently blacklisted.'
+            : 'Candidate is not blacklisted.';
+        }
+      }
 
 
       updateLinkedInUI(data.linkedin || '');
@@ -1859,7 +1873,8 @@ function wireVideoLinkDedupe() {
 
 (function wireBlacklistToggle(){
   const checkbox = document.getElementById('blacklist-toggle');
-  if (!checkbox) return;
+  const card = document.getElementById('blacklist-card');
+  if (!checkbox || !card) return;
 
   const statusText = document.getElementById('blacklist-status-text');
   const params = new URLSearchParams(window.location.search);
@@ -1873,83 +1888,75 @@ function wireVideoLinkDedupe() {
     return;
   }
 
-  let currentBlacklistId = null;
-  let busy = false;
+  const state = {
+    candidateId,
+    blacklistId: null,
+    isBlacklisted: false,
+    busy: false
+  };
 
-  async function refreshBlacklistStatus(){
-    busy = true;
-    checkbox.disabled = true;
-    checkbox.indeterminate = true;
-    if (statusText) statusText.textContent = 'Checking blacklist status...';
-    try {
-      const resp = await fetch(`${API}/api/blacklist/status?candidate_id=${encodeURIComponent(candidateParam)}`);
-      if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to fetch status'));
-      const payload = await resp.json();
-      currentBlacklistId = payload?.blacklist_id || null;
-      checkbox.checked = Boolean(payload?.is_blacklisted);
-      if (statusText) {
-        statusText.textContent = checkbox.checked
-          ? 'Candidate is currently blacklisted.'
-          : 'Candidate is not blacklisted.';
-      }
-    } catch (err) {
-      console.error('❌ Unable to load blacklist status', err);
-      checkbox.checked = false;
-      if (statusText) statusText.textContent = 'Could not load blacklist status.';
-    } finally {
-      checkbox.indeterminate = false;
-      checkbox.disabled = false;
-      busy = false;
-    }
+  function setStatusMessage(message) {
+    if (statusText) statusText.textContent = message;
   }
 
-  refreshBlacklistStatus();
+  function paintState() {
+    const checked = Boolean(state.isBlacklisted);
+    checkbox.checked = checked;
+    card.classList.toggle('is-blacklisted', checked);
+    card.classList.toggle('not-blacklisted', !checked);
+    setStatusMessage(checked ? 'Candidate is currently blacklisted.' : 'Candidate is not blacklisted.');
+  }
+
+  window.__applyBlacklistState = function applyBlacklistState(payload) {
+    if (!payload) return;
+    state.blacklistId = payload.blacklist_id || null;
+    state.isBlacklisted = Boolean(payload.is_blacklisted);
+    paintState();
+  };
+
+  setStatusMessage('Loading blacklist status...');
 
   checkbox.addEventListener('change', async () => {
-    if (busy) return;
-    const shouldBlacklist = checkbox.checked;
-    busy = true;
-    checkbox.disabled = true;
-    if (statusText) {
-      statusText.textContent = shouldBlacklist
-        ? 'Adding candidate to blacklist...'
-        : 'Removing candidate from blacklist...';
+    if (state.busy) {
+      checkbox.checked = state.isBlacklisted;
+      return;
     }
+    const shouldBlacklist = checkbox.checked;
+    state.busy = true;
+    checkbox.disabled = true;
+    setStatusMessage(shouldBlacklist ? 'Adding candidate to blacklist...' : 'Removing candidate from blacklist...');
 
     try {
       if (shouldBlacklist) {
-        if (!currentBlacklistId) {
+        if (!state.blacklistId) {
           const resp = await fetch(`${API}/api/blacklist`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ candidate_id: candidateId })
+            body: JSON.stringify({ candidate_id: state.candidateId })
           });
           if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to create blacklist entry'));
           const payload = await resp.json();
-          currentBlacklistId = payload?.blacklist_id || currentBlacklistId;
+          state.blacklistId = payload?.blacklist_id || state.blacklistId;
         }
         showCuteToast('Candidate added to blacklist ⚠️', 4000);
-        if (statusText) statusText.textContent = 'Candidate is currently blacklisted.';
+      } else if (state.blacklistId) {
+        const resp = await fetch(`${API}/api/blacklist/${state.blacklistId}`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to delete blacklist entry'));
+        state.blacklistId = null;
+        showCuteToast('Candidate removed from blacklist ✅', 4000);
       } else {
-        if (!currentBlacklistId) {
-          checkbox.checked = false;
-          if (statusText) statusText.textContent = 'Candidate is not blacklisted.';
-        } else {
-          const resp = await fetch(`${API}/api/blacklist/${currentBlacklistId}`, { method: 'DELETE' });
-          if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to delete blacklist entry'));
-          currentBlacklistId = null;
-          showCuteToast('Candidate removed from blacklist ✅', 4000);
-          if (statusText) statusText.textContent = 'Candidate is not blacklisted.';
-        }
+        showCuteToast('Candidate removed from blacklist ✅', 4000);
       }
+      state.isBlacklisted = shouldBlacklist;
+      paintState();
     } catch (err) {
       console.error('❌ Unable to save blacklist change', err);
-      checkbox.checked = !shouldBlacklist;
-      if (statusText) statusText.textContent = 'We could not save this change.';
+      checkbox.checked = state.isBlacklisted;
+      paintState();
       alert('We could not update the blacklist status. Please try again.');
     } finally {
       checkbox.disabled = false;
-      busy = false;
+      state.busy = false;
     }
   });
 })();

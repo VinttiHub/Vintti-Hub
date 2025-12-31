@@ -134,6 +134,8 @@ function buildCandidateRow(candidate) {
     active: 'status-active',
     unhired: 'status-unhired'
   }[condition] || 'status-unhired';
+  const blacklistChipClass = isBlacklisted ? 'is-blacklisted' : 'not-blacklisted';
+  const blacklistLabel = isBlacklisted ? 'True' : 'False';
 
   const nameCellClasses = ['name-cell'];
   if (isBlacklisted) nameCellClasses.push('danger-name');
@@ -164,6 +166,11 @@ function buildCandidateRow(candidate) {
           : '—'
       }
     </td>
+    <td>
+      <span class="blacklist-chip ${blacklistChipClass}" aria-label="Blacklist status">
+        ${blacklistLabel}
+      </span>
+    </td>
   `;
 
   return tr;
@@ -171,7 +178,7 @@ function buildCandidateRow(candidate) {
 
 function buildEmptyRow() {
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td colspan="5">No data available</td>`;
+  tr.innerHTML = `<td colspan="6">No data available</td>`;
   return tr;
 }
 

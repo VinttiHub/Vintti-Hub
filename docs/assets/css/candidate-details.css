@@ -157,10 +157,22 @@ a {
   padding: 12px 16px;
   border-radius: 10px;
   transition: background 0.3s ease;
+  border: 1px solid transparent;
 }
 
 .field:hover {
   background-color: rgba(0, 0, 0, 0.035);
+}
+.blacklist-card {
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+.blacklist-card.is-blacklisted {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+.blacklist-card.not-blacklisted {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .icon {
@@ -3841,4 +3853,3 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .main-content {
   scroll-padding-top: 100px; /* agrega margen virtual para los anchors */
 }
-

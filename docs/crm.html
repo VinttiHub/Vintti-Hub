@@ -25,9 +25,128 @@
 
   <!-- ===== App CSS (scoped) ===== -->
   <link rel="stylesheet" href="./assets/css/crm.css" />
+  <style>
+    .filters-top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .filters-top-bar > * {
+      flex-shrink: 0;
+    }
+    .dataTables-length-wrapper {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+    .multi-filter {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 10px 14px;
+      min-width: 160px;
+      font-family: 'Onest', sans-serif;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .filter-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 13px;
+      color: #444;
+    }
+    .multi-filter select {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: 'Onest', sans-serif;
+      width: 100%;
+      background-color: #fff;
+    }
+    .text-filter input {
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 10px 16px;
+      min-width: 220px;
+      font-size: 14px;
+      font-family: 'Onest', sans-serif;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+    .crm-loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, rgba(11,61,145,0.15), rgba(255,255,255,0.95));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity .3s ease, visibility .3s ease;
+    }
+    .crm-loading-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .crm-loading-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 32px;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+      text-align: center;
+      width: min(420px, 90%);
+      position: relative;
+      overflow: hidden;
+    }
+    .crm-loading-card::after {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(11,61,145,0.08), rgba(205,255,48,0.2));
+      z-index: -1;
+    }
+    .crm-loading-spinner {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 6px solid rgba(11,61,145,0.15);
+      border-top-color: #0b3d91;
+      margin: 0 auto 16px;
+      animation: crm-spin 0.8s linear infinite;
+    }
+    @keyframes crm-spin {
+      to { transform: rotate(360deg); }
+    }
+    .crm-loading-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #0b3d91;
+      margin-bottom: 6px;
+    }
+    .crm-loading-text {
+      font-size: 0.95rem;
+      color: #1f2937;
+    }
+  </style>
 </head>
 
 <body>
+  <div id="crmLoadingOverlay" class="crm-loading-overlay hidden" aria-live="polite" aria-label="Loading CRM accounts">
+    <div class="crm-loading-card">
+      <div class="crm-loading-spinner" aria-hidden="true"></div>
+      <p class="crm-loading-title">Loading CRM</p>
+      <p class="crm-loading-text">Fetching accounts and calculating statuses…</p>
+    </div>
+  </div>
   <!-- ====================== SIDEBAR ====================== -->
 <aside class="sidebar">
   <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
@@ -127,44 +246,50 @@
       <button class="new-btn" onclick="openPopup()">New</button>
     </header>
 
-    <!-- Controls: page length (DataTables) + client search -->
-    <div class="crm-controls-bar">
-      <div id="datatable-length-container" aria-live="polite"></div>
-      <input
-        type="text"
-        id="searchClientInput"
-        placeholder="Search by Client Name"
-        class="crm-search-input"
-        inputmode="search"
-        aria-label="Search by Client Name"
-      />
-    </div>
+    <section class="filters-top-bar" aria-label="Table filters">
+      <div class="dataTables-length-wrapper" id="dataTablesLengthTarget" aria-live="polite"></div>
 
-    <section class="crm-filters-wrapper" aria-label="Table filters">
-      <button type="button" class="filters-toggle-btn" id="toggleFilters" aria-expanded="false">
-        🔍 Filters
-      </button>
-      <div class="filters-card hidden" id="filtersCard">
-        <div class="filters-grid">
-          <label class="filter-field">
-            <span>Sales Lead</span>
-            <select id="salesLeadFilter" data-filter-key="salesLead" aria-label="Filter by Sales Lead">
-              <option value="">All Sales Leads</option>
-            </select>
-          </label>
-          <label class="filter-field">
-            <span>Status</span>
-            <select id="statusFilter" data-filter-key="status" aria-label="Filter by Status">
-              <option value="">All Statuses</option>
-            </select>
-          </label>
-          <label class="filter-field">
-            <span>Contract</span>
-            <select id="contractFilter" data-filter-key="contract" aria-label="Filter by Contract">
-              <option value="">All Contracts</option>
-            </select>
-          </label>
+      <div class="multi-filter" id="salesLeadFilterContainer">
+        <div class="filter-header">
+          <label for="salesLeadFilter">Sales Lead</label>
         </div>
+        <div class="multi-select">
+          <select id="salesLeadFilter" data-filter-key="salesLead" aria-label="Filter by Sales Lead">
+            <option value="">All Sales Leads</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="multi-filter" id="statusFilterContainer">
+        <div class="filter-header">
+          <label for="statusFilter">Status</label>
+        </div>
+        <div class="multi-select">
+          <select id="statusFilter" data-filter-key="status" aria-label="Filter by Status">
+            <option value="">All Statuses</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="multi-filter" id="contractFilterContainer">
+        <div class="filter-header">
+          <label for="contractFilter">Contract</label>
+        </div>
+        <div class="multi-select">
+          <select id="contractFilter" data-filter-key="contract" aria-label="Filter by Contract">
+            <option value="">All Contracts</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="text-filter">
+        <input
+          type="text"
+          id="searchClientInput"
+          placeholder="Search by Client Name"
+          inputmode="search"
+          aria-label="Search by Client Name"
+        />
       </div>
     </section>
 

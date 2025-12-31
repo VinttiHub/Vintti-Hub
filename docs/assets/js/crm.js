@@ -164,6 +164,15 @@ function updateCrmEmptyState(table) {
   emptyState.classList.toggle('visible', visibleRows === 0);
 }
 
+function toggleCrmLoading(show, message) {
+  const overlay = document.getElementById('crmLoadingOverlay');
+  if (!overlay) return;
+  const textEl = overlay.querySelector('.crm-loading-text');
+  if (textEl && message) textEl.textContent = message;
+  overlay.classList.toggle('hidden', !show);
+  overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
 function createOption(value, label) {
   const opt = document.createElement('option');
   opt.value = value;
@@ -368,6 +377,13 @@ function hideSortToast() {
   t.classList.add('hide');
   t.classList.remove('show');
   setTimeout(() => { t.style.display = 'none'; }, 250);
+}
+
+function extendSortToastTotal(extra = 0) {
+  const inc = Number(extra) || 0;
+  if (inc <= 0) return;
+  const newTotal = (_sortToastState.total || 0) + inc;
+  updateSortToast(_sortToastState.done, newTotal);
 }
 
 /* =========================
@@ -613,13 +629,110 @@ async function patchAccountManager(accountId, email) {
   });
 }
 
+function updateRowSalesLead(rowEl, email, displayName) {
+  if (!rowEl) return null;
+  const normalizedEmail = (email || '').toString().trim().toLowerCase();
+  const item = {
+    account_manager: normalizedEmail,
+    account_manager_name: displayName || email || normalizedEmail
+  };
+  const cell = rowEl.querySelector('.sales-lead-cell');
+  if (cell) cell.innerHTML = getAccountSalesLeadCell(item);
+  const meta = deriveSalesLeadMeta(item);
+  rowEl.dataset.salesLeadLabel = meta.label || '';
+  rowEl.dataset.salesLeadCode = meta.code || '';
+  if (meta.code && upsertSalesLeadOption(meta.code, meta.label || meta.code)) {
+    renderSalesLeadOptions();
+  }
+  return meta;
+}
+
 // Quick UI repaint of the manager cell
 function paintManagerCell(rowEl, email) {
-  if (!rowEl) return;
-  const cell = rowEl.querySelector('.sales-lead-cell');
-  if (!cell) return;
-  const item = { account_manager: email, account_manager_name: email };
-  cell.innerHTML = getAccountSalesLeadCell(item);
+  updateRowSalesLead(rowEl, email, email);
+}
+
+async function assignManagersFromStatus(summary = {}, rowById = new Map(), onProgress) {
+  if (!summary || !rowById) return 0;
+  const tasks = [];
+  const getRowLead = (row) => (row?.dataset?.salesLeadCode || '').toLowerCase().trim();
+
+  for (const [idStr, info] of Object.entries(summary)) {
+    const accountId = Number(idStr);
+    if (!accountId) continue;
+    const status = norm(info?.status);
+    const row = rowById.get(accountId);
+    if (!row) continue;
+
+    if (status === 'active client') {
+      const targetEmail = 'lara@vintti.com';
+      if (getRowLead(row) === targetEmail) continue;
+      tasks.push(async () => {
+        try {
+          await patchAccountManager(accountId, targetEmail);
+          updateRowSalesLead(row, targetEmail, targetEmail);
+        } catch (e) {
+          console.warn(`⚠️ Could not assign manager to ${accountId}:`, e);
+        } finally {
+          onProgress?.(1);
+        }
+      });
+      continue;
+    }
+
+    if (status === 'lead in process') {
+      tasks.push(async () => {
+        try {
+          const r = await fetch(`${API_BASE}/accounts/${accountId}/sales-lead/suggest`);
+          const json = r.ok ? await r.json() : null;
+          const suggested = (json?.suggested_sales_lead || '').toLowerCase().trim();
+          if (!suggested) return;
+          if (getRowLead(row) === suggested) return;
+          await patchAccountManager(accountId, suggested);
+          updateRowSalesLead(row, suggested, suggested);
+        } catch (e) {
+          console.warn(`⚠️ Could not assign majority sales lead to ${accountId}:`, e);
+        } finally {
+          onProgress?.(1);
+        }
+      });
+    }
+  }
+
+  if (!tasks.length) return 0;
+  extendSortToastTotal(tasks.length);
+  await runWithConcurrency(tasks, 6);
+  return tasks.length;
+}
+
+function kickoffCrmStatusPipeline({ ids = [], rowById = new Map() }) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return Promise.resolve({ summary: {}, assignments: 0 });
+  }
+  showSortToast(ids.length + 1);
+  return computeAndPaintAccountStatuses({
+    ids,
+    rowById,
+    onProgress: (inc) => updateSortToast(inc)
+  })
+    .then(async (summary) => {
+      const statusLabels = new Set();
+      ids.forEach(id => {
+        const status = summary?.[id]?.status || '—';
+        if (status && status !== '—') statusLabels.add(status);
+      });
+      populateStatusFilter(Array.from(statusLabels));
+      const assignments = await assignManagersFromStatus(summary, rowById, (inc) => updateSortToast(inc));
+      return { summary, assignments };
+    })
+    .catch((err) => {
+      console.error('Error computing CRM statuses:', err);
+      return { summary: {}, assignments: 0 };
+    })
+    .finally(() => {
+      updateSortToast(1);
+      setTimeout(hideSortToast, 400);
+    });
 }
 
 /* =========================

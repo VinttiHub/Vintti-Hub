@@ -663,39 +663,75 @@ def delete_candidate_cv(candidate_id):
 def get_candidate_by_id(candidate_id):
     try:
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT 
-                name,
-                country,
-                phone,
-                email,
-                linkedin,
-                english_level,
-                salary_range,
-                red_flags,
-                comments,
-                created_by,
-                created_at,
-                linkedin_scrapper,
-                cv_pdf_scrapper,
-                discount_dolar,
-                discount_daterange,
-                affinda_scrapper,
-                coresignal_scrapper,
-                candidate_succes,
-                check_hr_lead,
-                address,
-                dni
-            FROM candidates
-            WHERE candidate_id = %s
-        """, (candidate_id,))
-        row = cursor.fetchone()
-        if not row:
-            return jsonify({"error": "Candidate not found"}), 404
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        colnames = [desc[0] for desc in cursor.description]
-        candidate = dict(zip(colnames, row))
+        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
+        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
+        b_linkedin_source = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized, 'b')
+        b_linkedin_norm = _linkedin_normalize_sql(b_linkedin_source)
+
+        cursor.execute(f"""
+            WITH normalized_candidate AS (
+                SELECT
+                    c.*,
+                    {c_linkedin_norm} AS linkedin_norm
+                FROM candidates c
+                WHERE c.candidate_id = %s
+            ),
+            normalized_blacklist AS (
+                SELECT
+                    b.blacklist_id,
+                    {b_linkedin_norm} AS linkedin_norm,
+                    b.candidate_id
+                FROM blacklist b
+            )
+            SELECT
+                nc.name,
+                nc.country,
+                nc.phone,
+                nc.email,
+                nc.linkedin,
+                nc.english_level,
+                nc.salary_range,
+                nc.red_flags,
+                nc.comments,
+                nc.created_by,
+                nc.created_at,
+                nc.linkedin_scrapper,
+                nc.cv_pdf_scrapper,
+                nc.discount_dolar,
+                nc.discount_daterange,
+                nc.affinda_scrapper,
+                nc.coresignal_scrapper,
+                nc.candidate_succes,
+                nc.check_hr_lead,
+                nc.address,
+                nc.dni,
+                bl.blacklist_id,
+                COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted
+            FROM normalized_candidate nc
+            LEFT JOIN LATERAL (
+                SELECT nb.blacklist_id
+                FROM normalized_blacklist nb
+                WHERE (
+                        nb.linkedin_norm IS NOT NULL
+                    AND nc.linkedin_norm IS NOT NULL
+                    AND nb.linkedin_norm = nc.linkedin_norm
+                )
+                OR (
+                    nb.candidate_id IS NOT NULL
+                    AND nc.candidate_id IS NOT NULL
+                    AND nb.candidate_id = nc.candidate_id
+                )
+                LIMIT 1
+            ) bl ON TRUE;
+        """, (candidate_id,))
+
+        candidate = cursor.fetchone()
+        if not candidate:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Candidate not found"}), 404
 
         cursor.close()
         conn.close()

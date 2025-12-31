@@ -214,6 +214,28 @@ body {
   font-size: 18px;
   line-height: 1;
 }
+.blacklist-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.blacklist-chip.is-blacklisted {
+  background: rgba(244, 63, 94, 0.16);
+  color: #b42318;
+  border: 1px solid rgba(244, 63, 94, 0.45);
+}
+.blacklist-chip.not-blacklisted {
+  background: rgba(16, 185, 129, 0.15);
+  color: #05603a;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
 
 /* =========================================================================
    Candidate modal
