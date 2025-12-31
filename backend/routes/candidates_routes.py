@@ -84,7 +84,7 @@ def _get_blacklist_columns(conn):
         cur.execute("""
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_name = 'balcklist'
+            WHERE table_name = 'blacklist'
               AND table_schema = 'public'
             ORDER BY ordinal_position
         """)
@@ -127,7 +127,7 @@ def _find_blacklist_match(cursor, candidate_id, linkedin_value, fallback_to_cand
         cursor.execute(
             f"""
             SELECT *
-            FROM balcklist
+            FROM blacklist
             WHERE {_linkedin_normalize_sql('linkedin')} = %s
             LIMIT 1
             """,
@@ -139,7 +139,7 @@ def _find_blacklist_match(cursor, candidate_id, linkedin_value, fallback_to_cand
         cursor.execute(
             """
             SELECT *
-            FROM balcklist
+            FROM blacklist
             WHERE candidate_id = %s
             LIMIT 1
             """,
@@ -168,12 +168,12 @@ def get_candidates_light():
                 {c_linkedin_norm} AS linkedin_norm
               FROM candidates c
             ),
-            normalized_balcklist AS (
+            normalized_blacklist AS (
               SELECT
                 b.blacklist_id,
                 {b_linkedin_norm} AS linkedin_norm,
                 b.candidate_id
-              FROM balcklist b
+              FROM blacklist b
             )
             SELECT
               nc.candidate_id,
@@ -193,7 +193,7 @@ def get_candidates_light():
             FROM normalized_candidates nc
             LEFT JOIN LATERAL (
               SELECT TRUE AS is_blacklisted
-              FROM normalized_balcklist nb
+              FROM normalized_blacklist nb
               WHERE (
                       nb.linkedin_norm IS NOT NULL
                   AND nc.linkedin_norm IS NOT NULL
@@ -233,12 +233,12 @@ def get_candidates():
                 {c_linkedin_norm} AS linkedin_norm
               FROM candidates c
             ),
-            normalized_balcklist AS (
+            normalized_blacklist AS (
               SELECT
                 b.blacklist_id,
                 {b_linkedin_norm} AS linkedin_norm,
                 b.candidate_id
-              FROM balcklist b
+              FROM blacklist b
             )
             SELECT
               nc.*,
@@ -258,7 +258,7 @@ def get_candidates():
             FROM normalized_candidates nc
             LEFT JOIN LATERAL (
               SELECT TRUE AS is_blacklisted
-              FROM normalized_balcklist nb
+              FROM normalized_blacklist nb
               WHERE (
                       nb.linkedin_norm IS NOT NULL
                   AND nc.linkedin_norm IS NOT NULL
@@ -312,7 +312,7 @@ def create_candidate_without_opportunity():
             cursor.execute(
                 f"""
                 SELECT blacklist_id, candidate_id, name, linkedin
-                FROM balcklist
+                FROM blacklist
                 WHERE {_linkedin_normalize_sql('linkedin')} = %s
                 LIMIT 1
                 """,
@@ -1410,12 +1410,12 @@ def get_candidates_light_fast():
                 {c_linkedin_norm} AS linkedin_norm
               FROM candidates c
             ),
-            normalized_balcklist AS (
+            normalized_blacklist AS (
               SELECT
                 b.blacklist_id,
                 {b_linkedin_norm} AS linkedin_norm,
                 b.candidate_id
-              FROM balcklist b
+              FROM blacklist b
             ),
             candidates_with_flags AS (
               SELECT
@@ -1439,7 +1439,7 @@ def get_candidates_light_fast():
               LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
               LEFT JOIN LATERAL (
                 SELECT TRUE AS is_blacklisted
-                FROM normalized_balcklist nb
+                FROM normalized_blacklist nb
                 WHERE (
                         nb.linkedin_norm IS NOT NULL
                     AND nc.linkedin_norm IS NOT NULL
@@ -2060,7 +2060,7 @@ def create_blacklist_entry():
 
         placeholders = ', '.join(['%s'] * len(insert_columns))
         cursor.execute(
-            f"INSERT INTO balcklist ({', '.join(insert_columns)}) VALUES ({placeholders}) RETURNING *",
+            f"INSERT INTO blacklist ({', '.join(insert_columns)}) VALUES ({placeholders}) RETURNING *",
             values
         )
         created_row = cursor.fetchone()
@@ -2081,7 +2081,7 @@ def delete_blacklist_entry(blacklist_id):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute(
-            "DELETE FROM balcklist WHERE blacklist_id = %s RETURNING blacklist_id",
+            "DELETE FROM blacklist WHERE blacklist_id = %s RETURNING blacklist_id",
             (blacklist_id,)
         )
         deleted = cursor.fetchone()
