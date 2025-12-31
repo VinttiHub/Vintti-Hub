@@ -21,11 +21,12 @@
     'felicitas@vintti.com':        'felicitas.png',
     'pgonzales@vintti.com':        'pri.png',
     'mora@vintti.com':             'mora.png',
-    'mia@vintti.com':              'mia.png',
+    'mia@vintti.com':              'mia_cavanagh.png',
     'luisa@vintti.com':            'luisa.png',
     'camila@vintti.com':           'camila.png',
     'felipe@vintti.com':           'felipe.png',
     'abril@vintti.com':            'abril.png',
+    'angie@vintti.com':            'angie.png',
   };
   const AVATAR_BY_USER_ID = {
     // '123': 'avatar.png',
