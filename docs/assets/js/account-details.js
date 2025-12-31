@@ -169,55 +169,80 @@ function loadAssociatedOpportunities(accountId) {
     });
 }
 function fillAccountDetails(data) {
-  document.querySelectorAll('#overview .accordion-content p').forEach(p => {
-    if (p.textContent.includes('Name:')) {
-      const inputHTML = `<strong>Name:</strong> <input id="account-client-name" class="editable-input" type="text" value="${data.client_name || ''}" placeholder="Not available" />`;
-      p.innerHTML = inputHTML;
-
-      // ⬅️ Aquí agregamos el blur listener justo después de crearlo
-      const clientNameInput = document.getElementById('account-client-name');
-      if (clientNameInput) {
-        clientNameInput.addEventListener('blur', () => {
-          const newName = clientNameInput.value.trim();
-          const accountId = getIdFromURL();
-          if (!accountId || !newName) return;
-
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ client_name: newName })
-          })
-          .then(res => {
-            if (!res.ok) throw new Error('Error updating client name');
-            console.log('Client name updated');
-          })
-          .catch(err => {
-            console.error('Failed to update client name:', err);
-          });
-        });
-      }
-
-    } else if (p.textContent.includes('Size:')) {
-      p.innerHTML = `<strong>Size:</strong> ${data.size || '—'}`;
-    } else if (p.textContent.includes('Timezone:')) {
-      p.innerHTML = `<strong>Timezone:</strong> ${data.timezone || '—'}`;
-    } else if (p.textContent.includes('State:')) {
-      p.innerHTML = `<strong>State:</strong> ${data.state || '—'}`;
-    } else if (p.textContent.includes('Contract:')) {
-      p.innerHTML = `<strong>Contract:</strong> ${data.contract || '—'}`;
+  const setFieldText = (id, value) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const normalized =
+      typeof value === 'string'
+        ? value.trim().replace(/^(null|undefined)$/i, '').trim()
+        : value;
+    const hasValue = normalized !== undefined && normalized !== null && normalized !== '';
+    el.textContent = hasValue ? normalized : 'Not available';
+    if (el.classList) {
+      el.classList.toggle('placeholder', !hasValue);
     }
-  });
+  };
+
+  const clientNameInput = document.getElementById('account-client-name');
+  if (clientNameInput) {
+    clientNameInput.value = data.client_name || '';
+  }
+
+  setFieldText('account-size', data.size);
+  setFieldText('account-timezone', data.timezone);
+  setFieldText('account-state', data.state);
+  setFieldText('account-contact-name', data.name);
+  setFieldText('account-contact-surname', data.surname);
+  setFieldText('account-industry', data.industry);
+  setFieldText('account-lead-source', data.where_come_from);
+  setFieldText('account-referral-source', data.referal_source);
+  setFieldText('account-position', data.position);
+  setFieldText('account-type', data.type);
+
+  const outsourceDisplay = (() => {
+    if (data.outsource === true) return 'Yes';
+    if (data.outsource === false) return 'No';
+    if (typeof data.outsource === 'string' && data.outsource.trim()) {
+      return data.outsource;
+    }
+    return null;
+  })();
+  setFieldText('account-outsource', outsourceDisplay);
+
+  setFieldText('account-contract', data.contract);
+
+  const mailLink = document.getElementById('account-mail-link');
+  if (mailLink) {
+    const email = (data.mail || '').trim();
+    if (email) {
+      mailLink.textContent = email;
+      mailLink.href = `mailto:${email}`;
+      mailLink.removeAttribute('aria-disabled');
+      mailLink.classList.remove('placeholder');
+    } else {
+      mailLink.textContent = 'Not available';
+      mailLink.removeAttribute('href');
+      mailLink.removeAttribute('target');
+      mailLink.setAttribute('aria-disabled', 'true');
+      mailLink.classList.add('placeholder');
+    }
+  }
 
   const linkedinLink = document.getElementById('linkedin-link');
   if (linkedinLink) linkedinLink.href = data.linkedin || '#';
 
   const websiteLink = document.getElementById('website-link');
   if (websiteLink) websiteLink.href = data.website || '#';
-document.getElementById('account-tsf').textContent = `$${data.tsf ?? 0}`;
-document.getElementById('account-tsr').textContent = `$${data.tsr ?? 0}`;
-document.getElementById('account-trr').textContent = `$${data.trr ?? 0}`;
 
+  const commentsTextarea = document.getElementById('comments');
+  if (commentsTextarea) commentsTextarea.value = data.comments || '';
 
+  const painPointsTextarea = document.getElementById('pain-points');
+  if (painPointsTextarea) painPointsTextarea.value = data.pain_points || '';
+
+  document.getElementById('account-tsf').textContent = `$${data.tsf ?? 0}`;
+  document.getElementById('account-tsr').textContent = `$${data.tsr ?? 0}`;
+  document.getElementById('account-trr').textContent = `$${data.trr ?? 0}`;
 }
 
 function fillOpportunitiesTable(opportunities) {
