@@ -17,6 +17,7 @@ bp = Blueprint('candidates', __name__)
 
 _LINKEDIN_SCHEME_RE = re.compile(r'^https?://', flags=re.I)
 _WHITESPACE_RE = re.compile(r'\s+')
+_LINKEDIN_DOMAIN_RE = re.compile(r'linkedin\.com.*', flags=re.I)
 _BLACKLIST_COLUMN_CACHE = None
 
 
@@ -43,10 +44,28 @@ def _clean_linkedin_for_storage(value):
 def _normalize_linkedin(value):
     if not value:
         return ''
-    clean = value.strip().lower()
-    clean = _WHITESPACE_RE.sub(' ', clean)
+
+    clean = (value or '').strip()
+    if not clean:
+        return ''
+
+    clean = _WHITESPACE_RE.sub(' ', clean).strip().lower()
+    clean = re.sub(r'^https?://', '', clean)
+    clean = clean.lstrip('/')
+    clean = re.sub(r'^www\.', '', clean)
+
+    if '#' in clean:
+        clean = clean.split('#', 1)[0]
+    if '?' in clean:
+        clean = clean.split('?', 1)[0]
+
     clean = clean.rstrip('/')
-    clean = clean.strip()
+
+    match = _LINKEDIN_DOMAIN_RE.search(clean)
+    if match:
+        clean = match.group(0)
+
+    clean = clean.lstrip('/')
     return clean
 
 
@@ -54,20 +73,43 @@ def _linkedin_normalize_sql(column):
     return f"""
         NULLIF(
             BTRIM(
-                LOWER(
+                REGEXP_REPLACE(
                     REGEXP_REPLACE(
                         REGEXP_REPLACE(
-                            TRIM(COALESCE({column}, '')),
-                            '\\s+',
-                            ' ',
+                            REGEXP_REPLACE(
+                                REGEXP_REPLACE(
+                                    REGEXP_REPLACE(
+                                        LOWER(
+                                            REGEXP_REPLACE(
+                                                TRIM(COALESCE({column}, '')),
+                                                '\\s+',
+                                                ' ',
+                                                'g'
+                                            )
+                                        ),
+                                        '^https?://',
+                                        '',
+                                        'g'
+                                    ),
+                                    '^/+',
+                                    '',
+                                    'g'
+                                ),
+                                '^www\\.',
+                                '',
+                                'g'
+                            ),
+                            '[?#].*$',
+                            '',
                             'g'
                         ),
                         '/+$',
                         '',
                         'g'
-                    )
-                ),
-                ' '
+                    ),
+                    '^.*?(linkedin\\.com.*)$',
+                    '\\1'
+                )
             ),
             ''
         )
