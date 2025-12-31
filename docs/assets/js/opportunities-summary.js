@@ -1,25 +1,52 @@
+const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+const recruiterNameByEmail = {};
+let recruiterDirectory = [];
+
+async function loadRecruiters() {
+  try {
+    const res = await fetch(`${API_BASE}/users/recruiters`, { credentials: "include" });
+    if (!res.ok) throw new Error(`Recruiter list failed: ${res.status}`);
+    const data = await res.json();
+    return (Array.isArray(data) ? data : [])
+      .filter((u) => u?.email_vintti)
+      .map((u) => ({
+        email: String(u.email_vintti).trim().toLowerCase(),
+        name: u.user_name || u.email_vintti,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    console.error("Error loading recruiters:", err);
+    return [];
+  }
+}
+
+function recruiterLabel(email) {
+  const key = String(email || "").trim().toLowerCase();
+  return recruiterNameByEmail[key] || email || "";
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const stages = ["Negotiating", "Interviewing", "Sourcing", "Deep Dive", "NDA Sent"];
-  const emails = {
-    "pilar@vintti.com": "Pilar Levalle",
-    "pilar.fernandez@vintti.com": "Pilar Fernandez",
-    "agostina@vintti.com": "Agostina",
-    "jazmin@vintti.com": "Jazmín",
-    "agustina.barbero@vintti.com": "Agustina Barbero",
-    "constanza@vintti.com": "Constanza",
-    "julieta@vintti.com": "Julieta Godoy"
-  };
-// --- Construir tbody dinámicamente desde `emails`
-const tbody = document.querySelector('#summaryTable tbody');
-tbody.innerHTML = '';
-Object.entries(emails).forEach(([email, name]) => {
-  const tr = document.createElement('tr');
-  tr.dataset.email = email.toLowerCase(); // normalizado
-  const td = document.createElement('td');
-  td.textContent = name;
-  tr.appendChild(td);
-  tbody.appendChild(tr);
-});
+  const tbody = document.querySelector("#summaryTable tbody");
+  tbody.innerHTML = "";
+
+  recruiterDirectory = await loadRecruiters();
+  recruiterDirectory.forEach(({ email, name }) => {
+    recruiterNameByEmail[email] = name;
+    const tr = document.createElement("tr");
+    tr.dataset.email = email;
+    const td = document.createElement("td");
+    td.textContent = name;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+
+  if (!recruiterDirectory.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td colspan="7" style="text-align:center;">No recruiters available. Create one from the Admin panel.</td>';
+    tbody.appendChild(tr);
+  }
 
   // ——— Etiquetar headers por stage para estilos por-columna
 (function colorizeStageHeaders() {
@@ -39,55 +66,48 @@ Object.entries(emails).forEach(([email, name]) => {
 
   // ——— Estructura de contadores
   const summaryCounts = {};
-  Object.keys(emails).forEach((email) => {
+  recruiterDirectory.forEach(({ email }) => {
     summaryCounts[email] = {};
     stages.forEach((stage) => (summaryCounts[email][stage] = 0));
   });
 
-  // ——— Cargar oportunidades
-  try {
-    const res = await fetch(
-      "https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light"
-    );
-    const opportunities = await res.json();
+  if (recruiterDirectory.length) {
+    try {
+      const res = await fetch(`${API_BASE}/opportunities/light`);
+      const opportunities = await res.json();
 
-opportunities.forEach((opp) => {
-  const hrLead = String(opp.opp_hr_lead || '').trim().toLowerCase();
-  const stage  = String(opp.opp_stage   || '').trim();
-  if (emails[hrLead] && stages.includes(stage)) {
-    summaryCounts[hrLead][stage]++;
-  }
-});
+      opportunities.forEach((opp) => {
+        const hrLead = String(opp.opp_hr_lead || "").trim().toLowerCase();
+        const stage = String(opp.opp_stage || "").trim();
+        if (summaryCounts[hrLead] && stages.includes(stage)) {
+          summaryCounts[hrLead][stage]++;
+        }
+      });
 
+      document.querySelectorAll("#summaryTable tbody tr").forEach((row) => {
+        const email = row.getAttribute("data-email");
+        if (!email) return;
+        while (row.children.length > 1) row.removeChild(row.lastChild);
 
-    // Render tabla
-  document.querySelectorAll("#summaryTable tbody tr").forEach((row) => {
-    const email = row.getAttribute("data-email");
-    // Vaciar la fila excepto primera col (HR Lead)
-    while (row.children.length > 1) row.removeChild(row.lastChild);
+        let rowTotal = 0;
+        stages.forEach((stage) => {
+          const val = Number(summaryCounts[email][stage] || 0);
+          rowTotal += val;
+          const cell = document.createElement("td");
+          cell.textContent = String(val);
+          row.appendChild(cell);
+        });
 
-    let rowTotal = 0;
-
-    stages.forEach((stage) => {
-      const val = Number(summaryCounts[email][stage] || 0);
-      rowTotal += val;
-      const cell = document.createElement("td");
-      cell.textContent = String(val);
-      row.appendChild(cell);
-    });
-
-    // --- Columna Total (última) ---
-    const totalTd = document.createElement("td");
-    totalTd.className = "total-cell";
-    totalTd.textContent = String(rowTotal);
-    row.appendChild(totalTd);
-    // ...después de renderizar todas las filas y su Total por fila:
-    const tableEl = document.getElementById("summaryTable");
-    updateColumnTotals(stages, tableEl);
-
-  });
-  } catch (err) {
-    console.error("❌ Error al cargar oportunidades:", err);
+        const totalTd = document.createElement("td");
+        totalTd.className = "total-cell";
+        totalTd.textContent = String(rowTotal);
+        row.appendChild(totalTd);
+        const tableEl = document.getElementById("summaryTable");
+        updateColumnTotals(stages, tableEl);
+      });
+    } catch (err) {
+      console.error("❌ Error al cargar oportunidades:", err);
+    }
   }
 
   // ——— Last updated
@@ -111,9 +131,9 @@ let accountsCache = null;
 async function ensureCaches() {
   if (!oppsCache || !accountsCache) {
     const [oppsRes, accountsRes] = await Promise.all([
-      fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light"),
+      fetch(`${API_BASE}/opportunities/light`),
       // 🔄 Importante: /data (completo) trae account.priority
-      fetch("https://7m6mw95m8y.us-east-2.awsapprunner.com/data"),
+      fetch(`${API_BASE}/data`),
     ]);
     oppsCache = await oppsRes.json();
     accountsCache = await accountsRes.json();
@@ -167,7 +187,7 @@ function renderDrilldown(hrEmail, stage, opps){
   const tbody = document.querySelector('#drilldownTable tbody');
   const empty = document.getElementById('drilldownEmpty');
 
-  const hrName = (emails[hrEmail] || hrEmail || '').split('@')[0];
+  const hrName = (recruiterLabel(hrEmail) || hrEmail || '').split('@')[0];
   title.innerHTML = `Opportunities — <strong>${hrName}</strong> · ${stageBadge(stage)}`;
   sub.textContent = `${opps.length} related`;
 

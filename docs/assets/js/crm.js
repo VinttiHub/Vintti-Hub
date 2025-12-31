@@ -479,6 +479,8 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
       td.innerHTML = renderAccountStatusChip(status);
       td.dataset.order = String(statusRank(status));
     }
+    row.dataset.statusLabel = status;
+    row.dataset.statusCode = norm(status);
   }
 
   // 4) Persist — try bulk first; if it fails, patch one by one
@@ -995,6 +997,8 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(async (data) => {
       if ($.fn.DataTable.isDataTable('#accountTable')) {
         $('#accountTable').DataTable().destroy();
+        accountTableInstance = null;
+        updateCrmEmptyState(null);
       }
 
       const tableBody = document.getElementById('accountTableBody');
@@ -1102,6 +1106,13 @@ document.addEventListener('DOMContentLoaded', () => {
         onProgress: (inc) => updateSortToast(inc)
       });
 
+      const statusLabels = new Set();
+      ids.forEach(id => {
+        const status = summary?.[id]?.status || '—';
+        if (status && status !== '—') statusLabels.add(status);
+      });
+      populateStatusFilter(Array.from(statusLabels));
+
       // Auto-assign managers by status (Active/Lead in Process)
 await (async function assignManagersFromStatus() {
   const tasks = [];
@@ -1194,12 +1205,18 @@ await (async function assignManagersFromStatus() {
         language: {
           search: "🔍 Buscar:",
           lengthMenu: "Mostrar _MENU_ registros por página",
-          zeroRecords: "No se encontraron resultados",
+          zeroRecords: "",
+          emptyTable: "",
           info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
           paginate: { first: "Primero", last: "Último", next: "Siguiente", previous: "Anterior" }
         },
         initComplete: finalizeToast
       });
+
+      accountTableInstance = table;
+      registerAccountTableFilters(table);
+      $tbl.on('draw.dt', () => updateCrmEmptyState(table));
+      updateCrmEmptyState(table);
 
       // Move length menu to custom container
       const lengthMenu = document.querySelector('#accountTable_length');

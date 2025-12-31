@@ -486,14 +486,37 @@ function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("
 function setQuickAvatar({ user_name, avatar_url }){
   const img = $("#uqAvatarImg");
   const ini = $("#uqAvatarInitials");
-  if (avatar_url){
-    img.src = avatar_url;
-    img.onload = ()=>{ img.style.display="block"; ini.style.display="none"; };
-    img.onerror = ()=>{ img.style.display="none"; ini.style.display="grid"; ini.textContent = initialsFromName(user_name); };
+  if (!img || !ini) return;
+
+  const initials = initialsFromName(user_name) || "";
+  const showInitials = ()=>{
+    img.style.display = "none";
+    img.removeAttribute("src");
+    ini.style.display = "grid";
+    ini.textContent = initials;
+  };
+
+  ini.textContent = initials;
+
+  const trimmed = typeof avatar_url === "string" ? avatar_url.trim() : "";
+  if (trimmed){
+    img.alt = user_name || "User avatar";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.style.display = "block";
+    ini.style.display = "none";
+    img.onload = ()=>{
+      img.style.display = "block";
+      ini.style.display = "none";
+    };
+    img.onerror = showInitials;
+    if (img.src !== trimmed){
+      img.src = trimmed;
+    } else if (img.complete && img.naturalWidth === 0){
+      showInitials();
+    }
   }else{
-    img.style.display="none";
-    ini.style.display="grid";
-    ini.textContent = initialsFromName(user_name);
+    showInitials();
   }
 }
 
@@ -659,6 +682,26 @@ function showApprovalsToast(text, ok=true){
   t.style.color = ok ? "#0f766e" : "#b91c1c";
   setTimeout(()=> t.textContent = "", 3500);
 }
+
+function hydrateAvatarImages(root){
+  if (!root) return;
+  root.querySelectorAll("[data-avatar-img]").forEach(img => {
+    const fallback = img.nextElementSibling;
+    const showFallback = ()=>{
+      img.style.display = "none";
+      if (fallback) fallback.style.display = "block";
+    };
+    img.onload = ()=>{
+      img.style.display = "block";
+      if (fallback) fallback.style.display = "none";
+    };
+    img.onerror = showFallback;
+    if (img.complete && img.naturalWidth === 0){
+      showFallback();
+    }
+  });
+}
+
 function renderApprovalsTable(items){
   const hostPending = document.getElementById("approvalsTable");
   if (!hostPending) return;
@@ -707,9 +750,24 @@ const headerHistory = `
     });
   }
 
+  function avatarMarkup(name, avatarUrl){
+    const initials = initialsFromName(name || "") || "";
+    if (!avatarUrl){
+      return `<div class="avatar-min">${esc(initials)}</div>`;
+    }
+    const safeUrl = esc(avatarUrl);
+    const safeName = esc(name || "User avatar");
+    const safeInitials = esc(initials);
+    return `
+      <div class="avatar-min">
+        <img data-avatar-img src="${safeUrl}" alt="${safeName}" loading="lazy" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;" />
+        <span class="avatar-fallback" aria-hidden="true" style="display:none;">${safeInitials}</span>
+      </div>
+    `;
+  }
+
 function buildRow(r, withActions){
-  const initials = String(r.user_name || "")
-    .trim().split(/\s+/).slice(0,2).map(p => p[0] || "").join("").toUpperCase();
+  const avatar = avatarMarkup(r.user_name, r.avatar_url);
 
   const startLbl = fmtDateShort(r.start_date);
   const endLbl   = fmtDateShort(r.end_date);
@@ -741,7 +799,7 @@ function buildRow(r, withActions){
   return `
     <div class="row ${statusLower}" data-id="${r.id}">
       <div class="cell col-employee">
-        <div class="avatar-min">${initials}</div>
+        ${avatar}
         <div class="uinfo">
           <div class="uname">
             ${r.user_name || "—"}
@@ -770,6 +828,7 @@ function buildRow(r, withActions){
   } else {
     hostPending.innerHTML = headerPending + pending.map(r => buildRow(r, true)).join("");
   }
+  hydrateAvatarImages(hostPending);
 
   // === Tabla de histórico ===
   if (hostHistory){
@@ -782,6 +841,7 @@ function buildRow(r, withActions){
     } else {
       hostHistory.innerHTML = headerHistory + processed.map(r => buildRow(r, false)).join("");
     }
+    hydrateAvatarImages(hostHistory);
   }
 
   // Wire de botones solo en la tabla de pendientes
@@ -1074,6 +1134,8 @@ async function onAdminCreateSubmit(ev){
   const email = (document.getElementById("adminEmail")?.value || "").trim().toLowerCase();
   const role = (document.getElementById("adminRole")?.value || "").trim();
   const active = document.getElementById("adminActive")?.checked ?? true;
+  const isRecruiter = document.getElementById("adminIsRecruiter")?.checked ?? false;
+  const isSalesLead = document.getElementById("adminIsSalesLead")?.checked ?? false;
   const sendInviteInput = document.getElementById("adminSendInvite");
   const shouldInvite = active ? (sendInviteInput?.checked ?? true) : false;
   const leaderInput = document.getElementById("adminLeaderInput");
@@ -1096,6 +1158,10 @@ async function onAdminCreateSubmit(ev){
     return;
   }
 
+  const roleTags = [];
+  if (isRecruiter) roleTags.push("recruiter");
+  if (isSalesLead) roleTags.push("sales_lead");
+
   const payload = {
     full_name: fullName,
     email,
@@ -1103,7 +1169,10 @@ async function onAdminCreateSubmit(ev){
     is_active: Boolean(active),
     send_invite: Boolean(shouldInvite),
     leader_user_id: leaderId || undefined,
-    leader_of_user_ids: leaderOfIds.length ? leaderOfIds : undefined
+    leader_of_user_ids: leaderOfIds.length ? leaderOfIds : undefined,
+    roles: roleTags.length ? roleTags : undefined,
+    is_recruiter: isRecruiter,
+    is_sales_lead: isSalesLead
   };
 
   if (submitBtn) submitBtn.disabled = true;
@@ -1123,6 +1192,8 @@ async function onAdminCreateSubmit(ev){
     form.reset();
     document.getElementById("adminActive").checked = true;
     document.getElementById("adminSendInvite").checked = true;
+    document.getElementById("adminIsRecruiter").checked = false;
+    document.getElementById("adminIsSalesLead").checked = false;
     if (leaderIdInput) leaderIdInput.value = "";
     if (leaderInput) leaderInput.value = "";
     syncAdminLeaderSelection();
@@ -1158,15 +1229,55 @@ async function api(path, opts={}){
 function setAvatar({ user_name, avatar_url }){
   const img = $("#avatarImg");
   const ini = $("#avatarInitials");
-  if (avatar_url){
-    img.src = avatar_url;
-    img.onload = ()=> { img.style.display = "block"; ini.style.display = "none"; };
-    img.onerror = ()=> { img.style.display = "none"; ini.style.display = "block"; ini.textContent = initialsFromName(user_name); };
-  }else{
+  if (!img || !ini) return;
+
+  const initials = initialsFromName(user_name) || "";
+  const showInitials = ()=>{
     img.style.display = "none";
+    img.removeAttribute("src");
     ini.style.display = "block";
-    ini.textContent = initialsFromName(user_name);
+    ini.textContent = initials;
+  };
+
+  ini.textContent = initials;
+
+  const trimmed = typeof avatar_url === "string" ? avatar_url.trim() : "";
+  if (trimmed){
+    img.alt = user_name || "User avatar";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.style.display = "block";
+    ini.style.display = "none";
+    img.onload = ()=>{
+      img.style.display = "block";
+      ini.style.display = "none";
+    };
+    img.onerror = showInitials;
+    if (img.src !== trimmed){
+      img.src = trimmed;
+    } else if (img.complete && img.naturalWidth === 0){
+      showInitials();
+    }
+  }else{
+    showInitials();
   }
+}
+
+function ensureAvatarField(){
+  let input = document.getElementById("avatar_url");
+  if (input) return input;
+  const form = document.getElementById("profileForm");
+  const grid = form?.querySelector(".grid");
+  if (!grid) return null;
+  const wrapper = document.createElement("label");
+  wrapper.className = "field";
+  wrapper.innerHTML = `
+    <span class="label">Avatar URL</span>
+    <input name="avatar_url" id="avatar_url" type="url" placeholder="https://example.com/photo.jpg" inputmode="url" />
+  `;
+  grid.appendChild(wrapper);
+  input = wrapper.querySelector("input");
+  return input;
 }
 
 // Format helpers for date inputs (YYYY-MM-DD)
@@ -1511,6 +1622,8 @@ async function onTimeoffSubmit(e){
 // ============================= PROFILEEEE =============================
 $("#profileForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
+  const avatarInput = ensureAvatarField();
+  const avatarUrlValue = avatarInput ? avatarInput.value.trim() : "";
   const payload = {
     user_id: CURRENT_USER_ID, // opcional, el backend ya lo acepta por body
     user_name: $("#user_name").value.trim(),
@@ -1519,6 +1632,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     emergency_contact: $("#emergency_contact").value.trim(),
     ingreso_vintti_date: $("#ingreso_vintti_date").value || null,
     fecha_nacimiento: $("#fecha_nacimiento").value || null,
+    avatar_url: avatarUrlValue || null,
   };
   const toast = $("#profileToast");
   try{
@@ -1533,7 +1647,18 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     );
     if (!r.ok) throw new Error(await r.text());
     showToast(toast, "Saved. Done & dusted 💫");
-    setAvatar({ user_name: payload.user_name });
+    PROFILE_CACHE = {
+      ...(PROFILE_CACHE || {}),
+      user_id: CURRENT_USER_ID,
+      user_name: payload.user_name,
+      email_vintti: payload.email_vintti,
+      role: payload.role,
+      emergency_contact: payload.emergency_contact,
+      ingreso_vintti_date: payload.ingreso_vintti_date,
+      fecha_nacimiento: payload.fecha_nacimiento,
+      avatar_url: payload.avatar_url
+    };
+    renderProfileView(PROFILE_CACHE);
   }catch(err){
     console.error(err);
     showToast(toast, "Could not save changes.", false);
@@ -1650,6 +1775,8 @@ async function loadMe(uid){
   $("#emergency_contact").value = PROFILE_CACHE.emergency_contact;
   $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
   $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+  const avatarInput = ensureAvatarField();
+  if (avatarInput) avatarInput.value = PROFILE_CACHE.avatar_url || "";
 
   const normalizedEmail = (PROFILE_CACHE.email_vintti || "").toLowerCase();
   if (ADMIN_ALLOWED_EMAILS.has(normalizedEmail)){
@@ -1672,6 +1799,8 @@ document.addEventListener("click", (e)=>{
       $("#emergency_contact").value = PROFILE_CACHE.emergency_contact || "";
       $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
       $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+      const avatarInput = ensureAvatarField();
+      if (avatarInput) avatarInput.value = PROFILE_CACHE.avatar_url || "";
     }
     showProfileEdit();
   }
@@ -1684,6 +1813,7 @@ document.addEventListener("click", (e)=>{
 });
 
 // Actualiza cache desde los inputs (lo guardamos crudo y que la vista lo formatee)
+const _avatarFieldInit = ensureAvatarField();
 PROFILE_CACHE = {
   user_id: CURRENT_USER_ID,
   user_name: $("#user_name").value.trim(),
@@ -1693,7 +1823,7 @@ PROFILE_CACHE = {
   // guardamos las fechas como las entrega el <input type="date"> (YYYY-MM-DD)
   ingreso_vintti_date: $("#ingreso_vintti_date").value || null,
   fecha_nacimiento: $("#fecha_nacimiento").value || null,
-  avatar_url: $("#avatarImg").src || null
+  avatar_url: (_avatarFieldInit ? _avatarFieldInit.value.trim() : "") || null
 };
 
 // Repinta tarjeta y vuelve a modo vista

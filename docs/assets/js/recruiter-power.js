@@ -36,6 +36,8 @@ const metricsState = {
   churnDetails: [],
   churnSummary: null,
   selectedLead: "",
+  recruiterDirectory: [],
+  recruiterLookup: {},
 };
 function isoToYMD(iso) {
   if (!iso) return "";
@@ -137,6 +139,34 @@ async function loadCurrentUserEmail() {
     metricsState.currentUserEmail = null;
   }
 }
+
+async function loadRecruiterDirectory() {
+  try {
+    const resp = await fetch(`${API_BASE}/users/recruiters`, {
+      credentials: "include",
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const directory = (Array.isArray(data) ? data : [])
+      .filter((row) => row?.email_vintti)
+      .map((row) => ({
+        email: String(row.email_vintti).trim().toLowerCase(),
+        name: row.user_name || row.email_vintti || "",
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    metricsState.recruiterDirectory = directory;
+    metricsState.recruiterLookup = directory.reduce((acc, person) => {
+      if (!EXCLUDED_EMAILS.has(person.email)) {
+        acc[person.email] = person.name;
+      }
+      return acc;
+    }, {});
+  } catch (err) {
+    console.error("[recruiter-metrics] Could not load recruiter directory:", err);
+    metricsState.recruiterDirectory = [];
+    metricsState.recruiterLookup = {};
+  }
+}
 function toggleRecruiterLabButton() {
   const btn = document.getElementById("recruiterLabBtn");
   if (!btn) return;
@@ -214,9 +244,12 @@ function formatDateISO(iso) {
 
 // 🔹 helper para el label: muestra el user_name si existe
 function getLeadLabel(email) {
-  const row = metricsState.byLead[email];
-  if (!row) return email;
-  return row.hr_lead_name || row.hr_lead || email;
+  const key = (email || "").toLowerCase();
+  const row = metricsState.byLead[key];
+  if (row) {
+    return row.hr_lead_name || row.hr_lead || email;
+  }
+  return metricsState.recruiterLookup[key] || email;
 }
 
 /* 🌟 NUEVO: helpers de animación numérica */
@@ -372,7 +405,8 @@ function renderChurnDetailsForLead(hrLeadEmail) {
 }
 
 function updateCardsForLead(hrLeadEmail) {
-  const m = metricsState.byLead[hrLeadEmail];
+  const key = (hrLeadEmail || "").toLowerCase();
+  const m = metricsState.byLead[key];
 
   const winMonthEl = $("#closedWinMonthValue");
   const lostMonthEl = $("#closedLostMonthValue");
@@ -419,7 +453,7 @@ function updateCardsForLead(hrLeadEmail) {
     if (interviewHelperEl) interviewHelperEl.textContent = "(— / —)";
     if (hireRateEl) hireRateEl.textContent = "–";
     if (hireHelperEl) hireHelperEl.textContent = "(— / —)";
-    renderChurnDetailsForLead(hrLeadEmail);
+    renderChurnDetailsForLead(key);
     return;
   }
 
@@ -631,7 +665,7 @@ function updateCardsForLead(hrLeadEmail) {
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
   animateCardsFlash();
-  renderChurnDetailsForLead(hrLeadEmail);
+  renderChurnDetailsForLead(key);
 }
 
 function populateDropdown() {
@@ -766,18 +800,27 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     }
 
     const byLead = {};
-    const emails = [];
+    const orderedEmails = [];
+    const seenEmails = new Set();
+
+    const addEmail = (raw) => {
+      const email = String(raw || "").toLowerCase();
+      if (!email || EXCLUDED_EMAILS.has(email) || seenEmails.has(email)) return;
+      seenEmails.add(email);
+      orderedEmails.push(email);
+    };
 
     for (const row of data.metrics || []) {
       const email = (row.hr_lead_email || row.hr_lead || "").toLowerCase();
-      if (!email) continue;
-      if (EXCLUDED_EMAILS.has(email)) continue;
+      if (!email || EXCLUDED_EMAILS.has(email)) continue;
       byLead[email] = row;
-      emails.push(email);
+      addEmail(email);
     }
 
+    (metricsState.recruiterDirectory || []).forEach((person) => addEmail(person.email));
+
     metricsState.byLead = byLead;
-    metricsState.orderedLeadEmails = emails;
+    metricsState.orderedLeadEmails = orderedEmails;
     metricsState.churnDetails = Array.isArray(data.churn_details) ? data.churn_details : [];
     metricsState.churnSummary = data.churn_summary || null;
 
@@ -834,6 +877,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderChurnDetailsForLead("");
   (async () => {
     const uid = await ensureUserIdInURL();
+    await loadRecruiterDirectory();
     if (!uid) {
       await fetchMetrics();
       return;

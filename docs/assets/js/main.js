@@ -309,7 +309,7 @@ function displayNameForSales(value){
   u = (window.allowedSalesUsers||[]).find(x => String(x.user_name||'').toLowerCase() === key);
   if (u?.user_name) return u.user_name;
 
-  // 3) Fallback heurístico
+  // 3) Fallback heurístico legacy
   if (key.includes('bahia'))   return 'Bahía';
   if (key.includes('lara'))    return 'Lara';
   if (key.includes('agustin')) return 'Agustín';
@@ -318,35 +318,81 @@ function displayNameForSales(value){
   // 4) Último recurso
   return String(value||'Unassigned');
 }
-// === GLOBALS para Sales Lead ===
+
 window.allowedSalesUsers = window.allowedSalesUsers || [];
+window.allowedHRUsers = window.allowedHRUsers || [];
+let roleDirectoryPromise = null;
+
+function normalizeRoleDirectory(users) {
+  const deduped = [];
+  const seen = new Set();
+  (Array.isArray(users) ? users : []).forEach(user => {
+    const email = String(user?.email_vintti || '').trim().toLowerCase();
+    if (!email || seen.has(email)) return;
+    seen.add(email);
+    deduped.push({
+      user_id: user.user_id,
+      user_name: user.user_name || user.email_vintti || email,
+      email_vintti: email
+    });
+  });
+  deduped.sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
+  return deduped;
+}
+
+async function fetchRoleDirectories() {
+  const [hrRes, salesRes] = await Promise.all([
+    fetch(`${API_BASE}/users/recruiters`, { credentials: 'include' }),
+    fetch(`${API_BASE}/users/sales-leads`, { credentials: 'include' })
+  ]);
+  if (!hrRes.ok) throw new Error(`Recruiter directory failed: ${hrRes.status}`);
+  if (!salesRes.ok) throw new Error(`Sales directory failed: ${salesRes.status}`);
+  const [hrData, salesData] = await Promise.all([hrRes.json(), salesRes.json()]);
+  window.allowedHRUsers = normalizeRoleDirectory(hrData);
+  window.allowedSalesUsers = normalizeRoleDirectory(salesData);
+}
+
+function ensureRoleDirectoryPromise() {
+  if (!roleDirectoryPromise) {
+    roleDirectoryPromise = fetchRoleDirectories().catch(err => {
+      console.error('Error loading role directories:', err);
+      throw err;
+    });
+  }
+  return roleDirectoryPromise;
+}
+
+async function ensureRoleDirectoriesLoaded() {
+  if ((window.allowedHRUsers?.length || 0) && (window.allowedSalesUsers?.length || 0)) return;
+  await ensureRoleDirectoryPromise();
+}
+
+ensureRoleDirectoryPromise();
 
 window.generateSalesOptions = function generateSalesOptions(currentValue) {
-  const allowedEmails = new Set((window.allowedSalesUsers || []).map(u => (u.email_vintti || '').toLowerCase()));
-  const isKnown = !!currentValue && allowedEmails.has(String(currentValue).toLowerCase());
+  const normalized = String(currentValue || '').trim().toLowerCase();
+  const allowedEmails = new Set((window.allowedSalesUsers || []).map(u => u.email_vintti));
+  const isKnown = !!normalized && allowedEmails.has(normalized);
 
   let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign Sales Lead</option>`;
-  (window.allowedSalesUsers || [])
-    .sort((a,b) => a.user_name.localeCompare(b.user_name))
-    .forEach(user => {
-      const email = (user.email_vintti || '').toLowerCase();
-      const selected = (isKnown && email === String(currentValue).toLowerCase()) ? 'selected' : '';
-      html += `<option value="${email}" ${selected}>${user.user_name}</option>`;
-    });
+  (window.allowedSalesUsers || []).forEach(user => {
+    const email = user.email_vintti;
+    const selected = (isKnown && email === normalized) ? 'selected' : '';
+    html += `<option value="${email}" ${selected}>${escapeHtml(user.user_name)}</option>`;
+  });
   return html;
 };
 
-// === GLOBALS para HR Lead ===
-window.allowedHRUsers = window.allowedHRUsers || [];
-
 window.generateHROptions = function generateHROptions(currentValue) {
+  const normalized = String(currentValue || '').trim().toLowerCase();
   const allowedEmails = new Set((window.allowedHRUsers || []).map(u => u.email_vintti));
-  const isKnown = !!currentValue && allowedEmails.has(currentValue);
+  const isKnown = !!normalized && allowedEmails.has(normalized);
 
   let html = `<option disabled ${isKnown ? '' : 'selected'}>Assign HR Lead</option>`;
   (window.allowedHRUsers || []).forEach(user => {
-    const selected = (isKnown && user.email_vintti === currentValue) ? 'selected' : '';
-    html += `<option value="${user.email_vintti}" ${selected}>${user.user_name}</option>`;
+    const email = user.email_vintti;
+    const selected = (isKnown && email === normalized) ? 'selected' : '';
+    html += `<option value="${email}" ${selected}>${escapeHtml(user.user_name)}</option>`;
   });
   return html;
 };
@@ -456,43 +502,6 @@ document.querySelectorAll('.filter-header button').forEach(button => {
 });
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
-
-  // usar el global
-window.allowedHRUsers = window.allowedHRUsers || [];
-
-
-fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
-  .then(response => response.json())
-  .then(users => {
-  const ALLOWED_HR_EMAILS = new Set([
-    'pilar@vintti.com',
-    'pilar.fernandez@vintti.com', 
-    'jazmin@vintti.com',
-    'agostina@vintti.com',
-    'agustina.barbero@vintti.com',
-    'agustina.ferrari@vintti.com',
-    'josefina@vintti.com',
-    'constanza@vintti.com',
-    'julieta@vintti.com'
-  ]);
-
-window.allowedHRUsers = users.filter(u =>
-  ALLOWED_HR_EMAILS.has(String(u.email_vintti||'').toLowerCase())
-);
-
-
-    // SALES permitidos por email (exacto)
-    const allowedSalesEmails = new Set([
-      'agustin@vintti.com',
-      'bahia@vintti.com',
-      'lara@vintti.com',
-      'mariano@vintti.com'
-    ]);
-    window.allowedSalesUsers = users.filter(u =>
-      allowedSalesEmails.has((u.email_vintti || '').toLowerCase())
-    );
-  })
-  .catch(err => console.error('Error loading users:', err));
 
   if (toggleButton && filtersCard) {
     toggleButton.addEventListener('click', () => {
@@ -787,22 +796,7 @@ if (accountSearchInput) {
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
 if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
   try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users');
-    const users = await res.json();
-    const ALLOWED_HR_EMAILS = new Set([
-      'pilar@vintti.com',
-      'pilar.fernandez@vintti.com',
-      'jazmin@vintti.com',
-      'agostina@vintti.com',
-      'agustina.barbero@vintti.com',
-      'agustina.ferrari@vintti.com',
-      'josefina@vintti.com',
-      'constanza@vintti.com',
-      'julieta@vintti.com'
-    ]);
-    window.allowedHRUsers = users.filter(u =>
-      ALLOWED_HR_EMAILS.has(String(u.email_vintti || '').toLowerCase())
-    );
+    await ensureRoleDirectoriesLoaded();
   } catch (e) {
     console.error('Error reloading HR Leads:', e);
   }
@@ -811,7 +805,8 @@ if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
 // Mapa email->nombre de HR permitidos
 const emailToNameMap = {};
 (window.allowedHRUsers || []).forEach(u => {
-  emailToNameMap[u.email_vintti] = u.user_name;
+  const email = String(u.email_vintti || '').toLowerCase();
+  if (email) emailToNameMap[email] = u.user_name;
 });
 
 // STAGES (igual que antes)
@@ -826,7 +821,10 @@ if (data.some(d => !d.sales_lead_name)) {
 // HR LEAD: usar el texto que realmente aparece en la celda del <select>
 // - si no hay hr o es legacy (no está en allowedHRUsers) -> 'Assign HR Lead'
 let uniqueHRLeads = [...new Set(
-  data.map(d => (d.opp_hr_lead && emailToNameMap[d.opp_hr_lead]) ? emailToNameMap[d.opp_hr_lead] : 'Assign HR Lead')
+  data.map(d => {
+    const hrEmail = String(d.opp_hr_lead || '').toLowerCase();
+    return hrEmail && emailToNameMap[hrEmail] ? emailToNameMap[hrEmail] : 'Assign HR Lead';
+  })
 )];
 const filterRegistry = [];
 // Llama a los filtros con estas opciones
@@ -976,6 +974,10 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
 function nameToEmail(label, isHR){
   const lower = String(label||'').toLowerCase();
 
+  const arr = isHR ? (window.allowedHRUsers||[]) : (window.allowedSalesUsers||[]);
+  const match = arr.find(u => String(u.user_name||'').toLowerCase() === lower);
+  if (match?.email_vintti) return match.email_vintti;
+
   if (isHR) {
     // ➕ primero casos específicos
     if (lower.includes('pilar') && lower.includes('fernandez')) return 'pilar.fernandez@vintti.com'; // ⬅️ NUEVA
@@ -993,9 +995,7 @@ function nameToEmail(label, isHR){
     if (lower.includes('agustin')) return 'agustin@vintti.com';
   }
 
-  const arr = isHR ? (window.allowedHRUsers||[]) : (window.allowedSalesUsers||[]);
-  const u = arr.find(u => String(u.user_name||'').toLowerCase() === lower);
-  return u?.email_vintti || '';
+  return '';
 }
 
 
@@ -2469,8 +2469,13 @@ function safePlay(id) {
 
 // Detecta email del sales lead si viene en el objeto; si no, infiere por el nombre
 function emailForSalesLead(opp) {
-  if (opp.sales_lead) return String(opp.sales_lead).toLowerCase();
-  const name = (opp.sales_lead_name || '').toLowerCase();
+  if (opp?.opp_sales_lead) return String(opp.opp_sales_lead).toLowerCase();
+  if (opp?.sales_lead) return String(opp.sales_lead).toLowerCase();
+  const name = (opp?.sales_lead_name || '').toLowerCase();
+  if (name) {
+    const match = (window.allowedSalesUsers || []).find(u => String(u.user_name || '').toLowerCase() === name);
+    if (match?.email_vintti) return match.email_vintti;
+  }
   if (name.includes('bahia'))   return 'bahia@vintti.com';
   if (name.includes('lara'))    return 'lara@vintti.com';
   if (name.includes('agustin')) return 'agustin@vintti.com';
@@ -2498,7 +2503,7 @@ function badgeClassForSalesLead(key) {
 
 function getSalesLeadCell(opp) {
   // email guardado o inferido
-  const email = (opp.sales_lead || emailForSalesLead(opp) || '').toLowerCase();
+  const email = (emailForSalesLead(opp) || '').toLowerCase();
   const fullName = opp.sales_lead_name || ''; // para filtros
 
   return `
@@ -2640,4 +2645,3 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = 'index.html';
   });
 });
-

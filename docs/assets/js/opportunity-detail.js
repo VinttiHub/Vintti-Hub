@@ -2302,35 +2302,50 @@ async function loadOpportunityData() {
     }
       window.currentAccountId = data.account_id;
         try {
-          const resUsers = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/users`);
-          const users = await resUsers.json();
+          const [recruitersRes, salesRes] = await Promise.all([
+            fetch(`${API_BASE}/users/recruiters`, { credentials: 'include' }),
+            fetch(`${API_BASE}/users/sales-leads`, { credentials: 'include' })
+          ]);
+          const [recruiters, salesLeads] = await Promise.all([recruitersRes.json(), salesRes.json()]);
+
+          const normalizeList = (list) => {
+            const seen = new Set();
+            return (Array.isArray(list) ? list : [])
+              .map(person => ({
+                email: String(person.email_vintti || '').trim().toLowerCase(),
+                name: person.user_name || person.email_vintti || ''
+              }))
+              .filter(person => person.email && !seen.has(person.email) && seen.add(person.email))
+              .sort((a, b) => a.name.localeCompare(b.name));
+          };
 
           const salesLeadSelect = document.getElementById('details-sales-lead');
           const hrLeadSelect = document.getElementById('details-hr-lead');
 
-          salesLeadSelect.innerHTML = `<option value="">Select Sales Lead...</option>`;
-          hrLeadSelect.innerHTML = `<option value="">Select HR Lead...</option>`;
+          const recruiterOptions = normalizeList(recruiters);
+          const salesOptions = normalizeList(salesLeads);
 
-          const allowedSubstrings = ['Pilar', 'Jazmin', 'Agostina', 'Agustina'];
+          if (hrLeadSelect) {
+            hrLeadSelect.innerHTML = `<option value="">Select HR Lead...</option>`;
+            recruiterOptions.forEach(person => {
+              const opt = document.createElement('option');
+              opt.value = person.email;
+              opt.textContent = person.name;
+              hrLeadSelect.appendChild(opt);
+            });
+            hrLeadSelect.value = (data.opp_hr_lead || '').toLowerCase();
+          }
 
-          users.forEach(user => {
-            const option1 = document.createElement('option');
-            option1.value = user.email_vintti;
-            option1.textContent = user.user_name;
-            salesLeadSelect.appendChild(option1);
-
-            // Solo agregar al dropdown de HR Lead si coincide con los nombres permitidos
-            if (allowedSubstrings.some(name => user.user_name.includes(name))) {
-              const option2 = document.createElement('option');
-              option2.value = user.email_vintti;
-              option2.textContent = user.user_name;
-              hrLeadSelect.appendChild(option2);
-            }
-          });
-
-          // Ahora cruzas: en data.opp_sales_lead y opp_hr_lead tienes el EMAIL → debes setear el value del <select> con ese email:
-          salesLeadSelect.value = data.opp_sales_lead || '';
-          hrLeadSelect.value = data.opp_hr_lead || '';
+          if (salesLeadSelect) {
+            salesLeadSelect.innerHTML = `<option value="">Select Sales Lead...</option>`;
+            salesOptions.forEach(person => {
+              const opt = document.createElement('option');
+              opt.value = person.email;
+              opt.textContent = person.name;
+              salesLeadSelect.appendChild(opt);
+            });
+            salesLeadSelect.value = (data.opp_sales_lead || '').toLowerCase();
+          }
           if (data.opportunity_id) {
             reloadBatchCandidates();
           }

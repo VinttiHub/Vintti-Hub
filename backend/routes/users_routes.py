@@ -93,4 +93,36 @@ def list_recruiters():
 
 @bp.route('/users/sales-leads')
 def list_sales_leads():
-    return _list_users_by_role('sales_lead')
+    """
+    Returns the distinct Sales Leads detected in the CRM accounts table.
+    The list is derived from accounts so filters always show active owners.
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                WITH normalized AS (
+                  SELECT
+                    LOWER(TRIM(a.account_manager)) AS email,
+                    MAX(NULLIF(TRIM(a.account_manager_name), '')) AS fallback_name
+                  FROM account a
+                  WHERE a.account_manager IS NOT NULL
+                    AND TRIM(a.account_manager) <> ''
+                  GROUP BY 1
+                )
+                SELECT
+                  n.email,
+                  COALESCE(NULLIF(u.user_name, ''), n.fallback_name, n.email) AS user_name
+                FROM normalized n
+                LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = n.email
+                ORDER BY COALESCE(NULLIF(u.user_name, ''), n.fallback_name, n.email) ASC;
+            """)
+            rows = cur.fetchall() or []
+        return jsonify(rows), 200
+    except Exception as exc:
+        print("Error fetching sales leads:", exc)
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if conn:
+            conn.close()

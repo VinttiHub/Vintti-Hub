@@ -9,6 +9,7 @@ import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
 from calendar import monthrange
+from urllib.parse import urlparse
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 
@@ -113,6 +114,18 @@ def _row_to_json(row: Dict[str, Any]) -> Dict[str, Any]:
             except Exception: pass
     return row
 
+def _normalize_avatar_url(raw: Optional[Any]) -> Optional[str]:
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    parsed = urlparse(value)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("avatar_url must be an http(s) URL")
+    return value
+
 # ---------- USERS ----------
 @users_bp.get("/users/<int:user_id>")
 def get_user(user_id: int):
@@ -156,10 +169,26 @@ def update_user(user_id: int):
         "ingreso_vintti_date": data.get("ingreso_vintti_date"),
         "fecha_nacimiento": data.get("fecha_nacimiento"),
     }
+
+    avatar_specified = "avatar_url" in data
+    avatar_value: Optional[str] = None
+    if avatar_specified:
+        try:
+            avatar_value = _normalize_avatar_url(data.get("avatar_url"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
     sets, vals = [], []
     for col, val in fields.items():
         if val is not None:
             sets.append(f"{col} = %s"); vals.append(val)
+
+    if avatar_specified:
+        if avatar_value is None:
+            sets.append("avatar_url = NULL")
+        else:
+            sets.append("avatar_url = %s"); vals.append(avatar_value)
+
     if not sets: return jsonify({"ok": True})
 
     vals.append(user_id)
@@ -220,6 +249,7 @@ def leader_list_timeoff():
               r.user_id,
               u.user_name,
               u.email_vintti AS user_email,
+              u.avatar_url,
               u.team,
               r.kind,
               r.start_date,
