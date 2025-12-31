@@ -15,34 +15,203 @@ from utils.types import to_bool
 
 bp = Blueprint('candidates', __name__)
 
+_LINKEDIN_SCHEME_RE = re.compile(r'^https?://', flags=re.I)
+_WHITESPACE_RE = re.compile(r'\s+')
+_BLACKLIST_COLUMN_CACHE = None
+
+
+def _normalize_name(value):
+    return (value or '').strip().lower()
+
+
+def _normalize_phone_digits(value):
+    return re.sub(r'\D', '', value or '')
+
+
+def _clean_linkedin_for_storage(value):
+    if not value:
+        return ''
+    clean = value.strip()
+    if not clean:
+        return ''
+    if not _LINKEDIN_SCHEME_RE.match(clean):
+        clean = f"https://{clean.lstrip('/')}"
+    clean = clean.rstrip('/')
+    return clean
+
+
+def _normalize_linkedin(value):
+    if not value:
+        return ''
+    clean = value.strip().lower()
+    clean = _WHITESPACE_RE.sub(' ', clean)
+    clean = clean.rstrip('/')
+    clean = clean.strip()
+    return clean
+
+
+def _linkedin_normalize_sql(column):
+    return f"""
+        NULLIF(
+            BTRIM(
+                LOWER(
+                    REGEXP_REPLACE(
+                        REGEXP_REPLACE(
+                            TRIM(COALESCE({column}, '')),
+                            '\\s+',
+                            ' ',
+                            'g'
+                        ),
+                        '/+$',
+                        '',
+                        'g'
+                    )
+                ),
+                ' '
+            ),
+            ''
+        )
+    """
+
+
+def _get_blacklist_columns(conn):
+    global _BLACKLIST_COLUMN_CACHE
+    if _BLACKLIST_COLUMN_CACHE is not None:
+        return _BLACKLIST_COLUMN_CACHE
+
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'balcklist'
+              AND table_schema = 'public'
+            ORDER BY ordinal_position
+        """)
+        rows = cur.fetchall()
+        columns = [row[0] for row in rows]
+        _BLACKLIST_COLUMN_CACHE = columns
+        return columns
+    finally:
+        cur.close()
+
+
+def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm):
+    columns = _get_blacklist_columns(conn)
+    insert_columns = []
+    values = []
+
+    for column in columns:
+        if column == 'blacklist_id':
+            continue
+
+        value = None
+        if column == 'linkedin_normalized':
+            value = linkedin_norm or None
+        elif column == 'notes' and 'comments' in candidate_row:
+            value = candidate_row.get('comments')
+        else:
+            value = candidate_row.get(column)
+
+        insert_columns.append(column)
+        values.append(value)
+
+    return insert_columns, values
+
+
+def _find_blacklist_match(cursor, candidate_id, linkedin_value, fallback_to_candidate_id=False):
+    linkedin_norm = _normalize_linkedin(linkedin_value)
+    match = None
+
+    if linkedin_norm:
+        cursor.execute(
+            f"""
+            SELECT *
+            FROM balcklist
+            WHERE {_linkedin_normalize_sql('linkedin')} = %s
+            LIMIT 1
+            """,
+            (linkedin_norm,)
+        )
+        match = cursor.fetchone()
+
+    if (fallback_to_candidate_id or not linkedin_norm) and candidate_id is not None and not match:
+        cursor.execute(
+            """
+            SELECT *
+            FROM balcklist
+            WHERE candidate_id = %s
+            LIMIT 1
+            """,
+            (candidate_id,)
+        )
+        match = cursor.fetchone()
+
+    return match, linkedin_norm
+
 @bp.route('/candidates/light')
 def get_candidates_light():
     try:
         conn = get_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        cursor.execute("""
-            SELECT 
+        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
+        b_linkedin_norm = _linkedin_normalize_sql('b.linkedin')
+        cursor.execute(f"""
+            WITH normalized_candidates AS (
+              SELECT
                 c.candidate_id,
                 c.name,
                 c.country,
                 c.phone,
                 c.linkedin,
-                CASE WHEN EXISTS (
-                    SELECT 1 
-                    FROM opportunity o 
-                    WHERE o.candidato_contratado = c.candidate_id
-                ) THEN '✔️' ELSE NULL END AS employee
-            FROM candidates c
-            ORDER BY c.candidate_id DESC
+                {c_linkedin_norm} AS linkedin_norm
+              FROM candidates c
+            ),
+            normalized_balcklist AS (
+              SELECT
+                b.blacklist_id,
+                {b_linkedin_norm} AS linkedin_norm,
+                b.candidate_id
+              FROM balcklist b
+            )
+            SELECT
+              nc.candidate_id,
+              nc.name,
+              nc.country,
+              nc.phone,
+              nc.linkedin,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM opportunity o
+                  WHERE o.candidato_contratado = nc.candidate_id
+                ) THEN '✔️'
+                ELSE '❌'
+              END AS employee,
+              COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
+            FROM normalized_candidates nc
+            LEFT JOIN LATERAL (
+              SELECT TRUE AS is_blacklisted
+              FROM normalized_balcklist nb
+              WHERE (
+                      nb.linkedin_norm IS NOT NULL
+                  AND nc.linkedin_norm IS NOT NULL
+                  AND nb.linkedin_norm = nc.linkedin_norm
+              )
+              OR (
+                  nb.candidate_id IS NOT NULL
+                  AND nc.candidate_id IS NOT NULL
+                  AND nb.candidate_id = nc.candidate_id
+              )
+              LIMIT 1
+            ) bl ON TRUE
+            ORDER BY nc.candidate_id DESC;
         """)
 
         rows = cursor.fetchall()
-        colnames = [desc[0] for desc in cursor.description]
-        candidates = [dict(zip(colnames, row)) for row in rows]
-
         cursor.close(); conn.close()
-        return jsonify(candidates)
+        return jsonify(rows)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -51,35 +220,63 @@ def get_candidates():
     search = request.args.get('search')
     if search:
         return search_candidates()
-    
     try:
         conn = get_connection()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        # Obtener todos los candidatos
-        cur.execute("SELECT * FROM candidates")
-        candidates_rows = cur.fetchall()
-        candidate_cols = [desc[0] for desc in cur.description]
-        candidates = [dict(zip(candidate_cols, row)) for row in candidates_rows]
+        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
+        b_linkedin_norm = _linkedin_normalize_sql('b.linkedin')
+        cur.execute(f"""
+            WITH normalized_candidates AS (
+              SELECT
+                c.*,
+                {c_linkedin_norm} AS linkedin_norm
+              FROM candidates c
+            ),
+            normalized_balcklist AS (
+              SELECT
+                b.blacklist_id,
+                {b_linkedin_norm} AS linkedin_norm,
+                b.candidate_id
+              FROM balcklist b
+            )
+            SELECT
+              nc.*,
+              CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM opportunity o
+                  JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
+                  WHERE oc.candidate_id = nc.candidate_id
+                    AND o.candidato_contratado = nc.candidate_id
+                  LIMIT 1
+                )
+                THEN '✔️'
+                ELSE '❌'
+              END AS employee,
+              COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
+            FROM normalized_candidates nc
+            LEFT JOIN LATERAL (
+              SELECT TRUE AS is_blacklisted
+              FROM normalized_balcklist nb
+              WHERE (
+                      nb.linkedin_norm IS NOT NULL
+                  AND nc.linkedin_norm IS NOT NULL
+                  AND nb.linkedin_norm = nc.linkedin_norm
+              )
+              OR (
+                  nb.candidate_id IS NOT NULL
+                  AND nc.candidate_id IS NOT NULL
+                  AND nb.candidate_id = nc.candidate_id
+              )
+              LIMIT 1
+            ) bl ON TRUE
+            ORDER BY nc.candidate_id DESC;
+        """)
 
-        # Para cada candidato, verificar si es empleado (si está en candidato_contratado)
-        for candidate in candidates:
-            candidate_id = candidate['candidate_id']
-
-            cur.execute("""
-                SELECT 1
-                FROM opportunity o
-                JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
-                WHERE oc.candidate_id = %s AND o.candidato_contratado = %s
-                LIMIT 1
-            """, (candidate_id, candidate_id))
-            result = cur.fetchone()
-            candidate['employee'] = '✔️' if result else '❌'
-
-        cur.close()
-        conn.close()
-        return jsonify(candidates)
-
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        return jsonify(rows)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -87,24 +284,112 @@ def get_candidates():
 def create_candidate_without_opportunity():
     data = request.get_json() or {}
 
-    name = data.get('name')
-    email = (data.get('email') or '').strip()
-    phone = (data.get('phone') or '').strip()
-    linkedin = (data.get('linkedin') or '').strip()
-    country = data.get('country')
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    phone_raw = (data.get('phone') or '').strip()
+    linkedin_raw = (data.get('linkedin') or '').strip()
+    linkedin_clean = _clean_linkedin_for_storage(linkedin_raw)
+    linkedin_normalized = _normalize_linkedin(linkedin_clean)
+    phone_digits = _normalize_phone_digits(phone_raw)
+    country = (data.get('country') or '').strip() or None
     red_flags = data.get('red_flags')
     comments = data.get('comments')
     english_level = data.get('english_level')
     salary_range = data.get('salary_range')
-    stage = data.get('stage') or 'Contactado'
-    created_by = data.get('created_by')
+    stage = (data.get('stage') or 'Contactado').strip() or 'Contactado'
+    created_by = (data.get('created_by') or '').strip().lower() or None
 
-    if not email or not phone or not linkedin:
+    if not email or not phone_digits or not linkedin_clean:
         return jsonify({"error": "Missing required fields: email, phone and linkedin"}), 400
+
+    name_db = name or None
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
+
+        if linkedin_normalized:
+            cursor.execute(
+                f"""
+                SELECT blacklist_id, candidate_id, name, linkedin
+                FROM balcklist
+                WHERE {_linkedin_normalize_sql('linkedin')} = %s
+                LIMIT 1
+                """,
+                (linkedin_normalized,)
+            )
+            blacklist_row = cursor.fetchone()
+            if blacklist_row:
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    "error": "Blacklisted candidate",
+                    "reason": "blacklisted candidate",
+                    "blacklist_entry": {
+                        "blacklist_id": blacklist_row[0],
+                        "candidate_id": blacklist_row[1],
+                        "name": blacklist_row[2],
+                        "linkedin": blacklist_row[3],
+                    }
+                }), 409
+
+        conflict_clauses = []
+        params = []
+
+        normalized_name = _normalize_name(name)
+        if normalized_name:
+            conflict_clauses.append("LOWER(TRIM(COALESCE(name,''))) = %s")
+            params.append(normalized_name)
+        if phone_digits:
+            conflict_clauses.append("regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g') = %s")
+            params.append(phone_digits)
+        if linkedin_normalized:
+            conflict_clauses.append(f"{_linkedin_normalize_sql('linkedin')} = %s")
+            params.append(linkedin_normalized)
+
+        if conflict_clauses:
+            where_sql = " OR ".join(conflict_clauses)
+            cursor.execute(
+                f"""
+                SELECT candidate_id, name, email, phone, linkedin
+                FROM candidates
+                WHERE {where_sql}
+                LIMIT 1
+                """,
+                tuple(params)
+            )
+            existing = cursor.fetchone()
+            if existing:
+                existing_candidate = {
+                    "candidate_id": existing[0],
+                    "name": existing[1],
+                    "email": existing[2],
+                    "phone": existing[3],
+                    "linkedin": existing[4],
+                }
+                conflict_fields = []
+                if normalized_name and _normalize_name(existing_candidate["name"]) == normalized_name:
+                    conflict_fields.append("name")
+                if phone_digits and _normalize_phone_digits(existing_candidate["phone"]) == phone_digits:
+                    conflict_fields.append("phone")
+                if linkedin_normalized and _normalize_linkedin(existing_candidate["linkedin"]) == linkedin_normalized:
+                    conflict_fields.append("linkedin")
+                label_map = {
+                    "name": "duplicate name",
+                    "phone": "duplicate phone",
+                    "linkedin": "duplicate LinkedIn",
+                }
+                reason_labels = [label_map.get(field, field) for field in conflict_fields]
+                reason_text = " / ".join(reason_labels) if reason_labels else "duplicate candidate data"
+                if reason_text:
+                    reason_text = reason_text[0].upper() + reason_text[1:]
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    "error": reason_text,
+                    "conflict_fields": conflict_fields,
+                    "candidate": existing_candidate,
+                }), 409
 
         cursor.execute("SELECT COALESCE(MAX(candidate_id), 0) + 1 FROM candidates")
         new_candidate_id = cursor.fetchone()[0]
@@ -117,7 +402,7 @@ def create_candidate_without_opportunity():
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """, (
-            new_candidate_id, name, email, phone, linkedin,
+            new_candidate_id, name_db, email, phone_digits, linkedin_clean,
             red_flags, comments, english_level, salary_range,
             country, stage, created_by
         ))
@@ -1087,11 +1372,22 @@ def get_candidates_light_fast():
       - Hay hire_opportunity con end_date IS NULL => status='active' y opp_model viene de opportunity.
       - No hay hire activo (o solo cerrados)     => status='unhired' y opp_model=NULL.
     """
+    blacklist_filter = (request.args.get('blacklist_filter') or 'all').strip().lower()
+    if blacklist_filter not in ('all', 'only', 'exclude'):
+        blacklist_filter = 'all'
+
     try:
         conn = get_connection()
         cur  = conn.cursor(cursor_factory=RealDictCursor)
+        blacklist_columns = set(_get_blacklist_columns(conn))
+        has_normalized_column = 'linkedin_normalized' in blacklist_columns
 
-        cur.execute("""
+        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
+        b_column = 'b.linkedin_normalized' if has_normalized_column else 'b.linkedin'
+        b_linkedin_norm = _linkedin_normalize_sql(b_column)
+
+        params = [blacklist_filter, blacklist_filter, blacklist_filter]
+        cur.execute(f"""
             WITH active_or_latest AS (
               -- Prioriza la fila ACTIVA (end_date IS NULL). Si no hay, toma la más reciente por start_date.
               SELECT DISTINCT ON (h.candidate_id)
@@ -1103,27 +1399,75 @@ def get_candidates_light_fast():
               ORDER BY h.candidate_id,
                        (h.end_date IS NULL) DESC,
                        h.start_date DESC NULLS LAST
+            ),
+            normalized_candidates AS (
+              SELECT
+                c.candidate_id,
+                c.name,
+                c.country,
+                c.phone,
+                c.linkedin,
+                {c_linkedin_norm} AS linkedin_norm
+              FROM candidates c
+            ),
+            normalized_balcklist AS (
+              SELECT
+                b.blacklist_id,
+                {b_linkedin_norm} AS linkedin_norm,
+                b.candidate_id
+              FROM balcklist b
+            ),
+            candidates_with_flags AS (
+              SELECT
+                nc.candidate_id,
+                nc.name,
+                nc.country,
+                nc.phone,
+                nc.linkedin,
+                CASE
+                  WHEN a.candidate_id IS NULL THEN 'unhired'
+                  WHEN a.end_date IS NULL      THEN 'active'
+                  ELSE 'unhired'
+                END AS status,
+                CASE
+                  WHEN a.end_date IS NULL THEN o.opp_model
+                  ELSE NULL
+                END AS opp_model,
+                COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
+              FROM normalized_candidates nc
+              LEFT JOIN active_or_latest a ON a.candidate_id = nc.candidate_id
+              LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
+              LEFT JOIN LATERAL (
+                SELECT TRUE AS is_blacklisted
+                FROM normalized_balcklist nb
+                WHERE (
+                        nb.linkedin_norm IS NOT NULL
+                    AND nc.linkedin_norm IS NOT NULL
+                    AND nb.linkedin_norm = nc.linkedin_norm
+                )
+                OR (
+                    nb.candidate_id IS NOT NULL
+                    AND nc.candidate_id IS NOT NULL
+                    AND nb.candidate_id = nc.candidate_id
+                )
+                LIMIT 1
+              ) bl ON TRUE
             )
             SELECT
-              c.candidate_id,
-              c.name,
-              c.country,
-              c.phone,
-              c.linkedin,
-              CASE
-                WHEN a.candidate_id IS NULL THEN 'unhired'     -- sin hires
-                WHEN a.end_date IS NULL      THEN 'active'      -- hire activo
-                ELSE 'unhired'                                    -- solo hires cerrados
-              END AS status,
-              CASE
-                WHEN a.end_date IS NULL THEN o.opp_model
-                ELSE NULL
-              END AS opp_model
-            FROM candidates c
-            LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
-            LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
-            ORDER BY c.candidate_id DESC;
-        """)
+              candidate_id,
+              name,
+              country,
+              phone,
+              linkedin,
+              status,
+              opp_model,
+              is_blacklisted
+            FROM candidates_with_flags
+            WHERE (%s = 'all')
+               OR (%s = 'only' AND is_blacklisted)
+               OR (%s = 'exclude' AND NOT is_blacklisted)
+            ORDER BY candidate_id DESC;
+        """, params)
 
         rows = cur.fetchall()
         cur.close(); conn.close()
@@ -1646,4 +1990,114 @@ def resumes(candidate_id):
     except Exception as e:
         logging.exception("❌ Error en PATCH /resumes")
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/api/blacklist/status', methods=['GET'])
+def get_blacklist_status():
+    candidate_id = request.args.get('candidate_id', type=int)
+    if not candidate_id:
+        return jsonify({'error': 'candidate_id is required'}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute(
+            "SELECT candidate_id, linkedin FROM candidates WHERE candidate_id = %s",
+            (candidate_id,)
+        )
+        candidate = cursor.fetchone()
+        if not candidate:
+            return jsonify({'error': 'Candidate not found'}), 404
+
+        existing, _ = _find_blacklist_match(
+            cursor,
+            candidate_id=candidate['candidate_id'],
+            linkedin_value=candidate.get('linkedin'),
+            fallback_to_candidate_id=True
+        )
+        payload = {
+            'is_blacklisted': bool(existing),
+            'blacklist_id': existing['blacklist_id'] if existing else None
+        }
+        return jsonify(payload)
+    except Exception as exc:
+        logging.exception("❌ Failed to fetch blacklist status for candidate %s", candidate_id)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@bp.route('/api/blacklist', methods=['POST'])
+def create_blacklist_entry():
+    data = request.get_json(silent=True) or {}
+    candidate_id = data.get('candidate_id')
+    try:
+        candidate_id = int(candidate_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'candidate_id is required'}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("SELECT * FROM candidates WHERE candidate_id = %s", (candidate_id,))
+        candidate = cursor.fetchone()
+        if not candidate:
+            return jsonify({'error': 'Candidate not found'}), 404
+
+        existing, linkedin_norm = _find_blacklist_match(
+            cursor,
+            candidate_id=candidate_id,
+            linkedin_value=candidate.get('linkedin'),
+            fallback_to_candidate_id=True
+        )
+        if existing:
+            return jsonify(existing), 200
+
+        insert_columns, values = _build_blacklist_insert_payload(conn, candidate, linkedin_norm)
+        if not insert_columns:
+            return jsonify({'error': 'Blacklist table has no columns to insert'}), 500
+
+        placeholders = ', '.join(['%s'] * len(insert_columns))
+        cursor.execute(
+            f"INSERT INTO balcklist ({', '.join(insert_columns)}) VALUES ({placeholders}) RETURNING *",
+            values
+        )
+        created_row = cursor.fetchone()
+        conn.commit()
+        return jsonify(created_row), 201
+    except Exception as exc:
+        conn.rollback()
+        logging.exception("❌ Failed to add candidate %s to blacklist", candidate_id)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@bp.route('/api/blacklist/<int:blacklist_id>', methods=['DELETE'])
+def delete_blacklist_entry(blacklist_id):
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute(
+            "DELETE FROM balcklist WHERE blacklist_id = %s RETURNING blacklist_id",
+            (blacklist_id,)
+        )
+        deleted = cursor.fetchone()
+        if not deleted:
+            conn.rollback()
+            return jsonify({'error': 'Blacklist entry not found'}), 404
+
+        conn.commit()
+        return jsonify({'status': 'deleted', 'blacklist_id': deleted['blacklist_id']})
+    except Exception as exc:
+        conn.rollback()
+        logging.exception("❌ Failed to delete blacklist entry %s", blacklist_id)
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
 __all__ = ['bp']

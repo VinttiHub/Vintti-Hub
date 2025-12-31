@@ -198,6 +198,31 @@ body {
   z-index: 2;
   position: relative;
 }
+#candidatesTable tbody tr.danger-row {
+  background: linear-gradient(to right, #ffe3e3 0%, #fff5f5 100%);
+  box-shadow: 0 0 12px rgba(255, 0, 0, 0.18);
+}
+#candidatesTable tbody tr.danger-row:hover {
+  background: linear-gradient(to right, #ffd2d2 0%, #ffe9e9 100%);
+  box-shadow: 0 0 20px rgba(255, 0, 0, 0.25), 0 0 40px rgba(255, 0, 0, 0.2);
+}
+#candidatesTable tbody tr.danger-row .status-chip {
+  background-color: #ff4d4f;
+  color: #fff;
+}
+#candidatesTable tbody td.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#candidatesTable tbody td.danger-name {
+  color: #7a0b0b;
+  font-weight: 600;
+}
+#candidatesTable tbody td .danger-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
 
 /* =========================================================================
    Candidate modal

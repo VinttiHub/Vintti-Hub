@@ -47,6 +47,18 @@ phoneEl?.addEventListener('input', paintWaBtn);    // mientras escriben
 
 window.__VINTTI_WIRED = window.__VINTTI_WIRED || {};
 
+function showCuteToast(messageHtml, duration = 5000) {
+  const toast = document.getElementById('cuteToast');
+  if (!toast) return;
+  toast.innerHTML = messageHtml;
+  toast.classList.add('show');
+  if (toast.__hideTimer) clearTimeout(toast.__hideTimer);
+  toast.__hideTimer = setTimeout(() => {
+    toast.classList.remove('show');
+    toast.__hideTimer = null;
+  }, duration);
+}
+
 const EQUIPMENT_OPTIONS = [
   { value: "Laptop",     emoji: "💻" },
   { value: "Monitor",    emoji: "🖥️" },
@@ -1818,15 +1830,6 @@ function wireVideoLinkDedupe() {
   const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const cid  = new URLSearchParams(window.location.search).get('id');
 
-  function showAutoToast(html, ms = 5000){
-    document.querySelectorAll('.toast-floating').forEach(n => n.remove());
-    const box = document.createElement('div');
-    box.className = 'toast-floating';
-    box.innerHTML = html;
-    document.body.appendChild(box);
-    setTimeout(()=> box.remove(), ms);
-  }
-
   check.addEventListener('change', async () => {
     if (!cid) return;
     const val = !!check.checked;
@@ -1840,7 +1843,7 @@ function wireVideoLinkDedupe() {
       if (!r.ok) throw new Error(await r.text().catch(()=> 'PATCH failed'));
 
       if (val) {
-        showAutoToast(
+        showCuteToast(
           `🎀 You rock! Task completed — resignation letter & references are on track.<br/>
            You’re the cutest recruiter ever 💖✨`,
           5000
@@ -1850,6 +1853,103 @@ function wireVideoLinkDedupe() {
       console.error('❌ Saving check_hr_lead failed', e);
       check.checked = !val; // revertir si falló
       alert('We could not save this change. Please try again.');
+    }
+  });
+})();
+
+(function wireBlacklistToggle(){
+  const checkbox = document.getElementById('blacklist-toggle');
+  if (!checkbox) return;
+
+  const statusText = document.getElementById('blacklist-status-text');
+  const params = new URLSearchParams(window.location.search);
+  const candidateParam = params.get('id');
+  const candidateId = candidateParam ? Number(candidateParam) : NaN;
+  const API  = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+
+  if (!candidateParam || Number.isNaN(candidateId)) {
+    checkbox.disabled = true;
+    if (statusText) statusText.textContent = 'Missing candidate id.';
+    return;
+  }
+
+  let currentBlacklistId = null;
+  let busy = false;
+
+  async function refreshBlacklistStatus(){
+    busy = true;
+    checkbox.disabled = true;
+    checkbox.indeterminate = true;
+    if (statusText) statusText.textContent = 'Checking blacklist status...';
+    try {
+      const resp = await fetch(`${API}/api/blacklist/status?candidate_id=${encodeURIComponent(candidateParam)}`);
+      if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to fetch status'));
+      const payload = await resp.json();
+      currentBlacklistId = payload?.blacklist_id || null;
+      checkbox.checked = Boolean(payload?.is_blacklisted);
+      if (statusText) {
+        statusText.textContent = checkbox.checked
+          ? 'Candidate is currently blacklisted.'
+          : 'Candidate is not blacklisted.';
+      }
+    } catch (err) {
+      console.error('❌ Unable to load blacklist status', err);
+      checkbox.checked = false;
+      if (statusText) statusText.textContent = 'Could not load blacklist status.';
+    } finally {
+      checkbox.indeterminate = false;
+      checkbox.disabled = false;
+      busy = false;
+    }
+  }
+
+  refreshBlacklistStatus();
+
+  checkbox.addEventListener('change', async () => {
+    if (busy) return;
+    const shouldBlacklist = checkbox.checked;
+    busy = true;
+    checkbox.disabled = true;
+    if (statusText) {
+      statusText.textContent = shouldBlacklist
+        ? 'Adding candidate to blacklist...'
+        : 'Removing candidate from blacklist...';
+    }
+
+    try {
+      if (shouldBlacklist) {
+        if (!currentBlacklistId) {
+          const resp = await fetch(`${API}/api/blacklist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ candidate_id: candidateId })
+          });
+          if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to create blacklist entry'));
+          const payload = await resp.json();
+          currentBlacklistId = payload?.blacklist_id || currentBlacklistId;
+        }
+        showCuteToast('Candidate added to blacklist ⚠️', 4000);
+        if (statusText) statusText.textContent = 'Candidate is currently blacklisted.';
+      } else {
+        if (!currentBlacklistId) {
+          checkbox.checked = false;
+          if (statusText) statusText.textContent = 'Candidate is not blacklisted.';
+        } else {
+          const resp = await fetch(`${API}/api/blacklist/${currentBlacklistId}`, { method: 'DELETE' });
+          if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to delete blacklist entry'));
+          currentBlacklistId = null;
+          showCuteToast('Candidate removed from blacklist ✅', 4000);
+          if (statusText) statusText.textContent = 'Candidate is not blacklisted.';
+        }
+      }
+    } catch (err) {
+      console.error('❌ Unable to save blacklist change', err);
+      checkbox.checked = !shouldBlacklist;
+      if (statusText) statusText.textContent = 'We could not save this change.';
+      alert('We could not update the blacklist status. Please try again.');
+    } finally {
+      checkbox.disabled = false;
+      busy = false;
     }
   });
 })();

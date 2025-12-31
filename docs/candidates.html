@@ -136,7 +136,7 @@
       <div class="left-controls">
         <!-- DataTables will inject its controls here -->
         <div id="datatable-wrapper"></div>
-      </div>
+          </div>
               <!-- === Filtros avanzados (Status / Modelo) === -->
           <div class="filters-bar">
             <label class="sr-only" for="statusFilter">Status</label>
@@ -151,6 +151,13 @@
               <option value="">Model: All</option>
               <option value="Recruiting">Recruiting</option>
               <option value="Staffing">Staffing</option>
+            </select>
+
+            <label class="sr-only" for="blacklistFilter">Blacklist</label>
+            <select id="blacklistFilter" class="filter-select">
+              <option value="all">Blacklist: All</option>
+              <option value="only">Only blacklisted</option>
+              <option value="exclude">Exclude blacklisted</option>
             </select>
           </div>
       <div class="right-controls">

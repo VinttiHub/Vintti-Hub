@@ -192,6 +192,29 @@ body {
   position: relative;
 }
 
+.blacklisted-row {
+  background: linear-gradient(to right, #fff1f1 0%, #ffffff 100%);
+  box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.4) inset, 0 0 8px rgba(244, 63, 94, 0.2);
+}
+.blacklisted-row:hover {
+  background: linear-gradient(to right, #ffe4e4 0%, #ffffff 100%);
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.16), 0 0 40px rgba(244, 63, 94, 0.08);
+}
+
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.danger-name {
+  color: #b42318;
+  font-weight: 600;
+}
+.danger-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
 /* =========================================================================
    Candidate modal
    ========================================================================= */

@@ -57,7 +57,8 @@ const candidateState = {
   dataTable: null,
   searchBound: false,
   duplicateMatch: null,
-  duplicateDetailsCache: new Map()
+  duplicateDetailsCache: new Map(),
+  blacklistFilter: 'all'
 };
 
 const candidateModalRefs = {
@@ -90,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
   candidateState.tbody = document.getElementById('candidatesTableBody');
   candidateState.tableEl = document.getElementById('candidatesTable');
 
+  setupBlacklistFilterControl();
   loadCandidates();
   setupRowNavigation();
   setupSidebarToggle();
@@ -97,8 +99,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadCandidates() {
+  const filter = candidateState.blacklistFilter || 'all';
+  const url = new URL(`${API_BASE}/candidates/light_fast`);
+  url.searchParams.set('blacklist_filter', filter);
+
   try {
-    const res = await fetch(`${API_BASE}/candidates/light_fast`, { cache: 'no-store' });
+    const res = await fetch(url.toString(), { cache: 'no-store' });
     const data = await res.json();
     candidateState.data = Array.isArray(data) ? data : [];
     paintCandidateRows(candidateState.data);
@@ -118,6 +124,10 @@ function buildCandidateRow(candidate) {
   const rawPhone = candidate.phone ? String(candidate.phone) : '';
   const phone = rawPhone.replace(/\D/g, '');
   const linkedin = candidate.linkedin || '';
+  const isBlacklisted = Boolean(candidate.is_blacklisted);
+  if (isBlacklisted) {
+    tr.classList.add('blacklisted-row');
+  }
 
   const condition = tr.dataset.status || 'unhired';
   const chipClass = {
@@ -125,9 +135,16 @@ function buildCandidateRow(candidate) {
     unhired: 'status-unhired'
   }[condition] || 'status-unhired';
 
+  const nameCellClasses = ['name-cell'];
+  if (isBlacklisted) nameCellClasses.push('danger-name');
+  const nameContent = isBlacklisted
+    ? `<span class="danger-emoji" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">🚨</span>
+       <span>${candidate.name || '—'}</span>`
+    : `${candidate.name || '—'}`;
+
   tr.innerHTML = `
     <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
-    <td>${candidate.name || '—'}</td>
+    <td class="${nameCellClasses.join(' ')}">${nameContent}</td>
     <td>${candidate.country || '—'}</td>
     <td>
       ${
@@ -215,6 +232,28 @@ function bindNameSearchInput(table) {
     nameSearchDebounce = setTimeout(() => table.column(1).search(value).draw(), 150);
   });
   candidateState.searchBound = true;
+}
+
+function setupBlacklistFilterControl() {
+  const select = document.getElementById('blacklistFilter');
+  if (!select) return;
+
+  const validValues = new Set(['all', 'only', 'exclude']);
+  const normalizeValue = (value) => {
+    const next = (value || '').trim().toLowerCase();
+    return validValues.has(next) ? next : 'all';
+  };
+
+  const initialValue = normalizeValue(select.value);
+  candidateState.blacklistFilter = initialValue;
+  select.value = initialValue;
+
+  select.addEventListener('change', () => {
+    const nextValue = normalizeValue(select.value);
+    if (candidateState.blacklistFilter === nextValue) return;
+    candidateState.blacklistFilter = nextValue;
+    loadCandidates();
+  });
 }
 
 function setupRowNavigation() {
@@ -422,11 +461,12 @@ function gatherCandidateFormValues() {
   const phoneCountry = candidateModalRefs.phoneCodeSelect?.value || DEFAULT_PHONE_COUNTRY;
   const phoneCode = PHONE_CODE_BY_COUNTRY[phoneCountry] || '';
   const rawPhone = candidateModalRefs.phoneInput?.value || '';
-  const linkedinRaw = candidateModalRefs.linkedinInput?.value.trim() || '';
+  const linkedinRawInput = candidateModalRefs.linkedinInput?.value || '';
+  const linkedinRaw = linkedinRawInput.trim();
 
   const phoneDigits = normalizePhoneDigits(rawPhone, phoneCode);
-  const normalizedLinkedin = normalizeLinkedin(linkedinRaw);
   const linkedinForSubmit = formatLinkedinForSubmit(linkedinRaw);
+  const normalizedLinkedin = normalizeLinkedin(linkedinForSubmit);
 
   return {
     name,
@@ -568,9 +608,9 @@ function normalizeName(name) {
 function normalizeLinkedin(url) {
   if (!url) return '';
   let clean = url.trim().toLowerCase();
-  clean = clean.replace(/^https?:\/\//, '');
-  clean = clean.replace(/^www\./, '');
+  clean = clean.replace(/\s+/g, ' ');
   clean = clean.replace(/\/+$/, '');
+  clean = clean.trim();
   return clean;
 }
 

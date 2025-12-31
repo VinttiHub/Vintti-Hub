@@ -264,6 +264,12 @@ function CandidatesPage() {
       closeModal();
       loadCandidates();
     } catch (error) {
+      if (error.details?.candidate) {
+        setDuplicateInfo({
+          candidate: error.details.candidate,
+          fields: error.details.conflict_fields || [],
+        });
+      }
       setFormError(error.message || 'Failed to create candidate.');
     } finally {
       setSubmitting(false);
@@ -356,12 +362,24 @@ function CandidatesPage() {
                 const status = (candidate.status || 'unhired').toLowerCase();
                 const chipClass = status === 'active' ? 'status-active' : 'status-unhired';
                 const phoneDigits = normalizeStoredPhone(candidate.phone, candidate.country);
+                const isBlacklisted = Boolean(candidate.is_blacklisted);
                 return (
-                  <tr key={candidate.candidate_id} onClick={() => handleRowClick(candidate.candidate_id)}>
+                  <tr
+                    key={candidate.candidate_id}
+                    className={isBlacklisted ? 'danger-row' : undefined}
+                    onClick={() => handleRowClick(candidate.candidate_id)}
+                  >
                     <td className="condition-cell">
                       <span className={`status-chip ${chipClass}`}>{status || 'unhired'}</span>
                     </td>
-                    <td>{candidate.name || '—'}</td>
+                    <td className={`name-cell${isBlacklisted ? ' danger-name' : ''}`}>
+                      {isBlacklisted ? (
+                        <span className="danger-emoji" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">
+                          🚨
+                        </span>
+                      ) : null}
+                      <span>{candidate.name || '—'}</span>
+                    </td>
                     <td>{candidate.country || '—'}</td>
                     <td>
                       {phoneDigits ? (

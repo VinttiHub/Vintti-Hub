@@ -19,12 +19,19 @@ export async function createCandidate(payload) {
     body: JSON.stringify(payload),
   });
   const text = await res.text();
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
   if (!res.ok) {
-    throw new Error(text || 'Failed to create candidate');
+    const message = data?.error || data?.message || text || 'Failed to create candidate';
+    const error = new Error(message);
+    if (data) error.details = data;
+    throw error;
   }
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
+  return data ?? text;
 }
