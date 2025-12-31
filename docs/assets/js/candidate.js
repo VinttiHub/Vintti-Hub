@@ -1144,17 +1144,30 @@ async function initSidebarProfileCandidates(){
   const $emailE = document.getElementById("profileEmail");
   const $img    = document.getElementById("profileAvatarImg");
 
-  // Nunca mostrar foto
-  if ($img) {
-    $img.removeAttribute("src");
-    $img.style.display = "none";
-  }
-
   // Nunca mostrar email (igual que en main)
   if ($emailE) {
     $emailE.textContent = "";
     $emailE.style.display = "none";
   }
+
+  const showInitials = (value) => {
+    if (!$init || !$img) return;
+    $init.style.display = "grid";
+    $init.textContent = value || "—";
+    $img.removeAttribute("src");
+    $img.style.display = "none";
+  };
+
+  const showAvatar = (src) => {
+    if (!$img || !$init) return;
+    if (src) {
+      $img.src = src;
+      $img.style.display = "block";
+      $init.style.display = "none";
+    } else {
+      showInitials($init?.textContent || "—");
+    }
+  };
 
   // Resolver uid igual que en main
   let uid = null;
@@ -1172,7 +1185,17 @@ async function initSidebarProfileCandidates(){
 
   // Iniciales rápidas con el email mientras carga
   const email = (localStorage.getItem("user_email") || sessionStorage.getItem("user_email") || "").toLowerCase();
-  if ($init) $init.textContent = initialsFromEmail(email);
+  if ($init) {
+    $init.textContent = initialsFromEmail(email);
+    $init.style.display = "grid";
+  }
+
+  const cachedAvatar = localStorage.getItem("user_avatar");
+  if (cachedAvatar) {
+    showAvatar(cachedAvatar);
+  } else {
+    showInitials($init?.textContent || initialsFromEmail(email));
+  }
 
   // Intentar /users/<uid>, fallback a /profile/me
   let user = null;
@@ -1201,8 +1224,24 @@ async function initSidebarProfileCandidates(){
   if (userName) {
     if ($name) $name.textContent = userName;            // ← muestra el nombre
     if ($init) $init.textContent = initialsFromName(userName); // ← iniciales del nombre
+  } else if ($name) {
+    $name.textContent = "Profile"; // fallback
+  }
+
+  const avatarSrc = typeof window.resolveUserAvatar === "function"
+    ? window.resolveUserAvatar({
+        avatar_url: user?.avatar_url,
+        email_vintti: user?.email_vintti || email,
+        email: user?.email_vintti || email,
+        user_id: user?.user_id ?? uid
+      })
+    : (user?.avatar_url || "");
+
+  if (avatarSrc) {
+    localStorage.setItem("user_avatar", avatarSrc);
+    showAvatar(avatarSrc);
   } else {
-    if ($name) $name.textContent = "Profile"; // fallback
+    showInitials(initialsFromName(userName) || initialsFromEmail(email));
   }
 
   // Aseguramos que se vea

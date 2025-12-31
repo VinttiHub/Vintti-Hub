@@ -291,11 +291,22 @@ function escapeHtml(s){
   return String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 }
 
+function prettyNameFromEmail(email, fallback = 'Assign HR Lead') {
+  const local = String(email || '').split('@')[0];
+  if (!local) return fallback;
+  const cleaned = local.replace(/[_\-.]+/g, ' ').trim();
+  if (!cleaned) return fallback;
+  return cleaned.split(/\s+/).map(part => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ') || fallback;
+}
+
 function displayNameForHR(email){
   const key = String(email||'').toLowerCase();
   if (!key) return 'Assign HR Lead';
+  const directoryName = (window.userDirectoryByEmail || {})[key];
+  if (directoryName) return directoryName;
   const u = (window.allowedHRUsers||[]).find(x => String(x.email_vintti||'').toLowerCase() === key);
-  return u?.user_name || 'Assign HR Lead';
+  if (u?.user_name) return u.user_name;
+  return prettyNameFromEmail(email, 'Assign HR Lead');
 }
 
 function displayNameForSales(value){
@@ -319,8 +330,15 @@ function displayNameForSales(value){
   return String(value||'Unassigned');
 }
 
+const HIDDEN_HR_FILTER_EMAILS = new Set([
+  'bahia@vintti.com',
+  'sol@vintti.com',
+  'agustin@vintti.com',
+  'agustina.ferrari@vintti.com',
+].map((email) => email.toLowerCase()));
 window.allowedSalesUsers = window.allowedSalesUsers || [];
 window.allowedHRUsers = window.allowedHRUsers || [];
+window.userDirectoryByEmail = window.userDirectoryByEmail || {};
 let roleDirectoryPromise = null;
 
 function normalizeRoleDirectory(users) {
@@ -340,16 +358,29 @@ function normalizeRoleDirectory(users) {
   return deduped;
 }
 
+function buildUserDirectoryMap(users) {
+  const map = {};
+  (Array.isArray(users) ? users : []).forEach((user) => {
+    const email = String(user?.email_vintti || '').trim().toLowerCase();
+    if (!email || map[email]) return;
+    if (user?.user_name) map[email] = user.user_name;
+  });
+  return map;
+}
+
 async function fetchRoleDirectories() {
-  const [hrRes, salesRes] = await Promise.all([
+  const [hrRes, salesRes, usersRes] = await Promise.all([
     fetch(`${API_BASE}/users/recruiters`, { credentials: 'include' }),
-    fetch(`${API_BASE}/users/sales-leads`, { credentials: 'include' })
+    fetch(`${API_BASE}/users/sales-leads`, { credentials: 'include' }),
+    fetch(`${API_BASE}/users`, { credentials: 'include' }),
   ]);
   if (!hrRes.ok) throw new Error(`Recruiter directory failed: ${hrRes.status}`);
   if (!salesRes.ok) throw new Error(`Sales directory failed: ${salesRes.status}`);
-  const [hrData, salesData] = await Promise.all([hrRes.json(), salesRes.json()]);
+  if (!usersRes.ok) throw new Error(`Users directory failed: ${usersRes.status}`);
+  const [hrData, salesData, usersData] = await Promise.all([hrRes.json(), salesRes.json(), usersRes.json()]);
   window.allowedHRUsers = normalizeRoleDirectory(hrData);
   window.allowedSalesUsers = normalizeRoleDirectory(salesData);
+  window.userDirectoryByEmail = buildUserDirectoryMap(usersData);
 }
 
 function ensureRoleDirectoryPromise() {
@@ -802,11 +833,11 @@ if (!window.allowedHRUsers || !window.allowedHRUsers.length) {
   }
 }
 
-// Mapa email->nombre de HR permitidos
-const emailToNameMap = {};
+// Mapa email->nombre priorizando tabla users
+const emailToNameMap = { ...(window.userDirectoryByEmail || {}) };
 (window.allowedHRUsers || []).forEach(u => {
   const email = String(u.email_vintti || '').toLowerCase();
-  if (email) emailToNameMap[email] = u.user_name;
+  if (email && !emailToNameMap[email]) emailToNameMap[email] = u.user_name;
 });
 
 // STAGES (igual que antes)
@@ -818,14 +849,24 @@ if (data.some(d => !d.sales_lead_name)) {
   uniqueSalesLeads.push('Unassigned'); // coincide con regex ^$ que pondremos abajo
 }
 
-// HR LEAD: usar el texto que realmente aparece en la celda del <select>
-// - si no hay hr o es legacy (no está en allowedHRUsers) -> 'Assign HR Lead'
+// HR LEAD: mostrar nombre completo y ocultar ciertos correos
+const hrLeadNameToEmail = {};
 let uniqueHRLeads = [...new Set(
   data.map(d => {
-    const hrEmail = String(d.opp_hr_lead || '').toLowerCase();
-    return hrEmail && emailToNameMap[hrEmail] ? emailToNameMap[hrEmail] : 'Assign HR Lead';
-  })
+    const hrEmailRaw = String(d.opp_hr_lead || '').trim();
+    const hrEmail = hrEmailRaw.toLowerCase();
+    if (!hrEmail) return 'Assign HR Lead';
+    if (HIDDEN_HR_FILTER_EMAILS.has(hrEmail)) return null;
+    const label = emailToNameMap[hrEmail] || displayNameForHR(hrEmailRaw);
+    if (label && label !== 'Assign HR Lead') {
+      hrLeadNameToEmail[label.toLowerCase()] = hrEmail;
+      return label;
+    }
+    return 'Assign HR Lead';
+  }).filter(Boolean)
 )];
+if (!uniqueHRLeads.includes('Assign HR Lead')) uniqueHRLeads.unshift('Assign HR Lead');
+window.hrLeadNameToEmail = hrLeadNameToEmail;
 const filterRegistry = [];
 // Llama a los filtros con estas opciones
 buildMultiFilter('filterStage',     uniqueStages,     0, 'Stage',      'Stage',    table);
@@ -973,6 +1014,10 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
   }
 function nameToEmail(label, isHR){
   const lower = String(label||'').toLowerCase();
+  if (isHR && window.hrLeadNameToEmail) {
+    const mapped = window.hrLeadNameToEmail[lower];
+    if (mapped) return mapped;
+  }
 
   const arr = isHR ? (window.allowedHRUsers||[]) : (window.allowedSalesUsers||[]);
   const match = arr.find(u => String(u.user_name||'').toLowerCase() === lower);
@@ -1029,9 +1074,12 @@ function paintLeadDots(selectedList) {
 
     // email (para avatar) y nombre bonito (para tooltip)
     const email   = isPlaceholder ? '' : nameToEmail(label, IS_HR);
+    const fallbackLabel = label || (IS_HR ? 'Assign HR Lead' : 'Unassigned');
     const tipText = isPlaceholder
-      ? label
-      : (IS_HR ? displayNameForHR(email) : displayNameForSales(label));
+      ? fallbackLabel
+      : (IS_HR
+          ? (email ? displayNameForHR(email) : fallbackLabel)
+          : displayNameForSales(label));
 
     // ✅ tooltip + accesibilidad + foco por teclado
     span.setAttribute('data-tip', escapeHtml(tipText));
@@ -1336,9 +1384,26 @@ async function initSidebarProfile(){
   const $emailE = document.getElementById('profileEmail');
   const $img    = document.getElementById('profileAvatarImg');
 
-  // never show photo
-  if ($img) { $img.removeAttribute('src'); $img.style.display = 'none'; }
   if ($emailE) { $emailE.textContent = ''; $emailE.style.display = 'none'; }
+
+  const showInitials = (value) => {
+    if (!$init || !$img) return;
+    $init.style.display = 'grid';
+    $init.textContent = value || '—';
+    $img.removeAttribute('src');
+    $img.style.display = 'none';
+  };
+
+  const showAvatar = (src) => {
+    if (!$img || !$init) return;
+    if (src) {
+      $img.src = src;
+      $img.style.display = 'block';
+      $init.style.display = 'none';
+    } else {
+      showInitials($init?.textContent || '—');
+    }
+  };
 
   // resolve uid
   let uid = null;
@@ -1356,7 +1421,17 @@ async function initSidebarProfile(){
 
   // show email initials immediately
   const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase();
-  if ($init) $init.textContent = initialsFromEmail(email);
+  if ($init) {
+    $init.textContent = initialsFromEmail(email);
+    $init.style.display = 'grid';
+  }
+
+  const cachedAvatar = localStorage.getItem('user_avatar');
+  if (cachedAvatar) {
+    showAvatar(cachedAvatar);
+  } else {
+    showInitials($init?.textContent || initialsFromEmail(email));
+  }
 
   // try /users/<uid>, fallback to /profile/me
   let user = null;
@@ -1379,8 +1454,24 @@ async function initSidebarProfile(){
   if (userName) {
     if ($name) $name.textContent = userName;
     if ($init) $init.textContent = initialsFromName(userName);
+  } else if ($name) {
+    $name.textContent = 'Profile'; // graceful fallback label
+  }
+
+  const avatarSrc = typeof window.resolveUserAvatar === 'function'
+    ? window.resolveUserAvatar({
+        avatar_url: user?.avatar_url,
+        email_vintti: user?.email_vintti || email,
+        email: user?.email_vintti || email,
+        user_id: user?.user_id ?? uid
+      })
+    : (user?.avatar_url || '');
+
+  if (avatarSrc) {
+    localStorage.setItem('user_avatar', avatarSrc);
+    showAvatar(avatarSrc);
   } else {
-    if ($name) $name.textContent = 'Profile'; // graceful fallback label
+    showInitials(initialsFromName(userName) || initialsFromEmail(email));
   }
 
   // ensure visible
@@ -2312,23 +2403,6 @@ window.addEventListener('pageshow', () => {
     tableCard.style.transform = 'translateX(0)';
   }
 });
- // === Avatares por email ===
-const AVATAR_BASE = './assets/img/'; 
-const AVATAR_BY_EMAIL = {
-  'agostina@vintti.com':                'agos.png',
-  'bahia@vintti.com':                   'bahia.png',
-  'lara@vintti.com':                    'lara.png',
-  'jazmin@vintti.com':                  'jaz.png',
-  'pilar@vintti.com':                   'pilar.png',
-  'pilar.fernandez@vintti.com':         'pilar_fer.png', 
-  'agustin@vintti.com':                 'agus.png',
-  'agustina.barbero@vintti.com':        'agustina.png',
-  'josefina@vintti.com':                'josefina.png',
-  'constanza@vintti.com':               'constanza.png',
-  'mariano@vintti.com':                 'mariano.png',
-  'julieta@vintti.com':                 'julieta.png'
-};
-
 // --- HR initials (dos letras) ---
 const HR_INITIALS_BY_EMAIL = {
   'agostina@vintti.com':                'AC',
@@ -2406,12 +2480,6 @@ function getHRLeadCell(opp) {
   `;
 }
 
-function resolveAvatar(email) {
-  if (!email) return null;
-  const key = String(email).trim().toLowerCase();
-  const filename = AVATAR_BY_EMAIL[key];
-  return filename ? (AVATAR_BASE + filename) : null;
-}
 
 function showLoginAvatar(email) {
   const img = document.getElementById('login-avatar');
