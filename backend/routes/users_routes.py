@@ -104,8 +104,7 @@ def list_sales_leads():
             cur.execute("""
                 WITH normalized AS (
                   SELECT
-                    LOWER(TRIM(a.account_manager)) AS email,
-                    MAX(NULLIF(TRIM(a.account_manager_name), '')) AS fallback_name
+                    LOWER(TRIM(a.account_manager)) AS email
                   FROM account a
                   WHERE a.account_manager IS NOT NULL
                     AND TRIM(a.account_manager) <> ''
@@ -113,10 +112,10 @@ def list_sales_leads():
                 )
                 SELECT
                   n.email,
-                  COALESCE(NULLIF(u.user_name, ''), n.fallback_name, n.email) AS user_name
+                  COALESCE(NULLIF(u.user_name, ''), n.email) AS user_name
                 FROM normalized n
                 LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = n.email
-                ORDER BY COALESCE(NULLIF(u.user_name, ''), n.fallback_name, n.email) ASC;
+                ORDER BY COALESCE(NULLIF(u.user_name, ''), n.email) ASC;
             """)
             rows = cur.fetchall() or []
         return jsonify(rows), 200

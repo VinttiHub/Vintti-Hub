@@ -164,7 +164,8 @@ a {
   background-color: rgba(0, 0, 0, 0.035);
 }
 .blacklist-card {
-  transition: background-color 0.25s ease, border-color 0.25s ease;
+  border: 1px solid transparent;
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .blacklist-card.is-blacklisted {
   background: rgba(244, 63, 94, 0.12);
@@ -173,6 +174,14 @@ a {
 .blacklist-card.not-blacklisted {
   background: rgba(16, 185, 129, 0.1);
   border-color: rgba(16, 185, 129, 0.3);
+}
+.blacklist-card .pretty-check input:checked {
+  background: linear-gradient(135deg, #f43f5e, #be123c);
+  border-color: rgba(244, 63, 94, 0.85);
+  box-shadow: 0 6px 18px rgba(244, 63, 94, 0.35);
+}
+.blacklist-card .pretty-check input:checked::before {
+  border-color: #fff;
 }
 
 .icon {
@@ -2721,16 +2730,24 @@ html body .month-year .btn-clear:active{
   display:grid; place-items:center; outline:none;
   transition: transform .14s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
   box-shadow: 0 2px 8px rgba(17,24,39,.06) inset;
+  position: relative;
 }
 .pretty-check input:hover{ transform: translateY(-1px); }
 .pretty-check input:active{ transform: scale(.96); }
 
 .pretty-check input::before{
   content:"";
-  width:12px; height:12px; transform: scale(0);
-  transition: transform .18s ease;
-  clip-path: polygon(14% 44%, 0 65%, 46% 100%, 100% 16%, 82% 0, 43% 62%);
-  background:#fff;
+  position:absolute;
+  width:6px;
+  height:12px;
+  border-right:2px solid transparent;
+  border-bottom:2px solid transparent;
+  top:3px;
+  left:7px;
+  transform: rotate(45deg) scale(0);
+  transform-origin: center;
+  transition: transform .18s ease, border-color .18s ease;
+  pointer-events:none;
 }
 
 /* caja visual que permite sparkles */
@@ -2744,7 +2761,10 @@ html body .month-year .btn-clear:active{
   background: linear-gradient(180deg, var(--accent-2), var(--accent));
   box-shadow: 0 6px 18px rgba(124,58,237,.25);
 }
-.pretty-check input:checked::before{ transform: scale(1); }
+.pretty-check input:checked::before{
+  border-color:#fff;
+  transform: rotate(45deg) scale(1);
+}
 
 /* sparkles */
 .pretty-check input:checked + .box::after{
