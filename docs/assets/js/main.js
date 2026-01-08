@@ -360,7 +360,9 @@ function buildDefaultSalesUsers() {
     }))
     .sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
 }
-window.allowedSalesUsers = window.allowedSalesUsers || [];
+window.allowedSalesUsers = (window.allowedSalesUsers && window.allowedSalesUsers.length)
+  ? window.allowedSalesUsers
+  : buildDefaultSalesUsers();
 window.allowedHRUsers = window.allowedHRUsers || [];
 window.userDirectoryByEmail = window.userDirectoryByEmail || {};
 let roleDirectoryPromise = null;

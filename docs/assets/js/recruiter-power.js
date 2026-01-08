@@ -316,14 +316,18 @@ function formatDisplayDate(dateString) {
   return `${day}/${month}/${year}`;
 }
 function formatDaysSummary(value) {
-  if (value == null || Number.isNaN(value)) return "No data";
-  const rounded = Math.round(value * 10) / 10;
+  if (value == null) return "No data";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "No data";
+  const rounded = Math.round(num * 10) / 10;
   const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
   return `${text} day${rounded === 1 ? "" : "s"}`;
 }
 function formatDaysLong(value) {
-  if (value == null || Number.isNaN(value)) return "Duration not documented";
-  const abs = Math.round(Number(value));
+  if (value == null) return "Duration not documented";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "Duration not documented";
+  const abs = Math.round(num);
   return `${abs} day${abs === 1 ? "" : "s"}`;
 }
 function setDetailCardsEnabled(enabled) {
@@ -415,9 +419,14 @@ function createDurationItems(entries = [], type) {
     }
     const timeline = timelineParts.length ? timelineParts.join(" → ") : "";
     const metaPieces = [];
-    if (stageLabel) metaPieces.push(stageLabel);
-    metaPieces.push(daysText);
+    if (daysText !== "Duration not documented") {
+      const action = endLabel === "Close" ? "to close" : "to send first batch";
+      metaPieces.push(`Took ${daysText} ${action}`);
+    } else {
+      metaPieces.push(daysText);
+    }
     if (timeline) metaPieces.push(timeline);
+    if (stageLabel) metaPieces.push(stageLabel);
     return {
       key: entry.opportunity_id || `duration-${type}-${index}`,
       primary: title,
