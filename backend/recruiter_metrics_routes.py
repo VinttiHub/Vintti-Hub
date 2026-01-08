@@ -81,6 +81,15 @@ def register_recruiter_metrics_routes(app):
         if err:
             return jsonify({"status": "error", "message": err}), 400
 
+        if disp_end is None:
+            # fallback: display end defaults to the inclusive day before window_end
+            disp_end = window_end - timedelta(days=1)
+
+        left90_end_inclusive = disp_end
+        left90_start_inclusive = left90_end_inclusive - timedelta(days=89)
+        left90_window_start = left90_start_inclusive
+        left90_window_end = left90_end_inclusive + timedelta(days=1)
+
         sql = """
         WITH base AS (
             SELECT
@@ -356,7 +365,62 @@ def register_recruiter_metrics_routes(app):
         ORDER BY cd.end_date DESC NULLS LAST, cd.hire_opportunity_id DESC;
         """
 
+        left90_summary_sql = """
+        WITH churned AS (
+            SELECT
+                h.hire_opp_id AS hire_opportunity_id,
+                h.opportunity_id,
+                h.start_date::date AS start_date,
+                h.end_date::date AS end_date,
+                CASE
+                    WHEN h.start_date IS NOT NULL
+                         AND h.end_date IS NOT NULL
+                    THEN GREATEST(0, (h.end_date::date - h.start_date::date))::int
+                    ELSE NULL
+                END AS tenure_days
+            FROM hire_opportunity h
+            WHERE h.end_date IS NOT NULL
+              AND h.end_date::date >= %(left90_start)s
+              AND h.end_date::date <  %(left90_end)s
+        )
+        SELECT
+            LOWER(o.opp_hr_lead) AS hr_lead_email,
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE c.tenure_days IS NOT NULL) AS tenure_known,
+            COUNT(*) FILTER (WHERE c.tenure_days IS NULL) AS tenure_unknown,
+            COUNT(*) FILTER (
+                WHERE c.tenure_days IS NOT NULL
+                  AND c.tenure_days < 90
+            ) AS within_90
+        FROM churned c
+        LEFT JOIN opportunity o
+            ON o.opportunity_id = c.opportunity_id
+        WHERE o.opp_hr_lead IS NOT NULL
+        GROUP BY LOWER(o.opp_hr_lead);
+        """
+
+        opportunity_details_sql = """
+        SELECT
+            o.opportunity_id,
+            o.opp_hr_lead AS hr_lead_email,
+            u.user_name AS hr_lead_name,
+            o.opp_stage AS opportunity_stage,
+            o.opp_close_date::date AS close_date,
+            o.opp_position_name AS opportunity_title,
+            a.client_name AS opportunity_client_name
+        FROM opportunity o
+        LEFT JOIN users u
+            ON LOWER(u.email_vintti) = LOWER(o.opp_hr_lead)
+        LEFT JOIN account a
+            ON a.account_id = o.account_id
+        WHERE o.opp_hr_lead IS NOT NULL
+          AND o.opp_stage IN ('Close Win', 'Closed Lost')
+        ORDER BY o.opp_close_date DESC NULLS LAST, o.opportunity_id;
+        """
+
         churn_detail_rows = []
+        opportunity_detail_rows = []
+        left90_summary_rows = []
         try:
             conn = get_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -379,6 +443,18 @@ def register_recruiter_metrics_routes(app):
                     },
                 )
                 churn_detail_rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    left90_summary_sql,
+                    {
+                        "left90_start": left90_window_start,
+                        "left90_end": left90_window_end,
+                    },
+                )
+                left90_summary_rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(opportunity_details_sql)
+                opportunity_detail_rows = cur.fetchall()
         except Exception as e:
             logger.exception("Error fetching recruiter metrics")
             return jsonify({"status": "error", "message": str(e)}), 500
@@ -459,6 +535,8 @@ def register_recruiter_metrics_routes(app):
             "tenure_known": 0,
             "tenure_unknown": 0,
         }
+        opportunity_details_by_lead = {}
+        left90_summary_by_lead = {}
 
         for row in churn_detail_rows:
             tenure_days = row.get("tenure_days")
@@ -513,6 +591,17 @@ def register_recruiter_metrics_routes(app):
             else:
                 summary["tenure_unknown"] += 1
 
+        for row in left90_summary_rows:
+            lead_key = (row.get("hr_lead_email") or "").lower()
+            if not lead_key:
+                continue
+            left90_summary_by_lead[lead_key] = {
+                "total": int(row.get("total") or 0),
+                "within_90": int(row.get("within_90") or 0),
+                "tenure_known": int(row.get("tenure_known") or 0),
+                "tenure_unknown": int(row.get("tenure_unknown") or 0),
+            }
+
         for item in metrics:
             lead_key = (item.get("hr_lead_email") or item.get("hr_lead") or "").lower()
             summary = churn_summary_by_lead.get(lead_key)
@@ -527,6 +616,25 @@ def register_recruiter_metrics_routes(app):
             else:
                 item["churn_within_90_rate"] = None
 
+        for item in metrics:
+            lead_key = (item.get("hr_lead_email") or item.get("hr_lead") or "").lower()
+            left90_summary = left90_summary_by_lead.get(lead_key, None)
+            if not left90_summary:
+                item["left90_total"] = 0
+                item["left90_within_90"] = 0
+                item["left90_tenure_known"] = 0
+                item["left90_tenure_unknown"] = 0
+                item["left90_rate"] = None
+                continue
+            item["left90_total"] = left90_summary["total"]
+            item["left90_within_90"] = left90_summary["within_90"]
+            item["left90_tenure_known"] = left90_summary["tenure_known"]
+            item["left90_tenure_unknown"] = left90_summary["tenure_unknown"]
+            if left90_summary["tenure_known"]:
+                item["left90_rate"] = left90_summary["within_90"] / left90_summary["tenure_known"]
+            else:
+                item["left90_rate"] = None
+
         if overall_churn_summary["tenure_known"]:
             overall_churn_summary["within_90_rate"] = (
                 overall_churn_summary["within_90"] / overall_churn_summary["tenure_known"]
@@ -535,6 +643,21 @@ def register_recruiter_metrics_routes(app):
             overall_churn_summary["within_90_rate"] = None
 
         current_user_email = getattr(g, "user_email", None)
+
+        for row in opportunity_detail_rows:
+            lead_key = (row.get("hr_lead_email") or "").lower()
+            if not lead_key:
+                continue
+            details = opportunity_details_by_lead.setdefault(lead_key, [])
+            details.append(
+                {
+                    "opportunity_id": row.get("opportunity_id"),
+                    "opportunity_title": row.get("opportunity_title"),
+                    "opportunity_client_name": row.get("opportunity_client_name"),
+                    "opportunity_stage": row.get("opportunity_stage"),
+                    "close_date": _iso_date_or_none(row.get("close_date")),
+                }
+            )
 
         return jsonify(
             {
@@ -545,6 +668,8 @@ def register_recruiter_metrics_routes(app):
                 # 👇 para pintar el picker bonito
                 "range_start": disp_start.isoformat(),
                 "range_end": disp_end.isoformat(),  # inclusive
+                "left90_range_start": left90_start_inclusive.isoformat(),
+                "left90_range_end": left90_end_inclusive.isoformat(),
                 "metrics": metrics,
                 # Churn data is requested by the non-React Recruiter Power UI:
                 #  - summary counts live in each metric row (per recruiter)
@@ -552,6 +677,7 @@ def register_recruiter_metrics_routes(app):
                 #  - churn_summary gives overall totals for the selected window
                 "churn_details": churn_details,
                 "churn_summary": overall_churn_summary,
+                "opportunity_details": opportunity_details_by_lead,
                 "current_user_email": current_user_email,
             }
         )

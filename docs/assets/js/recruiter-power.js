@@ -38,7 +38,22 @@ const metricsState = {
   selectedLead: "",
   recruiterDirectory: [],
   recruiterLookup: {},
+  left90RangeStart: null,
+  left90RangeEnd: null,
+  opportunityDetails: {},
 };
+const detailModalRefs = {
+  root: null,
+  overlay: null,
+  title: null,
+  context: null,
+  summary: null,
+  list: null,
+  empty: null,
+  closeBtn: null,
+};
+let detailModalKeyListener = null;
+let previousBodyOverflow = "";
 function isoToYMD(iso) {
   if (!iso) return "";
   return String(iso).slice(0, 10);
@@ -187,6 +202,17 @@ function updateDynamicRangeLabels() {
   if (c) c.textContent = `Conversion · ${txt}`;
 }
 
+function formatYMDForDisplay(ymd) {
+  if (!ymd) return "";
+  const parts = String(ymd).split("-");
+  if (parts.length !== 3) return ymd;
+  const [year, month, day] = parts.map((n) => Number(n));
+  if (!year || !month || !day) return ymd;
+  const prettyDay = String(day).padStart(2, "0");
+  const prettyMonth = String(month).padStart(2, "0");
+  return `${prettyDay}/${prettyMonth}/${year}`;
+}
+
 function computeTrend(current, previous, goodWhenHigher = true) {
   if (previous == null) {
     return { label: "–", className: "neutral" };
@@ -282,6 +308,79 @@ function formatRatioSubtext(numerator, denominator) {
   const safeDen = Number(denominator || 0).toLocaleString("en-US");
   return `(${safeNum} / ${safeDen})`;
 }
+function formatDisplayDate(dateString) {
+  if (!dateString) return "";
+  const [year, month, day] = String(dateString).split("-");
+  if (!year || !month || !day) return formatDateISO(dateString);
+  return `${day}/${month}/${year}`;
+}
+function setDetailCardsEnabled(enabled) {
+  const cards = document.querySelectorAll("[data-metric-detail]");
+  cards.forEach((card) => {
+    const nextTabIndex = enabled ? 0 : -1;
+    card.classList.toggle("metric-card--detail-disabled", !enabled);
+    card.setAttribute("aria-disabled", enabled ? "false" : "true");
+    card.tabIndex = nextTabIndex;
+  });
+}
+function getLeadOpportunities(hrLeadEmail) {
+  const key = (hrLeadEmail || "").toLowerCase();
+  return metricsState.opportunityDetails[key] || [];
+}
+function normalizeStage(stage) {
+  return (stage || "").trim().toLowerCase();
+}
+function formatStageLabel(stage) {
+  const normalized = normalizeStage(stage);
+  if (normalized === "close win") return "Closed Win";
+  if (normalized === "closed lost") return "Closed Lost";
+  return stage || "Status unavailable";
+}
+function sortOpportunitiesByDate(opps = []) {
+  return opps.slice().sort((a, b) => {
+    const aDate = a.close_date || "";
+    const bDate = b.close_date || "";
+    if (aDate === bDate) return 0;
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+    return bDate.localeCompare(aDate);
+  });
+}
+function filterOpportunities(opps = [], { stage, start, end } = {}) {
+  const normalizedStage = stage ? normalizeStage(stage) : null;
+  const hasRange = Boolean(start && end);
+  return opps.filter((item) => {
+    if (normalizedStage && normalizeStage(item.opportunity_stage) !== normalizedStage) {
+      return false;
+    }
+    if (hasRange) {
+      const closeDate = item.close_date;
+      if (!closeDate) return false;
+      if (closeDate < start || closeDate > end) return false;
+    }
+    return true;
+  });
+}
+function createOpportunityItems(opps = []) {
+  return sortOpportunitiesByDate(opps).map((item, index) => {
+    const title = item.opportunity_title || "Untitled opportunity";
+    const client = item.opportunity_client_name || "";
+    const metaStage = formatStageLabel(item.opportunity_stage);
+    const dateText = item.close_date ? formatDisplayDate(item.close_date) : "Close date not documented";
+    return {
+      key: item.opportunity_id || `opportunity-${index}`,
+      primary: title,
+      secondary: client,
+      meta: `${metaStage} · ${dateText}`,
+    };
+  });
+}
+function describeRange(start, end) {
+  if (start && end) {
+    return `${formatDisplayDate(start)} — ${formatDisplayDate(end)}`;
+  }
+  return "the last 30 days";
+}
 
 function animateValue(el, from, to, { duration = 650, formatter }) {
   if (!el) return;
@@ -314,6 +413,194 @@ function animateCardsFlash() {
     // fuerza reflow para reiniciar animación
     void card.offsetWidth;
     card.classList.add("is-updating");
+  });
+}
+function buildDetailModalPayload(type) {
+  const key = (metricsState.selectedLead || "").toLowerCase();
+  if (!key) return null;
+  const selectedMetrics = metricsState.byLead[key];
+  if (!selectedMetrics) return null;
+  const recruiterName = getLeadLabel(key);
+  const recruiterSuffix = recruiterName ? ` for ${recruiterName}` : "";
+  const opportunities = getLeadOpportunities(key);
+  const rangeStart = metricsState.rangeStart;
+  const rangeEnd = metricsState.rangeEnd;
+  const readableRange = describeRange(rangeStart, rangeEnd);
+
+  switch (type) {
+    case "closedWinRange":
+      return {
+        title: rangeStart && rangeEnd ? "Closed Win · Selected Range" : "Closed Win · Last 30 Days",
+        context: `Closed Win opportunities${recruiterSuffix} between ${readableRange}.`,
+        summaryLines: [`Count: ${selectedMetrics.closed_win_month ?? 0}`],
+        items: createOpportunityItems(
+          filterOpportunities(opportunities, { stage: "Close Win", start: rangeStart, end: rangeEnd })
+        ),
+        emptyMessage: "No Closed Win opportunities for this recruiter in the selected window.",
+      };
+    case "closedLostRange":
+      return {
+        title: rangeStart && rangeEnd ? "Closed Lost · Selected Range" : "Closed Lost · Last 30 Days",
+        context: `Closed Lost opportunities${recruiterSuffix} between ${readableRange}.`,
+        summaryLines: [`Count: ${selectedMetrics.closed_lost_month ?? 0}`],
+        items: createOpportunityItems(
+          filterOpportunities(opportunities, { stage: "Closed Lost", start: rangeStart, end: rangeEnd })
+        ),
+        emptyMessage: "No Closed Lost opportunities for this recruiter in the selected window.",
+      };
+    case "closedWinTotal":
+      return {
+        title: "Total Closed Win",
+        context: `Lifetime Closed Win opportunities${recruiterSuffix}.`,
+        summaryLines: [`Lifetime total: ${selectedMetrics.closed_win_total ?? 0}`],
+        items: createOpportunityItems(filterOpportunities(opportunities, { stage: "Close Win" })),
+        emptyMessage: "No Closed Win opportunities recorded for this recruiter.",
+      };
+    case "closedLostTotal":
+      return {
+        title: "Total Closed Lost",
+        context: `Lifetime Closed Lost opportunities${recruiterSuffix}.`,
+        summaryLines: [`Lifetime total: ${selectedMetrics.closed_lost_total ?? 0}`],
+        items: createOpportunityItems(filterOpportunities(opportunities, { stage: "Closed Lost" })),
+        emptyMessage: "No Closed Lost opportunities recorded for this recruiter.",
+      };
+    case "conversionRange": {
+      const total = selectedMetrics.last_20_count ?? 0;
+      const wins = selectedMetrics.last_20_win ?? 0;
+      const losses = Math.max(0, total - wins);
+      return {
+        title: rangeStart && rangeEnd ? "Conversion · Selected Range" : "Conversion · Last 30 Days",
+        context: `Conversion covers every closed opportunity${recruiterSuffix} between ${readableRange}.`,
+        summaryLines: [
+          `Wins: ${wins}`,
+          `Losses: ${losses}`,
+          `Conversion: ${formatPercent(selectedMetrics.conversion_rate_last_20)}`,
+        ],
+        items: createOpportunityItems(filterOpportunities(opportunities, { start: rangeStart, end: rangeEnd })),
+        emptyMessage: "No closed opportunities for this recruiter in the selected window.",
+      };
+    }
+    case "conversionLifetime": {
+      const lifetimeWins = selectedMetrics.closed_win_total ?? 0;
+      const lifetimeLosses = selectedMetrics.closed_lost_total ?? 0;
+      const lifetimeTotal = lifetimeWins + lifetimeLosses;
+      return {
+        title: "Conversion · Lifetime",
+        context: `Lifetime conversion is calculated with every closed opportunity${recruiterSuffix}.`,
+        summaryLines: [
+          `Wins: ${lifetimeWins}`,
+          `Losses: ${lifetimeLosses}`,
+          `Conversion: ${formatPercent(selectedMetrics.conversion_rate_lifetime)}`,
+          `Total closed: ${lifetimeTotal}`,
+        ],
+        items: createOpportunityItems(filterOpportunities(opportunities)),
+        emptyMessage: "No closed opportunities on record for this recruiter.",
+      };
+    }
+    default:
+      return null;
+  }
+}
+function renderDetailModalContent(detail) {
+  if (!detailModalRefs.root) return;
+  detailModalRefs.title.textContent = detail.title || "Metric detail";
+  detailModalRefs.context.textContent = detail.context || "";
+
+  detailModalRefs.summary.innerHTML = "";
+  (detail.summaryLines || []).forEach((line) => {
+    const li = document.createElement("li");
+    li.textContent = line;
+    detailModalRefs.summary.appendChild(li);
+  });
+  detailModalRefs.summary.style.display = detail.summaryLines?.length ? "" : "none";
+
+  detailModalRefs.list.innerHTML = "";
+  (detail.items || []).forEach((item) => {
+    const li = document.createElement("li");
+    li.className = "metric-detail-modal__item";
+    li.innerHTML = `
+      <div>${item.primary}</div>
+      ${item.secondary ? `<div class="metric-detail-modal__item-secondary">${item.secondary}</div>` : ""}
+      ${item.meta ? `<div class="metric-detail-modal__item-meta">${item.meta}</div>` : ""}
+    `;
+    detailModalRefs.list.appendChild(li);
+  });
+
+  if (detail.items?.length) {
+    detailModalRefs.list.style.display = "";
+    detailModalRefs.empty.textContent = "";
+    detailModalRefs.empty.style.display = "none";
+  } else {
+    detailModalRefs.list.style.display = "none";
+    detailModalRefs.empty.textContent = detail.emptyMessage || "No records available for this metric.";
+    detailModalRefs.empty.style.display = "";
+  }
+}
+function openMetricDetailModal(detail) {
+  if (!detailModalRefs.root || !detail) return;
+  renderDetailModalContent(detail);
+  detailModalRefs.root.hidden = false;
+  detailModalRefs.root.classList.add("is-visible");
+  previousBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+
+  detailModalKeyListener = (event) => {
+    if (event.key === "Escape") {
+      closeMetricDetailModal();
+    }
+  };
+  document.addEventListener("keydown", detailModalKeyListener);
+}
+function closeMetricDetailModal() {
+  if (!detailModalRefs.root) return;
+  detailModalRefs.root.hidden = true;
+  detailModalRefs.root.classList.remove("is-visible");
+  document.body.style.overflow = previousBodyOverflow || "";
+  if (detailModalKeyListener) {
+    document.removeEventListener("keydown", detailModalKeyListener);
+    detailModalKeyListener = null;
+  }
+}
+function setupMetricDetailModal() {
+  const root = document.getElementById("metricDetailModal");
+  if (!root) return;
+  detailModalRefs.root = root;
+  detailModalRefs.overlay = root.querySelector("[data-modal-overlay]");
+  detailModalRefs.title = document.getElementById("metricDetailTitle");
+  detailModalRefs.context = document.getElementById("metricDetailContext");
+  detailModalRefs.summary = document.getElementById("metricDetailSummary");
+  detailModalRefs.list = document.getElementById("metricDetailList");
+  detailModalRefs.empty = document.getElementById("metricDetailEmpty");
+  detailModalRefs.closeBtn = document.getElementById("metricDetailCloseBtn");
+
+  [detailModalRefs.overlay, detailModalRefs.closeBtn].forEach((el) => {
+    if (el) {
+      el.addEventListener("click", () => closeMetricDetailModal());
+    }
+  });
+}
+function requestMetricDetail(kind) {
+  if (!kind || !metricsState.selectedLead) return;
+  const detail = buildDetailModalPayload(kind);
+  if (detail) {
+    openMetricDetailModal(detail);
+  }
+}
+function wireMetricDetailCards() {
+  const cards = document.querySelectorAll("[data-metric-detail]");
+  cards.forEach((card) => {
+    const kind = card.getAttribute("data-metric-detail");
+    const handler = () => {
+      if (card.classList.contains("metric-card--detail-disabled")) return;
+      requestMetricDetail(kind);
+    };
+    card.addEventListener("click", handler);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handler();
+      }
+    });
   });
 }
 
@@ -407,6 +694,8 @@ function renderChurnDetailsForLead(hrLeadEmail) {
 function updateCardsForLead(hrLeadEmail) {
   const key = (hrLeadEmail || "").toLowerCase();
   const m = metricsState.byLead[key];
+  metricsState.selectedLead = key || "";
+  setDetailCardsEnabled(Boolean(key && m));
 
   const winMonthEl = $("#closedWinMonthValue");
   const lostMonthEl = $("#closedLostMonthValue");
@@ -639,13 +928,13 @@ function updateCardsForLead(hrLeadEmail) {
 
   // --- Left within 90 days ---
   if (left90CountEl && left90RateEl && left90HelperEl) {
-    const newLeftCount = m.churn_within_90 ?? 0;
+    const newLeftCount = m.left90_within_90 ?? 0;
     const fromLeftCount = parseIntSafe(left90CountEl.textContent);
     animateValue(left90CountEl, fromLeftCount, newLeftCount, {
       formatter: (v) => Math.round(v),
     });
 
-    const newLeftRate = m.churn_within_90_rate;
+    const newLeftRate = m.left90_rate;
     if (newLeftRate == null) {
       left90RateEl.textContent = "–";
     } else {
@@ -656,7 +945,7 @@ function updateCardsForLead(hrLeadEmail) {
       });
     }
 
-    const known = m.churn_tenure_known ?? 0;
+    const known = m.left90_tenure_known ?? 0;
     left90HelperEl.textContent =
       known === 0
         ? "No start dates available for this range."
@@ -759,14 +1048,27 @@ function updatePeriodInfo() {
     return;
   }
 
-  // start/end son YYYY-MM-DD inclusive
-  const [sy, sm, sd] = start.split("-").map(Number);
-  const [ey, em, ed] = end.split("-").map(Number);
-
-  const prettyStart = String(sd).padStart(2, "0") + "/" + String(sm).padStart(2, "0") + "/" + sy;
-  const prettyEnd = String(ed).padStart(2, "0") + "/" + String(em).padStart(2, "0") + "/" + ey;
+  const prettyStart = formatYMDForDisplay(start);
+  const prettyEnd = formatYMDForDisplay(end);
 
   el.textContent = `Selected window: ${prettyStart} — ${prettyEnd}`;
+}
+
+function updateLeft90RangeLabel() {
+  const el = $("#left90RangeLabel");
+  if (!el) return;
+
+  const start = metricsState.left90RangeStart;
+  const end = metricsState.left90RangeEnd;
+
+  if (!start || !end) {
+    el.textContent = "";
+    return;
+  }
+
+  const prettyStart = formatYMDForDisplay(start);
+  const prettyEnd = formatYMDForDisplay(end);
+  el.textContent = `Window: ${prettyStart} — ${prettyEnd}`;
 }
 
 async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
@@ -792,6 +1094,8 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
 
     metricsState.rangeStart = data.range_start || isoToYMD(data.month_start);
     metricsState.rangeEnd = data.range_end || null;
+    metricsState.left90RangeStart = data.left90_range_start || null;
+    metricsState.left90RangeEnd = data.left90_range_end || null;
 
     setRangeInputs(metricsState.rangeStart, metricsState.rangeEnd);
 
@@ -823,10 +1127,12 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     metricsState.orderedLeadEmails = orderedEmails;
     metricsState.churnDetails = Array.isArray(data.churn_details) ? data.churn_details : [];
     metricsState.churnSummary = data.churn_summary || null;
+    metricsState.opportunityDetails = normalizeOpportunityDetails(data.opportunity_details);
 
     populateDropdown();
     updatePeriodInfo();
     updateDynamicRangeLabels();
+    updateLeft90RangeLabel();
   } catch (err) {
     console.error("Error loading recruiter metrics:", err);
     showRangeError("Couldn’t load metrics for that range. Try again.");
@@ -841,6 +1147,23 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
       select.appendChild(opt);
     }
   }
+}
+
+function normalizeOpportunityDetails(raw) {
+  const normalized = {};
+  if (!raw || typeof raw !== "object") return normalized;
+  Object.entries(raw).forEach(([email, rows]) => {
+    const key = String(email || "").toLowerCase();
+    if (!key) return;
+    normalized[key] = (rows || []).map((row, index) => ({
+      opportunity_id: row.opportunity_id || `opportunity-${index}`,
+      opportunity_title: row.opportunity_title || "Untitled opportunity",
+      opportunity_client_name: row.opportunity_client_name || "",
+      opportunity_stage: row.opportunity_stage || "",
+      close_date: row.close_date || null,
+    }));
+  });
+  return normalized;
 }
 
 function wireRangePicker() {
@@ -874,6 +1197,8 @@ function wireRangePicker() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  setupMetricDetailModal();
+  wireMetricDetailCards();
   renderChurnDetailsForLead("");
   (async () => {
     const uid = await ensureUserIdInURL();

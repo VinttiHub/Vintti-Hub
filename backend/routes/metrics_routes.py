@@ -74,6 +74,7 @@ def get_opportunities_light():
                 o.opp_position_name,
                 o.opp_type,
                 o.opp_model,
+                o.opp_sales_lead,
                 o.opp_hr_lead,
                 o.comments,
                 o.nda_signature_or_start_date,

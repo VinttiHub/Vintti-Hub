@@ -14,6 +14,97 @@
   />
 
   <link rel="stylesheet" href="./assets/css/recruiter-power.css" />
+  <style>
+    .metric-card[data-metric-detail] {
+      cursor: pointer;
+      transition: box-shadow 0.25s ease, transform 0.25s ease;
+    }
+    .metric-card--detail-disabled,
+    .metric-card--detail-disabled:hover {
+      cursor: not-allowed;
+      opacity: 0.6;
+      transform: none;
+      box-shadow: none;
+    }
+    .metric-detail-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .metric-detail-modal.is-visible {
+      display: flex;
+    }
+    .metric-detail-modal__overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(20, 7, 33, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    .metric-detail-modal__panel {
+      position: relative;
+      max-width: 720px;
+      width: min(720px, 92vw);
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 40px 120px rgba(12, 5, 28, 0.35);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 85vh;
+    }
+    .metric-detail-modal__header {
+      padding: 1.75rem 2.5rem 0;
+    }
+    .metric-detail-modal__body {
+      padding: 1.5rem 2.5rem 2.25rem;
+      overflow-y: auto;
+    }
+    .metric-detail-modal__close {
+      position: absolute;
+      top: 1.2rem;
+      right: 1.2rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(0, 0, 0, 0.04);
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+    .metric-detail-modal__summary {
+      margin: 0 0 1rem 1rem;
+      color: #66557c;
+    }
+    .metric-detail-modal__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .metric-detail-modal__item {
+      border: 1px solid rgba(138, 110, 214, 0.25);
+      border-radius: 16px;
+      padding: 1rem 1.25rem;
+      background: rgba(248, 244, 255, 0.95);
+    }
+    .metric-detail-modal__item-secondary {
+      color: #6f5a98;
+    }
+    .metric-detail-modal__item-meta {
+      font-size: 0.85rem;
+      margin-top: 0.35rem;
+      color: #8b7ca8;
+    }
+    .metric-detail-modal__empty {
+      margin: 0;
+      color: #6d5c86;
+    }
+  </style>
 </head>
 <a
   id="recruiterLabBtn"
@@ -69,7 +160,13 @@
   </div>
 </section>
     <section class="metrics-cards" aria-live="polite">
-      <article class="metric-card metric-win-month">
+      <article
+        class="metric-card metric-win-month metric-card--detail-disabled"
+        data-metric-detail="closedWinRange"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label" id="winRangeLabel">Closed Win · Last 30 Days</span>
           <span class="metric-compare" id="winMonthCompare">–</span>
@@ -80,7 +177,13 @@
         </p>
       </article>
 
-      <article class="metric-card metric-lost-month">
+      <article
+        class="metric-card metric-lost-month metric-card--detail-disabled"
+        data-metric-detail="closedLostRange"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
          <span class="metric-label" id="lostRangeLabel">Closed Lost · Last 30 Days</span>
           <span class="metric-compare" id="lostMonthCompare">–</span>
@@ -91,7 +194,13 @@
         </p>
       </article>
 
-      <article class="metric-card metric-win-total">
+      <article
+        class="metric-card metric-win-total metric-card--detail-disabled"
+        data-metric-detail="closedWinTotal"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label">Total Closed Win</span>
           <span class="metric-pill metric-pill-win-soft">All time</span>
@@ -102,7 +211,13 @@
         </p>
       </article>
 
-      <article class="metric-card metric-lost-total">
+      <article
+        class="metric-card metric-lost-total metric-card--detail-disabled"
+        data-metric-detail="closedLostTotal"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label">Total Closed Lost</span>
           <span class="metric-pill metric-pill-lost-soft">All time</span>
@@ -113,7 +228,13 @@
         </p>
       </article>
 
-      <article class="metric-card metric-conversion">
+      <article
+        class="metric-card metric-conversion metric-card--detail-disabled"
+        data-metric-detail="conversionRange"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label" id="convRangeLabel">Conversion · Last 30 Days</span>
           <span class="metric-pill metric-pill-conv">%</span>
@@ -124,7 +245,13 @@
         </p>
       </article>
 
-      <article class="metric-card metric-conversion-lifetime">
+      <article
+        class="metric-card metric-conversion-lifetime metric-card--detail-disabled"
+        data-metric-detail="conversionLifetime"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label">Conversion · Lifetime</span>
           <span class="metric-pill metric-pill-conv">%</span>
@@ -223,6 +350,7 @@
           <span class="metric-number" id="left90Count">–</span>
           <span class="metric-percent" id="left90Rate">–</span>
         </div>
+        <p class="metric-caption metric-caption-subtle" id="left90RangeLabel"></p>
         <p class="metric-caption">People who left before reaching 90 days.</p>
         <p class="metric-caption" id="left90Helper">Based on – churned hires with a start date.</p>
       </article>
@@ -260,6 +388,28 @@
       <p id="periodInfo" class="meta-text"></p>
     </section>
   </main>
+  <div id="metricDetailModal" class="metric-detail-modal" hidden>
+    <div class="metric-detail-modal__overlay" data-modal-overlay></div>
+    <div
+      class="metric-detail-modal__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="metricDetailTitle"
+    >
+      <button type="button" id="metricDetailCloseBtn" class="metric-detail-modal__close" aria-label="Close details">
+        ×
+      </button>
+      <div class="metric-detail-modal__header">
+        <h2 id="metricDetailTitle">Metric detail</h2>
+        <p id="metricDetailContext"></p>
+      </div>
+      <div class="metric-detail-modal__body">
+        <ul id="metricDetailSummary" class="metric-detail-modal__summary"></ul>
+        <ul id="metricDetailList" class="metric-detail-modal__list"></ul>
+        <p id="metricDetailEmpty" class="metric-detail-modal__empty"></p>
+      </div>
+    </div>
+  </div>
 
   <script src="./assets/js/recruiter-power.js"></script>
 </body>
