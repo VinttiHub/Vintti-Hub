@@ -336,6 +336,30 @@ const HIDDEN_HR_FILTER_EMAILS = new Set([
   'agustin@vintti.com',
   'agustina.ferrari@vintti.com',
 ].map((email) => email.toLowerCase()));
+
+const SALES_ALLOWED_EMAILS = new Set([
+  'agustin@vintti.com',
+  'bahia@vintti.com',
+  'lara@vintti.com',
+  'mariano@vintti.com',
+].map((email) => email.toLowerCase()));
+
+const SALES_ALLOWED_NAME_OVERRIDES = new Map([
+  ['agustin@vintti.com', 'Agustín'],
+  ['bahia@vintti.com', 'Bahía'],
+  ['lara@vintti.com', 'Lara'],
+  ['mariano@vintti.com', 'Mariano'],
+]);
+
+function buildDefaultSalesUsers() {
+  return Array.from(SALES_ALLOWED_EMAILS)
+    .map((email) => ({
+      user_id: null,
+      user_name: SALES_ALLOWED_NAME_OVERRIDES.get(email) || prettyNameFromEmail(email, email),
+      email_vintti: email,
+    }))
+    .sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
+}
 window.allowedSalesUsers = window.allowedSalesUsers || [];
 window.allowedHRUsers = window.allowedHRUsers || [];
 window.userDirectoryByEmail = window.userDirectoryByEmail || {};
@@ -381,6 +405,18 @@ async function fetchRoleDirectories() {
   window.allowedHRUsers = normalizeRoleDirectory(hrData);
   window.allowedSalesUsers = normalizeRoleDirectory(salesData);
   window.userDirectoryByEmail = buildUserDirectoryMap(usersData);
+
+  if (!window.allowedSalesUsers.length) {
+    const fallbackFromUsers = (Array.isArray(usersData) ? usersData : []).filter((user) => {
+      const email = String(user?.email_vintti || '').trim().toLowerCase();
+      return email && SALES_ALLOWED_EMAILS.has(email);
+    });
+    if (fallbackFromUsers.length) {
+      window.allowedSalesUsers = normalizeRoleDirectory(fallbackFromUsers);
+    } else {
+      window.allowedSalesUsers = buildDefaultSalesUsers();
+    }
+  }
 }
 
 function ensureRoleDirectoryPromise() {

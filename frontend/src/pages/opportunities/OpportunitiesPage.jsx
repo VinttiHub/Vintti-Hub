@@ -18,6 +18,10 @@ import {
 import { API_BASE_URL } from '../../constants/api.js';
 import { resolveAvatar } from '../../utils/avatars.js';
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 const STAGE_OPTIONS = [
   'Close Win',
   'Closed Lost',
@@ -38,24 +42,28 @@ const STAGE_ORDER = [
   'Closed Lost',
 ];
 
-const HR_ALLOWED_EMAILS = new Set([
-  'pilar@vintti.com',
-  'pilar.fernandez@vintti.com',
-  'jazmin@vintti.com',
-  'agostina@vintti.com',
-  'agustina.barbero@vintti.com',
-  'agustina.ferrari@vintti.com',
-  'josefina@vintti.com',
-  'constanza@vintti.com',
-  'julieta@vintti.com',
-]);
+const HR_ALLOWED_EMAILS = new Set(
+  [
+    'pilar@vintti.com',
+    'pilar.fernandez@vintti.com',
+    'jazmin@vintti.com',
+    'agostina@vintti.com',
+    'agustina.barbero@vintti.com',
+    'agustina.ferrari@vintti.com',
+    'josefina@vintti.com',
+    'constanza@vintti.com',
+    'julieta@vintti.com',
+  ].map(normalizeEmail),
+);
 
-const SALES_ALLOWED_EMAILS = new Set([
-  'agustin@vintti.com',
-  'bahia@vintti.com',
-  'lara@vintti.com',
-  'mariano@vintti.com',
-]);
+const SALES_ALLOWED_EMAILS = new Set(
+  [
+    'agustin@vintti.com',
+    'bahia@vintti.com',
+    'lara@vintti.com',
+    'mariano@vintti.com',
+  ].map(normalizeEmail),
+);
 
 function formatDaysAgo(dateStr) {
   if (!dateStr) return '-';
@@ -116,12 +124,16 @@ function useAllowedUsers() {
       try {
         const users = await fetchUsers();
         if (ignore) return;
+        const normalizedUsers = (Array.isArray(users) ? users : []).map((user) => ({
+          ...user,
+          email_vintti: normalizeEmail(user.email_vintti),
+        }));
         setSales(
-          users
-            .filter((u) => SALES_ALLOWED_EMAILS.has((u.email_vintti || '').toLowerCase()))
-            .sort((a, b) => a.user_name.localeCompare(b.user_name)),
+          normalizedUsers
+            .filter((u) => SALES_ALLOWED_EMAILS.has(u.email_vintti))
+            .sort((a, b) => (a.user_name || '').localeCompare(b.user_name || '')),
         );
-        setHr(users.filter((u) => HR_ALLOWED_EMAILS.has((u.email_vintti || '').toLowerCase())));
+        setHr(normalizedUsers.filter((u) => HR_ALLOWED_EMAILS.has(u.email_vintti)));
       } catch (error) {
         console.error('Failed to load users', error);
       }
@@ -136,11 +148,12 @@ function useAllowedUsers() {
 }
 
 function OpportunityBadge({ email, label }) {
-  const key = String(email || label || '').toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
+  const key = String(normalizedEmail || label || '').toLowerCase();
   const initials = initialForSales(key);
   const bubble = badgeClassForSales(key);
-  const avatar = resolveAvatar(email || key);
-  const tip = label || email || 'Assign Sales Lead';
+  const avatar = resolveAvatar(normalizedEmail || key);
+  const tip = label || normalizedEmail || 'Assign Sales Lead';
   return (
     <div className="sales-lead lead-tip" data-tip={tip}>
       <span className={`lead-bubble ${bubble}`}>{initials}</span>
@@ -150,9 +163,10 @@ function OpportunityBadge({ email, label }) {
 }
 
 function HRBadge({ email, label }) {
-  const initials = initialsFromName(label || email);
-  const avatar = resolveAvatar(email);
-  const name = label || email || 'Assign HR Lead';
+  const normalizedEmail = normalizeEmail(email);
+  const initials = initialsFromName(label || normalizedEmail);
+  const avatar = resolveAvatar(normalizedEmail);
+  const name = label || normalizedEmail || 'Assign HR Lead';
   return (
     <div className="hr-lead lead-tip" data-tip={name}>
       <span className="lead-bubble">{initials}</span>
@@ -317,15 +331,16 @@ function OpportunitiesPage() {
   }
 
   async function handleSalesLeadChange(opp, value) {
+    const normalizedValue = normalizeEmail(value);
     try {
-      await updateOpportunityFields(opp.opportunity_id, { opp_sales_lead: value });
-      const selected = sales.find((user) => user.email_vintti.toLowerCase() === value);
+      await updateOpportunityFields(opp.opportunity_id, { opp_sales_lead: normalizedValue || null });
+      const selected = sales.find((user) => user.email_vintti === normalizedValue);
       setOpps((prev) => prev.map((row) => (row.opportunity_id === opp.opportunity_id
         ? {
             ...row,
-            opp_sales_lead: value,
-            sales_lead: value,
-            sales_lead_name: selected?.user_name || row.sales_lead_name,
+            opp_sales_lead: normalizedValue || null,
+            sales_lead: normalizedValue || null,
+            sales_lead_name: selected?.user_name || '',
           }
         : row)));
     } catch (error) {
@@ -334,12 +349,13 @@ function OpportunitiesPage() {
   }
 
   async function handleHRLeadChange(opp, value) {
+    const normalizedValue = normalizeEmail(value);
     try {
-      await updateOpportunityFields(opp.opportunity_id, { opp_hr_lead: value });
+      await updateOpportunityFields(opp.opportunity_id, { opp_hr_lead: normalizedValue || null });
       setOpps((prev) => prev.map((row) => (row.opportunity_id === opp.opportunity_id
-        ? { ...row, opp_hr_lead: value }
+        ? { ...row, opp_hr_lead: normalizedValue || null }
         : row)));
-      await sendHRLeadAssignmentEmail(opp.opportunity_id, value);
+      await sendHRLeadAssignmentEmail(opp.opportunity_id, normalizedValue);
     } catch (error) {
       alert(error.message || 'Failed to update HR Lead');
     }
@@ -368,7 +384,7 @@ function OpportunitiesPage() {
   async function sendNegotiatingReminder(opportunityId) {
     try {
       const opportunity = await fetch(`${API_BASE_URL}/opportunities/${opportunityId}`, { credentials: 'include' }).then((res) => res.json());
-      const hrEmail = (opportunity.opp_hr_lead || '').toLowerCase();
+      const hrEmail = normalizeEmail(opportunity.opp_hr_lead);
       if (!hrEmail) return;
       await fetch(`${API_BASE_URL}/send_email`, {
         method: 'POST',
@@ -625,32 +641,32 @@ function OpportunitiesPage() {
                       <td>{opp.opp_position_name || ''}</td>
                       <td>{opp.opp_type}</td>
                       <td>{opp.opp_model}</td>
-                  <td className="sales-lead-cell">
-                    <div className="sales-lead-cell-wrap">
-                      <OpportunityBadge
-                        email={(opp.opp_sales_lead || opp.sales_lead || '').toLowerCase()}
-                        label={displayNameForSales(opp, sales)}
-                      />
-                      <select
-                        className="sales-lead-dropdown"
-                        value={(opp.opp_sales_lead || '').toLowerCase()}
-                        onChange={(event) => handleSalesLeadChange(opp, event.target.value)}
+                      <td className="sales-lead-cell">
+                        <div className="sales-lead-cell-wrap">
+                          <OpportunityBadge
+                            email={normalizeEmail(opp.opp_sales_lead || opp.sales_lead)}
+                            label={displayNameForSales(opp, sales)}
+                          />
+                          <select
+                            className="sales-lead-dropdown"
+                            value={normalizeEmail(opp.opp_sales_lead || opp.sales_lead)}
+                            onChange={(event) => handleSalesLeadChange(opp, event.target.value)}
                           >
                             <option value="">Assign Sales Lead</option>
                             {sales.map((user) => (
-                              <option key={user.email_vintti} value={user.email_vintti.toLowerCase()}>
+                              <option key={user.email_vintti} value={user.email_vintti}>
                                 {user.user_name}
                               </option>
                             ))}
                           </select>
                         </div>
                       </td>
-                  <td className="hr-lead-cell">
-                    <div className="hr-lead-cell-wrap">
-                      <HRBadge email={opp.opp_hr_lead} label={displayNameForHR(opp.opp_hr_lead, hr)} />
-                      <select
-                        className="hr-lead-dropdown"
-                            value={opp.opp_hr_lead || ''}
+                      <td className="hr-lead-cell">
+                        <div className="hr-lead-cell-wrap">
+                          <HRBadge email={opp.opp_hr_lead} label={displayNameForHR(opp.opp_hr_lead, hr)} />
+                          <select
+                            className="hr-lead-dropdown"
+                            value={normalizeEmail(opp.opp_hr_lead)}
                             onChange={(event) => handleHRLeadChange(opp, event.target.value)}
                           >
                             <option value="">Assign HR Lead</option>
@@ -857,7 +873,7 @@ function CreateOpportunityModal({
             <select id="sales_lead" name="sales_lead" value={form.sales_lead} onChange={handleChange}>
               <option value="" disabled>Select Sales Lead</option>
               {salesUsers.map((user) => (
-                <option key={user.email_vintti} value={user.email_vintti.toLowerCase()}>
+                <option key={user.email_vintti} value={user.email_vintti}>
                   {user.user_name}
                 </option>
               ))}
@@ -1117,15 +1133,15 @@ function StageModal({
 
 export default OpportunitiesPage;
 function displayNameForSales(opp, salesList) {
-  const email = String(opp.opp_sales_lead || opp.sales_lead || '').toLowerCase();
+  const email = normalizeEmail(opp.opp_sales_lead || opp.sales_lead);
   if (!email) return 'Unassigned';
-  const user = salesList.find((u) => u.email_vintti?.toLowerCase() === email);
+  const user = salesList.find((u) => u.email_vintti === email);
   return user?.user_name || opp.sales_lead_name || email;
 }
 
 function displayNameForHR(email, hrList) {
-  if (!email) return 'Assign HR Lead';
-  const normalized = String(email).toLowerCase();
-  const user = hrList.find((u) => u.email_vintti?.toLowerCase() === normalized);
-  return user?.user_name || email;
+  const normalized = normalizeEmail(email);
+  if (!normalized) return 'Assign HR Lead';
+  const user = hrList.find((u) => u.email_vintti === normalized);
+  return user?.user_name || normalized;
 }

@@ -41,6 +41,7 @@ const metricsState = {
   left90RangeStart: null,
   left90RangeEnd: null,
   opportunityDetails: {},
+  durationDetails: {},
 };
 const detailModalRefs = {
   root: null,
@@ -314,6 +315,17 @@ function formatDisplayDate(dateString) {
   if (!year || !month || !day) return formatDateISO(dateString);
   return `${day}/${month}/${year}`;
 }
+function formatDaysSummary(value) {
+  if (value == null || Number.isNaN(value)) return "No data";
+  const rounded = Math.round(value * 10) / 10;
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return `${text} day${rounded === 1 ? "" : "s"}`;
+}
+function formatDaysLong(value) {
+  if (value == null || Number.isNaN(value)) return "Duration not documented";
+  const abs = Math.round(Number(value));
+  return `${abs} day${abs === 1 ? "" : "s"}`;
+}
 function setDetailCardsEnabled(enabled) {
   const cards = document.querySelectorAll("[data-metric-detail]");
   cards.forEach((card) => {
@@ -326,6 +338,10 @@ function setDetailCardsEnabled(enabled) {
 function getLeadOpportunities(hrLeadEmail) {
   const key = (hrLeadEmail || "").toLowerCase();
   return metricsState.opportunityDetails[key] || [];
+}
+function getLeadDurationDetails(hrLeadEmail) {
+  const key = (hrLeadEmail || "").toLowerCase();
+  return metricsState.durationDetails[key] || {};
 }
 function normalizeStage(stage) {
   return (stage || "").trim().toLowerCase();
@@ -381,6 +397,35 @@ function describeRange(start, end) {
   }
   return "the last 30 days";
 }
+function createDurationItems(entries = [], type) {
+  return entries.map((entry, index) => {
+    const title = entry.opportunity_title || "Untitled opportunity";
+    const client = entry.opportunity_client_name || "";
+    const stageLabel = formatStageLabel(entry.opportunity_stage);
+    const daysText = formatDaysLong(entry.duration_days);
+    const timelineParts = [];
+    if (entry.start_reference_date) {
+      timelineParts.push(`Start ${formatDisplayDate(entry.start_reference_date)}`);
+    }
+    const endLabel = type === "avgBatchOpen" || type === "avgBatchClosed" ? "First batch" : "Close";
+    const endDate =
+      type === "avgBatchOpen" || type === "avgBatchClosed" ? entry.first_batch_date : entry.close_date;
+    if (endDate) {
+      timelineParts.push(`${endLabel} ${formatDisplayDate(endDate)}`);
+    }
+    const timeline = timelineParts.length ? timelineParts.join(" → ") : "";
+    const metaPieces = [];
+    if (stageLabel) metaPieces.push(stageLabel);
+    metaPieces.push(daysText);
+    if (timeline) metaPieces.push(timeline);
+    return {
+      key: entry.opportunity_id || `duration-${type}-${index}`,
+      primary: title,
+      secondary: client,
+      meta: metaPieces.join(" · "),
+    };
+  });
+}
 
 function animateValue(el, from, to, { duration = 650, formatter }) {
   if (!el) return;
@@ -426,6 +471,9 @@ function buildDetailModalPayload(type) {
   const rangeStart = metricsState.rangeStart;
   const rangeEnd = metricsState.rangeEnd;
   const readableRange = describeRange(rangeStart, rangeEnd);
+  const durationDetails = getLeadDurationDetails(key);
+  const getDurationItems = (metricKey) => createDurationItems(durationDetails[metricKey] || [], metricKey);
+  const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
 
   switch (type) {
     case "closedWinRange":
@@ -495,6 +543,58 @@ function buildDetailModalPayload(type) {
         ],
         items: createOpportunityItems(filterOpportunities(opportunities)),
         emptyMessage: "No closed opportunities on record for this recruiter.",
+      };
+    }
+    case "avgCloseWin": {
+      const items = getDurationItems("avgCloseWin");
+      return {
+        title: "Average days to close (Win)",
+        context: `Time elapsed from opportunity start to Closed Win${recruiterSuffix} within ${readableRange}.`,
+        summaryLines: [
+          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_close_win)}`,
+          `Opportunities included: ${getDurationCount("avgCloseWin")}`,
+        ],
+        items,
+        emptyMessage: "No Closed Win opportunities with documented start and close dates in the selected window.",
+      };
+    }
+    case "avgCloseLost": {
+      const items = getDurationItems("avgCloseLost");
+      return {
+        title: "Average days to close (Lost)",
+        context: `Time elapsed from opportunity start to Closed Lost${recruiterSuffix} within ${readableRange}.`,
+        summaryLines: [
+          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_close_lost)}`,
+          `Opportunities included: ${getDurationCount("avgCloseLost")}`,
+        ],
+        items,
+        emptyMessage: "No Closed Lost opportunities with documented start and close dates in the selected window.",
+      };
+    }
+    case "avgBatchOpen": {
+      const items = getDurationItems("avgBatchOpen");
+      return {
+        title: "Average days to first batch (Open)",
+        context: `Open opportunities${recruiterSuffix} with start dates inside ${readableRange}, tracking how long it took to send the first batch.`,
+        summaryLines: [
+          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_first_batch_open)}`,
+          `Opportunities included: ${getDurationCount("avgBatchOpen")}`,
+        ],
+        items,
+        emptyMessage: "No open opportunities with a first batch recorded in the selected window.",
+      };
+    }
+    case "avgBatchClosed": {
+      const items = getDurationItems("avgBatchClosed");
+      return {
+        title: "Average days to first batch (Closed)",
+        context: `Closed opportunities${recruiterSuffix} that had a first batch before closing, limited to ${readableRange}.`,
+        summaryLines: [
+          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_first_batch_closed)}`,
+          `Opportunities included: ${getDurationCount("avgBatchClosed")}`,
+        ],
+        items,
+        emptyMessage: "No closed opportunities with a documented first batch in the selected window.",
       };
     }
     default:
@@ -1128,6 +1228,7 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     metricsState.churnDetails = Array.isArray(data.churn_details) ? data.churn_details : [];
     metricsState.churnSummary = data.churn_summary || null;
     metricsState.opportunityDetails = normalizeOpportunityDetails(data.opportunity_details);
+    metricsState.durationDetails = normalizeDurationDetails(data.duration_details);
 
     populateDropdown();
     updatePeriodInfo();
@@ -1162,6 +1263,29 @@ function normalizeOpportunityDetails(raw) {
       opportunity_stage: row.opportunity_stage || "",
       close_date: row.close_date || null,
     }));
+  });
+  return normalized;
+}
+function normalizeDurationDetails(raw) {
+  const normalized = {};
+  if (!raw || typeof raw !== "object") return normalized;
+  Object.entries(raw).forEach(([email, bucket]) => {
+    const leadKey = String(email || "").toLowerCase();
+    if (!leadKey) return;
+    const perMetric = {};
+    Object.entries(bucket || {}).forEach(([metricKey, rows]) => {
+      perMetric[metricKey] = (rows || []).map((row, index) => ({
+        opportunity_id: row.opportunity_id || `duration-${metricKey}-${index}`,
+        opportunity_title: row.opportunity_title || "Untitled opportunity",
+        opportunity_client_name: row.opportunity_client_name || "",
+        opportunity_stage: row.opportunity_stage || "",
+        duration_days: row.duration_days ?? null,
+        close_date: row.close_date || null,
+        first_batch_date: row.first_batch_date || null,
+        start_reference_date: row.start_reference_date || null,
+      }));
+    });
+    normalized[leadKey] = perMetric;
   });
   return normalized;
 }

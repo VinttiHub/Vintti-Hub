@@ -418,9 +418,106 @@ def register_recruiter_metrics_routes(app):
         ORDER BY o.opp_close_date DESC NULLS LAST, o.opportunity_id;
         """
 
+        duration_details_sql = """
+        WITH base AS (
+            SELECT
+                o.opportunity_id,
+                LOWER(o.opp_hr_lead) AS hr_lead_email,
+                o.opp_hr_lead,
+                o.opp_stage,
+                o.opp_close_date::date AS close_date,
+                COALESCE(
+                    o.nda_signature_or_start_date::date,
+                    o.opp_close_date::date
+                ) AS start_reference_date,
+                o.opp_position_name AS opportunity_title,
+                a.client_name AS opportunity_client_name
+            FROM opportunity o
+            LEFT JOIN account a
+                ON a.account_id = o.account_id
+            WHERE o.opp_hr_lead IS NOT NULL
+        ),
+        first_batches AS (
+            SELECT
+                b.opportunity_id,
+                MIN(b.presentation_date)::date AS first_batch_date
+            FROM batch b
+            WHERE b.presentation_date IS NOT NULL
+            GROUP BY b.opportunity_id
+        )
+        SELECT
+            b.hr_lead_email,
+            b.opportunity_id,
+            b.opportunity_title,
+            b.opportunity_client_name,
+            b.opp_stage,
+            b.close_date,
+            b.start_reference_date,
+            fb.first_batch_date,
+            d.metric_type,
+            d.duration_days
+        FROM base b
+        LEFT JOIN first_batches fb
+            ON fb.opportunity_id = b.opportunity_id
+        CROSS JOIN LATERAL (
+            VALUES
+                (
+                    'avgCloseWin',
+                    CASE
+                        WHEN b.opp_stage = 'Close Win'
+                          AND b.close_date >= %(win_start)s
+                          AND b.close_date <  %(win_end)s
+                          AND b.close_date IS NOT NULL
+                          AND b.start_reference_date IS NOT NULL
+                        THEN (b.close_date - b.start_reference_date)::int
+                        ELSE NULL
+                    END
+                ),
+                (
+                    'avgCloseLost',
+                    CASE
+                        WHEN b.opp_stage = 'Closed Lost'
+                          AND b.close_date >= %(win_start)s
+                          AND b.close_date <  %(win_end)s
+                          AND b.close_date IS NOT NULL
+                          AND b.start_reference_date IS NOT NULL
+                        THEN (b.close_date - b.start_reference_date)::int
+                        ELSE NULL
+                    END
+                ),
+                (
+                    'avgBatchOpen',
+                    CASE
+                        WHEN b.opp_stage NOT IN ('Close Win', 'Closed Lost')
+                          AND b.start_reference_date IS NOT NULL
+                          AND b.start_reference_date >= %(win_start)s
+                          AND b.start_reference_date <  %(win_end)s
+                          AND fb.first_batch_date IS NOT NULL
+                        THEN (fb.first_batch_date - b.start_reference_date)::int
+                        ELSE NULL
+                    END
+                ),
+                (
+                    'avgBatchClosed',
+                    CASE
+                        WHEN b.opp_stage IN ('Close Win', 'Closed Lost')
+                          AND b.close_date >= %(win_start)s
+                          AND b.close_date <  %(win_end)s
+                          AND fb.first_batch_date IS NOT NULL
+                          AND b.start_reference_date IS NOT NULL
+                        THEN (fb.first_batch_date - b.start_reference_date)::int
+                        ELSE NULL
+                    END
+                )
+        ) AS d(metric_type, duration_days)
+        WHERE d.duration_days IS NOT NULL
+        ORDER BY b.close_date DESC NULLS LAST, b.opportunity_id;
+        """
+
         churn_detail_rows = []
         opportunity_detail_rows = []
         left90_summary_rows = []
+        duration_detail_rows = []
         try:
             conn = get_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -455,6 +552,15 @@ def register_recruiter_metrics_routes(app):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(opportunity_details_sql)
                 opportunity_detail_rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    duration_details_sql,
+                    {
+                        "win_start": window_start,
+                        "win_end": window_end,
+                    },
+                )
+                duration_detail_rows = cur.fetchall()
         except Exception as e:
             logger.exception("Error fetching recruiter metrics")
             return jsonify({"status": "error", "message": str(e)}), 500
@@ -537,6 +643,7 @@ def register_recruiter_metrics_routes(app):
         }
         opportunity_details_by_lead = {}
         left90_summary_by_lead = {}
+        duration_details_by_lead = {}
 
         for row in churn_detail_rows:
             tenure_days = row.get("tenure_days")
@@ -658,6 +765,32 @@ def register_recruiter_metrics_routes(app):
                     "close_date": _iso_date_or_none(row.get("close_date")),
                 }
             )
+        for row in duration_detail_rows:
+            lead_key = (row.get("hr_lead_email") or row.get("opp_hr_lead") or "").lower()
+            if not lead_key:
+                continue
+            metric_type = row.get("metric_type")
+            if not metric_type:
+                continue
+            lead_bucket = duration_details_by_lead.setdefault(lead_key, {})
+            metric_bucket = lead_bucket.setdefault(metric_type, [])
+            duration_days = row.get("duration_days")
+            try:
+                duration_days = int(duration_days) if duration_days is not None else None
+            except (TypeError, ValueError):
+                duration_days = None
+            metric_bucket.append(
+                {
+                    "opportunity_id": row.get("opportunity_id"),
+                    "opportunity_title": row.get("opportunity_title"),
+                    "opportunity_client_name": row.get("opportunity_client_name"),
+                    "opportunity_stage": row.get("opp_stage") or row.get("opportunity_stage"),
+                    "close_date": _iso_date_or_none(row.get("close_date")),
+                    "start_reference_date": _iso_date_or_none(row.get("start_reference_date")),
+                    "first_batch_date": _iso_date_or_none(row.get("first_batch_date")),
+                    "duration_days": duration_days,
+                }
+            )
 
         return jsonify(
             {
@@ -678,6 +811,7 @@ def register_recruiter_metrics_routes(app):
                 "churn_details": churn_details,
                 "churn_summary": overall_churn_summary,
                 "opportunity_details": opportunity_details_by_lead,
+                "duration_details": duration_details_by_lead,
                 "current_user_email": current_user_email,
             }
         )
