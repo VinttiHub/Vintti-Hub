@@ -34,7 +34,57 @@ function normalizePhoneForWA(rawPhone, country){
 }
 // === WhatsApp helpers ===
 const PHONE_CACHE = Object.create(null);
+const BLACKLIST_CACHE = Object.create(null);
 const onlyDigits = s => String(s||'').replace(/\D/g, '');
+const BLACKLIST_TOOLTIP_TEXT = 'Black list';
+let blacklistTooltipEl = null;
+let blacklistTooltipHideQueued = false;
+
+function ensureBlacklistTooltipElement() {
+  if (blacklistTooltipEl) return blacklistTooltipEl;
+  const el = document.createElement('div');
+  el.className = 'blacklist-tooltip';
+  el.textContent = BLACKLIST_TOOLTIP_TEXT;
+  Object.assign(el.style, {
+    position: 'fixed',
+    padding: '6px 10px',
+    borderRadius: '6px',
+    background: 'rgba(17, 24, 39, 0.92)',
+    color: '#fff',
+    fontSize: '0.78rem',
+    fontWeight: '500',
+    pointerEvents: 'none',
+    zIndex: 2000,
+    transform: 'translate(-50%, -100%)',
+    whiteSpace: 'nowrap',
+    boxShadow: '0 4px 18px rgba(15, 23, 42, 0.35)',
+    display: 'none'
+  });
+  document.body.appendChild(el);
+  blacklistTooltipEl = el;
+  return el;
+}
+
+function showBlacklistTooltip(target) {
+  if (!target) return;
+  const tooltip = ensureBlacklistTooltipElement();
+  const rect = target.getBoundingClientRect();
+  tooltip.textContent = target.dataset.tooltipText || BLACKLIST_TOOLTIP_TEXT;
+  tooltip.style.left = `${rect.left + rect.width / 2}px`;
+  tooltip.style.top = `${rect.top - 6}px`;
+  tooltip.style.display = 'block';
+  blacklistTooltipHideQueued = false;
+}
+
+function hideBlacklistTooltip() {
+  blacklistTooltipHideQueued = false;
+  if (blacklistTooltipEl) {
+    blacklistTooltipEl.style.display = 'none';
+  }
+}
+
+window.addEventListener('scroll', hideBlacklistTooltip, { passive: true });
+window.addEventListener('resize', hideBlacklistTooltip);
 
 // Intenta muchas keys (pipeline y details pueden diferir)
 function pickPhoneFromCandidate(obj){
@@ -59,6 +109,113 @@ function pickPhoneFromCandidate(obj){
 
   return '';
 }
+
+function isTruthyFlag(value) {
+  if (value === true) return true;
+  if (value === false || value == null) return false;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes';
+  }
+  return Boolean(value);
+}
+
+function attachBlacklistTooltip(indicator) {
+  if (!indicator || indicator.dataset.tooltipBound === 'true') return;
+  indicator.dataset.tooltipText = indicator.dataset.tooltipText || BLACKLIST_TOOLTIP_TEXT;
+  indicator.style.cursor = 'help';
+  indicator.style.display = 'inline-flex';
+  indicator.style.alignItems = 'center';
+  indicator.style.justifyContent = 'center';
+  indicator.style.lineHeight = '1';
+  indicator.tabIndex = 0;
+  indicator.setAttribute('role', 'img');
+  indicator.setAttribute('aria-label', indicator.dataset.tooltipText);
+  const show = () => {
+    if (!document.body.contains(indicator)) return;
+    showBlacklistTooltip(indicator);
+  };
+  const hide = () => {
+    blacklistTooltipHideQueued = true;
+    requestAnimationFrame(() => {
+      if (blacklistTooltipHideQueued) hideBlacklistTooltip();
+    });
+  };
+  indicator.addEventListener('mouseover', show);
+  indicator.addEventListener('mouseout', hide);
+  indicator.addEventListener('focus', show);
+  indicator.addEventListener('blur', hide);
+  indicator.addEventListener('touchstart', () => {
+    show();
+    setTimeout(hideBlacklistTooltip, 1200);
+  }, { passive: true });
+  indicator.dataset.tooltipBound = 'true';
+}
+
+function applyBlacklistStyles(card, indicatorSize = '0.95rem') {
+  if (!card || card.dataset.blacklistDecorated === 'true') return;
+  card.dataset.blacklisted = 'true';
+  card.dataset.blacklistDecorated = 'true';
+  card.style.backgroundColor = '#ffecec';
+  card.style.border = '1px solid #f5b5b5';
+  card.style.boxShadow = '0 2px 8px rgba(245, 181, 181, 0.35)';
+  const nameNodes = card.querySelectorAll('.candidate-name');
+  nameNodes.forEach((el) => {
+    if (!el || el.dataset.hasBlacklistIndicator === 'true') return;
+    const indicator = document.createElement('span');
+    indicator.className = 'blacklist-indicator';
+    indicator.textContent = '🚨';
+    indicator.title = BLACKLIST_TOOLTIP_TEXT;
+    indicator.style.marginLeft = '0.35rem';
+    indicator.style.fontSize = indicatorSize;
+    indicator.setAttribute('aria-label', 'Blacklisted candidate');
+    el.appendChild(document.createTextNode(' '));
+    el.appendChild(indicator);
+    attachBlacklistTooltip(indicator);
+    el.dataset.hasBlacklistIndicator = 'true';
+  });
+}
+
+function fetchCandidateBlacklistFlag(candidateId) {
+  if (!candidateId) return Promise.resolve(false);
+  const key = String(candidateId);
+  if (Object.prototype.hasOwnProperty.call(BLACKLIST_CACHE, key)) {
+    return Promise.resolve(BLACKLIST_CACHE[key]);
+  }
+  return fetch(`${API_BASE}/candidates/${candidateId}`, { cache: 'no-store' })
+    .then((res) => {
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      return res.json();
+    })
+    .then((data) => {
+      const raw = data?.is_blacklisted ?? data?.blacklist ?? data?.candidate?.blacklist;
+      const flag = isTruthyFlag(raw);
+      BLACKLIST_CACHE[key] = flag;
+      return flag;
+    })
+    .catch((err) => {
+      console.error('Error fetching blacklist status:', err);
+      BLACKLIST_CACHE[key] = false;
+      return false;
+    });
+}
+
+function decorateUsingCandidateBlacklist(card, candidate, rawValue) {
+  if (!card || !candidate) return;
+  if (rawValue !== undefined && rawValue !== null) {
+    if (isTruthyFlag(rawValue)) applyBlacklistStyles(card);
+    return;
+  }
+  const candidateId = candidate.candidate_id || candidate.id;
+  if (!candidateId) return;
+  fetchCandidateBlacklistFlag(candidateId).then((flag) => {
+    if (flag) applyBlacklistStyles(card);
+  });
+}
+
+window.applyBlacklistStyles = applyBlacklistStyles;
+window.attachBlacklistTooltip = attachBlacklistTooltip;
 
 // Trae y cachea el teléfono si no vino en el pipeline
 async function resolvePhone(candidate){
@@ -378,6 +535,7 @@ candidates.forEach(candidate => {
   const signoffChecked = candidate.sign_off === 'yes' ? 'checked' : '';
   const isStarred = candidate.star === 'yes';
   const starClass = isStarred ? 'starred' : '';
+  const rawBlacklist = candidate.is_blacklisted ?? candidate.blacklist;
 
 card.innerHTML = `
 <div class="card-header">
@@ -401,6 +559,7 @@ card.innerHTML = `
   </div>
 </div>
 `;
+decorateUsingCandidateBlacklist(card, candidate, rawBlacklist);
 // WhatsApp click (robusto con fallback a /candidates/:id)
 // WhatsApp click (robusto con fallback a /candidates/:id)
 {

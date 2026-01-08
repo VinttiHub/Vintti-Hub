@@ -316,6 +316,10 @@ function fillEmployeesTables(candidates) {
     // ---------- STAFFING ----------
     if (candidate.opp_model === 'Staffing') {
       const row = document.createElement('tr');
+      const isBlacklisted = Boolean(candidate.is_blacklisted);
+      const blacklistIndicator = isBlacklisted
+        ? `<span class="blacklist-indicator" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">⚠️</span>`
+        : '';
       console.log('end_date raw:', candidate.end_date, 'candidate:', candidate.candidate_id);
       const startVal = dateInputValue(candidate.start_date);
 const endVal   = dateInputValue(candidate.end_date);
@@ -323,7 +327,7 @@ const endVal   = dateInputValue(candidate.end_date);
         <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
         <td>
           <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
-            ${candidate.name || '—'}
+            ${candidate.name || '—'} ${blacklistIndicator}
           </a>
         </td>
         <td>
@@ -425,6 +429,10 @@ const endVal   = dateInputValue(candidate.end_date);
          </div>
         </td>
       `;
+      if (isBlacklisted) {
+        row.classList.add('blacklisted-row');
+        row.style.backgroundColor = '#ffeaea';
+      }
       const recruitingEndEl = row.querySelector('.end-date-input');
       if (recruitingEndEl) {
         recruitingEndEl.dataset.previousEndDate = dateInputValue(candidate.end_date) || '';
@@ -705,11 +713,15 @@ if (endInputS) {
           : '—';
 
       const row = document.createElement('tr');
+      const isBlacklisted = Boolean(candidate.is_blacklisted);
+      const blacklistIndicator = isBlacklisted
+        ? `<span class="blacklist-indicator" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">⚠️</span>`
+        : '';
       row.innerHTML = `
         <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
         <td>
           <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
-            ${candidate.name || '—'}
+            ${candidate.name || '—'} ${blacklistIndicator}
           </a>
         </td>
         <td>
@@ -762,6 +774,10 @@ if (endInputS) {
           />
         </td>
       `;
+      if (isBlacklisted) {
+        row.classList.add('blacklisted-row');
+        row.style.backgroundColor = '#ffeaea';
+      }
       // Recruiting: guardar referral $
       const refRecInput = row.querySelector('.ref-rec-input');
       if (refRecInput) {

@@ -2699,6 +2699,7 @@ function createCandidateCard(c, batchId) {
   const cardFragment = template.content.cloneNode(true);
   const cardElement = cardFragment.querySelector('.candidate-card');
   cardElement.setAttribute('data-candidate-id', c.candidate_id);
+  const isBlacklisted = Boolean(c.is_blacklisted || c.blacklist);
 
   cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
   const flag = getFlagEmoji(c.country);
@@ -2706,6 +2707,31 @@ function createCandidateCard(c, batchId) {
   cardElement.querySelector('.candidate-salary').textContent = c.salary_range ? `$${c.salary_range}` : '—';
   cardElement.querySelector('.candidate-email').textContent = c.email || '';
   cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+
+  if (isBlacklisted) {
+    if (typeof applyBlacklistStyles === 'function') {
+      applyBlacklistStyles(cardElement, '0.9rem');
+    } else {
+      cardElement.dataset.blacklisted = 'true';
+      cardElement.style.backgroundColor = '#ffecec';
+      cardElement.style.border = '1px solid #f5b5b5';
+      cardElement.style.boxShadow = '0 2px 8px rgba(245, 181, 181, 0.35)';
+      cardElement.querySelectorAll('.candidate-name').forEach((el) => {
+        const indicator = document.createElement('span');
+        indicator.className = 'blacklist-indicator';
+        indicator.textContent = '🚨';
+        indicator.title = 'Black list';
+        indicator.style.marginLeft = '0.35rem';
+        indicator.style.fontSize = '0.9rem';
+        indicator.setAttribute('aria-label', 'Blacklisted candidate');
+        el.appendChild(document.createTextNode(' '));
+        el.appendChild(indicator);
+        if (typeof attachBlacklistTooltip === 'function') {
+          attachBlacklistTooltip(indicator);
+        }
+      });
+    }
+  }
 
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
   dropdown.value = c.status || "Client interviewing/testing";
