@@ -363,6 +363,7 @@ const endVal   = dateInputValue(candidate.end_date);
             placeholder="$"
             value="${candidate.discount_dolar || ''}"
             data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
           />
         </td>
 
@@ -372,8 +373,9 @@ const endVal   = dateInputValue(candidate.end_date);
            type="text" 
            class="month-range-picker range-chip" 
             placeholder="Select range"
-            readonly 
+           readonly 
             data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
             value="${candidate.discount_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
           />
         </td>
@@ -391,6 +393,7 @@ const endVal   = dateInputValue(candidate.end_date);
              step="0.01" min="0" inputmode="decimal"
              value="${candidate.referral_dolar ?? ''}"
              data-candidate-id="${candidate.candidate_id}"
+             data-opportunity-id="${candidate.opportunity_id}"
            />
          </div>
         </td>
@@ -403,6 +406,7 @@ const endVal   = dateInputValue(candidate.end_date);
             placeholder="Select range"
             readonly 
             data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
             value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
           />
         </td>
@@ -501,8 +505,9 @@ if (endEl) {
       if (referralInput) {
         referralInput.addEventListener('blur', () => {
           const candidateId = referralInput.dataset.candidateId;
+          const oppId = referralInput.dataset.opportunityId;
           const value = referralInput.value;
-          updateCandidateField(candidateId, 'referral_dolar', value);
+          updateCandidateField(candidateId, 'referral_dolar', value, oppId);
         });
       }
 
@@ -528,10 +533,11 @@ if (endEl) {
           setup: (picker) => {
             picker.on('selected', (date1, date2) => {
               const candidateId = referralPickerInput.dataset.candidateId;
+              const oppId = referralPickerInput.dataset.opportunityId;
               if (!candidateId) return;
               const start = date1.format('YYYY-MM-DD');
               const end   = date2.format('YYYY-MM-DD');
-              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`);
+              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
             });
           }
         };
@@ -610,21 +616,13 @@ if (endEl) {
           setup: (picker) => {
             picker.on('selected', (date1, date2) => {
               const candidateId = monthPickerInput.dataset.candidateId;
+              const oppId = monthPickerInput.dataset.opportunityId;
               if (!candidateId) return;
 
               const start = date1.format('YYYY-MM-DD');
               const end   = date2.format('YYYY-MM-DD');
 
-              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ discount_daterange: `[${start},${end}]` })
-              })
-              .then(res => {
-                if (!res.ok) throw new Error("Error al guardar discount_daterange");
-                console.log('🟢 Discount date range actualizado');
-              })
-              .catch(err => console.error('❌ Error:', err));
+              updateCandidateField(candidateId, 'discount_daterange', `[${start},${end}]`, oppId);
             });
           }
         };
@@ -641,8 +639,9 @@ if (endEl) {
       if (discountInput) {
         discountInput.addEventListener('blur', () => {
           const candidateId = discountInput.dataset.candidateId;
+          const oppId = discountInput.dataset.opportunityId;
           const value = discountInput.value;
-          updateCandidateField(candidateId, 'discount_dolar', value);
+          updateCandidateField(candidateId, 'discount_dolar', value, oppId);
         });
       }
 // === Start/End date (hire_opportunity) — STAFFING ===
@@ -758,6 +757,7 @@ if (endInputS) {
              step="0.01" min="0" inputmode="decimal"
              value="${candidate.referral_dolar ?? ''}"
              data-candidate-id="${candidate.candidate_id}"
+             data-opportunity-id="${candidate.opportunity_id}"
            />
          </div>
         </td>
@@ -770,6 +770,7 @@ if (endInputS) {
             placeholder="Select range"
             readonly 
             data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
             value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
           />
         </td>
@@ -783,8 +784,9 @@ if (endInputS) {
       if (refRecInput) {
         refRecInput.addEventListener('blur', () => {
           const candidateId = refRecInput.dataset.candidateId;
+          const oppId = refRecInput.dataset.opportunityId;
           const value = refRecInput.value;
-          updateCandidateField(candidateId, 'referral_dolar', value);
+          updateCandidateField(candidateId, 'referral_dolar', value, oppId);
         });
       }
 
@@ -810,10 +812,11 @@ if (endInputS) {
           setup: (picker) => {
             picker.on('selected', (date1, date2) => {
               const candidateId = refRecPickerInput.dataset.candidateId;
+              const oppId = refRecPickerInput.dataset.opportunityId;
               if (!candidateId) return;
               const start = date1.format('YYYY-MM-DD');
               const end   = date2.format('YYYY-MM-DD');
-              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`);
+              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
             });
           }
         };
