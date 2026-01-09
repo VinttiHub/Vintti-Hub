@@ -117,11 +117,13 @@ def register_recruiter_metrics_routes(app):
             GROUP BY b.opportunity_id
         ),
         sent_candidates AS (
-            SELECT DISTINCT ON (b.opp_hr_lead, b.opportunity_id, cb.candidate_id)
+            SELECT
                 b.opp_hr_lead,
                 b.opportunity_id,
                 cb.candidate_id,
-                bt.presentation_date::date AS first_sent_date,
+                cb.batch_id,
+                bt.batch_number,
+                bt.presentation_date::date AS sent_date,
                 cb.status AS candidate_status
             FROM base b
             JOIN batch bt
@@ -130,18 +132,13 @@ def register_recruiter_metrics_routes(app):
                 ON cb.batch_id = bt.batch_id
             WHERE cb.candidate_id IS NOT NULL
               AND bt.presentation_date IS NOT NULL
-            ORDER BY
-                b.opp_hr_lead,
-                b.opportunity_id,
-                cb.candidate_id,
-                bt.presentation_date
         ),
         sent_in_window AS (
             SELECT
                 *
             FROM sent_candidates
-            WHERE first_sent_date >= %(win_start)s
-              AND first_sent_date <  %(win_end)s  -- rango aplicado al evento “batch enviado”
+            WHERE sent_date >= %(win_start)s
+              AND sent_date <  %(win_end)s  -- rango aplicado al evento “batch enviado”
         ),
         pipeline_rates AS (
             SELECT
@@ -513,10 +510,99 @@ def register_recruiter_metrics_routes(app):
         ORDER BY b.close_date DESC NULLS LAST, b.opportunity_id;
         """
 
+        pipeline_details_sql = """
+        WITH base AS (
+            SELECT
+                o.opportunity_id,
+                LOWER(o.opp_hr_lead) AS hr_lead_email,
+                o.opp_hr_lead,
+                u.user_name AS hr_lead_name,
+                o.opp_position_name AS opportunity_title,
+                a.client_name AS opportunity_client_name
+            FROM opportunity o
+            LEFT JOIN users u
+                ON LOWER(u.email_vintti) = LOWER(o.opp_hr_lead)
+            LEFT JOIN account a
+                ON a.account_id = o.account_id
+            WHERE o.opp_hr_lead IS NOT NULL
+        ),
+        batches AS (
+            SELECT
+                b.batch_id,
+                b.batch_number,
+                b.opportunity_id,
+                b.presentation_date::date AS sent_date
+            FROM batch b
+            WHERE b.presentation_date IS NOT NULL
+        ),
+        sent_candidates AS (
+            SELECT
+                b.hr_lead_email,
+                b.opp_hr_lead,
+                b.hr_lead_name,
+                b.opportunity_id,
+                b.opportunity_title,
+                b.opportunity_client_name,
+                cb.candidate_id,
+                cb.batch_id,
+                bt.batch_number,
+                bt.sent_date,
+                cb.status AS candidate_status
+            FROM base b
+            JOIN batches bt
+                ON bt.opportunity_id = b.opportunity_id
+            JOIN candidates_batches cb
+                ON cb.batch_id = bt.batch_id
+            WHERE cb.candidate_id IS NOT NULL
+        )
+        SELECT
+            sc.hr_lead_email,
+            sc.opp_hr_lead AS hr_lead_raw,
+            sc.hr_lead_name,
+            sc.opportunity_id,
+            sc.opportunity_title,
+            sc.opportunity_client_name,
+            sc.candidate_id,
+            c.name AS candidate_name,
+            c.email AS candidate_email,
+            sc.batch_id,
+            sc.batch_number,
+            sc.sent_date,
+            sc.candidate_status,
+            CASE
+                WHEN COALESCE(sc.candidate_status, '') <> 'Client rejected CV'
+                THEN TRUE
+                ELSE FALSE
+            END AS is_interview_eligible,
+            CASE
+                WHEN sc.candidate_status IN (
+                    'Client hired',
+                    'Client rejected after interviewing',
+                    'Client interviewing/testing'
+                )
+                THEN TRUE
+                ELSE FALSE
+            END AS is_interviewed,
+            CASE
+                WHEN h.hire_opp_id IS NOT NULL THEN TRUE
+                ELSE FALSE
+            END AS is_hired
+        FROM sent_candidates sc
+        LEFT JOIN candidates c
+            ON c.candidate_id = sc.candidate_id
+        LEFT JOIN hire_opportunity h
+            ON h.opportunity_id = sc.opportunity_id
+           AND h.candidate_id = sc.candidate_id
+        WHERE sc.sent_date >= %(win_start)s
+          AND sc.sent_date <  %(win_end)s
+        ORDER BY sc.hr_lead_email, sc.sent_date DESC NULLS LAST, sc.opportunity_id, sc.candidate_id;
+        """
+
         churn_detail_rows = []
         opportunity_detail_rows = []
         left90_summary_rows = []
         duration_detail_rows = []
+        pipeline_detail_rows = []
         try:
             conn = get_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -560,6 +646,15 @@ def register_recruiter_metrics_routes(app):
                     },
                 )
                 duration_detail_rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    pipeline_details_sql,
+                    {
+                        "win_start": window_start,
+                        "win_end": window_end,
+                    },
+                )
+                pipeline_detail_rows = cur.fetchall()
         except Exception as e:
             logger.exception("Error fetching recruiter metrics")
             return jsonify({"status": "error", "message": str(e)}), 500
@@ -648,6 +743,7 @@ def register_recruiter_metrics_routes(app):
         opportunity_details_by_lead = {}
         left90_summary_by_lead = {}
         duration_details_by_lead = {}
+        pipeline_details_by_lead = {}
 
         for row in churn_detail_rows:
             tenure_days = row.get("tenure_days")
@@ -796,6 +892,34 @@ def register_recruiter_metrics_routes(app):
                 }
             )
 
+        for row in pipeline_detail_rows:
+            lead_key = (row.get("hr_lead_email") or "").lower()
+            if not lead_key:
+                continue
+            details = pipeline_details_by_lead.setdefault(lead_key, [])
+            batch_number = row.get("batch_number")
+            try:
+                batch_number = int(batch_number) if batch_number is not None else None
+            except (TypeError, ValueError):
+                batch_number = None
+            details.append(
+                {
+                    "candidate_id": row.get("candidate_id"),
+                    "candidate_name": row.get("candidate_name"),
+                    "candidate_email": row.get("candidate_email"),
+                    "candidate_status": row.get("candidate_status"),
+                    "opportunity_id": row.get("opportunity_id"),
+                    "opportunity_title": row.get("opportunity_title"),
+                    "opportunity_client_name": row.get("opportunity_client_name"),
+                    "batch_id": row.get("batch_id"),
+                    "batch_number": batch_number,
+                    "sent_date": _iso_date_or_none(row.get("sent_date")),
+                    "is_interview_eligible": bool(row.get("is_interview_eligible")),
+                    "is_interviewed": bool(row.get("is_interviewed")),
+                    "is_hired": bool(row.get("is_hired")),
+                }
+            )
+
         return jsonify(
             {
                 "status": "ok",
@@ -816,6 +940,7 @@ def register_recruiter_metrics_routes(app):
                 "churn_summary": overall_churn_summary,
                 "opportunity_details": opportunity_details_by_lead,
                 "duration_details": duration_details_by_lead,
+                "pipeline_details": pipeline_details_by_lead,
                 "current_user_email": current_user_email,
             }
         )

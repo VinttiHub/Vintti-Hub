@@ -42,6 +42,7 @@ const metricsState = {
   left90RangeEnd: null,
   opportunityDetails: {},
   durationDetails: {},
+  pipelineDetails: {},
 };
 const detailModalRefs = {
   root: null,
@@ -347,6 +348,10 @@ function getLeadDurationDetails(hrLeadEmail) {
   const key = (hrLeadEmail || "").toLowerCase();
   return metricsState.durationDetails[key] || {};
 }
+function getPipelineDetails(hrLeadEmail) {
+  const key = (hrLeadEmail || "").toLowerCase();
+  return metricsState.pipelineDetails[key] || [];
+}
 function normalizeStage(stage) {
   return (stage || "").trim().toLowerCase();
 }
@@ -435,6 +440,44 @@ function createDurationItems(entries = [], type) {
     };
   });
 }
+function createPipelineItems(entries = []) {
+  return entries
+    .slice()
+    .sort((a, b) => {
+      const aDate = a.sent_date || "";
+      const bDate = b.sent_date || "";
+      if (aDate === bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return bDate.localeCompare(aDate);
+    })
+    .map((entry, index) => {
+      const fallbackId =
+        entry.candidate_id != null ? `#${entry.candidate_id}` : `entry-${index + 1}`;
+      const candidateLabel =
+        entry.candidate_name || entry.candidate_email || `Candidate ${fallbackId}`;
+      const secondaryParts = [];
+      if (entry.opportunity_title) secondaryParts.push(entry.opportunity_title);
+      if (entry.opportunity_client_name) secondaryParts.push(entry.opportunity_client_name);
+      if (entry.batch_number != null) secondaryParts.push(`Batch #${entry.batch_number}`);
+      const metaParts = [];
+      if (entry.sent_date) metaParts.push(`Sent ${formatDisplayDate(entry.sent_date)}`);
+      if (entry.candidate_status) metaParts.push(entry.candidate_status);
+      const tags = [];
+      if (entry.is_hired) tags.push("Hired");
+      else if (entry.is_interviewed) tags.push("Interviewing/testing");
+      else if (entry.is_interview_eligible) tags.push("Eligible");
+      if (tags.length) metaParts.push(tags.join(" · "));
+      return {
+        key: entry.candidate_id
+          ? `candidate-${entry.candidate_id}-${entry.batch_id || index}`
+          : `candidate-${index}`,
+        primary: candidateLabel,
+        secondary: secondaryParts.join(" · "),
+        meta: metaParts.join(" · "),
+      };
+    });
+}
 
 function animateValue(el, from, to, { duration = 650, formatter }) {
   if (!el) return;
@@ -483,6 +526,7 @@ function buildDetailModalPayload(type) {
   const durationDetails = getLeadDurationDetails(key);
   const getDurationItems = (metricKey) => createDurationItems(durationDetails[metricKey] || [], metricKey);
   const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
+  const pipelineEntries = getPipelineDetails(key);
 
   switch (type) {
     case "closedWinRange":
@@ -604,6 +648,38 @@ function buildDetailModalPayload(type) {
         ],
         items,
         emptyMessage: "No closed opportunities with a documented first batch in the selected window.",
+      };
+    }
+    case "interviewRate": {
+      const totalSent = pipelineEntries.length;
+      const eligibleEntries = pipelineEntries.filter((entry) => entry.is_interview_eligible);
+      const interviewedEntries = eligibleEntries.filter((entry) => entry.is_interviewed);
+      return {
+        title: "Interview rate",
+        context: `Candidate batches sent${recruiterSuffix} between ${readableRange}.`,
+        summaryLines: [
+          `Eligible candidates: ${eligibleEntries.length}`,
+          `Reached interview/testing: ${interviewedEntries.length}`,
+          `Rate: ${formatPercent(selectedMetrics.interview_rate?.pct)}`,
+          `Total sent: ${totalSent}`,
+        ],
+        items: createPipelineItems(eligibleEntries),
+        emptyMessage: "No interview-eligible candidates sent in the selected window.",
+      };
+    }
+    case "hireRate": {
+      const totalSent = pipelineEntries.length;
+      const hiredEntries = pipelineEntries.filter((entry) => entry.is_hired);
+      return {
+        title: "Hire rate",
+        context: `Sent candidates${recruiterSuffix} between ${readableRange}.`,
+        summaryLines: [
+          `Hires: ${hiredEntries.length}`,
+          `Sent candidates: ${totalSent}`,
+          `Rate: ${formatPercent(selectedMetrics.hire_rate?.pct)}`,
+        ],
+        items: createPipelineItems(pipelineEntries),
+        emptyMessage: "No candidates were sent in the selected window.",
       };
     }
     default:
@@ -1238,6 +1314,7 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     metricsState.churnSummary = data.churn_summary || null;
     metricsState.opportunityDetails = normalizeOpportunityDetails(data.opportunity_details);
     metricsState.durationDetails = normalizeDurationDetails(data.duration_details);
+    metricsState.pipelineDetails = normalizePipelineDetails(data.pipeline_details);
 
     populateDropdown();
     updatePeriodInfo();
@@ -1295,6 +1372,30 @@ function normalizeDurationDetails(raw) {
       }));
     });
     normalized[leadKey] = perMetric;
+  });
+  return normalized;
+}
+function normalizePipelineDetails(raw) {
+  const normalized = {};
+  if (!raw || typeof raw !== "object") return normalized;
+  Object.entries(raw).forEach(([email, rows]) => {
+    const key = String(email || "").toLowerCase();
+    if (!key) return;
+    normalized[key] = (rows || []).map((row, index) => ({
+      candidate_id: row.candidate_id ?? null,
+      candidate_name: row.candidate_name || "",
+      candidate_email: row.candidate_email || "",
+      candidate_status: row.candidate_status || "",
+      opportunity_id: row.opportunity_id ?? null,
+      opportunity_title: row.opportunity_title || "",
+      opportunity_client_name: row.opportunity_client_name || "",
+      batch_id: row.batch_id ?? null,
+      batch_number: row.batch_number ?? null,
+      sent_date: row.sent_date || null,
+      is_interview_eligible: Boolean(row.is_interview_eligible),
+      is_interviewed: Boolean(row.is_interviewed),
+      is_hired: Boolean(row.is_hired),
+    }));
   });
   return normalized;
 }
