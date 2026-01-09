@@ -117,11 +117,12 @@ def register_recruiter_metrics_routes(app):
             GROUP BY b.opportunity_id
         ),
         sent_candidates AS (
-            SELECT
+            SELECT DISTINCT ON (b.opp_hr_lead, b.opportunity_id, cb.candidate_id)
                 b.opp_hr_lead,
                 b.opportunity_id,
                 cb.candidate_id,
-                MIN(bt.presentation_date)::date AS first_sent_date
+                bt.presentation_date::date AS first_sent_date,
+                cb.status AS candidate_status
             FROM base b
             JOIN batch bt
                 ON bt.opportunity_id = b.opportunity_id
@@ -129,7 +130,11 @@ def register_recruiter_metrics_routes(app):
                 ON cb.batch_id = bt.batch_id
             WHERE cb.candidate_id IS NOT NULL
               AND bt.presentation_date IS NOT NULL
-            GROUP BY b.opp_hr_lead, b.opportunity_id, cb.candidate_id
+            ORDER BY
+                b.opp_hr_lead,
+                b.opportunity_id,
+                cb.candidate_id,
+                bt.presentation_date
         ),
         sent_in_window AS (
             SELECT
@@ -138,35 +143,28 @@ def register_recruiter_metrics_routes(app):
             WHERE first_sent_date >= %(win_start)s
               AND first_sent_date <  %(win_end)s  -- rango aplicado al evento “batch enviado”
         ),
-        sent_enriched AS (
-            SELECT
-                s.opp_hr_lead,
-                s.opportunity_id,
-                s.candidate_id,
-                s.first_sent_date,
-                LOWER(COALESCE(oc.stage_pipeline, '')) AS stage_pipeline
-            FROM sent_in_window s
-            LEFT JOIN opportunity_candidates oc
-                ON oc.opportunity_id = s.opportunity_id
-               AND oc.candidate_id = s.candidate_id
-        ),
         pipeline_rates AS (
             SELECT
                 opp_hr_lead,
                 COUNT(*) AS sent_candidate_count,
                 COUNT(*) FILTER (
-                    WHERE stage_pipeline IN ('primera entrevista', 'en proceso con cliente')
-                       OR stage_pipeline LIKE 'segunda entrevista%%'
-                       OR stage_pipeline LIKE '%%entrevist%%'
+                    WHERE COALESCE(candidate_status, '') <> 'Client rejected CV'
+                ) AS interview_eligible_candidate_count,
+                COUNT(*) FILTER (
+                    WHERE candidate_status IN (
+                        'Client hired',
+                        'Client rejected after interviewing',
+                        'Client interviewing/testing'
+                    )
                 ) AS interviewed_candidate_count
-            FROM sent_enriched
+            FROM sent_in_window
             GROUP BY opp_hr_lead
         ),
         hired_by_lead AS (
             SELECT
                 s.opp_hr_lead,
                 COUNT(DISTINCT (s.opportunity_id::text || '-' || s.candidate_id::text)) AS hired_candidate_count
-            FROM sent_enriched s
+            FROM sent_in_window s
             JOIN hire_opportunity h
                 ON h.opportunity_id = s.opportunity_id
                AND h.candidate_id = s.candidate_id
@@ -285,6 +283,7 @@ def register_recruiter_metrics_routes(app):
             c.last_20_count,
             c.last_20_win,
             pr.sent_candidate_count,
+            pr.interview_eligible_candidate_count,
             pr.interviewed_candidate_count,
             hb.hired_candidate_count,
             CASE
@@ -581,10 +580,15 @@ def register_recruiter_metrics_routes(app):
             avg_days_batch_closed = _float_or_none(r.get("avg_days_to_first_batch_closed"))
 
             sent_candidates = int(r.get("sent_candidate_count") or 0)
+            interview_eligible_candidates = int(r.get("interview_eligible_candidate_count") or 0)
             interviewed_candidates = int(r.get("interviewed_candidate_count") or 0)
             hired_candidates = int(r.get("hired_candidate_count") or 0)
 
-            interview_pct = (interviewed_candidates / sent_candidates) if sent_candidates else None
+            interview_pct = (
+                interviewed_candidates / interview_eligible_candidates
+                if interview_eligible_candidates
+                else None
+            )
             hire_pct = (hired_candidates / sent_candidates) if sent_candidates else None
 
             email = r["opp_hr_lead"]
@@ -616,7 +620,7 @@ def register_recruiter_metrics_routes(app):
                     "interview_rate": {
                         "pct": interview_pct,
                         "interviewed": interviewed_candidates,
-                        "sent": sent_candidates,
+                        "sent": interview_eligible_candidates,
                     },
                     "hire_rate": {
                         "pct": hire_pct,
