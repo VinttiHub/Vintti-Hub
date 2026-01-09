@@ -352,6 +352,71 @@ function getPipelineDetails(hrLeadEmail) {
   const key = (hrLeadEmail || "").toLowerCase();
   return metricsState.pipelineDetails[key] || [];
 }
+function normalizeCandidateStatus(status) {
+  return (status || "").trim().toLowerCase();
+}
+function getStatusLabel(status) {
+  const trimmed = (status || "").trim();
+  return trimmed || "Status unavailable";
+}
+function isClientRejectedCvStatus(status) {
+  return normalizeCandidateStatus(status) === "client rejected cv";
+}
+function isClientHiredStatus(status) {
+  return normalizeCandidateStatus(status) === "client hired";
+}
+function getInterviewStatusInfo(entry = {}) {
+  const label = getStatusLabel(entry.candidate_status);
+  if (isClientRejectedCvStatus(entry.candidate_status)) {
+    return { variant: "negative", label };
+  }
+  return { variant: "positive", label };
+}
+function getHireStatusInfo(entry = {}) {
+  const label = getStatusLabel(entry.candidate_status);
+  if (isClientHiredStatus(entry.candidate_status)) {
+    return { variant: "positive", label };
+  }
+  return { variant: "negative", label };
+}
+function computeInterviewPipelineInsights(entries = []) {
+  const eligibleEntries = entries.filter((entry) => entry.is_interview_eligible);
+  let greenCount = 0;
+  let redCount = 0;
+  eligibleEntries.forEach((entry) => {
+    if (isClientRejectedCvStatus(entry.candidate_status)) {
+      redCount += 1;
+    } else {
+      greenCount += 1;
+    }
+  });
+  const totalEligible = eligibleEntries.length;
+  return {
+    items: eligibleEntries,
+    totalEligible,
+    totalSent: entries.length,
+    greenCount,
+    redCount,
+    pct: totalEligible ? greenCount / totalEligible : null,
+  };
+}
+function computeHirePipelineInsights(entries = []) {
+  let greenCount = 0;
+  entries.forEach((entry) => {
+    if (isClientHiredStatus(entry.candidate_status)) {
+      greenCount += 1;
+    }
+  });
+  const totalSent = entries.length;
+  const redCount = Math.max(totalSent - greenCount, 0);
+  return {
+    items: entries,
+    totalSent,
+    greenCount,
+    redCount,
+    pct: totalSent ? greenCount / totalSent : null,
+  };
+}
 function normalizeStage(stage) {
   return (stage || "").trim().toLowerCase();
 }
@@ -440,7 +505,8 @@ function createDurationItems(entries = [], type) {
     };
   });
 }
-function createPipelineItems(entries = []) {
+function createPipelineItems(entries = [], options = {}) {
+  const { statusResolver } = options;
   return entries
     .slice()
     .sort((a, b) => {
@@ -462,12 +528,14 @@ function createPipelineItems(entries = []) {
       if (entry.batch_number != null) secondaryParts.push(`Batch #${entry.batch_number}`);
       const metaParts = [];
       if (entry.sent_date) metaParts.push(`Sent ${formatDisplayDate(entry.sent_date)}`);
-      if (entry.candidate_status) metaParts.push(entry.candidate_status);
       const tags = [];
       if (entry.is_hired) tags.push("Hired");
       else if (entry.is_interviewed) tags.push("Interviewing/testing");
-      else if (entry.is_interview_eligible) tags.push("Eligible");
+      else if (entry.is_interview_eligible && entry.candidate_status) tags.push(entry.candidate_status);
       if (tags.length) metaParts.push(tags.join(" · "));
+      else if (entry.candidate_status) metaParts.push(entry.candidate_status);
+      const statusInfo =
+        typeof statusResolver === "function" ? statusResolver(entry) : { variant: null, label: null };
       return {
         key: entry.candidate_id
           ? `candidate-${entry.candidate_id}-${entry.batch_id || index}`
@@ -475,8 +543,85 @@ function createPipelineItems(entries = []) {
         primary: candidateLabel,
         secondary: secondaryParts.join(" · "),
         meta: metaParts.join(" · "),
+        statusVariant: statusInfo?.variant || null,
+        statusLabel: statusInfo?.label || null,
       };
     });
+}
+function describeLeft90Window() {
+  const start = metricsState.left90RangeStart;
+  const end = metricsState.left90RangeEnd;
+  if (start && end) {
+    return `${formatDisplayDate(start)} — ${formatDisplayDate(end)}`;
+  }
+  return "this window";
+}
+function getLeadChurnDetails(hrLeadEmail) {
+  const key = (hrLeadEmail || "").toLowerCase();
+  if (!key) return [];
+  return (metricsState.churnDetails || []).filter(
+    (row) => (row.hr_lead_email || "").toLowerCase() === key
+  );
+}
+function filterChurnEntries(entries = [], { within90Days = null } = {}) {
+  return entries.filter((row) => {
+    if (within90Days == null) return true;
+    return Boolean(row.left_within_90_days) === Boolean(within90Days);
+  });
+}
+function sortChurnEntries(entries = []) {
+  return entries.slice().sort((a, b) => {
+    const aDate = a.end_date || "";
+    const bDate = b.end_date || "";
+    if (aDate === bDate) return 0;
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+    return bDate.localeCompare(aDate);
+  });
+}
+function formatChurnTenure(days) {
+  if (days == null || Number.isNaN(Number(days))) return "Tenure not documented";
+  const parsed = Math.round(Number(days));
+  return `Tenure: ${parsed} day${parsed === 1 ? "" : "s"}`;
+}
+function createChurnDetailItems(entries = []) {
+  return sortChurnEntries(entries).map((row, index) => {
+    const identifier = row.candidate_id != null ? row.candidate_id : `row-${index}`;
+    const candidateName =
+      row.candidate_name || row.candidate_email || `Candidate #${identifier}`;
+    const candidateEmail = row.candidate_email || "";
+    const opportunityParts = [];
+    if (row.opportunity_title) opportunityParts.push(row.opportunity_title);
+    if (row.opportunity_client_name) opportunityParts.push(row.opportunity_client_name);
+    const opportunityLabel = opportunityParts.join(" · ") || "Opportunity not documented";
+    const opportunityContent = row.opportunity_id
+      ? `<a href="./opportunity-detail.html?id=${encodeURIComponent(
+          row.opportunity_id
+        )}" target="_blank" rel="noopener">${opportunityLabel}</a>`
+      : opportunityLabel;
+    const secondaryParts = [];
+    if (candidateEmail) secondaryParts.push(candidateEmail);
+    if (opportunityContent) secondaryParts.push(opportunityContent);
+    const metaParts = [];
+    metaParts.push(
+      row.start_date
+        ? `Started ${formatDisplayDate(row.start_date)}`
+        : "Start date missing"
+    );
+    metaParts.push(
+      row.end_date ? `Ended ${formatDisplayDate(row.end_date)}` : "End date missing"
+    );
+    metaParts.push(formatChurnTenure(row.tenure_days));
+    if (row.left_within_90_days) metaParts.push("Left within 90 days");
+    const hrLeadLabel = row.hr_lead_name || row.hr_lead_email || "";
+    if (hrLeadLabel) metaParts.push(`HR lead: ${hrLeadLabel}`);
+    return {
+      key: `churn-${identifier}-${index}`,
+      primary: candidateName,
+      secondary: secondaryParts.join(" · "),
+      meta: metaParts.join(" · "),
+    };
+  });
 }
 
 function animateValue(el, from, to, { duration = 650, formatter }) {
@@ -527,6 +672,7 @@ function buildDetailModalPayload(type) {
   const getDurationItems = (metricKey) => createDurationItems(durationDetails[metricKey] || [], metricKey);
   const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
   const pipelineEntries = getPipelineDetails(key);
+  const churnEntries = getLeadChurnDetails(key);
 
   switch (type) {
     case "closedWinRange":
@@ -652,34 +798,78 @@ function buildDetailModalPayload(type) {
     }
     case "interviewRate": {
       const totalSent = pipelineEntries.length;
-      const eligibleEntries = pipelineEntries.filter((entry) => entry.is_interview_eligible);
-      const interviewedEntries = eligibleEntries.filter((entry) => entry.is_interviewed);
+      const interviewInsights = computeInterviewPipelineInsights(pipelineEntries);
+      const computedRate =
+        interviewInsights.pct ??
+        (typeof selectedMetrics.interview_rate?.pct === "number"
+          ? selectedMetrics.interview_rate.pct
+          : null);
       return {
         title: "Interview rate",
         context: `Candidate batches sent${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [
-          `Eligible candidates: ${eligibleEntries.length}`,
-          `Reached interview/testing: ${interviewedEntries.length}`,
-          `Rate: ${formatPercent(selectedMetrics.interview_rate?.pct)}`,
+          `Green candidates: ${interviewInsights.greenCount}`,
+          `Red candidates: ${interviewInsights.redCount}`,
+          `Rate: ${formatPercent(computedRate)}`,
+          `Eligible candidates: ${interviewInsights.totalEligible}`,
           `Total sent: ${totalSent}`,
         ],
-        items: createPipelineItems(eligibleEntries),
+        items: createPipelineItems(interviewInsights.items, {
+          statusResolver: getInterviewStatusInfo,
+        }),
         emptyMessage: "No interview-eligible candidates sent in the selected window.",
       };
     }
     case "hireRate": {
       const totalSent = pipelineEntries.length;
-      const hiredEntries = pipelineEntries.filter((entry) => entry.is_hired);
+      const hireInsights = computeHirePipelineInsights(pipelineEntries);
+      const computedRate =
+        hireInsights.pct ??
+        (typeof selectedMetrics.hire_rate?.pct === "number"
+          ? selectedMetrics.hire_rate.pct
+          : null);
       return {
         title: "Hire rate",
         context: `Sent candidates${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [
-          `Hires: ${hiredEntries.length}`,
+          `Green candidates: ${hireInsights.greenCount}`,
+          `Red candidates: ${hireInsights.redCount}`,
+          `Rate: ${formatPercent(computedRate)}`,
           `Sent candidates: ${totalSent}`,
-          `Rate: ${formatPercent(selectedMetrics.hire_rate?.pct)}`,
         ],
-        items: createPipelineItems(pipelineEntries),
+        items: createPipelineItems(hireInsights.items, {
+          statusResolver: getHireStatusInfo,
+        }),
         emptyMessage: "No candidates were sent in the selected window.",
+      };
+    }
+    case "churnRange": {
+      const known = selectedMetrics.churn_tenure_known ?? 0;
+      const missing = selectedMetrics.churn_tenure_unknown ?? 0;
+      return {
+        title: "Total churn · Selected range",
+        context: `Churned hires${recruiterSuffix} whose end date falls between ${readableRange}.`,
+        summaryLines: [
+          `Count: ${selectedMetrics.churn_total ?? 0}`,
+          `Start date available: ${known} · Missing: ${missing}`,
+        ],
+        items: createChurnDetailItems(churnEntries),
+        emptyMessage: "No churn recorded for this recruiter in the selected range.",
+      };
+    }
+    case "churn90Days": {
+      const windowLabel = describeLeft90Window();
+      const within90Entries = filterChurnEntries(churnEntries, { within90Days: true });
+      return {
+        title: "Total churn · 90-day tenure",
+        context: `Hires that left within 90 days of their start date${recruiterSuffix} (${windowLabel}).`,
+        summaryLines: [
+          `Left within 90 days: ${selectedMetrics.left90_within_90 ?? 0}`,
+          `Rate: ${formatPercent(selectedMetrics.left90_rate)}`,
+          `Start dates available: ${selectedMetrics.left90_tenure_known ?? 0}`,
+        ],
+        items: createChurnDetailItems(within90Entries),
+        emptyMessage: "No hires left within 90 days for this recruiter.",
       };
     }
     default:
@@ -703,9 +893,13 @@ function renderDetailModalContent(detail) {
   (detail.items || []).forEach((item) => {
     const li = document.createElement("li");
     li.className = "metric-detail-modal__item";
+    if (item.statusVariant) {
+      li.classList.add(`metric-detail-modal__item--${item.statusVariant}`);
+    }
     li.innerHTML = `
       <div>${item.primary}</div>
       ${item.secondary ? `<div class="metric-detail-modal__item-secondary">${item.secondary}</div>` : ""}
+      ${item.statusLabel ? `<div class="metric-detail-modal__badge">${item.statusLabel}</div>` : ""}
       ${item.meta ? `<div class="metric-detail-modal__item-meta">${item.meta}</div>` : ""}
     `;
     detailModalRefs.list.appendChild(li);
@@ -789,93 +983,6 @@ function wireMetricDetailCards() {
   });
 }
 
-function renderChurnDetailsForLead(hrLeadEmail) {
-  const section = document.getElementById("churnDetailsSection");
-  const tbody = document.getElementById("churnDetailsTableBody");
-  const empty = document.getElementById("churnDetailsEmpty");
-  if (!section || !tbody || !empty) return;
-
-  tbody.innerHTML = "";
-  const email = (hrLeadEmail || "").toLowerCase();
-
-  if (!email) {
-    section.classList.add("is-empty");
-    empty.textContent = "Select a recruiter to see churn details.";
-    empty.style.display = "";
-    return;
-  }
-
-  const rows = (metricsState.churnDetails || []).filter(
-    (row) => (row.hr_lead_email || "").toLowerCase() === email
-  );
-
-  if (!rows.length) {
-    section.classList.add("is-empty");
-    empty.textContent = "No churn recorded for this recruiter in the selected range.";
-    empty.style.display = "";
-    return;
-  }
-
-  section.classList.remove("is-empty");
-  empty.style.display = "none";
-
-  rows.forEach((row) => {
-    const tr = document.createElement("tr");
-    const candidateName = row.candidate_name || `Candidate #${row.candidate_id || "—"}`;
-    const candidateEmail = row.candidate_email
-      ? `<div class="cell-subtle">${row.candidate_email}</div>`
-      : "";
-
-    const opportunityClient = row.opportunity_client_name || "No client";
-    const opportunityTitle = row.opportunity_title || "—";
-    const opportunityLink = row.opportunity_id
-      ? `<a href="./opportunity-detail.html?id=${encodeURIComponent(
-          row.opportunity_id
-        )}" target="_blank" rel="noopener">${opportunityClient}</a>`
-      : `<span>${opportunityClient}</span>`;
-    const roleLine = opportunityTitle ? `<div class="cell-subtle">${opportunityTitle}</div>` : "";
-
-    const start = isoToYMD(row.start_date) || "—";
-    const end = isoToYMD(row.end_date) || "—";
-    const tenure =
-      row.tenure_days == null ? "–" : `${row.tenure_days} day${row.tenure_days === 1 ? "" : "s"}`;
-    const badge = row.left_within_90_days
-      ? '<span class="tenure-badge">Left within 90 days</span>'
-      : "";
-
-    const hrLeadName = row.hr_lead_name || row.hr_lead_email || "—";
-    const hrLeadEmailText = row.hr_lead_email
-      ? `<div class="cell-subtle">${row.hr_lead_email}</div>`
-      : "";
-
-    tr.innerHTML = `
-      <td>
-        <div class="cell-main">${candidateName}</div>
-        ${candidateEmail}
-      </td>
-      <td>
-        <div class="opportunity-cell">
-          ${opportunityLink}
-          ${roleLine}
-        </div>
-      </td>
-      <td>${start}</td>
-      <td>${end}</td>
-      <td>
-        <div class="tenure-cell">
-          <span>${tenure}</span>
-          ${badge}
-        </div>
-      </td>
-      <td>
-        <div class="cell-main">${hrLeadName}</div>
-        ${hrLeadEmailText}
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
 function updateCardsForLead(hrLeadEmail) {
   const key = (hrLeadEmail || "").toLowerCase();
   const m = metricsState.byLead[key];
@@ -927,9 +1034,12 @@ function updateCardsForLead(hrLeadEmail) {
     if (interviewHelperEl) interviewHelperEl.textContent = "(— / —)";
     if (hireRateEl) hireRateEl.textContent = "–";
     if (hireHelperEl) hireHelperEl.textContent = "(— / —)";
-    renderChurnDetailsForLead(key);
     return;
   }
+
+  const pipelineEntries = getPipelineDetails(key);
+  const interviewInsights = computeInterviewPipelineInsights(pipelineEntries);
+  const hireInsights = computeHirePipelineInsights(pipelineEntries);
 
   /* 🌟 NUEVO: animamos los números en vez de cambiarlos brusco */
 
@@ -1067,7 +1177,8 @@ function updateCardsForLead(hrLeadEmail) {
   if (interviewRateEl && interviewHelperEl) {
     const interviewRate = m.interview_rate || {};
     const newInterviewPct =
-      typeof interviewRate.pct === "number" ? interviewRate.pct : null;
+      interviewInsights.pct ??
+      (typeof interviewRate.pct === "number" ? interviewRate.pct : null);
     if (newInterviewPct == null) {
       interviewRateEl.textContent = "–";
     } else {
@@ -1078,14 +1189,15 @@ function updateCardsForLead(hrLeadEmail) {
       });
     }
     interviewHelperEl.textContent = formatRatioSubtext(
-      interviewRate.interviewed,
-      interviewRate.sent
+      interviewInsights.greenCount,
+      interviewInsights.totalEligible
     );
   }
 
   if (hireRateEl && hireHelperEl) {
     const hireRate = m.hire_rate || {};
-    const newHirePct = typeof hireRate.pct === "number" ? hireRate.pct : null;
+    const newHirePct =
+      hireInsights.pct ?? (typeof hireRate.pct === "number" ? hireRate.pct : null);
     if (newHirePct == null) {
       hireRateEl.textContent = "–";
     } else {
@@ -1095,7 +1207,10 @@ function updateCardsForLead(hrLeadEmail) {
         formatter: (v) => formatPercent(v),
       });
     }
-    hireHelperEl.textContent = formatRatioSubtext(hireRate.hired, hireRate.sent);
+    hireHelperEl.textContent = formatRatioSubtext(
+      hireInsights.greenCount,
+      hireInsights.totalSent
+    );
   }
 
   // --- Churn · Selected range ---
@@ -1139,7 +1254,6 @@ function updateCardsForLead(hrLeadEmail) {
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
   animateCardsFlash();
-  renderChurnDetailsForLead(key);
 }
 
 function populateDropdown() {
@@ -1426,14 +1540,12 @@ function wireRangePicker() {
 
     const sel = document.getElementById("hrLeadSelect");
     if (sel && sel.value) updateCardsForLead(sel.value);
-    else renderChurnDetailsForLead("");
   });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   setupMetricDetailModal();
   wireMetricDetailCards();
-  renderChurnDetailsForLead("");
   (async () => {
     const uid = await ensureUserIdInURL();
     await loadRecruiterDirectory();

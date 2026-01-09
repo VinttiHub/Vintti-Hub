@@ -92,6 +92,14 @@
       padding: 1rem 1.25rem;
       background: rgba(248, 244, 255, 0.95);
     }
+    .metric-detail-modal__item--positive {
+      border-color: rgba(108, 175, 146, 0.35);
+      background: #ecf9f3;
+    }
+    .metric-detail-modal__item--negative {
+      border-color: rgba(217, 125, 143, 0.35);
+      background: #fff0f3;
+    }
     .metric-detail-modal__item-secondary {
       color: #6f5a98;
     }
@@ -99,6 +107,24 @@
       font-size: 0.85rem;
       margin-top: 0.35rem;
       color: #8b7ca8;
+    }
+    .metric-detail-modal__badge {
+      display: inline-flex;
+      margin-top: 0.45rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(107, 97, 139, 0.12);
+      color: #5f4d7a;
+    }
+    .metric-detail-modal__item--positive .metric-detail-modal__badge {
+      background: rgba(64, 150, 116, 0.18);
+      color: #215941;
+    }
+    .metric-detail-modal__item--negative .metric-detail-modal__badge {
+      background: rgba(210, 95, 121, 0.18);
+      color: #7b1c36;
     }
     .metric-detail-modal__empty {
       margin: 0;
@@ -366,7 +392,13 @@
         <p class="metric-caption metric-caption-subtle" id="hireRateHelper">(— / —)</p>
       </article>
 
-      <article class="metric-card metric-churn-range">
+      <article
+        class="metric-card metric-churn-range metric-card--detail-disabled"
+        data-metric-detail="churnRange"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label">Total churn · Selected range</span>
           <span class="metric-pill metric-pill-churn">End date based</span>
@@ -377,7 +409,13 @@
         </p>
       </article>
 
-      <article class="metric-card metric-early-churn">
+      <article
+        class="metric-card metric-early-churn metric-card--detail-disabled"
+        data-metric-detail="churn90Days"
+        role="button"
+        tabindex="-1"
+        aria-disabled="true"
+      >
         <div class="metric-header">
           <span class="metric-label">Total churn - 90 days</span>
           <span class="metric-pill metric-pill-early">Tenure insight</span>
@@ -389,34 +427,6 @@
         <p class="metric-caption metric-caption-subtle" id="left90RangeLabel"></p>
         <p class="metric-caption" id="left90Helper">Based on – churned hires with a start date.</p>
       </article>
-    </section>
-
-    <section class="churn-details" id="churnDetailsSection">
-      <div class="churn-details-head">
-        <div>
-          <h2>Churn details</h2>
-          <p>See which hires left, when they started and which opportunity they belonged to.</p>
-        </div>
-        <p class="churn-details-note">Churn is calculated when a hire end date is recorded.</p>
-      </div>
-      <div class="churn-details-table-wrapper">
-        <table class="churn-table">
-          <thead>
-            <tr>
-              <th>Candidate</th>
-              <th>Opportunity</th>
-              <th>Started</th>
-              <th>Ended</th>
-              <th>Tenure</th>
-              <th>HR Lead</th>
-            </tr>
-          </thead>
-          <tbody id="churnDetailsTableBody"></tbody>
-        </table>
-        <div class="churn-details-empty" id="churnDetailsEmpty">
-          Select a recruiter to see churn details.
-        </div>
-      </div>
     </section>
 
     <section class="meta-footer">
