@@ -314,6 +314,7 @@ function fillEmployeesTables(candidates) {
 
   let hasStaffing = false;
   let hasRecruiting = false;
+  const staffingBuyoutClones = [];
 
   if (!Array.isArray(candidates) || candidates.length === 0) {
     staffingTableBody.innerHTML   = `<tr><td colspan="15">No employees in Staffing</td></tr>`;
@@ -694,183 +695,27 @@ if (endInputS) {
 
       staffingTableBody.appendChild(row);
       hasStaffing = true;
+      if (hasBuyoutInfo(candidate)) {
+        staffingBuyoutClones.push(candidate);
+      }
     }
 
     // ---------- RECRUITING ----------
     else if (candidate.opp_model === 'Recruiting') {
-      const probation =
-        candidate.probation_days ??
-        candidate.probation ??
-        candidate.probation_days_recruiting ?? '—';
-
-      const revenueRecruit =
-        (candidate.employee_revenue_recruiting ??
-         candidate.employee_revenue ??
-         '—');
-
-      const referralVal =
-        (candidate.referral ??
-         candidate.referral_dolar ??
-         '—');
-
-      const referralRange =
-        candidate.referral_daterange
-          ? candidate.referral_daterange
-              .replace('[','').replace(']','')
-              .split(',').map(d => d.trim()).join(' - ')
-          : '—';
-
-      const row = document.createElement('tr');
-      const isBlacklisted = Boolean(candidate.is_blacklisted);
-      const blacklistIndicator = isBlacklisted
-        ? `<span class="blacklist-indicator" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">⚠️</span>`
-        : '';
-      row.innerHTML = `
-        <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
-        <td>
-          <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
-            ${candidate.name || '—'} ${blacklistIndicator}
-          </a>
-        </td>
-        <td>
-          <input
-            type="date"
-            class="start-date-input input-chip"
-            value="${dateInputValue(candidate.start_date)}"
-            data-candidate-id="${candidate.candidate_id}"
-            data-opportunity-id="${candidate.opportunity_id}"
-          />
-        </td>
-
-        <td>
-          <input
-            type="date"
-            class="end-date-input input-chip"
-            value="${dateInputValue(candidate.end_date)}"
-            data-candidate-id="${candidate.candidate_id}"
-            data-opportunity-id="${candidate.opportunity_id}"
-          />
-        </td>
-        <td>${candidate.opp_position_name || '—'}</td>
-        <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
-        <td>$${candidate.employee_salary ?? '—'}</td>
-        <td>$${(candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '—')}</td>
-
-        <!-- NUEVO: Referral $ -->
-        <td>
-         <div class="currency-wrap">
-           <input 
-             type="number"
-             class="ref-rec-input input-chip"
-             placeholder="0.00"
-             step="0.01" min="0" inputmode="decimal"
-             value="${candidate.referral_dolar ?? ''}"
-             data-candidate-id="${candidate.candidate_id}"
-             data-opportunity-id="${candidate.opportunity_id}"
-           />
-         </div>
-        </td>
-
-        <!-- NUEVO: Referral Date Range -->
-        <td>
-       <input 
-         type="text" 
-         class="ref-rec-range-picker range-chip" 
-            placeholder="Select range"
-            readonly 
-            data-candidate-id="${candidate.candidate_id}"
-            data-opportunity-id="${candidate.opportunity_id}"
-            value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
-          />
-        </td>
-      `;
-      if (isBlacklisted) {
-        row.classList.add('blacklisted-row');
-        row.style.backgroundColor = '#ffeaea';
+      const row = createRecruitingRow(candidate);
+      if (row) {
+        recruitingTableBody.appendChild(row);
+        hasRecruiting = true;
       }
-      // Recruiting: guardar referral $
-      const refRecInput = row.querySelector('.ref-rec-input');
-      if (refRecInput) {
-        refRecInput.addEventListener('blur', () => {
-          const candidateId = refRecInput.dataset.candidateId;
-          const oppId = refRecInput.dataset.opportunityId;
-          const value = refRecInput.value;
-          updateCandidateField(candidateId, 'referral_dolar', value, oppId);
-        });
-      }
-
-      // Recruiting: referral date range
-      const refRecPickerInput = row.querySelector('.ref-rec-range-picker');
-      if (refRecPickerInput) {
-        const rr = candidate.referral_daterange;
-        let startDateR = null, endDateR = null;
-        if (rr && rr.includes(',')) {
-          const [s,e] = rr.replace('[','').replace(']','').split(',').map(d => d.trim());
-          startDateR = new Date(s.slice(0,7) + '-15');
-          endDateR   = new Date(e.slice(0,7) + '-15');
-        }
-
-        const options = {
-          element: refRecPickerInput,
-          format: 'MMM YYYY',
-          numberOfMonths: 2,
-          numberOfColumns: 2,
-          singleMode: false,
-          allowRepick: true,
-          dropdowns: { minYear: 2020, maxYear: 2030, months: true, years: true },
-          setup: (picker) => {
-            picker.on('selected', (date1, date2) => {
-              const candidateId = refRecPickerInput.dataset.candidateId;
-              const oppId = refRecPickerInput.dataset.opportunityId;
-              if (!candidateId) return;
-              const start = date1.format('YYYY-MM-DD');
-              const end   = date2.format('YYYY-MM-DD');
-              updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
-            });
-          }
-        };
-        if (startDateR && endDateR) { options.startDate = startDateR; options.endDate = endDateR; }
-        new Litepicker(options);
-      }
-// === Start/End date (hire_opportunity) ===
-const startInput = row.querySelector('.start-date-input');
-if (startInput) {
-  startInput.addEventListener('change', () => {
-    const candidateId = startInput.dataset.candidateId;
-    const oppId = startInput.dataset.opportunityId;
-    updateCandidateField(candidateId, 'start_date', startInput.value || null, oppId);
+    }
   });
-}
 
-const endInput = row.querySelector('.end-date-input');
-if (endInput) {
-  endInput.addEventListener('change', () => {
-    const candidateId = endInput.dataset.candidateId;
-    const oppId = endInput.dataset.opportunityId;
-    const newValue = endInput.value || '';
-    const patchValue = newValue || null;
-    const prevValue = endInput.dataset.previousEndDate || '';
-    const shouldNotify = !prevValue && !!newValue;
-    const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
-    const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
-
-    updatePromise.then(() => {
-      if (shouldNotify) {
-        notifyCandidateInactiveEmail({
-          candidateId,
-          candidateName: candidate.name,
-          clientName: accountName,
-          roleName: candidate.opp_position_name,
-          endDate: newValue,
-          opportunityId: oppId
-        });
-      }
-    }).finally(() => {
-      endInput.dataset.previousEndDate = newValue;
+  staffingBuyoutClones.forEach((candidate) => {
+    const row = createRecruitingRow(candidate, {
+      forceActiveStatus: true,
+      isBuyoutDuplicate: true,
     });
-  });
-}
-
+    if (row) {
       recruitingTableBody.appendChild(row);
       hasRecruiting = true;
     }
@@ -956,6 +801,214 @@ if (endInput) {
     })
     .catch(err => console.error('❌ Error updating contract:', err));
   }
+}
+
+function hasBuyoutInfo(candidate) {
+  if (!candidate) return false;
+  const amount = candidate.buyout_dolar;
+  const range = candidate.buyout_daterange;
+  const hasAmount =
+    amount !== null &&
+    amount !== undefined &&
+    !(typeof amount === 'string' && amount.trim() === '');
+  const hasRange = Boolean(range && String(range).trim());
+  return hasAmount || hasRange;
+}
+
+function createRecruitingRow(candidate, options = {}) {
+  if (!candidate) return null;
+  const { forceActiveStatus = false, isBuyoutDuplicate = false } = options;
+  if (isBuyoutDuplicate) ensureBuyoutNoteStyles();
+
+  const isBlacklisted = Boolean(candidate.is_blacklisted);
+  const blacklistIndicator = isBlacklisted
+    ? `<span class="blacklist-indicator" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">⚠️</span>`
+    : '';
+  const buyoutNote = isBuyoutDuplicate
+    ? `<span class="buyout-note" title="Candidate has buyout info">Buyout</span>`
+    : '';
+
+  const rowStatus =
+    forceActiveStatus
+      ? 'active'
+      : (candidate.status ?? (candidate.end_date ? 'inactive' : 'active'));
+  const row = document.createElement('tr');
+  row.innerHTML = `
+        <td>${renderStatusChip(rowStatus)}</td>
+        <td>
+          <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
+            ${candidate.name || '—'} ${blacklistIndicator}
+          </a>
+          ${buyoutNote}
+        </td>
+        <td>
+          <input
+            type="date"
+            class="start-date-input input-chip"
+            value="${dateInputValue(candidate.start_date)}"
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+          />
+        </td>
+
+        <td>
+          <input
+            type="date"
+            class="end-date-input input-chip"
+            value="${dateInputValue(candidate.end_date)}"
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+          />
+        </td>
+        <td>${candidate.opp_position_name || '—'}</td>
+        <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
+        <td>$${candidate.employee_salary ?? '—'}</td>
+        <td>$${(candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '—')}</td>
+
+        <!-- NUEVO: Referral $ -->
+        <td>
+         <div class="currency-wrap">
+           <input 
+             type="number"
+             class="ref-rec-input input-chip"
+             placeholder="0.00"
+             step="0.01" min="0" inputmode="decimal"
+             value="${candidate.referral_dolar ?? ''}"
+             data-candidate-id="${candidate.candidate_id}"
+             data-opportunity-id="${candidate.opportunity_id}"
+           />
+         </div>
+        </td>
+
+        <!-- NUEVO: Referral Date Range -->
+        <td>
+       <input 
+         type="text" 
+         class="ref-rec-range-picker range-chip" 
+            placeholder="Select range"
+            readonly 
+            data-candidate-id="${candidate.candidate_id}"
+            data-opportunity-id="${candidate.opportunity_id}"
+            value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
+          />
+        </td>
+      `;
+
+  if (isBlacklisted) {
+    row.classList.add('blacklisted-row');
+    row.style.backgroundColor = '#ffeaea';
+  }
+  if (isBuyoutDuplicate) {
+    row.dataset.buyoutDuplicate = 'true';
+  }
+
+  const refRecInput = row.querySelector('.ref-rec-input');
+  if (refRecInput) {
+    refRecInput.addEventListener('blur', () => {
+      const candidateId = refRecInput.dataset.candidateId;
+      const oppId = refRecInput.dataset.opportunityId;
+      const value = refRecInput.value;
+      updateCandidateField(candidateId, 'referral_dolar', value, oppId);
+    });
+  }
+
+  const refRecPickerInput = row.querySelector('.ref-rec-range-picker');
+  if (refRecPickerInput) {
+    const rr = candidate.referral_daterange;
+    let startDateR = null;
+    let endDateR = null;
+    if (rr && rr.includes(',')) {
+      const [s, e] = rr.replace('[', '').replace(']', '').split(',').map(d => d.trim());
+      startDateR = new Date(s.slice(0, 7) + '-15');
+      endDateR = new Date(e.slice(0, 7) + '-15');
+    }
+
+    const options = {
+      element: refRecPickerInput,
+      format: 'MMM YYYY',
+      numberOfMonths: 2,
+      numberOfColumns: 2,
+      singleMode: false,
+      allowRepick: true,
+      dropdowns: { minYear: 2020, maxYear: 2030, months: true, years: true },
+      setup: (picker) => {
+        picker.on('selected', (date1, date2) => {
+          const candidateId = refRecPickerInput.dataset.candidateId;
+          const oppId = refRecPickerInput.dataset.opportunityId;
+          if (!candidateId) return;
+          const start = date1.format('YYYY-MM-DD');
+          const end = date2.format('YYYY-MM-DD');
+          updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
+        });
+      }
+    };
+    if (startDateR && endDateR) {
+      options.startDate = startDateR;
+      options.endDate = endDateR;
+    }
+    new Litepicker(options);
+  }
+
+  const startInput = row.querySelector('.start-date-input');
+  if (startInput) {
+    startInput.addEventListener('change', () => {
+      const candidateId = startInput.dataset.candidateId;
+      const oppId = startInput.dataset.opportunityId;
+      updateCandidateField(candidateId, 'start_date', startInput.value || null, oppId);
+    });
+  }
+
+  const endInput = row.querySelector('.end-date-input');
+  if (endInput) {
+    endInput.addEventListener('change', () => {
+      const candidateId = endInput.dataset.candidateId;
+      const oppId = endInput.dataset.opportunityId;
+      const newValue = endInput.value || '';
+      const patchValue = newValue || null;
+      const prevValue = endInput.dataset.previousEndDate || '';
+      const shouldNotify = !prevValue && !!newValue;
+      const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
+      const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
+
+      updatePromise.then(() => {
+        if (shouldNotify) {
+          notifyCandidateInactiveEmail({
+            candidateId,
+            candidateName: candidate.name,
+            clientName: accountName,
+            roleName: candidate.opp_position_name,
+            endDate: newValue,
+            opportunityId: oppId
+          });
+        }
+      }).finally(() => {
+        endInput.dataset.previousEndDate = newValue;
+      });
+    });
+  }
+
+  return row;
+}
+
+function ensureBuyoutNoteStyles() {
+  if (document.getElementById('buyout-note-style')) return;
+  const style = document.createElement('style');
+  style.id = 'buyout-note-style';
+  style.textContent = `
+    .buyout-note {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #fff4e5;
+      color: #b45a00;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
   function getIdFromURL() {

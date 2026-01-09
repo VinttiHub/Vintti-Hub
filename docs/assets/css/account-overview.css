@@ -171,6 +171,12 @@ body.panel-open {
   gap: 1.5rem;
 }
 
+.empty-state {
+  margin-top: 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
 .opportunity-card {
   border: 1px solid transparent;
   border-radius: 28px;
@@ -237,6 +243,17 @@ body.panel-open {
   font-weight: 600;
 }
 
+.batch-pill--empty {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--text-muted);
+}
+
+.batch-subtext {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
 .avatars {
   display: flex;
   align-items: center;
@@ -274,6 +291,11 @@ body.panel-open {
   width: 52px;
   height: 52px;
   font-size: 1.1rem;
+}
+
+.batch-empty-text {
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .status-pill {
@@ -387,6 +409,12 @@ body.panel-open {
 
 .candidate-role {
   margin: 0.1rem 0 0;
+  color: var(--text-muted);
+}
+
+.candidate-card__batch {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 

@@ -398,6 +398,17 @@ async function runWithConcurrency(tasks, limit = 6) {
   await Promise.all(workers);
 }
 
+async function fetchAccountStatusDetails(accountId) {
+  const [oppsRes, hiresRes] = await Promise.all([
+    fetch(`${API_BASE}/accounts/${accountId}/opportunities`),
+    fetch(`${API_BASE}/accounts/${accountId}/opportunities/candidates`)
+  ]);
+  if (!oppsRes.ok) throw new Error(`Opps HTTP ${oppsRes.status}`);
+  if (!hiresRes.ok) throw new Error(`Candidates HTTP ${hiresRes.status}`);
+  const [opps, hires] = await Promise.all([oppsRes.json(), hiresRes.json()]);
+  return deriveStatusFrom(opps, hires);
+}
+
 /* =========================
    4) Status computation & painting
    ========================= */
@@ -466,20 +477,23 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
     })
   );
 
-  // 2) Fallback per-account for missing
-  const missing = ids.filter(id => !summary[id]);
-  if (missing.length) {
-    const tasks = missing.map(id => async () => {
+  // 2) Re-derive using detailed data for anything missing or non-active
+  const needsDetail = ids.filter(id => {
+    const status = summary[id]?.status || '';
+    if (!status) return true;
+    return norm(status) !== 'active client';
+  });
+  if (needsDetail.length) {
+    const tasks = needsDetail.map(id => async () => {
+      const hadSummary = Boolean(summary[id]);
       try {
-        const [opps, hires] = await Promise.all([
-          fetch(`${API_BASE}/accounts/${id}/opportunities`).then(r => r.json()),
-          fetch(`${API_BASE}/accounts/${id}/opportunities/candidates`).then(r => r.json()),
-        ]);
-        summary[id] = { status: deriveStatusFrom(opps, hires) };
-      } catch {
-        summary[id] = { status: '—' };
+        const derivedStatus = await fetchAccountStatusDetails(id);
+        summary[id] = { status: derivedStatus };
+      } catch (err) {
+        if (!summary[id]) summary[id] = { status: '—' };
+        console.warn(`⚠️ Could not re-derive status for account ${id}:`, err);
       } finally {
-        onProgress?.(1);
+        if (!hadSummary) onProgress?.(1);
       }
     });
     await runWithConcurrency(tasks, CONC_FALLBACK);
