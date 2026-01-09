@@ -861,7 +861,7 @@ function buildDetailModalPayload(type) {
       const within90Entries = filterChurnEntries(churnEntries, { within90Days: true });
       return {
         title: "Total churn · 90-day tenure",
-        context: `Hires that left within 90 days of their start date${recruiterSuffix} (${windowLabel}).`,
+        context: `Churned hires${recruiterSuffix} whose end date falls between ${windowLabel} and whose tenure was under 90 days.`,
         summaryLines: [
           `Left within 90 days: ${selectedMetrics.left90_within_90 ?? 0}`,
           `Rate: ${formatPercent(selectedMetrics.left90_rate)}`,

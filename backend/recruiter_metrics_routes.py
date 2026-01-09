@@ -85,10 +85,10 @@ def register_recruiter_metrics_routes(app):
             # fallback: display end defaults to the inclusive day before window_end
             disp_end = window_end - timedelta(days=1)
 
-        left90_end_inclusive = disp_end
-        left90_start_inclusive = left90_end_inclusive - timedelta(days=89)
-        left90_window_start = left90_start_inclusive
-        left90_window_end = left90_end_inclusive + timedelta(days=1)
+        left90_window_start = window_start
+        left90_window_end = window_end
+        left90_display_start = disp_start
+        left90_display_end = disp_end
 
         sql = """
         WITH base AS (
@@ -929,8 +929,8 @@ def register_recruiter_metrics_routes(app):
                 # 👇 para pintar el picker bonito
                 "range_start": disp_start.isoformat(),
                 "range_end": disp_end.isoformat(),  # inclusive
-                "left90_range_start": left90_start_inclusive.isoformat(),
-                "left90_range_end": left90_end_inclusive.isoformat(),
+                "left90_range_start": left90_display_start.isoformat(),
+                "left90_range_end": left90_display_end.isoformat(),
                 "metrics": metrics,
                 # Churn data is requested by the non-React Recruiter Power UI:
                 #  - summary counts live in each metric row (per recruiter)
