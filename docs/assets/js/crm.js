@@ -58,6 +58,16 @@ function isActiveHire(h) {
   return false;
 }
 
+function hasBuyout(h) {
+  if (!h) return false;
+  const amount = h.buyout_dolar;
+  const range = h.buyout_daterange;
+  const hasAmount =
+    amount !== null && amount !== undefined && String(amount).trim() !== '';
+  const hasRange = range !== null && range !== undefined && String(range).trim() !== '';
+  return hasAmount || hasRange;
+}
+
 // Render a status chip for the accounts table
 function renderAccountStatusChip(statusText) {
   const s = norm(statusText);
@@ -73,6 +83,7 @@ function renderAccountStatusChip(statusText) {
 function deriveStatusFrom(opps = [], hires = []) {
   const hasCandidates = Array.isArray(hires) && hires.length > 0;
   const anyActiveCandidate = hasCandidates && hires.some(isActiveHire);
+  const hasBuyoutCandidate = Array.isArray(hires) && hires.some(hasBuyout);
   const allCandidatesInactive = hasCandidates && hires.every(h => !isActiveHire(h));
 
   const stages = (Array.isArray(opps) ? opps : []).map(o => normalizeStage(o.opp_stage || o.stage));
@@ -80,7 +91,7 @@ function deriveStatusFrom(opps = [], hires = []) {
   const hasPipeline = stages.some(s => s === 'pipeline');
   const allLost = hasOpps && stages.every(s => s === 'lost');
 
-  if (anyActiveCandidate) return 'Active Client';
+  if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
   if (allCandidatesInactive) return 'Inactive Client';
   if (!hasOpps && !hasCandidates) return 'Lead';
   if (allLost && !hasCandidates) return 'Lead Lost';

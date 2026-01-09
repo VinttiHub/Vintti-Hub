@@ -33,18 +33,57 @@ def data_light():
               FROM hire_opportunity
               WHERE end_date IS NULL
               ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
+            ),
+            hire_labels AS (
+              SELECT
+                o.account_id,
+                CASE
+                  WHEN (
+                    (
+                      h.buyout_dolar IS NOT NULL
+                      AND NULLIF(TRIM(CAST(h.buyout_dolar AS TEXT)), '') IS NOT NULL
+                    )
+                    OR (
+                      h.buyout_daterange IS NOT NULL
+                      AND NULLIF(TRIM(CAST(h.buyout_daterange AS TEXT)), '') IS NOT NULL
+                    )
+                  ) THEN 'buyout'
+                  WHEN LOWER(COALESCE(o.opp_model, '')) LIKE 'staff%%' THEN 'staffing'
+                  WHEN LOWER(COALESCE(o.opp_model, '')) LIKE 'recruit%%' THEN 'recruiting'
+                  ELSE NULL
+                END AS label
+              FROM opportunity o
+              JOIN hire_opportunity h
+                ON h.opportunity_id = o.opportunity_id
+               AND h.candidate_id   = o.candidato_contratado
+              WHERE o.candidato_contratado IS NOT NULL
+            ),
+            contract_types AS (
+              SELECT
+                account_id,
+                CASE
+                  WHEN BOOL_OR(label = 'staffing') AND BOOL_OR(label IN ('recruiting', 'buyout')) THEN 'Mix'
+                  WHEN BOOL_OR(label = 'staffing') THEN 'Staffing'
+                  WHEN BOOL_OR(label IN ('recruiting', 'buyout')) THEN 'Recruiting'
+                  ELSE NULL
+                END AS contract
+              FROM hire_labels
+              WHERE label IS NOT NULL
+              GROUP BY account_id
             )
             SELECT
               a.account_id,
               a.client_name,
               a.priority,
+              COALESCE(ct.contract, a.contract) AS contract,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary, 0) + COALESCE(h.fee, 0) END), 0) AS tsr
             FROM account a
+            LEFT JOIN contract_types ct ON ct.account_id = a.account_id
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name
+            GROUP BY a.account_id, a.client_name, a.priority, a.contract, ct.contract
             ORDER BY LOWER(a.client_name) ASC;
         """)
 
@@ -190,7 +229,17 @@ def accounts_status_summary():
               SELECT
                 o.account_id,
                 COUNT(*) > 0 AS has_candidates,
-                BOOL_OR(COALESCE(lower(h.status)='active', h.end_date IS NULL)) AS any_active
+                BOOL_OR(COALESCE(lower(h.status)='active', h.end_date IS NULL)) AS any_active,
+                BOOL_OR(
+                  (
+                    h.buyout_dolar IS NOT NULL
+                    AND NULLIF(TRIM(CAST(h.buyout_dolar AS TEXT)), '') IS NOT NULL
+                  )
+                  OR (
+                    h.buyout_daterange IS NOT NULL
+                    AND NULLIF(TRIM(CAST(h.buyout_daterange AS TEXT)), '') IS NOT NULL
+                  )
+                ) AS has_buyout
               FROM opportunity o
               JOIN hire_opportunity h ON h.opportunity_id = o.opportunity_id
               WHERE o.account_id = ANY(%s)
@@ -200,6 +249,7 @@ def accounts_status_summary():
               a.account_id,
               COALESCE(hi.has_candidates, FALSE) AS has_candidates,
               COALESCE(hi.any_active, FALSE)     AS any_active_candidate,
+              COALESCE(hi.has_buyout, FALSE)     AS has_buyout,
               COALESCE(op.total_opps, 0) > 0     AS has_opps,
               COALESCE(op.has_pipeline, FALSE)   AS has_pipeline,
               (COALESCE(op.total_opps,0) > 0 AND COALESCE(op.lost_opps,0) = COALESCE(op.total_opps,0)) AS all_lost
@@ -214,8 +264,8 @@ def accounts_status_summary():
         cur.close()
         conn.close()
 
-        def decide(has_candidates, any_active, has_opps, has_pipeline, all_lost):
-            if any_active:
+        def decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost):
+            if any_active or has_buyout:
                 return 'Active Client'
             if has_candidates and not any_active:
                 return 'Inactive Client'
@@ -230,10 +280,10 @@ def accounts_status_summary():
             return 'Lead in Process'
 
         out = []
-        for (acc_id, has_candidates, any_active, has_opps, has_pipeline, all_lost) in rows:
+        for (acc_id, has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost) in rows:
             out.append({
                 "account_id": acc_id,
-                "status": decide(has_candidates, any_active, has_opps, has_pipeline, all_lost)
+                "status": decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost)
             })
         return jsonify(out)
     except Exception as exc:

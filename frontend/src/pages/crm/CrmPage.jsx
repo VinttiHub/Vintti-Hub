@@ -546,6 +546,16 @@ function isActiveHire(hire) {
   return false;
 }
 
+function hasBuyout(hire) {
+  if (!hire) return false;
+  const amount = hire.buyout_dolar;
+  const range = hire.buyout_daterange;
+  const hasAmount =
+    amount !== null && amount !== undefined && String(amount).trim() !== '';
+  const hasRange = range !== null && range !== undefined && String(range).trim() !== '';
+  return hasAmount || hasRange;
+}
+
 function deriveStatusFrom(opps = [], hires = []) {
   const stages = (opps || []).map((opp) => normalizeStage(opp.opp_stage || opp.stage));
   const hasOpps = stages.length > 0;
@@ -554,9 +564,10 @@ function deriveStatusFrom(opps = [], hires = []) {
 
   const hasCandidates = Array.isArray(hires) && hires.length > 0;
   const anyActiveCandidate = hasCandidates && hires.some(isActiveHire);
+  const hasBuyoutCandidate = Array.isArray(hires) && hires.some(hasBuyout);
   const allCandidatesInactive = hasCandidates && hires.every((hire) => !isActiveHire(hire));
 
-  if (anyActiveCandidate) return 'Active Client';
+  if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
   if (allCandidatesInactive) return 'Inactive Client';
   if (!hasOpps && !hasCandidates) return 'Lead';
   if (allLost && !hasCandidates) return 'Lead Lost';

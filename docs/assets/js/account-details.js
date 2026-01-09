@@ -17,6 +17,9 @@ function dateInputValue(v) {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+const API_BASE_URL = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+let buyoutReloadTimer = null;
 document.addEventListener('DOMContentLoaded', () => {
 document.body.style.backgroundColor = 'var(--bg)';
 
@@ -293,36 +296,134 @@ function fillOpportunitiesTable(opportunities) {
   });
 }
 
-function loadCandidates(accountId) {
-  fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities/candidates`)
-    .then(res => res.json())
-    .then(data => {
-      console.log("Candidates asociados:", data);
-      fillEmployeesTables(data);
-    })
-    .catch(err => {
-      console.error("Error cargando candidates asociados:", err);
-    });
+async function loadCandidates(accountId) {
+  if (!accountId) return;
+  try {
+    const [candidatesRes, buyoutsRes] = await Promise.allSettled([
+      fetch(`${API_BASE_URL}/accounts/${accountId}/opportunities/candidates`),
+      fetch(`${API_BASE_URL}/accounts/${accountId}/buyouts`),
+    ]);
+
+    if (candidatesRes.status !== 'fulfilled' || !candidatesRes.value.ok) {
+      throw new Error('Failed to load candidates');
+    }
+
+    const candidates = await candidatesRes.value.json();
+    let buyouts = [];
+    if (buyoutsRes.status === 'fulfilled' && buyoutsRes.value.ok) {
+      buyouts = await buyoutsRes.value.json();
+    } else {
+      console.warn('Buyouts endpoint unavailable, continuing with empty set');
+    }
+
+    const syncedBuyouts = await ensureBuyoutRows(accountId, candidates, buyouts);
+    console.log('Candidates asociados:', candidates);
+    fillEmployeesTables(candidates, syncedBuyouts);
+  } catch (err) {
+    console.error('Error cargando candidates asociados:', err);
+  }
 }
 
-function fillEmployeesTables(candidates) {
+async function fetchAccountBuyouts(accountId) {
+  if (!accountId) return [];
+  const res = await fetch(`${API_BASE_URL}/accounts/${accountId}/buyouts`);
+  if (!res.ok) {
+    throw new Error('Failed to load buyouts');
+  }
+  return res.json();
+}
+
+async function createAccountBuyout(accountId, payload) {
+  const res = await fetch(`${API_BASE_URL}/accounts/${accountId}/buyouts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`Failed to create buyout: ${msg}`);
+  }
+  return res.json();
+}
+
+async function ensureBuyoutRows(accountId, candidates, buyouts) {
+  if (!accountId) return Array.isArray(buyouts) ? buyouts : [];
+
+  const candidateList = Array.isArray(candidates) ? candidates : [];
+  const buyoutList = Array.isArray(buyouts) ? buyouts : [];
+  if (!candidateList.length) return buyoutList;
+
+  const existing = new Set(
+    buyoutList
+      .filter((row) => row && row.candidate_id != null)
+      .map((row) => Number(row.candidate_id))
+  );
+
+  const missingCandidates = candidateList.filter((candidate) => {
+    if (!candidate || candidate.candidate_id == null) return false;
+    if (!hasBuyoutInfo(candidate)) return false;
+    return !existing.has(Number(candidate.candidate_id));
+  });
+
+  if (!missingCandidates.length) {
+    return buyoutList;
+  }
+
+  for (const candidate of missingCandidates) {
+    try {
+      await createAccountBuyout(accountId, {
+        candidate_id: candidate.candidate_id,
+        salary: null,
+        revenue: null,
+        referral: null,
+        referral_id: null,
+        start_date: deriveBuyoutStartDate(candidate.buyout_daterange),
+        end_date: null,
+      });
+    } catch (err) {
+      console.error('Failed to auto-create buyout row', err);
+    }
+  }
+
+  try {
+    return await fetchAccountBuyouts(accountId);
+  } catch (err) {
+    console.error('Failed to refresh buyouts after sync', err);
+    return buyoutList;
+  }
+}
+
+function deriveBuyoutStartDate(raw) {
+  if (!raw) return null;
+  const text = String(raw).trim();
+  const fullDate = text.match(/\d{4}-\d{2}-\d{2}/);
+  if (fullDate && fullDate[0]) return fullDate[0];
+  const monthDate = text.match(/\d{4}-\d{2}/);
+  if (monthDate && monthDate[0]) return `${monthDate[0]}-01`;
+  return null;
+}
+
+function fillEmployeesTables(candidates, buyouts = []) {
   const staffingTableBody   = document.querySelector('#employees .card:nth-of-type(1) tbody');
   const recruitingTableBody = document.querySelector('#employees .card:nth-of-type(2) tbody');
+
+  if (!staffingTableBody || !recruitingTableBody) return;
 
   staffingTableBody.innerHTML = '';
   recruitingTableBody.innerHTML = '';
 
+  const candidateList = Array.isArray(candidates) ? candidates : [];
+  const candidateLookup = new Map();
+  candidateList.forEach((candidate) => {
+    if (candidate && candidate.candidate_id != null) {
+      candidateLookup.set(Number(candidate.candidate_id), candidate);
+    }
+  });
+
   let hasStaffing = false;
   let hasRecruiting = false;
-  const staffingBuyoutClones = [];
 
-  if (!Array.isArray(candidates) || candidates.length === 0) {
-    staffingTableBody.innerHTML   = `<tr><td colspan="15">No employees in Staffing</td></tr>`;
-    recruitingTableBody.innerHTML = `<tr><td colspan="10">No employees in Recruiting</td></tr>`;
-    return;
-  }
-
-  candidates.forEach(candidate => {
+  candidateList.forEach(candidate => {
     // ---------- STAFFING ----------
     if (candidate.opp_model === 'Staffing') {
       const row = document.createElement('tr');
@@ -695,9 +796,6 @@ if (endInputS) {
 
       staffingTableBody.appendChild(row);
       hasStaffing = true;
-      if (hasBuyoutInfo(candidate)) {
-        staffingBuyoutClones.push(candidate);
-      }
     }
 
     // ---------- RECRUITING ----------
@@ -710,16 +808,12 @@ if (endInputS) {
     }
   });
 
-  staffingBuyoutClones.forEach((candidate) => {
-    const row = createRecruitingRow(candidate, {
-      forceActiveStatus: true,
-      isBuyoutDuplicate: true,
-    });
-    if (row) {
-      recruitingTableBody.appendChild(row);
-      hasRecruiting = true;
-    }
-  });
+  const appendedBuyoutRows = appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody);
+  if (appendedBuyoutRows > 0) {
+    hasRecruiting = true;
+  }
+
+  renderBuyoutsTable(buyouts, candidateLookup);
 
   if (!hasStaffing) {
     staffingTableBody.innerHTML = `<tr><td colspan="15">No employees in Staffing</td></tr>`;
@@ -733,7 +827,7 @@ if (endInputS) {
   const discountCountEl = document.getElementById("discount-count");
   const discountListEl  = document.getElementById("discount-list");
 
-  const discountCandidates = candidates.filter(c => {
+  const discountCandidates = candidateList.filter(c => {
     if (c.opp_model !== 'Staffing') return false;
     if (!c.discount_dolar || !c.discount_daterange || !c.discount_daterange.includes(',')) return false;
 
@@ -803,6 +897,200 @@ if (endInputS) {
   }
 }
 
+function appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody) {
+  if (!recruitingTableBody) return 0;
+  const rows = Array.isArray(buyouts) ? buyouts : [];
+  if (!rows.length) return 0;
+
+  let appended = 0;
+  const sorted = [...rows].sort((a, b) => (Number(a.buyout_id) || 0) - (Number(b.buyout_id) || 0));
+
+  sorted.forEach((buyout) => {
+    const baseCandidate =
+      candidateLookup.get(Number(buyout.candidate_id)) || buildBuyoutCandidateFallback(buyout);
+    if (!baseCandidate) return;
+
+    const candidateForRow = {
+      ...baseCandidate,
+      start_date: buyout.start_date || baseCandidate.start_date,
+      end_date: buyout.end_date || baseCandidate.end_date,
+      employee_salary: buyout.salary ?? baseCandidate.employee_salary,
+      employee_revenue_recruiting: buyout.revenue ?? baseCandidate.employee_revenue_recruiting,
+      employee_revenue: buyout.revenue ?? baseCandidate.employee_revenue,
+      referral_dolar: buyout.referral ?? baseCandidate.referral_dolar,
+    };
+
+    const row = createRecruitingRow(candidateForRow, {
+      forceActiveStatus: true,
+      isBuyoutDuplicate: true,
+      updateTarget: 'buyout',
+      buyoutId: buyout.buyout_id,
+      disableReferralRange: true,
+    });
+
+    if (row) {
+      row.dataset.buyoutId = buyout.buyout_id || '';
+      recruitingTableBody.appendChild(row);
+      appended += 1;
+    }
+  });
+
+  return appended;
+}
+
+function buildBuyoutCandidateFallback(buyout) {
+  if (!buyout) return null;
+  const candidateId = buyout.candidate_id;
+  return {
+    candidate_id: candidateId,
+    name: buyout.candidate_name || (candidateId ? `Candidate #${candidateId}` : 'Candidate'),
+    opportunity_id: null,
+    opp_position_name: '',
+    probation_days: '—',
+    status: 'active',
+    start_date: buyout.start_date || null,
+    end_date: buyout.end_date || null,
+    employee_salary: buyout.salary ?? null,
+    employee_revenue_recruiting: buyout.revenue ?? null,
+    employee_revenue: buyout.revenue ?? null,
+    referral_dolar: buyout.referral ?? null,
+  };
+}
+
+function renderBuyoutsTable(buyouts, candidateLookup) {
+  const tableBody = document.querySelector('#buyoutsTable tbody');
+  if (!tableBody) return;
+
+  const rows = Array.isArray(buyouts) ? buyouts : [];
+  tableBody.innerHTML = '';
+
+  if (!rows.length) {
+    tableBody.innerHTML = `<tr><td colspan="9">No buyouts yet</td></tr>`;
+    return;
+  }
+
+  const sorted = [...rows].sort((a, b) => (Number(a.buyout_id) || 0) - (Number(b.buyout_id) || 0));
+
+  sorted.forEach((buyout) => {
+    const candidate = candidateLookup.get(Number(buyout.candidate_id));
+    const candidateName =
+      candidate?.name || buyout.candidate_name || (buyout.candidate_id ? `Candidate #${buyout.candidate_id}` : '—');
+    const candidateLink = buyout.candidate_id
+      ? `<a href="/candidate-details.html?id=${buyout.candidate_id}" class="employee-link">${candidateName}</a>`
+      : candidateName;
+    const positionNote = candidate?.opp_position_name ? `<span>${candidate.opp_position_name}</span>` : '';
+
+    const row = document.createElement('tr');
+    row.dataset.buyoutId = buyout.buyout_id || '';
+    row.innerHTML = `
+      <td>${buyout.buyout_id ?? '—'}</td>
+      <td>${buyout.account_id ?? '—'}</td>
+      <td>
+        ${candidateLink}
+        <div class="buyout-meta">
+          ${buyout.candidate_id ? `ID: ${buyout.candidate_id}` : ''}
+          ${positionNote}
+        </div>
+      </td>
+      <td>
+        <input
+          type="number"
+          class="buyout-salary-input input-chip"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          data-buyout-id="${buyout.buyout_id || ''}"
+          value="${buyout.salary ?? ''}"
+        />
+      </td>
+      <td>
+        <input
+          type="number"
+          class="buyout-revenue-input input-chip"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          data-buyout-id="${buyout.buyout_id || ''}"
+          value="${buyout.revenue ?? ''}"
+        />
+      </td>
+      <td>
+        <input
+          type="number"
+          class="buyout-referral-input input-chip"
+          step="0.01"
+          min="0"
+          placeholder="0.00"
+          data-buyout-id="${buyout.buyout_id || ''}"
+          value="${buyout.referral ?? ''}"
+        />
+      </td>
+      <td>
+        <input
+          type="text"
+          class="buyout-referral-id-input input-chip"
+          placeholder="Referral ID"
+          data-buyout-id="${buyout.buyout_id || ''}"
+          value="${buyout.referral_id ?? ''}"
+        />
+      </td>
+      <td>
+        <input
+          type="date"
+          class="buyout-start-input input-chip"
+          data-buyout-id="${buyout.buyout_id || ''}"
+          value="${dateInputValue(buyout.start_date)}"
+        />
+      </td>
+      <td>
+        <input
+          type="date"
+          class="buyout-end-input input-chip"
+          data-buyout-id="${buyout.buyout_id || ''}"
+          value="${dateInputValue(buyout.end_date)}"
+        />
+      </td>
+    `;
+
+    tableBody.appendChild(row);
+
+    bindBuyoutInput(row.querySelector('.buyout-salary-input'), 'salary', numberOrNull);
+    bindBuyoutInput(row.querySelector('.buyout-revenue-input'), 'revenue', numberOrNull);
+    bindBuyoutInput(row.querySelector('.buyout-referral-input'), 'referral', numberOrNull);
+    bindBuyoutInput(row.querySelector('.buyout-referral-id-input'), 'referral_id', (value) => {
+      const trimmed = String(value || '').trim();
+      return trimmed || null;
+    });
+    bindBuyoutInput(row.querySelector('.buyout-start-input'), 'start_date', dateOrNull, 'change');
+    bindBuyoutInput(row.querySelector('.buyout-end-input'), 'end_date', dateOrNull, 'change');
+  });
+}
+
+function bindBuyoutInput(input, field, parser = (value) => value, eventName = 'blur') {
+  if (!input) return;
+  input.addEventListener(eventName, () => {
+    const buyoutId = input.dataset.buyoutId;
+    if (!buyoutId) return;
+    const parsedValue = parser(input.value);
+    updateBuyoutRow(buyoutId, { [field]: parsedValue })
+      .then(() => {
+        scheduleBuyoutReload();
+      })
+      .catch((err) => console.error(`Failed to update buyout ${field}`, err));
+  });
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function dateOrNull(value) {
+  const s = String(value || '').trim();
+  return s === '' ? null : s;
+}
+
 function hasBuyoutInfo(candidate) {
   if (!candidate) return false;
   const amount = candidate.buyout_dolar;
@@ -817,8 +1105,15 @@ function hasBuyoutInfo(candidate) {
 
 function createRecruitingRow(candidate, options = {}) {
   if (!candidate) return null;
-  const { forceActiveStatus = false, isBuyoutDuplicate = false } = options;
+  const {
+    forceActiveStatus = false,
+    isBuyoutDuplicate = false,
+    updateTarget = 'candidate',
+    buyoutId = null,
+    disableReferralRange = false,
+  } = options;
   if (isBuyoutDuplicate) ensureBuyoutNoteStyles();
+  const isBuyoutRow = updateTarget === 'buyout' && buyoutId;
 
   const isBlacklisted = Boolean(candidate.is_blacklisted);
   const blacklistIndicator = isBlacklisted
@@ -905,15 +1200,26 @@ function createRecruitingRow(candidate, options = {}) {
   const refRecInput = row.querySelector('.ref-rec-input');
   if (refRecInput) {
     refRecInput.addEventListener('blur', () => {
+      const value = refRecInput.value;
+      if (isBuyoutRow) {
+        updateBuyoutRow(buyoutId, { referral: numberOrNull(value) })
+          .then(() => scheduleBuyoutReload())
+          .catch((err) => console.error('Failed to update buyout referral', err));
+        return;
+      }
       const candidateId = refRecInput.dataset.candidateId;
       const oppId = refRecInput.dataset.opportunityId;
-      const value = refRecInput.value;
       updateCandidateField(candidateId, 'referral_dolar', value, oppId);
     });
   }
 
   const refRecPickerInput = row.querySelector('.ref-rec-range-picker');
   if (refRecPickerInput) {
+    if (disableReferralRange) {
+      refRecPickerInput.value = '';
+      refRecPickerInput.placeholder = '—';
+      refRecPickerInput.disabled = true;
+    } else {
     const rr = candidate.referral_daterange;
     let startDateR = null;
     let endDateR = null;
@@ -947,11 +1253,18 @@ function createRecruitingRow(candidate, options = {}) {
       options.endDate = endDateR;
     }
     new Litepicker(options);
+    }
   }
 
   const startInput = row.querySelector('.start-date-input');
   if (startInput) {
     startInput.addEventListener('change', () => {
+      if (isBuyoutRow) {
+        updateBuyoutRow(buyoutId, { start_date: startInput.value || null })
+          .then(() => scheduleBuyoutReload())
+          .catch((err) => console.error('Failed to update buyout start date', err));
+        return;
+      }
       const candidateId = startInput.dataset.candidateId;
       const oppId = startInput.dataset.opportunityId;
       updateCandidateField(candidateId, 'start_date', startInput.value || null, oppId);
@@ -961,6 +1274,12 @@ function createRecruitingRow(candidate, options = {}) {
   const endInput = row.querySelector('.end-date-input');
   if (endInput) {
     endInput.addEventListener('change', () => {
+      if (isBuyoutRow) {
+        updateBuyoutRow(buyoutId, { end_date: endInput.value || null })
+          .then(() => scheduleBuyoutReload())
+          .catch((err) => console.error('Failed to update buyout end date', err));
+        return;
+      }
       const candidateId = endInput.dataset.candidateId;
       const oppId = endInput.dataset.opportunityId;
       const newValue = endInput.value || '';
@@ -1118,6 +1437,35 @@ function updateCandidateField(candidateId, field, value, opportunityId) {
     console.log(`💾 ${field} saved for candidate ${candidateId}`);
   })
   .catch(err => console.error('❌ Failed to save field:', err));
+}
+
+function updateBuyoutRow(buyoutId, data) {
+  if (!buyoutId) return Promise.resolve();
+  return fetch(`${API_BASE_URL}/buyouts/${buyoutId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then((res) => {
+    if (!res.ok) {
+      return res.text().then((text) => {
+        throw new Error(text || 'Failed to update buyout');
+      });
+    }
+    return res.json();
+  });
+}
+
+function scheduleBuyoutReload() {
+  if (buyoutReloadTimer) {
+    clearTimeout(buyoutReloadTimer);
+  }
+  buyoutReloadTimer = setTimeout(() => {
+    buyoutReloadTimer = null;
+    const accountId = getIdFromURL();
+    if (accountId) {
+      loadCandidates(accountId);
+    }
+  }, 400);
 }
 
 const INACTIVE_EMAIL_TO = ('lara@vintti.com', 'angie@vintti.com');

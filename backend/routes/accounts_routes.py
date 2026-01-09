@@ -847,6 +847,194 @@ def get_candidates_by_account_opportunities(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@bp.route('/accounts/<account_id>/buyouts', methods=['GET'])
+def list_account_buyouts(account_id):
+    """Return every buyout row associated to an account."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT
+                b.buyout_id,
+                b.account_id,
+                b.candidate_id,
+                b.salary,
+                b.revenue,
+                b.referral,
+                b.referral_id,
+                b.start_date,
+                b.end_date,
+                c.name AS candidate_name
+            FROM buyouts b
+            LEFT JOIN candidates c ON c.candidate_id = b.candidate_id
+            WHERE b.account_id = %s
+            ORDER BY b.buyout_id
+            """,
+            (account_id,),
+        )
+        rows = cursor.fetchall() or []
+        cursor.close()
+        conn.close()
+        return jsonify(rows)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/accounts/<account_id>/buyouts', methods=['POST'])
+def create_account_buyout(account_id):
+    """Create a buyout row ensuring incremental buyout_id values."""
+    try:
+        payload = request.get_json() or {}
+        candidate_id = payload.get('candidate_id')
+        if not candidate_id:
+            return jsonify({"error": "candidate_id is required"}), 400
+
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute(
+            """
+            SELECT
+                buyout_id,
+                account_id,
+                candidate_id,
+                salary,
+                revenue,
+                referral,
+                referral_id,
+                start_date,
+                end_date
+            FROM buyouts
+            WHERE account_id = %s AND candidate_id = %s
+            LIMIT 1
+            """,
+            (account_id, candidate_id),
+        )
+        existing = cursor.fetchone()
+        if existing:
+            cursor.close()
+            conn.close()
+            return jsonify(existing), 200
+
+        cursor.execute("SELECT COALESCE(MAX(buyout_id), 0) AS max_id FROM buyouts")
+        max_row = cursor.fetchone()
+        next_id = ((max_row or {}).get('max_id') or 0) + 1
+
+        salary = payload.get('salary')
+        revenue = payload.get('revenue')
+        referral = payload.get('referral')
+        referral_id = payload.get('referral_id')
+        start_date = payload.get('start_date')
+        end_date = payload.get('end_date')
+
+        cursor.execute(
+            """
+            INSERT INTO buyouts (
+                buyout_id,
+                account_id,
+                candidate_id,
+                salary,
+                revenue,
+                referral,
+                referral_id,
+                start_date,
+                end_date
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            RETURNING
+                buyout_id,
+                account_id,
+                candidate_id,
+                salary,
+                revenue,
+                referral,
+                referral_id,
+                start_date,
+                end_date
+            """,
+            (
+                next_id,
+                account_id,
+                candidate_id,
+                salary,
+                revenue,
+                referral,
+                referral_id,
+                start_date,
+                end_date,
+            ),
+        )
+        created = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify(created), 201
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/buyouts/<int:buyout_id>', methods=['PATCH'])
+def update_buyout_row(buyout_id):
+    """Allow editing any editable column in the buyouts table."""
+    try:
+        payload = request.get_json() or {}
+        editable_fields = (
+            'account_id',
+            'candidate_id',
+            'salary',
+            'revenue',
+            'referral',
+            'referral_id',
+            'start_date',
+            'end_date',
+        )
+        sets = []
+        params = []
+        for field in editable_fields:
+            if field in payload:
+                sets.append(f"{field} = %s")
+                params.append(payload[field])
+
+        if not sets:
+            return jsonify({"error": "No valid fields to update"}), 400
+
+        params.append(buyout_id)
+
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            f"""
+            UPDATE buyouts
+            SET {', '.join(sets)}
+            WHERE buyout_id = %s
+            RETURNING
+                buyout_id,
+                account_id,
+                candidate_id,
+                salary,
+                revenue,
+                referral,
+                referral_id,
+                start_date,
+                end_date
+            """,
+            params,
+        )
+        updated = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        if not updated:
+            return jsonify({"error": "Buyout not found"}), 404
+
+        return jsonify(updated)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @bp.route('/opportunities/<opportunity_id>/batches', methods=['POST'])
 def create_batch(opportunity_id):
     try:
