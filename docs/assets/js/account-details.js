@@ -813,13 +813,11 @@ if (endInputS) {
     hasRecruiting = true;
   }
 
-  renderBuyoutsTable(buyouts, candidateLookup);
-
   if (!hasStaffing) {
     staffingTableBody.innerHTML = `<tr><td colspan="15">No employees in Staffing</td></tr>`;
   }
   if (!hasRecruiting) {
-    recruitingTableBody.innerHTML = `<tr><td colspan="10">No employees in Recruiting</td></tr>`;
+    recruitingTableBody.innerHTML = `<tr><td colspan="11">No employees in Recruiting</td></tr>`;
   }
 
   // ------- Alertas de Discount (solo Staffing) -------
@@ -918,6 +916,7 @@ function appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody
       employee_revenue_recruiting: buyout.revenue ?? baseCandidate.employee_revenue_recruiting,
       employee_revenue: buyout.revenue ?? baseCandidate.employee_revenue,
       referral_dolar: buyout.referral ?? baseCandidate.referral_dolar,
+      referral_id: buyout.referral_id ?? baseCandidate.referral_id,
     };
 
     const row = createRecruitingRow(candidateForRow, {
@@ -954,141 +953,8 @@ function buildBuyoutCandidateFallback(buyout) {
     employee_revenue_recruiting: buyout.revenue ?? null,
     employee_revenue: buyout.revenue ?? null,
     referral_dolar: buyout.referral ?? null,
+    referral_id: buyout.referral_id ?? null,
   };
-}
-
-function renderBuyoutsTable(buyouts, candidateLookup) {
-  const tableBody = document.querySelector('#buyoutsTable tbody');
-  if (!tableBody) return;
-
-  const rows = Array.isArray(buyouts) ? buyouts : [];
-  tableBody.innerHTML = '';
-
-  if (!rows.length) {
-    tableBody.innerHTML = `<tr><td colspan="9">No buyouts yet</td></tr>`;
-    return;
-  }
-
-  const sorted = [...rows].sort((a, b) => (Number(a.buyout_id) || 0) - (Number(b.buyout_id) || 0));
-
-  sorted.forEach((buyout) => {
-    const candidate = candidateLookup.get(Number(buyout.candidate_id));
-    const candidateName =
-      candidate?.name || buyout.candidate_name || (buyout.candidate_id ? `Candidate #${buyout.candidate_id}` : '—');
-    const candidateLink = buyout.candidate_id
-      ? `<a href="/candidate-details.html?id=${buyout.candidate_id}" class="employee-link">${candidateName}</a>`
-      : candidateName;
-    const positionNote = candidate?.opp_position_name ? `<span>${candidate.opp_position_name}</span>` : '';
-
-    const row = document.createElement('tr');
-    row.dataset.buyoutId = buyout.buyout_id || '';
-    row.innerHTML = `
-      <td>${buyout.buyout_id ?? '—'}</td>
-      <td>${buyout.account_id ?? '—'}</td>
-      <td>
-        ${candidateLink}
-        <div class="buyout-meta">
-          ${buyout.candidate_id ? `ID: ${buyout.candidate_id}` : ''}
-          ${positionNote}
-        </div>
-      </td>
-      <td>
-        <input
-          type="number"
-          class="buyout-salary-input input-chip"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          data-buyout-id="${buyout.buyout_id || ''}"
-          value="${buyout.salary ?? ''}"
-        />
-      </td>
-      <td>
-        <input
-          type="number"
-          class="buyout-revenue-input input-chip"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          data-buyout-id="${buyout.buyout_id || ''}"
-          value="${buyout.revenue ?? ''}"
-        />
-      </td>
-      <td>
-        <input
-          type="number"
-          class="buyout-referral-input input-chip"
-          step="0.01"
-          min="0"
-          placeholder="0.00"
-          data-buyout-id="${buyout.buyout_id || ''}"
-          value="${buyout.referral ?? ''}"
-        />
-      </td>
-      <td>
-        <input
-          type="text"
-          class="buyout-referral-id-input input-chip"
-          placeholder="Referral ID"
-          data-buyout-id="${buyout.buyout_id || ''}"
-          value="${buyout.referral_id ?? ''}"
-        />
-      </td>
-      <td>
-        <input
-          type="date"
-          class="buyout-start-input input-chip"
-          data-buyout-id="${buyout.buyout_id || ''}"
-          value="${dateInputValue(buyout.start_date)}"
-        />
-      </td>
-      <td>
-        <input
-          type="date"
-          class="buyout-end-input input-chip"
-          data-buyout-id="${buyout.buyout_id || ''}"
-          value="${dateInputValue(buyout.end_date)}"
-        />
-      </td>
-    `;
-
-    tableBody.appendChild(row);
-
-    bindBuyoutInput(row.querySelector('.buyout-salary-input'), 'salary', numberOrNull);
-    bindBuyoutInput(row.querySelector('.buyout-revenue-input'), 'revenue', numberOrNull);
-    bindBuyoutInput(row.querySelector('.buyout-referral-input'), 'referral', numberOrNull);
-    bindBuyoutInput(row.querySelector('.buyout-referral-id-input'), 'referral_id', (value) => {
-      const trimmed = String(value || '').trim();
-      return trimmed || null;
-    });
-    bindBuyoutInput(row.querySelector('.buyout-start-input'), 'start_date', dateOrNull, 'change');
-    bindBuyoutInput(row.querySelector('.buyout-end-input'), 'end_date', dateOrNull, 'change');
-  });
-}
-
-function bindBuyoutInput(input, field, parser = (value) => value, eventName = 'blur') {
-  if (!input) return;
-  input.addEventListener(eventName, () => {
-    const buyoutId = input.dataset.buyoutId;
-    if (!buyoutId) return;
-    const parsedValue = parser(input.value);
-    updateBuyoutRow(buyoutId, { [field]: parsedValue })
-      .then(() => {
-        scheduleBuyoutReload();
-      })
-      .catch((err) => console.error(`Failed to update buyout ${field}`, err));
-  });
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function dateOrNull(value) {
-  const s = String(value || '').trim();
-  return s === '' ? null : s;
 }
 
 function hasBuyoutInfo(candidate) {
@@ -1120,8 +986,18 @@ function createRecruitingRow(candidate, options = {}) {
     ? `<span class="blacklist-indicator" role="img" aria-label="Blacklisted candidate" title="Blacklisted candidate">⚠️</span>`
     : '';
   const buyoutNote = isBuyoutDuplicate
-    ? `<span class="buyout-note" title="Candidate has buyout info">Buyout</span>`
+    ? `<span class="buyout-note" title="Candidate has buyout info">Buyout${buyoutId ? ` #${buyoutId}` : ''}</span>`
     : '';
+
+  const salaryCellContent = isBuyoutRow
+    ? `<input type="number" class="buyout-salary-input input-chip" step="0.01" min="0" placeholder="0.00" data-buyout-id="${buyoutId}" value="${candidate.employee_salary ?? ''}" />`
+    : `$${candidate.employee_salary ?? '—'}`;
+  const revenueCellContent = isBuyoutRow
+    ? `<input type="number" class="buyout-revenue-input input-chip" step="0.01" min="0" placeholder="0.00" data-buyout-id="${buyoutId}" value="${candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? ''}" />`
+    : `$${(candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '—')}`;
+  const referralIdCellContent = isBuyoutRow
+    ? `<input type="text" class="buyout-referral-id-input input-chip" placeholder="Referral ID" data-buyout-id="${buyoutId}" value="${candidate.referral_id ?? ''}" />`
+    : '—';
 
   const rowStatus =
     forceActiveStatus
@@ -1157,8 +1033,8 @@ function createRecruitingRow(candidate, options = {}) {
         </td>
         <td>${candidate.opp_position_name || '—'}</td>
         <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
-        <td>$${candidate.employee_salary ?? '—'}</td>
-        <td>$${(candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '—')}</td>
+        <td>${salaryCellContent}</td>
+        <td>${revenueCellContent}</td>
 
         <!-- NUEVO: Referral $ -->
         <td>
@@ -1187,6 +1063,7 @@ function createRecruitingRow(candidate, options = {}) {
             value="${candidate.referral_daterange?.replace('[','').replace(']','').split(',').map(d => d.trim()).join(' - ') || ''}"
           />
         </td>
+        <td>${referralIdCellContent}</td>
       `;
 
   if (isBlacklisted) {
@@ -1195,6 +1072,29 @@ function createRecruitingRow(candidate, options = {}) {
   }
   if (isBuyoutDuplicate) {
     row.dataset.buyoutDuplicate = 'true';
+  }
+
+  if (isBuyoutRow) {
+    const attachNumberHandler = (selector, field) => {
+      const input = row.querySelector(selector);
+      if (!input) return;
+      input.addEventListener('blur', () => {
+        updateBuyoutRow(buyoutId, { [field]: numberOrNull(input.value) })
+          .then(() => scheduleBuyoutReload())
+          .catch((err) => console.error(`Failed to update buyout ${field}`, err));
+      });
+    };
+    attachNumberHandler('.buyout-salary-input', 'salary');
+    attachNumberHandler('.buyout-revenue-input', 'revenue');
+    const referralIdInput = row.querySelector('.buyout-referral-id-input');
+    if (referralIdInput) {
+      referralIdInput.addEventListener('blur', () => {
+        const val = String(referralIdInput.value || '').trim() || null;
+        updateBuyoutRow(buyoutId, { referral_id: val })
+          .then(() => scheduleBuyoutReload())
+          .catch((err) => console.error('Failed to update buyout referral_id', err));
+      });
+    }
   }
 
   const refRecInput = row.querySelector('.ref-rec-input');
@@ -1466,6 +1366,12 @@ function scheduleBuyoutReload() {
       loadCandidates(accountId);
     }
   }, 400);
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
 }
 
 const INACTIVE_EMAIL_TO = ('lara@vintti.com', 'angie@vintti.com');

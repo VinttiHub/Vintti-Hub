@@ -863,7 +863,7 @@ def list_account_buyouts(account_id):
                 b.salary,
                 b.revenue,
                 b.referral,
-                b.referral_id,
+                b.referral,
                 b.start_date,
                 b.end_date,
                 c.name AS candidate_name
