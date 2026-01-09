@@ -383,11 +383,7 @@ def register_recruiter_metrics_routes(app):
             LOWER(o.opp_hr_lead) AS hr_lead_email,
             COUNT(*) AS total,
             COUNT(*) FILTER (WHERE c.tenure_days IS NOT NULL) AS tenure_known,
-            COUNT(*) FILTER (WHERE c.tenure_days IS NULL) AS tenure_unknown,
-            COUNT(*) FILTER (
-                WHERE c.tenure_days IS NOT NULL
-                  AND c.tenure_days < 90
-            ) AS within_90
+            COUNT(*) FILTER (WHERE c.tenure_days IS NULL) AS tenure_unknown
         FROM churned c
         LEFT JOIN opportunity o
             ON o.opportunity_id = c.opportunity_id
@@ -804,7 +800,6 @@ def register_recruiter_metrics_routes(app):
                 continue
             left90_summary_by_lead[lead_key] = {
                 "total": int(row.get("total") or 0),
-                "within_90": int(row.get("within_90") or 0),
                 "tenure_known": int(row.get("tenure_known") or 0),
                 "tenure_unknown": int(row.get("tenure_unknown") or 0),
             }
@@ -834,13 +829,10 @@ def register_recruiter_metrics_routes(app):
                 item["left90_rate"] = None
                 continue
             item["left90_total"] = left90_summary["total"]
-            item["left90_within_90"] = left90_summary["within_90"]
+            item["left90_within_90"] = left90_summary["total"]
             item["left90_tenure_known"] = left90_summary["tenure_known"]
             item["left90_tenure_unknown"] = left90_summary["tenure_unknown"]
-            if left90_summary["tenure_known"]:
-                item["left90_rate"] = left90_summary["within_90"] / left90_summary["tenure_known"]
-            else:
-                item["left90_rate"] = None
+            item["left90_rate"] = None
 
         if overall_churn_summary["tenure_known"]:
             overall_churn_summary["within_90_rate"] = (

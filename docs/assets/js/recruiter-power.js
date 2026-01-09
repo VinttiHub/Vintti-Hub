@@ -357,7 +357,7 @@ function normalizeCandidateStatus(status) {
 }
 function getStatusLabel(status) {
   const trimmed = (status || "").trim();
-  return trimmed || "Status unavailable";
+  return trimmed || "Client interviewing/testing";
 }
 function isClientRejectedCvStatus(status) {
   return normalizeCandidateStatus(status) === "client rejected cv";
@@ -424,7 +424,7 @@ function formatStageLabel(stage) {
   const normalized = normalizeStage(stage);
   if (normalized === "close win") return "Closed Win";
   if (normalized === "closed lost") return "Closed Lost";
-  return stage || "Status unavailable";
+  return stage || "Client interviewing/testing";
 }
 function sortOpportunitiesByDate(opps = []) {
   return opps.slice().sort((a, b) => {
@@ -808,10 +808,9 @@ function buildDetailModalPayload(type) {
         title: "Interview rate",
         context: `Candidate batches sent${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [
-          `Green candidates: ${interviewInsights.greenCount}`,
-          `Red candidates: ${interviewInsights.redCount}`,
+          `Interviewied candidates: ${interviewInsights.greenCount}`,
+          `Client rejected cv: ${interviewInsights.redCount}`,
           `Rate: ${formatPercent(computedRate)}`,
-          `Eligible candidates: ${interviewInsights.totalEligible}`,
           `Total sent: ${totalSent}`,
         ],
         items: createPipelineItems(interviewInsights.items, {
@@ -832,8 +831,8 @@ function buildDetailModalPayload(type) {
         title: "Hire rate",
         context: `Sent candidates${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [
-          `Green candidates: ${hireInsights.greenCount}`,
-          `Red candidates: ${hireInsights.redCount}`,
+          `Hired candidates: ${hireInsights.greenCount}`,
+          `Not hired candidates: ${hireInsights.redCount}`,
           `Rate: ${formatPercent(computedRate)}`,
           `Sent candidates: ${totalSent}`,
         ],
@@ -858,17 +857,14 @@ function buildDetailModalPayload(type) {
     }
     case "churn90Days": {
       const windowLabel = describeLeft90Window();
-      const within90Entries = filterChurnEntries(churnEntries, { within90Days: true });
       return {
         title: "Total churn · 90-day tenure",
-        context: `Churned hires${recruiterSuffix} whose end date falls between ${windowLabel} and whose tenure was under 90 days.`,
+        context: `Churned hires${recruiterSuffix} whose end date falls between ${windowLabel}.`,
         summaryLines: [
-          `Left within 90 days: ${selectedMetrics.left90_within_90 ?? 0}`,
-          `Rate: ${formatPercent(selectedMetrics.left90_rate)}`,
-          `Start dates available: ${selectedMetrics.left90_tenure_known ?? 0}`,
+          `Churn count: ${selectedMetrics.left90_total ?? selectedMetrics.left90_within_90 ?? 0}`,
         ],
-        items: createChurnDetailItems(within90Entries),
-        emptyMessage: "No hires left within 90 days for this recruiter.",
+        items: createChurnDetailItems(churnEntries),
+        emptyMessage: "No hires left in this window for this recruiter.",
       };
     }
     default:
@@ -1022,9 +1018,12 @@ function updateCardsForLead(hrLeadEmail) {
     if (churnTotalHelperEl)
       churnTotalHelperEl.textContent = "People who left within the selected dates.";
     if (left90CountEl) left90CountEl.textContent = "–";
-    if (left90RateEl) left90RateEl.textContent = "–";
+    if (left90RateEl) {
+      left90RateEl.textContent = "";
+      left90RateEl.style.display = "none";
+    }
     if (left90HelperEl)
-      left90HelperEl.textContent = "Based on – churned hires with a start date.";
+      left90HelperEl.textContent = "Start dates documented: – · Missing: –";
     if (avgCloseWinEl) avgCloseWinEl.textContent = "–";
     if (avgCloseLostEl) avgCloseLostEl.textContent = "–";
     if (avgBatchOpenEl) avgBatchOpenEl.textContent = "–";
@@ -1222,11 +1221,12 @@ function updateCardsForLead(hrLeadEmail) {
 
     const known = m.churn_tenure_known ?? 0;
     const missing = m.churn_tenure_unknown ?? 0;
+    churnTotalHelperEl.textContent = `Start date available: ${known} · Missing: ${missing}`;
   }
 
-  // --- Left within 90 days ---
+  // --- Window churn count (90-day card) ---
   if (left90CountEl && left90RateEl && left90HelperEl) {
-    const newLeftCount = m.left90_within_90 ?? 0;
+    const newLeftCount = m.left90_total ?? m.left90_within_90 ?? 0;
     const fromLeftCount = parseIntSafe(left90CountEl.textContent);
     animateValue(left90CountEl, fromLeftCount, newLeftCount, {
       formatter: (v) => Math.round(v),
@@ -1234,8 +1234,10 @@ function updateCardsForLead(hrLeadEmail) {
 
     const newLeftRate = m.left90_rate;
     if (newLeftRate == null) {
-      left90RateEl.textContent = "–";
+      left90RateEl.textContent = "";
+      left90RateEl.style.display = "none";
     } else {
+      left90RateEl.style.display = "";
       const fromLeftRate = parsePercentSafe(left90RateEl.textContent);
       animateValue(left90RateEl, fromLeftRate, newLeftRate, {
         duration: 750,
@@ -1244,10 +1246,8 @@ function updateCardsForLead(hrLeadEmail) {
     }
 
     const known = m.left90_tenure_known ?? 0;
-    left90HelperEl.textContent =
-      known === 0
-        ? "No start dates available for this range."
-        : `Based on ${known} churned hires with a start date.`;
+    const missing = m.left90_tenure_unknown ?? 0;
+    left90HelperEl.textContent = `Start dates documented: ${known} · Missing: ${missing}`;
   }
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
