@@ -1,0 +1,474 @@
+:root {
+  color-scheme: light;
+  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bg: #f4f6fb;
+  --page-max: 1200px;
+  --card-bg: #ffffff;
+  --card-border: rgba(15, 23, 42, 0.08);
+  --text-primary: #0f172a;
+  --text-muted: #5f6c8c;
+  --accent: #5d5fef;
+  --accent-soft: #eef0ff;
+  --shadow-soft: 0 20px 60px rgba(15, 23, 42, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #f9fbff, #eef1f8 45%, #e3e6ef);
+  min-height: 100vh;
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+body.panel-open {
+  overflow: hidden;
+}
+
+.overview-shell {
+  width: min(100%, var(--page-max));
+  margin: 0 auto;
+  padding: 2.5rem clamp(1.25rem, 4vw, 3rem) 3.5rem;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 2.5rem;
+  border-radius: 28px;
+  background: linear-gradient(120deg, #11142d, #1b1f3c 55%, #2d295c);
+  color: #f4f7ff;
+  box-shadow: var(--shadow-soft);
+}
+
+.overview-header h1 {
+  margin: 0.4rem 0;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  font-weight: 600;
+}
+
+.overview-header .lead {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.75);
+}
+
+.breadcrumb {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(244, 247, 255, 0.6);
+}
+
+.account-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.overview-header .eyebrow {
+  color: rgba(244, 247, 255, 0.65);
+}
+
+.stat {
+  margin: 0.5rem 0 0;
+  font-size: 1.9rem;
+  font-weight: 600;
+}
+
+.stat.subtle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: rgba(244, 247, 255, 0.7);
+}
+
+.account-meta {
+  margin-top: 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.meta-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 15px 40px rgba(15, 23, 42, 0.04);
+}
+
+.meta-card p {
+  margin: 0.25rem 0 0;
+  font-weight: 500;
+}
+
+.opportunities {
+  margin-top: 3rem;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+}
+
+.section-heading p {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+}
+
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  padding: 0.35rem 1.2rem;
+  background: transparent;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip.is-active,
+.chip:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.opportunity-grid {
+  margin-top: 1.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.opportunity-card {
+  border: 1px solid transparent;
+  border-radius: 28px;
+  background: var(--card-bg);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  outline: none;
+}
+
+.opportunity-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(93, 95, 239, 0.4);
+}
+
+.opportunity-card:hover {
+  transform: translateY(-6px);
+}
+
+.opportunity-card .card-body {
+  padding: 1.75rem;
+}
+
+.card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.card-title h3 {
+  margin: 0.15rem 0 0;
+  font-size: 1.35rem;
+}
+
+.card-meta {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  color: var(--text-muted);
+}
+
+.card-meta span {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 0.4rem;
+}
+
+.batch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.batch-pill {
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0.35rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.avatars {
+  display: flex;
+  align-items: center;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(93, 95, 239, 0.12);
+  color: var(--accent);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -8px;
+  position: relative;
+  border: 2px solid #fff;
+}
+
+.avatar::after {
+  content: attr(data-initials);
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar--more {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--text-primary);
+}
+
+.avatar--large {
+  width: 52px;
+  height: 52px;
+  font-size: 1.1rem;
+}
+
+.status-pill {
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.status-pill--warm {
+  background: linear-gradient(120deg, #f39f5a, #ef6c3e);
+}
+
+.status-pill--hot {
+  background: linear-gradient(120deg, #ff6b6b, #c9184a);
+}
+
+.status-pill--cool {
+  background: linear-gradient(120deg, #54c5f8, #4285f4);
+}
+
+.status-pill--neutral {
+  background: linear-gradient(120deg, #bec6ff, #7e89e1);
+}
+
+.candidate-panel {
+  position: fixed;
+  inset: 0;
+  display: none;
+}
+
+.candidate-panel.is-visible {
+  display: block;
+}
+
+.candidate-panel__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+}
+
+.candidate-panel__sheet {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(520px, 90vw);
+  height: 100%;
+  background: #ffffff;
+  border-radius: 28px 0 0 28px;
+  padding: 2.5rem clamp(1.25rem, 3vw, 2.5rem);
+  box-shadow: -20px 0 60px rgba(15, 23, 42, 0.2);
+  overflow-y: auto;
+}
+
+.candidate-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.candidate-panel__title {
+  margin: 0.25rem 0 0;
+  font-size: 1.7rem;
+}
+
+.candidate-panel__body {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.candidate-panel__empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.panel-close {
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.candidate-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 22px;
+  padding: 1.25rem;
+  background: #f9fbff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.candidate-card header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.candidate-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.candidate-role {
+  margin: 0.1rem 0 0;
+  color: var(--text-muted);
+}
+
+.candidate-meta {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.candidate-meta span {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 0.35rem;
+}
+
+.candidate-meta a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.candidate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.candidate-actions .primary,
+.candidate-actions .ghost {
+  border-radius: 999px;
+  padding: 0.5rem 1.35rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.candidate-actions .primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(93, 95, 239, 0.35);
+}
+
+.candidate-actions .ghost {
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.candidate-actions a:hover {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 820px) {
+  .overview-header {
+    flex-direction: column;
+  }
+
+  .account-highlights {
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .overview-shell {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+  }
+
+  .opportunity-card .card-body {
+    padding: 1.25rem;
+  }
+
+  .candidate-panel__sheet {
+    width: 100%;
+    border-radius: 24px 24px 0 0;
+    top: auto;
+    bottom: 0;
+    max-height: 90vh;
+  }
+}

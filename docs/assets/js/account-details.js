@@ -45,6 +45,15 @@ document.body.style.backgroundColor = 'var(--bg)';
 
   // Cargar datos
   const id = getIdFromURL();
+  const overviewFab = document.getElementById('clientOverviewFab');
+  if (overviewFab) {
+    if (id) {
+      overviewFab.href = `account-overview.html?id=${encodeURIComponent(id)}`;
+    } else {
+      overviewFab.addEventListener('click', (event) => event.preventDefault());
+      overviewFab.setAttribute('aria-disabled', 'true');
+    }
+  }
   if (!id) return;
 
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)

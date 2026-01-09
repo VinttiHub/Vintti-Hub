@@ -211,6 +211,43 @@ h1, h2 {
   cursor: pointer;
 }
 
+.client-overview-fab {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  padding: 14px 24px;
+  border-radius: 999px;
+  font-family: 'Onest', 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(135deg, #11142d, #4b4fa6);
+  box-shadow: 0 20px 40px rgba(20, 22, 45, 0.25);
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.client-overview-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 28px 50px rgba(20, 22, 45, 0.35);
+}
+
+.client-overview-fab:focus-visible {
+  outline: 3px solid rgba(93, 95, 239, 0.5);
+  outline-offset: 4px;
+}
+
+@media (max-width: 640px) {
+  .client-overview-fab {
+    right: 16px;
+    bottom: 16px;
+    padding: 12px 18px;
+  }
+}
+
 
 
 /* ===== COMENTARIOS ===== */
