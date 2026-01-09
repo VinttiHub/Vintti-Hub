@@ -851,7 +851,6 @@ function buildDetailModalPayload(type) {
         context: `Churned hires${recruiterSuffix} whose end date falls between ${readableRange}.`,
         summaryLines: [
           `Count: ${selectedMetrics.churn_total ?? 0}`,
-          `Start date available: ${known} · Missing: ${missing}`,
         ],
         items: createChurnDetailItems(churnEntries),
         emptyMessage: "No churn recorded for this recruiter in the selected range.",
@@ -1223,7 +1222,6 @@ function updateCardsForLead(hrLeadEmail) {
 
     const known = m.churn_tenure_known ?? 0;
     const missing = m.churn_tenure_unknown ?? 0;
-    churnTotalHelperEl.textContent = `Start date available: ${known} · Missing: ${missing}`;
   }
 
   // --- Left within 90 days ---
