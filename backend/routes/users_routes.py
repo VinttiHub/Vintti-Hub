@@ -27,7 +27,13 @@ def users_list_or_by_email():
                   emergency_contact,
                   ingreso_vintti_date,
                   fecha_nacimiento,
-                  avatar_url
+                  avatar_url,
+                  COALESCE(vacaciones_acumuladas, 0)   AS vacaciones_acumuladas,
+                  COALESCE(vacaciones_habiles, 0)      AS vacaciones_habiles,
+                  COALESCE(vacaciones_consumidas, 0)   AS vacaciones_consumidas,
+                  COALESCE(vintti_days_consumidos, 0)  AS vintti_days_consumidos,
+                  COALESCE(feriados_consumidos, 0)     AS feriados_consumidos,
+                  team
                 FROM users
             """
 
