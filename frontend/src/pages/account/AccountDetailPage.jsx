@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SidebarLayout from '../../components/layout/SidebarLayout.jsx';
 import LogoutFab from '../../components/common/LogoutFab.jsx';
@@ -13,7 +13,9 @@ import {
   updateAccount,
   updateCandidateField,
   uploadAccountPdfs,
+  suggestAccountSalesLead,
 } from '../../services/accountDetailService.js';
+import { deriveContractFromHires, deriveStatusFrom } from '../../utils/accountMetrics.js';
 
 function AccountDetailPage() {
   usePageStylesheet('/assets/css/account-details.css');
@@ -31,6 +33,65 @@ function AccountDetailPage() {
   const [painPoints, setPainPoints] = useState('');
   const [pdfUploading, setPdfUploading] = useState(false);
   const [showDiscountAlert, setShowDiscountAlert] = useState(true);
+
+  const resolveAutoAssignedLead = useCallback(
+    async (statusText, currentManager) => {
+      const normalizedStatus = (statusText || '').toLowerCase().trim();
+      const normalizedManager = (currentManager || '').toLowerCase().trim();
+      if (!normalizedStatus) return null;
+      if (normalizedStatus === 'active client') {
+        return normalizedManager === 'lara@vintti.com' ? null : 'lara@vintti.com';
+      }
+      if (normalizedStatus === 'lead in process') {
+        try {
+          const suggestion = await suggestAccountSalesLead(id);
+          const suggested = (suggestion?.suggested_sales_lead || '').toLowerCase().trim();
+          if (!suggested || suggested === normalizedManager) return null;
+          return suggested;
+        } catch (err) {
+          console.error('Failed to fetch sales lead suggestion', err);
+          return null;
+        }
+      }
+      return null;
+    },
+    [id]
+  );
+
+  const refreshDerivedAccountFields = useCallback(
+    async (baseAccount, oppList, hireList) => {
+      if (!id) return;
+      const derivedStatus = deriveStatusFrom(oppList || [], hireList || []);
+      const derivedContract = deriveContractFromHires(hireList || []);
+      const patch = {};
+      const currentStatus = (baseAccount?.account_status || '').toString().toLowerCase().trim();
+      if (derivedStatus && derivedStatus.toLowerCase() !== currentStatus) {
+        patch.account_status = derivedStatus;
+      }
+      const currentContract = (baseAccount?.contract || '').toString().trim();
+      if (derivedContract && derivedContract !== currentContract) {
+        patch.contract = derivedContract;
+      }
+      const autoManager = await resolveAutoAssignedLead(derivedStatus, baseAccount?.account_manager);
+      if (autoManager) {
+        patch.account_manager = autoManager;
+      }
+      if (!Object.keys(patch).length) return;
+      try {
+        await updateAccount(id, patch);
+        setAccount((prev) => {
+          const next = { ...(prev || baseAccount || {}), ...patch };
+          if (patch.account_manager) {
+            next.account_manager_name = patch.account_manager;
+          }
+          return next;
+        });
+      } catch (err) {
+        console.error('Failed to refresh derived account info', err);
+      }
+    },
+    [id, resolveAutoAssignedLead]
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +111,7 @@ function AccountDetailPage() {
         setPdfs(docs || []);
         setComments(acc.comments || '');
         setPainPoints(acc.pain_points || '');
+        await refreshDerivedAccountFields(acc, opps, emps);
       } catch (err) {
         console.error(err);
         setError('Unable to load account details.');
@@ -58,7 +120,7 @@ function AccountDetailPage() {
       }
     };
     load();
-  }, [id]);
+  }, [id, refreshDerivedAccountFields]);
 
   const staffingEmployees = useMemo(
     () => candidates.filter((candidate) => candidate.opp_model === 'Staffing'),

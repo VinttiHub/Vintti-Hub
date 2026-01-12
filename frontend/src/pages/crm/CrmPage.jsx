@@ -4,13 +4,9 @@ import SidebarLayout from '../../components/layout/SidebarLayout.jsx';
 import LogoutFab from '../../components/common/LogoutFab.jsx';
 import usePageStylesheet from '../../hooks/usePageStylesheet.js';
 import {
-  bulkUpdateStatuses,
   createAccount,
-  fetchAccountOpportunities,
   fetchAccountsLight,
   fetchAccountsList,
-  fetchSalesLeadSuggestion,
-  fetchStatusSummary,
   patchAccount,
 } from '../../services/crmService.js';
 import { resolveAvatar } from '../../utils/avatars.js';
@@ -56,7 +52,6 @@ function CrmPage() {
   const [referralOptions, setReferralOptions] = useState([]);
   const [searchValue, setSearchValue] = useState('');
   const [loading, setLoading] = useState(true);
-  const [statusProgress, setStatusProgress] = useState({ total: 0, done: 0, visible: false });
   const [showModal, setShowModal] = useState(false);
   const [modalError, setModalError] = useState('');
   const [formState, setFormState] = useState(initialFormState());
@@ -78,15 +73,9 @@ function CrmPage() {
     try {
       const data = await fetchAccountsLight();
       setAccounts(data || []);
-      if (Array.isArray(data) && data.length) {
-        computeStatuses(data);
-      } else {
-        setStatusProgress({ total: 0, done: 0, visible: false });
-      }
     } catch (error) {
       console.error('Failed to load accounts', error);
       setAccounts([]);
-      setStatusProgress({ total: 0, done: 0, visible: false });
     } finally {
       setLoading(false);
     }
@@ -100,97 +89,6 @@ function CrmPage() {
       setReferralOptions(names);
     } catch (error) {
       console.warn('Could not load referral clients', error);
-    }
-  }
-
-  async function computeStatuses(data) {
-    const ids = data.map((item) => item.account_id).filter(Boolean);
-    if (!ids.length) return;
-    setStatusProgress({ total: ids.length + 1, done: 0, visible: true });
-    const summary = {};
-    const chunkSize = 200;
-    for (let i = 0; i < ids.length; i += chunkSize) {
-      const chunk = ids.slice(i, i + chunkSize);
-      try {
-        const json = await fetchStatusSummary(chunk);
-        mergeSummary(summary, json);
-        setStatusProgress((prev) => ({ ...prev, done: Math.min(prev.done + chunk.length, prev.total) }));
-      } catch (error) {
-        console.warn('Summary chunk failed', error);
-      }
-    }
-
-    const missing = ids.filter((id) => !summary[id]);
-    if (missing.length) {
-      for (const accountId of missing) {
-        try {
-          const { opps, hires } = await fetchAccountOpportunities(accountId);
-          summary[accountId] = { status: deriveStatusFrom(opps, hires) };
-        } catch {
-          summary[accountId] = { status: '—' };
-        } finally {
-          setStatusProgress((prev) => ({ ...prev, done: Math.min(prev.done + 1, prev.total) }));
-        }
-      }
-    }
-
-    try {
-      const updates = ids.map((id) => ({
-        account_id: id,
-        status: summary[id]?.status || '—',
-      }));
-      await bulkUpdateStatuses(updates);
-    } catch (error) {
-      console.warn('Bulk update failed', error);
-    }
-
-    setAccounts((prev) =>
-      prev.map((account) => ({
-        ...account,
-        computed_status: summary[account.account_id]?.status || '—',
-      })),
-    );
-    setStatusProgress((prev) => ({ ...prev, done: prev.total, visible: false }));
-    autoAssignManagers(summary);
-  }
-
-  async function autoAssignManagers(summary) {
-    const tasks = [];
-    Object.entries(summary || {}).forEach(([idStr, info]) => {
-      const accountId = Number(idStr);
-      const status = (info?.status || '').toLowerCase();
-      if (status === 'active client') {
-        tasks.push(assignManager(accountId, 'lara@vintti.com'));
-      } else if (status === 'lead in process') {
-        tasks.push(assignSuggestedManager(accountId));
-      }
-    });
-    await Promise.all(tasks);
-  }
-
-  async function assignManager(accountId, email) {
-    try {
-      await patchAccount(accountId, { account_manager: email });
-      setAccounts((prev) =>
-        prev.map((acc) =>
-          acc.account_id === accountId
-            ? { ...acc, account_manager: email, account_manager_name: email }
-            : acc,
-        ),
-      );
-    } catch (error) {
-      console.warn('Failed to assign manager', error);
-    }
-  }
-
-  async function assignSuggestedManager(accountId) {
-    try {
-      const suggestion = await fetchSalesLeadSuggestion(accountId);
-      const suggested = (suggestion?.suggested_sales_lead || '').toLowerCase();
-      if (!suggested) return;
-      await assignManager(accountId, suggested);
-    } catch (error) {
-      console.warn('Failed to assign suggested manager', error);
     }
   }
 
@@ -268,10 +166,6 @@ function CrmPage() {
         />
       </div>
 
-      {statusProgress.visible && (
-        <SortToast total={statusProgress.total} done={statusProgress.done} />
-      )}
-
       <div className="table-container">
         {loading ? (
           <p>Loading accounts…</p>
@@ -326,7 +220,7 @@ function CrmPage() {
 }
 
 function AccountRow({ account, priorityVisible, onPriorityChange, onNavigate }) {
-  const status = account.computed_status || '—';
+  const status = account.account_status || account.computed_status || '—';
   const priority = (account.priority || '').trim().toUpperCase();
   const showPriority = priorityVisible;
   const contractTxt = account.contract || <span className="placeholder">No hires yet</span>;
@@ -381,34 +275,6 @@ function renderSalesLeadCell(account) {
       <span className={`lead-bubble ${bubble}`}>{initials}</span>
       {avatar ? <img className="lead-avatar" src={avatar} alt="" /> : null}
       <span className="sr-only">{email || name}</span>
-    </div>
-  );
-}
-
-function SortToast({ total, done }) {
-  const percent = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  return (
-    <div id="crmSortToast" className="sort-toast show" role="status" aria-live="polite">
-      <div className="sort-toast__content">
-        <div className="sort-toast__header">
-          <span className="sort-toast__dot" />
-          <span>
-            Prepping the cutest view — sorting the table by <b>Status</b>…
-          </span>
-        </div>
-        <div
-          className="sort-toast__progress"
-          role="progressbar"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow={percent}
-        >
-          <div className="sort-toast__bar" style={{ width: `${percent}%` }} />
-        </div>
-        <div className="sort-toast__meta">
-          <span id="sortToastPercent">{percent}%</span>
-        </div>
-      </div>
     </div>
   );
 }
@@ -521,81 +387,6 @@ function renderAccountStatusChip(statusText) {
   if (s === 'lead') return <span className="chip chip--lead">Lead</span>;
   if (s === 'lead lost') return <span className="chip chip--lead-lost">Lead Lost</span>;
   return <span className="chip chip--empty">No data</span>;
-}
-
-function norm(value) {
-  return (value || '').toString().toLowerCase().trim();
-}
-
-function normalizeStage(stage) {
-  const v = norm(stage);
-  if (/closed?[_\s-]?won|close[_\s-]?win/.test(v)) return 'won';
-  if (/closed?[_\s-]?lost|close[_\s-]?lost/.test(v)) return 'lost';
-  if (/(sourc|interview|negotiat|deep\s?dive)/.test(v)) return 'pipeline';
-  return 'other';
-}
-
-function isActiveHire(hire) {
-  const st = norm(hire.status);
-  if (st === 'active') return true;
-  if (st === 'inactive') return false;
-  const endDate = (hire.end_date || '').trim().toLowerCase();
-  if (!endDate || endDate === 'null' || endDate === 'none' || endDate === 'undefined' || endDate === '0000-00-00') {
-    return true;
-  }
-  return false;
-}
-
-function hasBuyout(hire) {
-  if (!hire) return false;
-  const amount = hire.buyout_dolar;
-  const range = hire.buyout_daterange;
-  const hasAmount =
-    amount !== null && amount !== undefined && String(amount).trim() !== '';
-  const hasRange = range !== null && range !== undefined && String(range).trim() !== '';
-  return hasAmount || hasRange;
-}
-
-function deriveStatusFrom(opps = [], hires = []) {
-  const stages = (opps || []).map((opp) => normalizeStage(opp.opp_stage || opp.stage));
-  const hasOpps = stages.length > 0;
-  const hasPipeline = stages.some((s) => s === 'pipeline');
-  const allLost = hasOpps && stages.every((s) => s === 'lost');
-
-  const hasCandidates = Array.isArray(hires) && hires.length > 0;
-  const anyActiveCandidate = hasCandidates && hires.some(isActiveHire);
-  const hasBuyoutCandidate = Array.isArray(hires) && hires.some(hasBuyout);
-  const allCandidatesInactive = hasCandidates && hires.every((hire) => !isActiveHire(hire));
-
-  if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
-  if (allCandidatesInactive) return 'Inactive Client';
-  if (!hasOpps && !hasCandidates) return 'Lead';
-  if (allLost && !hasCandidates) return 'Lead Lost';
-  if (hasPipeline) return 'Lead in Process';
-  if (!hasOpps && hasCandidates) return 'Inactive Client';
-  return 'Lead in Process';
-}
-
-function mergeSummary(summary, response) {
-  if (!response) return summary;
-  if (Array.isArray(response)) {
-    response.forEach((item) => {
-      const id = Number(item.account_id || item.id || item.accountId);
-      if (!id) return;
-      summary[id] = { status: item.status || item.calculated_status || item.value || '—' };
-    });
-    return summary;
-  }
-  Object.entries(response).forEach(([id, value]) => {
-    const accountId = Number(id);
-    if (!accountId) return;
-    if (value && typeof value === 'object') {
-      summary[accountId] = { status: value.status || value.calculated_status || value.value || '—' };
-    } else {
-      summary[accountId] = { status: value || '—' };
-    }
-  });
-  return summary;
 }
 
 function initialsForSalesLead(key = '') {

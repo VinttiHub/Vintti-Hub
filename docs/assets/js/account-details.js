@@ -20,6 +20,160 @@ function dateInputValue(v) {
 
 const API_BASE_URL = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 let buyoutReloadTimer = null;
+let ACCOUNT_DETAIL_RECORD = null;
+let ACCOUNT_DETAIL_OPPORTUNITIES = [];
+let ACCOUNT_DETAIL_CANDIDATES = [];
+let ACCOUNT_OPPS_READY = false;
+let ACCOUNT_CANDIDATES_READY = false;
+let ACCOUNT_DERIVED_REFRESHING = false;
+
+function norm(value) {
+  return (value || '').toString().toLowerCase().trim();
+}
+
+function normalizeStage(stage) {
+  const val = norm(stage);
+  if (/closed?[_\s-]?won|close[_\s-]?win/.test(val)) return 'won';
+  if (/closed?[_\s-]?lost|close[_\s-]?lost/.test(val)) return 'lost';
+  if (/(sourc|interview|negotiat|deep\s?dive)/.test(val)) return 'pipeline';
+  return 'other';
+}
+
+function isActiveHire(hire = {}) {
+  const st = norm(hire.status);
+  if (st === 'active') return true;
+  if (st === 'inactive') return false;
+  const ed = (hire.end_date ?? '').toString().trim().toLowerCase();
+  if (!ed || ed === 'null' || ed === 'none' || ed === 'undefined' || ed === '0000-00-00') return true;
+  return false;
+}
+
+function hasBuyout(hire = {}) {
+  const amount = hire.buyout_dolar;
+  const range = hire.buyout_daterange;
+  const hasAmount = amount !== null && amount !== undefined && String(amount).trim() !== '';
+  const hasRange = range !== null && range !== undefined && String(range).trim() !== '';
+  return hasAmount || hasRange;
+}
+
+function deriveAccountStatusFromData(opps = [], hires = []) {
+  const stages = (Array.isArray(opps) ? opps : []).map(opp => normalizeStage(opp.opp_stage || opp.stage));
+  const hasOpps = stages.length > 0;
+  const hasPipeline = stages.some(stage => stage === 'pipeline');
+  const allLost = hasOpps && stages.every(stage => stage === 'lost');
+
+  const candidates = Array.isArray(hires) ? hires : [];
+  const hasCandidates = candidates.length > 0;
+  const anyActiveCandidate = hasCandidates && candidates.some(isActiveHire);
+  const hasBuyoutCandidate = hasCandidates && candidates.some(hasBuyout);
+  const allCandidatesInactive = hasCandidates && candidates.every(candidate => !isActiveHire(candidate));
+
+  if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
+  if (allCandidatesInactive) return 'Inactive Client';
+  if (!hasOpps && !hasCandidates) return 'Lead';
+  if (allLost && !hasCandidates) return 'Lead Lost';
+  if (hasPipeline) return 'Lead in Process';
+  if (!hasOpps && hasCandidates) return 'Inactive Client';
+  return 'Lead in Process';
+}
+
+function deriveContractTypeFromCandidates(hires = []) {
+  if (!Array.isArray(hires) || hires.length === 0) return null;
+  let hasStaffing = false;
+  let hasRecruitingOrBuyout = false;
+  hires.forEach(hire => {
+    if (!hire) return;
+    const model = (hire.opp_model || '').toLowerCase();
+    if (model.includes('staff')) hasStaffing = true;
+    if (model.includes('recruit')) hasRecruitingOrBuyout = true;
+    if (hasBuyout(hire)) hasRecruitingOrBuyout = true;
+  });
+  if (hasStaffing && hasRecruitingOrBuyout) return 'Mix';
+  if (hasStaffing) return 'Staffing';
+  if (hasRecruitingOrBuyout) return 'Recruiting';
+  return null;
+}
+
+async function fetchSuggestedSalesLead(accountId) {
+  if (!accountId) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/accounts/${accountId}/sales-lead/suggest`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const suggested = (data?.suggested_sales_lead || '').toString().trim().toLowerCase();
+    return suggested || null;
+  } catch (err) {
+    console.warn('⚠️ Could not fetch sales lead suggestion:', err);
+    return null;
+  }
+}
+
+function scheduleAccountDerivedRefresh() {
+  if (!ACCOUNT_DETAIL_RECORD) return;
+  if (!ACCOUNT_OPPS_READY || !ACCOUNT_CANDIDATES_READY) return;
+  if (ACCOUNT_DERIVED_REFRESHING) return;
+  ACCOUNT_DERIVED_REFRESHING = true;
+  refreshAccountDerivedFields()
+    .catch(err => console.error('❌ Error refreshing derived account info:', err))
+    .finally(() => { ACCOUNT_DERIVED_REFRESHING = false; });
+}
+
+async function refreshAccountDerivedFields() {
+  const base = ACCOUNT_DETAIL_RECORD;
+  if (!base || !base.account_id) return;
+  const opps = Array.isArray(ACCOUNT_DETAIL_OPPORTUNITIES) ? ACCOUNT_DETAIL_OPPORTUNITIES : [];
+  const hires = Array.isArray(ACCOUNT_DETAIL_CANDIDATES) ? ACCOUNT_DETAIL_CANDIDATES : [];
+  const derivedStatus = deriveAccountStatusFromData(opps, hires);
+  const derivedContract = deriveContractTypeFromCandidates(hires);
+  const patch = {};
+  const currentStatus = (base.account_status || '').toLowerCase().trim();
+  if (derivedStatus && derivedStatus.toLowerCase() !== currentStatus) {
+    patch.account_status = derivedStatus;
+  }
+  const currentContract = (base.contract || '').toString().trim();
+  if (derivedContract && derivedContract !== currentContract) {
+    patch.contract = derivedContract;
+  }
+  const normalizedManager = (base.account_manager || '').toString().toLowerCase().trim();
+  if (derivedStatus) {
+    const normalizedStatus = derivedStatus.toLowerCase();
+    if (normalizedStatus === 'active client' && normalizedManager !== 'lara@vintti.com') {
+      patch.account_manager = 'lara@vintti.com';
+    } else if (normalizedStatus === 'lead in process') {
+      const suggested = await fetchSuggestedSalesLead(base.account_id);
+      if (suggested && suggested !== normalizedManager) {
+        patch.account_manager = suggested;
+      }
+    }
+  }
+  if (!Object.keys(patch).length) return;
+  const res = await fetch(`${API_BASE_URL}/accounts/${base.account_id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch)
+  });
+  if (!res.ok) throw new Error('Failed to persist derived fields');
+  Object.assign(base, patch);
+  updateAccountDerivedUi(patch);
+}
+
+function updateAccountDerivedUi(fields = {}) {
+  if (fields.contract !== undefined) {
+    const text = fields.contract || 'Not available';
+    const contractEl = document.getElementById('account-contract');
+    if (contractEl) {
+      contractEl.textContent = text;
+      contractEl.classList.toggle('placeholder', !fields.contract);
+    }
+  }
+  if (fields.account_status) {
+    const statusEl = document.getElementById('account-status');
+    if (statusEl) {
+      statusEl.textContent = fields.account_status;
+      statusEl.classList.remove('placeholder');
+    }
+  }
+}
 document.addEventListener('DOMContentLoaded', () => {
 document.body.style.backgroundColor = 'var(--bg)';
 
@@ -62,6 +216,11 @@ document.body.style.backgroundColor = 'var(--bg)';
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)
     .then(res => res.json())
     .then(data => {
+      ACCOUNT_DETAIL_RECORD = data || null;
+      ACCOUNT_DETAIL_OPPORTUNITIES = [];
+      ACCOUNT_DETAIL_CANDIDATES = [];
+      ACCOUNT_OPPS_READY = false;
+      ACCOUNT_CANDIDATES_READY = false;
       fillAccountDetails(data);
       loadAssociatedOpportunities(id);
       loadCandidates(id);
@@ -173,6 +332,9 @@ function loadAssociatedOpportunities(accountId) {
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}/opportunities`)
     .then(res => res.json())
     .then(data => {
+      ACCOUNT_DETAIL_OPPORTUNITIES = Array.isArray(data) ? data : [];
+      ACCOUNT_OPPS_READY = true;
+      scheduleAccountDerivedRefresh();
       console.log("Oportunidades asociadas:", data);
       fillOpportunitiesTable(data);
     })
@@ -309,6 +471,9 @@ async function loadCandidates(accountId) {
     }
 
     const candidates = await candidatesRes.value.json();
+    ACCOUNT_DETAIL_CANDIDATES = Array.isArray(candidates) ? candidates : [];
+    ACCOUNT_CANDIDATES_READY = true;
+    scheduleAccountDerivedRefresh();
     let buyouts = [];
     if (buyoutsRes.status === 'fulfilled' && buyoutsRes.value.ok) {
       buyouts = await buyoutsRes.value.json();
@@ -874,25 +1039,7 @@ if (endInputS) {
     contractType = 'Mix';
   }
 
-  const contractField = Array.from(document.querySelectorAll('#overview .accordion-content p'))
-    .find(p => p.textContent.includes('Contract:'));
-  if (contractField) {
-    contractField.innerHTML = `<strong>Contract:</strong> ${contractType}`;
-  }
-
-  const accountId = getIdFromURL();
-  if (accountId && contractType !== '—') {
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contract: contractType })
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Error updating contract');
-      console.log('✅ Contract updated to:', contractType);
-    })
-    .catch(err => console.error('❌ Error updating contract:', err));
-  }
+  updateAccountDerivedUi({ contract: contractType !== '—' ? contractType : '' });
 }
 
 function appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody) {

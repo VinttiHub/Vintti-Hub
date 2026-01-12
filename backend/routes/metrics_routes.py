@@ -33,57 +33,20 @@ def data_light():
               FROM hire_opportunity
               WHERE end_date IS NULL
               ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
-            ),
-            hire_labels AS (
-              SELECT
-                o.account_id,
-                CASE
-                  WHEN (
-                    (
-                      h.buyout_dolar IS NOT NULL
-                      AND NULLIF(TRIM(CAST(h.buyout_dolar AS TEXT)), '') IS NOT NULL
-                    )
-                    OR (
-                      h.buyout_daterange IS NOT NULL
-                      AND NULLIF(TRIM(CAST(h.buyout_daterange AS TEXT)), '') IS NOT NULL
-                    )
-                  ) THEN 'buyout'
-                  WHEN LOWER(COALESCE(o.opp_model, '')) LIKE 'staff%%' THEN 'staffing'
-                  WHEN LOWER(COALESCE(o.opp_model, '')) LIKE 'recruit%%' THEN 'recruiting'
-                  ELSE NULL
-                END AS label
-              FROM opportunity o
-              JOIN hire_opportunity h
-                ON h.opportunity_id = o.opportunity_id
-               AND h.candidate_id   = o.candidato_contratado
-              WHERE o.candidato_contratado IS NOT NULL
-            ),
-            contract_types AS (
-              SELECT
-                account_id,
-                CASE
-                  WHEN BOOL_OR(label = 'staffing') AND BOOL_OR(label IN ('recruiting', 'buyout')) THEN 'Mix'
-                  WHEN BOOL_OR(label = 'staffing') THEN 'Staffing'
-                  WHEN BOOL_OR(label IN ('recruiting', 'buyout')) THEN 'Recruiting'
-                  ELSE NULL
-                END AS contract
-              FROM hire_labels
-              WHERE label IS NOT NULL
-              GROUP BY account_id
             )
             SELECT
               a.account_id,
               a.client_name,
               a.priority,
-              COALESCE(ct.contract, a.contract) AS contract,
+              a.contract,
+              a.account_status,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary, 0) + COALESCE(h.fee, 0) END), 0) AS tsr
             FROM account a
-            LEFT JOIN contract_types ct ON ct.account_id = a.account_id
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name, a.priority, a.contract, ct.contract
+            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status
             ORDER BY LOWER(a.client_name) ASC;
         """)
 

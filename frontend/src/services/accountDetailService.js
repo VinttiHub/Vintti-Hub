@@ -69,6 +69,12 @@ export async function deleteAccountPdf(accountId, key) {
   return res.json();
 }
 
+export async function suggestAccountSalesLead(accountId) {
+  const res = await fetch(`${API_BASE_URL}/accounts/${accountId}/sales-lead/suggest`, { credentials: 'include' });
+  if (!res.ok) return null;
+  return res.json();
+}
+
 const HIRE_FIELDS = new Set([
   'discount_dolar',
   'discount_daterange',

@@ -270,8 +270,9 @@ function decorateRowFilterMeta(row, item) {
   row.dataset.salesLeadLabel = leadMeta.label;
   row.dataset.salesLeadCode = leadMeta.code;
 
-  row.dataset.statusLabel = row.dataset.statusLabel || '';
-  row.dataset.statusCode = row.dataset.statusCode || '';
+  const statusRaw = (item?.account_status || item?.calculated_status || '').toString().trim();
+  row.dataset.statusLabel = statusRaw || '—';
+  row.dataset.statusCode = norm(statusRaw || '—');
   return { contractLabel, leadMeta };
 }
 
@@ -1226,13 +1227,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const priorityClass = priorityUpper
           ? 'priority-' + priorityUpper.toLowerCase()
           : 'priority-empty';
+        const statusTxt = item.account_status || item.calculated_status || '—';
+        const statusOrder = statusRank(statusTxt);
         return `
           <tr data-id="${item.account_id}">
             <td>${item.client_name || '—'}</td>
-            <td class="status-td" data-id="${item.account_id}" data-order="99">
-              <span class="chip chip--loading" aria-label="Loading status">
-                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              </span>
+            <td class="status-td" data-id="${item.account_id}" data-order="${statusOrder}">
+              ${renderAccountStatusChip(statusTxt)}
             </td>
             <td class="sales-lead-cell">
               ${(item.account_manager || item.account_manager_name)
@@ -1261,19 +1262,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const rowById = new Map(
         [...document.querySelectorAll('#accountTableBody tr')].map(r => [Number(r.dataset.id), r])
       );
-      const ids = data.map(x => Number(x.account_id)).filter(Boolean);
-      const contractPersistPromise = persistAccountContracts(data).catch(err => {
-        console.warn('⚠️ Could not complete contract persistence:', err);
-        return { total: 0, persisted: 0 };
-      });
 
       const contractLabels = new Set();
+      const statusLabels = new Set();
       data.forEach(item => {
         const row = rowById.get(Number(item.account_id));
         const meta = decorateRowFilterMeta(row, item);
         if (meta?.contractLabel) contractLabels.add(meta.contractLabel);
+        const statusTxt = (item.account_status || item.calculated_status || '').toString().trim();
+        if (statusTxt && statusTxt !== '—') statusLabels.add(statusTxt);
       });
       populateContractFilter(Array.from(contractLabels));
+      populateStatusFilter(Array.from(statusLabels));
       augmentSalesLeadFilterWithData(data);
 
       const th3 = document.querySelector('#accountTable thead tr th:nth-child(3)');
@@ -1299,9 +1299,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target.closest('select.priority-select')) e.stopPropagation();
       });
 
-      const statusWorkflowPromise = kickoffCrmStatusPipeline({ ids, rowById });
-      const dataPersistencePromise = Promise.all([statusWorkflowPromise, contractPersistPromise]);
-
       const $tbl = $('#accountTable');
       const table = $tbl.DataTable({
         responsive: true,
@@ -1322,12 +1319,6 @@ document.addEventListener('DOMContentLoaded', () => {
           accountTableInstance = this.api();
           updateCrmEmptyState(accountTableInstance);
           toggleCrmLoading(false);
-          dataPersistencePromise.then(([statusResult]) => {
-            if (accountTableInstance && statusResult) {
-              accountTableInstance.rows().invalidate('dom');
-              accountTableInstance.order([1, 'asc']).draw(false);
-            }
-          });
         }
       });
 
