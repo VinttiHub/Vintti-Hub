@@ -725,6 +725,34 @@ body {
   display: none;
   animation: sparkleFade 2.8s ease forwards;
 }
+.close-win-celebration {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  animation: closeWinCelebrationFade 1.6s ease-out forwards;
+  z-index: 100000;
+}
+
+.close-win-celebration__gif {
+  width: min(420px, 70vw);
+  max-width: 520px;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes closeWinCelebrationFade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 
 @keyframes sparkleFade {
   0% {

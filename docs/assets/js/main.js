@@ -1196,10 +1196,45 @@ const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))
       const spinner = document.getElementById('spinner-overlay');
       if (spinner) spinner.classList.add('hidden');
     });
-    } else {
+} else {
   // Opcional: silencio/diagnóstico en index
   console.debug('No hay tabla de oportunidades en esta página; omito inicialización.');
 }
+
+const CLOSE_WIN_CELEBRATION_DURATION = 1500;
+let closeWinCelebrationTimer = null;
+
+function playCloseWinCelebration(onDone) {
+  if (closeWinCelebrationTimer) {
+    clearTimeout(closeWinCelebrationTimer);
+    closeWinCelebrationTimer = null;
+  }
+
+  const existing = document.getElementById('closeWinCelebrationOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'closeWinCelebrationOverlay';
+  overlay.className = 'close-win-celebration';
+  overlay.setAttribute('aria-hidden', 'true');
+
+  const gif = document.createElement('img');
+  gif.src = './assets/img/applause.gif';
+  gif.alt = 'Celebration fireworks';
+  gif.className = 'close-win-celebration__gif';
+  overlay.appendChild(gif);
+
+  (document.body || document.documentElement).appendChild(overlay);
+
+  closeWinCelebrationTimer = window.setTimeout(() => {
+    overlay.remove();
+    closeWinCelebrationTimer = null;
+    if (typeof onDone === 'function') {
+      onDone();
+    }
+  }, CLOSE_WIN_CELEBRATION_DURATION);
+}
+
 document.addEventListener('change', async (e) => {
     if (e.target && e.target.classList.contains('stage-dropdown')) {
       const newStage = e.target.value;
@@ -1221,7 +1256,7 @@ document.addEventListener('change', async (e) => {
       return;
     }
     if (newStage === 'Close Win') {
-      openCloseWinPopup(opportunityId, e.target);
+      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target));
       return;
     }
     if (newStage === 'Closed Lost') {

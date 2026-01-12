@@ -682,7 +682,7 @@ function getAccountSalesLeadCell(item) {
 
 function managerEmailForStatus(statusText='') {
   const s = (statusText || '').toLowerCase().trim();
-  if (s === 'active client') return 'lara@vintti.com';
+  if (s === 'active client') return null;
   // lead in process => se resuelve por endpoint (mayoría)
   return null;
 }
@@ -725,23 +725,7 @@ async function assignManagersFromStatus(summary = {}, rowById = new Map(), onPro
     const row = rowById.get(accountId);
     if (!row) continue;
 
-    if (status === 'active client') {
-      const targetEmail = 'lara@vintti.com';
-      if (getRowLead(row) === targetEmail) continue;
-      tasks.push(async () => {
-        try {
-          await patchAccountManager(accountId, targetEmail);
-          updateRowSalesLead(row, targetEmail, targetEmail);
-        } catch (e) {
-          console.warn(`⚠️ Could not assign manager to ${accountId}:`, e);
-        } finally {
-          onProgress?.(1);
-        }
-      });
-      continue;
-    }
-
-    if (status === 'lead in process') {
+    if (status === 'lead in process' || status === 'active client') {
       tasks.push(async () => {
         try {
           const r = await fetch(`${API_BASE}/accounts/${accountId}/sales-lead/suggest`);

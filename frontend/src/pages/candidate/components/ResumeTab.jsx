@@ -10,6 +10,7 @@ import {
   fetchCandidateCvs,
   fetchCandidate,
 } from '../../../services/candidateDetailService.js';
+import downloadResumePdf from '../../../utils/resumePdf.js';
 
 const STAR_SECTIONS = [
   { id: 'about', label: 'About', emoji: '🌟' },
@@ -66,6 +67,7 @@ function ResumeTab({ candidateId, candidate, onOpenAi, frameKey, onRefresh }) {
   const [openPopup, setOpenPopup] = useState(null);
   const [starAvailability, setStarAvailability] = useState(() => createAvailabilityState(false, 'Checking sources...'));
   const [checkingStars, setCheckingStars] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const resumeUrl = useMemo(() => (candidateId ? `resume-readonly.html?id=${candidateId}` : '#'), [candidateId]);
 
@@ -159,6 +161,20 @@ function ResumeTab({ candidateId, candidate, onOpenAi, frameKey, onRefresh }) {
     refreshStarAvailability();
   }, [onRefresh, refreshStarAvailability]);
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (!candidateId || downloadingPdf) return;
+    setDownloadingPdf(true);
+    try {
+      const resume = await fetchResumeRecord(candidateId);
+      await downloadResumePdf({ candidate, resume });
+    } catch (err) {
+      console.error('Failed to download resume PDF', err);
+      alert('Unable to generate the resume PDF right now. Please try again in a moment.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }, [candidateId, candidate, downloadingPdf]);
+
   return (
     <div id="resume" className="tab-content active">
       <div className="resume-toolbar">
@@ -168,6 +184,9 @@ function ResumeTab({ candidateId, candidate, onOpenAi, frameKey, onRefresh }) {
         <a className="pill" href={resumeUrl} target="_blank" rel="noopener noreferrer">
           📄 Client Version
         </a>
+        <button type="button" className="pill" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+          {downloadingPdf ? '⏳ Preparing PDF…' : '⬇️ Download PDF'}
+        </button>
       </div>
 
       <div className="star-buttons">

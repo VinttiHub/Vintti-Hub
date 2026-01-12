@@ -461,8 +461,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiPopup   = document.getElementById('ai-popup');
   const aiClose   = document.getElementById('ai-close');
   // --- Tabs + visibilidad de pills (UNA sola implementación) ---
-  const aiButton  = document.getElementById('ai-action-button');
-  const clientBtn = document.getElementById('client-version-btn');
+  const aiButton   = document.getElementById('ai-action-button');
+  const clientBtn  = document.getElementById('client-version-btn');
+  const downloadBtn = document.getElementById('download-pdf-btn');
 
   function setActiveTab(tabId) {
     // pestañas
@@ -480,6 +481,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const onResume = tabId === 'resume';
     aiButton?.classList.toggle('hidden', !onResume);
     clientBtn?.classList.toggle('hidden', !onResume);
+    downloadBtn?.classList.toggle('hidden', !onResume);
   }
 
 document.querySelectorAll('.tab').forEach(t => {
@@ -2326,16 +2328,320 @@ document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const tabId = tab.dataset.tab;
     const show = tabId === 'resume';
-    if (aiButton)  aiButton.classList.toggle('hidden', !show);
+    if (aiButton) aiButton.classList.toggle('hidden', !show);
     if (clientBtn) clientBtn.classList.toggle('hidden', !show);
+    if (downloadBtn) downloadBtn.classList.toggle('hidden', !show);
   });
 });
 
 // si ya estás en "resume" al cargar
 if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
-  if (aiButton)  aiButton.classList.remove('hidden');
+  if (aiButton) aiButton.classList.remove('hidden');
   if (clientBtn) clientBtn.classList.remove('hidden');
+  if (downloadBtn) downloadBtn.classList.remove('hidden');
 }
+
+(function setupResumePdfDownload(){
+  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const btn = document.getElementById('download-pdf-btn');
+  if (!btn || !candidateId) return;
+
+  const { PDFDocument, StandardFonts, rgb } = window.PDFLib || {};
+  if (!PDFDocument || !StandardFonts || !rgb) {
+    btn.disabled = true;
+    btn.title = 'PDF generator is unavailable right now.';
+    return;
+  }
+
+  const idleLabel = btn.innerHTML;
+  let downloading = false;
+
+  const parseJsonArray = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        console.warn('Unable to parse resume field', err);
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const cleanHtml = (value) => {
+    if (!value || typeof value !== 'string') return '';
+    const div = document.createElement('div');
+    div.innerHTML = value;
+    return div.textContent ? div.textContent.replace(/\s+/g, ' ').trim() : '';
+  };
+
+  const extractListItems = (html) => {
+    if (!html || typeof html !== 'string') return [];
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return Array.from(div.querySelectorAll('li'))
+      .map((li) => li.textContent.trim())
+      .filter(Boolean);
+  };
+
+  const formatDatePart = (part) => {
+    if (!part) return null;
+    const [year, month] = part.split('-');
+    if (!year) return null;
+    const date = month ? new Date(`${year}-${month}-01T12:00:00Z`) : new Date(`${year}-01-01T12:00:00Z`);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString('en', { year: 'numeric', month: 'short' });
+  };
+
+  const formatDateRange = (entry) => {
+    const start = formatDatePart(entry.start_date || entry.startDate);
+    const end = entry.current ? 'Present' : formatDatePart(entry.end_date || entry.endDate);
+    if (!start && !end) return '';
+    if (start && end) return `${start} – ${end}`;
+    if (start) return `${start} – Present`;
+    return end || '';
+  };
+
+  const normalizeResume = (raw = {}) => {
+    const workExperience = parseJsonArray(raw.work_experience).map((item) => ({
+      title: item?.title || '',
+      company: item?.company || '',
+      location: item?.location || item?.country || '',
+      start_date: item?.start_date || item?.startDate || '',
+      end_date: item?.end_date || item?.endDate || '',
+      current: Boolean(item?.current),
+      summary: cleanHtml(item?.description || item?.description_html || ''),
+      bullets: extractListItems(item?.description || item?.description_html || ''),
+    }));
+
+    const education = parseJsonArray(raw.education).map((item) => ({
+      degree: item?.degree || item?.title || '',
+      school: item?.institution || item?.company || '',
+      location: item?.location || item?.country || '',
+      start_date: item?.start_date || item?.startDate || '',
+      end_date: item?.end_date || item?.endDate || '',
+      summary: cleanHtml(item?.description || ''),
+    }));
+
+    const tools = parseJsonArray(raw.tools).map((tool) => {
+      if (typeof tool === 'string') return { name: tool, level: '' };
+      return { name: tool?.tool || tool?.name || '', level: tool?.level || '' };
+    });
+
+    const languages = parseJsonArray(raw.languages).map((lang) => ({
+      name: lang?.language || lang?.name || '',
+      level: lang?.level || '',
+    }));
+
+    return {
+      about: cleanHtml(raw.about),
+      videoLink: raw.video_link || raw.videoLink || '',
+      workExperience,
+      education,
+      tools,
+      languages,
+    };
+  };
+
+  const createDownloader = (bytes, filename) => {
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  };
+
+  const buildPdfBytes = async (candidate, resumeData) => {
+    const normalized = normalizeResume(resumeData || {});
+    const pdfDoc = await PDFDocument.create();
+    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    let page = pdfDoc.addPage();
+    let { width, height } = page.getSize();
+    const margin = 40;
+    const titleSize = 22;
+    const headingSize = 14;
+    const bodySize = 11;
+    const usableWidth = width - margin * 2;
+    let cursorY = height - margin;
+
+    const ensureSpace = (needed) => {
+      if (cursorY - needed <= margin) {
+        page = pdfDoc.addPage();
+        ({ width, height } = page.getSize());
+        cursorY = height - margin;
+      }
+    };
+
+    const drawLine = (text, { font = regularFont, size = bodySize, color = rgb(0.15, 0.15, 0.17), indent = 0 } = {}) => {
+      if (!text) return;
+      const lineHeight = size + 2;
+      ensureSpace(lineHeight);
+      page.drawText(text, { x: margin + indent, y: cursorY - lineHeight, font, size, color });
+      cursorY -= lineHeight;
+    };
+
+    const addParagraph = (text, opts = {}) => {
+      const content = text ? text.toString().trim() : '';
+      if (!content) return;
+      const { font = regularFont, size = bodySize, indent = 0, spacing = 4, color = rgb(0.15, 0.15, 0.17) } = opts;
+      const words = content.split(/\s+/);
+      const availableWidth = usableWidth - indent;
+      let current = '';
+      words.forEach((word) => {
+        const next = current ? `${current} ${word}` : word;
+        const textWidth = font.widthOfTextAtSize(next, size);
+        if (textWidth > availableWidth && current) {
+          drawLine(current, { font, size, indent, color });
+          current = word;
+        } else {
+          current = next;
+        }
+      });
+      if (current) {
+        drawLine(current, { font, size, indent, color });
+      }
+      cursorY -= spacing;
+    };
+
+    const addHeading = (text) => {
+      if (!text) return;
+      cursorY -= 6;
+      drawLine(text, { font: boldFont, size: headingSize });
+      cursorY -= 6;
+    };
+
+    const addList = (items, bullet = '•') => {
+      if (!items || !items.length) return;
+      items.forEach((item) => addParagraph(`${bullet} ${item}`, { indent: 10 }));
+    };
+
+    const addDivider = () => {
+      ensureSpace(8);
+      page.drawLine({
+        start: { x: margin, y: cursorY - 4 },
+        end: { x: width - margin, y: cursorY - 4 },
+        thickness: 0.5,
+        color: rgb(0.8, 0.8, 0.8),
+      });
+      cursorY -= 10;
+    };
+
+    const metaBits = [candidate?.country, candidate?.timezone, candidate?.english_level]
+      .map((bit) => (bit || '').toString().trim())
+      .filter(Boolean);
+
+    drawLine('Vintti · Top Candidate Profile', { font: boldFont, size: 10, color: rgb(0.4, 0.4, 0.4) });
+    cursorY -= 6;
+    const candidateName = candidate?.name || 'Candidate';
+    drawLine(candidateName, { font: boldFont, size: titleSize });
+    if (metaBits.length) addParagraph(metaBits.join(' • '));
+    addDivider();
+
+    if (normalized.about) {
+      addHeading('About');
+      addParagraph(normalized.about);
+    }
+
+    if (normalized.workExperience.length) {
+      addHeading('Work Experience');
+      normalized.workExperience.forEach((exp, index) => {
+        const titleLine = [exp.title, exp.company].filter(Boolean).join(' · ');
+        addParagraph(titleLine, { font: boldFont });
+        const detailLine = [formatDateRange(exp), exp.location].filter(Boolean).join(' • ');
+        if (detailLine) {
+          addParagraph(detailLine, { size: bodySize - 1, color: rgb(0.35, 0.35, 0.35) });
+        }
+        if (exp.summary) addParagraph(exp.summary);
+        addList(exp.bullets);
+        if (index < normalized.workExperience.length - 1) cursorY -= 6;
+      });
+    }
+
+    if (normalized.education.length) {
+      addHeading('Education');
+      normalized.education.forEach((edu, index) => {
+        addParagraph([edu.degree, edu.school].filter(Boolean).join(' · '), { font: boldFont });
+        const detailLine = [formatDateRange(edu), edu.location].filter(Boolean).join(' • ');
+        if (detailLine) {
+          addParagraph(detailLine, { size: bodySize - 1, color: rgb(0.35, 0.35, 0.35) });
+        }
+        if (edu.summary) addParagraph(edu.summary);
+        if (index < normalized.education.length - 1) cursorY -= 4;
+      });
+    }
+
+    if (normalized.tools.length) {
+      addHeading('Tools');
+      normalized.tools.forEach((tool) => {
+        const label = tool.level ? `${tool.name} — ${tool.level}` : tool.name;
+        addParagraph(label);
+      });
+    }
+
+    if (normalized.languages.length) {
+      addHeading('Languages');
+      normalized.languages.forEach((lang) => {
+        const label = lang.level ? `${lang.name} — ${lang.level}` : lang.name;
+        addParagraph(label);
+      });
+    }
+
+    if (normalized.videoLink) {
+      addHeading('Video Introduction');
+      addParagraph(normalized.videoLink);
+    }
+
+    return pdfDoc.save();
+  };
+
+  const fetchCandidateData = async () => {
+    if (candidateOverviewData) return candidateOverviewData;
+    const resp = await fetch(`${API_BASE}/candidates/${candidateId}`);
+    if (!resp.ok) throw new Error('Failed to load candidate');
+    const data = await resp.json();
+    candidateOverviewData = data;
+    return data;
+  };
+
+  const fetchResumeData = async () => {
+    const resp = await fetch(`${API_BASE}/resumes/${candidateId}`);
+    if (!resp.ok) throw new Error('Failed to load resume');
+    return resp.json();
+  };
+
+  btn.addEventListener('click', async () => {
+    if (downloading) return;
+    downloading = true;
+    const prevLabel = btn.innerHTML;
+    btn.innerText = '⏳ Preparing PDF…';
+    btn.disabled = true;
+    try {
+      const [candidate, resume] = await Promise.all([fetchCandidateData(), fetchResumeData()]);
+      const bytes = await buildPdfBytes(candidate, resume);
+      const safeName = (candidate?.name || 'resume')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'resume';
+      createDownloader(bytes, `${safeName}-resume.pdf`);
+    } catch (err) {
+      console.error('Failed to build resume PDF', err);
+      alert('Unable to generate the resume PDF right now. Please try again later.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = prevLabel || idleLabel;
+      downloading = false;
+    }
+  });
+})();
 (function wireHireReminders(){
   const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const cid = new URLSearchParams(location.search).get('id');

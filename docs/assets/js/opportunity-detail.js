@@ -2311,10 +2311,23 @@ async function loadOpportunityData() {
           const normalizeList = (list) => {
             const seen = new Set();
             return (Array.isArray(list) ? list : [])
-              .map(person => ({
-                email: String(person.email_vintti || '').trim().toLowerCase(),
-                name: person.user_name || person.email_vintti || ''
-              }))
+              .map(person => {
+                const email = String(
+                  person.email_vintti ||
+                  person.email ||
+                  person.emailVintti ||
+                  person.email_work ||
+                  person.emailWork ||
+                  ''
+                ).trim().toLowerCase();
+                const name = person.user_name
+                  || person.name
+                  || person.full_name
+                  || person.email_vintti
+                  || person.email
+                  || email;
+                return { email, name };
+              })
               .filter(person => person.email && !seen.has(person.email) && seen.add(person.email))
               .sort((a, b) => a.name.localeCompare(b.name));
           };
@@ -2333,7 +2346,8 @@ async function loadOpportunityData() {
               opt.textContent = person.name;
               hrLeadSelect.appendChild(opt);
             });
-            hrLeadSelect.value = (data.opp_hr_lead || '').toLowerCase();
+            const hrLeadValue = String(data.opp_hr_lead || data.hr_lead || '').trim().toLowerCase();
+            hrLeadSelect.value = hrLeadValue;
           }
 
           if (salesLeadSelect) {
@@ -2344,7 +2358,13 @@ async function loadOpportunityData() {
               opt.textContent = person.name;
               salesLeadSelect.appendChild(opt);
             });
-            salesLeadSelect.value = (data.opp_sales_lead || '').toLowerCase();
+            const salesLeadValue = String(
+              data.opp_sales_lead ||
+              data.sales_lead ||
+              data.account_manager ||
+              ''
+            ).trim().toLowerCase();
+            salesLeadSelect.value = salesLeadValue;
           }
           if (data.opportunity_id) {
             reloadBatchCandidates();

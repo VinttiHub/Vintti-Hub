@@ -56,6 +56,24 @@ function hasBuyout(hire = {}) {
   return hasAmount || hasRange;
 }
 
+function escapeAttribute(value) {
+  return String(value).replace(/"/g, '&quot;');
+}
+
+function renderReplacementBadge(replacementOf) {
+  if (replacementOf === null || replacementOf === undefined) return '';
+  const idLabel = typeof replacementOf === 'number' ? replacementOf : String(replacementOf).trim();
+  const label = idLabel ? `Replacement · ID ${idLabel}` : 'Replacement';
+  const safeLabel = escapeAttribute(label);
+  return `<span class="replacement-badge" data-label="${safeLabel}" role="img" aria-label="${safeLabel}">🔁</span>`;
+}
+
+function wrapContentWithBadge(content, replacementOf) {
+  const badge = renderReplacementBadge(replacementOf);
+  if (!badge) return content;
+  return `<div class="cell-with-badge">${content}${badge}</div>`;
+}
+
 function deriveAccountStatusFromData(opps = [], hires = []) {
   const stages = (Array.isArray(opps) ? opps : []).map(opp => normalizeStage(opp.opp_stage || opp.stage));
   const hasOpps = stages.length > 0;
@@ -137,9 +155,7 @@ async function refreshAccountDerivedFields() {
   const normalizedManager = (base.account_manager || '').toString().toLowerCase().trim();
   if (derivedStatus) {
     const normalizedStatus = derivedStatus.toLowerCase();
-    if (normalizedStatus === 'active client' && normalizedManager !== 'lara@vintti.com') {
-      patch.account_manager = 'lara@vintti.com';
-    } else if (normalizedStatus === 'lead in process') {
+    if (normalizedStatus === 'active client' || normalizedStatus === 'lead in process') {
       const suggested = await fetchSuggestedSalesLead(base.account_id);
       if (suggested && suggested !== normalizedManager) {
         patch.account_manager = suggested;
@@ -437,8 +453,9 @@ function fillOpportunitiesTable(opportunities) {
       : `<span class="no-hire">Not hired yet</span>`;
 
     const row = document.createElement('tr');
+    const positionContent = `<span>${opp.opp_position_name || '—'}</span>`;
     row.innerHTML = `
-      <td>${opp.opp_position_name || '—'}</td>
+      <td>${wrapContentWithBadge(positionContent, opp.replacement_of)}</td>
       <td>${opp.opp_stage || '—'}</td>
       <td>${hireContent}</td>
     `;
@@ -599,13 +616,15 @@ function fillEmployeesTables(candidates, buyouts = []) {
       console.log('end_date raw:', candidate.end_date, 'candidate:', candidate.candidate_id);
       const startVal = dateInputValue(candidate.start_date);
 const endVal   = dateInputValue(candidate.end_date);
-      row.innerHTML = `
-        <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
-        <td>
+      const candidateLink = `
           <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
             ${candidate.name || '—'} ${blacklistIndicator}
           </a>
-        </td>
+        `;
+      const employeeCell = wrapContentWithBadge(candidateLink, candidate.replacement_of);
+      row.innerHTML = `
+        <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
+        <td>${employeeCell}</td>
         <td>
 <input
   type="date"
@@ -1139,6 +1158,12 @@ function createRecruitingRow(candidate, options = {}) {
   const buyoutNote = isBuyoutDuplicate
     ? `<span class="buyout-note" title="Candidate has buyout info">Buyout${buyoutId ? ` #${buyoutId}` : ''}</span>`
     : '';
+  const candidateLink = `
+          <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
+            ${candidate.name || '—'} ${blacklistIndicator}
+          </a>
+        `;
+  const employeeCell = wrapContentWithBadge(candidateLink, candidate.replacement_of);
 
   const probationValueRaw =
     candidate.buyoutProbation ??
@@ -1167,12 +1192,7 @@ function createRecruitingRow(candidate, options = {}) {
   const row = document.createElement('tr');
   row.innerHTML = `
         <td>${renderStatusChip(rowStatus)}</td>
-        <td>
-          <a href="/candidate-details.html?id=${candidate.candidate_id}" class="employee-link">
-            ${candidate.name || '—'} ${blacklistIndicator}
-          </a>
-          ${buyoutNote}
-        </td>
+        <td>${employeeCell}${buyoutNote}</td>
         <td>
           <input
             type="date"

@@ -947,7 +947,7 @@ def create_account_buyout(account_id):
                 end_date,
                 probation
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING
                 buyout_id,
                 account_id,
