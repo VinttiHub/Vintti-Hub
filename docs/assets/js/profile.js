@@ -585,13 +585,15 @@ function renderUserQuick(u){
   const vacAvail = Math.max(0, vacTotal - _nz(u.vacaciones_consumidas || 0));
   $("#uqVacTotal").textContent = String(vacAvail);
 
-  // Vintti Days: total fijo = 2
+  // Vintti Days: mostrar disponibles de los 2 totales
   const vdTotal = 2;
-  $("#uqVdTotal").textContent  = String(vdTotal);
+  const vdAvail = Math.max(0, vdTotal - _nz(u.vintti_days_consumidos));
+  $("#uqVdTotal").textContent  = String(vdAvail);
 
-  // Holidays: total fijo = 2
-  const holTotal = 2;
-  $("#uqHolTotal").textContent = String(holTotal);
+  // Holidays: mostrar disponibles de los 4 totales
+  const holTotal = 4;
+  const holAvail = Math.max(0, holTotal - _nz(u.feriados_consumidos));
+  $("#uqHolTotal").textContent = String(holAvail);
 
   setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials, email_vintti: u.email_vintti, user_id: u.user_id });
 }
