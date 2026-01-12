@@ -814,6 +814,7 @@ def get_candidates_by_account_opportunities(account_id):
             o.opportunity_id,
             o.opp_model,
             o.opp_position_name,
+            o.replacement_of,
             h.salary  AS employee_salary,
             h.fee     AS employee_fee,
             h.revenue AS employee_revenue,
@@ -863,9 +864,11 @@ def list_account_buyouts(account_id):
                 b.salary,
                 b.revenue,
                 b.referral,
-                b.referral,
+                b.referral_id,
+                b.referral_date_range,
                 b.start_date,
                 b.end_date,
+                b.probation,
                 c.name AS candidate_name
             FROM buyouts b
             LEFT JOIN candidates c ON c.candidate_id = b.candidate_id
@@ -904,8 +907,10 @@ def create_account_buyout(account_id):
                 revenue,
                 referral,
                 referral_id,
+                referral_date_range,
                 start_date,
-                end_date
+                end_date,
+                probation
             FROM buyouts
             WHERE account_id = %s AND candidate_id = %s
             LIMIT 1
@@ -926,8 +931,10 @@ def create_account_buyout(account_id):
         revenue = payload.get('revenue')
         referral = payload.get('referral')
         referral_id = payload.get('referral_id')
+        referral_date_range = payload.get('referral_date_range')
         start_date = payload.get('start_date')
         end_date = payload.get('end_date')
+        probation = payload.get('probation')
 
         cursor.execute(
             """
@@ -939,10 +946,12 @@ def create_account_buyout(account_id):
                 revenue,
                 referral,
                 referral_id,
+                referral_date_range,
                 start_date,
-                end_date
+                end_date,
+                probation
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING
                 buyout_id,
                 account_id,
@@ -951,8 +960,10 @@ def create_account_buyout(account_id):
                 revenue,
                 referral,
                 referral_id,
+                referral_date_range,
                 start_date,
-                end_date
+                end_date,
+                probation
             """,
             (
                 next_id,
@@ -962,8 +973,10 @@ def create_account_buyout(account_id):
                 revenue,
                 referral,
                 referral_id,
+                referral_date_range,
                 start_date,
                 end_date,
+                probation,
             ),
         )
         created = cursor.fetchone()
@@ -987,8 +1000,10 @@ def update_buyout_row(buyout_id):
             'revenue',
             'referral',
             'referral_id',
+            'referral_date_range',
             'start_date',
             'end_date',
+            'probation',
         )
         sets = []
         params = []
@@ -1017,8 +1032,10 @@ def update_buyout_row(buyout_id):
                 revenue,
                 referral,
                 referral_id,
+                referral_date_range,
                 start_date,
-                end_date
+                end_date,
+                probation
             """,
             params,
         )

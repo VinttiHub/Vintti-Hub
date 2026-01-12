@@ -97,6 +97,7 @@ def register_recruiter_metrics_routes(app):
                 o.opp_hr_lead,
                 u.user_name,
                 o.opp_stage,
+                o.cantidad_entrevistados,
                 (o.opp_close_date)::date AS close_date,
                 -- usamos NDA/start_date como proxy de inicio y caemos al close_date si no existe
                 COALESCE(
@@ -120,6 +121,7 @@ def register_recruiter_metrics_routes(app):
             SELECT
                 b.opp_hr_lead,
                 b.opportunity_id,
+                b.cantidad_entrevistados,
                 cb.candidate_id,
                 cb.batch_id,
                 bt.batch_number,
@@ -139,6 +141,30 @@ def register_recruiter_metrics_routes(app):
             FROM sent_candidates
             WHERE sent_date >= %(win_start)s
               AND sent_date <  %(win_end)s  -- rango aplicado al evento “batch enviado”
+        ),
+        ratio_per_opportunity AS (
+            SELECT
+                s.opp_hr_lead,
+                s.opportunity_id,
+                MAX(s.cantidad_entrevistados) AS cantidad_entrevistados,
+                COUNT(DISTINCT s.candidate_id) AS sent_candidate_count,
+                CASE
+                    WHEN COALESCE(MAX(s.cantidad_entrevistados), 0) <= 0 THEN NULL
+                    ELSE COUNT(DISTINCT s.candidate_id)::decimal
+                         / NULLIF(MAX(s.cantidad_entrevistados), 0)
+                END AS sent_vs_interview_ratio
+            FROM sent_in_window s
+            GROUP BY s.opp_hr_lead, s.opportunity_id
+        ),
+        ratio_by_lead AS (
+            SELECT
+                opp_hr_lead,
+                AVG(sent_vs_interview_ratio) AS avg_sent_vs_interview_ratio,
+                COUNT(*) FILTER (WHERE sent_vs_interview_ratio IS NOT NULL) AS ratio_sample_count,
+                SUM(sent_candidate_count) AS ratio_total_sent_candidates,
+                SUM(COALESCE(cantidad_entrevistados, 0)) AS ratio_total_interviewed
+            FROM ratio_per_opportunity
+            GROUP BY opp_hr_lead
         ),
         pipeline_rates AS (
             SELECT
@@ -283,6 +309,10 @@ def register_recruiter_metrics_routes(app):
             pr.interview_eligible_candidate_count,
             pr.interviewed_candidate_count,
             hb.hired_candidate_count,
+            rbl.avg_sent_vs_interview_ratio,
+            rbl.ratio_sample_count,
+            rbl.ratio_total_sent_candidates,
+            rbl.ratio_total_interviewed,
             CASE
                 WHEN c.last_20_count = 0 THEN NULL
                 ELSE c.last_20_win::decimal / c.last_20_count
@@ -299,6 +329,8 @@ def register_recruiter_metrics_routes(app):
             ON pr.opp_hr_lead = a.opp_hr_lead
         LEFT JOIN hired_by_lead hb
             ON hb.opp_hr_lead = a.opp_hr_lead
+        LEFT JOIN ratio_by_lead rbl
+            ON rbl.opp_hr_lead = a.opp_hr_lead
         ORDER BY a.opp_hr_lead;
         """
 
@@ -674,6 +706,10 @@ def register_recruiter_metrics_routes(app):
             interview_eligible_candidates = int(r.get("interview_eligible_candidate_count") or 0)
             interviewed_candidates = int(r.get("interviewed_candidate_count") or 0)
             hired_candidates = int(r.get("hired_candidate_count") or 0)
+            avg_sent_vs_interview_ratio = _float_or_none(r.get("avg_sent_vs_interview_ratio"))
+            ratio_sample_count = int(r.get("ratio_sample_count") or 0)
+            ratio_total_sent = int(r.get("ratio_total_sent_candidates") or 0)
+            ratio_total_interviewed = int(r.get("ratio_total_interviewed") or 0)
 
             interview_pct = (
                 interviewed_candidates / interview_eligible_candidates
@@ -717,6 +753,12 @@ def register_recruiter_metrics_routes(app):
                         "pct": hire_pct,
                         "hired": hired_candidates,
                         "sent": sent_candidates,
+                    },
+                    "avg_sent_vs_interview_ratio": avg_sent_vs_interview_ratio,
+                    "sent_vs_interview_sample_count": ratio_sample_count,
+                    "sent_vs_interview_totals": {
+                        "sent": ratio_total_sent,
+                        "interviewed": ratio_total_interviewed,
                     },
 
                     # placeholders updated once churn details are computed

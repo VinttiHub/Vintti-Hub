@@ -306,7 +306,12 @@ function AccountDetailPage() {
                             }
                             style={{ cursor: 'pointer' }}
                           >
-                            <td>{opp.opp_position_name || '—'}</td>
+                            <td>
+                              <div className="cell-with-badge">
+                                <span>{opp.opp_position_name || '—'}</span>
+                                <ReplacementBadge replacementOf={opp.replacement_of} />
+                              </div>
+                            </td>
                             <td>{opp.opp_stage || '—'}</td>
                             <td>{opp.candidate_name || <span className="no-hire">Not hired yet</span>}</td>
                           </tr>
@@ -533,9 +538,12 @@ function StaffingRow({ employee, onChange }) {
     <tr>
       <td>{renderStatusChip(employee.status || (employee.end_date ? 'inactive' : 'active'))}</td>
       <td>
-        <a href={`/candidates/${employee.candidate_id}`} className="employee-link">
-          {employee.name || '—'}
-        </a>
+        <div className="cell-with-badge">
+          <a href={`/candidates/${employee.candidate_id}`} className="employee-link">
+            {employee.name || '—'}
+          </a>
+          <ReplacementBadge replacementOf={employee.replacement_of} />
+        </div>
       </td>
       <td>
         <input
@@ -606,9 +614,12 @@ function RecruitingRow({ employee, onChange }) {
     <tr>
       <td>{renderStatusChip(employee.status || (employee.end_date ? 'inactive' : 'active'))}</td>
       <td>
-        <a href={`/candidates/${employee.candidate_id}`} className="employee-link">
-          {employee.name || '—'}
-        </a>
+        <div className="cell-with-badge">
+          <a href={`/candidates/${employee.candidate_id}`} className="employee-link">
+            {employee.name || '—'}
+          </a>
+          <ReplacementBadge replacementOf={employee.replacement_of} />
+        </div>
       </td>
       <td>
         <input
@@ -735,6 +746,17 @@ function DiscountAlert({ candidates, onDismiss }) {
         })}
       </ul>
     </aside>
+  );
+}
+
+function ReplacementBadge({ replacementOf }) {
+  if (replacementOf == null) return null;
+  const idLabel = typeof replacementOf === 'number' ? replacementOf : String(replacementOf).trim();
+  const label = idLabel ? `Replacement · ID ${idLabel}` : 'Replacement';
+  return (
+    <span className="replacement-badge" data-label={label} role="img" aria-label={label}>
+      🔁
+    </span>
   );
 }
 

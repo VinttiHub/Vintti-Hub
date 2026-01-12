@@ -231,6 +231,12 @@ function RecruiterPowerPage() {
             value={formatPercent(selectedMetrics?.conversion_rate_lifetime)}
             helper="Lifetime share of Closed Win over all closed opportunities."
           />
+
+          <MetricCard
+            label="Sent vs Interviewed"
+            value={formatPercent(selectedMetrics?.avg_sent_vs_interview_ratio)}
+            helper={sentVsInterviewHelper(selectedMetrics)}
+          />
         </section>
 
         <section className="meta-footer">
@@ -315,6 +321,18 @@ function conversionHelper(metrics) {
   const wins = metrics.last_20_win ?? 0;
   if (!total) return 'No closed opportunities in the selected range.';
   return `Selected range: ${wins} Closed Win out of ${total} closed opportunities.`;
+}
+
+function sentVsInterviewHelper(metrics) {
+  if (!metrics) return 'No opportunities with interview counts yet.';
+  const sample = metrics.sent_vs_interview_sample_count ?? 0;
+  const totals = metrics.sent_vs_interview_totals || {};
+  const sent = Number(totals.sent ?? 0);
+  const interviewedNumber = Number(totals.interviewed);
+  const interviewed = Number.isFinite(interviewedNumber) ? interviewedNumber : '—';
+  if (!sample) return 'No opportunities with interview counts yet.';
+  const plural = sample === 1 ? '' : 's';
+  return `Avg of ${sample} opp${plural} · ${sent} sent / ${interviewed} interviewed.`;
 }
 
 export default RecruiterPowerPage;

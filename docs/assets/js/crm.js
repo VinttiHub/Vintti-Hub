@@ -533,11 +533,10 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
     const rb = await fetch(`${API_BASE}/accounts/status/bulk_update`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // FIX: previously referenced u.calculated_status (undefined).
-      // If the API expects "calculated_status", send that key with the status value.
       body: JSON.stringify({
         updates: updates.map(u => ({
           account_id: u.account_id,
+          status: u.status,
           calculated_status: u.status
         }))
       })
@@ -546,10 +545,14 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
   } catch {
     const patchTasks = ids.map(id => async () => {
       try {
+        const statusValue = summary?.[id]?.status || '—';
         await fetch(`${API_BASE}/accounts/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_status: summary?.[id]?.status || '—' })
+          body: JSON.stringify({
+            account_status: statusValue,
+            calculated_status: statusValue
+          })
         });
       } catch { /* noop */ }
     });
@@ -557,6 +560,43 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
   }
 
   return summary;
+}
+
+/* =========================
+   4b) Contract persistence
+   ========================= */
+
+function buildContractUpdatePayload(items = []) {
+  const map = new Map();
+  items.forEach(item => {
+    const accountId = Number(item?.account_id);
+    if (!accountId) return;
+    const contract = (item?.contract || '').toString().trim();
+    if (!contract) return;
+    map.set(accountId, contract);
+  });
+  return Array.from(map.entries()).map(([accountId, contract]) => ({ accountId, contract }));
+}
+
+async function persistAccountContracts(items = []) {
+  const updates = buildContractUpdatePayload(items);
+  if (!updates.length) return { total: 0, persisted: 0 };
+  let persisted = 0;
+  const tasks = updates.map(({ accountId, contract }) => async () => {
+    try {
+      const res = await fetch(`${API_BASE}/accounts/${accountId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contract })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      persisted++;
+    } catch (err) {
+      console.warn(`⚠️ Could not persist contract for account ${accountId}:`, err);
+    }
+  });
+  await runWithConcurrency(tasks, 6);
+  return { total: updates.length, persisted };
 }
 
 /* =========================
@@ -1222,6 +1262,10 @@ document.addEventListener('DOMContentLoaded', () => {
         [...document.querySelectorAll('#accountTableBody tr')].map(r => [Number(r.dataset.id), r])
       );
       const ids = data.map(x => Number(x.account_id)).filter(Boolean);
+      const contractPersistPromise = persistAccountContracts(data).catch(err => {
+        console.warn('⚠️ Could not complete contract persistence:', err);
+        return { total: 0, persisted: 0 };
+      });
 
       const contractLabels = new Set();
       data.forEach(item => {
@@ -1256,6 +1300,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       const statusWorkflowPromise = kickoffCrmStatusPipeline({ ids, rowById });
+      const dataPersistencePromise = Promise.all([statusWorkflowPromise, contractPersistPromise]);
 
       const $tbl = $('#accountTable');
       const table = $tbl.DataTable({
@@ -1277,8 +1322,8 @@ document.addEventListener('DOMContentLoaded', () => {
           accountTableInstance = this.api();
           updateCrmEmptyState(accountTableInstance);
           toggleCrmLoading(false);
-          statusWorkflowPromise.then(({ assignments, summary }) => {
-            if (accountTableInstance) {
+          dataPersistencePromise.then(([statusResult]) => {
+            if (accountTableInstance && statusResult) {
               accountTableInstance.rows().invalidate('dom');
               accountTableInstance.order([1, 'asc']).draw(false);
             }

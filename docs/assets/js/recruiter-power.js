@@ -1004,6 +1004,8 @@ function updateCardsForLead(hrLeadEmail) {
   const interviewHelperEl = $("#interviewRateHelper");
   const hireRateEl = $("#hireRateValue");
   const hireHelperEl = $("#hireRateHelper");
+  const sentVsInterviewEl = $("#sentVsInterviewValue");
+  const sentVsInterviewHelperEl = $("#sentVsInterviewHelper");
 
   if (!m) {
     winMonthEl.textContent = "–";
@@ -1032,6 +1034,9 @@ function updateCardsForLead(hrLeadEmail) {
     if (interviewHelperEl) interviewHelperEl.textContent = "(— / —)";
     if (hireRateEl) hireRateEl.textContent = "–";
     if (hireHelperEl) hireHelperEl.textContent = "(— / —)";
+    if (sentVsInterviewEl) sentVsInterviewEl.textContent = "–";
+    if (sentVsInterviewHelperEl)
+      sentVsInterviewHelperEl.textContent = "No opportunities with interview counts yet.";
     return;
   }
 
@@ -1209,6 +1214,34 @@ function updateCardsForLead(hrLeadEmail) {
       hireInsights.greenCount,
       hireInsights.totalSent
     );
+  }
+
+  if (sentVsInterviewEl && sentVsInterviewHelperEl) {
+    const avgRatio = m.avg_sent_vs_interview_ratio;
+    if (avgRatio == null) {
+      sentVsInterviewEl.textContent = "–";
+    } else {
+      const fromRatio = parsePercentSafe(sentVsInterviewEl.textContent);
+      animateValue(sentVsInterviewEl, fromRatio, avgRatio, {
+        duration: 750,
+        formatter: (v) => formatPercent(v),
+      });
+    }
+    const sampleCount = m.sent_vs_interview_sample_count || 0;
+    const totals = m.sent_vs_interview_totals || {};
+    const sentTotal = Number(totals.sent ?? 0);
+    const interviewedTotal = Number(totals.interviewed);
+    if (!sampleCount) {
+      sentVsInterviewHelperEl.textContent =
+        "No opportunities with interview counts yet.";
+    } else {
+      const interviewedDisplay = Number.isFinite(interviewedTotal)
+        ? interviewedTotal
+        : "—";
+      sentVsInterviewHelperEl.textContent = `Avg of ${sampleCount} opp${
+        sampleCount === 1 ? "" : "s"
+      } · ${sentTotal} sent / ${interviewedDisplay} interviewed`;
+    }
   }
 
   // --- Churn · Selected range ---

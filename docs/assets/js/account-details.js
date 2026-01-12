@@ -917,6 +917,8 @@ function appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody
       employee_revenue: buyout.revenue ?? baseCandidate.employee_revenue,
       referral_dolar: buyout.referral ?? baseCandidate.referral_dolar,
       referral_id: buyout.referral_id ?? baseCandidate.referral_id,
+      referral_daterange: buyout.referral_date_range ?? baseCandidate.referral_daterange,
+      buyoutProbation: buyout.probation ?? null,
     };
 
     const row = createRecruitingRow(candidateForRow, {
@@ -924,7 +926,7 @@ function appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody
       isBuyoutDuplicate: true,
       updateTarget: 'buyout',
       buyoutId: buyout.buyout_id,
-      disableReferralRange: true,
+      disableReferralRange: false,
     });
 
     if (row) {
@@ -954,6 +956,8 @@ function buildBuyoutCandidateFallback(buyout) {
     employee_revenue: buyout.revenue ?? null,
     referral_dolar: buyout.referral ?? null,
     referral_id: buyout.referral_id ?? null,
+    referral_daterange: buyout.referral_date_range ?? null,
+    buyoutProbation: buyout.probation ?? null,
   };
 }
 
@@ -988,6 +992,16 @@ function createRecruitingRow(candidate, options = {}) {
   const buyoutNote = isBuyoutDuplicate
     ? `<span class="buyout-note" title="Candidate has buyout info">Buyout${buyoutId ? ` #${buyoutId}` : ''}</span>`
     : '';
+
+  const probationValueRaw =
+    candidate.buyoutProbation ??
+    candidate.probation_days ??
+    candidate.probation ??
+    candidate.probation_days_recruiting ??
+    null;
+  const probationCellContent = isBuyoutRow
+    ? `<input type="number" class="buyout-probation-input input-chip" step="1" min="0" placeholder="0" data-buyout-id="${buyoutId}" value="${(probationValueRaw === null || probationValueRaw === undefined || probationValueRaw === '—') ? '' : probationValueRaw}"/>`
+    : (probationValueRaw ?? '—');
 
   const salaryCellContent = isBuyoutRow
     ? `<input type="number" class="buyout-salary-input input-chip" step="0.01" min="0" placeholder="0.00" data-buyout-id="${buyoutId}" value="${candidate.employee_salary ?? ''}" />`
@@ -1032,7 +1046,7 @@ function createRecruitingRow(candidate, options = {}) {
           />
         </td>
         <td>${candidate.opp_position_name || '—'}</td>
-        <td>${(candidate.probation_days ?? candidate.probation ?? candidate.probation_days_recruiting ?? '—')}</td>
+        <td>${probationCellContent}</td>
         <td>${salaryCellContent}</td>
         <td>${revenueCellContent}</td>
 
@@ -1095,6 +1109,14 @@ function createRecruitingRow(candidate, options = {}) {
           .catch((err) => console.error('Failed to update buyout referral_id', err));
       });
     }
+    const probationInput = row.querySelector('.buyout-probation-input');
+    if (probationInput) {
+      probationInput.addEventListener('blur', () => {
+        updateBuyoutRow(buyoutId, { probation: numberOrNull(probationInput.value) })
+          .then(() => scheduleBuyoutReload())
+          .catch((err) => console.error('Failed to update buyout probation', err));
+      });
+    }
   }
 
   const refRecInput = row.querySelector('.ref-rec-input');
@@ -1139,12 +1161,18 @@ function createRecruitingRow(candidate, options = {}) {
       dropdowns: { minYear: 2020, maxYear: 2030, months: true, years: true },
       setup: (picker) => {
         picker.on('selected', (date1, date2) => {
-          const candidateId = refRecPickerInput.dataset.candidateId;
-          const oppId = refRecPickerInput.dataset.opportunityId;
-          if (!candidateId) return;
           const start = date1.format('YYYY-MM-DD');
           const end = date2.format('YYYY-MM-DD');
-          updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
+          if (isBuyoutRow) {
+            updateBuyoutRow(buyoutId, { referral_date_range: `[${start},${end}]` })
+              .then(() => scheduleBuyoutReload())
+              .catch((err) => console.error('Failed to update buyout referral date range', err));
+          } else {
+            const candidateId = refRecPickerInput.dataset.candidateId;
+            const oppId = refRecPickerInput.dataset.opportunityId;
+            if (!candidateId) return;
+            updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
+          }
         });
       }
     };
