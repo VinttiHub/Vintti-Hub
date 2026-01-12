@@ -905,7 +905,6 @@ def create_account_buyout(account_id):
                 salary,
                 revenue,
                 referral,
-                referral_id,
                 referral_date_range,
                 start_date,
                 end_date,
@@ -929,7 +928,6 @@ def create_account_buyout(account_id):
         salary = payload.get('salary')
         revenue = payload.get('revenue')
         referral = payload.get('referral')
-        referral_id = payload.get('referral_id')
         referral_date_range = payload.get('referral_date_range')
         start_date = payload.get('start_date')
         end_date = payload.get('end_date')
@@ -944,7 +942,6 @@ def create_account_buyout(account_id):
                 salary,
                 revenue,
                 referral,
-                referral_id,
                 referral_date_range,
                 start_date,
                 end_date,
@@ -958,7 +955,6 @@ def create_account_buyout(account_id):
                 salary,
                 revenue,
                 referral,
-                referral_id,
                 referral_date_range,
                 start_date,
                 end_date,
@@ -971,7 +967,6 @@ def create_account_buyout(account_id):
                 salary,
                 revenue,
                 referral,
-                referral_id,
                 referral_date_range,
                 start_date,
                 end_date,
@@ -998,7 +993,6 @@ def update_buyout_row(buyout_id):
             'salary',
             'revenue',
             'referral',
-            'referral_id',
             'referral_date_range',
             'start_date',
             'end_date',
@@ -1030,7 +1024,6 @@ def update_buyout_row(buyout_id):
                 salary,
                 revenue,
                 referral,
-                referral_id,
                 referral_date_range,
                 start_date,
                 end_date,

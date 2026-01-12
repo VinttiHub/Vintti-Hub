@@ -162,7 +162,7 @@ def register_recruiter_metrics_routes(app):
                 AVG(sent_vs_interview_ratio) AS avg_sent_vs_interview_ratio,
                 COUNT(*) FILTER (WHERE sent_vs_interview_ratio IS NOT NULL) AS ratio_sample_count,
                 SUM(sent_candidate_count) AS ratio_total_sent_candidates,
-                SUM(COALESCE(cantidad_entrevistados, 0)) AS ratio_total_interviewed
+                SUM(cantidad_entrevistados) AS ratio_total_interviewed
             FROM ratio_per_opportunity
             GROUP BY opp_hr_lead
         ),
@@ -626,11 +626,58 @@ def register_recruiter_metrics_routes(app):
         ORDER BY sc.hr_lead_email, sc.sent_date DESC NULLS LAST, sc.opportunity_id, sc.candidate_id;
         """
 
+        sent_vs_interview_details_sql = """
+        WITH base AS (
+            SELECT
+                o.opportunity_id,
+                LOWER(o.opp_hr_lead) AS hr_lead_email,
+                o.opp_hr_lead AS hr_lead_raw,
+                o.opp_position_name AS opportunity_title,
+                a.client_name AS opportunity_client_name,
+                o.cantidad_entrevistados
+            FROM opportunity o
+            LEFT JOIN account a
+                ON a.account_id = o.account_id
+            WHERE o.opp_hr_lead IS NOT NULL
+        ),
+        sent_counts AS (
+            SELECT
+                bt.opportunity_id,
+                COUNT(DISTINCT cb.candidate_id) AS sent_candidate_count
+            FROM batch bt
+            JOIN candidates_batches cb
+                ON cb.batch_id = bt.batch_id
+            WHERE cb.candidate_id IS NOT NULL
+              AND bt.presentation_date IS NOT NULL
+              AND bt.presentation_date::date >= %(win_start)s
+              AND bt.presentation_date::date <  %(win_end)s
+            GROUP BY bt.opportunity_id
+        )
+        SELECT
+            b.hr_lead_email,
+            b.hr_lead_raw,
+            b.opportunity_id,
+            b.opportunity_title,
+            b.opportunity_client_name,
+            b.cantidad_entrevistados,
+            sc.sent_candidate_count,
+            CASE
+                WHEN COALESCE(b.cantidad_entrevistados, 0) <= 0 THEN NULL
+                ELSE sc.sent_candidate_count::decimal
+                     / NULLIF(b.cantidad_entrevistados, 0)
+            END AS ratio
+        FROM base b
+        JOIN sent_counts sc
+            ON sc.opportunity_id = b.opportunity_id
+        ORDER BY b.hr_lead_email, sc.sent_candidate_count DESC, b.opportunity_id;
+        """
+
         churn_detail_rows = []
         opportunity_detail_rows = []
         left90_summary_rows = []
         duration_detail_rows = []
         pipeline_detail_rows = []
+        sent_vs_interview_detail_rows = []
         try:
             conn = get_connection()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -683,6 +730,15 @@ def register_recruiter_metrics_routes(app):
                     },
                 )
                 pipeline_detail_rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    sent_vs_interview_details_sql,
+                    {
+                        "win_start": window_start,
+                        "win_end": window_end,
+                    },
+                )
+                sent_vs_interview_detail_rows = cur.fetchall()
         except Exception as e:
             logger.exception("Error fetching recruiter metrics")
             return jsonify({"status": "error", "message": str(e)}), 500
@@ -709,7 +765,14 @@ def register_recruiter_metrics_routes(app):
             avg_sent_vs_interview_ratio = _float_or_none(r.get("avg_sent_vs_interview_ratio"))
             ratio_sample_count = int(r.get("ratio_sample_count") or 0)
             ratio_total_sent = int(r.get("ratio_total_sent_candidates") or 0)
-            ratio_total_interviewed = int(r.get("ratio_total_interviewed") or 0)
+            ratio_total_interviewed_raw = r.get("ratio_total_interviewed")
+            if ratio_total_interviewed_raw is None:
+                ratio_total_interviewed = None
+            else:
+                try:
+                    ratio_total_interviewed = int(ratio_total_interviewed_raw)
+                except (TypeError, ValueError):
+                    ratio_total_interviewed = _float_or_none(ratio_total_interviewed_raw)
 
             interview_pct = (
                 interviewed_candidates / interview_eligible_candidates
@@ -782,6 +845,7 @@ def register_recruiter_metrics_routes(app):
         left90_summary_by_lead = {}
         duration_details_by_lead = {}
         pipeline_details_by_lead = {}
+        sent_vs_interview_details_by_lead = {}
 
         for row in churn_detail_rows:
             tenure_days = row.get("tenure_days")
@@ -953,6 +1017,27 @@ def register_recruiter_metrics_routes(app):
                     "is_hired": bool(row.get("is_hired")),
                 }
             )
+        for row in sent_vs_interview_detail_rows:
+            lead_key = (row.get("hr_lead_email") or "").lower()
+            if not lead_key:
+                continue
+            details = sent_vs_interview_details_by_lead.setdefault(lead_key, [])
+            interviewed_raw = row.get("cantidad_entrevistados")
+            try:
+                interviewed_val = int(interviewed_raw) if interviewed_raw is not None else None
+            except (TypeError, ValueError):
+                interviewed_val = None
+            sent_count = int(row.get("sent_candidate_count") or 0)
+            details.append(
+                {
+                    "opportunity_id": row.get("opportunity_id"),
+                    "opportunity_title": row.get("opportunity_title"),
+                    "opportunity_client_name": row.get("opportunity_client_name"),
+                    "sent_candidate_count": sent_count,
+                    "interviewed_count": interviewed_val,
+                    "ratio": _float_or_none(row.get("ratio")),
+                }
+            )
 
         return jsonify(
             {
@@ -975,6 +1060,7 @@ def register_recruiter_metrics_routes(app):
                 "opportunity_details": opportunity_details_by_lead,
                 "duration_details": duration_details_by_lead,
                 "pipeline_details": pipeline_details_by_lead,
+                "sent_vs_interview_details": sent_vs_interview_details_by_lead,
                 "current_user_email": current_user_email,
             }
         )

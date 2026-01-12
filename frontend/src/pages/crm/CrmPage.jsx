@@ -274,6 +274,7 @@ function renderSalesLeadCell(account) {
     <div className="sales-lead" title={name}>
       <span className={`lead-bubble ${bubble}`}>{initials}</span>
       {avatar ? <img className="lead-avatar" src={avatar} alt="" /> : null}
+      <span className="lead-name">{name}</span>
       <span className="sr-only">{email || name}</span>
     </div>
   );

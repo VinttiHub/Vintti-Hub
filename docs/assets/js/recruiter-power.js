@@ -43,6 +43,7 @@ const metricsState = {
   opportunityDetails: {},
   durationDetails: {},
   pipelineDetails: {},
+  sentVsInterviewDetails: {},
 };
 const detailModalRefs = {
   root: null,
@@ -352,6 +353,10 @@ function getPipelineDetails(hrLeadEmail) {
   const key = (hrLeadEmail || "").toLowerCase();
   return metricsState.pipelineDetails[key] || [];
 }
+function getSentVsInterviewDetails(hrLeadEmail) {
+  const key = (hrLeadEmail || "").toLowerCase();
+  return metricsState.sentVsInterviewDetails[key] || [];
+}
 function normalizeCandidateStatus(status) {
   return (status || "").trim().toLowerCase();
 }
@@ -548,6 +553,33 @@ function createPipelineItems(entries = [], options = {}) {
       };
     });
 }
+function createSentVsInterviewItems(entries = []) {
+  return entries
+    .slice()
+    .sort((a, b) => {
+      const aRatio = typeof a.ratio === "number" ? a.ratio : -1;
+      const bRatio = typeof b.ratio === "number" ? b.ratio : -1;
+      return bRatio - aRatio;
+    })
+    .map((entry, index) => {
+      const title = entry.opportunity_title || "Untitled opportunity";
+      const client = entry.opportunity_client_name || "";
+      const sent = Number(entry.sent_candidate_count ?? 0);
+      let interviewed = "—";
+      if (!(entry.interviewed_count === null || entry.interviewed_count === undefined)) {
+        const interviewedValue = Number(entry.interviewed_count);
+        if (!Number.isNaN(interviewedValue)) interviewed = interviewedValue;
+      }
+      const ratioText =
+        typeof entry.ratio === "number" ? formatPercent(entry.ratio) : "Ratio not documented";
+      return {
+        key: entry.opportunity_id || `sent-vs-interview-${index}`,
+        primary: title,
+        secondary: client,
+        meta: `${ratioText} · ${sent} sent / ${interviewed} interviewed`,
+      };
+    });
+}
 function describeLeft90Window() {
   const start = metricsState.left90RangeStart;
   const end = metricsState.left90RangeEnd;
@@ -673,6 +705,7 @@ function buildDetailModalPayload(type) {
   const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
   const pipelineEntries = getPipelineDetails(key);
   const churnEntries = getLeadChurnDetails(key);
+  const sentVsInterviewDetails = getSentVsInterviewDetails(key);
 
   switch (type) {
     case "closedWinRange":
@@ -840,6 +873,28 @@ function buildDetailModalPayload(type) {
           statusResolver: getHireStatusInfo,
         }),
         emptyMessage: "No candidates were sent in the selected window.",
+      };
+    }
+    case "sentVsInterview": {
+      const sample = selectedMetrics.sent_vs_interview_sample_count || 0;
+      const totals = selectedMetrics.sent_vs_interview_totals || {};
+      const sentTotal = Number(totals.sent ?? 0);
+      const interviewedNumber = Number(totals.interviewed);
+      const interviewedDisplay = Number.isFinite(interviewedNumber) ? interviewedNumber : "—";
+      const avgRatio =
+        typeof selectedMetrics.avg_sent_vs_interview_ratio === "number"
+          ? formatPercent(selectedMetrics.avg_sent_vs_interview_ratio)
+          : "No data";
+      return {
+        title: "Sent vs Interviewed",
+        context: `Average batches sent${recruiterSuffix} compared with recruiter-documented interview counts between ${readableRange}.`,
+        summaryLines: [
+          `Average ratio: ${avgRatio}`,
+          `Opportunities analyzed: ${sample}`,
+          `Totals: ${sentTotal} sent / ${interviewedDisplay} interviewed`,
+        ],
+        items: createSentVsInterviewItems(sentVsInterviewDetails),
+        emptyMessage: "No opportunities with recruiter interview counts in this window.",
       };
     }
     case "churnRange": {
@@ -1036,7 +1091,7 @@ function updateCardsForLead(hrLeadEmail) {
     if (hireHelperEl) hireHelperEl.textContent = "(— / —)";
     if (sentVsInterviewEl) sentVsInterviewEl.textContent = "–";
     if (sentVsInterviewHelperEl)
-      sentVsInterviewHelperEl.textContent = "No opportunities with interview counts yet.";
+      sentVsInterviewHelperEl.textContent = "No opportunities with recruiter interview counts yet.";
     return;
   }
 
@@ -1230,17 +1285,20 @@ function updateCardsForLead(hrLeadEmail) {
     const sampleCount = m.sent_vs_interview_sample_count || 0;
     const totals = m.sent_vs_interview_totals || {};
     const sentTotal = Number(totals.sent ?? 0);
-    const interviewedTotal = Number(totals.interviewed);
+    const interviewedRaw = totals.interviewed;
+    const interviewedDisplay =
+      interviewedRaw === null ||
+      interviewedRaw === undefined ||
+      Number.isNaN(Number(interviewedRaw))
+        ? "—"
+        : Number(interviewedRaw);
     if (!sampleCount) {
       sentVsInterviewHelperEl.textContent =
-        "No opportunities with interview counts yet.";
+        "No opportunities with recruiter interview counts yet.";
     } else {
-      const interviewedDisplay = Number.isFinite(interviewedTotal)
-        ? interviewedTotal
-        : "—";
       sentVsInterviewHelperEl.textContent = `Avg of ${sampleCount} opp${
         sampleCount === 1 ? "" : "s"
-      } · ${sentTotal} sent / ${interviewedDisplay} interviewed`;
+      } · ${sentTotal} sent / ${interviewedDisplay} interviewed (recruiter logs)`;
     }
   }
 
@@ -1258,7 +1316,7 @@ function updateCardsForLead(hrLeadEmail) {
   }
 
   // --- Window churn count (90-day card) ---
-  if (left90CountEl && left90RateEl && left90HelperEl) {
+  if (left90CountEl && left90RateEl) {
     const newLeftCount = m.left90_total ?? m.left90_within_90 ?? 0;
     const fromLeftCount = parseIntSafe(left90CountEl.textContent);
     animateValue(left90CountEl, fromLeftCount, newLeftCount, {
@@ -1278,9 +1336,11 @@ function updateCardsForLead(hrLeadEmail) {
       });
     }
 
-    const known = m.left90_tenure_known ?? 0;
-    const missing = m.left90_tenure_unknown ?? 0;
-    left90HelperEl.textContent = `Start dates documented: ${known} · Missing: ${missing}`;
+    if (left90HelperEl) {
+      const known = m.left90_tenure_known ?? 0;
+      const missing = m.left90_tenure_unknown ?? 0;
+      left90HelperEl.textContent = `Start dates documented: ${known} · Missing: ${missing}`;
+    }
   }
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
@@ -1460,6 +1520,9 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     metricsState.opportunityDetails = normalizeOpportunityDetails(data.opportunity_details);
     metricsState.durationDetails = normalizeDurationDetails(data.duration_details);
     metricsState.pipelineDetails = normalizePipelineDetails(data.pipeline_details);
+    metricsState.sentVsInterviewDetails = normalizeSentVsInterviewDetails(
+      data.sent_vs_interview_details
+    );
 
     populateDropdown();
     updatePeriodInfo();
@@ -1541,6 +1604,35 @@ function normalizePipelineDetails(raw) {
       is_interviewed: Boolean(row.is_interviewed),
       is_hired: Boolean(row.is_hired),
     }));
+  });
+  return normalized;
+}
+function normalizeSentVsInterviewDetails(raw) {
+  const normalized = {};
+  if (!raw || typeof raw !== "object") return normalized;
+  Object.entries(raw).forEach(([email, rows]) => {
+    const key = String(email || "").toLowerCase();
+    if (!key) return;
+    normalized[key] = (rows || []).map((row, index) => {
+      const sent = Number(row?.sent_candidate_count ?? 0);
+      const interviewedRaw = row?.interviewed_count;
+      const interviewed =
+        interviewedRaw === null || interviewedRaw === undefined
+          ? null
+          : Number.isFinite(Number(interviewedRaw))
+          ? Number(interviewedRaw)
+          : null;
+      const ratioRaw = Number(row?.ratio);
+      const ratio = Number.isFinite(ratioRaw) ? ratioRaw : null;
+      return {
+        opportunity_id: row?.opportunity_id || `sent-vs-interview-${index}`,
+        opportunity_title: row?.opportunity_title || "Untitled opportunity",
+        opportunity_client_name: row?.opportunity_client_name || "",
+        sent_candidate_count: sent,
+        interviewed_count: interviewed,
+        ratio,
+      };
+    });
   });
   return normalized;
 }

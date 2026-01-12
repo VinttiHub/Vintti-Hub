@@ -324,15 +324,19 @@ function conversionHelper(metrics) {
 }
 
 function sentVsInterviewHelper(metrics) {
-  if (!metrics) return 'No opportunities with interview counts yet.';
+  if (!metrics) return 'No opportunities with recruiter interview counts yet.';
   const sample = metrics.sent_vs_interview_sample_count ?? 0;
   const totals = metrics.sent_vs_interview_totals || {};
   const sent = Number(totals.sent ?? 0);
-  const interviewedNumber = Number(totals.interviewed);
-  const interviewed = Number.isFinite(interviewedNumber) ? interviewedNumber : '—';
-  if (!sample) return 'No opportunities with interview counts yet.';
+  const interviewed =
+    totals.interviewed === null ||
+    totals.interviewed === undefined ||
+    Number.isNaN(Number(totals.interviewed))
+      ? '—'
+      : Number(totals.interviewed);
+  if (!sample) return 'No opportunities with recruiter interview counts yet.';
   const plural = sample === 1 ? '' : 's';
-  return `Avg of ${sample} opp${plural} · ${sent} sent / ${interviewed} interviewed.`;
+  return `Avg of ${sample} opp${plural} · ${sent} sent / ${interviewed} interviewed (recruiter logs).`;
 }
 
 export default RecruiterPowerPage;
