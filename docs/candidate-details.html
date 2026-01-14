@@ -12,6 +12,7 @@
   <!-- Fonts & Styles -->
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/css/candidate-details.css" />
+  <link rel="stylesheet" href="./assets/css/rich-comments.css" />
 
   <!-- JS for this page lives at the bottom (defer) to avoid blocking -->
 </head>
@@ -247,7 +248,7 @@
                 <img src="assets/img/flag.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
                 Red Flags
               </label>
-              <textarea id="redFlags" placeholder="No red flags">—</textarea>
+              <textarea id="redFlags" placeholder="No red flags"></textarea>
             </div>
 
             <div class="field textarea comments">
@@ -255,7 +256,7 @@
                 <img src="assets/img/comment.png" alt="Phone" style="width:14px; height:14px; object-fit:contain;">
                 Comments
               </label>
-              <textarea id="comments" placeholder="No comments">—</textarea>
+              <textarea id="comments" placeholder="No comments"></textarea>
             </div>
           </div>
 
@@ -699,6 +700,7 @@
 
   <!-- ===================== Scripts ===================== -->
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script defer src="./assets/js/rich-comment-box.js"></script>
   <script defer src="./assets/js/resume.js"></script>
   <script defer src="./assets/js/candidate-details.js"></script>
 </body>

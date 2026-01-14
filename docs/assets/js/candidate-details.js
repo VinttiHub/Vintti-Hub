@@ -1230,20 +1230,39 @@ function paintWaBtn(){
         }
       }
 
-      // Red flags / comments (blur)
-      (['redFlags','comments']).forEach(id => {
-        const ta = document.getElementById(id);
-        if (!ta) return;
-        ta.value = id === 'redFlags' ? (data.red_flags || '') : (data.comments || '');
-        ta.addEventListener('blur', () => {
-          const field = id === 'redFlags' ? 'red_flags' : 'comments';
-          fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ [field]: ta.value.trim() })
+      const richFactory = window.RichComments && typeof window.RichComments.enhance === 'function';
+      const ensureCandidatePatch = (field, value) => {
+        if (!candidateId) return;
+        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: value || '' })
+        }).catch((err) => console.warn(`Failed to update ${field}`, err));
+      };
+
+      if (richFactory) {
+        const redFlagsEditor = window.RichComments.enhance('redFlags', {
+          placeholder: 'No red flags',
+          onBlur: (html) => ensureCandidatePatch('red_flags', html)
+        });
+        if (redFlagsEditor) redFlagsEditor.setHTML(data.red_flags || '');
+
+        const commentsEditor = window.RichComments.enhance('comments', {
+          placeholder: 'No comments',
+          onBlur: (html) => ensureCandidatePatch('comments', html)
+        });
+        if (commentsEditor) commentsEditor.setHTML(data.comments || '');
+      } else {
+        (['redFlags','comments']).forEach((id) => {
+          const ta = document.getElementById(id);
+          if (!ta) return;
+          ta.value = id === 'redFlags' ? (data.red_flags || '') : (data.comments || '');
+          ta.addEventListener('blur', () => {
+            const field = id === 'redFlags' ? 'red_flags' : 'comments';
+            ensureCandidatePatch(field, ta.value.trim());
           });
         });
-      });
+      }
 
       // Otros metadatos
       const by = document.getElementById("field-created-by");

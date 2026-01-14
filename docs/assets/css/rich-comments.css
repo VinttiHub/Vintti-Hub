@@ -1,0 +1,126 @@
+.rich-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.rich-comment-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rich-comment-toolbar button {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+}
+
+.rich-comment-toolbar button:hover,
+.rich-comment-toolbar button:focus-visible {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.rich-comment-toolbar button.active {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+
+.rich-comment-toolbar .rich-highlight-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  border-left: 1px solid #e5e7eb;
+}
+
+.rich-comment-toolbar button[data-highlight] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  border-color: transparent;
+  background: var(--highlight-color, #fde68a);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.rich-comment-toolbar button[data-highlight]:focus-visible {
+  outline: 2px solid var(--highlight-color, #fde68a);
+  outline-offset: 2px;
+}
+
+.rich-comment-toolbar button[data-highlight="clear"] {
+  background: transparent;
+  border: 1px dashed #cbd5f5;
+  color: #6b7280;
+  width: auto;
+  padding: 4px 10px;
+}
+
+.rich-comment-toolbar .rich-emoji-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.rich-comment-toolbar .rich-emoji-anchor button {
+  width: auto;
+  border-radius: 999px;
+}
+
+.rich-comment-toolbar emoji-picker,
+.rich-comment-emoji-picker {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 9999;
+  width: 300px;
+  max-height: 360px;
+  display: none;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.16);
+  border-radius: 16px;
+}
+
+.rich-comment-editor {
+  min-height: 120px;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  padding: 14px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #111827;
+  background: #fff;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rich-comment-editor:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.rich-comment-editor[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.rich-comment-editor ol,
+.rich-comment-editor ul {
+  padding-left: 24px;
+}
+
+.rich-comment-editor a {
+  color: #2563eb;
+}

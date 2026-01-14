@@ -26,6 +26,7 @@ let ACCOUNT_DETAIL_CANDIDATES = [];
 let ACCOUNT_OPPS_READY = false;
 let ACCOUNT_CANDIDATES_READY = false;
 let ACCOUNT_DERIVED_REFRESHING = false;
+const ACCOUNT_RICH_COMMENT_HANDLES = { comments: null, painPoints: null };
 
 function norm(value) {
   return (value || '').toString().toLowerCase().trim();
@@ -218,6 +219,36 @@ document.body.style.backgroundColor = 'var(--bg)';
 
   // Cargar datos
   const id = getIdFromURL();
+  const richEnabled = window.RichComments && typeof window.RichComments.enhance === 'function';
+  const patchAccountField = (field, value) => {
+    if (!id) return;
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value || '' })
+    }).catch((err) => console.warn(`Failed to update ${field}`, err));
+  };
+
+  if (richEnabled) {
+    ACCOUNT_RICH_COMMENT_HANDLES.comments = window.RichComments.enhance('comments', {
+      placeholder: 'Write comments here...',
+      onBlur: (html) => patchAccountField('comments', html)
+    });
+    ACCOUNT_RICH_COMMENT_HANDLES.painPoints = window.RichComments.enhance('pain-points', {
+      placeholder: 'Write Pain Points here...',
+      onBlur: (html) => patchAccountField('pain_points', html)
+    });
+  } else {
+    const commentsTextarea = document.getElementById('comments');
+    if (commentsTextarea) {
+      commentsTextarea.addEventListener('blur', () => patchAccountField('comments', commentsTextarea.value.trim()));
+    }
+    const painPointsTextarea = document.getElementById('pain-points');
+    if (painPointsTextarea) {
+      painPointsTextarea.addEventListener('blur', () => patchAccountField('pain_points', painPointsTextarea.value.trim()));
+    }
+  }
+
   const overviewFab = document.getElementById('clientOverviewFab');
   if (overviewFab) {
     if (id) {
@@ -256,28 +287,6 @@ if (goBackButton) {
     }
   });
 }
-  // Guardar Pain Points al hacer blur
-  const painPointsTextarea = document.getElementById('pain-points');
-  if (painPointsTextarea) {
-    painPointsTextarea.addEventListener('blur', () => {
-      const value = painPointsTextarea.value.trim();
-      const accountId = getIdFromURL();
-      if (!accountId) return;
-
-      fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${accountId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pain_points: value })
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('Error updating pain points');
-        console.log('Pain Points updated');
-      })
-      .catch(err => {
-        console.error('Failed to update Pain Points:', err);
-      });
-    });
-  }
 
 const clientNameInput = document.getElementById('account-client-name');
 if (clientNameInput) {
@@ -424,11 +433,19 @@ function fillAccountDetails(data) {
   const websiteLink = document.getElementById('website-link');
   if (websiteLink) websiteLink.href = data.website || '#';
 
-  const commentsTextarea = document.getElementById('comments');
-  if (commentsTextarea) commentsTextarea.value = data.comments || '';
+  if (ACCOUNT_RICH_COMMENT_HANDLES.comments) {
+    ACCOUNT_RICH_COMMENT_HANDLES.comments.setHTML(data.comments || '');
+  } else {
+    const commentsTextarea = document.getElementById('comments');
+    if (commentsTextarea) commentsTextarea.value = data.comments || '';
+  }
 
-  const painPointsTextarea = document.getElementById('pain-points');
-  if (painPointsTextarea) painPointsTextarea.value = data.pain_points || '';
+  if (ACCOUNT_RICH_COMMENT_HANDLES.painPoints) {
+    ACCOUNT_RICH_COMMENT_HANDLES.painPoints.setHTML(data.pain_points || '');
+  } else {
+    const painPointsTextarea = document.getElementById('pain-points');
+    if (painPointsTextarea) painPointsTextarea.value = data.pain_points || '';
+  }
 
   document.getElementById('account-tsf').textContent = `$${data.tsf ?? 0}`;
   document.getElementById('account-tsr').textContent = `$${data.tsr ?? 0}`;

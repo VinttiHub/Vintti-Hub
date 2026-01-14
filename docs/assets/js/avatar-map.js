@@ -27,6 +27,7 @@
     'felipe@vintti.com':           'felipe.png',
     'abril@vintti.com':            'abril.png',
     'angie@vintti.com':            'angie.png',
+    'juliana@vintti.com':          'juliana.png',
   };
   const AVATAR_BY_USER_ID = {
     // '123': 'avatar.png',

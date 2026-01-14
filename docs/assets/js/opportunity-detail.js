@@ -1,5 +1,10 @@
 let emailToChoices = null;
 let emailCcChoices = null;
+const OPPORTUNITY_RICH_COMMENT_HANDLES = {
+  overview: null,
+  clientAbout: null,
+  firstMeeting: null,
+};
 // === MODEL helpers (normaliza, setea UI y guarda consistente) ===
 const MODEL = {
   normalize(v){
@@ -858,11 +863,41 @@ document.getElementById('sendEmailBtn').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+const richCommentsEnabled = window.RichComments && typeof window.RichComments.enhance === 'function';
+const overviewCommentsTextarea = document.getElementById('comments-overview-textarea');
+if (richCommentsEnabled && overviewCommentsTextarea) {
+  OPPORTUNITY_RICH_COMMENT_HANDLES.overview = window.RichComments.enhance('comments-overview-textarea', {
+    placeholder: 'Write internal comments here...',
+    onBlur: (html) => updateOpportunityField('comments', html)
+  });
+} else if (overviewCommentsTextarea) {
+  overviewCommentsTextarea.addEventListener('blur', async (e) => {
+    await updateOpportunityField('comments', e.target.value);
+  });
+}
 
+const clientAboutTextarea = document.getElementById('client-about-textarea');
+if (richCommentsEnabled && clientAboutTextarea) {
+  OPPORTUNITY_RICH_COMMENT_HANDLES.clientAbout = window.RichComments.enhance('client-about-textarea', {
+    placeholder: 'Client background, culture, values...',
+    onBlur: (html) => updateAccountField('comments', html)
+  });
+} else if (clientAboutTextarea) {
+  clientAboutTextarea.addEventListener('blur', async (e) => {
+    await updateAccountField('comments', e.target.value);
+  });
+}
 
-document.getElementById('comments-overview-textarea').addEventListener('blur', async (e) => {
-  await updateOpportunityField('comments', e.target.value);
-});
+const firstMeetingTextarea = document.getElementById('comments-firstmeeting-textarea');
+if (richCommentsEnabled && firstMeetingTextarea) {
+  OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting = window.RichComments.enhance('comments-firstmeeting-textarea', {
+    placeholder: 'Summary of the first meeting...',
+    onBlur: (html) => updateOpportunityField('opp_comments', html)
+  });
+} else if (firstMeetingTextarea) {
+  firstMeetingTextarea.addEventListener('blur', (e) => updateOpportunityField('opp_comments', e.target.value));
+}
+
 document.getElementById('interviewing-process-editor').addEventListener('blur', e => {
   updateOpportunityField('client_interviewing_process', e.target.innerHTML);
 });
@@ -902,10 +937,6 @@ document.getElementById('client-mail-input').addEventListener('blur', async (e) 
   await updateAccountField('mail', e.target.value);
 });
 
-document.getElementById('client-about-textarea').addEventListener('blur', async (e) => {
-  await updateAccountField('comments', e.target.value);
-});
-
 // DETAILS
 document.getElementById('details-opportunity-name').addEventListener('blur', async (e) => {
   await updateOpportunityField('opp_position_name', e.target.value);
@@ -937,9 +968,6 @@ document.getElementById('years-experience-input').addEventListener('blur', e =>
 
 document.getElementById('fee-input').addEventListener('blur', e =>
   updateOpportunityField('fee', e.target.value));
-
-document.getElementById('comments-firstmeeting-textarea').addEventListener('blur', e =>
-  updateOpportunityField('opp_comments', e.target.value));
 
 document.getElementById('recording-input').addEventListener('blur', e =>
   updateOpportunityField('first_meeting_recording', e.target.value));
@@ -2216,7 +2244,12 @@ async function loadOpportunityData() {
     document.getElementById('opportunity-id-text').setAttribute('data-id', data.opportunity_id);
     document.getElementById('start-date-input').value = toYMD(data.nda_signature_or_start_date);
     document.getElementById('close-date-input').value = toYMD(data.opp_close_date);
-    document.getElementById('comments-overview-textarea').value = data.comments || '';
+    if (OPPORTUNITY_RICH_COMMENT_HANDLES.overview) {
+      OPPORTUNITY_RICH_COMMENT_HANDLES.overview.setHTML(data.comments || '');
+    } else {
+      const overviewTa = document.getElementById('comments-overview-textarea');
+      if (overviewTa) overviewTa.value = data.comments || '';
+    }
 
     // Client section
     document.getElementById('client-name-input').value = data.account_name || '';
@@ -2225,7 +2258,12 @@ async function loadOpportunityData() {
     document.getElementById('client-linkedin-input').value = data.account_linkedin || '';
     document.getElementById('client-website-input').value = data.account_website || '';
     document.getElementById('client-mail-input').value = data.account_mail || '';
-    document.getElementById('client-about-textarea').value = data.account_about || '';
+    if (OPPORTUNITY_RICH_COMMENT_HANDLES.clientAbout) {
+      OPPORTUNITY_RICH_COMMENT_HANDLES.clientAbout.setHTML(data.account_about || '');
+    } else {
+      const aboutTa = document.getElementById('client-about-textarea');
+      if (aboutTa) aboutTa.value = data.account_about || '';
+    }
 
     // DETAILS
     document.getElementById('details-opportunity-name').value = data.opp_position_name || '';
@@ -2244,7 +2282,12 @@ async function loadOpportunityData() {
     document.getElementById('years-experience-input').value = data.years_experience || '';
     document.getElementById('fee-input').value = data.fee || '';
     document.getElementById('timezone-input').value = data.account_timezone || '';
-    document.getElementById('comments-firstmeeting-textarea').value = data.opp_comments || '';
+    if (OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting) {
+      OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting.setHTML(data.opp_comments || '');
+    } else {
+      const meetingTa = document.getElementById('comments-firstmeeting-textarea');
+      if (meetingTa) meetingTa.value = data.opp_comments || '';
+    }
     document.getElementById('recording-input').value = data.first_meeting_recording || '';
     document.getElementById('deepdive-recording-input').value = data.deepdive_recording || '';
     document.getElementById('interviewing-process-editor').innerHTML = data.client_interviewing_process || '';
