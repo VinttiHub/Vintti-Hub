@@ -12,6 +12,19 @@
   gap: 8px;
 }
 
+.rich-comment-toolbar .rich-font-group {
+  display: inline-flex;
+  gap: 6px;
+  border-right: 1px solid #e5e7eb;
+  padding-right: 8px;
+}
+
+.rich-comment-toolbar .rich-font-group button {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+}
+
 .rich-comment-toolbar button {
   border: 1px solid #d1d5db;
   background: #fff;

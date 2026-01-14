@@ -1,6 +1,43 @@
 document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const candidateId = urlParams.get("id");
+  const isPdfExport = urlParams.has("pdf_export");
+  const bodyEl = document.body;
+  if (bodyEl) bodyEl.dataset.resumeReady = "loading";
+
+  if (isPdfExport) {
+    document.documentElement.style.backgroundColor = "#fff";
+    if (bodyEl) {
+      bodyEl.style.backgroundColor = "#fff";
+      bodyEl.style.paddingTop = "32px";
+      bodyEl.style.paddingBottom = "48px";
+    }
+    const header = document.querySelector(".cv-header");
+    if (header) header.remove();
+    const footer = document.querySelector(".cv-footer");
+    if (footer) footer.remove();
+  }
+
+  const notifyParent = (status) => {
+    if (bodyEl) {
+      bodyEl.dataset.resumeReady = status ? "ready" : "error";
+    }
+    if (window.parent && window.parent !== window) {
+      try {
+        window.parent.postMessage(
+          {
+            source: "resume-readonly",
+            type: "resume-readonly-ready",
+            status: status ? "ready" : "error",
+            candidateId,
+          },
+          "*",
+        );
+      } catch (err) {
+        console.warn("Unable to notify parent about resume readiness", err);
+      }
+    }
+  };
 // Muestra esto cuando no hay fecha
 const NO_DATE_LABEL = "No date assigned";
 
@@ -24,6 +61,7 @@ function formatDateFromDateObj(d) {
 
   if (!candidateId) {
     console.error("❌ Candidate ID missing in URL");
+    notifyParent(false);
     return;
   }
 
@@ -410,23 +448,41 @@ if (languages.length === 0) {
 const videoSection = document.getElementById("videoLinkSection");
 const videoDiv = document.getElementById("readonly-video-link");
 if (data.video_link && data.video_link.trim() !== "") {
-  const button = document.createElement("a");
-  button.href = data.video_link;
-  button.target = "_blank";
-  button.rel = "noopener noreferrer";
-  button.className = "video-link-button";
-  button.setAttribute("aria-label", "Watch candidate introduction video");
-  button.innerHTML = `
-    <span class="video-link-icon" aria-hidden="true">▶</span>
-    <span>Watch video</span>
-  `;
-  videoDiv.innerHTML = "";
-  videoDiv.appendChild(button);
+  if (isPdfExport) {
+    const linkText = document.createElement("div");
+    linkText.className = "video-link-button";
+    linkText.style.background = "transparent";
+    linkText.style.border = "none";
+    linkText.style.padding = "0";
+    linkText.style.boxShadow = "none";
+    linkText.style.color = "#003BFF";
+    linkText.style.textTransform = "none";
+    linkText.style.letterSpacing = "normal";
+    linkText.style.fontWeight = "500";
+    linkText.textContent = data.video_link;
+    videoDiv.innerHTML = "";
+    videoDiv.appendChild(linkText);
+  } else {
+    const button = document.createElement("a");
+    button.href = data.video_link;
+    button.target = "_blank";
+    button.rel = "noopener noreferrer";
+    button.className = "video-link-button";
+    button.setAttribute("aria-label", "Watch candidate introduction video");
+    button.innerHTML = `
+      <span class="video-link-icon" aria-hidden="true">▶</span>
+      <span>Watch video</span>
+    `;
+    videoDiv.innerHTML = "";
+    videoDiv.appendChild(button);
+  }
 } else if (videoSection) {
   videoSection.style.display = "none";
 }
+    notifyParent(true);
   } catch (error) {
     console.error("❌ Error loading resume data:", error);
+    notifyParent(false);
   }
 });
 document.addEventListener('paste', function (e) {

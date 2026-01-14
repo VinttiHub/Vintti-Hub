@@ -7,6 +7,14 @@
     { name: 'Blue', color: '#bfdbfe' },
     { name: 'Red', color: '#fecaca' },
   ];
+  const FONT_SIZE_OPTIONS = [
+    { key: 'small', label: 'A-', commandValue: 2, px: '13px' },
+    { key: 'default', label: 'A', commandValue: 3, px: '15px' },
+    { key: 'large', label: 'A+', commandValue: 4, px: '18px' },
+    { key: 'huge', label: 'A++', commandValue: 5, px: '22px' },
+  ];
+  const FONT_SIZE_MAP = Object.fromEntries(FONT_SIZE_OPTIONS.map((opt) => [opt.key, opt]));
+  const COMMAND_SIZE_MAP = Object.fromEntries(FONT_SIZE_OPTIONS.map((opt) => [String(opt.commandValue), opt]));
 
   let emojiLoaderPromise = null;
   async function ensureEmojiPickerLoaded() {
@@ -39,6 +47,34 @@
     return val;
   }
 
+  function normalizeFontTags(root) {
+    if (!root) return;
+    root.querySelectorAll('font').forEach((fontEl) => {
+      const replacement = document.createElement('span');
+      const styleAttr = fontEl.getAttribute('style');
+      if (styleAttr) replacement.setAttribute('style', styleAttr);
+      const sizeAttr = fontEl.getAttribute('size');
+      if (!replacement.style.fontSize) {
+        const option = COMMAND_SIZE_MAP[String(sizeAttr)];
+        if (option) {
+          replacement.style.fontSize = option.px;
+        } else if (sizeAttr && !Number.isNaN(Number(sizeAttr))) {
+          const numeric = Number(sizeAttr);
+          replacement.style.fontSize = `${Math.min(32, 10 + numeric * 2)}px`;
+        }
+      }
+      replacement.innerHTML = fontEl.innerHTML;
+      fontEl.replaceWith(replacement);
+    });
+  }
+
+  function applyFontSize(editor, sizeKey) {
+    const option = FONT_SIZE_MAP[sizeKey];
+    if (!option) return;
+    runCommand(editor, 'fontSize', option.commandValue);
+    normalizeFontTags(editor);
+  }
+
   function enhance(target, options = {}) {
     const ta = typeof target === 'string' ? document.getElementById(target) : target;
     if (!ta) return null;
@@ -56,6 +92,18 @@
       <button type="button" data-command="insertUnorderedList" aria-label="Bullet list">• List</button>
       <button type="button" data-command="removeFormat" aria-label="Clear formatting">⤫</button>
     `;
+
+    const fontGroup = document.createElement('div');
+    fontGroup.className = 'rich-font-group';
+    FONT_SIZE_OPTIONS.forEach((option) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.fontSize = option.key;
+      btn.textContent = option.label;
+      btn.title = `Set font size ${option.label}`;
+      fontGroup.appendChild(btn);
+    });
+    toolbar.appendChild(fontGroup);
 
     const highlightGroup = document.createElement('div');
     highlightGroup.className = 'rich-highlight-group';
@@ -93,6 +141,7 @@
     editor.contentEditable = 'true';
     editor.dataset.placeholder = placeholder;
     editor.innerHTML = normalizeInitialValue(options.initialHTML ?? ta.value ?? '');
+    normalizeFontTags(editor);
 
     ta.style.display = 'none';
     ta.dataset.richified = '1';
@@ -101,6 +150,7 @@
     wrap.appendChild(editor);
 
     function syncValue(trigger = 'change') {
+      normalizeFontTags(editor);
       const html = editor.innerHTML;
       ta.value = html;
       if (trigger === 'input' && typeof options.onChange === 'function') options.onChange(html);
@@ -124,6 +174,12 @@
         } else {
           runCommand(editor, 'backColor', highlight);
         }
+        return;
+      }
+      const fontSize = btn.dataset.fontSize;
+      if (fontSize) {
+        event.preventDefault();
+        applyFontSize(editor, fontSize);
         return;
       }
       if (btn.dataset.emojiToggle) {
@@ -155,6 +211,7 @@
       toolbar,
       setHTML(html) {
         editor.innerHTML = html || '';
+        normalizeFontTags(editor);
         syncValue('input');
       },
       getHTML() {

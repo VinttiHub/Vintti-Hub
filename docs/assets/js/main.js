@@ -112,6 +112,25 @@ function getCurrentUserEmail(){
     .toLowerCase()
     .trim();
 }
+
+const _plainTextParser = document.createElement('div');
+function htmlToPlainText(value) {
+  if (value === null || value === undefined) return '';
+  _plainTextParser.innerHTML = value;
+  const text = _plainTextParser.textContent || _plainTextParser.innerText || '';
+  _plainTextParser.textContent = '';
+  return text;
+}
+
+function escapeAttribute(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '&#10;');
+}
 // --- Email cuando se asigna / cambia HR Lead en una oportunidad ---
 async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
   try {
@@ -757,6 +776,7 @@ document.querySelectorAll('.filter-header button').forEach(button => {
             }
           }
 
+          const plainComment = htmlToPlainText(opp.comments || '');
           tr.innerHTML = `
             <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
             <td>${opp.client_name || ''}</td>
@@ -768,7 +788,13 @@ document.querySelectorAll('.filter-header button').forEach(button => {
               ${getHRLeadCell(opp)}
             </td>
             <td>
-              <input type="text" class="comment-input" data-id="${opp.opportunity_id}" value="${opp.comments || ''}" />
+              <input
+                type="text"
+                class="comment-input"
+                data-id="${opp.opportunity_id}"
+                data-original-value="${escapeAttribute(plainComment)}"
+                value="${escapeAttribute(plainComment)}"
+              />
             </td>
             <td>${daysAgo}</td>
             <td>${daysSinceBatch}</td>
@@ -1355,15 +1381,27 @@ document.addEventListener('click', e => {
   }
 }, true);
 
-document.addEventListener('blur', async e => {
-  if (e.target.classList.contains('comment-input')) {
-    const oppId = e.target.dataset.id;
-    const newComment = e.target.value;
-    await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
+document.addEventListener('blur', async (e) => {
+  if (!e.target.classList.contains('comment-input')) return;
+  const input = e.target;
+  const oppId = input.dataset.id;
+  const newComment = input.value;
+  const original = input.dataset.originalValue ?? '';
+  if (newComment === original) return;
+
+  try {
+    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ comments: newComment })
     });
+    if (!res.ok) {
+      console.error('Failed to update plain comment', res.status);
+      return;
+    }
+    input.dataset.originalValue = newComment;
+  } catch (err) {
+    console.error('Error updating comment', err);
   }
 }, true);
 

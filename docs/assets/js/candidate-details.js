@@ -2375,6 +2375,179 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
   const idleLabel = btn.innerHTML;
   let downloading = false;
 
+  const HTML2CANVAS_URL = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+  const READONLY_READY_EVENT = 'resume-readonly-ready';
+  const PDF_PAGE = { width: 595.28, height: 841.89 };
+  const PDF_PAGE_MARGIN = 24;
+
+  const buildReadonlyUrl = () => {
+    const base = `resume-readonly.html?id=${encodeURIComponent(candidateId)}`;
+    return base.includes('?') ? `${base}&pdf_export=1` : `${base}?pdf_export=1`;
+  };
+
+  const createHiddenIframe = (src) => {
+    const iframe = document.createElement('iframe');
+    iframe.src = src;
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-2000px';
+    iframe.style.top = '0';
+    iframe.style.width = '1200px';
+    iframe.style.height = '1600px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = '0';
+    return iframe;
+  };
+
+  const waitForIframeLoad = (iframe) =>
+    new Promise((resolve, reject) => {
+      const cleanup = () => {
+        iframe.removeEventListener('load', onLoad);
+        iframe.removeEventListener('error', onError);
+        clearTimeout(timeoutId);
+      };
+      const onLoad = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error('Unable to load the resume preview.'));
+      };
+      iframe.addEventListener('load', onLoad, { once: true });
+      iframe.addEventListener('error', onError, { once: true });
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        reject(new Error('Loading the resume preview timed out.'));
+      }, 15000);
+    });
+
+  const waitForReadonlyReady = (iframe, timeoutMs = 20000) =>
+    new Promise((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => {
+        window.removeEventListener('message', onMessage);
+        clearInterval(pollId);
+        clearTimeout(timeoutId);
+      };
+      const finish = (status) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (status === 'ready') {
+          resolve();
+        } else {
+          reject(new Error('The client resume could not finish loading.'));
+        }
+      };
+      const onMessage = (event) => {
+        if (event.source !== iframe.contentWindow) return;
+        const data = event.data;
+        if (!data || data.type !== READONLY_READY_EVENT) return;
+        finish(data.status === 'ready' ? 'ready' : 'error');
+      };
+      window.addEventListener('message', onMessage);
+      const pollId = setInterval(() => {
+        const state = iframe.contentDocument?.body?.dataset?.resumeReady;
+        if (state === 'ready') finish('ready');
+        if (state === 'error') finish('error');
+      }, 250);
+      const timeoutId = setTimeout(() => finish('timeout'), timeoutMs);
+    });
+
+  const ensureFrameHtml2canvas = (iframe) =>
+    new Promise((resolve, reject) => {
+      const frameWin = iframe.contentWindow;
+      if (frameWin?.html2canvas) {
+        resolve(frameWin.html2canvas);
+        return;
+      }
+      const doc = iframe.contentDocument;
+      if (!doc) {
+        reject(new Error('Missing resume document context.'));
+        return;
+      }
+      const script = doc.createElement('script');
+      script.src = HTML2CANVAS_URL;
+      script.referrerPolicy = 'no-referrer';
+      script.onload = () => resolve(frameWin.html2canvas);
+      script.onerror = () => reject(new Error('Unable to load html2canvas for the resume.'));
+      doc.head.appendChild(script);
+    });
+
+  const captureReadonlyCanvas = async () => {
+    const iframe = createHiddenIframe(buildReadonlyUrl());
+    document.body.appendChild(iframe);
+    try {
+      await waitForIframeLoad(iframe);
+      await waitForReadonlyReady(iframe);
+      const html2canvas = await ensureFrameHtml2canvas(iframe);
+      const doc = iframe.contentDocument;
+      if (!doc || !doc.body) throw new Error('Resume preview is empty.');
+      const docEl = doc.documentElement;
+      const width = Math.max(doc.body.scrollWidth, docEl.scrollWidth);
+      const height = Math.max(doc.body.scrollHeight, docEl.scrollHeight);
+      iframe.style.width = `${width}px`;
+      iframe.style.height = `${height}px`;
+      return await html2canvas(doc.body, {
+        backgroundColor: '#f5f6f7',
+        scale: Math.min(3, window.devicePixelRatio > 1 ? 2 : 1.5),
+        useCORS: true,
+        windowWidth: width,
+        windowHeight: height,
+        logging: false,
+      });
+    } finally {
+      iframe.remove();
+    }
+  };
+
+  const dataUrlToUint8Array = (dataUrl) => {
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  };
+
+  const canvasToPdfBytes = async (canvas) => {
+    if (!canvas || !canvas.width || !canvas.height) throw new Error('Invalid resume canvas.');
+    const pdfDoc = await PDFDocument.create();
+    const scale = PDF_PAGE.width / canvas.width;
+    const usableCanvasHeight = (PDF_PAGE.height - PDF_PAGE_MARGIN * 2) / scale;
+    const pageSliceHeight = Math.max(usableCanvasHeight, 100);
+    let offsetY = 0;
+    while (offsetY < canvas.height) {
+      const sliceHeight = Math.min(pageSliceHeight, canvas.height - offsetY);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sliceHeight;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+      const pngBytes = dataUrlToUint8Array(sliceCanvas.toDataURL('image/png'));
+      const image = await pdfDoc.embedPng(pngBytes);
+      const page = pdfDoc.addPage([PDF_PAGE.width, PDF_PAGE.height]);
+      const renderedHeight = image.height * scale;
+      page.drawImage(image, {
+        x: 0,
+        y: PDF_PAGE.height - PDF_PAGE_MARGIN - renderedHeight,
+        width: PDF_PAGE.width,
+        height: renderedHeight,
+      });
+      offsetY += sliceHeight;
+    }
+    return pdfDoc.save();
+  };
+
+  const buildStyledPdfBytes = async () => {
+    const canvas = await captureReadonlyCanvas();
+    return canvasToPdfBytes(canvas);
+  };
+
   const parseJsonArray = (value) => {
     if (!value) return [];
     if (Array.isArray(value)) return value;
@@ -2477,7 +2650,7 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
-  const buildPdfBytes = async (candidate, resumeData) => {
+  const buildLegacyPdfBytes = async (candidate, resumeData) => {
     const normalized = normalizeResume(resumeData || {});
     const pdfDoc = await PDFDocument.create();
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -2620,6 +2793,15 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
     }
 
     return pdfDoc.save();
+  };
+
+  const buildPdfBytes = async (candidate, resumeData) => {
+    try {
+      return await buildStyledPdfBytes(candidate, resumeData);
+    } catch (err) {
+      console.warn('Styled resume PDF failed, falling back to legacy layout.', err);
+      return buildLegacyPdfBytes(candidate, resumeData);
+    }
   };
 
   const fetchCandidateData = async () => {
