@@ -324,7 +324,6 @@
           <h2>Candidates</h2>
           <p class="subtitle">See the final candidates for this opportunity.</p>
         </div>
-        <button id="createCandidateBtn" class="header-btn">+ Create Candidate</button>
       </div>
 
       <!-- Batches table -->
@@ -533,32 +532,6 @@
       <div id="email-message" class="rich-editor" contenteditable="true" style="height: 200px; border: 1px solid #ccc; padding: 10px; border-radius: 8px;"></div>
 
       <button id="sendEmailBtn">Send</button>
-    </div>
-  </div>
-
-  <div id="chooseCandidateActionPopup" class="popup hidden">
-    <div class="popup-content">
-      <span class="close-btn" id="closeChoosePopup">&times;</span>
-      <h2>Add to Pipeline</h2>
-      <p>Let’s get someone on board!</p>
-      <button id="openNewCandidatePopup">Create New Candidate</button>
-    </div>
-  </div>
-
-  <div id="preCreateCheckPopup" class="popup hidden">
-    <div class="popup-content">
-      <span class="close-btn" id="closePreCreatePopup">&times;</span>
-      <h2>Check Candidate</h2>
-      <p style="margin-bottom: 10px;">Let's check if this candidate already exists</p>
-
-      <input type="text" id="precreate-search" placeholder="Full name or search..." autocomplete="off"/>
-      <p id="precreate-found-msg" style="display: none; color: #444; font-weight: 500; margin-top: 10px;">We found some matches</p>
-      <ul id="precreate-results" class="search-results-list"></ul>
-
-      <div id="precreate-no-match" style="display:none; margin-top:20px; text-align: center;">
-        <p>We're all set! Create a new candidate</p>
-        <button id="goToCreateCandidateBtn" class="arrow-btn"></button>
-      </div>
     </div>
   </div>
 

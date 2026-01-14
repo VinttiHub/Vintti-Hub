@@ -1359,17 +1359,6 @@ body {
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
-#precreate-search {
-  width: 100%;
-  max-width: 360px;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  border-radius: 10px;
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-  margin: 0 auto 16px;
-  background-color: white;
-}
 #candidate-name {
   max-width: 360px;
   margin: 0 auto;
@@ -1542,16 +1531,6 @@ select {
   height: 42px;
 }
 
-/* Popup de elección de acción */
-#chooseCandidateActionPopup .popup-content {
-  width: 400px;
-  max-width: 90%;
-  padding: 30px;
-  border-radius: 12px;
-  background: var(--card-bg, #fff);
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
-  text-align: center;
-}
 .candidate-status-dropdown {
   position: absolute;
   top: 1rem;
@@ -1567,34 +1546,6 @@ select {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-#chooseCandidateActionPopup h2 {
-  margin-top: 0;
-  font-size: 1.4rem;
-}
-
-#chooseCandidateActionPopup p {
-  margin: 10px 0 20px;
-  font-size: 1rem;
-  color: #555;
-}
-
-#chooseCandidateActionPopup button {
-  display: block;
-  width: 100%;
-  padding: 12px 20px;
-  margin: 10px 0;
-  background-color: var(--primary-color, #2d72d9);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-#chooseCandidateActionPopup button:hover {
-  background-color: var(--primary-hover, #1e56b0);
-}
 .spinner {
   width: 14px;
   height: 14px;
@@ -1899,35 +1850,6 @@ input:checked + .slider:before {
 
 .hidden {
   display: none;
-}
-#precreate-no-match p {
-  margin-bottom: 6px;
-  font-weight: 500;
-  color: #444;
-}
-.arrow-btn {
-  background-color: #4CAF50; /* verde */
-  border: none;
-  border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease;
-}
-
-.arrow-btn::before {
-  content: "➤";
-  color: white;
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.arrow-btn:hover {
-  transform: scale(1.1);
 }
 /* Estilo base del switch */
 .switch {
@@ -2347,23 +2269,7 @@ input:checked + .slider::before {
   font-size: 12px;
   color: #888;
 }
-#batchesSection #createCandidateBtn {
-  position: static !important;
-  margin: 12px 0 20px 0;
-}
-/* Centra la flecha dentro de cualquier popup */
-.popup-content .arrow-btn,
-#goToCreateCandidateBtn.arrow-btn {
-  display: inline-flex;
-  margin: 8px auto 0;    /* ← centra horizontal */
-  align-self: center;    /* ← centra en contenedor flex column */
-  width: 48px;
-  height: 48px;
-}
 
-#precreate-no-match { 
-  text-align: center;    /* por si la flecha vive dentro de este bloque */
-}
 /* ===== Career Publish popup: layout grande y orden ===== */
 #publishCareerPopup .popup-content{
   width: min(1100px, 92vw) !important;

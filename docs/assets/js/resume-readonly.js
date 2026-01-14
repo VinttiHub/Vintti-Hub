@@ -11,6 +11,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       bodyEl.style.backgroundColor = "#fff";
       bodyEl.style.paddingTop = "32px";
       bodyEl.style.paddingBottom = "48px";
+      const watermarkLayer = document.createElement("div");
+      Object.assign(watermarkLayer.style, {
+        position: "fixed",
+        inset: "0",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+        zIndex: "9999",
+      });
+      const watermark = document.createElement("div");
+      watermark.textContent = "vintti";
+      Object.assign(watermark.style, {
+        fontSize: "220px",
+        fontWeight: "700",
+        color: "#003BFF",
+        opacity: "0.12",
+        textTransform: "lowercase",
+        letterSpacing: "12px",
+        userSelect: "none",
+        transform: "rotate(-18deg)",
+        textShadow: "0 10px 30px rgba(0,59,255,0.15)",
+      });
+      watermarkLayer.appendChild(watermark);
+      bodyEl.appendChild(watermarkLayer);
     }
     const header = document.querySelector(".cv-header");
     if (header) header.remove();
@@ -447,12 +472,12 @@ if (languages.length === 0) {
 // 📹 Video Link
 const videoSection = document.getElementById("videoLinkSection");
 const videoDiv = document.getElementById("readonly-video-link");
-if (data.video_link && data.video_link.trim() !== "") {
-  if (isPdfExport) {
-    const linkText = document.createElement("div");
-    linkText.className = "video-link-button";
-    linkText.style.background = "transparent";
-    linkText.style.border = "none";
+  if (data.video_link && data.video_link.trim() !== "") {
+    if (isPdfExport) {
+      const linkText = document.createElement("div");
+      linkText.className = "video-link-button";
+      linkText.style.background = "transparent";
+      linkText.style.border = "none";
     linkText.style.padding = "0";
     linkText.style.boxShadow = "none";
     linkText.style.color = "#003BFF";
@@ -478,6 +503,24 @@ if (data.video_link && data.video_link.trim() !== "") {
   }
 } else if (videoSection) {
   videoSection.style.display = "none";
+}
+
+if (isPdfExport) {
+  const container = document.querySelector(".cv-container");
+  if (container) {
+    const pdfFooter = document.createElement("div");
+    pdfFooter.className = "pdf-footer-note";
+    pdfFooter.textContent = "Powered by Vintti · All rights reserved.";
+    Object.assign(pdfFooter.style, {
+      textAlign: "center",
+      marginTop: "40px",
+      fontSize: "13px",
+      color: "#9ca3af",
+      textTransform: "uppercase",
+      letterSpacing: "0.2em",
+    });
+    container.appendChild(pdfFooter);
+  }
 }
     notifyParent(true);
   } catch (error) {

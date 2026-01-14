@@ -447,43 +447,8 @@ async function getCandidatesCached() {
 // 🔥 Precalienta en cuanto carga la página (mitiga cold start del backend)
 document.addEventListener('DOMContentLoaded', () => { getCandidatesCached(); });
 
-document.addEventListener('DOMContentLoaded', () => {
-  // 🔹 Mostrar popup para elegir acción
-document.getElementById('createCandidateBtn').addEventListener('click', () => {
-  document.getElementById('chooseCandidateActionPopup').classList.remove('hidden');
-});
-document.getElementById('closeSignOffPopup').addEventListener('click', () => {
-  document.getElementById('signOffPopup').classList.add('hidden');
-});
-
-// 🔹 Cerrar popup de elección
-document.getElementById('closeChoosePopup').addEventListener('click', () => {
-  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
-});
-
-document.getElementById('openNewCandidatePopup').addEventListener('click', () => {
-  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
-
-  // Mostrar campos
-  document.getElementById('extra-fields').style.display = 'block';
-  document.getElementById('popupcreateCandidateBtn').style.display = 'block';
-  document.getElementById('popupAddExistingBtn').style.display = 'none';
-  const nameWarning = document.getElementById('name-warning');
-  if (nameWarning) {
-    nameWarning.style.display = 'none'; // o 'block' si es el otro caso
-  }
-  document.getElementById('name-warning').style.display = 'none';
-  document.getElementById('pipelineCandidateSearchResults').innerHTML = '';
-
-  // Campo de nombre como input normal (sin buscador)
-  const input = document.getElementById('candidate-name');
-  input.value = '';
-  input.placeholder = 'Full name';
-  input.removeAttribute('data-candidate-id');
-
-  // ⚠️ Eliminar cualquier buscador anterior
-  const newInput = input.cloneNode(true);
-  input.parentNode.replaceChild(newInput, input);
+document.getElementById('closeSignOffPopup')?.addEventListener('click', () => {
+  document.getElementById('signOffPopup')?.classList.add('hidden');
 });
 function getOpportunityIdStrict(){
   // tu helper ya hace esto, pero dejo versión corta que se apoya en el mismo <span>
@@ -566,104 +531,6 @@ document.getElementById('delete-career-btn')?.addEventListener('click', () => {
   if (confirm('⚠️ Set Action = “Borrar” for all rows with this Job ID?')) {
     setSheetActionForOpportunity('Borrar');
   }
-});
-
-function openPreCreateModal() {
-  document.getElementById('chooseCandidateActionPopup').classList.add('hidden');
-  document.getElementById('preCreateCheckPopup').classList.remove('hidden');
-
-  const input = document.getElementById('precreate-search');
-  const results = document.getElementById('precreate-results');
-  const foundMsg = document.getElementById('precreate-found-msg');
-  const noMatch = document.getElementById('precreate-no-match');
-
-  input.value = '';
-  results.innerHTML = '';
-  foundMsg.style.display = 'none';
-  noMatch.style.display = 'none';
-
-  // Un (1) único listener siempre, sin duplicados en reaperturas
-  input.oninput = quickDebounce(async () => {
-    const termRaw = input.value.trim();
-    const term = norm(termRaw);
-    results.innerHTML = '';
-    foundMsg.style.display = 'none';
-    noMatch.style.display = 'none';
-    if (!term || term.length < 2) return;
-
-    const tokens = term.split(/\s+/).filter(Boolean);
-    const { idx } = await getCandidatesCached();
-
-    // filtro ultra rápido + top 50 para no saturar el DOM
-    const matches = [];
-    for (const c of idx) {
-      if (tokens.every(t => c._haystack.includes(t))) {
-        matches.push(c);
-        if (matches.length >= 50) break;
-      }
-    }
-
-    if (!matches.length && term.length >= 3) {
-      noMatch.style.display = 'block';
-      return;
-    }
-
-    foundMsg.style.display = 'block';
-    for (const c of matches) {
-      const li = document.createElement('li');
-      li.className = 'search-result-item';
-      li.dataset.candidateId = c.candidate_id;
-      li.innerHTML = `
-        <div style="font-weight:600;">${c.name || '(no name)'}</div>
-        <div style="font-size:12px;color:#666;">🔍 Match</div>
-      `;
-      li.addEventListener('click', async () => {
-        const opportunityId = getOpportunityId();
-        if (!opportunityId || !c.candidate_id) return alert('❌ Invalid candidate or opportunity');
-
-        await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidate_id: c.candidate_id })
-        });
-
-        const tpl = document.getElementById('candidate-card-template');
-        const frag = tpl.content.cloneNode(true);
-        frag.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
-        frag.querySelector('.candidate-email').textContent = c.email || '';
-        frag.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
-        frag.querySelector('.candidate-status-dropdown')?.remove();
-        document.querySelector('#contacted').appendChild(frag);
-
-        document.getElementById('preCreateCheckPopup').classList.add('hidden');
-        showFriendlyPopup(`✅ ${c.name} added to pipeline`);
-        loadPipelineCandidates?.();
-      });
-      results.appendChild(li);
-    }
-  }, 120);
-}
-
-document.getElementById('openNewCandidatePopup').addEventListener('click', openPreCreateModal);
-
-
-document.getElementById('goToCreateCandidateBtn').addEventListener('click', () => {
-  document.getElementById('preCreateCheckPopup').classList.add('hidden');
-  document.getElementById('candidatePopup').classList.remove('hidden');
-
-  document.getElementById('extra-fields').style.display = 'block';
-  document.getElementById('popupcreateCandidateBtn').style.display = 'block';
-  document.getElementById('popupAddExistingBtn').style.display = 'none';
-
-  const input = document.getElementById('candidate-name');
-  const precreateValue = document.getElementById('precreate-search').value;
-
-  input.value = precreateValue || ''; // copiar el valor buscado si existe
-  input.placeholder = 'Full name';
-  input.removeAttribute('data-candidate-id');
-});
-document.getElementById('closePreCreatePopup').addEventListener('click', () => {
-  document.getElementById('preCreateCheckPopup').classList.add('hidden');
 });
 
 // 🔹 Agregar candidato existente al pipeline
@@ -2223,12 +2090,6 @@ async function publishCareerNow() {
     btn.textContent = 'Publish';
   }
 }
-
-
-
-
-
-});
 
 async function loadOpportunityData() {
   const params = new URLSearchParams(window.location.search);
