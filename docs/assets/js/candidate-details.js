@@ -932,7 +932,7 @@ function updateLinkedInUI(raw) {
     const flags = {
       "Argentina":"🇦🇷","Bolivia":"🇧🇴","Brazil":"🇧🇷","Chile":"🇨🇱","Colombia":"🇨🇴","Costa Rica":"🇨🇷",
       "Cuba":"🇨🇺","Dominican Republic":"🇩🇴","Ecuador":"🇪🇨","El Salvador":"🇸🇻","Guatemala":"🇬🇹",
-      "Honduras":"🇭🇳","Mexico":"🇲🇽","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
+      "Honduras":"🇭🇳","Mexico":"🇲🇽","United States":"🇺🇸","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
       "Uruguay":"🇺🇾","Venezuela":"🇻🇪"
     };
     return flags[countryName] || '';
@@ -1924,6 +1924,26 @@ function wireVideoLinkDedupe() {
     busy: false
   };
 
+  async function ensureBlacklistId() {
+    if (state.blacklistId) return state.blacklistId;
+    try {
+      const resp = await fetch(
+        `${API}/api/blacklist/status?candidate_id=${state.candidateId}`,
+        { cache: 'no-store' }
+      );
+      if (!resp.ok) return null;
+      const payload = await resp.json();
+      const serverId = payload?.blacklist_id || null;
+      if (serverId) {
+        state.blacklistId = serverId;
+      }
+      return serverId;
+    } catch (err) {
+      console.error('❌ Unable to refresh blacklist id before deletion', err);
+      return null;
+    }
+  }
+
   function setStatusMessage(message) {
     if (!statusText) return;
     statusText.textContent = message;
@@ -1984,12 +2004,15 @@ function wireVideoLinkDedupe() {
           state.blacklistId = payload?.blacklist_id || state.blacklistId;
         }
         showCuteToast('Candidate added to blacklist ⚠️', 4000);
-      } else if (state.blacklistId) {
-        const resp = await fetch(`${API}/api/blacklist/${state.blacklistId}`, { method: 'DELETE' });
-        if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to delete blacklist entry'));
-        state.blacklistId = null;
-        showCuteToast('Candidate removed from blacklist ✅', 4000);
       } else {
+        const blacklistId = state.blacklistId || (await ensureBlacklistId());
+        if (blacklistId) {
+          const resp = await fetch(`${API}/api/blacklist/${blacklistId}`, { method: 'DELETE' });
+          if (!resp.ok) throw new Error(await resp.text().catch(() => 'Failed to delete blacklist entry'));
+        } else {
+          console.warn('⚠️ No blacklist entry found for candidate, skipping delete');
+        }
+        state.blacklistId = null;
         showCuteToast('Candidate removed from blacklist ✅', 4000);
       }
       state.isBlacklisted = shouldBlacklist;

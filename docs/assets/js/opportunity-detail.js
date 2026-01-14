@@ -1257,7 +1257,7 @@ let toolsChoices = null;
 const LATAM_COUNTRIES = [
   "Latin America", 
   "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Ecuador",
-  "El Salvador","Guatemala","Honduras","Mexico","Nicaragua","Panama","Paraguay",
+  "El Salvador","Guatemala","Honduras","Mexico","United States","Nicaragua","Panama","Paraguay",
   "Peru","Puerto Rico","Dominican Republic","Uruguay","Venezuela"
 ];
 
@@ -1276,6 +1276,7 @@ const CITIES_BY_COUNTRY = {
   "Guatemala": ["Guatemala City","Quetzaltenango","Mixco"],
   "Honduras": ["Tegucigalpa","San Pedro Sula","La Ceiba"],
   "Mexico": ["Mexico City","Guadalajara","Monterrey","Puebla","Querétaro","Tijuana"],
+  "United States": ["New York","Los Angeles","Chicago","Miami","San Francisco"],
   "Nicaragua": ["Managua","León","Masaya"],
   "Panama": ["Panama City","Colón","David"],
   "Paraguay": ["Asunción","Ciudad del Este","Encarnación"],
@@ -2885,7 +2886,7 @@ function getFlagEmoji(country) {
     "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
     "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Ecuador": "🇪🇨",
     "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "Mexico": "🇲🇽",
-    "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
+    "United States": "🇺🇸", "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
     "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
   };
   return flags[country] || "";

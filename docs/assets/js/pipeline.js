@@ -2,7 +2,7 @@
 const WA_countryToCodeMap = {
   "Argentina": "54","Bolivia": "591","Brazil": "55","Chile": "56","Colombia": "57",
   "Costa Rica": "506","Cuba": "53","Ecuador": "593","El Salvador": "503","Guatemala": "502",
-  "Honduras": "504","Mexico": "52","Nicaragua": "505","Panama": "507","Paraguay": "595",
+  "Honduras": "504","Mexico": "52","United States": "1","Nicaragua": "505","Panama": "507","Paraguay": "595",
   "Peru": "51","Puerto Rico": "1","Dominican Republic": "1","Uruguay": "598","Venezuela": "58"
 };
 
@@ -411,6 +411,7 @@ const countryToCodeMap = {
   "Guatemala": "502",
   "Honduras": "504",
   "Mexico": "52",
+  "United States": "1",
   "Nicaragua": "505",
   "Panama": "507",
   "Paraguay": "595",
@@ -756,6 +757,7 @@ function getFlagEmoji(country) {
     "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
     "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Ecuador": "🇪🇨",
     "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "Mexico": "🇲🇽",
+    "United States": "🇺🇸",
     "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
     "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
   };

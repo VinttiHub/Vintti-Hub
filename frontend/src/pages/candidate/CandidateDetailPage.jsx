@@ -576,6 +576,7 @@ const COUNTRIES = [
   'Guatemala',
   'Honduras',
   'Mexico',
+  'United States',
   'Nicaragua',
   'Panama',
   'Paraguay',

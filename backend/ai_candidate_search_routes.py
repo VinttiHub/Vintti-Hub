@@ -9,8 +9,9 @@ from typing import Optional
 
 # --- LATAM / Central America location gate ---
 LATAM_COUNTRIES = [
-    # Central America
+    # North & Central America
     ("Mexico","MX"), 
+    ("United States","US"),
     # South America
     ("Colombia","CO"), ("Ecuador","EC"), ("Peru","PE"), ("Bolivia","BO"),
     ("Chile","CL"), ("Argentina","AR"), ("Uruguay","UY"), ("Paraguay","PY"), ("Brazil","BR"),

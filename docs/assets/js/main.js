@@ -4,6 +4,16 @@
 let _interviewingOppId = null;
 let _interviewingDropdownEl = null;
 
+const STAGE_ORDER_PRIORITY = [
+  'Negotiating',
+  'Sourcing',
+  'Interviewing',
+  'NDA Sent',
+  'Deep Dive',
+  'Close Win',
+  'Closed Lost'
+];
+
 function openInterviewingPopup(opportunityId, dropdownElement) {
   _interviewingOppId = Number(opportunityId);
   _interviewingDropdownEl = dropdownElement;
@@ -651,15 +661,7 @@ document.querySelectorAll('.filter-header button').forEach(button => {
       }
 
     // 👇 Orden de etapas personalizado
-    const stageOrder = [
-      'Negotiating',
-      'Interviewing',
-      'Sourcing',
-      'NDA Sent',
-      'Deep Dive',
-      'Close Win',
-      'Closed Lost'
-    ];
+    const stageOrder = STAGE_ORDER_PRIORITY;
 
     // 👇 Agrupar oportunidades por stage
     const grouped = {};
@@ -915,7 +917,14 @@ const emailToNameMap = { ...(window.userDirectoryByEmail || {}) };
 });
 
 // STAGES (igual que antes)
-const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))];
+const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))].sort((a, b) => {
+  const idxA = STAGE_ORDER_PRIORITY.indexOf(a);
+  const idxB = STAGE_ORDER_PRIORITY.indexOf(b);
+  if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+  if (idxA === -1) return 1;
+  if (idxB === -1) return -1;
+  return idxA - idxB;
+});
 
 // SALES LEAD: agrega 'Unassigned' si hay filas sin nombre
 let uniqueSalesLeads = [...new Set(data.map(d => d.sales_lead_name).filter(Boolean))];

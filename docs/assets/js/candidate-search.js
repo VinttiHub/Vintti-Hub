@@ -104,10 +104,11 @@ async function coresignalSearch(parsed, page = 1, locationOverride = null){
 
 async function coresignalMultiSearch(parsed){
   const order = [
-    { tag: '🇲🇽 Mexico',       loc: 'Mexico'    },
-    { tag: '🇦🇷 Argentina',    loc: 'Argentina' },
-    { tag: '🇨🇴 Colombia',     loc: 'Colombia'  },
-    { tag: '🌎 General LATAM', loc: null }      // null → gate LATAM en backend
+    { tag: '🇲🇽 Mexico',       loc: 'Mexico'        },
+    { tag: '🇺🇸 United States',loc: 'United States' },
+    { tag: '🇦🇷 Argentina',    loc: 'Argentina'     },
+    { tag: '🇨🇴 Colombia',     loc: 'Colombia'      },
+    { tag: '🌎 General LATAM', loc: null }          // null → gate LATAM en backend
   ];
 
   const seen = new Set();
@@ -171,11 +172,11 @@ function renderCs(items, {append=false}={}){
   }
   csEmpty.classList.add('hidden');
 
-  // 🔥 Ordenar por país: 1) México 2) Argentina 3) Colombia 4) resto
+  // 🔥 Ordenar por país: 1) México 2) United States 3) Argentina 4) Colombia 5) resto
   const countryPriority = (it) => {
     const raw = (it.country || '').toString().toLowerCase();
 
-    if (!raw) return 4;
+    if (!raw) return 5;
 
     // México
     if (
@@ -185,20 +186,28 @@ function renderCs(items, {append=false}={}){
       raw === 'mex'
     ) return 1;
 
+    // United States
+    if (
+      raw.includes('united states') ||
+      raw.includes('usa') ||
+      raw.includes('u.s.') ||
+      raw === 'us'
+    ) return 2;
+
     // Argentina
     if (
       raw.includes('argentina') ||
       raw === 'ar'
-    ) return 2;
+    ) return 3;
 
     // Colombia
     if (
       raw.includes('colombia') ||
       raw === 'co'
-    ) return 3;
+    ) return 4;
 
     // resto de países
-    return 4;
+    return 5;
   };
 
   const sorted = [...items].sort((a, b) => {
@@ -335,14 +344,19 @@ function renderChips({ title, tools, years_experience, location }){
   }
   chips.classList.remove('hidden');
 }
-// 👇 prioridad por país: 1) Mexico 2) Argentina 3) Colombia 4) resto
+// 👇 prioridad por país: 1) Mexico 2) United States 3) Argentina 4) Colombia 5) resto
 const countryRank = (country) => {
   const c = (country || '').toLowerCase();
 
-  if (c.includes('mexico'))   return 1; // México primero
-  if (c.includes('argentina'))return 2; // luego Argentina
-  if (c.includes('colombia')) return 3; // luego Colombia
-  return 4;                               // el resto
+  if (c.includes('mexico'))        return 1; // México primero
+  if (
+    c.includes('united states') ||
+    c.includes('usa') ||
+    c.includes('u.s.')
+  ) return 2;                                  // luego United States
+  if (c.includes('argentina'))     return 3; // luego Argentina
+  if (c.includes('colombia'))      return 4; // luego Colombia
+  return 5;                                   // el resto
 };
 
 function applyExperienceFilterAndRender(){

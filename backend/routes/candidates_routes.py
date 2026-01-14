@@ -157,13 +157,16 @@ def _blacklist_linkedin_source_expr(has_linkedin_normalized, table_alias=None):
     return base_column
 
 
-def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm):
-    columns = _get_blacklist_columns(conn)
+def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm, blacklist_id_override=None, columns=None):
+    columns = columns or _get_blacklist_columns(conn)
     insert_columns = []
     values = []
 
     for column in columns:
         if column == 'blacklist_id':
+            if blacklist_id_override is not None:
+                insert_columns.append('blacklist_id')
+                values.append(blacklist_id_override)
             continue
 
         value = None
@@ -2204,7 +2207,20 @@ def create_blacklist_entry():
         if existing:
             return jsonify(existing), 200
 
-        insert_columns, values = _build_blacklist_insert_payload(conn, candidate, linkedin_norm)
+        blacklist_columns = _get_blacklist_columns(conn)
+        next_blacklist_id = None
+        if 'blacklist_id' in blacklist_columns:
+            cursor.execute("SELECT COALESCE(MAX(blacklist_id), 0) + 1 AS next_id FROM blacklist")
+            row = cursor.fetchone() or {}
+            next_blacklist_id = row.get('next_id') or 1
+
+        insert_columns, values = _build_blacklist_insert_payload(
+            conn,
+            candidate,
+            linkedin_norm,
+            blacklist_id_override=next_blacklist_id,
+            columns=blacklist_columns
+        )
         if not insert_columns:
             return jsonify({'error': 'Blacklist table has no columns to insert'}), 500
 

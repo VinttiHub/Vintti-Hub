@@ -22,7 +22,7 @@ const providers = { quipteams: "Quipteams", bord: "Bord" };
 const LATAM_COUNTRIES = [
   "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba",
   "Dominican Republic","Ecuador","El Salvador","Guatemala","Haiti","Honduras",
-  "Mexico","Nicaragua","Panama","Paraguay","Peru","Puerto Rico","Uruguay","Venezuela"
+  "Mexico","United States","Nicaragua","Panama","Paraguay","Peru","Puerto Rico","Uruguay","Venezuela"
 ];
 
 // ============================================================
@@ -107,7 +107,7 @@ const COUNTRY_FLAGS = {
   "Argentina":"🇦🇷","Bolivia":"🇧🇴","Brazil":"🇧🇷","Chile":"🇨🇱","Colombia":"🇨🇴",
   "Costa Rica":"🇨🇷","Cuba":"🇨🇺","Dominican Republic":"🇩🇴","Ecuador":"🇪🇨",
   "El Salvador":"🇸🇻","Guatemala":"🇬🇹","Haiti":"🇭🇹","Honduras":"🇭🇳",
-  "Mexico":"🇲🇽","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
+  "Mexico":"🇲🇽","United States":"🇺🇸","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
   "Puerto Rico":"🇵🇷","Uruguay":"🇺🇾","Venezuela":"🇻🇪"
 };
 function flagEmoji(country){ return COUNTRY_FLAGS[country] || ""; }

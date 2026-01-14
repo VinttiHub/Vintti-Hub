@@ -12,6 +12,7 @@ import {
 const EXPERIENCE_OPTIONS = Array.from({ length: 11 }, (_, i) => i);
 const CORESIGNAL_LOCATIONS = [
   { tag: '🇲🇽 Mexico', location: 'Mexico' },
+  { tag: '🇺🇸 United States', location: 'United States' },
   { tag: '🇦🇷 Argentina', location: 'Argentina' },
   { tag: '🇨🇴 Colombia', location: 'Colombia' },
   { tag: '🌎 LATAM', location: null },
