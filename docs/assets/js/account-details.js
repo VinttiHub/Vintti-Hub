@@ -156,7 +156,12 @@ async function refreshAccountDerivedFields() {
   const normalizedManager = (base.account_manager || '').toString().toLowerCase().trim();
   if (derivedStatus) {
     const normalizedStatus = derivedStatus.toLowerCase();
-    if (normalizedStatus === 'active client' || normalizedStatus === 'lead in process') {
+    if (normalizedStatus === 'active client') {
+      const laraEmail = 'lara@vintti.com';
+      if (normalizedManager !== laraEmail) {
+        patch.account_manager = laraEmail;
+      }
+    } else if (normalizedStatus === 'lead in process') {
       const suggested = await fetchSuggestedSalesLead(base.account_id);
       if (suggested && suggested !== normalizedManager) {
         patch.account_manager = suggested;
