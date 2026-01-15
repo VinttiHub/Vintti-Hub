@@ -20,16 +20,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         opacity: "0.08",
         mixBlendMode: "multiply",
       });
-      const svgMarkup = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500">
-          <text x="-50" y="300" fill="rgba(0,59,255,0.45)" font-size="120" font-family="Onest, sans-serif" font-weight="700" transform="rotate(-30 0 250)">
-            VINTTI
-          </text>
-        </svg>`;
-      watermarkLayer.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svgMarkup)}")`;
-      watermarkLayer.style.backgroundRepeat = "repeat";
-      watermarkLayer.style.backgroundSize = "520px 520px";
-      watermarkLayer.style.transform = "translateZ(0)";
+      const singleMark = document.createElement("div");
+      singleMark.textContent = "VINTTI";
+      Object.assign(singleMark.style, {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%) rotate(-32deg)",
+        fontSize: "360px",
+        fontWeight: "700",
+        color: "rgba(0,59,255,0.08)",
+        letterSpacing: "40px",
+        userSelect: "none",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+      });
+      watermarkLayer.appendChild(singleMark);
       bodyEl.appendChild(watermarkLayer);
     }
     const header = document.querySelector(".cv-header");
