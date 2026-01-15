@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         position: "fixed",
         inset: "0",
         pointerEvents: "none",
-        zIndex: "0",
+        zIndex: "2",
         opacity: "0.08",
         mixBlendMode: "multiply",
       });
@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const container = document.querySelector(".cv-container");
     if (container) {
       container.style.position = "relative";
-      container.style.zIndex = "5";
+      container.style.zIndex = "1";
     }
   }
 
