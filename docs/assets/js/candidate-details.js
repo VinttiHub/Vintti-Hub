@@ -464,7 +464,7 @@ function normalizeDateForAPI(ymd) {
   return `${s}T12:00:00`;
 }
 
-const INACTIVE_EMAIL_TO = ('lara@vintti.com', 'angie@vintti.com');
+const INACTIVE_EMAIL_TO = ['angie@vintti.com', 'lara@vintti.com'];
 const SEND_EMAIL_ENDPOINT = 'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email';
 let candidateOverviewData = null;
 
@@ -480,32 +480,47 @@ function notifyCandidateInactiveEmail({
 
   const displayName = (candidateName || '').trim() || `Candidate #${candidateId}`;
   const subject = `Inactive candidate – ${displayName}`;
-  const contextLines = [
-    clientName ? `Client: ${clientName}` : '',
-    roleName ? `Role: ${roleName}` : '',
-    opportunityId ? `Opportunity ID: ${opportunityId}` : ''
-  ].filter(Boolean);
+  const detailRows = [
+    { label: 'End date', value: endDate },
+    { label: 'Client', value: clientName },
+    { label: 'Role', value: roleName },
+    { label: 'Opportunity ID', value: opportunityId }
+  ].filter(item => item.value);
 
-  const bodyLines = [
-'Hi Lara,',
-'',
-`${displayName} has just been marked as inactive.`,
-`End date: ${endDate}`,
-...contextLines,
-'',
-'Please proceed with billing adjustments and coordinate the laptop pickup.',
-'',
-'Thanks,',
-'Vintti Hub'
-  ].filter(Boolean);
+  const detailHtml = detailRows.length
+    ? `<div style="background:#f5f7fa;border-radius:14px;padding:18px 20px;margin:0 0 20px;">
+        ${detailRows.map(item => `<p style="margin:0 0 10px;font-size:15px;color:#111927;">
+          <span style="font-weight:600;">${item.label}:</span> ${item.value}
+        </p>`).join('')}
+      </div>`
+    : '';
+
+  const htmlBody = `
+    <div style="font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#243B53;">
+      <p style="margin:0 0 18px;font-size:16px;">Hi Lara,</p>
+      <p style="margin:0 0 18px;">
+        <strong>${displayName}</strong> has just been marked as
+        <strong style="color:#b42318;">inactive</strong>.
+      </p>
+      ${detailHtml}
+      <p style="margin:0 0 16px;">
+        Please proceed with the <strong>billing adjustments</strong> and coordinate the
+        <strong>laptop pickup</strong> with the client.
+      </p>
+      <p style="margin:0;font-size:14px;color:#52606d;">
+        Thanks,<br/>
+        <strong>Vintti Hub</strong>
+      </p>
+    </div>
+  `.trim();
 
   return fetch(SEND_EMAIL_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      to: [INACTIVE_EMAIL_TO],
+      to: INACTIVE_EMAIL_TO,
       subject,
-      body: bodyLines.join('\n')
+      body: htmlBody
     })
   })
   .then(res => {
