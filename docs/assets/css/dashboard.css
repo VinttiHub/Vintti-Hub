@@ -218,6 +218,66 @@ body{
 }
 .metrics-value{ font-size:2rem; font-weight:800; color:#111827; }
 .metrics-sub{ font-size:.92rem; color:var(--muted); }
+.metrics-count{
+  font-size:.85rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:#475569;
+}
+.metrics-card--revenue{
+  position:relative;
+  overflow:hidden;
+  border-radius:22px;
+  background:linear-gradient(145deg, rgba(255,255,255,.75), rgba(255,255,255,.55));
+  border:1px solid rgba(251,146,60,.3);
+  box-shadow:0 14px 36px rgba(251,146,60,.15);
+}
+.metrics-card--revenue::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:22px;
+  padding:1px;
+  background:linear-gradient(135deg,#f97316,#fb7185,#facc15);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+}
+.metrics-card--revenue .metrics-tile{
+  border-color:rgba(249,115,22,.25);
+  background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(254,249,241,.9));
+  box-shadow:0 16px 40px rgba(249,115,22,.15);
+}
+.metrics-card--revenue .metrics-label{ color:#9a3412; }
+.metrics-card--revenue .metrics-value{ color:#c2410c; }
+.metrics-card--active{
+  position:relative;
+  overflow:hidden;
+  border-radius:22px;
+  background:linear-gradient(145deg, rgba(255,255,255,.8), rgba(240,253,250,.7));
+  border:1px solid rgba(34,197,94,.28);
+  box-shadow:0 18px 44px rgba(16,185,129,.16);
+}
+.metrics-card--active::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:22px;
+  padding:1px;
+  background:linear-gradient(135deg,#4ade80,#14b8a6,#22c55e);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+}
+.metrics-card--active .metrics-tile{
+  border-color:rgba(16,185,129,.24);
+  background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(240,253,244,.9));
+  box-shadow:0 16px 42px rgba(16,185,129,.14);
+}
+.metrics-card--active .metrics-label{ color:#166534; }
+.metrics-card--active .metrics-value{ color:#15803d; }
 
 /* ========================
    8) EXPECTED CARD (distinct look)

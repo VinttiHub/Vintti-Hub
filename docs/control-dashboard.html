@@ -157,7 +157,7 @@
       <!-- =====================================================
            CARD: Recruiting Revenue Snapshots
            ===================================================== -->
-      <section class="card glass metrics-card" id="recruitingRevenueCard">
+      <section class="card glass metrics-card metrics-card--revenue" id="recruitingRevenueCard">
         <div class="card-head card-head--center">
           <h2>Recruiting Revenue</h2>
           <div class="muted">Rolling 30 days vs. previous month</div>
@@ -167,11 +167,13 @@
             <div class="metrics-label">Last 30 days</div>
             <div class="metrics-value" id="recRevenueLast30Value">—</div>
             <div class="metrics-sub" id="recRevenueLast30Dates">—</div>
+            <div class="metrics-count" id="recRevenueLast30Accounts">— accounts</div>
           </button>
           <button class="metrics-tile" type="button" data-range="previousMonth">
             <div class="metrics-label">Previous month</div>
             <div class="metrics-value" id="recRevenuePrevValue">—</div>
             <div class="metrics-sub" id="recRevenuePrevDates">—</div>
+            <div class="metrics-count" id="recRevenuePrevAccounts">— accounts</div>
           </button>
         </div>
       </section>
@@ -179,7 +181,7 @@
       <!-- =====================================================
            CARD: Active Employees Snapshot
            ===================================================== -->
-      <section class="card glass metrics-card" id="activeEmployeesCard">
+      <section class="card glass metrics-card metrics-card--active" id="activeEmployeesCard">
         <div class="card-head card-head--center">
           <h2>Active Employees</h2>
           <div class="muted" id="activeEmployeesAsOf">As of —</div>
@@ -188,11 +190,13 @@
           <button class="metrics-tile" type="button" data-model="staffing">
             <div class="metrics-label">Staffing</div>
             <div class="metrics-value" id="activeStaffingValue">—</div>
+            <div class="metrics-count" id="activeStaffingAccounts">— accounts</div>
             <div class="metrics-sub">Click to explore</div>
           </button>
           <button class="metrics-tile" type="button" data-model="recruiting">
             <div class="metrics-label">Recruiting</div>
             <div class="metrics-value" id="activeRecruitingValue">—</div>
+            <div class="metrics-count" id="activeRecruitingAccounts">— accounts</div>
             <div class="metrics-sub">Click to explore</div>
           </button>
         </div>

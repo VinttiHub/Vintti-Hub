@@ -52,6 +52,12 @@ function fmtInteger(v){
   return INTEGER_FORMATTER.format(num);
 }
 
+function formatCount(value, singular, plural){
+  const count = Number(value) || 0;
+  const label = count === 1 ? singular : plural;
+  return `${fmtInteger(count)} ${label}`;
+}
+
 function parseISODate(value){
   if (!value) return null;
   const d = new Date(value);
@@ -674,13 +680,19 @@ function renderRecruitingRevenueCard(summary){
 
   const last30Val = document.getElementById('recRevenueLast30Value');
   const last30Dates = document.getElementById('recRevenueLast30Dates');
+  const last30Accounts = document.getElementById('recRevenueLast30Accounts');
+  const last30Count = Array.isArray(last30.accounts) ? last30.accounts.length : 0;
   if (last30Val) last30Val.textContent = fmtMoney(last30.total || 0);
   if (last30Dates) last30Dates.textContent = formatRangeLabel(last30);
+  if (last30Accounts) last30Accounts.textContent = formatCount(last30Count, 'account', 'accounts');
 
   const prevVal = document.getElementById('recRevenuePrevValue');
   const prevDates = document.getElementById('recRevenuePrevDates');
+  const prevAccounts = document.getElementById('recRevenuePrevAccounts');
+  const prevCount = Array.isArray(prev.accounts) ? prev.accounts.length : 0;
   if (prevVal) prevVal.textContent = fmtMoney(prev.total || 0);
   if (prevDates) prevDates.textContent = formatRangeLabel(prev);
+  if (prevAccounts) prevAccounts.textContent = formatCount(prevCount, 'account', 'accounts');
 }
 
 function renderActiveEmployeesCard(summary){
@@ -698,11 +710,17 @@ function renderActiveEmployeesCard(summary){
 
   const staffingTotal = summary.staffing?.total ?? 0;
   const recruitingTotal = summary.recruiting?.total ?? 0;
+  const staffingAccounts = Array.isArray(summary.staffing?.accounts) ? summary.staffing.accounts.length : 0;
+  const recruitingAccounts = Array.isArray(summary.recruiting?.accounts) ? summary.recruiting.accounts.length : 0;
 
   const staffEl = document.getElementById('activeStaffingValue');
   const recEl = document.getElementById('activeRecruitingValue');
+  const staffAccountsEl = document.getElementById('activeStaffingAccounts');
+  const recAccountsEl = document.getElementById('activeRecruitingAccounts');
   if (staffEl) staffEl.textContent = fmtInteger(staffingTotal);
   if (recEl) recEl.textContent = fmtInteger(recruitingTotal);
+  if (staffAccountsEl) staffAccountsEl.textContent = formatCount(staffingAccounts, 'account', 'accounts');
+  if (recAccountsEl) recAccountsEl.textContent = formatCount(recruitingAccounts, 'account', 'accounts');
 }
 
 function openRecruitingRevenueDetail(rangeKey){
