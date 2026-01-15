@@ -2412,18 +2412,14 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
     const iframe = document.createElement('iframe');
     iframe.src = src;
     iframe.setAttribute('aria-hidden', 'true');
-    Object.assign(iframe.style, {
-      position: 'fixed',
-      left: '0',
-      top: '0',
-      width: '1200px',
-      height: '1600px',
-      opacity: '0',
-      pointerEvents: 'none',
-      border: '0',
-      zIndex: '-1',
-      backgroundColor: 'transparent',
-    });
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-2000px';
+    iframe.style.top = '0';
+    iframe.style.width = '1200px';
+    iframe.style.height = '1600px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.border = '0';
     return iframe;
   };
 
