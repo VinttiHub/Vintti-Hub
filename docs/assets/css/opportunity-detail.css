@@ -621,6 +621,40 @@ body {
   padding-bottom: 8px;
 }
 
+/* Friendly toast shown when backward moves are blocked */
+.pipeline-restriction-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 24px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-weight: 500;
+  font-size: 0.95rem;
+  box-shadow: 0 15px 30px rgba(15, 23, 42, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 2100;
+  cursor: pointer;
+}
+
+.pipeline-restriction-toast.show {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.pipeline-restriction-toast__emoji {
+  font-size: 1.2rem;
+}
+
 /* cada columna reparte el ancho disponible y puede encogerse “a cero” */
 .column{
   flex: 1 1 0;            /* crecer y encoger a partes iguales */

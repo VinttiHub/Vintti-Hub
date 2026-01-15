@@ -20,7 +20,8 @@ const PHONE_CODE_BY_COUNTRY = {
   'Dominican Republic': '1',
   Uruguay: '598',
   Venezuela: '58',
-  'United States': '1'
+  'United States': '1',
+  Canada: '1'
 };
 
 const COUNTRY_FLAG_BY_NAME = {
@@ -44,11 +45,123 @@ const COUNTRY_FLAG_BY_NAME = {
   'Dominican Republic': '🇩🇴',
   Uruguay: '🇺🇾',
   Venezuela: '🇻🇪',
-  'United States': '🇺🇸'
+  'United States': '🇺🇸',
+  Canada: '🇨🇦'
 };
 
 const COUNTRY_NAMES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
 const DEFAULT_PHONE_COUNTRY = 'Argentina';
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+  { code: 'DC', name: 'District of Columbia' }
+];
+const US_STATE_MAP = US_STATES.reduce((acc, state) => {
+  acc[state.code] = state.name;
+  return acc;
+}, {});
+const US_STATE_LABEL_TO_CODE = US_STATES.reduce((acc, state) => {
+  const label = `${state.name} (${state.code})`.toLowerCase();
+  acc[label] = state.code;
+  acc[state.code.toLowerCase()] = state.code;
+  return acc;
+}, {});
+const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+
+function normalizeCountryKey(country) {
+  const value = (country || '').trim();
+  if (!value) return '';
+  const match = USA_STATE_REGEX.exec(value);
+  if (match) return 'United States';
+  if (value.toUpperCase() === 'USA') return 'United States';
+  return value;
+}
+
+function extractUsStateCode(country) {
+  const match = USA_STATE_REGEX.exec(country || '');
+  return match ? match[1].toUpperCase() : '';
+}
+
+function formatCountryDisplay(country) {
+  if (!country) return '—';
+  const code = extractUsStateCode(country);
+  if (code) {
+    const name = US_STATE_MAP[code] || code;
+    return `USA · ${name} (${code})`;
+  }
+  return country;
+}
+
+function formatCountryForSubmit(country, stateCode) {
+  if (normalizeCountryKey(country) === 'United States' && stateCode) {
+    return `USA ${stateCode.toUpperCase()}`;
+  }
+  return country || null;
+}
+
+function resolveUsStateCodeFromInput(value) {
+  if (!value) return '';
+  const normalized = value.trim().toLowerCase();
+  if (US_STATE_LABEL_TO_CODE[normalized]) {
+    return US_STATE_LABEL_TO_CODE[normalized];
+  }
+  const codeMatch = value.trim().toUpperCase();
+  if (US_STATE_MAP[codeMatch]) return codeMatch;
+  const withinParens = /\(([A-Z]{2})\)\s*$/.exec(value.trim());
+  if (withinParens) {
+    const code = withinParens[1].toUpperCase();
+    if (US_STATE_MAP[code]) return code;
+  }
+  return '';
+}
 
 const candidateState = {
   tbody: null,
@@ -78,11 +191,51 @@ const candidateModalRefs = {
   countryDisplayButton: null,
   countryDropdown: null,
   countryOptionsList: null,
+  usStateField: null,
+  usStateInput: null,
+  usStateList: null,
   phoneCodeSelect: null,
   phoneInput: null,
   linkedinInput: null,
   openExistingBtn: null
 };
+
+function setUsStateInputValue(code) {
+  if (!candidateModalRefs.usStateInput) return;
+  const label = code && US_STATE_MAP[code] ? `${US_STATE_MAP[code]} (${code})` : '';
+  candidateModalRefs.usStateInput.value = label;
+  candidateModalRefs.usStateInput.dataset.code = code || '';
+}
+
+function getUsStateCodeFromInput() {
+  if (!candidateModalRefs.usStateInput) return '';
+  const code = resolveUsStateCodeFromInput(candidateModalRefs.usStateInput.value);
+  candidateModalRefs.usStateInput.dataset.code = code || '';
+  return code;
+}
+
+function toggleUsStateField(country) {
+  if (!candidateModalRefs.usStateField) return;
+  const shouldShow = normalizeCountryKey(country) === 'United States';
+  candidateModalRefs.usStateField.hidden = !shouldShow;
+  if (!shouldShow) {
+    setUsStateInputValue('');
+    candidateModalRefs.usStateInput?.classList.remove('input-error');
+  }
+}
+
+function renderUsStateOptions() {
+  if (!candidateModalRefs.usStateList) return;
+  const fragment = document.createDocumentFragment();
+  US_STATES.forEach(state => {
+    const option = document.createElement('option');
+    option.value = `${state.name} (${state.code})`;
+    option.dataset.code = state.code;
+    fragment.appendChild(option);
+  });
+  candidateModalRefs.usStateList.innerHTML = '';
+  candidateModalRefs.usStateList.appendChild(fragment);
+}
 
 let nameSearchDebounce = null;
 let toastTimer = null;
@@ -171,10 +324,11 @@ function buildCandidateRow(candidate) {
        <span>${candidate.name || '—'}</span>`
     : `${candidate.name || '—'}`;
 
+  const formattedCountry = formatCountryDisplay(candidate.country);
   tr.innerHTML = `
     <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
     <td class="${nameCellClasses.join(' ')}">${nameContent}</td>
-    <td>${candidate.country || '—'}</td>
+    <td>${formattedCountry}</td>
     <td>
       ${
         phone
@@ -360,6 +514,9 @@ function setupCandidateModal() {
   candidateModalRefs.countryDisplayButton = document.getElementById('candidateCountryDisplay');
   candidateModalRefs.countryDropdown = document.getElementById('candidateCountryDropdown');
   candidateModalRefs.countryOptionsList = document.getElementById('candidateCountryOptions');
+  candidateModalRefs.usStateField = document.getElementById('candidateUsStateField');
+  candidateModalRefs.usStateInput = document.getElementById('candidateUsStateInput');
+  candidateModalRefs.usStateList = document.getElementById('candidateUsStateList');
   candidateModalRefs.phoneCodeSelect = document.getElementById('candidatePhoneCode');
   candidateModalRefs.phoneInput = document.getElementById('candidatePhone');
   candidateModalRefs.linkedinInput = document.getElementById('candidateLinkedin');
@@ -402,6 +559,12 @@ function setupCandidateModal() {
   renderNativeCountryOptions();
   updateCountryDisplay('');
   renderCountrySelectOptions('');
+  renderUsStateOptions();
+  toggleUsStateField('');
+  candidateModalRefs.usStateInput?.addEventListener('input', () => {
+    const code = resolveUsStateCodeFromInput(candidateModalRefs.usStateInput.value);
+    candidateModalRefs.usStateInput.dataset.code = code || '';
+  });
 
   candidateModalRefs.countrySearchInput?.addEventListener('input', (event) => {
     renderCountrySelectOptions(event.target.value || '');
@@ -468,6 +631,8 @@ function resetCandidateForm() {
   if (candidateModalRefs.phoneCodeSelect) {
     candidateModalRefs.phoneCodeSelect.value = DEFAULT_PHONE_COUNTRY;
   }
+  setUsStateInputValue('');
+  toggleUsStateField('');
 }
 
 function clearInputErrors() {
@@ -475,6 +640,7 @@ function clearInputErrors() {
     candidateModalRefs.nameInput,
     candidateModalRefs.emailInput,
     candidateModalRefs.countrySelect,
+    candidateModalRefs.usStateInput,
     candidateModalRefs.phoneInput,
     candidateModalRefs.linkedinInput
   ].forEach(input => input?.classList.remove('input-error'));
@@ -515,11 +681,13 @@ function gatherCandidateFormValues() {
   const phoneDigits = normalizePhoneDigits(rawPhone, phoneCode);
   const linkedinForSubmit = formatLinkedinForSubmit(linkedinRaw);
   const normalizedLinkedin = normalizeLinkedin(linkedinForSubmit);
+  const usStateCode = getUsStateCodeFromInput();
 
   return {
     name,
     email,
     country,
+    usStateCode,
     phoneCountry,
     phoneCode,
     rawPhone,
@@ -546,6 +714,10 @@ function validateCandidateForm(values) {
   if (!values.normalizedLinkedin.includes('linkedin.com')) {
     error = error || 'LinkedIn URL must point to linkedin.com.';
     candidateModalRefs.linkedinInput?.classList.add('input-error');
+  }
+  if (normalizeCountryKey(values.country) === 'United States' && !values.usStateCode) {
+    error = error || 'Select a state for United States candidates.';
+    candidateModalRefs.usStateInput?.classList.add('input-error');
   }
 
   return error;
@@ -684,7 +856,7 @@ function normalizePhoneDigits(rawPhone, phoneCode) {
 function normalizeStoredPhone(phone, country) {
   const digits = (phone || '').toString().replace(/\D/g, '');
   if (!digits) return '';
-  const code = PHONE_CODE_BY_COUNTRY[country] || '';
+  const code = PHONE_CODE_BY_COUNTRY[normalizeCountryKey(country)] || '';
   if (code && !digits.startsWith(code) && digits.length <= 11) {
     return code + digits;
   }
@@ -768,6 +940,7 @@ function handleCountrySelection(country) {
   if (!candidateModalRefs.countrySelect) return;
   candidateModalRefs.countrySelect.value = country || '';
   updateCountryDisplay(country);
+  toggleUsStateField(country || '');
   if (country) {
     syncPhoneCountryToSelected(country);
   } else if (candidateModalRefs.phoneCodeSelect) {
@@ -832,7 +1005,7 @@ async function submitCandidate(values) {
     email: values.email,
     phone: values.phoneDigits,
     linkedin: values.linkedinForSubmit,
-    country: values.country || null,
+    country: formatCountryForSubmit(values.country, values.usStateCode),
     stage: 'Contactado',
     created_by: localStorage.getItem('user_email')
   };

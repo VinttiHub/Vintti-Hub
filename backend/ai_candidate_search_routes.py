@@ -12,6 +12,7 @@ LATAM_COUNTRIES = [
     # North & Central America
     ("Mexico","MX"), 
     ("United States","US"),
+    ("Canada","CA"),
     # South America
     ("Colombia","CO"), ("Ecuador","EC"), ("Peru","PE"), ("Bolivia","BO"),
     ("Chile","CL"), ("Argentina","AR"), ("Uruguay","UY"), ("Paraguay","PY"), ("Brazil","BR"),

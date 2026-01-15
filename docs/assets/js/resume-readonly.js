@@ -622,6 +622,13 @@ function cleanHTML(html) {
 
   return wrapper.innerHTML.trim();
 }
+function normalizeCountryKey(countryName) {
+  const value = (countryName || '').trim();
+  if (!value) return '';
+  const match = /^USA\s+([A-Z]{2})$/i.exec(value);
+  if (match || value.toUpperCase() === 'USA') return 'United States';
+  return value;
+}
 function getFlagEmoji(countryName) {
   const flags = {
     "Argentina":"🇦🇷","Bolivia":"🇧🇴","Brazil":"🇧🇷","Chile":"🇨🇱","Colombia":"🇨🇴","Costa Rica":"🇨🇷",
@@ -631,5 +638,6 @@ function getFlagEmoji(countryName) {
     "United Kingdom":"🇬🇧","Germany":"🇩🇪","France":"🇫🇷","Italy":"🇮🇹","Netherlands":"🇳🇱","Poland":"🇵🇱",
     "India":"🇮🇳","China":"🇨🇳","Japan":"🇯🇵","Australia":"🇦🇺"
   };
-  return flags[countryName] || '';
+  const normalized = normalizeCountryKey(countryName);
+  return flags[normalized] || '';
 }

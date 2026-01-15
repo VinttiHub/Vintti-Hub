@@ -1257,9 +1257,24 @@ let toolsChoices = null;
 const LATAM_COUNTRIES = [
   "Latin America", 
   "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Ecuador",
-  "El Salvador","Guatemala","Honduras","Mexico","United States","Nicaragua","Panama","Paraguay",
+  "El Salvador","Guatemala","Honduras","Mexico","United States","Canada","Nicaragua","Panama","Paraguay",
   "Peru","Puerto Rico","Dominican Republic","Uruguay","Venezuela"
 ];
+
+const US_STATE_MAP = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
+  KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
+  MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri',
+  MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey',
+  NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio',
+  OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina',
+  SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont',
+  VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+  DC: 'District of Columbia'
+};
+const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 
 
 // Ciudades por país (principales) — puedes ampliar cuando quieras
@@ -1277,6 +1292,7 @@ const CITIES_BY_COUNTRY = {
   "Honduras": ["Tegucigalpa","San Pedro Sula","La Ceiba"],
   "Mexico": ["Mexico City","Guadalajara","Monterrey","Puebla","Querétaro","Tijuana"],
   "United States": ["New York","Los Angeles","Chicago","Miami","San Francisco"],
+  "Canada": ["Toronto","Vancouver","Montreal","Calgary","Ottawa"],
   "Nicaragua": ["Managua","León","Masaya"],
   "Panama": ["Panama City","Colón","David"],
   "Paraguay": ["Asunción","Ciudad del Este","Encarnación"],
@@ -1286,6 +1302,29 @@ const CITIES_BY_COUNTRY = {
   "Uruguay": ["Montevideo","Punta del Este","Salto"],
   "Venezuela": ["Caracas","Maracaibo","Valencia","Barquisimeto"]
 };
+function normalizeCountryKey(country){
+  const value = (country || '').trim();
+  if (!value) return '';
+  const match = USA_STATE_REGEX.exec(value);
+  if (match) return 'United States';
+  if (value.toUpperCase() === 'USA') return 'United States';
+  return value;
+}
+
+function extractUsStateCode(country){
+  const match = USA_STATE_REGEX.exec(country || '');
+  return match ? match[1].toUpperCase() : '';
+}
+
+function formatCountryDisplay(country){
+  if (!country) return '—';
+  const code = extractUsStateCode(country);
+  if (code) {
+    const name = US_STATE_MAP[code] || code;
+    return `USA · ${name} (${code})`;
+  }
+  return country;
+}
 function toArray(val){
   if (Array.isArray(val)) return val;
   if (val == null) return [];
@@ -2628,7 +2667,11 @@ function createCandidateCard(c, batchId) {
 
   cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
   const flag = getFlagEmoji(c.country);
-  cardElement.querySelector('.candidate-country').textContent = c.country ? `${flag} ${c.country}` : '—';
+  const formattedCountry = formatCountryDisplay(c.country);
+  cardElement.querySelector('.candidate-country').textContent =
+    formattedCountry && formattedCountry !== '—'
+      ? `${flag ? flag + ' ' : ''}${formattedCountry}`
+      : '—';
   cardElement.querySelector('.candidate-salary').textContent = c.salary_range ? `$${c.salary_range}` : '—';
   cardElement.querySelector('.candidate-email').textContent = c.email || '';
   cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
@@ -2893,10 +2936,11 @@ function getFlagEmoji(country) {
     "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
     "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Ecuador": "🇪🇨",
     "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "Mexico": "🇲🇽",
-    "United States": "🇺🇸", "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
+    "United States": "🇺🇸", "Canada": "🇨🇦", "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
     "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
   };
-  return flags[country] || "";
+  const base = normalizeCountryKey(country);
+  return flags[base] || "";
 }
 function toggleActiveButton(command, button) {
   document.execCommand(command, false, '');

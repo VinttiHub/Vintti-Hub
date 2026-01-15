@@ -315,6 +315,18 @@
           <div class="card-container" id="client-process"></div>
         </div>
       </div>
+
+      <div
+        id="pipelineRestrictionToast"
+        class="pipeline-restriction-toast"
+        role="alert"
+        aria-live="assertive"
+      >
+        <span class="pipeline-restriction-toast__emoji" aria-hidden="true">🚦</span>
+        <span class="pipeline-restriction-toast__text">
+          Oops! You can only move candidates forward in this pipeline.
+        </span>
+      </div>
     </section>
 
     <!-- ========== Candidates / Batches ========== -->
@@ -408,6 +420,7 @@
           <option value="Honduras">🇭🇳 Honduras</option>
           <option value="Mexico">🇲🇽 Mexico</option>
           <option value="United States">🇺🇸 United States</option>
+          <option value="Canada">🇨🇦 Canada</option>
           <option value="Nicaragua">🇳🇮 Nicaragua</option>
           <option value="Panama">🇵🇦 Panama</option>
           <option value="Paraguay">🇵🇾 Paraguay</option>
@@ -434,15 +447,22 @@
           <option value="504">🇭🇳 +504  Honduras</option>
           <option value="52">🇲🇽 +52    México</option>
           <option value="1">🇺🇸 +1     United States</option>
+          <option value="1">🇨🇦 +1     Canada</option>
           <option value="505">🇳🇮 +505  Nicaragua</option>
           <option value="507">🇵🇦 +507  Panamá</option>
           <option value="595">🇵🇾 +595  Paraguay</option>
-            <option value="51">🇵🇪 +51    Perú</option>
-            <option value="1">🇵🇷 +1     Puerto Rico</option>
-            <option value="1">🇩🇴 +1     República Dominicana</option>
-            <option value="598">🇺🇾 +598  Uruguay</option>
-            <option value="58">🇻🇪 +58    Venezuela</option>
+          <option value="51">🇵🇪 +51    Perú</option>
+          <option value="1">🇵🇷 +1     Puerto Rico</option>
+          <option value="1">🇩🇴 +1     República Dominicana</option>
+          <option value="598">🇺🇾 +598  Uruguay</option>
+          <option value="58">🇻🇪 +58    Venezuela</option>
           </select>
+        <div id="candidate-us-state-wrapper" class="hidden">
+          <label for="candidate-us-state">State (USA)</label>
+          <select id="candidate-us-state">
+            <option value="">Select state…</option>
+          </select>
+        </div>
           <input type="text" id="candidate-phone" placeholder="Phone number *" style="width: 70%;" />
         </div>
 

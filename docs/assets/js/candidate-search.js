@@ -1,5 +1,18 @@
 // === Config ===
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+const USA_PATTERN = /^usa\s+([a-z]{2})$/i;
+function normalizeCountryForComparison(country) {
+  if (!country) return '';
+  const value = country.toString().trim().toLowerCase();
+  if (!value) return '';
+  if (
+    value === 'usa' ||
+    value === 'us' ||
+    value === 'u.s.' ||
+    USA_PATTERN.test(value)
+  ) return 'united states';
+  return value;
+}
 
 const $ = (s, r=document)=>r.querySelector(s);
 const $all = (s, r=document)=>[...r.querySelectorAll(s)];
@@ -106,6 +119,7 @@ async function coresignalMultiSearch(parsed){
   const order = [
     { tag: '🇲🇽 Mexico',       loc: 'Mexico'        },
     { tag: '🇺🇸 United States',loc: 'United States' },
+    { tag: '🇨🇦 Canada',       loc: 'Canada'        },
     { tag: '🇦🇷 Argentina',    loc: 'Argentina'     },
     { tag: '🇨🇴 Colombia',     loc: 'Colombia'      },
     { tag: '🌎 General LATAM', loc: null }          // null → gate LATAM en backend
@@ -172,13 +186,13 @@ function renderCs(items, {append=false}={}){
   }
   csEmpty.classList.add('hidden');
 
-  // 🔥 Ordenar por país: 1) México 2) United States 3) Argentina 4) Colombia 5) resto
+  // 🔥 Ordenar por país: 1) México 2) United States 3) Canada 4) Argentina 5) Colombia 6) resto
   const countryPriority = (it) => {
     const raw = (it.country || '').toString().toLowerCase();
+    const normalized = normalizeCountryForComparison(it.country);
 
-    if (!raw) return 5;
+    if (!raw && !normalized) return 6;
 
-    // México
     if (
       raw.includes('mexico') ||
       raw.includes('méxico') ||
@@ -186,28 +200,21 @@ function renderCs(items, {append=false}={}){
       raw === 'mex'
     ) return 1;
 
-    // United States
-    if (
-      raw.includes('united states') ||
-      raw.includes('usa') ||
-      raw.includes('u.s.') ||
-      raw === 'us'
-    ) return 2;
+    if (normalized === 'united states') return 2;
 
-    // Argentina
+    if (raw.includes('canada') || raw === 'ca') return 3;
+
     if (
       raw.includes('argentina') ||
       raw === 'ar'
-    ) return 3;
+    ) return 4;
 
-    // Colombia
     if (
       raw.includes('colombia') ||
       raw === 'co'
-    ) return 4;
+    ) return 5;
 
-    // resto de países
-    return 5;
+    return 6;
   };
 
   const sorted = [...items].sort((a, b) => {
@@ -344,19 +351,17 @@ function renderChips({ title, tools, years_experience, location }){
   }
   chips.classList.remove('hidden');
 }
-// 👇 prioridad por país: 1) Mexico 2) United States 3) Argentina 4) Colombia 5) resto
+// 👇 prioridad por país: 1) Mexico 2) United States 3) Canada 4) Argentina 5) Colombia 6) resto
 const countryRank = (country) => {
-  const c = (country || '').toLowerCase();
+  const c = (country || '').toString().toLowerCase();
+  const normalized = normalizeCountryForComparison(country);
 
-  if (c.includes('mexico'))        return 1; // México primero
-  if (
-    c.includes('united states') ||
-    c.includes('usa') ||
-    c.includes('u.s.')
-  ) return 2;                                  // luego United States
-  if (c.includes('argentina'))     return 3; // luego Argentina
-  if (c.includes('colombia'))      return 4; // luego Colombia
-  return 5;                                   // el resto
+  if (c.includes('mexico') || c.includes('méxico')) return 1; // México primero
+  if (normalized === 'united states') return 2;               // luego United States
+  if (c.includes('canada')) return 3;                         // luego Canada
+  if (c.includes('argentina')) return 4;                      // luego Argentina
+  if (c.includes('colombia')) return 5;                       // luego Colombia
+  return 6;                                                   // el resto
 };
 
 function applyExperienceFilterAndRender(){

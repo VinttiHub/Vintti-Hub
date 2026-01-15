@@ -2,9 +2,121 @@
 const WA_countryToCodeMap = {
   "Argentina": "54","Bolivia": "591","Brazil": "55","Chile": "56","Colombia": "57",
   "Costa Rica": "506","Cuba": "53","Ecuador": "593","El Salvador": "503","Guatemala": "502",
-  "Honduras": "504","Mexico": "52","United States": "1","Nicaragua": "505","Panama": "507","Paraguay": "595",
+  "Honduras": "504","Mexico": "52","United States": "1","Canada": "1","Nicaragua": "505","Panama": "507","Paraguay": "595",
   "Peru": "51","Puerto Rico": "1","Dominican Republic": "1","Uruguay": "598","Venezuela": "58"
 };
+
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+  { code: 'DC', name: 'District of Columbia' }
+];
+const US_STATE_MAP = US_STATES.reduce((acc, entry) => {
+  acc[entry.code] = entry.name;
+  return acc;
+}, {});
+const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+let candidateStateChoices = null;
+
+function normalizeCountryKey(country){
+  const value = (country || '').trim();
+  if (!value) return '';
+  const match = USA_STATE_REGEX.exec(value);
+  if (match) return 'United States';
+  if (value.toUpperCase() === 'USA') return 'United States';
+  return value;
+}
+
+function extractUsStateCode(country){
+  const match = USA_STATE_REGEX.exec(country || '');
+  return match ? match[1].toUpperCase() : '';
+}
+
+function formatUsCountryValue(stateCode){
+  return `USA ${stateCode.toUpperCase()}`;
+}
+
+function formatCountryDisplay(country){
+  if (!country) return '—';
+  const code = extractUsStateCode(country);
+  if (code) {
+    const name = US_STATE_MAP[code] || code;
+    return `USA · ${name} (${code})`;
+  }
+  return country;
+}
+
+function resetCandidateStateField(){
+  const stateSelect = document.getElementById('candidate-us-state');
+  if (!stateSelect) return;
+  stateSelect.value = '';
+  if (candidateStateChoices) {
+    candidateStateChoices.removeActiveItems();
+    try { candidateStateChoices.setChoiceByValue(''); } catch {}
+  }
+}
+
+function updateCandidateStateFieldVisibility(countryValue){
+  const wrapper = document.getElementById('candidate-us-state-wrapper');
+  if (!wrapper) return;
+  const shouldShow = normalizeCountryKey(countryValue) === 'United States';
+  wrapper.classList.toggle('hidden', !shouldShow);
+  if (!shouldShow) resetCandidateStateField();
+}
+
+function getSelectedCandidateStateCode(){
+  const stateSelect = document.getElementById('candidate-us-state');
+  if (!stateSelect) return '';
+  return (stateSelect.value || '').toUpperCase();
+}
 
 // Limpia y normaliza a E.164 sin "+" (wa.me exige dígitos, sin signos)
 function normalizePhoneForWA(rawPhone, country){
@@ -20,7 +132,7 @@ function normalizePhoneForWA(rawPhone, country){
 
   // Si tras limpiar empieza con código de país (2–3 dígitos) probablemente ya está bien
   // Si NO, y tenemos país, lo preprendemos.
-  const cc = WA_countryToCodeMap[country] || '';
+  const cc = WA_countryToCodeMap[normalizeCountryKey(country)] || '';
   if (cc && !s.startsWith(cc)) {
     // Evita doble indicativo si el número ya venía con él
     // (heurística simple: si la longitud sin cc es <= 10–11, prepende)
@@ -613,10 +725,60 @@ document.addEventListener("DOMContentLoaded", () => {
       'client-process': 'En proceso con Cliente',
       'applicant': 'Applicant'  
     };
+    const stageOrder = ['applicant', 'contacted', 'no-advance', 'first-interview', 'client-process'];
+    const stageIndexLookup = stageOrder.reduce((acc, key, idx) => {
+      acc[key] = idx;
+      return acc;
+    }, {});
+    const PIPELINE_BACKTRACK_WHITELIST = new Set([
+      'bahia@vintti.com',
+      'agostina@vintti.com',
+      'lara@vintti.com',
+      'agustin@vintti.com',
+      'jazmin@vintti.com'
+    ].map(email => email.toLowerCase()));
+    const pipelineUserEmail = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase().trim();
+    const canMoveCandidateBackward = PIPELINE_BACKTRACK_WHITELIST.has(pipelineUserEmail);
+    const pipelineRestrictionToast = document.getElementById('pipelineRestrictionToast');
+    let pipelineRestrictionToastTimer = null;
+    pipelineRestrictionToast?.setAttribute('aria-hidden', 'true');
+
+    function hidePipelineRestrictionMessage() {
+      if (!pipelineRestrictionToast) return;
+      pipelineRestrictionToast.classList.remove('show');
+      pipelineRestrictionToast.setAttribute('aria-hidden', 'true');
+    }
+
+    function showPipelineRestrictionMessage() {
+      if (!pipelineRestrictionToast) {
+        alert("Heads up! You can only move candidates forward in this pipeline.");
+        return;
+      }
+      pipelineRestrictionToast.classList.add('show');
+      pipelineRestrictionToast.setAttribute('aria-hidden', 'false');
+      clearTimeout(pipelineRestrictionToastTimer);
+      pipelineRestrictionToastTimer = setTimeout(() => {
+        hidePipelineRestrictionMessage();
+      }, 4200);
+    }
+    pipelineRestrictionToast?.addEventListener('click', hidePipelineRestrictionMessage);
 
     let draggedCard = null;
     setupPipelineCandidateSearch();
-  
+    const candidateCountrySelect = document.getElementById('candidate-country');
+    const candidateStateSelect = document.getElementById('candidate-us-state');
+    if (candidateStateSelect) {
+      const options = ['<option value=\"\">Select state…</option>']
+        .concat(US_STATES.map(s => `<option value=\"${s.code}\">${s.name} (${s.code})</option>`));
+      candidateStateSelect.innerHTML = options.join('');
+      candidateStateChoices = new Choices('#candidate-us-state', {
+        searchEnabled: true,
+        itemSelectText: '',
+        shouldSort: false,
+      });
+    }
+    updateCandidateStateFieldVisibility(candidateCountrySelect ? candidateCountrySelect.value : '');
+ 
     // Activar drag para tarjetas iniciales
     document.querySelectorAll(".candidate-card").forEach(enableDrag);
   
@@ -643,6 +805,22 @@ document.addEventListener("DOMContentLoaded", () => {
           const draggedCardElement = document.querySelector(`.candidate-card[data-candidate-id='${candidateId}']`);
           if (draggedCardElement) {
             console.log('📥 Found draggedCardElement:', draggedCardElement);
+
+            const currentColumn = draggedCardElement.closest('.card-container');
+            const currentColumnId = currentColumn?.id || '';
+            const targetColumnId = container.id || container.getAttribute('id');
+            const currentIndex = stageIndexLookup[currentColumnId];
+            const nextIndex = stageIndexLookup[targetColumnId];
+            const isMovingBackward = typeof currentIndex === 'number' &&
+                                     typeof nextIndex === 'number' &&
+                                     nextIndex < currentIndex;
+
+            if (isMovingBackward && !canMoveCandidateBackward) {
+              console.info('⛔ Backward move blocked for', pipelineUserEmail || 'unknown user');
+              showPipelineRestrictionMessage();
+              container.parentElement.classList.remove('drag-over');
+              return;
+            }
 
             container.appendChild(draggedCardElement);
 
@@ -690,6 +868,8 @@ document.getElementById("closePopup").addEventListener("click", () => {
 
   ["candidate-name", "candidate-email", "candidate-phone", "candidate-linkedin", "candidate-country"]
     .forEach(id => document.getElementById(id).value = '');
+  resetCandidateStateField();
+  updateCandidateStateFieldVisibility('');
 });
 
 
@@ -704,7 +884,16 @@ document.getElementById("popupcreateCandidateBtn").addEventListener("click", asy
   const rawPhone = document.getElementById("candidate-phone").value.replace(/\s+/g, '');
   const phone = phoneCode + rawPhone;
   const linkedin = document.getElementById("candidate-linkedin").value;
-  const country = document.getElementById("candidate-country").value;
+  const selectedCountry = document.getElementById("candidate-country").value;
+  let country = selectedCountry;
+  if (normalizeCountryKey(selectedCountry) === 'United States') {
+    const stateCode = getSelectedCandidateStateCode();
+    if (!stateCode) {
+      alert('Please choose a state for United States candidates.');
+      return;
+    }
+    country = formatUsCountryValue(stateCode);
+  }
   const stage = "Contactado";
 
   if (!opportunityId || opportunityId === '—') {
@@ -773,6 +962,7 @@ const countryToCodeMap = {
   "Honduras": "504",
   "Mexico": "52",
   "United States": "1",
+  "Canada": "1",
   "Nicaragua": "505",
   "Panama": "507",
   "Paraguay": "595",
@@ -785,7 +975,8 @@ const countryToCodeMap = {
 
 document.getElementById('candidate-country').addEventListener('change', (e) => {
   const selectedCountry = e.target.value;
-  const code = countryToCodeMap[selectedCountry];
+  updateCandidateStateFieldVisibility(selectedCountry);
+  const code = countryToCodeMap[normalizeCountryKey(selectedCountry)];
   if (code) {
     document.getElementById('phone-country-code').value = code;
   }
@@ -904,7 +1095,7 @@ card.innerHTML = `
   <div class="candidate-info">
     <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
     <div class="candidate-meta">
-      <span class="country">${getFlagEmoji(candidate.country || '')}</span>
+      <span class="country"></span>
       <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
     </div>
     <div class="star-wrapper">
@@ -921,6 +1112,16 @@ card.innerHTML = `
   </div>
 </div>
 `;
+const countryEl = card.querySelector('.country');
+if (countryEl) {
+  const formattedCountry = formatCountryDisplay(candidate.country);
+  const flag = getFlagEmoji(candidate.country);
+  if (formattedCountry && formattedCountry !== '—') {
+    countryEl.textContent = flag ? `${flag} ${formattedCountry}` : formattedCountry;
+  } else {
+    countryEl.textContent = '—';
+  }
+}
 decorateUsingCandidateBlacklist(card, candidate, rawBlacklist);
 decorateCandidateAssociations(card, candidate);
 // WhatsApp click (robusto con fallback a /candidates/:id)
@@ -1119,11 +1320,12 @@ function getFlagEmoji(country) {
     "Argentina": "🇦🇷", "Bolivia": "🇧🇴", "Brazil": "🇧🇷", "Chile": "🇨🇱",
     "Colombia": "🇨🇴", "Costa Rica": "🇨🇷", "Cuba": "🇨🇺", "Ecuador": "🇪🇨",
     "El Salvador": "🇸🇻", "Guatemala": "🇬🇹", "Honduras": "🇭🇳", "Mexico": "🇲🇽",
-    "United States": "🇺🇸",
+    "United States": "🇺🇸", "Canada": "🇨🇦",
     "Nicaragua": "🇳🇮", "Panama": "🇵🇦", "Paraguay": "🇵🇾", "Peru": "🇵🇪",
     "Puerto Rico": "🇵🇷", "Dominican Republic": "🇩🇴", "Uruguay": "🇺🇾", "Venezuela": "🇻🇪"
   };
-  return flags[country] || "";
+  const base = normalizeCountryKey(country);
+  return flags[base] || "";
 }
 
 const pipelineSearchUI = {

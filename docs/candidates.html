@@ -308,6 +308,17 @@
           </div>
           <select id="candidateCountry" name="country" hidden></select>
         </label>
+        <label class="candidate-field" id="candidateUsStateField" hidden>
+          <span>State (USA)</span>
+          <input
+            type="text"
+            id="candidateUsStateInput"
+            list="candidateUsStateList"
+            placeholder="Type to search state…"
+            autocomplete="off"
+          />
+          <datalist id="candidateUsStateList"></datalist>
+        </label>
 
         <div class="candidate-field">
           <span>Phone <span class="required-marker">*</span></span>

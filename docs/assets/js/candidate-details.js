@@ -59,6 +59,74 @@ function showCuteToast(messageHtml, duration = 5000) {
   }, duration);
 }
 
+function showCuteConfirmDialog({
+  title = 'Are you sure?',
+  message = '',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  tone = 'default'
+} = {}) {
+  return new Promise((resolve) => {
+    const body = document.body;
+    if (!body) {
+      resolve(window.confirm(`${title}\n\n${message}`.trim()));
+      return;
+    }
+
+    const previous = document.querySelector('.cute-confirm-overlay');
+    previous?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'cute-confirm-overlay';
+    const accent = tone === 'danger' ? '⚠️' : '🤔';
+    overlay.innerHTML = `
+      <div class="cute-confirm-card" role="dialog" aria-modal="true">
+        <div class="cute-confirm-icon" aria-hidden="true">${accent}</div>
+        <div class="cute-confirm-copy">
+          <h3>${title}</h3>
+          <p>${message}</p>
+        </div>
+        <div class="cute-confirm-actions">
+          <button type="button" class="cute-confirm-cancel">${cancelText}</button>
+          <button type="button" class="cute-confirm-confirm">${confirmText}</button>
+        </div>
+        <div class="cute-confirm-note">You can always undo this later.</div>
+      </div>
+    `;
+
+    body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+
+    const confirmBtn = overlay.querySelector('.cute-confirm-confirm');
+    const cancelBtn = overlay.querySelector('.cute-confirm-cancel');
+
+    const cleanup = (result) => {
+      overlay.classList.remove('is-visible');
+      overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+      document.removeEventListener('keydown', keyHandler);
+      resolve(result);
+    };
+
+    const keyHandler = (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        cleanup(false);
+      } else if (ev.key === 'Enter' && document.activeElement === confirmBtn) {
+        ev.preventDefault();
+        cleanup(true);
+      }
+    };
+
+    confirmBtn?.addEventListener('click', () => cleanup(true));
+    cancelBtn?.addEventListener('click', () => cleanup(false));
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay) cleanup(false);
+    });
+    document.addEventListener('keydown', keyHandler);
+    confirmBtn?.focus();
+  });
+}
+
 const EQUIPMENT_OPTIONS = [
   { value: "Laptop",     emoji: "💻" },
   { value: "Monitor",    emoji: "🖥️" },
@@ -928,14 +996,155 @@ function updateLinkedInUI(raw) {
     const tooltip = document.querySelector('.input-tooltip');
     if (tooltip) tooltip.remove();
   }
+  const US_STATES = [
+    { code: 'AL', name: 'Alabama' },
+    { code: 'AK', name: 'Alaska' },
+    { code: 'AZ', name: 'Arizona' },
+    { code: 'AR', name: 'Arkansas' },
+    { code: 'CA', name: 'California' },
+    { code: 'CO', name: 'Colorado' },
+    { code: 'CT', name: 'Connecticut' },
+    { code: 'DE', name: 'Delaware' },
+    { code: 'FL', name: 'Florida' },
+    { code: 'GA', name: 'Georgia' },
+    { code: 'HI', name: 'Hawaii' },
+    { code: 'ID', name: 'Idaho' },
+    { code: 'IL', name: 'Illinois' },
+    { code: 'IN', name: 'Indiana' },
+    { code: 'IA', name: 'Iowa' },
+    { code: 'KS', name: 'Kansas' },
+    { code: 'KY', name: 'Kentucky' },
+    { code: 'LA', name: 'Louisiana' },
+    { code: 'ME', name: 'Maine' },
+    { code: 'MD', name: 'Maryland' },
+    { code: 'MA', name: 'Massachusetts' },
+    { code: 'MI', name: 'Michigan' },
+    { code: 'MN', name: 'Minnesota' },
+    { code: 'MS', name: 'Mississippi' },
+    { code: 'MO', name: 'Missouri' },
+    { code: 'MT', name: 'Montana' },
+    { code: 'NE', name: 'Nebraska' },
+    { code: 'NV', name: 'Nevada' },
+    { code: 'NH', name: 'New Hampshire' },
+    { code: 'NJ', name: 'New Jersey' },
+    { code: 'NM', name: 'New Mexico' },
+    { code: 'NY', name: 'New York' },
+    { code: 'NC', name: 'North Carolina' },
+    { code: 'ND', name: 'North Dakota' },
+    { code: 'OH', name: 'Ohio' },
+    { code: 'OK', name: 'Oklahoma' },
+    { code: 'OR', name: 'Oregon' },
+    { code: 'PA', name: 'Pennsylvania' },
+    { code: 'RI', name: 'Rhode Island' },
+    { code: 'SC', name: 'South Carolina' },
+    { code: 'SD', name: 'South Dakota' },
+    { code: 'TN', name: 'Tennessee' },
+    { code: 'TX', name: 'Texas' },
+    { code: 'UT', name: 'Utah' },
+    { code: 'VT', name: 'Vermont' },
+    { code: 'VA', name: 'Virginia' },
+    { code: 'WA', name: 'Washington' },
+    { code: 'WV', name: 'West Virginia' },
+    { code: 'WI', name: 'Wisconsin' },
+    { code: 'WY', name: 'Wyoming' },
+    { code: 'DC', name: 'District of Columbia' }
+  ];
+  const US_STATE_MAP = US_STATES.reduce((acc, entry) => {
+    acc[entry.code] = entry.name;
+    return acc;
+  }, {});
+  const US_STATE_LABEL_TO_CODE = US_STATES.reduce((acc, entry) => {
+    const label = `${entry.name} (${entry.code})`.toLowerCase();
+    acc[label] = entry.code;
+    acc[entry.code.toLowerCase()] = entry.code;
+    return acc;
+  }, {});
+  const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+
+  function normalizeCountryKey(country){
+    const value = (country || '').trim();
+    if (!value) return '';
+    const match = USA_STATE_REGEX.exec(value);
+    if (match) return 'United States';
+    if (value.toUpperCase() === 'USA') return 'United States';
+    return value;
+  }
+
+  function extractUsStateCode(country){
+    const match = USA_STATE_REGEX.exec(country || '');
+    return match ? match[1].toUpperCase() : '';
+  }
+
+  function formatCountryDisplay(country){
+    if (!country) return '—';
+    const code = extractUsStateCode(country);
+    if (code) {
+      const name = US_STATE_MAP[code] || code;
+      return `USA · ${name} (${code})`;
+    }
+    return country;
+  }
+
+  function resolveUsStateCodeFromInput(value){
+    if (!value) return '';
+    const normalized = value.trim().toLowerCase();
+    if (US_STATE_LABEL_TO_CODE[normalized]) return US_STATE_LABEL_TO_CODE[normalized];
+    const direct = value.trim().toUpperCase();
+    if (US_STATE_MAP[direct]) return direct;
+    const match = /\(([A-Z]{2})\)\s*$/.exec(value.trim());
+    if (match) {
+      const code = match[1].toUpperCase();
+      if (US_STATE_MAP[code]) return code;
+    }
+    return '';
+  }
+
   function getFlagEmoji(countryName) {
     const flags = {
       "Argentina":"🇦🇷","Bolivia":"🇧🇴","Brazil":"🇧🇷","Chile":"🇨🇱","Colombia":"🇨🇴","Costa Rica":"🇨🇷",
       "Cuba":"🇨🇺","Dominican Republic":"🇩🇴","Ecuador":"🇪🇨","El Salvador":"🇸🇻","Guatemala":"🇬🇹",
-      "Honduras":"🇭🇳","Mexico":"🇲🇽","United States":"🇺🇸","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
+      "Honduras":"🇭🇳","Mexico":"🇲🇽","United States":"🇺🇸","Canada":"🇨🇦","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
       "Uruguay":"🇺🇾","Venezuela":"🇻🇪"
     };
-    return flags[countryName] || '';
+    const base = normalizeCountryKey(countryName);
+    return flags[base] || '';
+  }
+
+  function setUsStateInputValue(inputEl, code) {
+    if (!inputEl) return;
+    const label = code && US_STATE_MAP[code] ? `${US_STATE_MAP[code]} (${code})` : '';
+    inputEl.value = label;
+    inputEl.dataset.code = code || '';
+  }
+
+  function populateUsStatesDatalist(listEl) {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    US_STATES.forEach(state => {
+      const option = document.createElement('option');
+      option.value = `${state.name} (${state.code})`;
+      option.dataset.code = state.code;
+      listEl.appendChild(option);
+    });
+  }
+
+  function buildCountryPayload(baseCountry, stateInput) {
+    if (normalizeCountryKey(baseCountry) === 'United States') {
+      const code = resolveUsStateCodeFromInput(stateInput?.value || '');
+      if (!code) return null;
+      return `USA ${code}`;
+    }
+    return baseCountry || '';
+  }
+
+  function toggleUsStateField(countryValue, fieldEl, inputEl) {
+    if (!fieldEl) return;
+    const shouldShow = normalizeCountryKey(countryValue) === 'United States';
+    fieldEl.classList.toggle('hidden', !shouldShow);
+    if (!shouldShow && inputEl) {
+      setUsStateInputValue(inputEl, '');
+      inputEl.classList.remove('input-error');
+    }
   }
 
   // --- Patch helpers (Hire) ---
@@ -1127,7 +1336,6 @@ window.updateHireField = async function(field, value) {
       // Mapeo de campos (overview)
       const overviewFields = {
         'field-name': 'name',
-        'field-country': 'country',
         'field-phone': 'phone',
         'field-email': 'email',
         'field-english-level': 'english_level',
@@ -1163,54 +1371,103 @@ function paintWaBtn(){
         const el = document.getElementById(elementId);
         if (!el) return;
 
-        if (fieldName === 'country') {
-          if (data.country) el.value = data.country;
+        const value = data[fieldName];
+        if (el.tagName === 'SELECT') {
+          if (value) el.value = value;
           el.addEventListener('change', () => {
             fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ country: el.value })
+              body: JSON.stringify({ [fieldName]: el.value })
             });
           });
         } else {
-          const value = data[fieldName];
-          if (el.tagName === 'SELECT') {
-            if (value) el.value = value;
-            el.addEventListener('change', () => {
-              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ [fieldName]: el.value })
-              });
+          if (value) el.innerText = value;
+          if (value) el.innerText = value;
+          el.contentEditable = "true";
+          el.addEventListener('blur', () => {
+            const updated = el.innerText.trim();
+            fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ [fieldName]: updated })
             });
-          } else {
-            if (value) el.innerText = value;
-            if (value) el.innerText = value;
-            el.contentEditable = "true";
-            el.addEventListener('blur', () => {
-              const updated = el.innerText.trim();
-              fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ [fieldName]: updated })
-              });
 
-              // Si este field es LinkedIn, refresca botón + normaliza visualmente
-              if (fieldName === 'linkedin') {
-                updateLinkedInUI(updated);
-              }
-            });
-          }
+            // Si este field es LinkedIn, refresca botón + normaliza visualmente
+            if (fieldName === 'linkedin') {
+              updateLinkedInUI(updated);
+            }
+          });
         }
       });
 
       // País → bandera
       const countrySelect = document.getElementById('field-country');
       const countryFlagSpan = document.getElementById('country-flag');
-      if (countryFlagSpan) countryFlagSpan.textContent = getFlagEmoji(data.country || '');
+      const usStateField = document.getElementById('us-state-field');
+      const usStateInput = document.getElementById('us-state-input');
+      const usStateList = document.getElementById('us-states-list');
+      populateUsStatesDatalist(usStateList);
+
+      const initialBaseCountry = normalizeCountryKey(data.country || '');
+      const initialStateCode = extractUsStateCode(data.country);
+      if (countrySelect) {
+        countrySelect.value = initialBaseCountry;
+      }
+      if (usStateInput) {
+        setUsStateInputValue(usStateInput, initialStateCode);
+      }
+      toggleUsStateField(initialBaseCountry, usStateField, usStateInput);
+      if (countryFlagSpan) {
+        countryFlagSpan.textContent = getFlagEmoji(data.country || initialBaseCountry);
+      }
+
+      const persistCountryValue = (requireState = false) => {
+        if (!countrySelect) return;
+        const payloadValue = buildCountryPayload(countrySelect.value, usStateInput);
+        if (payloadValue === null) {
+          if (requireState && usStateInput) {
+            usStateInput.classList.add('input-error');
+            if (usStateInput.reportValidity) {
+              usStateInput.setCustomValidity('Select a valid state for United States');
+              usStateInput.reportValidity();
+            }
+          }
+          return;
+        }
+        if (usStateInput) {
+          usStateInput.classList.remove('input-error');
+          if (usStateInput.setCustomValidity) usStateInput.setCustomValidity('');
+        }
+        fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ country: payloadValue })
+        });
+        if (countryFlagSpan) countryFlagSpan.textContent = getFlagEmoji(payloadValue || countrySelect.value);
+      };
+
       if (countrySelect) {
         countrySelect.addEventListener('change', () => {
-          if (countryFlagSpan) countryFlagSpan.textContent = getFlagEmoji(countrySelect.value);
+          toggleUsStateField(countrySelect.value, usStateField, usStateInput);
+          if (normalizeCountryKey(countrySelect.value) !== 'United States') {
+            persistCountryValue(false);
+          }
+        });
+      }
+      if (usStateInput) {
+        usStateInput.addEventListener('input', () => {
+          usStateInput.dataset.code = resolveUsStateCodeFromInput(usStateInput.value) || '';
+        });
+        usStateInput.addEventListener('change', () => {
+          if (normalizeCountryKey(countrySelect?.value || '') === 'United States') {
+            persistCountryValue(false);
+          }
+        });
+        usStateInput.addEventListener('blur', () => {
+          if (normalizeCountryKey(countrySelect?.value || '') === 'United States') {
+            persistCountryValue(true);
+          }
         });
       }
 
@@ -1950,6 +2207,16 @@ function wireVideoLinkDedupe() {
     statusText.style.display = message ? 'block' : 'none';
   }
 
+  function confirmBlacklistAddition() {
+    return showCuteConfirmDialog({
+      title: 'Add this candidate to your blacklist?',
+      message: 'We will hide this profile from searches and alerts. Are you sure you want to continue?',
+      confirmText: 'Yes, blacklist',
+      cancelText: 'No, keep visible',
+      tone: 'danger'
+    });
+  }
+
   function paintState() {
     const checked = Boolean(state.isBlacklisted);
     checkbox.checked = checked;
@@ -1987,6 +2254,14 @@ function wireVideoLinkDedupe() {
       return;
     }
     const shouldBlacklist = checkbox.checked;
+    if (shouldBlacklist) {
+      const confirmed = await confirmBlacklistAddition();
+      if (!confirmed) {
+        checkbox.checked = state.isBlacklisted;
+        paintState();
+        return;
+      }
+    }
     state.busy = true;
     checkbox.disabled = true;
     setStatusMessage(shouldBlacklist ? 'Adding candidate to blacklist...' : 'Removing candidate from blacklist...');
@@ -2757,7 +3032,8 @@ if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
       cursorY -= 10;
     };
 
-    const metaBits = [candidate?.country, candidate?.timezone, candidate?.english_level]
+    const countryLabel = candidate?.country ? formatCountryDisplay(candidate.country) : '';
+    const metaBits = [countryLabel, candidate?.timezone, candidate?.english_level]
       .map((bit) => (bit || '').toString().trim())
       .filter(Boolean);
 

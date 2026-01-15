@@ -2815,6 +2815,88 @@ html body .month-year .btn-clear:active{
   display:block; font-size:12px; color:#6b7280; margin-top:4px;
 }
 
+.cute-confirm-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.55);
+  backdrop-filter: blur(6px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10500;
+  opacity:0;
+  pointer-events:none;
+  transition: opacity .18s ease;
+}
+.cute-confirm-overlay.is-visible{
+  opacity:1;
+  pointer-events:auto;
+}
+.cute-confirm-card{
+  width:min(420px, calc(100% - 32px));
+  background:#fff;
+  border-radius: 24px;
+  padding:28px 28px 24px;
+  box-shadow:0 30px 80px rgba(15,23,42,.25);
+  text-align:center;
+  animation: popIn .22s ease;
+}
+.cute-confirm-icon{
+  font-size:36px;
+  margin-bottom:12px;
+}
+.cute-confirm-copy h3{
+  font-size:20px;
+  color:#0f172a;
+  margin-bottom:8px;
+}
+.cute-confirm-copy p{
+  font-size:15px;
+  color:#4b5563;
+  margin:0;
+}
+.cute-confirm-actions{
+  display:flex;
+  gap:12px;
+  margin-top:22px;
+}
+.cute-confirm-actions button{
+  flex:1;
+  padding:12px 16px;
+  border-radius:999px;
+  border:1px solid transparent;
+  font-weight:600;
+  font-size:14px;
+  cursor:pointer;
+  transition: all .15s ease;
+}
+.cute-confirm-cancel{
+  background:#f8fafc;
+  color:#0f172a;
+  border-color:rgba(15,23,42,.08);
+}
+.cute-confirm-cancel:hover{
+  background:#fff;
+  border-color:rgba(15,23,42,.2);
+}
+.cute-confirm-confirm{
+  background:#ef4444;
+  color:#fff;
+  box-shadow:0 12px 24px rgba(239,68,68,.35);
+}
+.cute-confirm-confirm:hover{
+  background:#dc2626;
+}
+.cute-confirm-note{
+  font-size:13px;
+  color:#94a3b8;
+  margin-top:14px;
+}
+@keyframes popIn{
+  from{ transform: translateY(8px) scale(.96); opacity:0; }
+  to{ transform: translateY(0) scale(1); opacity:1; }
+}
+
 
 
 

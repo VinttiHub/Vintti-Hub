@@ -22,7 +22,7 @@ const providers = { quipteams: "Quipteams", bord: "Bord" };
 const LATAM_COUNTRIES = [
   "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba",
   "Dominican Republic","Ecuador","El Salvador","Guatemala","Haiti","Honduras",
-  "Mexico","United States","Nicaragua","Panama","Paraguay","Peru","Puerto Rico","Uruguay","Venezuela"
+  "Mexico","United States","Canada","Nicaragua","Panama","Paraguay","Peru","Puerto Rico","Uruguay","Venezuela"
 ];
 
 // ============================================================
@@ -107,10 +107,17 @@ const COUNTRY_FLAGS = {
   "Argentina":"🇦🇷","Bolivia":"🇧🇴","Brazil":"🇧🇷","Chile":"🇨🇱","Colombia":"🇨🇴",
   "Costa Rica":"🇨🇷","Cuba":"🇨🇺","Dominican Republic":"🇩🇴","Ecuador":"🇪🇨",
   "El Salvador":"🇸🇻","Guatemala":"🇬🇹","Haiti":"🇭🇹","Honduras":"🇭🇳",
-  "Mexico":"🇲🇽","United States":"🇺🇸","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
+  "Mexico":"🇲🇽","United States":"🇺🇸","Canada":"🇨🇦","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
   "Puerto Rico":"🇵🇷","Uruguay":"🇺🇾","Venezuela":"🇻🇪"
 };
-function flagEmoji(country){ return COUNTRY_FLAGS[country] || ""; }
+const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+function normalizeCountryKey(country){
+  const value = (country || '').trim();
+  if (!value) return '';
+  if (USA_STATE_REGEX.test(value) || value.toUpperCase() === 'USA') return 'United States';
+  return value;
+}
+function flagEmoji(country){ return COUNTRY_FLAGS[normalizeCountryKey(country)] || ""; }
 
 function fmtCurrency(n){
   if (n == null || n === "") return "—";

@@ -158,12 +158,15 @@ def _blacklist_linkedin_source_expr(has_linkedin_normalized, table_alias=None):
 
 
 def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm, blacklist_id_override=None, columns=None):
+    global _BLACKLIST_COLUMN_CACHE
     columns = columns or _get_blacklist_columns(conn)
     insert_columns = []
     values = []
+    saw_blacklist_id = False
 
     for column in columns:
         if column == 'blacklist_id':
+            saw_blacklist_id = True
             if blacklist_id_override is not None:
                 insert_columns.append('blacklist_id')
                 values.append(blacklist_id_override)
@@ -179,6 +182,12 @@ def _build_blacklist_insert_payload(conn, candidate_row, linkedin_norm, blacklis
 
         insert_columns.append(column)
         values.append(value)
+
+    if blacklist_id_override is not None and not saw_blacklist_id:
+        logging.warning("⚠️ blacklist_id column missing from cache; forcing refresh before insert")
+        insert_columns.insert(0, 'blacklist_id')
+        values.insert(0, blacklist_id_override)
+        _BLACKLIST_COLUMN_CACHE = None
 
     return insert_columns, values
 
@@ -2018,13 +2027,19 @@ def candidates_search_alias():
 
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute("""
+        params = [f"%{q}%", f"%{q}%"]
+        linkedin_norm_clause = ""
+        linkedin_norm_value = _normalize_linkedin(q)
+        if linkedin_norm_value:
+            linkedin_norm_clause = f" OR {_linkedin_normalize_sql('linkedin')} = %s"
+            params.append(linkedin_norm_value)
+        cur.execute(f"""
             SELECT candidate_id, name, email, linkedin, country
             FROM candidates
-            WHERE name ILIKE %s OR linkedin ILIKE %s
+            WHERE name ILIKE %s OR linkedin ILIKE %s{linkedin_norm_clause}
             ORDER BY LOWER(name) ASC
             LIMIT 15
-        """, (f"%{q}%", f"%{q}%"))
+        """, params)
         rows = cur.fetchall()
         cur.close(); conn.close()
         return jsonify([
@@ -2194,6 +2209,7 @@ def get_blacklist_status():
 
 @bp.route('/api/blacklist', methods=['POST'])
 def create_blacklist_entry():
+    global _BLACKLIST_COLUMN_CACHE
     data = request.get_json(silent=True) or {}
     candidate_id = data.get('candidate_id')
     try:
@@ -2219,11 +2235,21 @@ def create_blacklist_entry():
             return jsonify(existing), 200
 
         blacklist_columns = _get_blacklist_columns(conn)
+        if 'blacklist_id' not in blacklist_columns:
+            _BLACKLIST_COLUMN_CACHE = None
+            blacklist_columns = _get_blacklist_columns(conn)
+
         next_blacklist_id = None
         if 'blacklist_id' in blacklist_columns:
-            cursor.execute("SELECT COALESCE(MAX(blacklist_id), 0) + 1 AS next_id FROM blacklist")
-            row = cursor.fetchone() or {}
-            next_blacklist_id = row.get('next_id') or 1
+            try:
+                cursor.execute("SELECT COALESCE(MAX(blacklist_id), 0) + 1 AS next_id FROM blacklist")
+                row = cursor.fetchone() or {}
+                next_blacklist_id = row.get('next_id') or 1
+            except Exception as seq_err:
+                logging.warning("⚠️ Unable to compute next blacklist_id: %s", seq_err)
+                next_blacklist_id = None
+        else:
+            logging.warning("⚠️ blacklist table is missing blacklist_id column metadata; skipping manual id assignment.")
 
         insert_columns, values = _build_blacklist_insert_payload(
             conn,
