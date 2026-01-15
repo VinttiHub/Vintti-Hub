@@ -20,17 +20,30 @@ document.addEventListener("DOMContentLoaded", async () => {
         opacity: "0.08",
         mixBlendMode: "multiply",
       });
-      const svgMarkup = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
-          <rect width="800" height="800" fill="none"/>
-          <text x="40" y="500" fill="rgba(0,59,255,0.35)" font-size="220" font-family="Onest, sans-serif" font-weight="700" transform="rotate(-30 0 400)" letter-spacing="40">
-            VINTTI
-          </text>
-        </svg>`;
-      watermarkLayer.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svgMarkup)}")`;
-      watermarkLayer.style.backgroundRepeat = "repeat";
-      watermarkLayer.style.backgroundSize = "900px 900px";
-      watermarkLayer.style.backgroundPosition = "center";
+      const baseMarkStyle = {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        fontSize: "340px",
+        fontWeight: "700",
+        color: "rgba(0,59,255,0.08)",
+        textTransform: "uppercase",
+        letterSpacing: "32px",
+        userSelect: "none",
+        whiteSpace: "nowrap",
+      };
+
+      const offsets = [-800, 0, 800];
+      offsets.forEach((offsetX) => {
+        offsets.forEach((offsetY) => {
+          const mark = document.createElement("div");
+          mark.textContent = "vintti";
+          Object.assign(mark.style, baseMarkStyle, {
+            transform: `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px) rotate(-30deg)`,
+          });
+          watermarkLayer.appendChild(mark);
+        });
+      });
       bodyEl.appendChild(watermarkLayer);
     }
     const header = document.querySelector(".cv-header");
