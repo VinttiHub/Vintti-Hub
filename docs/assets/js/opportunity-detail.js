@@ -2658,6 +2658,13 @@ function createCandidateCard(c, batchId) {
     }
   }
 
+  if (typeof window.decorateCandidateAssociations === 'function') {
+    window.decorateCandidateAssociations(cardElement, c, {
+      indicatorSize: '14px',
+      fallbackTargetSelector: '.candidate-info-inline'
+    });
+  }
+
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
   dropdown.value = c.status || "Client interviewing/testing";
   setDropdownValue(dropdown, c.status);

@@ -473,6 +473,20 @@
     </div>
   </div>
 
+  <!-- Popup: candidate associations -->
+  <div id="candidateAssociationPopup" class="popup hidden">
+    <div class="popup-content association-popup-content">
+      <span class="close-btn" id="closeCandidateAssociationPopup">&times;</span>
+      <h2 id="candidateAssociationTitle">Candidate associations</h2>
+      <p id="candidateAssociationMessage" class="association-message"></p>
+      <div id="candidateAssociationList" class="association-list"></div>
+      <div id="candidateAssociationActions" class="association-actions hidden">
+        <button type="button" id="candidateAssociationCancelBtn" class="btn-ghost">Cancel</button>
+        <button type="button" id="candidateAssociationConfirmBtn" class="btn-primary">Yes, add candidate</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Popup: add candidate to batch -->
   <div id="batchCandidatePopup" class="popup hidden">
     <div class="popup-content">

@@ -35,6 +35,7 @@ function normalizePhoneForWA(rawPhone, country){
 // === WhatsApp helpers ===
 const PHONE_CACHE = Object.create(null);
 const BLACKLIST_CACHE = Object.create(null);
+const CANDIDATE_ASSOCIATION_CACHE = Object.create(null);
 const onlyDigits = s => String(s||'').replace(/\D/g, '');
 const BLACKLIST_TOOLTIP_TEXT = 'Black list';
 let blacklistTooltipEl = null;
@@ -216,6 +217,366 @@ function decorateUsingCandidateBlacklist(card, candidate, rawValue) {
 
 window.applyBlacklistStyles = applyBlacklistStyles;
 window.attachBlacklistTooltip = attachBlacklistTooltip;
+
+const ASSOCIATION_TOOLTIP_TEXT = 'Candidate associated to another opportunity';
+let associationTooltipEl = null;
+let associationTooltipHideQueued = false;
+const candidateAssociationPopupState = {
+  onConfirm: null,
+  onCancel: null,
+  requireConfirmation: false
+};
+
+function ensureAssociationTooltipElement() {
+  if (associationTooltipEl) return associationTooltipEl;
+  const el = document.createElement('div');
+  el.className = 'association-tooltip';
+  document.body.appendChild(el);
+  associationTooltipEl = el;
+  return el;
+}
+
+function showAssociationTooltip(target) {
+  if (!target) return;
+  const el = ensureAssociationTooltipElement();
+  const rect = target.getBoundingClientRect();
+  el.textContent = target.dataset.tooltipText || ASSOCIATION_TOOLTIP_TEXT;
+  el.style.left = `${rect.left + rect.width / 2}px`;
+  el.style.top = `${rect.top - 6}px`;
+  el.style.display = 'block';
+  associationTooltipHideQueued = false;
+}
+
+function hideAssociationTooltip() {
+  associationTooltipHideQueued = false;
+  if (associationTooltipEl) {
+    associationTooltipEl.style.display = 'none';
+  }
+}
+
+window.addEventListener('scroll', hideAssociationTooltip, { passive: true });
+window.addEventListener('resize', hideAssociationTooltip);
+
+function attachAssociationTooltip(el) {
+  if (!el || el.dataset.associationTooltipBound === 'true') return;
+  el.dataset.tooltipText = el.dataset.tooltipText || ASSOCIATION_TOOLTIP_TEXT;
+  const show = () => {
+    if (!document.body.contains(el)) return;
+    showAssociationTooltip(el);
+  };
+  const hide = () => {
+    associationTooltipHideQueued = true;
+    requestAnimationFrame(() => {
+      if (associationTooltipHideQueued) hideAssociationTooltip();
+    });
+  };
+  el.addEventListener('mouseover', show);
+  el.addEventListener('mouseout', hide);
+  el.addEventListener('focus', show);
+  el.addEventListener('blur', hide);
+  el.addEventListener('touchstart', () => {
+    show();
+    setTimeout(hideAssociationTooltip, 1200);
+  }, { passive: true });
+  el.dataset.associationTooltipBound = 'true';
+}
+
+function getCurrentOpportunityIdValue() {
+  const el = document.getElementById('opportunity-id-text');
+  if (!el) return null;
+  const attr = (el.getAttribute('data-id') || '').trim();
+  if (attr && attr !== '—') return attr;
+  const text = (el.textContent || '').trim();
+  if (!text || text === '—') return null;
+  return text;
+}
+
+function fetchCandidateAssociations(candidateId) {
+  if (!candidateId) return Promise.resolve([]);
+  const key = String(candidateId);
+  if (Object.prototype.hasOwnProperty.call(CANDIDATE_ASSOCIATION_CACHE, key)) {
+    return Promise.resolve(CANDIDATE_ASSOCIATION_CACHE[key]);
+  }
+  return fetch(`${API_BASE}/candidates/${candidateId}/opportunities`, { cache: 'no-store' })
+    .then((res) => {
+      if (!res.ok) throw new Error(`Association fetch failed ${res.status}`);
+      return res.json();
+    })
+    .then((data) => {
+      const list = Array.isArray(data) ? data : [];
+      CANDIDATE_ASSOCIATION_CACHE[key] = list;
+      return list;
+    })
+    .catch((err) => {
+      console.error('Unable to fetch candidate associations:', err);
+      CANDIDATE_ASSOCIATION_CACHE[key] = [];
+      return [];
+    });
+}
+
+function filterAssociationsForOtherOpportunities(list, currentOppId) {
+  if (!Array.isArray(list) || !list.length) return [];
+  const normalized = currentOppId ? String(currentOppId).trim() : '';
+  if (!normalized) {
+    const unique = new Set();
+    list.forEach((assoc) => {
+      if (assoc && assoc.opportunity_id != null) {
+        unique.add(String(assoc.opportunity_id));
+      }
+    });
+    if (unique.size <= 1) return [];
+    return list.slice();
+  }
+  return list.filter((assoc) => {
+    if (!assoc || assoc.opportunity_id == null) return false;
+    return String(assoc.opportunity_id) !== normalized;
+  });
+}
+
+function prepareCandidateAssociationRows(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((row) => {
+    const batchNumber = row.batch_number != null ? row.batch_number : row.batch_id;
+    return {
+      opportunityId: row.opportunity_id,
+      accountName: row.account_name || row.client_name || '—',
+      roleName: row.opp_position_name || row.opp_model || '—',
+      batchLabel: batchNumber != null ? `Batch #${batchNumber}` : '—',
+      statusLabel: row.batch_status || '—'
+    };
+  });
+}
+
+function renderCandidateAssociationList(container, rows) {
+  if (!container) return;
+  container.innerHTML = '';
+  if (!rows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'No linked opportunities to display.';
+    container.appendChild(empty);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'association-table';
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  ['Account', 'Opportunity', 'Batch', 'Status'].forEach((label) => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    const tdAccount = document.createElement('td');
+    tdAccount.textContent = row.accountName || '—';
+    const tdRole = document.createElement('td');
+    tdRole.textContent = row.roleName || '—';
+    const tdBatch = document.createElement('td');
+    tdBatch.textContent = row.batchLabel || '—';
+    const tdStatus = document.createElement('td');
+    tdStatus.textContent = row.statusLabel || '—';
+    tr.appendChild(tdAccount);
+    tr.appendChild(tdRole);
+    tr.appendChild(tdBatch);
+    tr.appendChild(tdStatus);
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+function openCandidateAssociationPopup({
+  candidateName,
+  associations,
+  message,
+  requireConfirmation = false,
+  onConfirm,
+  onCancel
+}) {
+  const popup = document.getElementById('candidateAssociationPopup');
+  const title = document.getElementById('candidateAssociationTitle');
+  const msg = document.getElementById('candidateAssociationMessage');
+  const list = document.getElementById('candidateAssociationList');
+  const actions = document.getElementById('candidateAssociationActions');
+  if (!popup || !list) return false;
+
+  if (title) {
+    title.textContent = candidateName
+      ? `Linked opportunities for ${candidateName}`
+      : 'Candidate associations';
+  }
+  if (msg) {
+    msg.textContent = message || '';
+  }
+  renderCandidateAssociationList(list, prepareCandidateAssociationRows(associations || []));
+  if (actions) {
+    actions.classList.toggle('hidden', !requireConfirmation);
+  }
+
+  candidateAssociationPopupState.onConfirm = typeof onConfirm === 'function' ? onConfirm : null;
+  candidateAssociationPopupState.onCancel = typeof onCancel === 'function' ? onCancel : null;
+  candidateAssociationPopupState.requireConfirmation = !!requireConfirmation;
+
+  popup.classList.remove('hidden');
+  return true;
+}
+
+function closeCandidateAssociationPopup(triggerCancel = true) {
+  const popup = document.getElementById('candidateAssociationPopup');
+  const msg = document.getElementById('candidateAssociationMessage');
+  const list = document.getElementById('candidateAssociationList');
+  if (popup) popup.classList.add('hidden');
+  if (msg) msg.textContent = '';
+  if (list) list.innerHTML = '';
+
+  if (triggerCancel && typeof candidateAssociationPopupState.onCancel === 'function') {
+    try {
+      candidateAssociationPopupState.onCancel();
+    } catch (err) {
+      console.error('Association popup cancel handler error:', err);
+    }
+  }
+
+  candidateAssociationPopupState.onConfirm = null;
+  candidateAssociationPopupState.onCancel = null;
+  candidateAssociationPopupState.requireConfirmation = false;
+}
+
+function confirmCandidateAssociationPopup() {
+  const handler = candidateAssociationPopupState.onConfirm;
+  closeCandidateAssociationPopup(false);
+  if (typeof handler === 'function') {
+    try {
+      handler();
+    } catch (err) {
+      console.error('Association popup confirm handler error:', err);
+    }
+  }
+}
+
+function wireCandidateAssociationPopup() {
+  const popup = document.getElementById('candidateAssociationPopup');
+  if (!popup || popup.dataset.wired === 'true') return;
+  popup.dataset.wired = 'true';
+  const closeBtn = document.getElementById('closeCandidateAssociationPopup');
+  const cancelBtn = document.getElementById('candidateAssociationCancelBtn');
+  const confirmBtn = document.getElementById('candidateAssociationConfirmBtn');
+
+  const cancelHandler = () => closeCandidateAssociationPopup(true);
+
+  closeBtn?.addEventListener('click', cancelHandler);
+  cancelBtn?.addEventListener('click', cancelHandler);
+  confirmBtn?.addEventListener('click', () => {
+    confirmCandidateAssociationPopup();
+  });
+  popup.addEventListener('click', (evt) => {
+    if (evt.target === popup) {
+      cancelHandler();
+    }
+  });
+}
+
+function showCandidateAssociationDetails(candidateId, candidateName, preloadedAssociations = null) {
+  const currentOppId = getCurrentOpportunityIdValue();
+  const dataPromise = preloadedAssociations
+    ? Promise.resolve(preloadedAssociations)
+    : fetchCandidateAssociations(candidateId);
+  dataPromise.then((raw) => {
+    const relevant = filterAssociationsForOtherOpportunities(raw || [], currentOppId);
+    if (!relevant.length) return;
+    openCandidateAssociationPopup({
+      candidateName,
+      associations: relevant,
+      message: `${candidateName || 'This candidate'} is also linked to the opportunities below.`,
+      requireConfirmation: false
+    });
+  });
+}
+
+function ensureCandidateAssociationAllowed(candidateId, candidateName, currentOppId) {
+  return fetchCandidateAssociations(candidateId)
+    .then((rows) => {
+      const conflicts = filterAssociationsForOtherOpportunities(rows, currentOppId);
+      if (!conflicts.length) return true;
+      return new Promise((resolve) => {
+        const opened = openCandidateAssociationPopup({
+          candidateName,
+          associations: conflicts,
+          message: 'Heads up! This candidate is already associated to another opportunity. Are you sure you want to add them?',
+          requireConfirmation: true,
+          onConfirm: () => resolve(true),
+          onCancel: () => resolve(false)
+        });
+        if (!opened) {
+          const fallback = window.confirm('This candidate is already associated to another opportunity. Do you still want to add them?');
+          resolve(Boolean(fallback));
+        }
+      });
+    })
+    .catch((err) => {
+      console.error('Unable to validate candidate associations:', err);
+      return true;
+    });
+}
+
+function decorateCandidateAssociations(card, candidate, options = {}) {
+  if (!card || !candidate) return;
+  if (card.dataset.associationDecorated === 'true' || card.dataset.associationDecorating === 'true') return;
+  const candidateId = candidate.candidate_id || candidate.id;
+  if (!candidateId) return;
+  card.dataset.associationDecorating = 'true';
+  const candidateName = candidate.name || candidate.full_name || candidate.label || 'Candidate';
+  fetchCandidateAssociations(candidateId)
+    .then((rows) => {
+      const currentOppId = getCurrentOpportunityIdValue();
+      const relevant = filterAssociationsForOtherOpportunities(rows, currentOppId);
+      if (!relevant.length) return;
+      insertAssociationIndicator(card, candidateId, candidateName, relevant, options);
+    })
+    .finally(() => {
+      card.dataset.associationDecorating = 'false';
+    });
+}
+
+function insertAssociationIndicator(card, candidateId, candidateName, associations, options = {}) {
+  if (!card || card.querySelector('.association-indicator')) return;
+  const indicator = document.createElement('span');
+  indicator.className = 'association-indicator';
+  indicator.textContent = options.emoji || '🤝';
+  indicator.style.fontSize = options.indicatorSize || '16px';
+  indicator.dataset.tooltipText = ASSOCIATION_TOOLTIP_TEXT;
+  indicator.dataset.candidateId = candidateId;
+  indicator.__associations = Array.isArray(associations) ? associations.slice() : [];
+  indicator.addEventListener('click', (evt) => {
+    evt.stopPropagation();
+    const cached = indicator.__associations ? indicator.__associations.slice() : null;
+    showCandidateAssociationDetails(candidateId, candidateName, cached);
+  });
+  attachAssociationTooltip(indicator);
+
+  const waIcon = card.querySelector('.wa-icon');
+  if (waIcon && waIcon.parentElement) {
+    waIcon.insertAdjacentElement('afterend', indicator);
+  } else if (options.fallbackTargetSelector) {
+    const fallback = card.querySelector(options.fallbackTargetSelector);
+    if (fallback) {
+      fallback.appendChild(indicator);
+    } else {
+      (card.querySelector('.candidate-card-header') || card).appendChild(indicator);
+    }
+  } else {
+    (card.querySelector('.candidate-card-header') || card).appendChild(indicator);
+  }
+  card.dataset.associationDecorated = 'true';
+}
+window.decorateCandidateAssociations = decorateCandidateAssociations;
 
 // Trae y cachea el teléfono si no vino en el pipeline
 async function resolvePhone(candidate){
@@ -561,6 +922,7 @@ card.innerHTML = `
 </div>
 `;
 decorateUsingCandidateBlacklist(card, candidate, rawBlacklist);
+decorateCandidateAssociations(card, candidate);
 // WhatsApp click (robusto con fallback a /candidates/:id)
 // WhatsApp click (robusto con fallback a /candidates/:id)
 {
@@ -924,14 +1286,14 @@ function renderPipelineSearchResults(items) {
     actionBtn.textContent = 'Add';
     actionBtn.addEventListener('click', (evt) => {
       evt.stopPropagation();
-      linkCandidateToPipeline(candidate.candidate_id, actionBtn);
+      linkCandidateToPipeline(candidate.candidate_id, actionBtn, candidate.name || '(no name)');
     });
 
     wrapper.appendChild(details);
     wrapper.appendChild(actionBtn);
     li.appendChild(wrapper);
     li.addEventListener('click', () => {
-      linkCandidateToPipeline(candidate.candidate_id, actionBtn);
+      linkCandidateToPipeline(candidate.candidate_id, actionBtn, candidate.name || '(no name)');
     });
     fragment.appendChild(li);
   });
@@ -940,13 +1302,16 @@ function renderPipelineSearchResults(items) {
 
 // Pipeline search uses this helper to call POST /opportunities/<id>/candidates/link,
 // which only inserts the relationship row in opportunity_candidates.
-async function linkCandidateToPipeline(candidateId, triggerButton) {
+async function linkCandidateToPipeline(candidateId, triggerButton, candidateName = '') {
   const opportunityEl = document.getElementById('opportunity-id-text');
   const opportunityId = opportunityEl?.getAttribute('data-id') || opportunityEl?.textContent || '';
   if (!candidateId || !opportunityId || opportunityId === '—') {
     showPipelineSearchNotice('error', 'Opportunity ID not found.');
     return;
   }
+  const candidateLabel = (candidateName || '').trim() || 'this candidate';
+  const allow = await ensureCandidateAssociationAllowed(candidateId, candidateLabel, opportunityId);
+  if (!allow) return;
 
   setCandidateLinkButtonState(triggerButton, true);
   try {
@@ -1019,3 +1384,5 @@ function debounce(fn, wait = 300) {
     timeout = setTimeout(() => fn.apply(null, args), wait);
   };
 }
+
+document.addEventListener('DOMContentLoaded', wireCandidateAssociationPopup);

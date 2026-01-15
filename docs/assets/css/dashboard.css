@@ -175,7 +175,52 @@ body{
 .money-gif{ width:100%; height:100%; object-fit:cover; display:block; }
 
 /* ========================
-   7) EXPECTED CARD (distinct look)
+   7) KPI SNAPSHOTS / INTERACTIVE CARDS
+   ======================== */
+.metrics-card .metrics-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:16px;
+  padding:20px;
+}
+.metrics-grid--dual{ grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
+.metrics-tile{
+  border:1px solid rgba(99,102,241,.14);
+  border-radius:18px;
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(247,248,255,.9));
+  box-shadow:0 10px 30px rgba(15,23,42,.08);
+  padding:18px 20px;
+  text-align:left;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  font-family:inherit;
+  color:inherit;
+  transition:transform .15s ease, box-shadow .2s ease;
+}
+.metrics-tile:hover{
+  transform:translateY(-2px);
+  box-shadow:0 14px 36px rgba(99,102,241,.18);
+}
+.metrics-tile:focus-visible{
+  transform:translateY(-2px);
+  box-shadow:0 14px 36px rgba(99,102,241,.18);
+  outline:3px solid #c7d2fe;
+  outline-offset:3px;
+}
+.metrics-label{
+  font-size:.95rem;
+  font-weight:700;
+  color:#4c4f73;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+.metrics-value{ font-size:2rem; font-weight:800; color:#111827; }
+.metrics-sub{ font-size:.92rem; color:var(--muted); }
+
+/* ========================
+   8) EXPECTED CARD (distinct look)
    ======================== */
 .card.expected{
   position:relative; overflow:hidden; border-radius:20px;
@@ -230,7 +275,7 @@ body{
 .card.expected .kpi::before{ content:none !important; }
 
 /* ========================
-   8) TSR/TSF CHART STYLING
+   9) TSR/TSF CHART STYLING
    ======================== */
 #tsHistoryCard .chart-wrap{ padding:12px 12px 6px; position:relative; }
 #tsHistoryChart{ width:100%; height:auto; display:block; color:var(--ink); }
@@ -266,7 +311,114 @@ body{
 .chart-tooltip .muted{ font-size:.8rem; color:var(--muted); margin-top:6px; }
 
 /* ========================
-   9) TITLES / UTILITIES
+   10) METRICS DIALOG & TABLES
+   ======================== */
+.metrics-dialog{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:40;
+}
+.metrics-dialog.open{ display:flex; }
+.metrics-dialog__backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(11,19,48,.35);
+  backdrop-filter:blur(4px);
+}
+.metrics-dialog__panel{
+  position:relative;
+  width:min(720px, 100%);
+  max-height:90vh;
+  background:#fff;
+  border-radius:28px;
+  border:1px solid rgba(99,102,241,.12);
+  box-shadow:0 30px 80px rgba(5,8,20,.25);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.metrics-dialog__header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  padding:24px 28px 12px;
+  border-bottom:1px solid rgba(15,23,42,.06);
+}
+.metrics-dialog__header h3{ margin:0; font-size:1.35rem; font-weight:800; }
+.metrics-dialog__close{
+  border:none;
+  background:#fff;
+  font-size:1.5rem;
+  cursor:pointer;
+  color:#6b7280;
+  border-radius:999px;
+  width:36px; height:36px;
+  display:grid; place-items:center;
+  box-shadow:0 4px 12px rgba(15,23,42,.08);
+}
+.metrics-dialog__close:hover{ color:#0f172a; }
+.metrics-dialog__body{
+  padding:20px 28px 28px;
+  overflow:auto;
+}
+.metrics-search{
+  width:100%;
+  border:1px solid rgba(99,102,241,.18);
+  border-radius:16px;
+  padding:10px 14px;
+  margin-bottom:16px;
+  font-size:.95rem;
+}
+.metrics-summary{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.metrics-summary strong{
+  font-size:.85rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:#6b7280;
+}
+.metrics-summary span{
+  font-size:1.35rem;
+  font-weight:800;
+  color:#0f172a;
+}
+.metrics-table{
+  width:100%;
+  border-collapse:collapse;
+  font-variant-numeric:tabular-nums;
+}
+.metrics-table th,
+.metrics-table td{
+  text-align:left;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(15,23,42,.08);
+}
+.metrics-table th{
+  font-size:.78rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:#6b7280;
+}
+.metrics-table td:last-child{
+  text-align:right;
+  font-weight:700;
+}
+.metrics-table tbody tr:hover{ background:rgba(99,102,241,.05); }
+body.dialog-open{ overflow:hidden; }
+
+/* ========================
+   11) TITLES / UTILITIES
    ======================== */
 .title-with-info{ display:inline-flex; align-items:center; gap:8px; }
 .card-head--center{ display:flex; flex-direction:column; align-items:center; gap:6px; }
@@ -289,7 +441,7 @@ body{
 .info-ghost:hover{ opacity:1; box-shadow: inset 0 0 0 1px rgba(99,102,241,.28); }
 
 /* ========================
-   10) RESPONSIVE
+   12) RESPONSIVE
    ======================== */
 @media (prefers-reduced-motion:no-preference){
   .h2--bluegrad{ background-size:180% 100%; animation: gradSlide 12s ease-in-out infinite alternate; }
@@ -297,6 +449,11 @@ body{
 }
 
 @media (max-width:720px){
+  .metrics-card .metrics-grid,
+  .metrics-grid--dual{
+    grid-template-columns:1fr;
+  }
+
   /* Expected */
   .expected-grid{ grid-template-columns:1fr; }
   .expected-head{ gap:10px; padding:16px 14px 6px; }

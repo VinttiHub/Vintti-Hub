@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
-from psycopg2.extras import execute_values
+from psycopg2.extras import RealDictCursor, execute_values
 
 from db import get_connection
 
@@ -424,3 +424,259 @@ def ts_history():
         import traceback
         logging.error("❌ ts_history failed: %s\n%s", exc, traceback.format_exc())
         return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/metrics/management_dashboard', methods=['GET'])
+def management_dashboard_metrics():
+    """
+    Aggregated data for the Management Metrics dashboard:
+      - Recruiting revenue by account for rolling 30d + previous month
+      - Active employees (staffing/recruiting) per account
+      - Staffing LTV value (avg active months per client)
+    """
+    today = datetime.utcnow().date()
+    last30_start = today - timedelta(days=30)
+    last30_end = today
+
+    current_month_start = today.replace(day=1)
+    prev_month_end = current_month_start - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        # --- Recruiting revenue (two ranges) ---
+        cur.execute(
+            """
+            WITH recruiting_rows AS (
+              SELECT
+                ho.account_id,
+                CASE
+                  WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+                  WHEN NULLIF(ho.start_date, '') IS NOT NULL THEN NULLIF(ho.start_date, '')::date
+                  ELSE NULL
+                END AS start_d,
+                COALESCE(NULLIF(TRIM(CAST(ho.revenue AS TEXT)), ''), '0')::numeric AS revenue
+              FROM hire_opportunity ho
+              JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+              WHERE ho.account_id IS NOT NULL
+                AND o.opp_model ILIKE 'recruiting%%'
+            ),
+            buyout_rows AS (
+              SELECT
+                b.account_id,
+                CASE
+                  WHEN NULLIF(b.start_date, '') IS NOT NULL THEN NULLIF(b.start_date, '')::date
+                  ELSE NULL
+                END AS start_d,
+                COALESCE(NULLIF(TRIM(CAST(b.revenue AS TEXT)), ''), '0')::numeric AS revenue
+              FROM buyouts b
+              WHERE b.account_id IS NOT NULL
+            ),
+            events AS (
+              SELECT * FROM recruiting_rows
+              UNION ALL
+              SELECT * FROM buyout_rows
+            )
+            SELECT
+              e.account_id,
+              a.client_name,
+              SUM(CASE WHEN e.start_d BETWEEN %s AND %s THEN e.revenue ELSE 0 END) AS last_30,
+              SUM(CASE WHEN e.start_d BETWEEN %s AND %s THEN e.revenue ELSE 0 END) AS previous_month
+            FROM events e
+            LEFT JOIN account a ON a.account_id = e.account_id
+            WHERE e.start_d IS NOT NULL
+            GROUP BY e.account_id, a.client_name
+            """,
+            (last30_start, last30_end, prev_month_start, prev_month_end),
+        )
+        revenue_rows = cur.fetchall()
+
+        revenue_summary = {
+            "last30": {"from": str(last30_start), "to": str(last30_end), "total": 0, "accounts": []},
+            "previousMonth": {
+                "from": str(prev_month_start),
+                "to": str(prev_month_end),
+                "total": 0,
+                "accounts": [],
+            },
+        }
+
+        for row in revenue_rows:
+            account_id = row.get("account_id")
+            account_name = row.get("client_name")
+            last30_val = float(row.get("last_30") or 0)
+            prev_val = float(row.get("previous_month") or 0)
+
+            if last30_val > 0:
+                revenue_summary["last30"]["accounts"].append(
+                    {"account_id": account_id, "client_name": account_name, "amount": last30_val}
+                )
+                revenue_summary["last30"]["total"] += last30_val
+
+            if prev_val > 0:
+                revenue_summary["previousMonth"]["accounts"].append(
+                    {"account_id": account_id, "client_name": account_name, "amount": prev_val}
+                )
+                revenue_summary["previousMonth"]["total"] += prev_val
+
+        for key in ("last30", "previousMonth"):
+            revenue_summary[key]["accounts"].sort(key=lambda it: it["amount"], reverse=True)
+
+        # --- Active employees by model ---
+        cur.execute(
+            """
+            WITH hire_rows AS (
+              SELECT
+                ho.account_id,
+                LOWER(o.opp_model) AS model,
+                CASE
+                  WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+                  WHEN NULLIF(ho.start_date, '') IS NOT NULL THEN NULLIF(ho.start_date, '')::date
+                  ELSE NULL
+                END AS start_d,
+                CASE
+                  WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+                  WHEN ho.end_date IS NULL OR ho.end_date = '' THEN NULL
+                  ELSE ho.end_date::date
+                END AS end_d
+              FROM hire_opportunity ho
+              JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+              WHERE ho.account_id IS NOT NULL
+            ),
+            buyout_rows AS (
+              SELECT
+                b.account_id,
+                'recruiting' AS model,
+                CASE
+                  WHEN NULLIF(b.start_date, '') IS NOT NULL THEN NULLIF(b.start_date, '')::date
+                  ELSE NULL
+                END AS start_d,
+                CASE
+                  WHEN NULLIF(b.end_date, '') IS NOT NULL THEN NULLIF(b.end_date, '')::date
+                  ELSE NULL
+                END AS end_d
+              FROM buyouts b
+              WHERE b.account_id IS NOT NULL
+            ),
+            all_rows AS (
+              SELECT * FROM hire_rows
+              UNION ALL
+              SELECT * FROM buyout_rows
+            )
+            SELECT
+              r.account_id,
+              a.client_name,
+              r.model,
+              COUNT(*) FILTER (
+                WHERE r.start_d IS NOT NULL
+                  AND r.start_d <= %s
+                  AND (r.end_d IS NULL OR r.end_d >= %s)
+              ) AS active_now
+            FROM all_rows r
+            LEFT JOIN account a ON a.account_id = r.account_id
+            WHERE r.model IN ('staffing', 'recruiting')
+            GROUP BY r.account_id, a.client_name, r.model
+            """,
+            (today, today),
+        )
+        active_rows = cur.fetchall()
+
+        active_summary = {
+            "asOf": str(today),
+            "staffing": {"total": 0, "accounts": []},
+            "recruiting": {"total": 0, "accounts": []},
+        }
+
+        for row in active_rows:
+            model = (row.get("model") or "").strip()
+            count = int(row.get("active_now") or 0)
+            if count <= 0 or model not in active_summary:
+                continue
+            account_entry = {
+                "account_id": row.get("account_id"),
+                "client_name": row.get("client_name"),
+                "count": count,
+            }
+            active_summary[model]["accounts"].append(account_entry)
+            active_summary[model]["total"] += count
+
+        for key in ("staffing", "recruiting"):
+            active_summary[key]["accounts"].sort(key=lambda it: it["count"], reverse=True)
+
+        # --- LTV value ---
+        cur.execute(
+            """
+            WITH candidatos AS (
+              SELECT
+                ho.candidate_id,
+                ho.account_id,
+                CASE
+                  WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+                  WHEN NULLIF(ho.start_date, '') IS NOT NULL THEN NULLIF(ho.start_date, '')::date
+                  ELSE NULL
+                END AS start_d,
+                CASE
+                  WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+                  WHEN ho.end_date IS NULL OR ho.end_date = '' THEN NULL
+                  ELSE ho.end_date::date
+                END AS end_d
+              FROM hire_opportunity ho
+              JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+              WHERE ho.candidate_id IS NOT NULL
+                AND (
+                  ho.carga_active IS NOT NULL
+                  OR NULLIF(ho.start_date, '') IS NOT NULL
+                )
+                AND o.opp_model = 'Staffing'
+            ),
+            meses AS (
+              SELECT DATE_TRUNC('month', gs)::date AS mes
+              FROM generate_series(
+                (SELECT MIN(start_d) FROM candidatos),
+                (SELECT MAX(COALESCE(end_d, CURRENT_DATE)) FROM candidatos),
+                interval '1 month'
+              ) gs
+            ),
+            activos_mes AS (
+              SELECT
+                m.mes,
+                c.account_id,
+                COUNT(DISTINCT c.candidate_id) AS activos
+              FROM meses m
+              JOIN candidatos c
+                ON c.start_d < (m.mes + interval '1 month')
+               AND (c.end_d IS NULL OR c.end_d >= m.mes)
+              GROUP BY 1,2
+            ),
+            duracion_cliente AS (
+              SELECT
+                account_id,
+                COUNT(*) AS active_months
+              FROM activos_mes
+              WHERE activos > 0
+              GROUP BY account_id
+            )
+            SELECT AVG(active_months)::numeric(10,0) AS promedio_meses_por_cliente
+            FROM duracion_cliente;
+            """
+        )
+        ltv_row = cur.fetchone()
+        ltv_value = ltv_row.get("promedio_meses_por_cliente") if ltv_row else None
+        ltv_value = float(ltv_value) if ltv_value is not None else None
+
+        return jsonify(
+            {
+                "recruitingRevenue": revenue_summary,
+                "activeEmployees": active_summary,
+                "ltvMonths": ltv_value,
+            }
+        )
+    except Exception as exc:
+        import traceback
+        logging.error("❌ management_dashboard failed: %s\n%s", exc, traceback.format_exc())
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()

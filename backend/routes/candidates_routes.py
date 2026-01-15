@@ -964,10 +964,21 @@ def get_opportunities_by_candidate(candidate_id):
                 o.opp_sales_lead,
                 o.opp_stage,
                 o.opp_hr_lead,
-                a.client_name
+                a.client_name,
+                a.client_name AS account_name,
+                b.batch_id,
+                b.batch_number,
+                cb.status AS batch_status
             FROM opportunity o
-            JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
-            LEFT JOIN account a ON o.account_id = a.account_id
+            JOIN opportunity_candidates oc
+              ON o.opportunity_id = oc.opportunity_id
+            LEFT JOIN account a
+              ON o.account_id = a.account_id
+            LEFT JOIN candidates_batches cb
+              ON cb.candidate_id = oc.candidate_id
+            LEFT JOIN batch b
+              ON b.batch_id = cb.batch_id
+             AND b.opportunity_id = o.opportunity_id
             WHERE oc.candidate_id = %s
         """, (candidate_id,))
         

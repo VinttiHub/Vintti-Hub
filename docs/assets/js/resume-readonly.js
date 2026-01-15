@@ -15,32 +15,32 @@ document.addEventListener("DOMContentLoaded", async () => {
       Object.assign(watermarkLayer.style, {
         position: "fixed",
         inset: "0",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         pointerEvents: "none",
-        zIndex: "9999",
+        zIndex: "0",
+        opacity: "0.08",
+        mixBlendMode: "multiply",
       });
-      const watermark = document.createElement("div");
-      watermark.textContent = "vintti";
-      Object.assign(watermark.style, {
-        fontSize: "220px",
-        fontWeight: "700",
-        color: "#003BFF",
-        opacity: "0.12",
-        textTransform: "lowercase",
-        letterSpacing: "12px",
-        userSelect: "none",
-        transform: "rotate(-18deg)",
-        textShadow: "0 10px 30px rgba(0,59,255,0.15)",
-      });
-      watermarkLayer.appendChild(watermark);
+      const svgMarkup = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500">
+          <text x="-50" y="300" fill="rgba(0,59,255,0.45)" font-size="120" font-family="Onest, sans-serif" font-weight="700" transform="rotate(-30 0 250)">
+            VINTTI
+          </text>
+        </svg>`;
+      watermarkLayer.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svgMarkup)}")`;
+      watermarkLayer.style.backgroundRepeat = "repeat";
+      watermarkLayer.style.backgroundSize = "520px 520px";
+      watermarkLayer.style.transform = "translateZ(0)";
       bodyEl.appendChild(watermarkLayer);
     }
     const header = document.querySelector(".cv-header");
     if (header) header.remove();
     const footer = document.querySelector(".cv-footer");
     if (footer) footer.remove();
+    const container = document.querySelector(".cv-container");
+    if (container) {
+      container.style.position = "relative";
+      container.style.zIndex = "5";
+    }
   }
 
   const notifyParent = (status) => {

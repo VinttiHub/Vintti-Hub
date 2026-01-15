@@ -1,5 +1,14 @@
 // ===== Helpers =====
 const API = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const MANAGEMENT_METRICS_DATA = {
+  recruitingRevenue: null,
+  activeEmployees: null,
+  ltvMonths: null,
+  expectedTotals: null
+};
+const DATE_FMT_SHORT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const DATE_FMT_LONG = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const INTEGER_FORMATTER = new Intl.NumberFormat('en-US');
 
 /** Normalize any string-ish value to lowercased, trimmed text. */
 function norm(s){ return String(s || '').toLowerCase().trim(); }
@@ -38,6 +47,164 @@ function fmtMoney(v){
   return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
+function fmtInteger(v){
+  const num = Number(v) || 0;
+  return INTEGER_FORMATTER.format(num);
+}
+
+function parseISODate(value){
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatRangeLabel(range){
+  if (!range) return '—';
+  const start = parseISODate(range.from);
+  const end = parseISODate(range.to);
+  if (!start || !end) return '—';
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const startFmt = (sameYear ? DATE_FMT_SHORT : DATE_FMT_LONG).format(start);
+  const endFmt = DATE_FMT_LONG.format(end);
+  return `${startFmt} → ${endFmt}`;
+}
+
+function formatFullDate(value){
+  const date = parseISODate(value);
+  return date ? DATE_FMT_LONG.format(date) : '—';
+}
+
+const MetricsDialog = (() => {
+  const root = document.getElementById('metricsDialog');
+  if (!root) return { open(){}, close(){} };
+
+  const titleEl = root.querySelector('#metricsDialogTitle');
+  const subtitleEl = root.querySelector('#metricsDialogSubtitle');
+  const bodyEl = root.querySelector('#metricsDialogBody');
+  const closeBtn = root.querySelector('.metrics-dialog__close');
+  const backdrop = root.querySelector('[data-close-dialog]');
+  let isOpen = false;
+
+  const close = () => {
+    if (!isOpen) return;
+    root.classList.remove('open');
+    root.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('dialog-open');
+    isOpen = false;
+  };
+
+  const open = ({ title, subtitle = '', content }) => {
+    if (!bodyEl) return;
+    if (titleEl) titleEl.textContent = title || 'Details';
+    if (subtitleEl) subtitleEl.textContent = subtitle || '';
+    bodyEl.innerHTML = '';
+    if (content instanceof Node) {
+      bodyEl.appendChild(content);
+    } else if (typeof content === 'string') {
+      bodyEl.innerHTML = content;
+    }
+    root.classList.add('open');
+    root.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('dialog-open');
+    isOpen = true;
+  };
+
+  closeBtn?.addEventListener('click', close);
+  backdrop?.addEventListener('click', close);
+  document.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Escape') close();
+  });
+
+  return { open, close };
+})();
+
+function buildMetricsTable(rows, {
+  columns = [],
+  rowRenderer = () => [],
+  searchPlaceholder = 'Search…',
+  emptyLabel = 'No data available.',
+  searchValue = (row) => String(row?.client_name || '').toLowerCase()
+} = {}){
+  const data = Array.isArray(rows) ? rows : [];
+  if (!data.length){
+    const empty = document.createElement('p');
+    empty.className = 'muted';
+    empty.textContent = emptyLabel;
+    return empty;
+  }
+
+  const wrap = document.createElement('div');
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'metrics-search';
+  search.placeholder = searchPlaceholder;
+  wrap.appendChild(search);
+
+  const table = document.createElement('table');
+  table.className = 'metrics-table';
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const columnLabels = columns.length ? columns : ['Item', 'Value'];
+  columnLabels.forEach(label => {
+    const th = document.createElement('th');
+    th.textContent = label;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  const tbody = document.createElement('tbody');
+  table.append(thead, tbody);
+  wrap.appendChild(table);
+
+  const renderRows = () => {
+    const query = search.value.trim().toLowerCase();
+    const filtered = query
+      ? data.filter(row => searchValue(row).includes(query))
+      : data;
+    tbody.innerHTML = '';
+    if (!filtered.length){
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = columnLabels.length;
+      td.classList.add('muted');
+      td.textContent = emptyLabel;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+    filtered.forEach(row => {
+      const cells = rowRenderer(row) || [];
+      const tr = document.createElement('tr');
+      cells.forEach(value => {
+        const td = document.createElement('td');
+        td.textContent = value != null ? String(value) : '';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  };
+
+  renderRows();
+  search.addEventListener('input', renderRows);
+  return wrap;
+}
+
+function buildKeyValueTable(rows){
+  const table = document.createElement('table');
+  table.className = 'metrics-table';
+  const tbody = document.createElement('tbody');
+  rows.forEach(([label, value]) => {
+    const tr = document.createElement('tr');
+    const keyTd = document.createElement('td');
+    keyTd.textContent = label;
+    const valTd = document.createElement('td');
+    valTd.textContent = value;
+    tr.append(keyTd, valTd);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
 // ======= TSR/TSF History (Staffing) =======
 // === Expected (Fee & Revenue) por modelo (Staffing / Recruiting) ===
 /**
@@ -69,16 +236,29 @@ function computeExpectedByModel(opps){
 /**
  * Push KPI numbers into fixed DOM ids.
  */
-function renderExpectedByModel(modelTotals){
+function renderExpectedByModel(modelTotals, options = {}){
+  const multiplier = Number(options.ltvMultiplier);
+  const ltv = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : null;
+  const staffingFee = ltv ? modelTotals.staffing.fee * ltv : modelTotals.staffing.fee;
+  const staffingRev = ltv ? modelTotals.staffing.revenue * ltv : modelTotals.staffing.revenue;
   const map = [
-    ['kpiExpectedFeeStaff', modelTotals.staffing.fee],
-    ['kpiExpectedRevStaff', modelTotals.staffing.revenue],
+    ['kpiExpectedFeeStaff', staffingFee],
+    ['kpiExpectedRevStaff', staffingRev],
     ['kpiExpectedRevRec',   modelTotals.recruiting.revenue],
   ];
   for (const [id, val] of map){
     const el = document.getElementById(id);
     if (el) el.textContent = fmtMoney(val);
   }
+  MANAGEMENT_METRICS_DATA.expectedTotals = {
+    raw: modelTotals,
+    ltvMultiplier: ltv,
+    applied: {
+      staffingFee,
+      staffingRevenue: staffingRev,
+      recruitingRevenue: modelTotals.recruiting.revenue
+    }
+  };
 }
 
 /**
@@ -371,6 +551,12 @@ async function fetchAccountsLight(){
   return Array.isArray(arr) ? arr : [];
 }
 
+async function fetchManagementMetrics(){
+  const r = await fetch(`${API}/metrics/management_dashboard`, { credentials: 'include' });
+  if (!r.ok) throw new Error(`Management metrics HTTP ${r.status}`);
+  return r.json();
+}
+
 // ===== Render Tabla Oportunidades =====
 function buildEmptyMatrix(){
   return {
@@ -470,6 +656,142 @@ function renderMRRFromAccounts(accounts){
   if (elTSF) elTSF.textContent = fmtMoney(totalTSF);
 }
 
+function getRevenueRangeLabel(rangeKey){
+  return rangeKey === 'previousMonth' ? 'Previous month' : 'Last 30 days';
+}
+
+function renderRecruitingRevenueCard(summary){
+  const card = document.getElementById('recruitingRevenueCard');
+  MANAGEMENT_METRICS_DATA.recruitingRevenue = summary || null;
+  if (!card) return;
+  if (!summary){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+  const last30 = summary.last30 || {};
+  const prev = summary.previousMonth || {};
+
+  const last30Val = document.getElementById('recRevenueLast30Value');
+  const last30Dates = document.getElementById('recRevenueLast30Dates');
+  if (last30Val) last30Val.textContent = fmtMoney(last30.total || 0);
+  if (last30Dates) last30Dates.textContent = formatRangeLabel(last30);
+
+  const prevVal = document.getElementById('recRevenuePrevValue');
+  const prevDates = document.getElementById('recRevenuePrevDates');
+  if (prevVal) prevVal.textContent = fmtMoney(prev.total || 0);
+  if (prevDates) prevDates.textContent = formatRangeLabel(prev);
+}
+
+function renderActiveEmployeesCard(summary){
+  const card = document.getElementById('activeEmployeesCard');
+  MANAGEMENT_METRICS_DATA.activeEmployees = summary || null;
+  if (!card) return;
+  if (!summary){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  const asOf = document.getElementById('activeEmployeesAsOf');
+  if (asOf) asOf.textContent = summary.asOf ? `As of ${formatFullDate(summary.asOf)}` : 'As of —';
+
+  const staffingTotal = summary.staffing?.total ?? 0;
+  const recruitingTotal = summary.recruiting?.total ?? 0;
+
+  const staffEl = document.getElementById('activeStaffingValue');
+  const recEl = document.getElementById('activeRecruitingValue');
+  if (staffEl) staffEl.textContent = fmtInteger(staffingTotal);
+  if (recEl) recEl.textContent = fmtInteger(recruitingTotal);
+}
+
+function openRecruitingRevenueDetail(rangeKey){
+  const summary = MANAGEMENT_METRICS_DATA.recruitingRevenue;
+  if (!summary || !rangeKey) return;
+  const rangeData = summary[rangeKey];
+  if (!rangeData) return;
+
+  const accounts = Array.isArray(rangeData.accounts) ? rangeData.accounts.slice() : [];
+  accounts.sort((a, b) => (Number(b?.amount) || 0) - (Number(a?.amount) || 0));
+
+  const container = document.createElement('div');
+  const totalRow = document.createElement('div');
+  totalRow.className = 'metrics-summary';
+  totalRow.innerHTML = `<strong>Total</strong><span>${fmtMoney(rangeData.total || 0)}</span>`;
+  container.appendChild(totalRow);
+
+  const tableNode = buildMetricsTable(accounts, {
+    columns: ['Account', 'Revenue'],
+    searchPlaceholder: 'Search accounts…',
+    emptyLabel: 'No accounts found for this period.',
+    searchValue: (row) => String(row?.client_name || '').toLowerCase(),
+    rowRenderer: (row) => {
+      const label = (row?.client_name || '').trim() || `Account #${row?.account_id ?? '—'}`;
+      return [label, fmtMoney(row?.amount || 0)];
+    }
+  });
+  container.appendChild(tableNode);
+
+  MetricsDialog.open({
+    title: 'Recruiting Revenue',
+    subtitle: `${getRevenueRangeLabel(rangeKey)} · ${formatRangeLabel(rangeData)}`,
+    content: container
+  });
+}
+
+function openActiveEmployeesDetail(modelKey){
+  const summary = MANAGEMENT_METRICS_DATA.activeEmployees;
+  if (!summary || !modelKey || !summary[modelKey]) return;
+  const bucket = summary[modelKey];
+  const accounts = Array.isArray(bucket.accounts) ? bucket.accounts.slice() : [];
+  accounts.sort((a, b) => (Number(b?.count) || 0) - (Number(a?.count) || 0));
+
+  const container = document.createElement('div');
+  const totalRow = document.createElement('div');
+  totalRow.className = 'metrics-summary';
+  const prettyLabel = modelKey === 'staffing' ? 'Staffing' : 'Recruiting';
+  totalRow.innerHTML = `<strong>Total ${prettyLabel}</strong><span>${fmtInteger(bucket.total || 0)}</span>`;
+  container.appendChild(totalRow);
+
+  const tableNode = buildMetricsTable(accounts, {
+    columns: ['Account', 'Active employees'],
+    searchPlaceholder: 'Filter accounts…',
+    emptyLabel: 'No active employees for this model.',
+    searchValue: (row) => String(row?.client_name || '').toLowerCase(),
+    rowRenderer: (row) => {
+      const label = (row?.client_name || '').trim() || `Account #${row?.account_id ?? '—'}`;
+      return [label, fmtInteger(row?.count || 0)];
+    }
+  });
+  container.appendChild(tableNode);
+
+  MetricsDialog.open({
+    title: 'Active Employees',
+    subtitle: `${prettyLabel} · As of ${formatFullDate(summary.asOf)}`,
+    content: container
+  });
+}
+
+function openExpectedBreakdown(){
+  const data = MANAGEMENT_METRICS_DATA.expectedTotals;
+  if (!data) return;
+  const ltv = data.ltvMultiplier;
+  const rows = [
+    ['Staffing fee (pipeline)', fmtMoney(data.raw.staffing.fee)],
+    ['Staffing fee × LTV', fmtMoney(data.applied.staffingFee)],
+    ['Staffing revenue (pipeline)', fmtMoney(data.raw.staffing.revenue)],
+    ['Staffing revenue × LTV', fmtMoney(data.applied.staffingRevenue)],
+    ['Recruiting revenue (pipeline)', fmtMoney(data.raw.recruiting.revenue)],
+    ['LTV (avg months per client)', ltv ? `${fmtInteger(ltv)} months` : 'Not available']
+  ];
+  const table = buildKeyValueTable(rows);
+  MetricsDialog.open({
+    title: 'Expected · Pipeline',
+    subtitle: ltv ? `LTV multiplier applied (${fmtInteger(ltv)} months)` : 'LTV multiplier not available',
+    content: table
+  });
+}
+
 // ===== Orchestración =====
 async function loadTSHistorySection(){
   try {
@@ -484,18 +806,28 @@ async function loadDashboard(){
   try{
     document.body.classList.add('loading');
 
-    // 1) Opportunities table
-    const opps = await fetchOpportunitiesLight();
+    const managementPromise = fetchManagementMetrics().catch(err => {
+      console.warn('Management metrics error:', err);
+      return null;
+    });
+
+    const [opps, accounts, management] = await Promise.all([
+      fetchOpportunitiesLight(),
+      fetchAccountsLight(),
+      managementPromise
+    ]);
+
     const matrix = computeMatrix(opps);
     renderTable(matrix);
 
-    // 1.b) Expected Fee/Revenue (pipeline filters)
+    const ltvCandidate = Number(management?.ltvMonths);
+    MANAGEMENT_METRICS_DATA.ltvMonths = Number.isFinite(ltvCandidate) && ltvCandidate > 0 ? ltvCandidate : null;
     const expectedByModel = computeExpectedByModel(opps);
-    renderExpectedByModel(expectedByModel);
+    renderExpectedByModel(expectedByModel, { ltvMultiplier: MANAGEMENT_METRICS_DATA.ltvMonths });
 
-    // 2) MRR from accounts
-    const accounts = await fetchAccountsLight();
     renderMRRFromAccounts(accounts);
+    renderRecruitingRevenueCard(management?.recruitingRevenue || null);
+    renderActiveEmployeesCard(management?.activeEmployees || null);
   }catch(e){
     console.warn('Dashboard load error:', e);
   }finally{
@@ -507,6 +839,25 @@ async function loadDashboard(){
 document.addEventListener('DOMContentLoaded', () => {
   loadDashboard();
   loadTSHistorySection();
+  const revenueCard = document.getElementById('recruitingRevenueCard');
+  revenueCard?.querySelectorAll('.metrics-tile').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const range = btn.getAttribute('data-range');
+      if (range) openRecruitingRevenueDetail(range);
+    });
+  });
+  const activeCard = document.getElementById('activeEmployeesCard');
+  activeCard?.querySelectorAll('.metrics-tile').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const model = btn.getAttribute('data-model');
+      if (model) openActiveEmployeesDetail(model);
+    });
+  });
+  const expectedCard = document.getElementById('expectedCard');
+  expectedCard?.addEventListener('click', (evt) => {
+    if (evt.target.closest('.info-ghost')) return;
+    openExpectedBreakdown();
+  });
   document.getElementById('refreshBtn')?.addEventListener('click', () => {
     loadDashboard();
     loadTSHistorySection();
