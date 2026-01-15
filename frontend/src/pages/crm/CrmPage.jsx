@@ -123,7 +123,26 @@ function CrmPage() {
 
   function handleFormChange(event) {
     const { name, value } = event.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
+    setFormState((prev) => {
+      if (name === 'referral_mode') {
+        return {
+          ...prev,
+          referral_mode: value,
+          ...(value === 'other' ? { referal_source: '' } : { referal_source_other: '' }),
+        };
+      }
+      if (name === 'where_come_from') {
+        const isReferral = (value || '').toLowerCase() === 'referral';
+        return {
+          ...prev,
+          where_come_from: value,
+          ...(isReferral
+            ? {}
+            : { referal_source: '', referal_source_other: '', referral_mode: 'existing' }),
+        };
+      }
+      return { ...prev, [name]: value };
+    });
     setModalError('');
   }
 
@@ -318,19 +337,53 @@ function NewAccountModal({ formState, referralOptions, onChange, onClose, onSubm
           {isReferral && (
             <div className="popup-field" id="referralSourceWrapper">
               <label>Referral – Client</label>
-              <input
-                type="text"
-                name="referal_source"
-                value={formState.referal_source}
-                onChange={onChange}
-                list="referralList"
-                placeholder="Type to search clients..."
-              />
-              <datalist id="referralList">
-                {referralOptions.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
+              <div className="referral-source-mode" role="group" aria-label="Referral type">
+                <label className="inline-radio">
+                  <input
+                    type="radio"
+                    name="referral_mode"
+                    value="existing"
+                    checked={formState.referral_mode !== 'other'}
+                    onChange={onChange}
+                  />
+                  Existing client
+                </label>
+                <label className="inline-radio">
+                  <input
+                    type="radio"
+                    name="referral_mode"
+                    value="other"
+                    checked={formState.referral_mode === 'other'}
+                    onChange={onChange}
+                  />
+                  Other
+                </label>
+              </div>
+              {formState.referral_mode === 'other' ? (
+                <input
+                  type="text"
+                  name="referal_source_other"
+                  value={formState.referal_source_other}
+                  onChange={onChange}
+                  placeholder="Who referred this account?"
+                />
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    name="referal_source"
+                    value={formState.referal_source}
+                    onChange={onChange}
+                    list="referralList"
+                    placeholder="Type to search clients..."
+                  />
+                  <datalist id="referralList">
+                    {referralOptions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                </>
+              )}
             </div>
           )}
           <FormSelect label="Outsource before" name="outsource" value={formState.outsource} onChange={onChange} options={outsourceOptions} />
@@ -411,9 +464,17 @@ function badgeClassForSalesLead(key = '') {
 function normalizeAccountPayload(state) {
   const payload = { ...state };
   if (payload.where_come_from) payload.where_come_from = payload.where_come_from.trim();
-  if ((payload.where_come_from || '').toLowerCase() !== 'referral') {
+  const isReferral = (payload.where_come_from || '').toLowerCase() === 'referral';
+  const referralMode = (payload.referral_mode || 'existing').toLowerCase();
+  if (isReferral) {
+    const fromList = (payload.referal_source || '').trim();
+    const manualValue = (payload.referal_source_other || '').trim();
+    payload.referal_source = (referralMode === 'other' ? manualValue : fromList) || null;
+  } else {
     delete payload.referal_source;
   }
+  delete payload.referal_source_other;
+  delete payload.referral_mode;
   return payload;
 }
 
@@ -431,6 +492,8 @@ function initialFormState() {
     linkedin: '',
     where_come_from: '',
     referal_source: '',
+    referal_source_other: '',
+    referral_mode: 'existing',
     outsource: '',
     pain_points: '',
     position: '',

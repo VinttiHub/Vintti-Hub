@@ -799,15 +799,47 @@ async function loadReferralClients() {
   }
 }
 
+function getSelectedReferralMode() {
+  const current = document.querySelector('input[name="referral_source_mode"]:checked');
+  return (current?.value || 'existing').toLowerCase();
+}
+
+function resetReferralMode() {
+  const existing = document.querySelector('input[name="referral_source_mode"][value="existing"]');
+  if (existing) existing.checked = true;
+}
+
+function updateReferralModeUI(isReferral) {
+  const searchWrap = document.getElementById('referralSearchContainer');
+  const otherWrap = document.getElementById('referralOtherContainer');
+  const searchInput = document.getElementById('referralSourceInput');
+  const otherInput = document.getElementById('referralOtherInput');
+
+  const mode = isReferral ? getSelectedReferralMode() : 'existing';
+  const showSearch = isReferral && mode !== 'other';
+  const showOther = isReferral && mode === 'other';
+
+  if (searchWrap) searchWrap.style.display = showSearch ? '' : 'none';
+  if (otherWrap) otherWrap.style.display = showOther ? '' : 'none';
+
+  if (searchInput) {
+    searchInput.required = showSearch;
+    if (!showSearch) searchInput.value = '';
+  }
+  if (otherInput) {
+    otherInput.required = showOther;
+    if (!showOther) otherInput.value = '';
+  }
+}
+
 function updateReferralVisibility(sourceSelect) {
   const wrap  = document.getElementById('referralSourceWrapper');
-  const input = document.getElementById('referralSourceInput');
-  if (!wrap || !input || !sourceSelect) return;
+  if (!wrap || !sourceSelect) return;
 
   const isReferral = String(sourceSelect.value || '').toLowerCase() === 'referral';
   wrap.style.display = isReferral ? '' : 'none';
-  input.required = isReferral;
-  if (!isReferral) input.value = '';
+  if (!isReferral) resetReferralMode();
+  updateReferralModeUI(isReferral);
 }
 
 /* =========================
@@ -1364,6 +1396,13 @@ document.addEventListener('DOMContentLoaded', () => {
         sourceSelect.setCustomValidity('');
         updateReferralVisibility(sourceSelect);
       });
+      const referralModeRadios = form.querySelectorAll('input[name="referral_source_mode"]');
+      referralModeRadios.forEach((radio) => {
+        radio.addEventListener('change', () => {
+          const isReferral = String(sourceSelect.value || '').toLowerCase() === 'referral';
+          updateReferralModeUI(isReferral);
+        });
+      });
     }
 
     form.addEventListener('submit', async (e) => {
@@ -1380,11 +1419,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // Normalize lead source + referral_source
       if (data.where_come_from != null) data.where_come_from = String(data.where_come_from).trim();
       const isReferral = (data.where_come_from || '').toLowerCase() === 'referral';
+      const referralMode = (data.referral_source_mode || 'existing').toLowerCase();
       if (isReferral) {
-        data.referal_source = (data.referal_source || '').trim() || null;
+        const fromList = (data.referal_source || '').trim();
+        const manualValue = (data.referal_source_other || '').trim();
+        data.referal_source = (referralMode === 'other' ? manualValue : fromList) || null;
       } else {
         delete data.referal_source;
       }
+      delete data.referal_source_other;
+      delete data.referral_source_mode;
 
       try {
         const response = await fetch(`${API_BASE}/accounts`, {

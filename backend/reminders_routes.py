@@ -52,9 +52,10 @@ def _format_money(n) -> str:
 
 def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail,
-    candidate_name:str, client_name:str, opp_position_name:str
+    candidate_name:str, client_name:str, opp_position_name:str, referal_source: Optional[str] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
+    referral_html = f'<li><b>Referral source:</b> {html.escape(referal_source)}</li>' if referal_source else ''
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close-Win</b> 🎉</p>
@@ -67,6 +68,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
         <li><b>Fee:</b> ${html.escape(_format_money(fee))}</li>
         <li><b>Set-up fee:</b> ${html.escape(_format_money(setup_fee))}</li>
         <li><b>Client email:</b> {html.escape(client_mail or '—')}</li>
+        {referral_html}
       </ul>
 
       <p><b>References / notes:</b><br>{references or '—'}</p>
@@ -84,9 +86,10 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
 
 def _initial_email_html_recruiting(  
     candidate_id:int, start_date, salary, revenue, references, client_mail,
-    candidate_name:str, client_name:str, opp_position_name:str
+    candidate_name:str, client_name:str, opp_position_name:str, referal_source: Optional[str] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
+    referral_line = f"<b>Referral source:</b> {html.escape(referal_source)}<br>" if referal_source else ""
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close-Win</b> 🎉</p>
@@ -98,6 +101,7 @@ def _initial_email_html_recruiting(
          <b>Salary:</b> ${html.escape(_format_money(salary))}<br>
          <b>Revenue :</b> ${html.escape(_format_money(revenue))}<br>
          <b>Client email:</b> {html.escape(client_mail or '—')}<br>
+         {referral_line}
          <b>References / notes:</b> {references or '—'}
       </p>
 
@@ -154,6 +158,7 @@ def press_and_send(candidate_id):
         client_name       = ctx.get("client_name") or ""
         opp_position_name = ctx.get("opp_position_name") or ""
         client_mail       = ctx.get("client_mail") or (_fetch_client_email(opportunity_id, cur) or "")
+        referal_source    = ctx.get("referal_source") or ""
 
         # Detectar tipo de opp
         opp_type = _fetch_opportunity_type(opportunity_id, cur)  # NEW
@@ -171,7 +176,8 @@ def press_and_send(candidate_id):
                 client_mail=client_mail,
                 candidate_name=candidate_name,
                 client_name=client_name,
-                opp_position_name=opp_position_name
+                opp_position_name=opp_position_name,
+                referal_source=referal_source
             )
         else:
             html_body = _initial_email_html_staffing(
@@ -184,7 +190,8 @@ def press_and_send(candidate_id):
                 client_mail=client_mail,
                 candidate_name=candidate_name,
                 client_name=client_name,
-                opp_position_name=opp_position_name
+                opp_position_name=opp_position_name,
+                referal_source=referal_source
             )
 
 
@@ -285,13 +292,15 @@ def _fetch_email_context(candidate_id:int, opportunity_id:int, cur):
       - client_name         (account.client_name)
       - client_mail         (account.mail)
       - opp_position_name   (opportunity.opp_position_name)
+      - referal_source      (account.referal_source)
     """
     cur.execute("""
         SELECT
             c.name                         AS candidate_name,
             a.client_name                  AS client_name,
             a.mail                         AS client_mail,
-            o.opp_position_name            AS opp_position_name
+            o.opp_position_name            AS opp_position_name,
+            a.referal_source               AS referal_source
         FROM opportunity o
         JOIN account a   ON a.account_id = o.account_id
         JOIN candidates c ON c.candidate_id = %s

@@ -481,16 +481,38 @@
           <!-- Referral source (shown only when Lead source = Referral) -->
           <div class="popup-field" id="referralSourceWrapper" style="display:none">
             <label>Referral – Client</label>
-            <input
-              type="text"
-              name="referal_source"
-              id="referralSourceInput"
-              placeholder="Type to search clients…"
-              list="referralList"
-              autocomplete="off"
-            />
-            <datalist id="referralList"></datalist>
-            <small class="muted">Choose the client who referred this account.</small>
+            <div class="referral-source-mode" role="group" aria-label="Referral type">
+              <label class="inline-radio">
+                <input type="radio" name="referral_source_mode" value="existing" checked />
+                Existing client
+              </label>
+              <label class="inline-radio">
+                <input type="radio" name="referral_source_mode" value="other" />
+                Other
+              </label>
+            </div>
+            <div id="referralSearchContainer">
+              <input
+                type="text"
+                name="referal_source"
+                id="referralSourceInput"
+                placeholder="Type to search clients…"
+                list="referralList"
+                autocomplete="off"
+              />
+              <datalist id="referralList"></datalist>
+              <small class="muted">Choose the client who referred this account.</small>
+            </div>
+            <div id="referralOtherContainer" style="display:none">
+              <input
+                type="text"
+                id="referralOtherInput"
+                name="referal_source_other"
+                placeholder="Who referred this account?"
+                autocomplete="off"
+              />
+              <small class="muted">Enter the referral source manually.</small>
+            </div>
           </div>
 
           <!-- 🆕 Outsource before (boolean) -->
