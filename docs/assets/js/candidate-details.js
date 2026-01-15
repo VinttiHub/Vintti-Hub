@@ -996,7 +996,7 @@ function updateLinkedInUI(raw) {
     const tooltip = document.querySelector('.input-tooltip');
     if (tooltip) tooltip.remove();
   }
-  const US_STATES = [
+  const CD_US_STATES = [
     { code: 'AL', name: 'Alabama' },
     { code: 'AK', name: 'Alaska' },
     { code: 'AZ', name: 'Arizona' },
@@ -1049,29 +1049,29 @@ function updateLinkedInUI(raw) {
     { code: 'WY', name: 'Wyoming' },
     { code: 'DC', name: 'District of Columbia' }
   ];
-  const US_STATE_MAP = US_STATES.reduce((acc, entry) => {
+  const CD_US_STATE_MAP = CD_US_STATES.reduce((acc, entry) => {
     acc[entry.code] = entry.name;
     return acc;
   }, {});
-  const US_STATE_LABEL_TO_CODE = US_STATES.reduce((acc, entry) => {
+  const CD_US_STATE_LABEL_TO_CODE = CD_US_STATES.reduce((acc, entry) => {
     const label = `${entry.name} (${entry.code})`.toLowerCase();
     acc[label] = entry.code;
     acc[entry.code.toLowerCase()] = entry.code;
     return acc;
   }, {});
-  const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+  const CD_USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 
   function normalizeCountryKey(country){
     const value = (country || '').trim();
     if (!value) return '';
-    const match = USA_STATE_REGEX.exec(value);
+    const match = CD_USA_STATE_REGEX.exec(value);
     if (match) return 'United States';
     if (value.toUpperCase() === 'USA') return 'United States';
     return value;
   }
 
   function extractUsStateCode(country){
-    const match = USA_STATE_REGEX.exec(country || '');
+    const match = CD_USA_STATE_REGEX.exec(country || '');
     return match ? match[1].toUpperCase() : '';
   }
 
@@ -1079,7 +1079,7 @@ function updateLinkedInUI(raw) {
     if (!country) return '—';
     const code = extractUsStateCode(country);
     if (code) {
-      const name = US_STATE_MAP[code] || code;
+    const name = CD_US_STATE_MAP[code] || code;
       return `USA · ${name} (${code})`;
     }
     return country;
@@ -1088,13 +1088,13 @@ function updateLinkedInUI(raw) {
   function resolveUsStateCodeFromInput(value){
     if (!value) return '';
     const normalized = value.trim().toLowerCase();
-    if (US_STATE_LABEL_TO_CODE[normalized]) return US_STATE_LABEL_TO_CODE[normalized];
+    if (CD_US_STATE_LABEL_TO_CODE[normalized]) return CD_US_STATE_LABEL_TO_CODE[normalized];
     const direct = value.trim().toUpperCase();
-    if (US_STATE_MAP[direct]) return direct;
+    if (CD_US_STATE_MAP[direct]) return direct;
     const match = /\(([A-Z]{2})\)\s*$/.exec(value.trim());
     if (match) {
       const code = match[1].toUpperCase();
-      if (US_STATE_MAP[code]) return code;
+      if (CD_US_STATE_MAP[code]) return code;
     }
     return '';
   }
@@ -1112,7 +1112,7 @@ function updateLinkedInUI(raw) {
 
   function setUsStateInputValue(inputEl, code) {
     if (!inputEl) return;
-    const label = code && US_STATE_MAP[code] ? `${US_STATE_MAP[code]} (${code})` : '';
+    const label = code && CD_US_STATE_MAP[code] ? `${CD_US_STATE_MAP[code]} (${code})` : '';
     inputEl.value = label;
     inputEl.dataset.code = code || '';
   }
@@ -1120,7 +1120,7 @@ function updateLinkedInUI(raw) {
   function populateUsStatesDatalist(listEl) {
     if (!listEl) return;
     listEl.innerHTML = '';
-    US_STATES.forEach(state => {
+    CD_US_STATES.forEach(state => {
       const option = document.createElement('option');
       option.value = `${state.name} (${state.code})`;
       option.dataset.code = state.code;
@@ -1148,11 +1148,20 @@ function updateLinkedInUI(raw) {
   }
 
   // --- Patch helpers (Hire) ---
-window.updateHireField = async function(field, value) {
+async function patchHireFields(fields = {}) {
   if (!candidateId) return;
-  const oppId = await ensureCurrentOppId(candidateId);  // 🔑
+  const entries = Object.entries(fields || {}).filter(([, value]) => value !== undefined);
+  if (!entries.length) return;
 
-  const payload = { opportunity_id: oppId, [field]: value };
+  const oppId = await ensureCurrentOppId(candidateId);  // 🔑
+  const payload = entries.reduce(
+    (acc, [key, value]) => {
+      acc[key] = value;
+      return acc;
+    },
+    { opportunity_id: oppId }
+  );
+
   const r = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -1160,13 +1169,43 @@ window.updateHireField = async function(field, value) {
   });
 
   if (!r.ok) {
-    const t = await r.text().catch(()=> '');
+    const t = await r.text().catch(() => '');
     console.error('PATCH /hire failed', r.status, t);
     alert('We couldn’t save this field. Please try again.');
     return;
   }
   if (typeof window.loadHireData === 'function') window.loadHireData();
+}
+
+window.patchHireFields = patchHireFields;
+window.updateHireField = function(field, value) {
+  return patchHireFields({ [field]: value });
 };
+
+async function captureInactiveMetadataFromModal({ candidateName, clientName, roleName } = {}) {
+  if (typeof window.openInactiveInfoModal !== 'function') return;
+  try {
+    const modalResult = await window.openInactiveInfoModal({
+      candidateName,
+      clientName,
+      roleName
+    });
+    if (!modalResult) return;
+
+    const trimmedComments = modalResult.comments?.trim();
+    await patchHireFields({
+      inactive_reason: modalResult.reason,
+      inactive_comments: trimmedComments ? trimmedComments : null,
+      inactive_vinttierror: Boolean(modalResult.vinttiError)
+    });
+    if (typeof showCuteToast === 'function') {
+      showCuteToast('Offboarding info saved ✅');
+    }
+  } catch (err) {
+    console.error('❌ Failed to store inactive metadata', err);
+    alert('We saved the end date but could not store the offboarding info. Please try again.');
+  }
+}
 
   // --- Restore Hire dates con <input type="date"> nativo ---
   (function restoreHireDates() {
@@ -1256,6 +1295,12 @@ window.updateHireField = async function(field, value) {
             candidateOverviewData?.title ||
             '';
 
+          const modalPromise = captureInactiveMetadataFromModal({
+            candidateName: candidateOverviewData?.name,
+            clientName,
+            roleName
+          });
+
           await notifyCandidateInactiveEmail({
             candidateId,
             candidateName: candidateOverviewData?.name,
@@ -1264,6 +1309,8 @@ window.updateHireField = async function(field, value) {
             endDate: ymd,
             opportunityId: oppIdForEmail
           });
+
+          await modalPromise;
         }
 
         endInp.dataset.previousEndDate = ymd;

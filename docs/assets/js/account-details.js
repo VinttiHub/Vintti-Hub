@@ -983,17 +983,24 @@ if (endInputS) {
     const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
     const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
 
-    updatePromise.then(() => {
-      if (shouldNotify) {
-        notifyCandidateInactiveEmail({
-          candidateId,
-          candidateName: candidate.name,
-          clientName: accountName,
-          roleName: candidate.opp_position_name,
-          endDate: newValue,
-          opportunityId: oppId
-        });
-      }
+    updatePromise.then(async () => {
+      if (!shouldNotify) return;
+      const modalPromise = captureInactiveMetadataFromAccount({
+        candidateId,
+        candidateName: candidate.name,
+        clientName: accountName,
+        roleName: candidate.opp_position_name,
+        opportunityId: oppId
+      });
+      await notifyCandidateInactiveEmail({
+        candidateId,
+        candidateName: candidate.name,
+        clientName: accountName,
+        roleName: candidate.opp_position_name,
+        endDate: newValue,
+        opportunityId: oppId
+      });
+      await modalPromise;
     }).finally(() => {
       endInputS.dataset.previousEndDate = newValue;
     });
@@ -1406,17 +1413,24 @@ function createRecruitingRow(candidate, options = {}) {
       const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
       const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
 
-      updatePromise.then(() => {
-        if (shouldNotify) {
-          notifyCandidateInactiveEmail({
-            candidateId,
-            candidateName: candidate.name,
-            clientName: accountName,
-            roleName: candidate.opp_position_name,
-            endDate: newValue,
-            opportunityId: oppId
-          });
-        }
+      updatePromise.then(async () => {
+        if (!shouldNotify) return;
+        const modalPromise = captureInactiveMetadataFromAccount({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          opportunityId: oppId
+        });
+        await notifyCandidateInactiveEmail({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          endDate: newValue,
+          opportunityId: oppId
+        });
+        await modalPromise;
       }).finally(() => {
         endInput.dataset.previousEndDate = newValue;
       });
@@ -1502,45 +1516,84 @@ uploadBtn.addEventListener("click", async () => {
   }
 });
 
-function updateCandidateField(candidateId, field, value, opportunityId) {
-  const hireFields = new Set([
-    'discount_dolar','discount_daterange',
-    'referral_dolar','referral_daterange',
-    'buyout_dolar','buyout_daterange',
-    'start_date','end_date'
-  ]);
+const HIRE_FIELD_NAMES = new Set([
+  'discount_dolar','discount_daterange',
+  'referral_dolar','referral_daterange',
+  'buyout_dolar','buyout_daterange',
+  'start_date','end_date',
+  'inactive_reason','inactive_comments','inactive_vinttierror'
+]);
 
-  if (hireFields.has(field)) {
+function persistHireFields(candidateId, patch, opportunityId) {
+  if (!candidateId) return Promise.resolve();
+  if (!opportunityId) {
+    console.error('Missing opportunity_id for hire field update:', { candidateId, patch });
+    return Promise.resolve();
+  }
+  const body = { ...patch, opportunity_id: opportunityId };
+  return fetch(`${API_BASE_URL}/candidates/${candidateId}/hire`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(res => {
+    if (!res.ok) {
+      return res.text().then(text => {
+        throw new Error(text || `Error saving hire fields (${res.status})`);
+      });
+    }
+    return res;
+  });
+}
+
+async function captureInactiveMetadataFromAccount({
+  candidateId,
+  candidateName,
+  clientName,
+  roleName,
+  opportunityId
+} = {}) {
+  if (typeof window.openInactiveInfoModal !== 'function') return;
+  if (!candidateId || !opportunityId) return;
+  try {
+    const modalResult = await window.openInactiveInfoModal({
+      candidateName,
+      clientName,
+      roleName
+    });
+    if (!modalResult) return;
+    const trimmedComments = modalResult.comments?.trim();
+    await persistHireFields(
+      candidateId,
+      {
+        inactive_reason: modalResult.reason,
+        inactive_comments: trimmedComments ? trimmedComments : null,
+        inactive_vinttierror: Boolean(modalResult.vinttiError)
+      },
+      opportunityId
+    );
+  } catch (err) {
+    console.error('❌ Failed to store inactive metadata (account view)', err);
+    alert('We saved the end date but could not store the offboarding info. Please try again.');
+  }
+}
+
+function updateCandidateField(candidateId, field, value, opportunityId) {
+  if (HIRE_FIELD_NAMES.has(field)) {
     const payloadValue = field.endsWith('_dolar')
       ? parseFloat(String(value).replace(/[^\d.]/g, ''))
       : value;
 
     if (field.endsWith('_dolar') && isNaN(payloadValue)) return;
 
-    // ✅ opportunity_id obligatorio para tu backend
-    const body = { [field]: payloadValue, opportunity_id: opportunityId };
-
-    // Si por alguna razón no viene, mejor loguearlo (para no mandar 400 silencioso)
-    if (!opportunityId) {
-      console.error('Missing opportunity_id for hire field update:', { candidateId, field, value });
-      return Promise.resolve();
-    }
-
-    return fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    .then(res => {
-      if (!res.ok) throw new Error(`Error saving ${field} (hire_opportunity)`);
-      console.log(`💾 ${field} saved in hire_opportunity for candidate ${candidateId}`);
-
-      if (field.startsWith('buyout_')) {
-        const accountId = getIdFromURL && getIdFromURL();
-        if (accountId) loadCandidates(accountId);
-      }
-    })
-    .catch(err => console.error('❌ Failed to save field:', explainFetchError(err)));
+    return persistHireFields(candidateId, { [field]: payloadValue }, opportunityId)
+      .then(() => {
+        console.log(`💾 ${field} saved in hire_opportunity for candidate ${candidateId}`);
+        if (field.startsWith('buyout_')) {
+          const accountId = getIdFromURL && getIdFromURL();
+          if (accountId) loadCandidates(accountId);
+        }
+      })
+      .catch(err => console.error('❌ Failed to save field:', explainFetchError(err)));
   }
 
   // Fallback candidates table

@@ -51,7 +51,7 @@ const COUNTRY_FLAG_BY_NAME = {
 
 const COUNTRY_NAMES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
 const DEFAULT_PHONE_COUNTRY = 'Argentina';
-const US_STATES = [
+const CANDIDATE_US_STATES = [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
   { code: 'AZ', name: 'Arizona' },
@@ -104,29 +104,29 @@ const US_STATES = [
   { code: 'WY', name: 'Wyoming' },
   { code: 'DC', name: 'District of Columbia' }
 ];
-const US_STATE_MAP = US_STATES.reduce((acc, state) => {
+const CANDIDATE_US_STATE_MAP = CANDIDATE_US_STATES.reduce((acc, state) => {
   acc[state.code] = state.name;
   return acc;
 }, {});
-const US_STATE_LABEL_TO_CODE = US_STATES.reduce((acc, state) => {
+const CANDIDATE_US_STATE_LABEL_TO_CODE = CANDIDATE_US_STATES.reduce((acc, state) => {
   const label = `${state.name} (${state.code})`.toLowerCase();
   acc[label] = state.code;
   acc[state.code.toLowerCase()] = state.code;
   return acc;
 }, {});
-const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+const CANDIDATE_USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 
 function normalizeCountryKey(country) {
   const value = (country || '').trim();
   if (!value) return '';
-  const match = USA_STATE_REGEX.exec(value);
+  const match = CANDIDATE_USA_STATE_REGEX.exec(value);
   if (match) return 'United States';
   if (value.toUpperCase() === 'USA') return 'United States';
   return value;
 }
 
 function extractUsStateCode(country) {
-  const match = USA_STATE_REGEX.exec(country || '');
+  const match = CANDIDATE_USA_STATE_REGEX.exec(country || '');
   return match ? match[1].toUpperCase() : '';
 }
 
@@ -134,7 +134,7 @@ function formatCountryDisplay(country) {
   if (!country) return '—';
   const code = extractUsStateCode(country);
   if (code) {
-    const name = US_STATE_MAP[code] || code;
+    const name = CANDIDATE_US_STATE_MAP[code] || code;
     return `USA · ${name} (${code})`;
   }
   return country;
@@ -150,15 +150,15 @@ function formatCountryForSubmit(country, stateCode) {
 function resolveUsStateCodeFromInput(value) {
   if (!value) return '';
   const normalized = value.trim().toLowerCase();
-  if (US_STATE_LABEL_TO_CODE[normalized]) {
-    return US_STATE_LABEL_TO_CODE[normalized];
+  if (CANDIDATE_US_STATE_LABEL_TO_CODE[normalized]) {
+    return CANDIDATE_US_STATE_LABEL_TO_CODE[normalized];
   }
   const codeMatch = value.trim().toUpperCase();
-  if (US_STATE_MAP[codeMatch]) return codeMatch;
+  if (CANDIDATE_US_STATE_MAP[codeMatch]) return codeMatch;
   const withinParens = /\(([A-Z]{2})\)\s*$/.exec(value.trim());
   if (withinParens) {
     const code = withinParens[1].toUpperCase();
-    if (US_STATE_MAP[code]) return code;
+    if (CANDIDATE_US_STATE_MAP[code]) return code;
   }
   return '';
 }
@@ -202,7 +202,7 @@ const candidateModalRefs = {
 
 function setUsStateInputValue(code) {
   if (!candidateModalRefs.usStateInput) return;
-  const label = code && US_STATE_MAP[code] ? `${US_STATE_MAP[code]} (${code})` : '';
+  const label = code && CANDIDATE_US_STATE_MAP[code] ? `${CANDIDATE_US_STATE_MAP[code]} (${code})` : '';
   candidateModalRefs.usStateInput.value = label;
   candidateModalRefs.usStateInput.dataset.code = code || '';
 }
@@ -227,7 +227,7 @@ function toggleUsStateField(country) {
 function renderUsStateOptions() {
   if (!candidateModalRefs.usStateList) return;
   const fragment = document.createDocumentFragment();
-  US_STATES.forEach(state => {
+  CANDIDATE_US_STATES.forEach(state => {
     const option = document.createElement('option');
     option.value = `${state.name} (${state.code})`;
     option.dataset.code = state.code;

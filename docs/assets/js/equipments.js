@@ -110,11 +110,11 @@ const COUNTRY_FLAGS = {
   "Mexico":"🇲🇽","United States":"🇺🇸","Canada":"🇨🇦","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
   "Puerto Rico":"🇵🇷","Uruguay":"🇺🇾","Venezuela":"🇻🇪"
 };
-const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+const EQUIP_USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 function normalizeCountryKey(country){
   const value = (country || '').trim();
   if (!value) return '';
-  if (USA_STATE_REGEX.test(value) || value.toUpperCase() === 'USA') return 'United States';
+  if (EQUIP_USA_STATE_REGEX.test(value) || value.toUpperCase() === 'USA') return 'United States';
   return value;
 }
 function flagEmoji(country){ return COUNTRY_FLAGS[normalizeCountryKey(country)] || ""; }

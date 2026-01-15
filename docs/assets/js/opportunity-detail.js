@@ -1261,7 +1261,7 @@ const LATAM_COUNTRIES = [
   "Peru","Puerto Rico","Dominican Republic","Uruguay","Venezuela"
 ];
 
-const US_STATE_MAP = {
+const OPD_US_STATE_MAP = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
   CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
   HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
@@ -1274,7 +1274,7 @@ const US_STATE_MAP = {
   VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
   DC: 'District of Columbia'
 };
-const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+const OPD_USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 
 
 // Ciudades por país (principales) — puedes ampliar cuando quieras
@@ -1305,14 +1305,14 @@ const CITIES_BY_COUNTRY = {
 function normalizeCountryKey(country){
   const value = (country || '').trim();
   if (!value) return '';
-  const match = USA_STATE_REGEX.exec(value);
+  const match = OPD_USA_STATE_REGEX.exec(value);
   if (match) return 'United States';
   if (value.toUpperCase() === 'USA') return 'United States';
   return value;
 }
 
 function extractUsStateCode(country){
-  const match = USA_STATE_REGEX.exec(country || '');
+  const match = OPD_USA_STATE_REGEX.exec(country || '');
   return match ? match[1].toUpperCase() : '';
 }
 
@@ -1320,7 +1320,7 @@ function formatCountryDisplay(country){
   if (!country) return '—';
   const code = extractUsStateCode(country);
   if (code) {
-    const name = US_STATE_MAP[code] || code;
+    const name = OPD_US_STATE_MAP[code] || code;
     return `USA · ${name} (${code})`;
   }
   return country;

@@ -6,7 +6,7 @@ const WA_countryToCodeMap = {
   "Peru": "51","Puerto Rico": "1","Dominican Republic": "1","Uruguay": "598","Venezuela": "58"
 };
 
-const US_STATES = [
+const PIPELINE_US_STATES = [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
   { code: 'AZ', name: 'Arizona' },
@@ -59,24 +59,24 @@ const US_STATES = [
   { code: 'WY', name: 'Wyoming' },
   { code: 'DC', name: 'District of Columbia' }
 ];
-const US_STATE_MAP = US_STATES.reduce((acc, entry) => {
+const PIPELINE_US_STATE_MAP = PIPELINE_US_STATES.reduce((acc, entry) => {
   acc[entry.code] = entry.name;
   return acc;
 }, {});
-const USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
+const PIPELINE_USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 let candidateStateChoices = null;
 
 function normalizeCountryKey(country){
   const value = (country || '').trim();
   if (!value) return '';
-  const match = USA_STATE_REGEX.exec(value);
+  const match = PIPELINE_USA_STATE_REGEX.exec(value);
   if (match) return 'United States';
   if (value.toUpperCase() === 'USA') return 'United States';
   return value;
 }
 
 function extractUsStateCode(country){
-  const match = USA_STATE_REGEX.exec(country || '');
+  const match = PIPELINE_USA_STATE_REGEX.exec(country || '');
   return match ? match[1].toUpperCase() : '';
 }
 
@@ -88,7 +88,7 @@ function formatCountryDisplay(country){
   if (!country) return '—';
   const code = extractUsStateCode(country);
   if (code) {
-    const name = US_STATE_MAP[code] || code;
+    const name = PIPELINE_US_STATE_MAP[code] || code;
     return `USA · ${name} (${code})`;
   }
   return country;
@@ -769,7 +769,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const candidateStateSelect = document.getElementById('candidate-us-state');
     if (candidateStateSelect) {
       const options = ['<option value=\"\">Select state…</option>']
-        .concat(US_STATES.map(s => `<option value=\"${s.code}\">${s.name} (${s.code})</option>`));
+        .concat(PIPELINE_US_STATES.map(s => `<option value=\"${s.code}\">${s.name} (${s.code})</option>`));
       candidateStateSelect.innerHTML = options.join('');
       candidateStateChoices = new Choices('#candidate-us-state', {
         searchEnabled: true,
