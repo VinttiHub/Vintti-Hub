@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         left: "50%",
         fontSize: "340px",
         fontWeight: "700",
-        color: "rgba(0,59,255,0.16)",
+        color: "rgba(0,59,255,0.22)",
         textTransform: "uppercase",
         letterSpacing: "32px",
         userSelect: "none",
