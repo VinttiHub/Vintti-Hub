@@ -11,6 +11,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       bodyEl.style.backgroundColor = "#fff";
       bodyEl.style.paddingTop = "32px";
       bodyEl.style.paddingBottom = "48px";
+      const hero = document.createElement("div");
+      hero.className = "pdf-hero-banner";
+      Object.assign(hero.style, {
+        width: "100%",
+        padding: "28px 0 18px",
+        background: "linear-gradient(135deg, #ecf1ff, #f8faff)",
+        textAlign: "center",
+        borderBottom: "1px solid rgba(0,59,255,0.15)",
+        marginBottom: "32px",
+        boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
+        position: "relative",
+        zIndex: "3",
+      });
+      hero.innerHTML = `
+        <div style="font-size:40px;font-weight:700;letter-spacing:6px;color:#003BFF;text-transform:lowercase;margin-bottom:8px;">vintti</div>
+        <div style="font-size:13px;letter-spacing:0.3em;text-transform:uppercase;color:#5b6bad;font-weight:600;">Top Candidate Profile</div>
+      `;
+      bodyEl.insertBefore(hero, bodyEl.firstChild || null);
+
       const watermarkLayer = document.createElement("div");
       Object.assign(watermarkLayer.style, {
         position: "fixed",
@@ -18,7 +37,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         pointerEvents: "none",
         zIndex: "2",
         opacity: "0.08",
-        mixBlendMode: "multiply",
       });
       const baseMarkStyle = {
         position: "absolute",
@@ -54,6 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (container) {
       container.style.position = "relative";
       container.style.zIndex = "1";
+      container.style.marginTop = "0";
     }
   }
 
