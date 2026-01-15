@@ -454,7 +454,8 @@ def management_dashboard_metrics():
                 ho.account_id,
                 CASE
                   WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-                  WHEN NULLIF(ho.start_date, '') IS NOT NULL THEN NULLIF(ho.start_date, '')::date
+                  WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+                    THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
                   ELSE NULL
                 END AS start_d,
                 COALESCE(NULLIF(TRIM(CAST(ho.revenue AS TEXT)), ''), '0')::numeric AS revenue
@@ -467,7 +468,8 @@ def management_dashboard_metrics():
               SELECT
                 b.account_id,
                 CASE
-                  WHEN NULLIF(b.start_date, '') IS NOT NULL THEN NULLIF(b.start_date, '')::date
+                  WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+                    THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
                   ELSE NULL
                 END AS start_d,
                 COALESCE(NULLIF(TRIM(CAST(b.revenue AS TEXT)), ''), '0')::numeric AS revenue
@@ -533,13 +535,14 @@ def management_dashboard_metrics():
                 LOWER(o.opp_model) AS model,
                 CASE
                   WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-                  WHEN NULLIF(ho.start_date, '') IS NOT NULL THEN NULLIF(ho.start_date, '')::date
+                  WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+                    THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
                   ELSE NULL
                 END AS start_d,
                 CASE
                   WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-                  WHEN ho.end_date IS NULL OR ho.end_date = '' THEN NULL
-                  ELSE ho.end_date::date
+                  WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL THEN NULL
+                  ELSE NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
                 END AS end_d
               FROM hire_opportunity ho
               JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
@@ -550,11 +553,13 @@ def management_dashboard_metrics():
                 b.account_id,
                 'recruiting' AS model,
                 CASE
-                  WHEN NULLIF(b.start_date, '') IS NOT NULL THEN NULLIF(b.start_date, '')::date
+                  WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+                    THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
                   ELSE NULL
                 END AS start_d,
                 CASE
-                  WHEN NULLIF(b.end_date, '') IS NOT NULL THEN NULLIF(b.end_date, '')::date
+                  WHEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NOT NULL
+                    THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date
                   ELSE NULL
                 END AS end_d
               FROM buyouts b
@@ -614,20 +619,21 @@ def management_dashboard_metrics():
                 ho.account_id,
                 CASE
                   WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-                  WHEN NULLIF(ho.start_date, '') IS NOT NULL THEN NULLIF(ho.start_date, '')::date
+                  WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+                    THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
                   ELSE NULL
                 END AS start_d,
                 CASE
                   WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-                  WHEN ho.end_date IS NULL OR ho.end_date = '' THEN NULL
-                  ELSE ho.end_date::date
+                  WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL THEN NULL
+                  ELSE NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
                 END AS end_d
               FROM hire_opportunity ho
               JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
               WHERE ho.candidate_id IS NOT NULL
                 AND (
                   ho.carga_active IS NOT NULL
-                  OR NULLIF(ho.start_date, '') IS NOT NULL
+                  OR NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
                 )
                 AND o.opp_model = 'Staffing'
             ),
