@@ -3,7 +3,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const candidateId = urlParams.get("id");
   const isPdfExport = urlParams.has("pdf_export");
   const bodyEl = document.body;
-  if (bodyEl) bodyEl.dataset.resumeReady = "loading";
+  const downloadBtn = document.getElementById("readonly-download-btn");
+  let candidateFileName = "resume";
+  if (downloadBtn) downloadBtn.disabled = true;
+  if (bodyEl) {
+    bodyEl.dataset.resumeReady = "loading";
+    if (isPdfExport) bodyEl.dataset.pdfExport = "true";
+  }
+  if (isPdfExport && downloadBtn) {
+    downloadBtn.remove();
+  }
 
   if (isPdfExport) {
     document.documentElement.style.backgroundColor = "#fff";
@@ -116,6 +125,51 @@ function formatDateFromDateObj(d) {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short" });
 }
 
+function parseDateForDuration(value) {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  if (typeof value === "string") {
+    const direct = new Date(value);
+    if (!isNaN(direct.getTime())) return direct;
+
+    const [datePart] = value.split("T");
+    if (!datePart) return null;
+    const [year, month, day] = datePart.split("-");
+    if (!year || !month) return null;
+
+    const safeMonth = month.padStart(2, "0");
+    const safeDay = (day ? day.replace(/\D/g, "").padStart(2, "0") : "01");
+    const fallback = new Date(`${year}-${safeMonth}-${safeDay}T12:00:00Z`);
+    return isNaN(fallback.getTime()) ? null : fallback;
+  }
+  return null;
+}
+
+function getYearMonthPartsForDuration(value) {
+  const date = parseDateForDuration(value);
+  if (!date) return null;
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() };
+}
+
+function formatDurationLabel(startValue, endValue, isCurrent = false) {
+  const startParts = getYearMonthPartsForDuration(startValue);
+  const endParts = isCurrent
+    ? getYearMonthPartsForDuration(new Date())
+    : getYearMonthPartsForDuration(endValue);
+  if (!startParts || !endParts) return "";
+
+  let totalMonths = (endParts.year - startParts.year) * 12 + (endParts.month - startParts.month) + 1;
+  if (totalMonths <= 0) return "";
+
+  const years = Math.floor(totalMonths / 12);
+  const months = totalMonths % 12;
+  const segments = [];
+  if (years > 0) segments.push(`${years} yr${years > 1 ? "s" : ""}`);
+  if (months > 0) segments.push(`${months} mo${months > 1 ? "s" : ""}`);
+  if (!segments.length && totalMonths > 0) segments.push("Less than a month");
+  return segments.join(" ");
+}
+
 
   if (!candidateId) {
     console.error("❌ Candidate ID missing in URL");
@@ -137,7 +191,9 @@ function formatDateFromDateObj(d) {
     // Nombre del candidato (fetch adicional)
     const nameRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`);
     const nameData = await nameRes.json();
-    document.getElementById("candidateNameTitle").textContent = nameData.name || "Unnamed Candidate";
+    const displayName = nameData.name || "Unnamed Candidate";
+    document.getElementById("candidateNameTitle").textContent = displayName;
+    candidateFileName = displayName;
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     // 🧠 About
@@ -223,6 +279,7 @@ function renderExperienceEntry(exp) {
     const startDate = formatDate(exp.start_date);
     const endDate = exp.current ? "Present" : formatDate(exp.end_date);
     const locationText = exp.location || exp.country || "";
+    const durationText = formatDurationLabel(exp.start_date, exp.end_date, !!exp.current);
 
     const entry = document.createElement("div");
     entry.className = "cv-entry";
@@ -234,6 +291,13 @@ function renderExperienceEntry(exp) {
     dateDiv.className = "cv-entry-date";
     dateDiv.textContent = `${startDate} – ${endDate}`;
     left.appendChild(dateDiv);
+
+    if (durationText) {
+      const durationDiv = document.createElement("div");
+      durationDiv.className = "cv-entry-duration";
+      durationDiv.textContent = durationText;
+      left.appendChild(durationDiv);
+    }
 
     if (locationText) {
       const locDiv = document.createElement("div");
@@ -278,6 +342,7 @@ function renderExperienceEntry(exp) {
         const d = safeDate(r.end_date);
         return (!max || (d && d > max)) ? d : max;
       }, null);
+  const durationText = formatDurationLabel(overallStart, overallEnd, hasCurrent);
 
   const entry = document.createElement("div");
   entry.className = "cv-entry multi-company";
@@ -291,6 +356,13 @@ function renderExperienceEntry(exp) {
     overallEnd ? formatDateFromDateObj(overallEnd) : "Present"
   }`;
   left.appendChild(dateDiv);
+
+  if (durationText) {
+    const durationDiv = document.createElement("div");
+    durationDiv.className = "cv-entry-duration";
+    durationDiv.textContent = durationText;
+    left.appendChild(durationDiv);
+  }
 
   const locationText = exp.location || exp.country || "";
   if (locationText) {
@@ -324,6 +396,13 @@ function renderExperienceEntry(exp) {
     const sd = formatDate(r.start_date);
     const ed = r.current ? "Present" : formatDate(r.end_date);
     datesDiv.textContent = `${sd} – ${ed}`;
+    const roleDuration = formatDurationLabel(r.start_date, r.end_date, !!r.current);
+    if (roleDuration) {
+      const durationDiv = document.createElement("div");
+      durationDiv.className = "cv-entry-duration";
+      durationDiv.textContent = roleDuration;
+      datesDiv.appendChild(durationDiv);
+    }
 
     roleBlock.appendChild(titleDiv);
     roleBlock.appendChild(datesDiv);
@@ -555,6 +634,14 @@ if (isPdfExport) {
     container.appendChild(pdfFooter);
   }
 }
+    if (!isPdfExport) {
+      wireResumeDownload({
+        button: downloadBtn,
+        target: document.getElementById("resume-readonly-page") || document.body,
+        getFileName: () => candidateFileName,
+        bodyEl,
+      });
+    }
     notifyParent(true);
   } catch (error) {
     console.error("❌ Error loading resume data:", error);
@@ -640,4 +727,138 @@ function getFlagEmoji(countryName) {
   };
   const normalized = normalizeCountryKey(countryName);
   return flags[normalized] || '';
+}
+
+const PDF_PAGE = { width: 595.28, height: 841.89 };
+const PDF_PAGE_MARGIN = 24;
+
+function sanitizeFilename(value) {
+  if (!value) return "resume";
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "resume";
+}
+
+function createDownloader(bytes, filename) {
+  if (!bytes) return;
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function dataUrlToUint8Array(dataUrl) {
+  const base64 = dataUrl.split(",")[1];
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function canvasToPdfBytes(canvas, PDFDocument) {
+  if (!canvas || !canvas.width || !canvas.height) throw new Error("Invalid resume canvas.");
+  const pdfDoc = await PDFDocument.create();
+  const scale = PDF_PAGE.width / canvas.width;
+  const usableCanvasHeight = (PDF_PAGE.height - PDF_PAGE_MARGIN * 2) / scale;
+  const pageSliceHeight = Math.max(usableCanvasHeight, 100);
+  let offsetY = 0;
+  while (offsetY < canvas.height) {
+    const sliceHeight = Math.min(pageSliceHeight, canvas.height - offsetY);
+    const sliceCanvas = document.createElement("canvas");
+    sliceCanvas.width = canvas.width;
+    sliceCanvas.height = sliceHeight;
+    const ctx = sliceCanvas.getContext("2d");
+    ctx.drawImage(
+      canvas,
+      0,
+      offsetY,
+      canvas.width,
+      sliceHeight,
+      0,
+      0,
+      canvas.width,
+      sliceHeight,
+    );
+    const pngBytes = dataUrlToUint8Array(sliceCanvas.toDataURL("image/png"));
+    const image = await pdfDoc.embedPng(pngBytes);
+    const renderedHeight = image.height * (PDF_PAGE.width / image.width);
+    const page = pdfDoc.addPage([PDF_PAGE.width, PDF_PAGE.height]);
+    page.drawImage(image, {
+      x: 0,
+      y: PDF_PAGE.height - PDF_PAGE_MARGIN - renderedHeight,
+      width: PDF_PAGE.width,
+      height: renderedHeight,
+    });
+    offsetY += sliceHeight;
+  }
+  return pdfDoc.save();
+}
+
+async function captureElementCanvas(element, html2canvas) {
+  if (!element) throw new Error("Resume layout missing.");
+  if (typeof html2canvas !== "function") throw new Error("html2canvas is unavailable.");
+  const width = Math.max(element.scrollWidth, element.offsetWidth, element.clientWidth || 0);
+  const height = Math.max(element.scrollHeight, element.offsetHeight, element.clientHeight || 0);
+  return html2canvas(element, {
+    backgroundColor: "#ffffff",
+    scale: Math.min(2.5, window.devicePixelRatio > 1 ? window.devicePixelRatio : 1.5),
+    useCORS: true,
+    allowTaint: true,
+    windowWidth: width,
+    windowHeight: height,
+    logging: false,
+  });
+}
+
+function wireResumeDownload({ button, target, getFileName, bodyEl }) {
+  if (!button || !target) return;
+  const pdfLib = window.PDFLib || {};
+  const html2canvas = window.html2canvas;
+  const { PDFDocument } = pdfLib;
+  if (!PDFDocument || typeof html2canvas !== "function") {
+    button.disabled = true;
+    button.title = "PDF download is unavailable right now.";
+    return;
+  }
+
+  button.disabled = false;
+  const labelEl = button.querySelector(".label");
+  const idleLabel = labelEl?.textContent || "Download PDF";
+  let exporting = false;
+
+  button.addEventListener("click", async () => {
+    if (exporting) return;
+    exporting = true;
+    button.disabled = true;
+    if (labelEl) labelEl.textContent = "Preparing…";
+    if (bodyEl) bodyEl.dataset.exporting = "true";
+    try {
+      const canvas = await captureElementCanvas(target, html2canvas);
+      const bytes = await canvasToPdfBytes(canvas, PDFDocument);
+      const safeName = sanitizeFilename(getFileName ? getFileName() : "resume");
+      const finalName = safeName ? `${safeName}-resume.pdf` : "resume.pdf";
+      createDownloader(bytes, finalName);
+    } catch (err) {
+      console.error("❌ Failed to export resume PDF", err);
+      alert("Unable to generate the resume PDF right now. Please try again in a moment.");
+    } finally {
+      exporting = false;
+      button.disabled = false;
+      if (labelEl) labelEl.textContent = idleLabel;
+      if (bodyEl) {
+        delete bodyEl.dataset.exporting;
+      }
+    }
+  });
 }

@@ -332,6 +332,13 @@ html, body {
   margin-right: -8px;
 }
 
+.cv-entry-duration {
+  display: block;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
+
 .cv-entry-location {
   display: block;
   margin-top: 2px;
@@ -391,6 +398,68 @@ html, body {
   }
 }
 
+.resume-page-root {
+  position: relative;
+  padding-bottom: 120px;
+}
 
+.resume-download-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  box-shadow: 0 18px 35px rgba(15, 23, 42, 0.26);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  z-index: 200;
+}
 
+.resume-download-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.3);
+}
+
+.resume-download-button:active {
+  transform: translateY(0);
+  box-shadow: 0 15px 30px rgba(15, 23, 42, 0.25);
+}
+
+.resume-download-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.2);
+}
+
+.resume-download-button .label {
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+body[data-exporting="true"] .resume-download-button {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body[data-pdf-export="true"] .resume-download-button {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .resume-download-button {
+    right: 16px;
+    bottom: 16px;
+    padding: 9px 16px;
+    letter-spacing: 0.05em;
+  }
+}
 

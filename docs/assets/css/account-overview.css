@@ -233,6 +233,7 @@ body.panel-open {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .batch-pill {
@@ -252,6 +253,27 @@ body.panel-open {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-top: 0.25rem;
+}
+
+.candidate-count {
+  text-align: right;
+  min-width: 90px;
+  margin-left: auto;
+}
+
+.candidate-count__number {
+  display: block;
+  font-size: 1.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.candidate-count__label {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .avatars {
@@ -306,20 +328,64 @@ body.panel-open {
   color: #fff;
 }
 
-.status-pill--warm {
-  background: linear-gradient(120deg, #f39f5a, #ef6c3e);
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text-primary);
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
-.status-pill--hot {
-  background: linear-gradient(120deg, #ff6b6b, #c9184a);
+.status-chip:hover {
+  background: rgba(93, 95, 239, 0.12);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
 }
 
-.status-pill--cool {
-  background: linear-gradient(120deg, #54c5f8, #4285f4);
+.status-chip--positive {
+  background: rgba(76, 217, 100, 0.18);
+  color: #1f8a3a;
+  border-color: rgba(76, 217, 100, 0.4);
 }
 
-.status-pill--neutral {
-  background: linear-gradient(120deg, #bec6ff, #7e89e1);
+.status-chip--warm {
+  background: rgba(255, 193, 7, 0.18);
+  color: #a36a00;
+  border-color: rgba(255, 193, 7, 0.4);
+}
+
+.status-chip--active {
+  background: rgba(255, 107, 107, 0.18);
+  color: #b3261e;
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+.status-chip--cool {
+  background: rgba(84, 197, 248, 0.2);
+  color: #1167a8;
+  border-color: rgba(84, 197, 248, 0.4);
+}
+
+.status-chip--neutral {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--text-primary);
+}
+
+.status-pill--open {
+  background: linear-gradient(120deg, #4e8df5, #2b57d9);
+}
+
+.status-pill--closed {
+  background: linear-gradient(120deg, #4cd964, #1faa5b);
 }
 
 .candidate-panel {
@@ -371,6 +437,43 @@ body.panel-open {
   gap: 1.5rem;
 }
 
+.batch-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #f7f9ff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.batch-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+.batch-card__title {
+  margin: 0.25rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.batch-card__meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.batch-card__cta {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .candidate-panel__empty {
   margin: 0;
   color: var(--text-muted);
@@ -384,6 +487,20 @@ body.panel-open {
   border-radius: 50%;
   font-size: 1.4rem;
   cursor: pointer;
+}
+
+.back-button {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  align-self: flex-start;
+}
+
+.back-button:hover {
+  text-decoration: underline;
 }
 
 .candidate-card {
@@ -438,6 +555,17 @@ body.panel-open {
 .candidate-meta a {
   color: var(--accent);
   text-decoration: none;
+}
+
+.candidate-meta .country-flag {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.35rem;
+  font-size: 1rem;
+}
+
+.candidate-meta .country-flag + span {
+  vertical-align: middle;
 }
 
 .candidate-actions {

@@ -9,14 +9,15 @@
 
 </head>
 <body>
-<header class="cv-header">
-  <div class="header-left">
-    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="vintti-logo" />
-    <div class="cv-subtitle">Top Candidate Profile</div>
-  </div>
-</header>
+  <div id="resume-readonly-page" class="resume-page-root">
+    <header class="cv-header">
+      <div class="header-left">
+        <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="vintti-logo" />
+        <div class="cv-subtitle">Top Candidate Profile</div>
+      </div>
+    </header>
 
-  <div class="cv-container">
+    <div class="cv-container">
     <h1 id="candidateNameTitle" class="cv-title">Candidate Name</h1>
     <p id="candidateCountry" class="cv-country">—</p>
     <!-- About -->
@@ -82,9 +83,18 @@
 
   </div>
 
-  <script src="./assets/js/resume-readonly.js"></script>
-  <footer class="cv-footer">
-    Powered by <strong>Vintti</strong> · <a href="https://www.vintti.com" target="_blank">vintti.com</a>
-  </footer>
+    <footer class="cv-footer">
+      Powered by <strong>Vintti</strong> · <a href="https://www.vintti.com" target="_blank">vintti.com</a>
+    </footer>
+  </div>
+
+  <button id="readonly-download-btn" class="resume-download-button" type="button">
+    <span aria-hidden="true">⬇️</span>
+    <span class="label">Download PDF</span>
+  </button>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script defer src="./assets/js/resume-readonly.js"></script>
 </body>
 </html>

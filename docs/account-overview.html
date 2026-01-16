@@ -18,29 +18,25 @@
         <div>
           <p class="breadcrumb" id="breadcrumbTrail">Accounts</p>
           <h1 id="accountName">Loading account…</h1>
-          <p class="lead" id="accountTagline">We are stitching your overview.</p>
+          <p class="lead" id="accountTagline">Your tailored overview is loading.</p>
         </div>
         <div class="account-highlights" aria-live="polite">
           <div>
-                <p class="eyebrow">Open opportunities</p>
-                <p class="stat" id="highlightOpportunities">—</p>
-              </div>
-              <div>
-                <p class="eyebrow">Batched candidates</p>
-                <p class="stat" id="highlightCandidates">—</p>
-              </div>
-              <div>
-                <p class="eyebrow">Last sync</p>
-                <p class="stat subtle" id="highlightSync">—</p>
-              </div>
+            <p class="eyebrow">Open opportunities</p>
+            <p class="stat" id="highlightOpportunities">—</p>
+          </div>
+          <div>
+            <p class="eyebrow">Closed opportunities</p>
+            <p class="stat" id="highlightClosed">—</p>
+          </div>
+          <div>
+            <p class="eyebrow">Hired candidates</p>
+            <p class="stat" id="highlightCandidates">—</p>
+          </div>
         </div>
       </header>
 
       <section class="account-meta">
-        <div class="meta-card">
-          <p class="eyebrow">Industry</p>
-          <p id="metaIndustry">—</p>
-        </div>
         <div class="meta-card">
           <p class="eyebrow">HQ / Timezone</p>
           <p id="metaTimezone">—</p>
@@ -48,10 +44,6 @@
         <div class="meta-card">
           <p class="eyebrow">Primary contact</p>
           <p id="metaContact">—</p>
-        </div>
-        <div class="meta-card">
-          <p class="eyebrow">Engagement tier</p>
-          <p id="metaEngagement">—</p>
         </div>
       </section>
 
@@ -62,10 +54,8 @@
             <p>Every live role mapped to the candidates already curated for your next batch review.</p>
           </div>
           <div class="filters">
-            <button type="button" class="chip is-active">All</button>
-            <button type="button" class="chip">Product</button>
-            <button type="button" class="chip">Engineering</button>
-            <button type="button" class="chip">GTMS</button>
+            <button type="button" class="chip is-active" data-filter="open">Open</button>
+            <button type="button" class="chip" data-filter="closed">Closed</button>
           </div>
         </div>
 

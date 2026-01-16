@@ -263,19 +263,17 @@ async function loadCandidates(options = {}) {
   const { showLoader = true, loaderMessage = 'Loading candidates…' } = options;
   if (showLoader) toggleCandidatesLoading(true, loaderMessage);
 
-  const filter = candidateState.blacklistFilter || 'all';
   const url = new URL(`${API_BASE}/candidates/light_fast`);
-  url.searchParams.set('blacklist_filter', filter);
 
   try {
     const res = await fetch(url.toString(), { cache: 'no-store' });
     const data = await res.json();
     candidateState.data = Array.isArray(data) ? data : [];
-    paintCandidateRows(candidateState.data);
+    repaintCandidatesWithBlacklistFilter();
   } catch (err) {
     console.error('❌ Error al obtener candidatos:', err);
     candidateState.data = [];
-    paintCandidateRows(candidateState.data);
+    repaintCandidatesWithBlacklistFilter();
   } finally {
     if (showLoader) toggleCandidatesLoading(false);
   }
@@ -295,6 +293,18 @@ function toggleCandidatesLoading(show, message) {
   candidateState.loadingOverlay.classList.toggle('hidden', !show);
   candidateState.loadingOverlay.setAttribute('aria-hidden', show ? 'false' : 'true');
   candidateState.loadingOverlay.setAttribute('aria-busy', show ? 'true' : 'false');
+}
+
+function getBlacklistFilteredCandidates() {
+  const list = Array.isArray(candidateState.data) ? candidateState.data : [];
+  const filter = candidateState.blacklistFilter || 'all';
+  if (filter === 'only') return list.filter(candidate => Boolean(candidate.is_blacklisted));
+  if (filter === 'exclude') return list.filter(candidate => !Boolean(candidate.is_blacklisted));
+  return list;
+}
+
+function repaintCandidatesWithBlacklistFilter() {
+  paintCandidateRows(getBlacklistFilteredCandidates());
 }
 
 function buildCandidateRow(candidate) {
@@ -442,7 +452,7 @@ function setupBlacklistFilterControl() {
     const nextValue = normalizeValue(select.value);
     if (candidateState.blacklistFilter === nextValue) return;
     candidateState.blacklistFilter = nextValue;
-    loadCandidates({ loaderMessage: 'Applying blacklist filter…' });
+    repaintCandidatesWithBlacklistFilter();
   });
 }
 

@@ -1,20 +1,64 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
-const CLOSED_STAGES = new Set(["close win", "closed lost", "lost", "closewon"]);
-const STAGE_ORDER = ["Negotiating", "Interviewing", "Sourcing", "Deep Dive", "NDA Sent", "Close Win", "Closed Lost"];
+const CLOSED_WIN_STAGES = new Set([
+  "close win",
+  "close won",
+  "closed win",
+  "closed won",
+  "won",
+  "closewon",
+  "closedwon",
+]);
+const LOST_STAGES = new Set(["closed lost", "close lost", "lost", "closelost"]);
+const STAGE_ORDER = ["Negotiating", "Interviewing", "Sourcing", "Deep Dive", "NDA Sent", "Close Win"];
+const STATUS_TRANSLATIONS = [
+  { match: "contactado", label: "Contacted" },
+  { match: "entrevista", label: "Interviewing" },
+  { match: "en revision", label: "Under review" },
+  { match: "revision", label: "Under review" },
+  { match: "cliente rechaz", label: "Client rejected" },
+  { match: "contratad", label: "Hired" },
+  { match: "en proceso", label: "In process" },
+  { match: "negociacion", label: "Negotiating" },
+  { match: "oferta", label: "Offer stage" },
+  { match: "pipeline", label: "Pipeline" },
+];
+const COUNTRY_ALIASES = {
+  argentina: "AR",
+  brazil: "BR",
+  brasil: "BR",
+  mexico: "MX",
+  colombia: "CO",
+  chile: "CL",
+  peru: "PE",
+  uruguay: "UY",
+  paraguay: "PY",
+  bolivia: "BO",
+  "united states": "US",
+  usa: "US",
+  canada: "CA",
+  spain: "ES",
+  portugal: "PT",
+  "united kingdom": "GB",
+  uk: "GB",
+  ireland: "IE",
+  france: "FR",
+  germany: "DE",
+  italy: "IT",
+  netherlands: "NL",
+};
 
 const els = {
   breadcrumb: document.getElementById("breadcrumbTrail"),
   accountName: document.getElementById("accountName"),
   accountTagline: document.getElementById("accountTagline"),
-  metaIndustry: document.getElementById("metaIndustry"),
   metaTimezone: document.getElementById("metaTimezone"),
   metaContact: document.getElementById("metaContact"),
-  metaEngagement: document.getElementById("metaEngagement"),
   highlightOpps: document.getElementById("highlightOpportunities"),
+  highlightClosed: document.getElementById("highlightClosed"),
   highlightCandidates: document.getElementById("highlightCandidates"),
-  highlightSync: document.getElementById("highlightSync"),
   opportunityGrid: document.getElementById("opportunityGrid"),
   opportunitiesEmpty: document.getElementById("opportunitiesEmpty"),
+  filterControls: document.querySelectorAll(".filters [data-filter]"),
   panel: document.querySelector(".candidate-panel"),
   panelTitle: document.querySelector(".candidate-panel__title"),
   panelBatch: document.querySelector(".candidate-panel__batch"),
@@ -23,6 +67,16 @@ const els = {
 
 const opportunityCache = new Map();
 let currentAccount = null;
+const panelState = {
+  view: "batches",
+  selectedBatchId: null,
+  opportunityId: null,
+  opportunity: null,
+};
+const pageState = {
+  opportunities: [],
+  filter: "open",
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   const accountId = new URLSearchParams(window.location.search).get("id");
@@ -33,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   els.opportunitiesEmpty.textContent = "Loading opportunities…";
   initializePanelControls();
+  initializeFilterControls();
   hydratePage(accountId);
 });
 
@@ -46,8 +101,12 @@ async function hydratePage(accountId) {
     currentAccount = account;
     updateAccountHeader(account);
     const enriched = await enrichWithBatches(opportunities);
-    updateHighlights(enriched);
-    renderOpportunities(enriched);
+    const visibleOpportunities = enriched.filter(
+      (opp) => classifyOpportunity(opp) !== "lost"
+    );
+    pageState.opportunities = visibleOpportunities;
+    updateHighlights(visibleOpportunities);
+    applyOpportunityFilter(pageState.filter);
   } catch (error) {
     console.error("Failed to load account overview", error);
     showErrorState("We couldn’t load this overview. Please refresh or try later.");
@@ -61,6 +120,16 @@ function initializePanelControls() {
     if (event.key === "Escape" && els.panel?.classList.contains("is-visible")) {
       closePanel();
     }
+  });
+}
+
+function initializeFilterControls() {
+  els.filterControls.forEach((button) => {
+    button.addEventListener("click", () => {
+      const filter = button.dataset.filter;
+      if (!filter || filter === pageState.filter) return;
+      applyOpportunityFilter(filter);
+    });
   });
 }
 
@@ -89,17 +158,9 @@ function updateAccountHeader(account) {
   const clientName = account?.client_name || "Client";
   els.breadcrumb.textContent = `Accounts › ${clientName}`;
   els.accountName.textContent = clientName;
-  els.accountTagline.textContent = account?.comments?.trim
-    ? account.comments.trim()
-    : "Every open search, every curated batch.";
-
-  els.metaIndustry.textContent = fallbackText(account?.industry);
+  els.accountTagline.textContent = "Your Vintti overview is curated for every engagement.";
   els.metaTimezone.textContent = formatLocation(account);
   els.metaContact.textContent = formatContact(account);
-  els.metaEngagement.textContent = formatEngagement(account);
-
-  const lastTouch = account?.updated_at || account?.created_at;
-  els.highlightSync.textContent = formatRelativeDate(lastTouch);
 }
 
 function fallbackText(value, placeholder = "Not available") {
@@ -122,11 +183,6 @@ function formatContact(account) {
   if (!nameParts.length && !email) return "Not available";
   if (nameParts.length && email) return `${nameParts.join(" ")} · ${email}`;
   return nameParts.join(" ") || email;
-}
-
-function formatEngagement(account) {
-  const pieces = [account?.type, account?.size].filter((piece) => piece && piece !== "null");
-  return pieces.length ? pieces.join(" · ") : "Not available";
 }
 
 async function enrichWithBatches(opportunities) {
@@ -155,6 +211,8 @@ async function enrichWithBatches(opportunities) {
               ? batchCandidates.map((candidate) => ({
                   ...candidate,
                   batch_status: candidate.status || candidate.stage || "",
+                  batch_number: batch.batch_number,
+                  presentation_date: batch.presentation_date,
                 }))
               : [];
             enrichedBatches.push({ ...batch, candidates: normalizedCandidates });
@@ -183,21 +241,44 @@ function buildStageRank() {
 
 function updateHighlights(opportunities) {
   const list = Array.isArray(opportunities) ? opportunities : [];
-  const openOpps = list.filter(
-    (opp) => !CLOSED_STAGES.has(String(opp?.opp_stage || "").toLowerCase())
-  );
-  els.highlightOpps.textContent = openOpps.length.toString().padStart(2, "0");
+  const openOpps = list.filter((opp) => classifyOpportunity(opp) === "open");
+  const closedOpps = list.filter((opp) => classifyOpportunity(opp) === "closed");
+  els.highlightOpps.textContent = padCount(openOpps.length);
+  els.highlightClosed.textContent = padCount(closedOpps.length);
 
-  const totalCandidates = list.reduce((acc, opp) => acc + collectCandidates(opp).length, 0);
-  els.highlightCandidates.textContent = totalCandidates.toString().padStart(2, "0");
+  const hiredCandidates = list.reduce((acc, opp) => {
+    const hired = collectCandidates(opp).filter(isHiredCandidate);
+    return acc + hired.length;
+  }, 0);
+  els.highlightCandidates.textContent = padCount(hiredCandidates);
 }
 
-function renderOpportunities(opportunities) {
+function applyOpportunityFilter(filter = "open") {
+  pageState.filter = filter;
+  updateFilterButtons(filter);
+  const matches = pageState.opportunities.filter(
+    (opp) => classifyOpportunity(opp) === filter
+  );
+  renderOpportunities(matches, filter);
+}
+
+function updateFilterButtons(activeFilter) {
+  els.filterControls.forEach((button) => {
+    const isActive = button.dataset.filter === activeFilter;
+    button.classList.toggle("is-active", Boolean(isActive));
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function renderOpportunities(opportunities, filter) {
   const grid = els.opportunityGrid;
   grid.innerHTML = "";
   if (!Array.isArray(opportunities) || !opportunities.length) {
     els.opportunitiesEmpty.hidden = false;
-    els.opportunitiesEmpty.textContent = "No opportunities are live for this account yet.";
+    els.opportunitiesEmpty.textContent =
+      filter === "closed"
+        ? "No closed opportunities are ready to showcase yet."
+        : "No open opportunities are live for this account yet.";
     return;
   }
 
@@ -219,15 +300,16 @@ function buildOpportunityCard(opportunity) {
   );
   card.dataset.opportunityId = opportunity?.opportunity_id;
 
-  const stageClass = stageToPillClass(opportunity?.opp_stage);
+  const statusInfo = getOpportunityStatus(opportunity);
+  const timelineInfo = getOpportunityTimeline(opportunity);
   const batchInfo = getLatestBatch(opportunity);
   const candidates = collectCandidates(opportunity);
   const batchLabel = batchInfo
     ? `Batch #${batchInfo.batch_number || "—"}`
-    : "No batches yet";
-  const batchMeta = batchInfo?.presentation_date
-    ? formatDate(batchInfo.presentation_date)
-    : "Awaiting kickoff";
+    : "Batch in progress";
+  const timelineText = timelineInfo.date
+    ? `${timelineInfo.label} · ${timelineInfo.date}`
+    : timelineInfo.label;
 
   card.innerHTML = `
     <div class="card-body">
@@ -236,7 +318,7 @@ function buildOpportunityCard(opportunity) {
           <p class="eyebrow">${fallbackText(opportunity?.opp_model || "Opportunity", "Opportunity")}</p>
           <h3>${fallbackText(opportunity?.opp_position_name || "Unnamed opportunity", "Unnamed opportunity")}</h3>
         </div>
-        <span class="status-pill ${stageClass}">${fallbackText(opportunity?.opp_stage, "Active")}</span>
+        <span class="status-pill ${statusInfo.className}">${statusInfo.label}</span>
       </div>
       <ul class="card-meta">
         <li><span>Model</span>${fallbackText(opportunity?.opp_model)}</li>
@@ -246,9 +328,9 @@ function buildOpportunityCard(opportunity) {
       <div class="batch-row">
         <div>
           <span class="batch-pill ${batchInfo ? "" : "batch-pill--empty"}">${batchLabel}</span>
-          <div class="batch-subtext">${batchInfo ? batchMeta : "Batch launch in progress"}</div>
+          <div class="batch-subtext">${timelineText}</div>
         </div>
-        ${renderAvatars(candidates)}
+        ${renderCandidateCount(candidates.length)}
       </div>
     </div>
   `;
@@ -265,21 +347,16 @@ function buildOpportunityCard(opportunity) {
   return card;
 }
 
-function renderAvatars(candidates) {
-  if (!candidates.length) {
-    return `<span class="batch-empty-text">0 batched</span>`;
-  }
-  const visible = candidates.slice(0, 3);
-  const avatars = visible
-    .map((candidate) => {
-      const initials = getInitials(candidate.name || "");
-      return `<span class="avatar" aria-hidden="true" data-initials="${initials}"></span>`;
-    })
-    .join("");
-  const remainder = Math.max(0, candidates.length - visible.length);
-  const remainderNode =
-    remainder > 0 ? `<span class="avatar avatar--more">+${remainder}</span>` : "";
-  return `<div class="avatars">${avatars}${remainderNode}</div>`;
+function renderCandidateCount(count) {
+  const normalized = Number(count) || 0;
+  const padded = padCount(normalized);
+  const label = normalized === 1 ? "candidate" : "candidates";
+  return `
+    <div class="candidate-count" aria-label="${normalized} ${label}">
+      <span class="candidate-count__number">${padded}</span>
+      <span class="candidate-count__label">${label}</span>
+    </div>
+  `;
 }
 
 function collectCandidates(opportunity) {
@@ -302,11 +379,11 @@ function collectCandidates(opportunity) {
   );
 }
 
-function getLatestBatch(opportunity) {
+function getSortedBatches(opportunity) {
   if (!opportunity || !Array.isArray(opportunity.batches) || !opportunity.batches.length) {
-    return null;
+    return [];
   }
-  const sorted = opportunity.batches.slice().sort((a, b) => {
+  return opportunity.batches.slice().sort((a, b) => {
     const numA = a.batch_number || 0;
     const numB = b.batch_number || 0;
     if (numA !== numB) return numB - numA;
@@ -314,39 +391,64 @@ function getLatestBatch(opportunity) {
     const dateB = new Date(b.presentation_date || 0);
     return dateB - dateA;
   });
-  return sorted[0];
 }
 
-function stageToPillClass(stage) {
-  const key = String(stage || "").toLowerCase();
-  if (key.includes("interview")) return "status-pill--warm";
-  if (key.includes("negotiat") || key.includes("contract")) return "status-pill--hot";
-  if (key.includes("sourcing") || key.includes("nda") || key.includes("deep")) {
-    return "status-pill--cool";
+function getLatestBatch(opportunity) {
+  const sorted = getSortedBatches(opportunity);
+  return sorted.length ? sorted[0] : null;
+}
+
+function getOpportunityStatus(opportunity) {
+  const classification = classifyOpportunity(opportunity);
+  if (classification === "closed") {
+    return { label: "Closed", className: "status-pill--closed" };
   }
-  if (key.includes("closed") || key.includes("lost")) return "status-pill--neutral";
-  return "status-pill--neutral";
+  return { label: "Open", className: "status-pill--open" };
+}
+
+function getOpportunityTimeline(opportunity) {
+  const classification = classifyOpportunity(opportunity);
+  if (classification === "closed") {
+    const closedDate =
+      opportunity?.closed_date ||
+      opportunity?.opp_closed_date ||
+      opportunity?.updated_at ||
+      opportunity?.nda_signature_or_start_date;
+    return { label: "Closed", date: formatTimelineDate(closedDate) };
+  }
+  const openDate =
+    opportunity?.opp_start_date ||
+    opportunity?.nda_signature_or_start_date ||
+    opportunity?.created_at ||
+    opportunity?.updated_at;
+  return { label: "Opened", date: formatTimelineDate(openDate) };
+}
+
+function classifyOpportunity(opportunity) {
+  const stage = normalizeStage(opportunity?.opp_stage);
+  if (LOST_STAGES.has(stage) || stage.includes("lost")) return "lost";
+  if (CLOSED_WIN_STAGES.has(stage)) return "closed";
+  return "open";
+}
+
+function normalizeStage(stage) {
+  return normalizeText(stage);
 }
 
 function openPanel(opportunityId) {
   const data = opportunityCache.get(String(opportunityId));
   if (!data) return;
-  const candidates = collectCandidates(data);
+  panelState.opportunityId = opportunityId;
+  panelState.opportunity = data;
+  panelState.view = "batches";
+  panelState.selectedBatchId = null;
+  const batches = getSortedBatches(data);
   els.panelTitle.textContent = data.opp_position_name || "Opportunity";
-  const latestBatch = getLatestBatch(data);
-  els.panelBatch.textContent = latestBatch
-    ? `Batch #${latestBatch.batch_number || "—"} · ${formatDate(latestBatch.presentation_date)}`
+  els.panelBatch.textContent = batches.length
+    ? `${batches.length} ${batches.length === 1 ? "batch" : "batches"} ready for review`
     : "No batches recorded yet";
 
-  els.panelBody.innerHTML = "";
-  if (!candidates.length) {
-    els.panelBody.innerHTML =
-      '<p class="candidate-panel__empty">No candidates have been placed into a batch yet.</p>';
-  } else {
-    candidates.forEach((candidate) => {
-      els.panelBody.appendChild(buildCandidateCard(candidate));
-    });
-  }
+  renderBatchList(batches);
 
   els.panel?.setAttribute("aria-hidden", "false");
   els.panel?.classList.add("is-visible");
@@ -359,7 +461,94 @@ function closePanel() {
   document.body.classList.remove("panel-open");
 }
 
-function buildCandidateCard(candidate) {
+function renderBatchList(batches) {
+  els.panelBody.innerHTML = "";
+  if (!Array.isArray(batches) || !batches.length) {
+    els.panelBody.innerHTML =
+      '<p class="candidate-panel__empty">No batches have been curated yet.</p>';
+    return;
+  }
+  batches.forEach((batch) => {
+    els.panelBody.appendChild(buildBatchCard(batch));
+  });
+}
+
+function buildBatchCard(batch) {
+  const card = document.createElement("article");
+  card.className = "batch-card";
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  const candidateCount = (batch?.candidates || []).length;
+  const label = candidateCount === 1 ? "candidate" : "candidates";
+  const presentation = batch?.presentation_date ? formatDate(batch.presentation_date) : "Date TBD";
+  card.innerHTML = `
+    <div>
+      <p class="eyebrow">Batch #${batch?.batch_number || "—"}</p>
+      <p class="batch-card__title">${candidateCount} ${label}</p>
+      <p class="batch-card__meta">Presented ${presentation}</p>
+    </div>
+    <span class="batch-card__cta">Review</span>
+  `;
+  const openBatch = () => showBatchCandidates(batch);
+  card.addEventListener("click", openBatch);
+  card.addEventListener("keypress", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openBatch();
+    }
+  });
+  return card;
+}
+
+function showBatchCandidates(batch) {
+  panelState.view = "candidates";
+  panelState.selectedBatchId = batch?.batch_id || null;
+  const descriptor = batch?.presentation_date
+    ? ` · ${formatDate(batch.presentation_date)}`
+    : "";
+  els.panelBatch.textContent = `Batch #${batch?.batch_number || "—"}${descriptor}`;
+  renderCandidateList(batch);
+}
+
+function renderCandidateList(batch) {
+  els.panelBody.innerHTML = "";
+  els.panelBody.appendChild(buildBackButton());
+  const candidates = Array.isArray(batch?.candidates) ? batch.candidates : [];
+  if (!candidates.length) {
+    const empty = document.createElement("p");
+    empty.className = "candidate-panel__empty";
+    empty.textContent = "No candidates are assigned to this batch yet.";
+    els.panelBody.appendChild(empty);
+    return;
+  }
+  const sorted = candidates.slice().sort((a, b) => {
+    const nameA = (a?.name || "").toLowerCase();
+    const nameB = (b?.name || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+  sorted.forEach((candidate) => {
+    els.panelBody.appendChild(buildCandidateCard(candidate, batch));
+  });
+}
+
+function buildBackButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "back-button";
+  button.textContent = "Back to batches";
+  button.addEventListener("click", () => {
+    panelState.view = "batches";
+    panelState.selectedBatchId = null;
+    const batches = getSortedBatches(panelState.opportunity);
+    els.panelBatch.textContent = batches.length
+      ? `${batches.length} ${batches.length === 1 ? "batch" : "batches"} ready for review`
+      : "No batches recorded yet";
+    renderBatchList(batches);
+  });
+  return button;
+}
+
+function buildCandidateCard(candidate, batch) {
   const card = document.createElement("article");
   card.className = "candidate-card";
   const initials = getInitials(candidate?.name || "");
@@ -367,22 +556,24 @@ function buildCandidateCard(candidate) {
     ? `resume-readonly.html?id=${encodeURIComponent(candidate.candidate_id)}`
     : "#";
   const linkedinUrl = normalizeLinkedin(candidate?.linkedin);
-  const countryLabel = candidate?.country ? `${candidate.country}` : "—";
   const salaryLabel = candidate?.salary_range ? `$${candidate.salary_range}` : "—";
-  const statusClass = candidateStatusClass(candidate?.batch_status || candidate?.stage);
-  const statusLabel = candidate?.batch_status || candidate?.stage || "Batch ready";
+  const statusRaw = candidate?.batch_status || candidate?.stage || "Batch ready";
+  const statusLabel = translateStatus(statusRaw);
+  const statusChip = buildStatusChip(statusLabel, statusRaw);
+  const countryLabel = formatCandidateCountry(candidate);
+  const batchNumber = candidate?.batch_number || batch?.batch_number;
 
   card.innerHTML = `
     <header>
       <div class="avatar avatar--large" data-initials="${initials}"></div>
       <div>
         <p class="eyebrow candidate-card__batch">${
-          candidate.batch_number ? `Batch #${candidate.batch_number}` : "Batch"
+          batchNumber ? `Batch #${batchNumber}` : "Batch"
         }</p>
         <p class="candidate-name">${fallbackText(candidate?.name, "Unnamed candidate")}</p>
         <p class="candidate-role">${fallbackText(candidate?.stage || candidate?.role || candidate?.title, "Pipeline candidate")}</p>
       </div>
-      <span class="status-pill ${statusClass}">${statusLabel}</span>
+      ${statusChip}
     </header>
     <ul class="candidate-meta">
       <li><span>Status</span>${fallbackText(statusLabel)}</li>
@@ -421,10 +612,11 @@ function normalizeLinkedin(url) {
 
 function candidateStatusClass(status) {
   const key = String(status || "").toLowerCase();
-  if (key.includes("client") || key.includes("review")) return "status-pill--warm";
-  if (key.includes("interview") || key.includes("panel")) return "status-pill--hot";
-  if (key.includes("sourcing") || key.includes("new")) return "status-pill--cool";
-  return "status-pill--neutral";
+  if (key.includes("hire") || key.includes("contrat")) return "status-chip--positive";
+  if (key.includes("client") || key.includes("review")) return "status-chip--warm";
+  if (key.includes("interview") || key.includes("panel")) return "status-chip--active";
+  if (key.includes("sourcing") || key.includes("new")) return "status-chip--cool";
+  return "status-chip--neutral";
 }
 
 function formatSalaryBand(opportunity) {
@@ -462,19 +654,79 @@ function formatDate(value) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatRelativeDate(value) {
-  if (!value) return "—";
+function translateStatus(value) {
+  const status = String(value || "").trim();
+  if (!status) return "Status pending";
+  const normalized = normalizeText(status);
+  const match = STATUS_TRANSLATIONS.find((entry) => normalized.includes(entry.match));
+  return match ? match.label : status;
+}
+
+function buildStatusChip(displayLabel, rawStatus) {
+  const cssClass = candidateStatusClass(rawStatus);
+  const tooltip = rawStatus || displayLabel;
+  return `<span class="status-chip ${cssClass}" title="${escapeHTML(tooltip)}"><span>${escapeHTML(
+    displayLabel
+  )}</span></span>`;
+}
+
+function formatTimelineDate(value) {
+  if (!value) return "";
   const date = new Date(value);
-  if (Number.isNaN(date)) return "—";
-  const now = new Date();
-  const diffMs = now - date;
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays <= 0) return "Today";
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) {
-    const weeks = Math.round(diffDays / 7);
-    return `${weeks}w ago`;
-  }
+  if (Number.isNaN(date)) return "";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function padCount(value) {
+  return Number(value || 0).toString().padStart(2, "0");
+}
+
+function isHiredCandidate(candidate) {
+  const status = String(candidate?.batch_status || candidate?.stage || "").toLowerCase();
+  return status.includes("hire") || status.includes("contrat");
+}
+
+function formatCandidateCountry(candidate) {
+  const name =
+    (candidate?.country && String(candidate.country).trim()) ||
+    (candidate?.country_name && String(candidate.country_name).trim()) ||
+    (candidate?.country_code && String(candidate.country_code).trim());
+  if (!name) return "Not available";
+  const flag = countryToFlag(candidate?.country_code || name);
+  if (!flag) return escapeHTML(name);
+  return `<span class="country-flag" role="img" aria-label="${escapeHTML(
+    name
+  )}">${flag}</span><span>${escapeHTML(name)}</span>`;
+}
+
+function countryToFlag(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  if (trimmed.length === 2) {
+    return [...trimmed.toUpperCase()]
+      .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+      .join("");
+  }
+  const normalized = normalizeText(trimmed);
+  const alias = COUNTRY_ALIASES[normalized];
+  if (!alias) return "";
+  return countryToFlag(alias);
+}
+
+function escapeHTML(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
