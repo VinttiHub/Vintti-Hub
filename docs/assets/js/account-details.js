@@ -198,6 +198,7 @@ function updateAccountDerivedUi(fields = {}) {
 }
 document.addEventListener('DOMContentLoaded', () => {
 document.body.style.backgroundColor = 'var(--bg)';
+  setupStatusChipEvents();
 
   // Tabs
   const tabs = document.querySelectorAll('.tab-btn');
@@ -608,6 +609,7 @@ function deriveBuyoutStartDate(raw) {
 }
 
 function fillEmployeesTables(candidates, buyouts = []) {
+  setupStatusChipEvents();
   const staffingTableBody   = document.querySelector('#employees .card:nth-of-type(1) tbody');
   const recruitingTableBody = document.querySelector('#employees .card:nth-of-type(2) tbody');
 
@@ -644,8 +646,9 @@ const endVal   = dateInputValue(candidate.end_date);
           </a>
         `;
       const employeeCell = wrapContentWithBadge(candidateLink, candidate.replacement_of);
+      const rowStatus = candidate.status ?? (candidate.end_date ? 'inactive' : 'active');
       row.innerHTML = `
-        <td>${renderStatusChip((candidate.status ?? (candidate.end_date ? 'inactive' : 'active')))}</td>
+        <td>${renderStatusChip(rowStatus)}</td>
         <td>${employeeCell}</td>
         <td>
 <input
@@ -750,6 +753,7 @@ const endVal   = dateInputValue(candidate.end_date);
          </div>
         </td>
       `;
+      applyStatusChipMetadata(row, candidate, rowStatus);
       if (isBlacklisted) {
         row.classList.add('blacklisted-row');
         row.style.backgroundColor = '#ffeaea';
@@ -973,7 +977,7 @@ if (startInputS) {
 
 const endInputS = row.querySelector('.end-date-input');
 if (endInputS) {
-  endInputS.addEventListener('change', () => {
+  endInputS.addEventListener('change', async () => {
     const candidateId = endInputS.dataset.candidateId;
     const oppId = endInputS.dataset.opportunityId;
     const newValue = endInputS.value || '';
@@ -981,29 +985,44 @@ if (endInputS) {
     const prevValue = endInputS.dataset.previousEndDate || '';
     const shouldNotify = !prevValue && !!newValue;
     const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
-    const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
+    const persistEndDate = () =>
+      updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
 
-    updatePromise.then(async () => {
-      if (!shouldNotify) return;
-      const modalPromise = captureInactiveMetadataFromAccount({
-        candidateId,
-        candidateName: candidate.name,
-        clientName: accountName,
-        roleName: candidate.opp_position_name,
-        opportunityId: oppId
-      });
-      await notifyCandidateInactiveEmail({
-        candidateId,
-        candidateName: candidate.name,
-        clientName: accountName,
-        roleName: candidate.opp_position_name,
-        endDate: newValue,
-        opportunityId: oppId
-      });
-      await modalPromise;
-    }).finally(() => {
+    try {
+      if (shouldNotify) {
+        const modalResult = await captureInactiveMetadataFromAccount({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          opportunityId: oppId
+        });
+        if (!modalResult) {
+          endInputS.value = prevValue;
+          endInputS.dataset.previousEndDate = prevValue;
+          return;
+        }
+      }
+
+      await persistEndDate();
+
+      if (shouldNotify) {
+        await notifyCandidateInactiveEmail({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          endDate: newValue,
+          opportunityId: oppId
+        });
+      }
+
       endInputS.dataset.previousEndDate = newValue;
-    });
+    } catch (err) {
+      console.error('Failed to process Staffing end date change', err);
+      endInputS.value = prevValue;
+      endInputS.dataset.previousEndDate = prevValue;
+    }
   });
 }
 
@@ -1275,6 +1294,7 @@ function createRecruitingRow(candidate, options = {}) {
         </td>
         <td>${referralIdCellContent}</td>
       `;
+  applyStatusChipMetadata(row, candidate, rowStatus);
 
   if (isBlacklisted) {
     row.classList.add('blacklisted-row');
@@ -1397,7 +1417,7 @@ function createRecruitingRow(candidate, options = {}) {
 
   const endInput = row.querySelector('.end-date-input');
   if (endInput) {
-    endInput.addEventListener('change', () => {
+    endInput.addEventListener('change', async () => {
       if (isBuyoutRow) {
         updateBuyoutRow(buyoutId, { end_date: endInput.value || null })
           .then(() => scheduleBuyoutReload())
@@ -1411,29 +1431,44 @@ function createRecruitingRow(candidate, options = {}) {
       const prevValue = endInput.dataset.previousEndDate || '';
       const shouldNotify = !prevValue && !!newValue;
       const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
-      const updatePromise = updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
+      const persistEndDate = () =>
+        updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
 
-      updatePromise.then(async () => {
-        if (!shouldNotify) return;
-        const modalPromise = captureInactiveMetadataFromAccount({
-          candidateId,
-          candidateName: candidate.name,
-          clientName: accountName,
-          roleName: candidate.opp_position_name,
-          opportunityId: oppId
-        });
-        await notifyCandidateInactiveEmail({
-          candidateId,
-          candidateName: candidate.name,
-          clientName: accountName,
-          roleName: candidate.opp_position_name,
-          endDate: newValue,
-          opportunityId: oppId
-        });
-        await modalPromise;
-      }).finally(() => {
+      try {
+        if (shouldNotify) {
+          const modalResult = await captureInactiveMetadataFromAccount({
+            candidateId,
+            candidateName: candidate.name,
+            clientName: accountName,
+            roleName: candidate.opp_position_name,
+            opportunityId: oppId
+          });
+          if (!modalResult) {
+            endInput.value = prevValue;
+            endInput.dataset.previousEndDate = prevValue;
+            return;
+          }
+        }
+
+        await persistEndDate();
+
+        if (shouldNotify) {
+          await notifyCandidateInactiveEmail({
+            candidateId,
+            candidateName: candidate.name,
+            clientName: accountName,
+            roleName: candidate.opp_position_name,
+            endDate: newValue,
+            opportunityId: oppId
+          });
+        }
+
         endInput.dataset.previousEndDate = newValue;
-      });
+      } catch (err) {
+        console.error('Failed to process Recruiting/Buyout end date change', err);
+        endInput.value = prevValue;
+        endInput.dataset.previousEndDate = prevValue;
+      }
     });
   }
 
@@ -1552,28 +1587,35 @@ async function captureInactiveMetadataFromAccount({
   roleName,
   opportunityId
 } = {}) {
-  if (typeof window.openInactiveInfoModal !== 'function') return;
-  if (!candidateId || !opportunityId) return;
+  if (typeof window.openInactiveInfoModal !== 'function') return null;
+  if (!candidateId || !opportunityId) return null;
   try {
     const modalResult = await window.openInactiveInfoModal({
       candidateName,
       clientName,
       roleName
     });
-    if (!modalResult) return;
+    if (!modalResult) return null;
     const trimmedComments = modalResult.comments?.trim();
+    const normalizedComments = trimmedComments ? trimmedComments : null;
     await persistHireFields(
       candidateId,
       {
         inactive_reason: modalResult.reason,
-        inactive_comments: trimmedComments ? trimmedComments : null,
+        inactive_comments: normalizedComments,
         inactive_vinttierror: Boolean(modalResult.vinttiError)
       },
       opportunityId
     );
+    return {
+      reason: modalResult.reason,
+      comments: normalizedComments,
+      vinttiError: Boolean(modalResult.vinttiError)
+    };
   } catch (err) {
     console.error('❌ Failed to store inactive metadata (account view)', err);
     alert('We saved the end date but could not store the offboarding info. Please try again.');
+    return null;
   }
 }
 
@@ -1992,6 +2034,303 @@ function renderStatusChip(status) {
   const label = cls.charAt(0).toUpperCase() + cls.slice(1);
   return `<span class="status-chip ${cls}">${label}</span>`;
 }
+
+let statusInfoOverlay = null;
+let statusInfoTitle = null;
+let statusInfoSubtitle = null;
+let statusInfoContent = null;
+let statusChipEventsBound = false;
+let statusInfoKeyListenerBound = false;
+
+function applyStatusChipMetadata(row, candidate = {}, statusValue) {
+  if (!row) return;
+  const chip = row.querySelector('.status-chip');
+  if (!chip) return;
+  const normalizedStatus = String(statusValue || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+  chip.dataset.statusPopup = '1';
+  chip.dataset.statusType = normalizedStatus;
+  chip.dataset.candidateId = candidate.candidate_id ?? '';
+  chip.dataset.candidateName = candidate.name || '';
+  chip.dataset.positionName = candidate.opp_position_name || '';
+  chip.dataset.salary = candidate.employee_salary ?? '';
+  chip.dataset.startDate = dateInputValue(candidate.start_date) || '';
+  chip.dataset.clientName = candidate.client_name || candidate.account_name || '';
+  chip.dataset.inactiveReason = candidate.inactive_reason || '';
+  chip.dataset.inactiveComments = candidate.inactive_comments || '';
+  chip.dataset.inactiveVinttierror = candidate.inactive_vinttierror ? 'true' : 'false';
+}
+
+function setupStatusChipEvents() {
+  if (statusChipEventsBound) return;
+  const employeesSection = document.getElementById('employees');
+  if (!employeesSection) return;
+  employeesSection.addEventListener('click', (event) => {
+    const chip = event.target.closest('.status-chip');
+    if (!chip || !employeesSection.contains(chip)) return;
+    if (!chip.dataset.statusPopup) return;
+    event.preventDefault();
+    handleStatusChipClick(chip);
+  });
+  statusChipEventsBound = true;
+}
+
+function handleStatusChipClick(chip) {
+  if (!chip) return;
+  openStatusInfoPopup({
+    status: chip.dataset.statusType || '',
+    name: chip.dataset.candidateName || '',
+    positionName: chip.dataset.positionName || '',
+    salary: chip.dataset.salary,
+    startDate: chip.dataset.startDate || '',
+    inactiveReason: chip.dataset.inactiveReason || '',
+    inactiveComments: chip.dataset.inactiveComments || '',
+    inactiveVinttierror: chip.dataset.inactiveVinttierror || '',
+    clientName: chip.dataset.clientName || ''
+  });
+}
+
+function openStatusInfoPopup(meta = {}) {
+  ensureStatusInfoUi();
+  if (!statusInfoOverlay || !statusInfoTitle || !statusInfoSubtitle || !statusInfoContent) return;
+  const normalizedStatus = String(meta.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+  const candidateName = meta.name || 'Candidate';
+  const clientName = meta.clientName || '';
+
+  if (normalizedStatus === 'inactive') {
+    statusInfoTitle.textContent = `${candidateName} is inactive`;
+    const subtitle = clientName ? `Offboarding info for ${clientName}` : 'Offboarding info';
+    statusInfoSubtitle.textContent = subtitle;
+    statusInfoSubtitle.style.display = 'block';
+    setStatusInfoRows([
+      { label: 'Reason', value: meta.inactiveReason || 'Not provided' },
+      { label: 'Comments', value: meta.inactiveComments || 'No comments added' },
+      {
+        label: 'Vintti process error?',
+        value: (meta.inactiveVinttierror === 'true' || meta.inactiveVinttierror === true) ? 'Yes' : 'No'
+      }
+    ]);
+  } else {
+    statusInfoTitle.textContent = `${candidateName} is active`;
+    const subtitle = clientName ? `Working with ${clientName}` : 'Active engagement details';
+    statusInfoSubtitle.textContent = subtitle;
+    statusInfoSubtitle.style.display = 'block';
+    const startReadable = formatReadableDate(meta.startDate);
+    const tenureText = describeTenure(meta.startDate);
+    const tenureDisplay = startReadable ? `${tenureText} (since ${startReadable})` : tenureText;
+    setStatusInfoRows([
+      { label: 'Position', value: meta.positionName || 'Not provided' },
+      { label: 'Salary', value: formatCurrencyDisplay(meta.salary) },
+      { label: 'Time with client', value: tenureDisplay }
+    ]);
+  }
+
+  requestAnimationFrame(() => {
+    statusInfoOverlay.classList.add('is-visible');
+  });
+}
+
+function closeStatusInfoPopup() {
+  if (statusInfoOverlay) {
+    statusInfoOverlay.classList.remove('is-visible');
+  }
+}
+
+function ensureStatusInfoUi() {
+  ensureStatusInfoStyles();
+  if (statusInfoOverlay) return;
+  statusInfoOverlay = document.createElement('div');
+  statusInfoOverlay.className = 'status-info-overlay';
+  statusInfoOverlay.innerHTML = `
+    <div class="status-info-card" role="dialog" aria-modal="true">
+      <button type="button" class="status-info-close" aria-label="Close dialog">×</button>
+      <div class="status-info-eyebrow">Employee status</div>
+      <h3 class="status-info-title"></h3>
+      <p class="status-info-subtitle"></p>
+      <div class="status-info-rows"></div>
+    </div>
+  `;
+  document.body.appendChild(statusInfoOverlay);
+  statusInfoTitle = statusInfoOverlay.querySelector('.status-info-title');
+  statusInfoSubtitle = statusInfoOverlay.querySelector('.status-info-subtitle');
+  statusInfoContent = statusInfoOverlay.querySelector('.status-info-rows');
+  const closeBtn = statusInfoOverlay.querySelector('.status-info-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeStatusInfoPopup);
+  }
+  statusInfoOverlay.addEventListener('click', (event) => {
+    if (event.target === statusInfoOverlay) closeStatusInfoPopup();
+  });
+  if (!statusInfoKeyListenerBound) {
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeStatusInfoPopup();
+    });
+    statusInfoKeyListenerBound = true;
+  }
+}
+
+function ensureStatusInfoStyles() {
+  if (document.getElementById('status-info-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'status-info-styles';
+  style.textContent = `
+.status-info-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  z-index: 9998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.status-info-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.status-info-card {
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  padding: 26px;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.25);
+  font-family: 'Onest', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  position: relative;
+}
+.status-info-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+.status-info-eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #6366f1;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.status-info-title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  color: #0f172a;
+}
+.status-info-subtitle {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: #475569;
+}
+.status-info-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.status-info-row {
+  background: #f8faff;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.status-info-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+.status-info-value {
+  font-size: 15px;
+  color: #0f172a;
+  font-weight: 600;
+  word-break: break-word;
+}
+`;
+  document.head.appendChild(style);
+}
+
+function setStatusInfoRows(rows = []) {
+  if (!statusInfoContent) return;
+  statusInfoContent.innerHTML = '';
+  rows.forEach(({ label, value }) => {
+    const row = document.createElement('div');
+    row.className = 'status-info-row';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'status-info-label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'status-info-value';
+    valueEl.textContent = value || '—';
+    row.appendChild(labelEl);
+    row.appendChild(valueEl);
+    statusInfoContent.appendChild(row);
+  });
+}
+
+function formatCurrencyDisplay(value) {
+  if (value === null || value === undefined) return 'Not provided';
+  const strValue = typeof value === 'string' ? value.trim() : value;
+  if (strValue === '' || strValue === '—') return 'Not provided';
+  const num = Number(strValue);
+  if (Number.isNaN(num)) return `$${strValue}`;
+  try {
+    return num.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+  } catch (err) {
+    return `$${num}`;
+  }
+}
+
+function describeTenure(startDate) {
+  const iso = dateInputValue(startDate);
+  if (!iso) return 'Start date not available';
+  const start = new Date(iso);
+  if (isNaN(start)) return 'Start date not available';
+  const now = new Date();
+  if (now < start) return 'Starts in the future';
+
+  let years = now.getFullYear() - start.getFullYear();
+  let months = now.getMonth() - start.getMonth();
+  let days = now.getDate() - start.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const previousMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    days += previousMonth.getDate();
+  }
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  const parts = [];
+  if (years > 0) parts.push(`${years} yr${years === 1 ? '' : 's'}`);
+  if (months > 0) parts.push(`${months} mo${months === 1 ? '' : 's'}`);
+  if (!parts.length) {
+    if (days > 0) {
+      parts.push(`${days} day${days === 1 ? '' : 's'}`);
+    } else {
+      parts.push('Less than a day');
+    }
+  }
+  return parts.join(' ');
+}
+
+function formatReadableDate(value) {
+  const iso = dateInputValue(value);
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (isNaN(date)) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function isRealISODate(v) {
   if (!v) return false;
   const s = String(v).trim();

@@ -52,10 +52,13 @@ def _format_money(n) -> str:
 
 def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail,
-    candidate_name:str, client_name:str, opp_position_name:str, referal_source: Optional[str] = None
+    candidate_name:str, client_name:str, opp_position_name:str,
+    referal_source: Optional[str] = None,
+    lead_source: Optional[str] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_html = f'<li><b>Referral source:</b> {html.escape(referal_source)}</li>' if referal_source else ''
+    lead_source_html = f'<li><b>Lead source:</b> {html.escape(lead_source)}</li>' if lead_source else ''
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close-Win</b> 🎉</p>
@@ -69,6 +72,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
         <li><b>Set-up fee:</b> ${html.escape(_format_money(setup_fee))}</li>
         <li><b>Client email:</b> {html.escape(client_mail or '—')}</li>
         {referral_html}
+        {lead_source_html}
       </ul>
 
       <p><b>References / notes:</b><br>{references or '—'}</p>
@@ -86,10 +90,13 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
 
 def _initial_email_html_recruiting(  
     candidate_id:int, start_date, salary, revenue, references, client_mail,
-    candidate_name:str, client_name:str, opp_position_name:str, referal_source: Optional[str] = None
+    candidate_name:str, client_name:str, opp_position_name:str,
+    referal_source: Optional[str] = None,
+    lead_source: Optional[str] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_line = f"<b>Referral source:</b> {html.escape(referal_source)}<br>" if referal_source else ""
+    lead_source_line = f"<b>Lead source:</b> {html.escape(lead_source)}<br>" if lead_source else ""
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close-Win</b> 🎉</p>
@@ -102,6 +109,7 @@ def _initial_email_html_recruiting(
          <b>Revenue :</b> ${html.escape(_format_money(revenue))}<br>
          <b>Client email:</b> {html.escape(client_mail or '—')}<br>
          {referral_line}
+         {lead_source_line}
          <b>References / notes:</b> {references or '—'}
       </p>
 
@@ -159,6 +167,7 @@ def press_and_send(candidate_id):
         opp_position_name = ctx.get("opp_position_name") or ""
         client_mail       = ctx.get("client_mail") or (_fetch_client_email(opportunity_id, cur) or "")
         referal_source    = ctx.get("referal_source") or ""
+        lead_source       = ctx.get("where_come_from") or ""
 
         # Detectar tipo de opp
         opp_type = _fetch_opportunity_type(opportunity_id, cur)  # NEW
@@ -177,7 +186,8 @@ def press_and_send(candidate_id):
                 candidate_name=candidate_name,
                 client_name=client_name,
                 opp_position_name=opp_position_name,
-                referal_source=referal_source
+                referal_source=referal_source,
+                lead_source=lead_source
             )
         else:
             html_body = _initial_email_html_staffing(
@@ -191,7 +201,8 @@ def press_and_send(candidate_id):
                 candidate_name=candidate_name,
                 client_name=client_name,
                 opp_position_name=opp_position_name,
-                referal_source=referal_source
+                referal_source=referal_source,
+                lead_source=lead_source
             )
 
 
@@ -293,6 +304,7 @@ def _fetch_email_context(candidate_id:int, opportunity_id:int, cur):
       - client_mail         (account.mail)
       - opp_position_name   (opportunity.opp_position_name)
       - referal_source      (account.referal_source)
+      - where_come_from     (account.where_come_from)
     """
     cur.execute("""
         SELECT
@@ -300,7 +312,8 @@ def _fetch_email_context(candidate_id:int, opportunity_id:int, cur):
             a.client_name                  AS client_name,
             a.mail                         AS client_mail,
             o.opp_position_name            AS opp_position_name,
-            a.referal_source               AS referal_source
+            a.referal_source               AS referal_source,
+            a.where_come_from              AS where_come_from
         FROM opportunity o
         JOIN account a   ON a.account_id = o.account_id
         JOIN candidates c ON c.candidate_id = %s

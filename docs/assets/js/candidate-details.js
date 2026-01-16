@@ -1198,27 +1198,34 @@ window.updateHireField = function(field, value) {
 };
 
 async function captureInactiveMetadataFromModal({ candidateName, clientName, roleName } = {}) {
-  if (typeof window.openInactiveInfoModal !== 'function') return;
+  if (typeof window.openInactiveInfoModal !== 'function') return null;
   try {
     const modalResult = await window.openInactiveInfoModal({
       candidateName,
       clientName,
       roleName
     });
-    if (!modalResult) return;
+    if (!modalResult) return null;
 
     const trimmedComments = modalResult.comments?.trim();
+    const normalizedComments = trimmedComments ? trimmedComments : null;
     await patchHireFields({
       inactive_reason: modalResult.reason,
-      inactive_comments: trimmedComments ? trimmedComments : null,
+      inactive_comments: normalizedComments,
       inactive_vinttierror: Boolean(modalResult.vinttiError)
     });
     if (typeof showCuteToast === 'function') {
       showCuteToast('Offboarding info saved ✅');
     }
+    return {
+      reason: modalResult.reason,
+      comments: normalizedComments,
+      vinttiError: Boolean(modalResult.vinttiError)
+    };
   } catch (err) {
     console.error('❌ Failed to store inactive metadata', err);
     alert('We saved the end date but could not store the offboarding info. Please try again.');
+    return null;
   }
 }
 
@@ -1273,62 +1280,70 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
         const ymd = endInp.value || '';
         const prevValue = endInp.dataset.previousEndDate || '';
         const shouldNotify = !prevValue && !!ymd;
+        const normalizedEndDate = ymd ? normalizeDateForAPI(ymd) : '';
 
-        // 1) actualiza end_date normal
-        await updateHireField(
-          'end_date',
-          ymd ? normalizeDateForAPI(ymd) : ''
-        );
+        const clientName =
+          candidateOverviewData?.account_name ||
+          candidateOverviewData?.client_name ||
+          candidateOverviewData?.account ||
+          '';
+        const roleName =
+          candidateOverviewData?.opp_position_name ||
+          candidateOverviewData?.current_position ||
+          candidateOverviewData?.title ||
+          '';
+        const candidateName = candidateOverviewData?.name;
 
-        // 2) registra la “fecha de carga inactive”
-        if (ymd) {
-          const today = todayYmd();
-          await updateHireField(
-            'carga_inactive',  
-            normalizeDateForAPI(today)
-          );
-        } else {
-          await updateHireField('carga_inactive', '');
-        }
+        const persistEndDateFields = async () => {
+          await updateHireField('end_date', normalizedEndDate);
+          if (ymd) {
+            const today = todayYmd();
+            await updateHireField('carga_inactive', normalizeDateForAPI(today));
+          } else {
+            await updateHireField('carga_inactive', '');
+          }
+        };
 
-        if (shouldNotify) {
-          let oppIdForEmail = null;
-          try {
-            oppIdForEmail = await ensureCurrentOppId(candidateId);
-          } catch (err) {
-            console.error('Missing opportunity_id while preparing inactive email', err);
+        try {
+          if (shouldNotify) {
+            const modalResult = await captureInactiveMetadataFromModal({
+              candidateName,
+              clientName,
+              roleName
+            });
+            if (!modalResult) {
+              endInp.value = prevValue;
+              endInp.dataset.previousEndDate = prevValue;
+              return;
+            }
           }
 
-          const clientName =
-            candidateOverviewData?.account_name ||
-            candidateOverviewData?.client_name ||
-            candidateOverviewData?.account ||
-            '';
-          const roleName =
-            candidateOverviewData?.opp_position_name ||
-            candidateOverviewData?.current_position ||
-            candidateOverviewData?.title ||
-            '';
+          await persistEndDateFields();
 
-          const modalPromise = captureInactiveMetadataFromModal({
-            candidateName: candidateOverviewData?.name,
-            clientName,
-            roleName
-          });
+          if (shouldNotify) {
+            let oppIdForEmail = null;
+            try {
+              oppIdForEmail = await ensureCurrentOppId(candidateId);
+            } catch (err) {
+              console.error('Missing opportunity_id while preparing inactive email', err);
+            }
 
-          await notifyCandidateInactiveEmail({
-            candidateId,
-            candidateName: candidateOverviewData?.name,
-            clientName,
-            roleName,
-            endDate: ymd,
-            opportunityId: oppIdForEmail
-          });
+            await notifyCandidateInactiveEmail({
+              candidateId,
+              candidateName,
+              clientName,
+              roleName,
+              endDate: ymd,
+              opportunityId: oppIdForEmail
+            });
+          }
 
-          await modalPromise;
+          endInp.dataset.previousEndDate = ymd;
+        } catch (err) {
+          console.error('Failed to process hire end date change', err);
+          endInp.value = prevValue;
+          endInp.dataset.previousEndDate = prevValue;
         }
-
-        endInp.dataset.previousEndDate = ymd;
       });
     }
   })();

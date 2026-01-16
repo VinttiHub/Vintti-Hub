@@ -64,15 +64,28 @@ function parseISODate(value){
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function formatRangeLabel(range){
-  if (!range) return '—';
-  const start = parseISODate(range.from);
-  const end = parseISODate(range.to);
-  if (!start || !end) return '—';
+function formatDateRangeDisplay(start, end){
+  const isValid = (date) => date instanceof Date && !Number.isNaN(date.getTime());
+  if (!isValid(start) || !isValid(end)) return '—';
   const sameYear = start.getFullYear() === end.getFullYear();
   const startFmt = (sameYear ? DATE_FMT_SHORT : DATE_FMT_LONG).format(start);
   const endFmt = DATE_FMT_LONG.format(end);
   return `${startFmt} → ${endFmt}`;
+}
+
+function formatRangeLabel(range){
+  if (!range) return '—';
+  const start = parseISODate(range.from);
+  const end = parseISODate(range.to);
+  return formatDateRangeDisplay(start, end);
+}
+
+function formatPreviousMonthRangeLabel(){
+  const today = new Date();
+  if (Number.isNaN(today.getTime())) return '—';
+  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const end = new Date(today.getFullYear(), today.getMonth(), 0);
+  return formatDateRangeDisplay(start, end);
 }
 
 function formatFullDate(value){
@@ -691,7 +704,10 @@ function renderRecruitingRevenueCard(summary){
   const prevAccounts = document.getElementById('recRevenuePrevAccounts');
   const prevCount = Array.isArray(prev.accounts) ? prev.accounts.length : 0;
   if (prevVal) prevVal.textContent = fmtMoney(prev.total || 0);
-  if (prevDates) prevDates.textContent = formatRangeLabel(prev);
+  if (prevDates){
+    const prevRangeLabel = formatPreviousMonthRangeLabel();
+    prevDates.textContent = prevRangeLabel === '—' ? formatRangeLabel(prev) : prevRangeLabel;
+  }
   if (prevAccounts) prevAccounts.textContent = formatCount(prevCount, 'account', 'accounts');
 }
 

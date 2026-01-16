@@ -218,6 +218,8 @@ function toggleUsStateField(country) {
   if (!candidateModalRefs.usStateField) return;
   const shouldShow = normalizeCountryKey(country) === 'United States';
   candidateModalRefs.usStateField.hidden = !shouldShow;
+  candidateModalRefs.usStateField.style.display = shouldShow ? '' : 'none';
+  candidateModalRefs.usStateField.setAttribute('aria-hidden', String(!shouldShow));
   if (!shouldShow) {
     setUsStateInputValue('');
     candidateModalRefs.usStateInput?.classList.remove('input-error');
