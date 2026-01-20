@@ -74,6 +74,38 @@ def _float_or_none(value):
         return None
 
 
+def _normalize_churn_detail_row(row):
+    if not row:
+        return None
+    tenure_days = row.get("tenure_days")
+    if tenure_days is not None:
+        try:
+            tenure_days = int(tenure_days)
+        except (TypeError, ValueError):
+            pass
+
+    return {
+        "hire_opportunity_id": row.get("hire_opportunity_id"),
+        "candidate_id": row.get("candidate_id"),
+        "candidate_name": row.get("candidate_name"),
+        "candidate_email": row.get("candidate_email"),
+        "opportunity_id": row.get("opportunity_id"),
+        "opportunity_title": row.get("opportunity_title"),
+        "opportunity_stage": row.get("opportunity_stage"),
+        "opportunity_status": row.get("opportunity_status"),
+        "opportunity_model": row.get("opportunity_model"),
+        "opportunity_type": row.get("opportunity_type"),
+        "opportunity_created_at": _iso_date_or_none(row.get("opportunity_created_date")),
+        "opportunity_client_name": row.get("opportunity_client_name"),
+        "hr_lead_email": row.get("hr_lead_email"),
+        "hr_lead_name": row.get("hr_lead_name"),
+        "start_date": _iso_date_or_none(row.get("start_date")),
+        "end_date": _iso_date_or_none(row.get("end_date")),
+        "tenure_days": tenure_days,
+        "left_within_90_days": bool(row.get("left_within_90_days")),
+    }
+
+
 def register_recruiter_metrics_routes(app):
     @app.route("/recruiter-metrics", methods=["GET"])
     def api_recruiter_metrics():
@@ -353,8 +385,8 @@ def register_recruiter_metrics_routes(app):
                 END AS tenure_days
             FROM hire_opportunity h
             WHERE h.end_date IS NOT NULL
-              AND h.end_date::date >= %(win_start)s
-              AND h.end_date::date <  %(win_end)s
+              AND h.end_date::date >= %(churn_start)s
+              AND h.end_date::date <  %(churn_end)s
         )
         SELECT
             cd.hire_opportunity_id,
@@ -675,6 +707,7 @@ def register_recruiter_metrics_routes(app):
         """
 
         churn_detail_rows = []
+        left90_churn_detail_rows = []
         opportunity_detail_rows = []
         left90_summary_rows = []
         duration_detail_rows = []
@@ -697,11 +730,20 @@ def register_recruiter_metrics_routes(app):
                 cur.execute(
                     churn_details_sql,
                     {
-                        "win_start": window_start,
-                        "win_end": window_end,
+                        "churn_start": window_start,
+                        "churn_end": window_end,
                     },
                 )
                 churn_detail_rows = cur.fetchall()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    churn_details_sql,
+                    {
+                        "churn_start": left90_window_start,
+                        "churn_end": left90_window_end,
+                    },
+                )
+                left90_churn_detail_rows = cur.fetchall()
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     left90_summary_sql,
@@ -836,6 +878,7 @@ def register_recruiter_metrics_routes(app):
             )
 
         churn_details = []
+        left90_churn_details = []
         churn_summary_by_lead = {}
         overall_churn_summary = {
             "total": 0,
@@ -850,36 +893,13 @@ def register_recruiter_metrics_routes(app):
         sent_vs_interview_details_by_lead = {}
 
         for row in churn_detail_rows:
-            tenure_days = row.get("tenure_days")
-            if tenure_days is not None:
-                try:
-                    tenure_days = int(tenure_days)
-                except (TypeError, ValueError):
-                    pass
-
-            detail = {
-                "hire_opportunity_id": row.get("hire_opportunity_id"),
-                "candidate_id": row.get("candidate_id"),
-                "candidate_name": row.get("candidate_name"),
-                "candidate_email": row.get("candidate_email"),
-                "opportunity_id": row.get("opportunity_id"),
-                "opportunity_title": row.get("opportunity_title"),
-                "opportunity_stage": row.get("opportunity_stage"),
-                "opportunity_status": row.get("opportunity_status"),
-                "opportunity_model": row.get("opportunity_model"),
-                "opportunity_type": row.get("opportunity_type"),
-                "opportunity_created_at": _iso_date_or_none(row.get("opportunity_created_date")),
-                "opportunity_client_name": row.get("opportunity_client_name"),
-                "hr_lead_email": row.get("hr_lead_email"),
-                "hr_lead_name": row.get("hr_lead_name"),
-                "start_date": _iso_date_or_none(row.get("start_date")),
-                "end_date": _iso_date_or_none(row.get("end_date")),
-                "tenure_days": tenure_days,
-                "left_within_90_days": bool(row.get("left_within_90_days")),
-            }
+            detail = _normalize_churn_detail_row(row)
+            if not detail:
+                continue
             churn_details.append(detail)
 
             overall_churn_summary["total"] += 1
+            tenure_days = detail["tenure_days"]
             if tenure_days is not None:
                 overall_churn_summary["tenure_known"] += 1
                 if detail["left_within_90_days"]:
@@ -901,6 +921,12 @@ def register_recruiter_metrics_routes(app):
                     summary["within_90"] += 1
             else:
                 summary["tenure_unknown"] += 1
+
+        for row in left90_churn_detail_rows:
+            detail = _normalize_churn_detail_row(row)
+            if not detail:
+                continue
+            left90_churn_details.append(detail)
 
         for row in left90_summary_rows:
             lead_key = (row.get("hr_lead_email") or "").lower()
@@ -1059,6 +1085,7 @@ def register_recruiter_metrics_routes(app):
                 #  - churn_summary gives overall totals for the selected window
                 "churn_details": churn_details,
                 "churn_summary": overall_churn_summary,
+                "left90_churn_details": left90_churn_details,
                 "opportunity_details": opportunity_details_by_lead,
                 "duration_details": duration_details_by_lead,
                 "pipeline_details": pipeline_details_by_lead,

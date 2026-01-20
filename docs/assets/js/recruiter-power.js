@@ -35,6 +35,7 @@ const metricsState = {
   rangeStart: null, // YYYY-MM-DD inclusive
   rangeEnd: null,   // YYYY-MM-DD inclusive
   churnDetails: [],
+  left90ChurnDetails: [],
   churnSummary: null,
   selectedLead: "",
   recruiterDirectory: [],
@@ -589,10 +590,12 @@ function describeLeft90Window() {
   }
   return "this window";
 }
-function getLeadChurnDetails(hrLeadEmail) {
+function getLeadChurnDetails(hrLeadEmail, { source = "range" } = {}) {
   const key = (hrLeadEmail || "").toLowerCase();
   if (!key) return [];
-  return (metricsState.churnDetails || []).filter(
+  const sourceList =
+    source === "left90" ? metricsState.left90ChurnDetails : metricsState.churnDetails;
+  return (sourceList || []).filter(
     (row) => (row.hr_lead_email || "").toLowerCase() === key
   );
 }
@@ -705,7 +708,6 @@ function buildDetailModalPayload(type) {
   const getDurationItems = (metricKey) => createDurationItems(durationDetails[metricKey] || [], metricKey);
   const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
   const pipelineEntries = getPipelineDetails(key);
-  const churnEntries = getLeadChurnDetails(key);
   const sentVsInterviewDetails = getSentVsInterviewDetails(key);
 
   switch (type) {
@@ -899,6 +901,7 @@ function buildDetailModalPayload(type) {
       };
     }
     case "churnRange": {
+      const churnEntries = getLeadChurnDetails(key);
       const known = selectedMetrics.churn_tenure_known ?? 0;
       const missing = selectedMetrics.churn_tenure_unknown ?? 0;
       return {
@@ -912,6 +915,7 @@ function buildDetailModalPayload(type) {
       };
     }
     case "churn90Days": {
+      const left90Entries = getLeadChurnDetails(key, { source: "left90" });
       const windowLabel = describeLeft90Window();
       return {
         title: "Total churn · 90-day tenure",
@@ -919,7 +923,7 @@ function buildDetailModalPayload(type) {
         summaryLines: [
           `Churn count: ${selectedMetrics.left90_total ?? selectedMetrics.left90_within_90 ?? 0}`,
         ],
-        items: createChurnDetailItems(churnEntries),
+        items: createChurnDetailItems(left90Entries),
         emptyMessage: "No hires left in this window for this recruiter.",
       };
     }
@@ -1517,6 +1521,9 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     metricsState.byLead = byLead;
     metricsState.orderedLeadEmails = orderedEmails;
     metricsState.churnDetails = Array.isArray(data.churn_details) ? data.churn_details : [];
+    metricsState.left90ChurnDetails = Array.isArray(data.left90_churn_details)
+      ? data.left90_churn_details
+      : [];
     metricsState.churnSummary = data.churn_summary || null;
     metricsState.opportunityDetails = normalizeOpportunityDetails(data.opportunity_details);
     metricsState.durationDetails = normalizeDurationDetails(data.duration_details);
