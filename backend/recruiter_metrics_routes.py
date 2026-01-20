@@ -85,10 +85,12 @@ def register_recruiter_metrics_routes(app):
             # fallback: display end defaults to the inclusive day before window_end
             disp_end = window_end - timedelta(days=1)
 
-        left90_window_start = window_start
-        left90_window_end = window_end
-        left90_display_start = disp_start
-        left90_display_end = disp_end
+        # Churn 90-day window is always relative to “today” in Bogota timezone
+        today = datetime.now(BOGOTA_TZ).date()
+        left90_display_end = today
+        left90_display_start = today - timedelta(days=90)
+        left90_window_start = left90_display_start
+        left90_window_end = today + timedelta(days=1)
 
         sql = """
         WITH base AS (
