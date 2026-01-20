@@ -1108,7 +1108,8 @@ function nameToEmail(label, isHR){
 
   if (isHR) {
     // ➕ primero casos específicos
-    if (lower.includes('pilar') && lower.includes('fernandez')) return 'pilar.fernandez@vintti.com'; // ⬅️ NUEVA
+    if (lower.includes('paz'))                                    return 'paz@vintti.com';
+    if (lower.includes('pilar') && lower.includes('fernandez')) return 'pilar.fernandez@vintti.com';
     if (lower.includes('pilar'))                                 return 'pilar@vintti.com';
 
     if (lower.includes('jazmin'))                                 return 'jazmin@vintti.com';
@@ -1467,7 +1468,8 @@ if (candidateSearchLink) {
     'pilar.fernandez@vintti.com',
     'angie@vintti.com',
     'agostina@vintti.com',
-    'julieta@vintti.com' 
+    'julieta@vintti.com',
+    'paz@vintti.com' 
   ]);
 
   candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';
@@ -2518,7 +2520,8 @@ async function patchOppFields(oppId, payload) {
     'constanza@vintti.com',
     'pilar@vintti.com',
     'pilar.fernandez@vintti.com',
-    'julieta@vintti.com'
+    'julieta@vintti.com',
+    'paz@vintti.com'
   ]);
 
   // Mantener flex para icono + texto alineados
@@ -2543,7 +2546,8 @@ const HR_INITIALS_BY_EMAIL = {
   'agustina.barbero@vintti.com':        'AB',
   'josefina@vintti.com':                'JP',
   'constanza@vintti.com':               'CL',
-  'julieta@vintti.com':                  'JG'
+  'julieta@vintti.com':                 'JG',
+  'paz@vintti.com':                     'PL'
 };
 
 function initialsForHRLead(emailOrName) {
@@ -2561,6 +2565,7 @@ function initialsForHRLead(emailOrName) {
   if (s.includes('agostina') && s.includes('ferrari'))  return 'AF';
   if (s.includes('agostina')) return 'AC';
   if (s.includes('jazmin'))   return 'JP';
+  if (s.includes('paz'))      return 'PZ';
 
   return '—';
 }

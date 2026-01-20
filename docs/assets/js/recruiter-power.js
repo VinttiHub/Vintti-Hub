@@ -17,12 +17,13 @@ const RESTRICTED_EMAILS = new Set([
   "pilar.fernandez@vintti.com",
   "agostina@vintti.com",
   "julieta@vintti.com",
+  "paz@vintti.com",
 ]);
 const RECRUITER_POWER_ALLOWED = new Set([
   "angie@vintti.com",
   "agostina@vintti.com",
   "agustin@vintti.com",
-  "lara@vintti.com",
+  "lara@vintti.com"
 ]);
 
 const metricsState = {

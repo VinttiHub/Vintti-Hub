@@ -662,6 +662,10 @@ body {
 .hr-lead-dropdown option[value*="Sol"] {
   background-color: #f0fff4;
 }
+.hr-lead-dropdown option[value*="Paz"],
+.hr-lead-dropdown option[value*="paz"] {
+  background-color: #eef0ff;
+}
 
 /* 6. Sombra rosita al enfocar dropdowns */
 .stage-dropdown:focus,

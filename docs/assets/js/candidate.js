@@ -1211,7 +1211,8 @@ function installAdvancedFilters(table) {
     'constanza@vintti.com',
     'pilar@vintti.com',
     'pilar.fernandez@vintti.com',
-    'julieta@vintti.com'
+    'julieta@vintti.com',
+    'paz@vintti.com'
   ]);
 
   // Mantener flex para icono + texto alineados
@@ -1253,7 +1254,8 @@ function installAdvancedFilters(table) {
     'pilar.fernandez@vintti.com',
     'angie@vintti.com',
     'agostina@vintti.com',
-    'julieta@vintti.com'
+    'julieta@vintti.com',
+    'paz@vintti.com'
   ]);
 
   candidateSearchLink.style.display = CANDIDATE_SEARCH_ALLOWED.has(email) ? 'flex' : 'none';

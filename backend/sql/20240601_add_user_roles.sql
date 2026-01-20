@@ -21,7 +21,8 @@ WHERE (u.role ILIKE '%recruit%')
         'agustina.ferrari@vintti.com',
         'josefina@vintti.com',
         'constanza@vintti.com',
-        'julieta@vintti.com'
+        'julieta@vintti.com',
+        'paz@vintti.com'
    )
 ON CONFLICT DO NOTHING;
 
