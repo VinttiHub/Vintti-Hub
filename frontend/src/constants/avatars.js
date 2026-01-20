@@ -14,4 +14,5 @@ export const AVATAR_BY_EMAIL = {
   'mariano@vintti.com': 'mariano.png',
   'julieta@vintti.com': 'julieta.png',
   'juliana@vintti.com': 'juliana.png',
+  'paz@vintti.com': 'paz.png',
 };
