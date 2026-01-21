@@ -918,10 +918,7 @@ if (positionSearchInput) {
 const typeFilterSelect = document.getElementById('typeFilterSelect');
 if (typeFilterSelect) {
   const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const seen = new Set();
   uniqueTypes.forEach((type) => {
-    if (seen.has(type)) return;
-    seen.add(type);
     const option = document.createElement('option');
     option.value = type;
     option.textContent = type;
@@ -929,9 +926,13 @@ if (typeFilterSelect) {
   });
 
   typeFilterSelect.addEventListener('change', () => {
-    const value = typeFilterSelect.value;
-    const pattern = value ? `^${escapeRegex(value)}$` : '';
-    table.column(3).search(pattern, true, false).draw(); // columna 3 = Type
+    const value = (typeFilterSelect.value || '').trim();
+    if (!value) {
+      table.column(3).search('', false, false, true).draw();
+      return;
+    }
+    const pattern = `^${escapeRegex(value)}$`;
+    table.column(3).search(pattern, true, false, true).draw(); // columna 3 = Type
   });
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
