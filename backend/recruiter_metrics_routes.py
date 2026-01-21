@@ -387,6 +387,23 @@ def register_recruiter_metrics_routes(app):
             WHERE h.end_date IS NOT NULL
               AND h.end_date::date >= %(churn_start)s
               AND h.end_date::date <  %(churn_end)s
+              AND (
+                    %(start_window_start)s IS NULL
+                    OR (
+                        h.start_date IS NOT NULL
+                        AND h.start_date::date >= %(start_window_start)s
+                        AND h.start_date::date <  %(start_window_end)s
+                    )
+                )
+              AND (
+                    %(max_tenure_days)s IS NULL
+                    OR (
+                        h.start_date IS NOT NULL
+                        AND h.end_date IS NOT NULL
+                        AND GREATEST(0, (h.end_date::date - h.start_date::date))::int
+                            <= %(max_tenure_days)s
+                    )
+                )
         )
         SELECT
             cd.hire_opportunity_id,
@@ -444,6 +461,23 @@ def register_recruiter_metrics_routes(app):
             WHERE h.end_date IS NOT NULL
               AND h.end_date::date >= %(left90_start)s
               AND h.end_date::date <  %(left90_end)s
+              AND (
+                    %(start_window_start)s IS NULL
+                    OR (
+                        h.start_date IS NOT NULL
+                        AND h.start_date::date >= %(start_window_start)s
+                        AND h.start_date::date <  %(start_window_end)s
+                    )
+                )
+              AND (
+                    %(max_tenure_days)s IS NULL
+                    OR (
+                        h.start_date IS NOT NULL
+                        AND h.end_date IS NOT NULL
+                        AND GREATEST(0, (h.end_date::date - h.start_date::date))::int
+                            <= %(max_tenure_days)s
+                    )
+                )
         )
         SELECT
             LOWER(o.opp_hr_lead) AS hr_lead_email,
@@ -732,6 +766,9 @@ def register_recruiter_metrics_routes(app):
                     {
                         "churn_start": window_start,
                         "churn_end": window_end,
+                        "start_window_start": None,
+                        "start_window_end": None,
+                        "max_tenure_days": None,
                     },
                 )
                 churn_detail_rows = cur.fetchall()
@@ -741,6 +778,9 @@ def register_recruiter_metrics_routes(app):
                     {
                         "churn_start": left90_window_start,
                         "churn_end": left90_window_end,
+                        "start_window_start": left90_window_start,
+                        "start_window_end": left90_window_end,
+                        "max_tenure_days": 90,
                     },
                 )
                 left90_churn_detail_rows = cur.fetchall()
@@ -750,6 +790,9 @@ def register_recruiter_metrics_routes(app):
                     {
                         "left90_start": left90_window_start,
                         "left90_end": left90_window_end,
+                        "start_window_start": left90_window_start,
+                        "start_window_end": left90_window_end,
+                        "max_tenure_days": 90,
                     },
                 )
                 left90_summary_rows = cur.fetchall()
