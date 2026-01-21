@@ -170,11 +170,15 @@
         <div class="multi-select hidden" id="filterHRLead"></div>
       </div>
 
-      <!-- Type Dropdown -->
-      <div class="text-filter text-filter--compact">
-        <select id="typeFilterSelect" class="filter-select" aria-label="Filter by type">
-          <option value="">New/Replacement</option>
-        </select>
+      <!-- Type Filter -->
+      <div class="multi-filter" id="filterTypeContainer">
+        <div class="filter-header filter-toggle" data-target="filterType">
+          <label>Type</label>
+          <button class="filter-toggle" data-target="filterType" type="button" aria-expanded="false" aria-controls="filterType">
+            <i class="fa-solid fa-angle-down" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="multi-select hidden" id="filterType"></div>
       </div>
 
       <!-- Account Text Search -->

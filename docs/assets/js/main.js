@@ -779,11 +779,15 @@ document.querySelectorAll('.filter-header button').forEach(button => {
           }
 
           const plainComment = htmlToPlainText(opp.comments || '');
+          const typeLabel = opp.opp_type || '';
           tr.innerHTML = `
             <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
             <td>${opp.client_name || ''}</td>
             <td>${opp.opp_position_name || ''}</td>
-            <td>${getTypeBadge(opp.opp_type)}</td>
+            <td data-type-value="${escapeAttribute(typeLabel)}">
+              ${getTypeBadge(typeLabel)}
+              <span class="sr-only type-label">${escapeHtml(typeLabel)}</span>
+            </td>
             <td>${opp.opp_model || ''}</td>
             <td class="sales-lead-cell">${getSalesLeadCell(opp)}</td>
             <td class="hr-lead-cell">
@@ -899,6 +903,25 @@ const uniqueTypes = [...new Set(
     .filter(Boolean)
 )].sort((a, b) => a.localeCompare(b));
 
+window.__typeFilterState = {
+  selected: new Set(uniqueTypes.map((type) => type.toLowerCase())),
+};
+
+if (!window.__typeFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
+  $.fn.dataTable.ext.search.push((settings, rowData, rowIndex) => {
+    if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
+    const selection = window.__typeFilterState?.selected;
+    if (!selection || selection.size === 0) return true;
+    const row = settings.aoData?.[rowIndex]?.nTr;
+    const cell = row?.querySelector('[data-type-value]');
+    const value = String(cell?.getAttribute('data-type-value') || '')
+      .trim()
+      .toLowerCase();
+    return selection.has(value);
+  });
+  window.__typeFilterExtRegistered = true;
+}
+
 const accountSearchInput = document.getElementById('accountSearchInput');
 if (accountSearchInput) {
   accountSearchInput.addEventListener('input', () => {
@@ -912,29 +935,6 @@ if (positionSearchInput) {
   positionSearchInput.addEventListener('input', () => {
     const value = positionSearchInput.value;
     table.column(2).search(value, true, false).draw(); // columna 2 = Position
-  });
-}
-
-const typeFilterSelect = document.getElementById('typeFilterSelect');
-if (typeFilterSelect) {
-  const typeLabels = [
-    { label: 'New', value: 'New' },
-    { label: 'Replacement', value: 'Replacement' }
-  ];
-  typeLabels.forEach(({ label, value }) => {
-    const option = document.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    typeFilterSelect.appendChild(option);
-  });
-
-  typeFilterSelect.addEventListener('change', () => {
-    const value = (typeFilterSelect.value || '').trim();
-    if (!value) {
-      table.column(3).search('', false, false, true).draw();
-      return;
-    }
-    table.column(3).search(value, true, false, false).draw(); // columna 3 = Type
   });
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
@@ -992,6 +992,7 @@ const filterRegistry = [];
 buildMultiFilter('filterStage',     uniqueStages,     0, 'Stage',      'Stage',    table);
 buildMultiFilter('filterSalesLead', uniqueSalesLeads, 5, 'Sales Lead', 'SalesLead',table);
 buildMultiFilter('filterHRLead',    uniqueHRLeads,    6, 'HR Lead',    'HRLead',   table);
+buildMultiFilter('filterType',      uniqueTypes,      3, 'Type',       'Type',     table);
 
 const dtLength = document.querySelector('#opportunityTable_length');
 const dtTarget = document.getElementById('dataTablesLengthTarget');
@@ -1056,6 +1057,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
   const IS_STAGE = (containerId === 'filterStage');
   const IS_SALES = (containerId === 'filterSalesLead');
   const IS_HR    = (containerId === 'filterHRLead');
+  const IS_TYPE  = (containerId === 'filterType');
 
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -1104,9 +1106,15 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
   checkboxWrapper.classList.add('checkbox-list');
   container.appendChild(checkboxWrapper);
 
-  // Por defecto, en Stage desmarcamos Close Win / Closed Lost
-  const EXCLUDED_BY_DEFAULT = IS_STAGE ? new Set(['Close Win', 'Closed Lost']) : null;
-  const anyUnchecked = !!EXCLUDED_BY_DEFAULT && options.some(v => EXCLUDED_BY_DEFAULT.has(v));
+  // Initial selection: Stage deselects wins/losses, others select all
+  const DEFAULT_EXCLUDED = IS_STAGE ? new Set(['Close Win', 'Closed Lost']) : null;
+  const initialSelection = new Set(
+    options.filter((val) => !(DEFAULT_EXCLUDED && DEFAULT_EXCLUDED.has(val)))
+  );
+  if (initialSelection.size === 0) {
+    options.forEach((val) => initialSelection.add(val));
+  }
+  const anyUnchecked = initialSelection.size !== options.length;
   selectToggle.textContent = anyUnchecked ? 'Select All' : 'Deselect All';
 
   // Render checkboxes
@@ -1115,11 +1123,17 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = val;
-    checkbox.checked = !(EXCLUDED_BY_DEFAULT && EXCLUDED_BY_DEFAULT.has(val));
+    checkbox.checked = initialSelection.has(val);
     label.appendChild(checkbox);
     label.append(' ' + val);
     checkboxWrapper.appendChild(label);
   });
+
+  if (IS_TYPE && window.__typeFilterState) {
+    window.__typeFilterState.selected = new Set(
+      Array.from(initialSelection).map((val) => String(val || '').trim().toLowerCase())
+    );
+  }
 
   function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
@@ -1232,7 +1246,17 @@ function paintLeadDots(selectedList) {
     const selected = Array.from(cbs).filter(c => c.checked).map(c => c.value);
     const pieces = selected.map(v => (v === 'Unassigned') ? '^$' : escapeRegex(v));
     const pattern = selected.length ? pieces.join('|') : '';
-    column.search(pattern, true, false).draw();
+
+    if (IS_TYPE) {
+      if (window.__typeFilterState) {
+        window.__typeFilterState.selected = new Set(
+          selected.map((val) => String(val || '').trim().toLowerCase()),
+        );
+      }
+      dataTable.draw();
+    } else {
+      column.search(pattern, true, false).draw();
+    }
 
     if (IS_STAGE) paintStageDots(selected);
     if (IS_HR || IS_SALES) paintLeadDots(selected);
