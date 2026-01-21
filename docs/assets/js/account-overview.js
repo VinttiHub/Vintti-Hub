@@ -93,20 +93,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function hydratePage(accountId) {
   try {
-    const [account, opportunities] = await Promise.all([
+    const [account, opportunities, cachedClosed] = await Promise.all([
       fetchJSON(`${API_BASE}/accounts/${accountId}`),
       fetchJSON(`${API_BASE}/accounts/${accountId}/opportunities`),
+      fetchClosedOpportunityCache(accountId),
     ]);
 
     currentAccount = account;
     updateAccountHeader(account);
-    const enriched = await enrichWithBatches(opportunities);
+    const { enriched, snapshotsToPersist } = await enrichWithBatches(
+      opportunities,
+      cachedClosed
+    );
     const visibleOpportunities = enriched.filter(
       (opp) => classifyOpportunity(opp) !== "lost"
     );
     pageState.opportunities = visibleOpportunities;
     updateHighlights(visibleOpportunities);
     applyOpportunityFilter(pageState.filter);
+    if (snapshotsToPersist.length) {
+      persistClosedOpportunityBatches(accountId, snapshotsToPersist);
+    }
   } catch (error) {
     console.error("Failed to load account overview", error);
     showErrorState("We couldn’t load this overview. Please refresh or try later.");
@@ -140,6 +147,55 @@ async function fetchJSON(url) {
     throw new Error(`Request failed ${res.status}: ${text}`);
   }
   return res.json();
+}
+
+async function fetchClosedOpportunityCache(accountId) {
+  if (!accountId) return new Map();
+  try {
+    const res = await fetch(`${API_BASE}/accounts/${accountId}/overview-cache`);
+    if (!res.ok) {
+      console.warn("Cache request failed with status", res.status);
+      return new Map();
+    }
+    const data = await res.json();
+    const cache = new Map();
+    if (Array.isArray(data)) {
+      data.forEach((entry) => {
+        if (entry?.opportunity_id == null) return;
+        const batches = normalizeCachedBatches(
+          entry.candidates_batches ?? entry.snapshot ?? entry.batches
+        );
+        cache.set(String(entry.opportunity_id), batches);
+      });
+    }
+    return cache;
+  } catch (error) {
+    console.warn("Failed to load cached closed opportunities", error);
+    return new Map();
+  }
+}
+
+async function persistClosedOpportunityBatches(accountId, snapshots) {
+  if (!accountId || !Array.isArray(snapshots) || !snapshots.length) return;
+  try {
+    const res = await fetch(`${API_BASE}/accounts/${accountId}/overview-cache`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ opportunities: snapshots }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Unknown error");
+    }
+  } catch (error) {
+    console.warn("Failed to persist closed opportunity cache", error);
+  }
+}
+
+function normalizeCachedBatches(entry) {
+  if (Array.isArray(entry)) return entry;
+  if (entry && Array.isArray(entry.batches)) return entry.batches;
+  return [];
 }
 
 function showMissingAccountMessage() {
@@ -185,7 +241,7 @@ function formatContact(account) {
   return nameParts.join(" ") || email;
 }
 
-async function enrichWithBatches(opportunities) {
+async function enrichWithBatches(opportunities, closedCache = new Map()) {
   const list = Array.isArray(opportunities) ? opportunities : [];
   const stageRank = buildStageRank();
   const sorted = list.slice().sort((a, b) => {
@@ -198,38 +254,56 @@ async function enrichWithBatches(opportunities) {
   });
 
   const enriched = [];
+  const cacheMap = closedCache instanceof Map ? closedCache : new Map();
+  const snapshotsToPersist = [];
   for (const opp of sorted) {
     const item = { ...opp, batches: [] };
-    try {
-      const batches = await fetchJSON(`${API_BASE}/opportunities/${opp.opportunity_id}/batches`);
-      if (Array.isArray(batches)) {
-        const enrichedBatches = [];
-        for (const batch of batches) {
-          try {
-            const batchCandidates = await fetchJSON(`${API_BASE}/batches/${batch.batch_id}/candidates`);
-            const normalizedCandidates = Array.isArray(batchCandidates)
-              ? batchCandidates.map((candidate) => ({
-                  ...candidate,
-                  batch_status: candidate.status || candidate.stage || "",
-                  batch_number: batch.batch_number,
-                  presentation_date: batch.presentation_date,
-                }))
-              : [];
-            enrichedBatches.push({ ...batch, candidates: normalizedCandidates });
-          } catch (err) {
-            console.error(`Failed to load batch candidates for batch ${batch.batch_id}`, err);
-            enrichedBatches.push({ ...batch, candidates: [] });
+    const cacheKey = String(item.opportunity_id || "");
+    const classification = classifyOpportunity(opp);
+    const hasCachedBatches =
+      classification === "closed" && cacheKey && cacheMap.has(cacheKey);
+    if (hasCachedBatches) {
+      const cachedEntry = cacheMap.get(cacheKey);
+      item.batches = Array.isArray(cachedEntry) ? cachedEntry : [];
+    } else {
+      try {
+        const batches = await fetchJSON(`${API_BASE}/opportunities/${opp.opportunity_id}/batches`);
+        if (Array.isArray(batches)) {
+          const enrichedBatches = [];
+          for (const batch of batches) {
+            try {
+              const batchCandidates = await fetchJSON(`${API_BASE}/batches/${batch.batch_id}/candidates`);
+              const normalizedCandidates = Array.isArray(batchCandidates)
+                ? batchCandidates.map((candidate) => ({
+                    ...candidate,
+                    batch_status: candidate.status || candidate.stage || "",
+                    batch_number: batch.batch_number,
+                    presentation_date: batch.presentation_date,
+                  }))
+                : [];
+              enrichedBatches.push({ ...batch, candidates: normalizedCandidates });
+            } catch (err) {
+              console.error(`Failed to load batch candidates for batch ${batch.batch_id}`, err);
+              enrichedBatches.push({ ...batch, candidates: [] });
+            }
           }
+          item.batches = enrichedBatches;
         }
-        item.batches = enrichedBatches;
+      } catch (error) {
+        console.warn(`Batches not available for opportunity ${opp.opportunity_id}`, error);
       }
-    } catch (error) {
-      console.warn(`Batches not available for opportunity ${opp.opportunity_id}`, error);
+
+      if (classification === "closed" && cacheKey) {
+        snapshotsToPersist.push({
+          opportunity_id: item.opportunity_id,
+          batches: item.batches,
+        });
+      }
     }
     enriched.push(item);
     opportunityCache.set(String(item.opportunity_id), item);
   }
-  return enriched;
+  return { enriched, snapshotsToPersist };
 }
 
 function buildStageRank() {

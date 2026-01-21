@@ -46,7 +46,40 @@ const metricsState = {
   durationDetails: {},
   pipelineDetails: {},
   sentVsInterviewDetails: {},
+  historyMonthlyWindows: [],
+  historyCache: {},
+  historyRangeStart: "",
+  historyRangeEnd: "",
+  historyError: "",
+  historyLoading: false,
+  activeTab: "summary",
 };
+const HISTORY_START_YEAR = 2025;
+const HISTORY_START_MONTH_INDEX = 0;
+const historyDom = {
+  panel: null,
+  subtitle: null,
+  globalFilters: null,
+  startInput: null,
+  endInput: null,
+  quickActions: null,
+  error: null,
+  empty: null,
+  highlights: null,
+  loading: null,
+  grid: null,
+  tableCard: null,
+  tableBody: null,
+};
+metricsState.historyMonthlyWindows = buildMonthlyWindows(
+  HISTORY_START_YEAR,
+  HISTORY_START_MONTH_INDEX
+);
+if (metricsState.historyMonthlyWindows.length) {
+  metricsState.historyRangeStart = metricsState.historyMonthlyWindows[0].key;
+  metricsState.historyRangeEnd =
+    metricsState.historyMonthlyWindows[metricsState.historyMonthlyWindows.length - 1].key;
+}
 const detailModalRefs = {
   root: null,
   overlay: null,
@@ -902,16 +935,32 @@ function buildDetailModalPayload(type) {
     }
     case "churnRange": {
       const churnEntries = getLeadChurnDetails(key);
+      const lifetimeHires = Number(selectedMetrics.hire_total_lifetime ?? 0);
+      const churnTotal = Number(selectedMetrics.churn_total ?? 0);
+      let churnRate = null;
+      if (typeof selectedMetrics.churn_lifetime_rate === "number") {
+        churnRate = selectedMetrics.churn_lifetime_rate;
+      } else if (lifetimeHires > 0) {
+        churnRate = churnTotal / lifetimeHires;
+      }
+      const summaryLines = [
+        `Lifetime hires: ${lifetimeHires}`,
+        `Hires who left: ${churnTotal}`,
+        `Churn rate: ${formatPercent(churnRate)}`,
+      ];
       const known = selectedMetrics.churn_tenure_known ?? 0;
       const missing = selectedMetrics.churn_tenure_unknown ?? 0;
+      if (known || missing) {
+        summaryLines.push(`Start date available: ${known} · Missing: ${missing}`);
+      }
       return {
-        title: "Total churn · Selected range",
-        context: `Churned hires${recruiterSuffix} whose end date falls between ${readableRange}.`,
-        summaryLines: [
-          `Count: ${selectedMetrics.churn_total ?? 0}`,
-        ],
+        title: "Total churn · Lifetime",
+        context: `All documented hires${recruiterSuffix} and how many have left since tracking began.`,
+        summaryLines,
         items: createChurnDetailItems(churnEntries),
-        emptyMessage: "No churn recorded for this recruiter in the selected range.",
+        emptyMessage: lifetimeHires
+          ? "No hires have left for this recruiter yet."
+          : "No hires recorded for this recruiter.",
       };
     }
     case "churn90Days": {
@@ -1078,7 +1127,7 @@ function updateCardsForLead(hrLeadEmail) {
     if (convLifetimeEl) convLifetimeEl.textContent = "–";
     if (churnTotalEl) churnTotalEl.textContent = "–";
     if (churnTotalHelperEl)
-      churnTotalHelperEl.textContent = "People who left within the selected dates.";
+      churnTotalHelperEl.textContent = "Lifetime churn will appear once hires are recorded.";
     if (left90CountEl) left90CountEl.textContent = "–";
     if (left90RateEl) {
       left90RateEl.textContent = "";
@@ -1307,7 +1356,7 @@ function updateCardsForLead(hrLeadEmail) {
     }
   }
 
-  // --- Churn · Selected range ---
+  // --- Churn · Lifetime ---
   if (churnTotalEl && churnTotalHelperEl) {
     const newChurnTotal = m.churn_total ?? 0;
     const fromChurnTotal = parseIntSafe(churnTotalEl.textContent);
@@ -1315,9 +1364,17 @@ function updateCardsForLead(hrLeadEmail) {
       formatter: (v) => Math.round(v),
     });
 
-    const known = m.churn_tenure_known ?? 0;
-    const missing = m.churn_tenure_unknown ?? 0;
-    churnTotalHelperEl.textContent = `Start date available: ${known} · Missing: ${missing}`;
+    const totalHires = m.hire_total_lifetime ?? 0;
+    const churnRate = typeof m.churn_lifetime_rate === "number" ? m.churn_lifetime_rate : null;
+    if (totalHires > 0) {
+      const helperParts = [`Hires: ${totalHires}`, `Left: ${newChurnTotal}`];
+      if (churnRate != null) {
+        helperParts.push(`Rate: ${formatPercent(churnRate)}`);
+      }
+      churnTotalHelperEl.textContent = helperParts.join(" · ");
+    } else {
+      churnTotalHelperEl.textContent = "No lifetime hires recorded for this recruiter.";
+    }
   }
 
   // --- Window churn count (90-day card) ---
@@ -1350,6 +1407,13 @@ function updateCardsForLead(hrLeadEmail) {
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
   animateCardsFlash();
+
+  updateHistoryGlobalMeta();
+  if (metricsState.activeTab === "history") {
+    refreshHistoryPanel();
+  } else if (!metricsState.selectedLead) {
+    resetHistoryView();
+  }
 }
 
 function populateDropdown() {
@@ -1428,6 +1492,9 @@ function populateDropdown() {
 
   if (shouldRefreshCards) {
     updateCardsForLead(metricsState.selectedLead);
+  } else {
+    updateHistoryGlobalMeta();
+    resetHistoryView();
   }
 }
 
@@ -1536,6 +1603,10 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     updatePeriodInfo();
     updateDynamicRangeLabels();
     updateLeft90RangeLabel();
+    updateHistoryGlobalMeta();
+    if (metricsState.activeTab === "history" && metricsState.selectedLead) {
+      refreshHistoryPanel();
+    }
   } catch (err) {
     console.error("Error loading recruiter metrics:", err);
     showRangeError("Couldn’t load metrics for that range. Try again.");
@@ -1671,12 +1742,801 @@ function wireRangePicker() {
 
     const sel = document.getElementById("hrLeadSelect");
     if (sel && sel.value) updateCardsForLead(sel.value);
+    if (!sel || !sel.value) {
+      updateHistoryGlobalMeta();
+      if (metricsState.activeTab === "history") {
+        resetHistoryView();
+      }
+    }
   });
+}
+
+/* ==========================================================================
+   Historic trends dashboard
+   ========================================================================== */
+
+function safeNumber(value) {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatIntegerDisplay(value) {
+  if (value === null || value === undefined) return "–";
+  const rounded = Math.round(value);
+  return Number.isFinite(rounded) ? rounded.toLocaleString("en-US") : "–";
+}
+
+function formatPercentNumber(value) {
+  if (value === null || value === undefined) return "–";
+  const fixed = Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(1);
+  return `${fixed.replace(/\.0$/, "")}%`;
+}
+
+function convertPercentValue(value) {
+  const numeric = safeNumber(value);
+  if (numeric === null) return null;
+  return numeric * 100;
+}
+
+function accumulateSeries(points = []) {
+  let running = 0;
+  return points.map((point) => {
+    if (point.value != null) {
+      running += point.value;
+    }
+    return { ...point, value: point.value == null ? null : running };
+  });
+}
+
+function getLineChartData(points, width, height) {
+  const usable = points.filter((point) => point.value != null);
+  if (!usable.length) {
+    return { normalized: [], areaPath: "" };
+  }
+  const values = usable.map((pt) => pt.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const normalized = usable.map((pt, index) => {
+    const x = usable.length > 1 ? (index / (usable.length - 1)) * width : width / 2;
+    const y = height - ((pt.value - min) / range) * height;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const startPoint = normalized[0];
+  const lineSegment = normalized.slice(1).map((point) => `L ${point}`).join(" ");
+  const areaPath = startPoint ? `M ${startPoint} ${lineSegment} L ${width},${height} L 0,${height} Z` : "";
+  return { normalized, areaPath };
+}
+
+function getColumnChartData(points, width, height) {
+  const usable = points.filter((point) => point.value != null);
+  if (!usable.length) {
+    return [];
+  }
+  const values = usable.map((pt) => pt.value);
+  const max = Math.max(...values) || 1;
+  const gap = 6;
+  const columnWidth = Math.max((width - gap * (usable.length - 1)) / usable.length, 8);
+  return usable.map((point, index) => {
+    const scaled = (point.value / max) * height;
+    const x = index * (columnWidth + gap);
+    const y = height - scaled;
+    return {
+      key: point.key,
+      x,
+      y: Math.min(y, height - 1),
+      width: columnWidth,
+      height: Math.max(scaled, 2),
+    };
+  });
+}
+
+function findExtremum(list = [], getter, lookForMax) {
+  let best = null;
+  list.forEach((entry) => {
+    const value = getter(entry);
+    if (value == null) return;
+    if (!best) {
+      best = { label: entry.label, value };
+      return;
+    }
+    if (lookForMax ? value > best.value : value < best.value) {
+      best = { label: entry.label, value };
+    }
+  });
+  return best;
+}
+
+function averageValues(values = []) {
+  const usable = values.filter((value) => value != null);
+  if (!usable.length) return null;
+  const total = usable.reduce((sum, value) => sum + value, 0);
+  return total / usable.length;
+}
+
+function buildMonthlyWindows(startYear, startMonthIndex) {
+  const windows = [];
+  const formatter = new Intl.DateTimeFormat("en", { month: "short", year: "numeric" });
+  const now = new Date();
+  const endCursor = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  for (let cursor = Date.UTC(startYear, startMonthIndex, 1); cursor <= endCursor; ) {
+    const currentDate = new Date(cursor);
+    const year = currentDate.getUTCFullYear();
+    const monthIndex = currentDate.getUTCMonth();
+    const key = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+    const start = `${year}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+    const monthEndDate = new Date(Date.UTC(year, monthIndex + 1, 0));
+    const end = monthEndDate.toISOString().slice(0, 10);
+    windows.push({
+      key,
+      label: formatter.format(currentDate),
+      start,
+      end,
+    });
+    cursor = Date.UTC(year, monthIndex + 1, 1);
+  }
+  return windows;
+}
+
+function buildQuickRanges(months) {
+  if (!months?.length) return [];
+  const ranges = [];
+  const lastIndex = months.length - 1;
+  const computeRangeFromEnd = (length) => {
+    const startIndex = Math.max(months.length - length, 0);
+    return { start: months[startIndex].key, end: months[lastIndex].key };
+  };
+  const computeYearToDate = () => {
+    const latest = months[lastIndex];
+    const [year] = latest.key.split("-");
+    const firstIndex = months.findIndex((item) => item.key.startsWith(`${year}-`));
+    if (firstIndex === -1) return null;
+    return { start: months[firstIndex].key, end: latest.key };
+  };
+  const last6 = computeRangeFromEnd(6);
+  const last12 = computeRangeFromEnd(12);
+  const ytd = computeYearToDate();
+  if (last6) ranges.push({ id: "6m", label: "Last 6 months", range: last6 });
+  if (last12) ranges.push({ id: "12m", label: "Last 12 months", range: last12 });
+  if (ytd) ranges.push({ id: "ytd", label: "Year to date", range: ytd });
+  ranges.push({
+    id: "full",
+    label: "Full history",
+    range: { start: months[0].key, end: months[lastIndex].key },
+  });
+  return ranges;
+}
+
+const HISTORY_METRICS = [
+  {
+    id: "closed_win_month",
+    title: "Closed Win",
+    description: "Deals marked as Closed Win each month.",
+    chart: "column",
+    color: "#6c5ce7",
+    goodWhenHigher: true,
+    extractor: (metrics) => safeNumber(metrics?.closed_win_month ?? 0),
+    formatter: formatIntegerDisplay,
+  },
+  {
+    id: "closed_lost_month",
+    title: "Closed Lost",
+    description: "Closed Lost opportunities per month.",
+    chart: "column",
+    color: "#f06595",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.closed_lost_month ?? 0),
+    formatter: formatIntegerDisplay,
+  },
+  {
+    id: "closed_win_total",
+    title: "Total Closed Win",
+    description: "Cumulative wins since Jan 2025.",
+    chart: "line",
+    color: "#9775fa",
+    goodWhenHigher: true,
+    extractor: (metrics) => safeNumber(metrics?.closed_win_month ?? 0),
+    formatter: formatIntegerDisplay,
+    accumulate: true,
+  },
+  {
+    id: "closed_lost_total",
+    title: "Total Closed Lost",
+    description: "Cumulative Closed Lost since Jan 2025.",
+    chart: "line",
+    color: "#ff8fa3",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.closed_lost_month ?? 0),
+    formatter: formatIntegerDisplay,
+    accumulate: true,
+  },
+  {
+    id: "conversion_range",
+    title: "Conversion · Range",
+    description: "Share of Closed Win over closed opps each month.",
+    chart: "line",
+    color: "#0ea5e9",
+    goodWhenHigher: true,
+    extractor: (metrics) => convertPercentValue(metrics?.conversion_rate_last_20),
+    formatter: formatPercentNumber,
+  },
+  {
+    id: "conversion_lifetime",
+    title: "Conversion · Lifetime",
+    description: "Lifetime conversion snapshot per month.",
+    chart: "line",
+    color: "#38bdf8",
+    goodWhenHigher: true,
+    extractor: (metrics) => convertPercentValue(metrics?.conversion_rate_lifetime),
+    formatter: formatPercentNumber,
+  },
+  {
+    id: "sent_vs_interview_ratio",
+    title: "Sent vs Interviewed",
+    description: "Average share of candidates interviewed vs sent.",
+    chart: "line",
+    color: "#f59e0b",
+    goodWhenHigher: true,
+    extractor: (metrics) => convertPercentValue(metrics?.avg_sent_vs_interview_ratio),
+    formatter: formatPercentNumber,
+  },
+];
+
+function setupTabs() {
+  const tabs = document.querySelectorAll("[data-tab-target]");
+  const panels = document.querySelectorAll("[data-tab-panel]");
+  if (!tabs.length || !panels.length) return;
+
+  const activateTab = (target) => {
+    metricsState.activeTab = target;
+    tabs.forEach((tab) => {
+      const isActive = tab.dataset.tabTarget === target;
+      tab.classList.toggle("is-active", isActive);
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.getAttribute("data-tab-panel") === target;
+      panel.classList.toggle("is-active", isActive);
+      panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    });
+    if (target === "history") {
+      refreshHistoryPanel();
+    }
+  };
+
+  tabs.forEach((tab, index) => {
+    if (!tab.hasAttribute("role")) {
+      tab.setAttribute("role", "tab");
+    }
+    const isActive = tab.classList.contains("is-active");
+    tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    if (!isActive && index === 0) {
+      tab.setAttribute("tabindex", "-1");
+    }
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.tabTarget;
+      if (!target || metricsState.activeTab === target) return;
+      activateTab(target);
+    });
+  });
+
+  panels.forEach((panel) => {
+    if (!panel.hasAttribute("role")) {
+      panel.setAttribute("role", "tabpanel");
+    }
+    const isActive = panel.classList.contains("is-active");
+    panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+  });
+}
+
+function initializeHistoryUI() {
+  historyDom.panel = document.getElementById("historyPanel");
+  if (!historyDom.panel) return;
+  historyDom.subtitle = document.getElementById("historySubtitle");
+  historyDom.globalFilters = document.getElementById("historyGlobalFilters");
+  historyDom.startInput = document.getElementById("historyRangeStart");
+  historyDom.endInput = document.getElementById("historyRangeEnd");
+  historyDom.quickActions = document.getElementById("historyQuickActions");
+  historyDom.error = document.getElementById("historyError");
+  historyDom.empty = document.getElementById("historyEmpty");
+  historyDom.highlights = document.getElementById("historyHighlights");
+  historyDom.loading = document.getElementById("historyLoading");
+  historyDom.grid = document.getElementById("historyGrid");
+  historyDom.tableCard = document.getElementById("historyTableContainer");
+  historyDom.tableBody = document.getElementById("historyTableBody");
+
+  if (historyDom.startInput) {
+    historyDom.startInput.addEventListener("change", (event) =>
+      handleHistoryRangeChange("start", event.target.value)
+    );
+  }
+  if (historyDom.endInput) {
+    historyDom.endInput.addEventListener("change", (event) =>
+      handleHistoryRangeChange("end", event.target.value)
+    );
+  }
+
+  renderHistoryQuickActions();
+  syncHistoryRangeInputs();
+  updateHistoryGlobalMeta();
+  resetHistoryView();
+}
+
+function syncHistoryRangeInputs() {
+  if (historyDom.startInput) {
+    historyDom.startInput.value = metricsState.historyRangeStart || "";
+    historyDom.startInput.max = metricsState.historyRangeEnd || "";
+  }
+  if (historyDom.endInput) {
+    historyDom.endInput.value = metricsState.historyRangeEnd || "";
+    historyDom.endInput.min = metricsState.historyRangeStart || "";
+  }
+}
+
+function renderHistoryQuickActions() {
+  if (!historyDom.quickActions) return;
+  const quickRanges = buildQuickRanges(metricsState.historyMonthlyWindows);
+  historyDom.quickActions.innerHTML = "";
+  quickRanges.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "history-quick-btn";
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => {
+      metricsState.historyRangeStart = item.range.start;
+      metricsState.historyRangeEnd = item.range.end;
+      syncHistoryRangeInputs();
+      if (metricsState.activeTab === "history" && metricsState.selectedLead) {
+        refreshHistoryPanel();
+      }
+    });
+    historyDom.quickActions.appendChild(btn);
+  });
+}
+
+function handleHistoryRangeChange(kind, rawValue) {
+  if (!rawValue) return;
+  const value = rawValue;
+  if (kind === "start") {
+    metricsState.historyRangeStart = value;
+    if (metricsState.historyRangeEnd && metricsState.historyRangeEnd < value) {
+      metricsState.historyRangeEnd = value;
+    }
+  } else {
+    metricsState.historyRangeEnd = value;
+    if (metricsState.historyRangeStart && metricsState.historyRangeStart > value) {
+      metricsState.historyRangeStart = value;
+    }
+  }
+  syncHistoryRangeInputs();
+  if (metricsState.activeTab === "history" && metricsState.selectedLead) {
+    refreshHistoryPanel();
+  }
+}
+
+function setHistoryLoading(isLoading) {
+  metricsState.historyLoading = isLoading;
+  if (historyDom.loading) {
+    historyDom.loading.hidden = !isLoading;
+  }
+}
+
+function showHistoryError(message) {
+  metricsState.historyError = message || "";
+  if (!historyDom.error) return;
+  if (!message) {
+    historyDom.error.hidden = true;
+    historyDom.error.textContent = "";
+    return;
+  }
+  historyDom.error.hidden = false;
+  historyDom.error.textContent = message;
+}
+
+function setHistoryEmptyState(show, message) {
+  if (!historyDom.empty) return;
+  historyDom.empty.hidden = !show;
+  if (message) {
+    historyDom.empty.textContent = message;
+  }
+}
+
+function updateHistoryGlobalMeta() {
+  if (!historyDom.globalFilters) return;
+  const leadLabel = metricsState.selectedLead
+    ? getLeadLabel(metricsState.selectedLead)
+    : "—";
+  let rangeLabel = "Rolling 30 days";
+  if (metricsState.rangeStart && metricsState.rangeEnd) {
+    rangeLabel = `${formatYMDForDisplay(metricsState.rangeStart)} — ${formatYMDForDisplay(
+      metricsState.rangeEnd
+    )}`;
+  }
+  historyDom.globalFilters.textContent = `${leadLabel || "—"} · ${rangeLabel}`;
+}
+
+function updateHistorySubtitleText(monthCount) {
+  if (!historyDom.subtitle) return;
+  if (!metricsState.selectedLead) {
+    historyDom.subtitle.textContent = "Pick a recruiter to explore their timeline.";
+    return;
+  }
+  const label = getLeadLabel(metricsState.selectedLead) || "Recruiter";
+  if (monthCount == null) {
+    historyDom.subtitle.textContent = `${label} · Loading timeline…`;
+    return;
+  }
+  const suffix = `${monthCount} month${monthCount === 1 ? "" : "s"} loaded`;
+  historyDom.subtitle.textContent = `${label} · ${suffix}`;
+}
+
+function resetHistoryView() {
+  if (!historyDom.panel) return;
+  if (!metricsState.selectedLead) {
+    updateHistorySubtitleText(0);
+    setHistoryEmptyState(true, "Select a recruiter above to render the dashboard.");
+  }
+  renderHistoryHighlights([]);
+  renderHistoryCards([]);
+  renderHistoryTable([]);
+}
+
+async function refreshHistoryPanel() {
+  if (!historyDom.panel) return;
+  updateHistoryGlobalMeta();
+  showHistoryError("");
+
+  if (!metricsState.selectedLead) {
+    resetHistoryView();
+    return;
+  }
+
+  setHistoryEmptyState(false);
+  updateHistorySubtitleText(null);
+
+  await ensureHistoryDataForLead(metricsState.selectedLead);
+
+  const timeline = getFilteredHistoryTimeline(metricsState.selectedLead);
+  updateHistorySubtitleText(timeline.length);
+
+  if (!timeline.length) {
+    renderHistoryHighlights([]);
+    renderHistoryCards([]);
+    renderHistoryTable([]);
+    setHistoryEmptyState(true, "No history found for this recruiter within the selected months.");
+    return;
+  }
+
+  const highlights = buildHistoryHighlights(timeline);
+  const cards = buildHistoryMetricCards(timeline);
+  const tableRows = buildHistoryTableRows(timeline);
+
+  renderHistoryHighlights(highlights);
+  renderHistoryCards(cards);
+  renderHistoryTable(tableRows);
+  setHistoryEmptyState(false);
+}
+
+async function ensureHistoryDataForLead(leadEmail) {
+  const key = (leadEmail || "").toLowerCase();
+  if (!key) return {};
+  const windows = metricsState.historyMonthlyWindows;
+  if (!windows.length) return {};
+  const cache = metricsState.historyCache[key] || {};
+  const missing = windows.filter((window) => !cache[window.key]);
+  if (!missing.length) {
+    metricsState.historyCache[key] = cache;
+    return cache;
+  }
+  setHistoryLoading(true);
+  showHistoryError("");
+  try {
+    const responses = await Promise.all(
+      missing.map((window) => fetchHistoryWindow(window.start, window.end))
+    );
+    missing.forEach((window, index) => {
+      const payload = responses[index] || {};
+      const row = extractLeadHistoryRow(payload.metrics, key);
+      cache[window.key] = {
+        key: window.key,
+        label: window.label,
+        start: window.start,
+        end: window.end,
+        metrics: row,
+      };
+    });
+    metricsState.historyCache[key] = cache;
+  } catch (err) {
+    console.error("[recruiter-metrics] Failed to load historic data:", err);
+    showHistoryError("Could not load historic data. Please try again.");
+  } finally {
+    setHistoryLoading(false);
+  }
+  return cache;
+}
+
+function extractLeadHistoryRow(rows = [], leadKey) {
+  if (!Array.isArray(rows)) return null;
+  const target = (leadKey || "").toLowerCase();
+  return (
+    rows.find(
+      (row) => (row?.hr_lead_email || row?.hr_lead || "").toLowerCase() === target
+    ) || null
+  );
+}
+
+async function fetchHistoryWindow(startYMD, endYMD) {
+  const url = new URL(`${API_BASE}/recruiter-metrics`);
+  url.searchParams.set("start", startYMD);
+  url.searchParams.set("end", endYMD);
+  const resp = await fetch(url.toString(), { credentials: "include" });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+function getHistoryTimelineForLead(leadKey) {
+  const windows = metricsState.historyMonthlyWindows || [];
+  if (!windows.length) return [];
+  const cache = metricsState.historyCache[leadKey] || {};
+  return windows.map((window) => {
+    const entry = cache[window.key];
+    return {
+      monthKey: window.key,
+      label: window.label,
+      start: window.start,
+      end: window.end,
+      metrics: entry?.metrics || null,
+    };
+  });
+}
+
+function getFilteredHistoryTimeline(leadKey) {
+  const key = (leadKey || "").toLowerCase();
+  if (!key) return [];
+  const timeline = getHistoryTimelineForLead(key);
+  return timeline.filter((entry) => {
+    if (!entry) return false;
+    if (metricsState.historyRangeStart && entry.monthKey < metricsState.historyRangeStart) {
+      return false;
+    }
+    if (metricsState.historyRangeEnd && entry.monthKey > metricsState.historyRangeEnd) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function buildHistoryMetricCards(timeline = []) {
+  return HISTORY_METRICS.map((config) => {
+    const basePoints = timeline.map((entry) => ({
+      key: entry.monthKey,
+      label: entry.label,
+      value: config.extractor(entry.metrics),
+    }));
+    const points = config.accumulate ? accumulateSeries(basePoints) : basePoints;
+    const populated = points.filter((pt) => pt.value != null);
+    const latest = populated.length ? populated[populated.length - 1].value : null;
+    const previous = populated.length > 1 ? populated[populated.length - 2].value : null;
+    const average =
+      populated.length > 0
+        ? populated.reduce((sum, pt) => sum + pt.value, 0) / populated.length
+        : null;
+    return {
+      ...config,
+      points,
+      latest,
+      previous,
+      average,
+    };
+  });
+}
+
+function buildHistoryHighlights(timeline = []) {
+  const bestWin = findExtremum(
+    timeline,
+    (entry) => safeNumber(entry?.metrics?.closed_win_month ?? 0),
+    true
+  );
+  const calmLost = findExtremum(
+    timeline,
+    (entry) => safeNumber(entry?.metrics?.closed_lost_month ?? 0),
+    false
+  );
+  const latestConversion = timeline.length
+    ? convertPercentValue(timeline[timeline.length - 1]?.metrics?.conversion_rate_last_20)
+    : null;
+  const avgSentInterview = averageValues(
+    timeline.map((entry) => convertPercentValue(entry?.metrics?.avg_sent_vs_interview_ratio))
+  );
+
+  return [
+    {
+      id: "best-win",
+      label: "Best month · Closed Win",
+      value: bestWin?.value != null ? formatIntegerDisplay(bestWin.value) : "–",
+      helper: bestWin?.label || "No win data yet",
+    },
+    {
+      id: "lowest-lost",
+      label: "Calmest month · Closed Lost",
+      value: calmLost?.value != null ? formatIntegerDisplay(calmLost.value) : "–",
+      helper: calmLost?.label || "No lost data yet",
+    },
+    {
+      id: "latest-conv",
+      label: "Latest conversion",
+      value: latestConversion != null ? formatPercentNumber(latestConversion) : "–",
+      helper: timeline.length ? timeline[timeline.length - 1].label : "Not enough data",
+    },
+    {
+      id: "avg-sent",
+      label: "Avg. Sent → Interview",
+      value: avgSentInterview != null ? formatPercentNumber(avgSentInterview) : "–",
+      helper: "Across selected months",
+    },
+  ];
+}
+
+function buildHistoryTableRows(timeline = []) {
+  if (!timeline.length) return [];
+  return timeline.slice(-6).reverse();
+}
+
+function renderHistoryHighlights(items = []) {
+  if (!historyDom.highlights) return;
+  if (!items.length) {
+    historyDom.highlights.innerHTML = "";
+    historyDom.highlights.hidden = true;
+    return;
+  }
+  historyDom.highlights.hidden = false;
+  historyDom.highlights.innerHTML = items
+    .map(
+      (item) => `
+        <div class="history-spotlight">
+          <span class="history-spotlight__label">${item.label}</span>
+          <span class="history-spotlight__value">${item.value}</span>
+          <span class="history-spotlight__meta">${item.helper}</span>
+        </div>`
+    )
+    .join("");
+}
+
+function renderHistoryCards(cards = []) {
+  if (!historyDom.grid) return;
+  if (!cards.length) {
+    historyDom.grid.innerHTML = "";
+    historyDom.grid.hidden = true;
+    return;
+  }
+  historyDom.grid.hidden = false;
+  historyDom.grid.innerHTML = cards.map((card) => createHistoryCardMarkup(card)).join("");
+}
+
+function renderHistoryTable(rows = []) {
+  if (!historyDom.tableCard || !historyDom.tableBody) return;
+  if (!rows.length) {
+    historyDom.tableBody.innerHTML = "";
+    historyDom.tableCard.hidden = true;
+    return;
+  }
+  historyDom.tableCard.hidden = false;
+  historyDom.tableBody.innerHTML = rows
+    .map(
+      (entry) => `
+        <tr>
+          <td>${entry.label}</td>
+          <td>${formatIntegerDisplay(safeNumber(entry.metrics?.closed_win_month ?? 0))}</td>
+          <td>${formatIntegerDisplay(safeNumber(entry.metrics?.closed_lost_month ?? 0))}</td>
+          <td>${formatPercentNumber(
+            convertPercentValue(entry.metrics?.conversion_rate_last_20)
+          )}</td>
+          <td>${formatPercentNumber(
+            convertPercentValue(entry.metrics?.avg_sent_vs_interview_ratio)
+          )}</td>
+        </tr>`
+    )
+    .join("");
+}
+
+function createHistoryCardMarkup(card) {
+  const trend = computeHistoryTrend(
+    card.latest,
+    card.previous,
+    card.goodWhenHigher !== false,
+    card.formatter
+  );
+  const chartMarkup =
+    card.chart === "column"
+      ? renderColumnChart(card.points, card.color)
+      : renderLineChart(card.id, card.points, card.color);
+  return `
+    <article class="history-card">
+      <div class="history-card__header">
+        <div>
+          <span class="history-card__label">${card.title}</span>
+          <p class="history-card__description">${card.description}</p>
+        </div>
+        ${
+          trend
+            ? `<span class="history-card__trend ${trend.className}">${trend.label}</span>`
+            : ""
+        }
+      </div>
+      <div class="history-chart">
+        ${chartMarkup}
+      </div>
+      <div class="history-card__metrics">
+        <div>
+          <span class="history-card__value">${card.formatter(card.latest)}</span>
+          <span class="history-card__meta-label">Latest month</span>
+        </div>
+        <div>
+          <span class="history-card__value">${card.formatter(card.average)}</span>
+          <span class="history-card__meta-label">Average</span>
+        </div>
+      </div>
+    </article>`;
+}
+
+function renderLineChart(id, points, color) {
+  const width = 320;
+  const height = 120;
+  const { normalized, areaPath } = getLineChartData(points, width, height);
+  if (!normalized.length) {
+    return `<div class="history-chart__empty">No data for this range.</div>`;
+  }
+  const gradientId = `historyLine-${id}`;
+  return `
+    <svg viewBox="0 0 ${width} ${height}" class="history-line" role="img" aria-hidden="true" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.35"></stop>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"></stop>
+        </linearGradient>
+      </defs>
+      <path d="${areaPath}" fill="url(#${gradientId})" stroke="none"></path>
+      <polyline points="${normalized.join(" ")}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    </svg>`;
+}
+
+function renderColumnChart(points, color) {
+  const width = 320;
+  const height = 120;
+  const bars = getColumnChartData(points, width, height);
+  if (!bars.length) {
+    return `<div class="history-chart__empty">No data for this range.</div>`;
+  }
+  return `
+    <svg viewBox="0 0 ${width} ${height}" class="history-column" role="img" aria-hidden="true" preserveAspectRatio="none">
+      ${bars
+        .map(
+          (bar) =>
+            `<rect x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="6" fill="${color}" opacity="0.82"></rect>`
+        )
+        .join("")}
+    </svg>`;
+}
+
+function computeHistoryTrend(latest, previous, goodWhenHigher, formatter) {
+  if (latest == null || previous == null) return null;
+  const diff = latest - previous;
+  if (diff === 0) return { label: "steady", className: "is-neutral" };
+  const arrow = diff > 0 ? "↑" : "↓";
+  const formattedDiff = formatter(Math.abs(diff));
+  const improvement = goodWhenHigher ? diff > 0 : diff < 0;
+  return {
+    label: `${arrow} ${formattedDiff}`,
+    className: improvement ? "is-up" : "is-down",
+  };
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   setupMetricDetailModal();
   wireMetricDetailCards();
+  setupTabs();
+  initializeHistoryUI();
   (async () => {
     const uid = await ensureUserIdInURL();
     await loadRecruiterDirectory();

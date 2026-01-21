@@ -132,6 +132,100 @@ def get_opportunities_by_account(account_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@bp.route('/accounts/<int:account_id>/overview-cache', methods=['GET'])
+def get_account_overview_cache(account_id):
+    """Return cached payloads for closed opportunities in client_overview."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+                SELECT opportunity_id, candidates_batches
+                FROM client_overview
+                WHERE account_id = %s
+            """,
+            (account_id,),
+        )
+        rows = cursor.fetchall() or []
+        payload = []
+        for row in rows:
+            opportunity_id, data = row
+            decoded = None
+            if data:
+                try:
+                    decoded = json.loads(data)
+                except Exception:
+                    logging.warning(
+                        "Failed to decode candidates_batches for account %s opportunity %s",
+                        account_id,
+                        opportunity_id,
+                    )
+            payload.append(
+                {
+                    "opportunity_id": opportunity_id,
+                    "candidates_batches": decoded,
+                }
+            )
+        cursor.close()
+        conn.close()
+        return jsonify(payload)
+    except Exception as e:
+        logging.exception("❌ get_account_overview_cache failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route('/accounts/<int:account_id>/overview-cache', methods=['PUT'])
+def upsert_account_overview_cache(account_id):
+    """Persist the provided closed opportunity payload into client_overview."""
+    try:
+        body = request.get_json(silent=True) or {}
+        entries = body.get('opportunities')
+        if not isinstance(entries, list):
+            return jsonify({'error': 'opportunities array is required'}), 400
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        saved = 0
+        for entry in entries:
+            try:
+                opportunity_id = int(entry.get('opportunity_id'))
+            except (TypeError, ValueError):
+                continue
+
+            snapshot = entry.get('snapshot')
+            if snapshot is None:
+                snapshot = entry.get('candidates_batches')
+            batches_payload = entry.get('batches')
+            if snapshot is None and batches_payload is not None:
+                snapshot = {'batches': batches_payload}
+            if snapshot is None:
+                snapshot = {'batches': []}
+
+            cursor.execute(
+                """
+                    DELETE FROM client_overview
+                    WHERE account_id = %s AND opportunity_id = %s
+                """,
+                (account_id, opportunity_id),
+            )
+            cursor.execute(
+                """
+                    INSERT INTO client_overview (account_id, opportunity_id, candidates_batches)
+                    VALUES (%s, %s, %s)
+                """,
+                (account_id, opportunity_id, json.dumps(snapshot)),
+            )
+            saved += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'saved': saved}), 200
+    except Exception as e:
+        logging.exception("❌ upsert_account_overview_cache failed")
+        return jsonify({'error': str(e)}), 500
+
 @bp.route('/opportunities/<int:opportunity_id>')
 def get_opportunity_by_id(opportunity_id):
     try:

@@ -186,7 +186,17 @@
     <div id="rangeError" class="range-error" style="display:none;"></div>
   </div>
 </section>
-    <section class="metrics-cards" aria-live="polite">
+    <div class="metrics-tabs" role="tablist" aria-label="Dashboard views">
+      <button type="button" class="metrics-tab is-active" data-tab-target="summary">
+        Summary
+      </button>
+      <button type="button" class="metrics-tab" data-tab-target="history">
+        Historic trends
+      </button>
+    </div>
+
+    <section class="metrics-tabpanel is-active" data-tab-panel="summary" id="summaryTab">
+      <section class="metrics-cards" aria-live="polite">
       <article
         class="metric-card metric-win-month metric-card--detail-disabled"
         data-metric-detail="closedWinRange"
@@ -421,12 +431,12 @@
         aria-disabled="true"
       >
         <div class="metric-header">
-          <span class="metric-label">Total churn · Selected range</span>
-          <span class="metric-pill metric-pill-churn">End date based</span>
+          <span class="metric-label">Total churn · Lifetime</span>
+          <span class="metric-pill metric-pill-churn">Lifetime view</span>
         </div>
         <div class="metric-value" id="churnRangeCount">–</div>
         <p class="metric-caption" id="churnRangeHelper">
-          People who left within the selected dates.
+          Lifetime churn will appear once hires are recorded.
         </p>
       </article>
 
@@ -447,10 +457,70 @@
         </div>
         <p class="metric-caption metric-caption-subtle" id="left90RangeLabel"></p>
       </article>
+      </section>
+
+      <section class="meta-footer">
+        <p id="periodInfo" class="meta-text"></p>
+      </section>
     </section>
 
-    <section class="meta-footer">
-      <p id="periodInfo" class="meta-text"></p>
+    <section class="metrics-tabpanel" data-tab-panel="history" id="historyTab">
+      <section class="history-panel" id="historyPanel" aria-live="polite">
+        <header class="history-header">
+          <div>
+            <h2 class="history-title">Historic recruiting performance</h2>
+            <p class="history-subtitle" id="historySubtitle">
+              Pick a recruiter to explore their timeline.
+            </p>
+          </div>
+          <div class="history-meta">
+            <span class="history-meta__label">Global filters</span>
+            <span class="history-meta__value" id="historyGlobalFilters">—</span>
+          </div>
+        </header>
+
+        <div class="history-filters" aria-label="Historic filters">
+          <div class="history-filter-group">
+            <label for="historyRangeStart" class="history-filter-label">From</label>
+            <input id="historyRangeStart" type="month" />
+          </div>
+          <div class="history-filter-group">
+            <label for="historyRangeEnd" class="history-filter-label">To</label>
+            <input id="historyRangeEnd" type="month" />
+          </div>
+          <div class="history-quick-actions" id="historyQuickActions"></div>
+        </div>
+
+        <div class="history-error" id="historyError" hidden></div>
+        <div class="history-spotlights" id="historyHighlights"></div>
+        <div class="history-loading" id="historyLoading" hidden>Plotting metrics…</div>
+        <div class="history-empty" id="historyEmpty">
+          Select a recruiter above to render the dashboard.
+        </div>
+        <div class="history-grid" id="historyGrid"></div>
+        <div class="history-table-card" id="historyTableContainer" hidden>
+          <div class="history-card__header">
+            <div>
+              <span class="history-card__label">Recent months</span>
+              <p class="history-card__description">Last six data points for quick reference.</p>
+            </div>
+          </div>
+          <div class="history-table-wrapper">
+            <table class="history-table" aria-label="Recent monthly breakdown">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Closed Win</th>
+                  <th>Closed Lost</th>
+                  <th>Conversion</th>
+                  <th>Sent → Interview</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
   <div id="metricDetailModal" class="metric-detail-modal" hidden>

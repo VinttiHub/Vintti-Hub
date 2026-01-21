@@ -444,9 +444,9 @@ function setupBlacklistFilterControl() {
     return validValues.has(next) ? next : 'all';
   };
 
-  const initialValue = normalizeValue(select.value);
-  candidateState.blacklistFilter = initialValue;
-  select.value = initialValue;
+  // Always reset to show all candidates on fresh page loads.
+  candidateState.blacklistFilter = 'all';
+  select.value = 'all';
 
   select.addEventListener('change', () => {
     const nextValue = normalizeValue(select.value);

@@ -227,6 +227,16 @@ def register_recruiter_metrics_routes(app):
                AND h.candidate_id = s.candidate_id
             GROUP BY s.opp_hr_lead
         ),
+        lifetime_hires AS (
+            SELECT
+                o.opp_hr_lead,
+                COUNT(DISTINCT h.hire_opp_id) AS lifetime_hire_count
+            FROM hire_opportunity h
+            JOIN opportunity o
+                ON o.opportunity_id = h.opportunity_id
+            WHERE o.opp_hr_lead IS NOT NULL
+            GROUP BY o.opp_hr_lead
+        ),
         agg AS (
             SELECT
                 b.opp_hr_lead,
@@ -347,6 +357,7 @@ def register_recruiter_metrics_routes(app):
             rbl.ratio_sample_count,
             rbl.ratio_total_sent_candidates,
             rbl.ratio_total_interviewed,
+            lh.lifetime_hire_count,
             CASE
                 WHEN c.last_20_count = 0 THEN NULL
                 ELSE c.last_20_win::decimal / c.last_20_count
@@ -365,6 +376,8 @@ def register_recruiter_metrics_routes(app):
             ON hb.opp_hr_lead = a.opp_hr_lead
         LEFT JOIN ratio_by_lead rbl
             ON rbl.opp_hr_lead = a.opp_hr_lead
+        LEFT JOIN lifetime_hires lh
+            ON lh.opp_hr_lead = a.opp_hr_lead
         ORDER BY a.opp_hr_lead;
         """
 
@@ -385,8 +398,14 @@ def register_recruiter_metrics_routes(app):
                 END AS tenure_days
             FROM hire_opportunity h
             WHERE h.end_date IS NOT NULL
-              AND h.end_date::date >= %(churn_start)s
-              AND h.end_date::date <  %(churn_end)s
+              AND (
+                    %(churn_start)s IS NULL
+                    OR h.end_date::date >= %(churn_start)s
+                )
+              AND (
+                    %(churn_end)s IS NULL
+                    OR h.end_date::date <  %(churn_end)s
+                )
               AND (
                     %(start_window_start)s IS NULL
                     OR (
@@ -764,8 +783,8 @@ def register_recruiter_metrics_routes(app):
                 cur.execute(
                     churn_details_sql,
                     {
-                        "churn_start": window_start,
-                        "churn_end": window_end,
+                        "churn_start": None,
+                        "churn_end": None,
                         "start_window_start": None,
                         "start_window_end": None,
                         "max_tenure_days": None,
@@ -849,6 +868,7 @@ def register_recruiter_metrics_routes(app):
             interview_eligible_candidates = int(r.get("interview_eligible_candidate_count") or 0)
             interviewed_candidates = int(r.get("interviewed_candidate_count") or 0)
             hired_candidates = int(r.get("hired_candidate_count") or 0)
+            lifetime_hires_total = int(r.get("lifetime_hire_count") or 0)
             avg_sent_vs_interview_ratio = _float_or_none(r.get("avg_sent_vs_interview_ratio"))
             ratio_sample_count = int(r.get("ratio_sample_count") or 0)
             ratio_total_sent = int(r.get("ratio_total_sent_candidates") or 0)
@@ -910,6 +930,7 @@ def register_recruiter_metrics_routes(app):
                         "sent": ratio_total_sent,
                         "interviewed": ratio_total_interviewed,
                     },
+                    "hire_total_lifetime": lifetime_hires_total,
 
                     # placeholders updated once churn details are computed
                     "churn_total": 0,
@@ -917,6 +938,7 @@ def register_recruiter_metrics_routes(app):
                     "churn_tenure_known": 0,
                     "churn_tenure_unknown": 0,
                     "churn_within_90_rate": None,
+                    "churn_lifetime_rate": None,
                 }
             )
 
@@ -994,6 +1016,14 @@ def register_recruiter_metrics_routes(app):
                 item["churn_within_90_rate"] = summary["within_90"] / summary["tenure_known"]
             else:
                 item["churn_within_90_rate"] = None
+
+        for item in metrics:
+            hires_total = int(item.get("hire_total_lifetime") or 0)
+            churn_total = int(item.get("churn_total") or 0)
+            if hires_total > 0:
+                item["churn_lifetime_rate"] = churn_total / hires_total
+            else:
+                item["churn_lifetime_rate"] = None
 
         for item in metrics:
             lead_key = (item.get("hr_lead_email") or item.get("hr_lead") or "").lower()
