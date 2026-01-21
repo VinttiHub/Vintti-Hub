@@ -46,6 +46,21 @@ def _format_money(n) -> str:
         return "0"
 
 
+def _references_card_html(references: Optional[str]) -> str:
+    """Render References / notes inside a simple card to improve readability."""
+    if references:
+        safe_body = html.escape(str(references)).replace("\n", "<br>")
+    else:
+        safe_body = "—"
+
+    return f"""
+      <div style="margin:16px 0;padding:12px 16px;border:1px solid #dfe5f2;border-radius:10px;background:#f6f8fc">
+        <div style="font-weight:600;margin-bottom:6px">References / notes</div>
+        <div style="white-space:normal">{safe_body}</div>
+      </div>
+    """
+
+
 # ===============================
 # Plantillas de correo
 # ===============================
@@ -59,6 +74,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_html = f'<li><b>Referral source:</b> {html.escape(referal_source)}</li>' if referal_source else ''
     lead_source_html = f'<li><b>Lead source:</b> {html.escape(lead_source)}</li>' if lead_source else ''
+    notes_card = _references_card_html(references)
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close-Win</b> 🎉</p>
@@ -75,7 +91,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
         {lead_source_html}
       </ul>
 
-      <p><b>References / notes:</b><br>{references or '—'}</p>
+      {notes_card}
 
       <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
         {link}
@@ -97,6 +113,7 @@ def _initial_email_html_recruiting(
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_line = f"<b>Referral source:</b> {html.escape(referal_source)}<br>" if referal_source else ""
     lead_source_line = f"<b>Lead source:</b> {html.escape(lead_source)}<br>" if lead_source else ""
+    notes_card = _references_card_html(references)
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Close-Win</b> 🎉</p>
@@ -110,8 +127,9 @@ def _initial_email_html_recruiting(
          <b>Client email:</b> {html.escape(client_mail or '—')}<br>
          {referral_line}
          {lead_source_line}
-         <b>References / notes:</b> {references or '—'}
       </p>
+
+      {notes_card}
 
       <p>—</p>
 
@@ -323,8 +341,13 @@ def _fetch_email_context(candidate_id:int, opportunity_id:int, cur):
     return cur.fetchone() or {}
 
 def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail,
-                        candidate_name:str, client_name:str, opp_position_name:str):
+                        candidate_name:str, client_name:str, opp_position_name:str,
+                        referal_source: Optional[str] = None,
+                        lead_source: Optional[str] = None):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
+    referral_html = f'<li><b>Referral source:</b> {html.escape(referal_source)}</li>' if referal_source else ''
+    lead_source_html = f'<li><b>Lead source:</b> {html.escape(lead_source)}</li>' if lead_source else ''
+    notes_card = _references_card_html(references)
     # Copys en inglés, tono casual/fluido
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
@@ -338,9 +361,11 @@ def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, re
         <li><b>Fee:</b> ${html.escape(f"{fee:,.0f}")}</li>
         <li><b>Set-up fee:</b> ${html.escape(f"{setup_fee:,.0f}")}</li>
         <li><b>Client email:</b> {html.escape(client_mail or '—')}</li>
+        {referral_html}
+        {lead_source_html}
       </ul>
 
-      <p><b>References / notes:</b><br>{references or '—'}</p>
+      {notes_card}
 
       <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
         {link}
