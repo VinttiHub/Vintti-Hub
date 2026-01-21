@@ -334,6 +334,31 @@
               <div id="resig-list" class="cv-list" style="grid-column: 1 / -1;"></div>
             </div>
           </div>
+
+          <!-- Tests card -->
+          <div class="field doc-card" id="tests-card">
+            <label class="doc-card-label">
+              <span>Tests</span>
+              <div class="tests-controls">
+                <button id="tests-refresh" class="btn-soft btn-sm" type="button" title="Refresh">
+                  <span class="btn-icon" aria-hidden="true">↻</span><span class="btn-text">Refresh</span>
+                </button>
+                <button id="tests-browse" class="btn-soft btn-sm" type="button" title="Upload files">
+                  <span class="btn-icon" aria-hidden="true">⬆</span><span class="btn-text">Upload</span>
+                </button>
+              </div>
+            </label>
+
+            <div id="tests-drop" class="cv-drop tests-drop" tabindex="0">
+              <input id="tests-input" type="file" multiple hidden />
+              <div class="cv-cta">
+                Drop PDF, Excel, CSV, images or any files here
+              </div>
+              <div class="cv-hint">Or click Upload to select multiple documents.</div>
+            </div>
+            <p id="tests-error" class="tests-error" role="alert"></p>
+            <div id="tests-list" class="tests-list"></div>
+          </div>
         
 
           <!-- === Resignation Letter & References (full width) === -->

@@ -66,6 +66,47 @@ export async function fetchCandidateEquipments(candidateId) {
   return res.json();
 }
 
+export async function fetchCandidateTests(candidateId) {
+  const res = await fetch(`${API_BASE_URL}/candidates/${candidateId}/tests`, { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to load candidate tests');
+  return res.json();
+}
+
+export async function uploadCandidateTests(candidateId, filesOrFormData) {
+  let body = filesOrFormData;
+  if (!(body instanceof FormData)) {
+    body = new FormData();
+    const files = Array.isArray(filesOrFormData) || filesOrFormData instanceof FileList
+      ? Array.from(filesOrFormData)
+      : [];
+    files.forEach((file) => body.append('files', file));
+  }
+  const res = await fetch(`${API_BASE_URL}/candidates/${candidateId}/tests`, {
+    method: 'POST',
+    body,
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || 'Failed to upload test files');
+  }
+  return res.json();
+}
+
+export async function deleteCandidateTest(candidateId, key) {
+  const res = await fetch(`${API_BASE_URL}/candidates/${candidateId}/tests`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ key }),
+  });
+  if (!res.ok) {
+    const message = await res.text();
+    throw new Error(message || 'Failed to delete test file');
+  }
+  return res.json();
+}
+
 export async function updateCandidateScrap(candidateId, payload) {
   const res = await fetch(`${API_BASE_URL}/candidates/${candidateId}`, {
     method: 'PATCH',

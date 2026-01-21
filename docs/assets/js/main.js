@@ -893,11 +893,45 @@ const table = $('#opportunityTable').DataTable({
    table.search('');
  table.columns().search('');
  table.draw();
+const uniqueTypes = [...new Set(
+  data
+    .map(d => (d.opp_type || '').trim())
+    .filter(Boolean)
+)].sort((a, b) => a.localeCompare(b));
+
 const accountSearchInput = document.getElementById('accountSearchInput');
 if (accountSearchInput) {
   accountSearchInput.addEventListener('input', () => {
     const value = accountSearchInput.value;
     table.column(1).search(value, true, false).draw(); // columna 1 = Account
+  });
+}
+
+const positionSearchInput = document.getElementById('positionSearchInput');
+if (positionSearchInput) {
+  positionSearchInput.addEventListener('input', () => {
+    const value = positionSearchInput.value;
+    table.column(2).search(value, true, false).draw(); // columna 2 = Position
+  });
+}
+
+const typeFilterSelect = document.getElementById('typeFilterSelect');
+if (typeFilterSelect) {
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const seen = new Set();
+  uniqueTypes.forEach((type) => {
+    if (seen.has(type)) return;
+    seen.add(type);
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
+    typeFilterSelect.appendChild(option);
+  });
+
+  typeFilterSelect.addEventListener('change', () => {
+    const value = typeFilterSelect.value;
+    const pattern = value ? `^${escapeRegex(value)}$` : '';
+    table.column(3).search(pattern, true, false).draw(); // columna 3 = Type
   });
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)

@@ -17,6 +17,7 @@ import {
 import { formatCurrency } from '../../utils/format.js';
 import AiAssistantModal from './components/AiAssistantModal.jsx';
 import ResumeTab from './components/ResumeTab.jsx';
+import TestsCard from './components/TestsCard.jsx';
 
 const TABS = ['overview', 'resume', 'opportunities', 'hire'];
 
@@ -148,6 +149,7 @@ function CandidateDetailPage() {
           <>
             {tab === 'overview' && (
               <OverviewTab
+                candidateId={candidateId}
                 candidate={candidate}
                 comments={comments}
                 onCommentsChange={setComments}
@@ -200,7 +202,7 @@ function CandidateDetailPage() {
   );
 }
 
-function OverviewTab({ candidate, comments, onCommentsChange, onSaveComments, onUpdateField, equipments, onOpenAi }) {
+function OverviewTab({ candidateId, candidate, comments, onCommentsChange, onSaveComments, onUpdateField, equipments, onOpenAi }) {
   return (
     <div id="overview" className="tab-content active">
       <div className="field">
@@ -325,6 +327,7 @@ function OverviewTab({ candidate, comments, onCommentsChange, onSaveComments, on
             View details
           </a>
         </div>
+        <TestsCard candidateId={candidateId} />
       </div>
     </div>
   );

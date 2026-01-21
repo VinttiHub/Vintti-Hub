@@ -137,6 +137,74 @@ def list_s3_with_prefix(prefix, expires=3600):
     return out
 
 
+def _normalize_tests_documents(raw_value):
+    if not raw_value:
+        return []
+    data = raw_value
+    if isinstance(raw_value, str):
+        try:
+            data = json.loads(raw_value)
+        except Exception:
+            data = []
+    if not isinstance(data, list):
+        return []
+    normalized = []
+    for item in data:
+        if isinstance(item, str):
+            normalized.append({
+                "key": item,
+                "name": item.split('/')[-1],
+            })
+        elif isinstance(item, dict) and item.get("key"):
+            normalized.append({
+                "key": item["key"],
+                "name": item.get("name") or item["key"].split('/')[-1],
+                "content_type": item.get("content_type"),
+                "size": item.get("size"),
+                "uploaded_at": item.get("uploaded_at"),
+                "uploaded_by": item.get("uploaded_by"),
+            })
+    return normalized
+
+
+def get_candidate_tests_documents(cursor, candidate_id: int):
+    cursor.execute("SELECT tests_documents_s3 FROM candidates WHERE candidate_id = %s", (candidate_id,))
+    row = cursor.fetchone()
+    raw_value = row[0] if row else None
+    return _normalize_tests_documents(raw_value)
+
+
+def set_candidate_tests_documents(cursor, candidate_id: int, documents):
+    cursor.execute(
+        "UPDATE candidates SET tests_documents_s3 = %s WHERE candidate_id = %s",
+        (json.dumps(documents), candidate_id)
+    )
+
+
+def make_candidate_tests_payload(documents, expires=604800):
+    payload = []
+    for doc in documents:
+        key = doc.get("key") if isinstance(doc, dict) else doc
+        if not key:
+            continue
+        name = (doc.get("name") if isinstance(doc, dict) else None) or key.split('/')[-1]
+        url = services.s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': services.S3_BUCKET, 'Key': key},
+            ExpiresIn=expires
+        )
+        payload.append({
+            "key": key,
+            "name": name,
+            "url": url,
+            "content_type": doc.get("content_type") if isinstance(doc, dict) else None,
+            "size": doc.get("size") if isinstance(doc, dict) else None,
+            "uploaded_at": doc.get("uploaded_at") if isinstance(doc, dict) else None,
+            "uploaded_by": doc.get("uploaded_by") if isinstance(doc, dict) else None,
+        })
+    return payload
+
+
 __all__ = [
     "get_account_pdf_keys",
     "set_account_pdf_keys",
@@ -145,4 +213,7 @@ __all__ = [
     "set_cv_keys",
     "make_cv_payload",
     "list_s3_with_prefix",
+    "get_candidate_tests_documents",
+    "set_candidate_tests_documents",
+    "make_candidate_tests_payload",
 ]

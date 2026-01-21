@@ -329,55 +329,111 @@ body.panel-open {
 }
 
 .status-chip {
+  --chip-size: 36px;
+  position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 0.3rem 1rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  border: 1px solid transparent;
-  background: rgba(15, 23, 42, 0.06);
-  color: var(--text-primary);
-  max-width: 180px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  justify-content: center;
+  width: var(--chip-size);
+  height: var(--chip-size);
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
   cursor: default;
-  transition: background 0.2s ease, box-shadow 0.2s ease;
+  font-size: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-chip::before {
+  content: "ℹ️";
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.status-chip span {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translate(-50%, 8px);
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.status-chip span::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 8px;
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+  background: #0f172a;
 }
 
 .status-chip:hover {
-  background: rgba(93, 95, 239, 0.12);
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
+  transform: translateY(-2px);
+  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.2);
+}
+
+.status-chip:hover span {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .status-chip--positive {
-  background: rgba(76, 217, 100, 0.18);
-  color: #1f8a3a;
-  border-color: rgba(76, 217, 100, 0.4);
+  background: #ecfdf3;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.status-chip--positive::before {
+  content: "✅";
 }
 
 .status-chip--warm {
-  background: rgba(255, 193, 7, 0.18);
-  color: #a36a00;
-  border-color: rgba(255, 193, 7, 0.4);
+  background: #fff8e6;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.status-chip--warm::before {
+  content: "🟡";
 }
 
 .status-chip--active {
-  background: rgba(255, 107, 107, 0.18);
-  color: #b3261e;
-  border-color: rgba(255, 107, 107, 0.4);
+  background: #fff2f2;
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.status-chip--active::before {
+  content: "🔥";
 }
 
 .status-chip--cool {
-  background: rgba(84, 197, 248, 0.2);
-  color: #1167a8;
-  border-color: rgba(84, 197, 248, 0.4);
+  background: #e6f6ff;
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
+.status-chip--cool::before {
+  content: "❄️";
 }
 
 .status-chip--neutral {
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--text-primary);
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.15);
+}
+
+.status-chip--neutral::before {
+  content: "ℹ️";
 }
 
 .status-pill--open {

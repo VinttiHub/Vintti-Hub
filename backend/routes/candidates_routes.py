@@ -7,10 +7,19 @@ from datetime import date, datetime
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
+from werkzeug.utils import secure_filename
 
 from db import get_connection
 from utils import services
-from utils.storage_utils import get_cv_keys, list_s3_with_prefix, make_cv_payload, set_cv_keys
+from utils.storage_utils import (
+    get_cv_keys,
+    get_candidate_tests_documents,
+    list_s3_with_prefix,
+    make_candidate_tests_payload,
+    make_cv_payload,
+    set_candidate_tests_documents,
+    set_cv_keys,
+)
 from utils.types import to_bool
 
 bp = Blueprint('candidates', __name__)
@@ -707,6 +716,115 @@ def delete_candidate_cv(candidate_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@bp.route('/candidates/<int:candidate_id>/tests', methods=['GET'])
+def list_candidate_tests(candidate_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        documents = get_candidate_tests_documents(cursor, candidate_id)
+        set_candidate_tests_documents(cursor, candidate_id, documents)
+        conn.commit()
+
+        payload = make_candidate_tests_payload(documents)
+
+        cursor.close(); conn.close()
+        return jsonify(payload)
+    except Exception as exc:
+        logging.exception("Failed to list candidate tests (candidate_id=%s)", candidate_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/candidates/<int:candidate_id>/tests', methods=['POST'])
+def upload_candidate_tests(candidate_id):
+    files = request.files.getlist('files')
+    if not files:
+        single = request.files.get('file')
+        if single:
+            files = [single]
+    files = [f for f in files if f and getattr(f, 'filename', '')]
+    if not files:
+        return jsonify({"error": "Missing files"}), 400
+
+    max_files = 10
+    if len(files) > max_files:
+        return jsonify({"error": f"Please upload at most {max_files} files per request."}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        documents = get_candidate_tests_documents(cursor, candidate_id)
+
+        for f in files:
+            original_name = (f.filename or '').strip() or 'document'
+            safe_name = secure_filename(original_name) or 'document'
+            s3_key = f"candidate-tests/{candidate_id}/{uuid.uuid4()}_{safe_name}"
+            content_type = f.mimetype or 'application/octet-stream'
+
+            try:
+                f.stream.seek(0)
+            except Exception:
+                pass
+
+            services.s3_client.upload_fileobj(
+                f,
+                services.S3_BUCKET,
+                s3_key,
+                ExtraArgs={'ContentType': content_type}
+            )
+
+            documents.append({
+                "key": s3_key,
+                "name": original_name,
+                "content_type": content_type,
+                "size": getattr(f, 'content_length', None),
+                "uploaded_at": datetime.utcnow().isoformat() + 'Z',
+            })
+
+        set_candidate_tests_documents(cursor, candidate_id, documents)
+        conn.commit()
+
+        payload = make_candidate_tests_payload(documents)
+        cursor.close(); conn.close()
+        return jsonify({"message": "Files uploaded", "items": payload}), 200
+    except Exception as exc:
+        logging.exception("Failed to upload candidate tests (candidate_id=%s)", candidate_id)
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/candidates/<int:candidate_id>/tests', methods=['DELETE'])
+def delete_candidate_test(candidate_id):
+    data = request.get_json(silent=True) or {}
+    key = data.get("key")
+    if not key:
+        return jsonify({"error": "Missing key"}), 400
+    prefix = f"candidate-tests/{candidate_id}/"
+    if not key.startswith(prefix):
+        return jsonify({"error": "Invalid key"}), 400
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        documents = get_candidate_tests_documents(cursor, candidate_id)
+        if not any(doc.get("key") == key for doc in documents):
+            cursor.close(); conn.close()
+            return jsonify({"error": "File not found"}), 404
+
+        services.s3_client.delete_object(Bucket=services.S3_BUCKET, Key=key)
+
+        documents = [doc for doc in documents if doc.get("key") != key]
+        set_candidate_tests_documents(cursor, candidate_id, documents)
+        conn.commit()
+
+        payload = make_candidate_tests_payload(documents)
+
+        cursor.close(); conn.close()
+        return jsonify({"message": "File removed", "items": payload}), 200
+    except Exception as exc:
+        logging.exception("Failed to delete candidate test (candidate_id=%s, key=%s)", candidate_id, key)
+        return jsonify({"error": str(exc)}), 500
 
 @bp.route('/candidates/<int:candidate_id>')
 def get_candidate_by_id(candidate_id):

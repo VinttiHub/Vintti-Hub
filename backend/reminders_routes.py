@@ -1,5 +1,6 @@
 # reminders_routes.py
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify
 from psycopg2.extras import RealDictCursor
@@ -48,10 +49,7 @@ def _format_money(n) -> str:
 
 def _references_card_html(references: Optional[str]) -> str:
     """Render References / notes inside a simple card to improve readability."""
-    if references:
-        safe_body = html.escape(str(references)).replace("\n", "<br>")
-    else:
-        safe_body = "—"
+    safe_body = _format_references_block(references)
 
     return f"""
       <div style="margin:16px 0;padding:12px 16px;border:1px solid #dfe5f2;border-radius:10px;background:#f6f8fc">
@@ -59,6 +57,29 @@ def _references_card_html(references: Optional[str]) -> str:
         <div style="white-space:normal">{safe_body}</div>
       </div>
     """
+
+
+def _format_references_block(references: Optional[str]) -> str:
+    """
+    Converts stored HTML-ish references into safe inline HTML without raw tags.
+    Keeps simple line breaks to avoid rendering literal <div>...</div>.
+    """
+    if not references:
+        return "—"
+
+    raw = html.unescape(str(references))
+    raw = re.sub(r'<\s*br\s*/?>', '\n', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'<\s*/?\s*(div|p|li|ul|ol)[^>]*>', '\n', raw, flags=re.IGNORECASE)
+    raw = re.sub(r'<[^>]+>', '', raw)  # drop any remaining tags
+    raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+    raw = re.sub(r'\n{3,}', '\n\n', raw)
+    raw = raw.strip()
+    if not raw:
+        return "—"
+
+    escaped = html.escape(raw)
+    escaped = escaped.replace("\n\n", "<br><br>").replace("\n", "<br>")
+    return escaped
 
 
 # ===============================
@@ -72,8 +93,10 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     lead_source: Optional[str] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
-    referral_html = f'<li><b>Referral source:</b> {html.escape(referal_source)}</li>' if referal_source else ''
-    lead_source_html = f'<li><b>Lead source:</b> {html.escape(lead_source)}</li>' if lead_source else ''
+    referral_value = html.escape(referal_source) if referal_source else "—"
+    referral_html = f'<li><b>Referral source:</b> {referral_value}</li>'
+    lead_value = html.escape(lead_source) if lead_source else "—"
+    lead_source_html = f'<li><b>Lead source:</b> {lead_value}</li>'
     notes_card = _references_card_html(references)
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
@@ -111,8 +134,10 @@ def _initial_email_html_recruiting(
     lead_source: Optional[str] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
-    referral_line = f"<b>Referral source:</b> {html.escape(referal_source)}<br>" if referal_source else ""
-    lead_source_line = f"<b>Lead source:</b> {html.escape(lead_source)}<br>" if lead_source else ""
+    referral_value = html.escape(referal_source) if referal_source else "—"
+    lead_value = html.escape(lead_source) if lead_source else "—"
+    referral_line = f"<b>Referral source:</b> {referral_value}<br>"
+    lead_source_line = f"<b>Lead source:</b> {lead_value}<br>"
     notes_card = _references_card_html(references)
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
@@ -345,8 +370,10 @@ def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, re
                         referal_source: Optional[str] = None,
                         lead_source: Optional[str] = None):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
-    referral_html = f'<li><b>Referral source:</b> {html.escape(referal_source)}</li>' if referal_source else ''
-    lead_source_html = f'<li><b>Lead source:</b> {html.escape(lead_source)}</li>' if lead_source else ''
+    referral_value = html.escape(referal_source) if referal_source else "—"
+    referral_html = f'<li><b>Referral source:</b> {referral_value}</li>'
+    lead_value = html.escape(lead_source) if lead_source else "—"
+    lead_source_html = f'<li><b>Lead source:</b> {lead_value}</li>'
     notes_card = _references_card_html(references)
     # Copys en inglés, tono casual/fluido
     return f"""

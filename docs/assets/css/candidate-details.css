@@ -3433,7 +3433,8 @@ html body .month-year .btn-clear:active{
 
 /* Dropzone normal */
 #cv-card .cv-drop,
-#resig-card .cv-drop {
+#resig-card .cv-drop,
+#tests-card .cv-drop {
   border: 2px dashed rgba(0,0,0,.08);
   background: #f8fafc;
   border-radius: 14px;
@@ -3442,10 +3443,85 @@ html body .month-year .btn-clear:active{
 
 /* Hover del dropzone */
 #cv-card .cv-drop:hover,
-#resig-card .cv-drop:hover {
+#resig-card .cv-drop:hover,
+#tests-card .cv-drop:hover {
   border-color: #2564eb97;           
   background: #eff6ff;             
   box-shadow: 0 0 0 3px #dbeafe;   
+}
+
+#tests-card .tests-controls{
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#tests-card .tests-error{
+  min-height: 18px;
+  font-size: 13px;
+  color: #b42318;
+  margin: 10px 0 0;
+}
+
+#tests-card .tests-list{
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tests-row{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f9fafb;
+}
+
+.tests-row-info{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tests-row-info a{
+  color: #111827;
+  font-weight: 600;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.tests-row-info a:hover{
+  text-decoration: underline;
+}
+
+.tests-row-note{
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.tests-empty{
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.tests-remove{
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(185,28,28,0.12);
+  color: #b91c1c;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.tests-remove:hover{
+  background: rgba(185,28,28,0.2);
 }
 
 

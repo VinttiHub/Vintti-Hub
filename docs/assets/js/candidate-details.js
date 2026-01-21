@@ -557,7 +557,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // cargas perezosas
     if (tabId === 'opportunities') window.loadOpportunitiesForCandidate?.();
     if (tabId === 'hire')          window.loadHireData?.();
-    if (tabId === 'overview')      window.loadCVs?.();
+    if (tabId === 'overview') {
+      window.loadCVs?.();
+      window.loadCandidateTests?.();
+    }
 
     // pills
     const onResume = tabId === 'resume';
@@ -2525,6 +2528,215 @@ function render(items = []) {
 
   // Carga inicial
   loadCVs();
+})();
+
+// ====== Candidate Tests documents (any file type) ==========================
+(() => {
+  if (!window.__VINTTI_WIRED) window.__VINTTI_WIRED = {};
+  if (window.__VINTTI_WIRED.testsWidgetOnce) return;
+  window.__VINTTI_WIRED.testsWidgetOnce = true;
+
+  const apiBase = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const cid = new URLSearchParams(window.location.search).get('id');
+
+  const drop = document.getElementById('tests-drop');
+  const input = document.getElementById('tests-input');
+  const browseBtn = document.getElementById('tests-browse');
+  const refreshBtn = document.getElementById('tests-refresh');
+  const list = document.getElementById('tests-list');
+  const errorBox = document.getElementById('tests-error');
+
+  if (!cid || !drop || !list) return;
+
+  let busy = false;
+
+  function setError(message) {
+    if (!errorBox) return;
+    errorBox.textContent = message || '';
+  }
+
+  function formatDateLabel(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatFileSize(bytes) {
+    const num = Number(bytes);
+    if (!Number.isFinite(num) || num <= 0) return '';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value = num;
+    let idx = 0;
+    while (value >= 1024 && idx < units.length - 1) {
+      value /= 1024;
+      idx += 1;
+    }
+    const precision = value >= 10 ? 0 : 1;
+    return `${value.toFixed(precision)} ${units[idx]}`;
+  }
+
+  function render(items = []) {
+    list.innerHTML = '';
+    const normalized = Array.isArray(items) ? items : [];
+    if (!normalized.length) {
+      const empty = document.createElement('div');
+      empty.className = 'tests-empty';
+      empty.textContent = 'No files yet.';
+      list.appendChild(empty);
+      return;
+    }
+    normalized.forEach((doc) => {
+      if (!doc || !doc.key) return;
+      const row = document.createElement('div');
+      row.className = 'tests-row';
+
+      const info = document.createElement('div');
+      info.className = 'tests-row-info';
+
+      const link = document.createElement('a');
+      link.href = doc.url || '#';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = doc.name || (doc.key.split('/').pop() || 'File');
+      info.appendChild(link);
+
+      const metaParts = [];
+      const label = formatDateLabel(doc.uploaded_at);
+      if (label) metaParts.push(`Uploaded ${label}`);
+      const sizeLabel = formatFileSize(doc.size);
+      if (sizeLabel) metaParts.push(sizeLabel);
+      const typeLabel = (doc.content_type || '').split(';')[0];
+      if (typeLabel) metaParts.push(typeLabel);
+      if (metaParts.length) {
+        const note = document.createElement('span');
+        note.className = 'tests-row-note';
+        note.textContent = metaParts.join(' • ');
+        info.appendChild(note);
+      }
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'tests-remove';
+      removeBtn.dataset.key = doc.key;
+      removeBtn.textContent = 'Remove';
+
+      row.appendChild(info);
+      row.appendChild(removeBtn);
+      list.appendChild(row);
+    });
+  }
+
+  async function loadCandidateTests() {
+    setError('');
+    try {
+      const resp = await fetch(`${apiBase}/candidates/${cid}/tests`);
+      const data = await resp.json();
+      const items = Array.isArray(data) ? data : (data?.items || []);
+      render(items);
+    } catch (err) {
+      console.warn('Failed to load candidate tests', err);
+      setError('Unable to load files right now.');
+      render([]);
+    }
+  }
+  window.loadCandidateTests = loadCandidateTests;
+
+  function setBusy(flag) {
+    busy = !!flag;
+    drop?.classList.toggle('is-uploading', busy);
+    drop?.classList.remove('dragover');
+    if (browseBtn) browseBtn.disabled = busy;
+    if (refreshBtn) refreshBtn.disabled = busy;
+    if (input) input.disabled = busy;
+  }
+
+  async function uploadTests(fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length || busy) return;
+
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+
+    setBusy(true);
+    setError('');
+    try {
+      const resp = await fetch(`${apiBase}/candidates/${cid}/tests`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!resp.ok) throw new Error(await resp.text().catch(() => 'Upload failed'));
+      const data = await resp.json();
+      const items = Array.isArray(data) ? data : (data?.items || []);
+      render(items);
+    } catch (err) {
+      console.error('Failed to upload tests', err);
+      setError(err?.message || 'Unable to upload files.');
+    } finally {
+      setBusy(false);
+      if (input) input.value = '';
+    }
+  }
+
+  async function deleteTest(key) {
+    if (!key) return;
+    try {
+      const resp = await fetch(`${apiBase}/candidates/${cid}/tests`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      if (!resp.ok) throw new Error(await resp.text().catch(() => 'Delete failed'));
+      const data = await resp.json();
+      const items = Array.isArray(data) ? data : (data?.items || []);
+      render(items);
+    } catch (err) {
+      console.error('Failed to delete test file', err);
+      setError('Unable to delete file right now.');
+    }
+  }
+
+  drop.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    drop.classList.add('dragover');
+  });
+  drop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    drop.classList.add('dragover');
+  });
+  drop.addEventListener('dragleave', (e) => {
+    if (e.target === drop) {
+      drop.classList.remove('dragover');
+    }
+  });
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    drop.classList.remove('dragover');
+    if (busy) return;
+    const files = e.dataTransfer?.files;
+    if (files?.length) uploadTests(files);
+  });
+
+  browseBtn?.addEventListener('click', () => input?.click());
+  input?.addEventListener('change', (e) => {
+    if (busy) return;
+    uploadTests(e.target.files);
+  });
+  refreshBtn?.addEventListener('click', () => loadCandidateTests());
+
+  list.addEventListener('click', (event) => {
+    const btn = event.target.closest('.tests-remove');
+    if (!btn) return;
+    const key = btn.dataset.key;
+    if (!key) return;
+    if (!window.confirm('Delete this file?')) return;
+    deleteTest(key);
+  });
+
+  loadCandidateTests();
 })();
 (() => {
   // Evita doble wiring
