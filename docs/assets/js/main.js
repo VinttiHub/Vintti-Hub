@@ -589,25 +589,33 @@ function getReplacementCandidateId() {
 })();
 
 
-document.querySelectorAll('.filter-header').forEach(header => {
-  header.addEventListener('click', () => {
-    const targetId = header.getAttribute('data-target');
-    const target = document.getElementById(targetId);
-    const icon = header.querySelector('i');
+function setupFilterToggle(header, targetIdOverride) {
+  if (!header || header.dataset.filterToggleBound === 'true') return;
+  const targetId = targetIdOverride || header.getAttribute('data-target');
+  if (!targetId) return;
+  const icon = header.querySelector('i');
 
+  function toggle() {
+    const target = document.getElementById(targetId);
+    if (!target) return;
     const isHidden = target.classList.toggle('hidden');
     if (icon) {
       icon.classList.toggle('rotate-up', !isHidden);
     }
-  });
-});
+  }
 
-document.querySelectorAll('.filter-header button').forEach(button => {
-  button.addEventListener('click', (e) => {
-    e.stopPropagation(); // evita que se dispare doble
-    button.parentElement.click();
-  });
-});
+  header.addEventListener('click', toggle);
+  const button = header.querySelector('button');
+  if (button) {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggle();
+    });
+  }
+  header.dataset.filterToggleBound = 'true';
+}
+
+document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggle(header));
   const toggleButton = document.getElementById('toggleFilters');
   const filtersCard = document.getElementById('filtersCard');
 
@@ -1071,6 +1079,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
   const headerWrap =
     document.querySelector(`#${containerId}Container .filter-header`) ||
     document.querySelector(`.filter-header[data-target="${containerId}"]`);
+  if (headerWrap) setupFilterToggle(headerWrap, containerId);
 
   // Barras de puntitos en el header:
   // - Stage usa .stage-dot-bar (ya la tienes en el HTML; si no, la creo)
