@@ -1003,6 +1003,72 @@ body {
   font-weight:800;
 }
 
+.history-chart-modal{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:1100;
+}
+
+.history-chart-modal:not([hidden]){
+  display:flex;
+}
+
+.history-chart-modal__overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(17,7,33,0.65);
+  backdrop-filter:blur(6px);
+}
+
+.history-chart-modal__panel{
+  position:relative;
+  width:min(960px,92vw);
+  background:#fff;
+  border-radius:32px;
+  box-shadow:0 40px 120px rgba(12,5,28,0.45);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.history-chart-modal__body{
+  padding:2.25rem 2.75rem 2.5rem;
+  display:flex;
+  flex-direction:column;
+  gap:1.5rem;
+}
+
+.history-chart-modal__header h3{
+  margin:0;
+  font-size:1.75rem;
+  color:#2a1f4a;
+}
+
+.history-chart-modal__header p{
+  margin:0.4rem 0 0;
+  color:#7b6f99;
+}
+
+.history-chart-modal__content{
+  width:100%;
+}
+
+.history-chart-modal__close{
+  position:absolute;
+  top:1.2rem;
+  right:1.2rem;
+  width:46px;
+  height:46px;
+  border-radius:999px;
+  border:none;
+  background:rgba(0,0,0,0.04);
+  font-size:1.4rem;
+  cursor:pointer;
+}
+
 @media (max-width: 720px){
   .history-card__metrics{
     flex-direction:column;

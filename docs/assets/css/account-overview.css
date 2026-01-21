@@ -147,6 +147,23 @@ body.panel-open {
   flex-wrap: wrap;
 }
 
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.refresh-chip {
+  white-space: nowrap;
+}
+
+.refresh-chip[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .chip {
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 999px;

@@ -614,8 +614,10 @@ window.AVATAR_BY_EMAIL = Object.assign(
     'jazmin@vintti.com':   'jaz.png',
     'pilar@vintti.com':    'pilar.png',
     'agustin@vintti.com':  'agus.png',
+    'agustina@vintti.com': 'agustina_valentini.png',
     'agustina.barbero@vintti.com': 'agustina.png',
-    'mariano@vintti.com': 'mariano.png'
+    'mariano@vintti.com': 'mariano.png',
+    'vianney@vintti.com': 'vianney.png'
   },
   window.AVATAR_BY_EMAIL || {}
 );

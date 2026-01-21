@@ -141,16 +141,17 @@ def get_account_overview_cache(account_id):
         cursor = conn.cursor()
         cursor.execute(
             """
-                SELECT opportunity_id, candidates_batches
+                SELECT client_overview_id, account_id, opportunity_id, candidates_batches
                 FROM client_overview
                 WHERE account_id = %s
+                ORDER BY client_overview_id ASC
             """,
             (account_id,),
         )
         rows = cursor.fetchall() or []
         payload = []
         for row in rows:
-            opportunity_id, data = row
+            client_overview_id, acc_id, opportunity_id, data = row
             decoded = None
             if data:
                 try:
@@ -163,8 +164,10 @@ def get_account_overview_cache(account_id):
                     )
             payload.append(
                 {
+                    "client_overview_id": client_overview_id,
+                    "account_id": acc_id,
                     "opportunity_id": opportunity_id,
-                    "candidates_batches": decoded,
+                    "snapshot": decoded,
                 }
             )
         cursor.close()
@@ -186,42 +189,95 @@ def upsert_account_overview_cache(account_id):
 
         conn = get_connection()
         cursor = conn.cursor()
-        saved = 0
+        cursor.execute("SELECT COALESCE(MAX(client_overview_id), 0) FROM client_overview")
+        next_id = cursor.fetchone()[0] or 0
+
+        saved, updated, skipped = 0, 0, 0
         for entry in entries:
             try:
                 opportunity_id = int(entry.get('opportunity_id'))
             except (TypeError, ValueError):
+                skipped += 1
                 continue
 
-            snapshot = entry.get('snapshot')
-            if snapshot is None:
-                snapshot = entry.get('candidates_batches')
-            batches_payload = entry.get('batches')
-            if snapshot is None and batches_payload is not None:
-                snapshot = {'batches': batches_payload}
-            if snapshot is None:
-                snapshot = {'batches': []}
+            snapshot = entry.get('snapshot') or entry.get('candidates_batches') or {}
+            if not isinstance(snapshot, dict):
+                skipped += 1
+                continue
 
             cursor.execute(
                 """
-                    DELETE FROM client_overview
+                    SELECT client_overview_id, candidates_batches
+                    FROM client_overview
                     WHERE account_id = %s AND opportunity_id = %s
                 """,
                 (account_id, opportunity_id),
             )
-            cursor.execute(
-                """
-                    INSERT INTO client_overview (account_id, opportunity_id, candidates_batches)
-                    VALUES (%s, %s, %s)
-                """,
-                (account_id, opportunity_id, json.dumps(snapshot)),
-            )
-            saved += 1
+            row = cursor.fetchone()
+            existing_id = None
+            existing_snapshot = None
+            if row:
+                existing_id, existing_payload = row
+                if existing_payload:
+                    try:
+                        existing_snapshot = json.loads(existing_payload)
+                    except Exception:
+                        existing_snapshot = None
+                if isinstance(existing_snapshot, dict):
+                    existing_snapshot.setdefault('client_overview_id', existing_id)
+                    opp_snapshot = existing_snapshot.get('opportunity')
+                    if isinstance(opp_snapshot, dict):
+                        opp_snapshot.setdefault('client_overview_id', existing_id)
+                else:
+                    existing_snapshot = None
+
+            if existing_id is None:
+                next_id += 1
+                target_id = next_id
+            else:
+                target_id = existing_id
+
+            snapshot['client_overview_id'] = target_id
+            snapshot['opportunity_id'] = opportunity_id
+            snapshot['account_id'] = account_id
+            opportunity_snapshot = snapshot.get('opportunity')
+            if isinstance(opportunity_snapshot, dict):
+                opportunity_snapshot.setdefault('client_overview_id', target_id)
+
+            payload_json = json.dumps(snapshot, sort_keys=True)
+
+            if existing_id is not None:
+                existing_serialized = (
+                    json.dumps(existing_snapshot, sort_keys=True)
+                    if isinstance(existing_snapshot, dict)
+                    else None
+                )
+                if existing_serialized == payload_json:
+                    skipped += 1
+                    continue
+                cursor.execute(
+                    """
+                        UPDATE client_overview
+                        SET candidates_batches = %s
+                        WHERE client_overview_id = %s
+                    """,
+                    (payload_json, target_id),
+                )
+                updated += 1
+            else:
+                cursor.execute(
+                    """
+                        INSERT INTO client_overview (client_overview_id, account_id, opportunity_id, candidates_batches)
+                        VALUES (%s, %s, %s, %s)
+                    """,
+                    (target_id, account_id, opportunity_id, payload_json),
+                )
+                saved += 1
 
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({'saved': saved}), 200
+        return jsonify({'inserted': saved, 'updated': updated, 'skipped': skipped}), 200
     except Exception as e:
         logging.exception("❌ upsert_account_overview_cache failed")
         return jsonify({'error': str(e)}), 500

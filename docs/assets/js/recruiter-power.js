@@ -53,6 +53,7 @@ const metricsState = {
   historyError: "",
   historyLoading: false,
   activeTab: "summary",
+  historyDetailCache: {},
 };
 const HISTORY_START_YEAR = 2025;
 const HISTORY_START_MONTH_INDEX = 0;
@@ -71,7 +72,13 @@ const historyDom = {
   tableCard: null,
   tableHead: null,
   tableBody: null,
+  currentCards: [],
+  chartModal: null,
+  chartModalTitle: null,
+  chartModalDescription: null,
+  chartModalContent: null,
 };
+let historyChartModalPrevOverflow = "";
 metricsState.historyMonthlyWindows = buildMonthlyWindows(
   HISTORY_START_YEAR,
   HISTORY_START_MONTH_INDEX
@@ -308,13 +315,15 @@ function formatDateISO(iso) {
 }
 
 // 🔹 helper para el label: muestra el user_name si existe
-function getLeadLabel(email) {
+function getLeadLabel(email, state = metricsState) {
   const key = (email || "").toLowerCase();
-  const row = metricsState.byLead[key];
+  const byLead = state.byLead || metricsState.byLead || {};
+  const lookup = state.recruiterLookup || metricsState.recruiterLookup || {};
+  const row = byLead[key];
   if (row) {
     return row.hr_lead_name || row.hr_lead || email;
   }
-  return metricsState.recruiterLookup[key] || email;
+  return lookup[key] || email;
 }
 
 /* 🌟 NUEVO: helpers de animación numérica */
@@ -377,21 +386,21 @@ function setDetailCardsEnabled(enabled) {
     card.tabIndex = nextTabIndex;
   });
 }
-function getLeadOpportunities(hrLeadEmail) {
+function getLeadOpportunities(hrLeadEmail, state = metricsState) {
   const key = (hrLeadEmail || "").toLowerCase();
-  return metricsState.opportunityDetails[key] || [];
+  return (state.opportunityDetails && state.opportunityDetails[key]) || [];
 }
-function getLeadDurationDetails(hrLeadEmail) {
+function getLeadDurationDetails(hrLeadEmail, state = metricsState) {
   const key = (hrLeadEmail || "").toLowerCase();
-  return metricsState.durationDetails[key] || {};
+  return (state.durationDetails && state.durationDetails[key]) || {};
 }
-function getPipelineDetails(hrLeadEmail) {
+function getPipelineDetails(hrLeadEmail, state = metricsState) {
   const key = (hrLeadEmail || "").toLowerCase();
-  return metricsState.pipelineDetails[key] || [];
+  return (state.pipelineDetails && state.pipelineDetails[key]) || [];
 }
-function getSentVsInterviewDetails(hrLeadEmail) {
+function getSentVsInterviewDetails(hrLeadEmail, state = metricsState) {
   const key = (hrLeadEmail || "").toLowerCase();
-  return metricsState.sentVsInterviewDetails[key] || [];
+  return (state.sentVsInterviewDetails && state.sentVsInterviewDetails[key]) || [];
 }
 function normalizeCandidateStatus(status) {
   return (status || "").trim().toLowerCase();
@@ -509,6 +518,12 @@ function createOpportunityItems(opps = []) {
 function describeRange(start, end) {
   if (start && end) {
     return `${formatDisplayDate(start)} — ${formatDisplayDate(end)}`;
+  }
+  if (start && !end) {
+    return `${formatDisplayDate(start)}`;
+  }
+  if (!start && end) {
+    return `${formatDisplayDate(end)}`;
   }
   return "the last 30 days";
 }
@@ -727,22 +742,28 @@ function animateCardsFlash() {
     card.classList.add("is-updating");
   });
 }
-function buildDetailModalPayload(type) {
-  const key = (metricsState.selectedLead || "").toLowerCase();
-  if (!key) return null;
-  const selectedMetrics = metricsState.byLead[key];
+function buildDetailModalPayload(type, options = {}, state = metricsState) {
+  const leadKeyExplicit = options.leadKey ? options.leadKey.toLowerCase() : null;
+  const effectiveLead =
+    leadKeyExplicit ||
+    (state.selectedLead && state.selectedLead.toLowerCase()) ||
+    (metricsState.selectedLead && metricsState.selectedLead.toLowerCase()) ||
+    "";
+  if (!effectiveLead) return null;
+  const byLead = state.byLead || metricsState.byLead || {};
+  const selectedMetrics = byLead[effectiveLead];
   if (!selectedMetrics) return null;
-  const recruiterName = getLeadLabel(key);
+  const recruiterName = getLeadLabel(effectiveLead, state);
   const recruiterSuffix = recruiterName ? ` for ${recruiterName}` : "";
-  const opportunities = getLeadOpportunities(key);
-  const rangeStart = metricsState.rangeStart;
-  const rangeEnd = metricsState.rangeEnd;
+  const opportunities = getLeadOpportunities(effectiveLead, state);
+  const rangeStart = options.rangeStart ?? metricsState.rangeStart;
+  const rangeEnd = options.rangeEnd ?? metricsState.rangeEnd;
   const readableRange = describeRange(rangeStart, rangeEnd);
-  const durationDetails = getLeadDurationDetails(key);
+  const durationDetails = getLeadDurationDetails(effectiveLead, state);
   const getDurationItems = (metricKey) => createDurationItems(durationDetails[metricKey] || [], metricKey);
   const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
-  const pipelineEntries = getPipelineDetails(key);
-  const sentVsInterviewDetails = getSentVsInterviewDetails(key);
+  const pipelineEntries = getPipelineDetails(effectiveLead, state);
+  const sentVsInterviewDetails = getSentVsInterviewDetails(effectiveLead, state);
 
   switch (type) {
     case "closedWinRange":
@@ -1063,10 +1084,22 @@ function setupMetricDetailModal() {
     }
   });
 }
-function requestMetricDetail(kind) {
+function requestMetricDetail(kind, overrides = {}, sourceState = metricsState) {
   if (!kind || !metricsState.selectedLead) return;
-  const detail = buildDetailModalPayload(kind);
+  const detail = buildDetailModalPayload(kind, overrides, sourceState);
   if (detail) {
+    if (overrides.titleSuffix) {
+      detail.title = `${detail.title || "Metric detail"} · ${overrides.titleSuffix}`;
+    }
+    if (overrides.appendContext) {
+      const base = detail.context || "";
+      detail.context = `${overrides.appendContext} ${base}`.trim();
+    } else if (overrides.context) {
+      detail.context = overrides.context;
+    }
+    if (overrides.rangeStart || overrides.rangeEnd) {
+      detail.context = detail.context || `Period ${describeRange(overrides.rangeStart, overrides.rangeEnd)}`;
+    }
     openMetricDetailModal(detail);
   }
 }
@@ -1717,6 +1750,24 @@ function normalizeSentVsInterviewDetails(raw) {
   return normalized;
 }
 
+function buildDetailStateFromPayload(payload) {
+  const state = {
+    byLead: {},
+    opportunityDetails: normalizeOpportunityDetails(payload.opportunity_details),
+    durationDetails: normalizeDurationDetails(payload.duration_details),
+    pipelineDetails: normalizePipelineDetails(payload.pipeline_details),
+    sentVsInterviewDetails: normalizeSentVsInterviewDetails(payload.sent_vs_interview_details),
+    recruiterLookup: metricsState.recruiterLookup,
+    selectedLead: metricsState.selectedLead,
+  };
+  (payload.metrics || []).forEach((row) => {
+    const email = (row.hr_lead_email || row.hr_lead || "").toLowerCase();
+    if (!email || EXCLUDED_EMAILS.has(email)) return;
+    state.byLead[email] = row;
+  });
+  return state;
+}
+
 function wireRangePicker() {
   const btn = document.getElementById("applyRangeBtn");
   const s = document.getElementById("rangeStart");
@@ -1808,11 +1859,13 @@ function getLineChartData(points, width, height) {
     const x = total > 1 ? (index / (total - 1)) * width : width / 2;
     const y = height - ((point.value - min) / range) * height;
     pathPoints.push({
-      x,
-      y,
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
       label: point.label || point.key || "",
       key: point.key,
       value: point.value,
+      rangeStart: point.start,
+      rangeEnd: point.end,
     });
   });
   const pathSequence = pathPoints.map((pt) => `${pt.x},${pt.y}`);
@@ -1843,8 +1896,10 @@ function getColumnChartData(points, width, height) {
         key: point.key,
         label: point.label || point.key || "",
         value: point.value,
-        x: center - columnWidth / 2,
-        y: height - scaled,
+        rangeStart: point.start,
+        rangeEnd: point.end,
+        x: Number((center - columnWidth / 2).toFixed(2)),
+        y: Number((height - scaled).toFixed(2)),
         width: columnWidth,
         height: Math.max(scaled, 2),
       };
@@ -2073,6 +2128,22 @@ const HISTORY_METRICS = [
   },
 ];
 
+const HISTORY_METRIC_DETAIL_MAP = {
+  closed_win_month: "closedWinRange",
+  closed_lost_month: "closedLostRange",
+  closed_win_total: "closedWinTotal",
+  closed_lost_total: "closedLostTotal",
+  conversion_range: "conversionRange",
+  conversion_lifetime: "conversionLifetime",
+  avg_days_to_close_win: "avgCloseWin",
+  avg_days_to_close_lost: "avgCloseLost",
+  avg_days_to_first_batch_open: "avgBatchOpen",
+  avg_days_to_first_batch_closed: "avgBatchClosed",
+  interview_rate: "interviewRate",
+  hire_rate: "hireRate",
+  sent_vs_interview_ratio: "sentVsInterview",
+};
+
 function setupTabs() {
   const tabs = document.querySelectorAll("[data-tab-target]");
   const panels = document.querySelectorAll("[data-tab-panel]");
@@ -2154,6 +2225,60 @@ function initializeHistoryUI() {
   syncHistoryRangeInputs();
   updateHistoryGlobalMeta();
   resetHistoryView();
+}
+
+function setupHistoryChartModal() {
+  historyDom.chartModal = document.getElementById("historyChartModal");
+  if (!historyDom.chartModal) return;
+  historyDom.chartModalTitle = document.getElementById("historyChartModalTitle");
+  historyDom.chartModalDescription = document.getElementById("historyChartModalDescription");
+  historyDom.chartModalContent = document.getElementById("historyChartModalContent");
+  const closers = historyDom.chartModal.querySelectorAll("[data-chart-modal-close]");
+  closers.forEach((element) => {
+    element.addEventListener("click", closeHistoryChartModal);
+  });
+  historyDom.chartModal.addEventListener("click", (event) => {
+    if (event.target.dataset && event.target.dataset.chartModalClose !== undefined) {
+      closeHistoryChartModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && historyDom.chartModal && !historyDom.chartModal.hidden) {
+      closeHistoryChartModal();
+    }
+  });
+  attachHistoryHoverHandlers(historyDom.chartModalContent);
+}
+
+function openHistoryChartModal(cardId) {
+  if (!historyDom.chartModal || !historyDom.chartModalContent) return;
+  const card = (historyDom.currentCards || []).find((item) => item.id === cardId);
+  if (!card) return;
+  const hasData = card.points.some((point) => point.value != null);
+  if (!hasData) return;
+
+  historyDom.chartModalTitle.textContent = card.title || "Metric detail";
+  historyDom.chartModalDescription.textContent = card.description || "";
+  const chartMarkup =
+    card.chart === "column"
+      ? renderColumnChart(card, { width: 900, height: 320 })
+      : renderLineChart(card, { width: 900, height: 320, pointRadius: 9 });
+  historyDom.chartModalContent.innerHTML = chartMarkup;
+  attachHistoryHoverHandlers(historyDom.chartModalContent);
+  historyChartModalPrevOverflow = document.body.style.overflow || "";
+  document.body.style.overflow = "hidden";
+  historyDom.chartModal.hidden = false;
+}
+
+function closeHistoryChartModal() {
+  if (!historyDom.chartModal) return;
+  historyDom.chartModal.hidden = true;
+  if (historyDom.chartModalContent) {
+    historyDom.chartModalContent.innerHTML = "";
+  }
+  hideHistoryTooltip();
+  document.body.style.overflow = historyChartModalPrevOverflow || "";
+  historyChartModalPrevOverflow = "";
 }
 
 function syncHistoryRangeInputs() {
@@ -2369,6 +2494,23 @@ async function fetchHistoryWindow(startYMD, endYMD) {
   return resp.json();
 }
 
+async function getHistoryDetailState(leadKey, rangeStart, rangeEnd) {
+  const normalizedLead = (leadKey || "").toLowerCase();
+  if (!normalizedLead || !rangeStart || !rangeEnd) return null;
+  const leadCache =
+    metricsState.historyDetailCache[normalizedLead] ||
+    (metricsState.historyDetailCache[normalizedLead] = {});
+  const cacheKey = `${rangeStart}::${rangeEnd}`;
+  if (leadCache[cacheKey]) {
+    return leadCache[cacheKey];
+  }
+  const data = await fetchRecruiterMetrics({ start: rangeStart, end: rangeEnd });
+  const detailState = buildDetailStateFromPayload(data);
+  detailState.selectedLead = normalizedLead;
+  leadCache[cacheKey] = detailState;
+  return detailState;
+}
+
 function getHistoryTimelineForLead(leadKey) {
   const windows = metricsState.historyMonthlyWindows || [];
   if (!windows.length) return [];
@@ -2406,6 +2548,8 @@ function buildHistoryMetricCards(timeline = []) {
     const basePoints = timeline.map((entry) => ({
       key: entry.monthKey,
       label: entry.label,
+      start: entry.start,
+      end: entry.end,
       value: config.extractor(entry.metrics),
     }));
     const points = config.accumulate ? accumulateSeries(basePoints) : basePoints;
@@ -2503,14 +2647,32 @@ function renderHistoryCards(cards = []) {
     historyDom.grid.innerHTML = "";
     historyDom.grid.hidden = true;
     hideHistoryTooltip();
+    historyDom.currentCards = [];
     return;
   }
   historyDom.grid.hidden = false;
   historyDom.grid.innerHTML = cards.map((card) => createHistoryCardMarkup(card)).join("");
-  attachHistoryHoverHandlers();
+  historyDom.currentCards = cards;
+  const cardElements = historyDom.grid.querySelectorAll("[data-history-card-id]");
+  cardElements.forEach((element) => {
+    const cardId = element.getAttribute("data-history-card-id");
+    const clickHandler = (event) => {
+      if (event && event.target.closest("[data-history-point]")) return;
+      openHistoryChartModal(cardId);
+    };
+    element.addEventListener("click", clickHandler);
+    element.addEventListener("keydown", (event) => {
+      if (event.target.closest("[data-history-point]")) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openHistoryChartModal(cardId);
+      }
+    });
+  });
+  attachHistoryHoverHandlers(historyDom.grid);
 }
 
-function renderHistoryTable(rows = [], cards = []) {
+function renderHistoryTable(rows = [], cards = historyDom.currentCards || []) {
   if (!historyDom.tableCard || !historyDom.tableBody || !historyDom.tableHead) return;
   if (!rows.length) {
     historyDom.tableBody.innerHTML = "";
@@ -2562,7 +2724,7 @@ function createHistoryCardMarkup(card) {
       ? renderColumnChart(card)
       : renderLineChart(card);
   return `
-    <article class="history-card">
+    <article class="history-card" data-history-card-id="${card.id}" role="button" tabindex="0" aria-label="View ${card.title} in detail">
       <div class="history-card__header">
         <div>
           <span class="history-card__label">${card.title}</span>
@@ -2590,10 +2752,11 @@ function createHistoryCardMarkup(card) {
     </article>`;
 }
 
-function renderLineChart(card) {
-  const width = 320;
-  const chartHeight = 120;
-  const axisHeight = 24;
+function renderLineChart(card, options = {}) {
+  const width = options.width || 320;
+  const chartHeight = options.height || 120;
+  const axisHeight = options.axisHeight ?? 24;
+  const pointRadius = options.pointRadius || 5;
   const svgHeight = chartHeight + axisHeight;
   const { pathPoints, areaPath } = getLineChartData(card.points, width, chartHeight);
   if (!pathPoints.length) {
@@ -2605,16 +2768,16 @@ function renderLineChart(card) {
   const circles = pathPoints
     .map(
       (pt) =>
-        `<circle class="history-point" data-history-point="true" data-history-label="${escapeAttribute(
+        `<circle class="history-point" data-history-point="true" data-history-metric-id="${card.id}" data-history-key="${escapeAttribute(
+          pt.key
+        )}" data-history-range-start="${pt.rangeStart || ""}" data-history-range-end="${pt.rangeEnd || ""}" data-history-label="${escapeAttribute(
           pt.label
-        )}" data-history-value="${escapeAttribute(card.formatter(pt.value))}" cx="${pt.x}" cy="${pt.y}" r="5" fill="${
-          card.color
-        }" />`
+        )}" data-history-value="${escapeAttribute(card.formatter(pt.value))}" cx="${pt.x}" cy="${pt.y}" r="${pointRadius}" fill="${card.color}" />`
     )
     .join("");
   const axisMarkup = renderAxis(ticks, width, chartHeight);
   return `
-    <svg viewBox="0 0 ${width} ${svgHeight}" class="history-line" role="img" aria-hidden="true" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${width} ${svgHeight}" class="history-line" role="img" aria-hidden="true" preserveAspectRatio="none" data-history-hover-root="true">
       <defs>
         <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="${card.color}" stop-opacity="0.35"></stop>
@@ -2628,10 +2791,10 @@ function renderLineChart(card) {
     </svg>`;
 }
 
-function renderColumnChart(card) {
-  const width = 320;
-  const chartHeight = 120;
-  const axisHeight = 24;
+function renderColumnChart(card, options = {}) {
+  const width = options.width || 320;
+  const chartHeight = options.height || 120;
+  const axisHeight = options.axisHeight ?? 24;
   const svgHeight = chartHeight + axisHeight;
   const bars = getColumnChartData(card.points, width, chartHeight);
   if (!bars.length) {
@@ -2640,15 +2803,15 @@ function renderColumnChart(card) {
   const ticks = buildAxisTicks(card.points, width);
   const axisMarkup = renderAxis(ticks, width, chartHeight);
   return `
-    <svg viewBox="0 0 ${width} ${svgHeight}" class="history-column" role="img" aria-hidden="true" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${width} ${svgHeight}" class="history-column" role="img" aria-hidden="true" preserveAspectRatio="none" data-history-hover-root="true">
       ${bars
         .map(
           (bar) =>
-            `<rect class="history-bar" data-history-point="true" data-history-label="${escapeAttribute(
+            `<rect class="history-bar" data-history-point="true" data-history-metric-id="${card.id}" data-history-key="${escapeAttribute(
+              bar.key
+            )}" data-history-range-start="${bar.rangeStart || ""}" data-history-range-end="${bar.rangeEnd || ""}" data-history-label="${escapeAttribute(
               bar.label
-            )}" data-history-value="${escapeAttribute(
-              card.formatter(bar.value)
-            )}" x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="6" fill="${card.color}" opacity="0.82"></rect>`
+            )}" data-history-value="${escapeAttribute(card.formatter(bar.value))}" x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="6" fill="${card.color}" opacity="0.82"></rect>`
         )
         .join("")}
       ${axisMarkup}
@@ -2708,15 +2871,20 @@ function escapeAttribute(value) {
 
 let historyTooltipEl = null;
 
-function attachHistoryHoverHandlers() {
-  if (!historyDom.grid || historyDom.grid._historyHoverAttached) return;
-  historyDom.grid.addEventListener("pointermove", handleHistoryPointerMove);
-  historyDom.grid.addEventListener("pointerleave", hideHistoryTooltip);
-  historyDom.grid._historyHoverAttached = true;
+function attachHistoryHoverHandlers(root) {
+  if (!root || root._historyHoverAttached) return;
+  root.addEventListener("pointermove", handleHistoryPointerMove);
+  root.addEventListener("pointerleave", hideHistoryTooltip);
+  root.addEventListener("click", handleHistoryPointClick);
+  root._historyHoverAttached = true;
 }
 
 function handleHistoryPointerMove(event) {
-  const target = event.target.closest("[data-history-point]");
+  const root = event.currentTarget;
+  let target = event.target.closest("[data-history-point]");
+  if (!target && root) {
+    target = findNearestHistoryPoint(root, event.clientX, event.clientY);
+  }
   if (!target) {
     hideHistoryTooltip();
     return;
@@ -2761,6 +2929,62 @@ function hideHistoryTooltip() {
   }
 }
 
+function findNearestHistoryPoint(root, clientX, clientY) {
+  const candidates = root.querySelectorAll("[data-history-point]");
+  let nearest = null;
+  let minDistance = Infinity;
+  candidates.forEach((candidate) => {
+    const rect = candidate.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const distance = Math.hypot(clientX - cx, clientY - cy);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearest = candidate;
+    }
+  });
+  if (minDistance <= 40) {
+    return nearest;
+  }
+  return null;
+}
+
+async function handleHistoryPointClick(event) {
+  const target = event.target.closest("[data-history-point]");
+  if (!target) return;
+  const metricId = target.getAttribute("data-history-metric-id");
+  if (!metricId) return;
+  const detailKey = HISTORY_METRIC_DETAIL_MAP[metricId];
+  if (!detailKey) return;
+  const monthLabel = target.getAttribute("data-history-label") || "";
+  const titleSuffix = monthLabel || null;
+  const appendContext = monthLabel ? `Month selected: ${monthLabel}.` : "";
+  const overrideStart = target.getAttribute("data-history-range-start") || null;
+  const overrideEnd = target.getAttribute("data-history-range-end") || null;
+  const detailOptions = {
+    titleSuffix,
+    appendContext,
+    rangeStart: overrideStart || undefined,
+    rangeEnd: overrideEnd || undefined,
+  };
+  if (historyDom.chartModal && !historyDom.chartModal.hidden) {
+    closeHistoryChartModal();
+  }
+  const leadKey = metricsState.selectedLead;
+  if (overrideStart && overrideEnd && leadKey) {
+    try {
+      const detailState = await getHistoryDetailState(leadKey, overrideStart, overrideEnd);
+      if (detailState) {
+        requestMetricDetail(detailKey, detailOptions, detailState);
+        return;
+      }
+    } catch (err) {
+      console.error("[recruiter-metrics] Could not load detail for month", err);
+    }
+  }
+  requestMetricDetail(detailKey, detailOptions);
+}
+
 function computeHistoryTrend(latest, previous, goodWhenHigher, formatter) {
   if (latest == null || previous == null) return null;
   const diff = latest - previous;
@@ -2779,6 +3003,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireMetricDetailCards();
   setupTabs();
   initializeHistoryUI();
+  setupHistoryChartModal();
   (async () => {
     const uid = await ensureUserIdInURL();
     await loadRecruiterDirectory();

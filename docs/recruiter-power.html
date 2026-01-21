@@ -517,6 +517,33 @@
       </section>
     </section>
   </main>
+
+  <div id="historyChartModal" class="history-chart-modal" hidden>
+    <div class="history-chart-modal__overlay" data-chart-modal-close></div>
+    <div
+      class="history-chart-modal__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="historyChartModalTitle"
+    >
+      <button
+        type="button"
+        class="history-chart-modal__close"
+        aria-label="Close enlarged chart"
+        data-chart-modal-close
+      >
+        ×
+      </button>
+      <div class="history-chart-modal__body">
+        <div class="history-chart-modal__header">
+          <h3 id="historyChartModalTitle">Metric detail</h3>
+          <p id="historyChartModalDescription"></p>
+        </div>
+        <div id="historyChartModalContent" class="history-chart-modal__content"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="metricDetailModal" class="metric-detail-modal" hidden>
     <div class="metric-detail-modal__overlay" data-modal-overlay></div>
     <div

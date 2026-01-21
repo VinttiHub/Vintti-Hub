@@ -13,6 +13,7 @@
     'pilar@vintti.com':            'pilar.png',
     'pilar.fernandez@vintti.com':  'pilar_fer.png',
     'agustin@vintti.com':          'agus.png',
+    'agustina@vintti.com':         'agustina_valentini.png',
     'agustina.barbero@vintti.com': 'agustina.png',
     'josefina@vintti.com':         'josefina.png',
     'constanza@vintti.com':        'constanza.png',
@@ -29,6 +30,7 @@
     'angie@vintti.com':            'angie.png',
     'juliana@vintti.com':          'juliana.png',
     'paz@vintti.com':              'paz.png',
+    'vianney@vintti.com':          'vianney.png',
   };
   const AVATAR_BY_USER_ID = {
     // '123': 'avatar.png',
