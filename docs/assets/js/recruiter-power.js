@@ -69,6 +69,7 @@ const historyDom = {
   loading: null,
   grid: null,
   tableCard: null,
+  tableHead: null,
   tableBody: null,
 };
 metricsState.historyMonthlyWindows = buildMonthlyWindows(
@@ -1790,46 +1791,65 @@ function accumulateSeries(points = []) {
 }
 
 function getLineChartData(points, width, height) {
-  const usable = points.filter((point) => point.value != null);
-  if (!usable.length) {
-    return { normalized: [], areaPath: "" };
+  if (!points.length) {
+    return { pathPoints: [], areaPath: "" };
   }
-  const values = usable.map((pt) => pt.value);
+  const values = points.map((point) => point.value).filter((value) => value != null);
+  if (!values.length) {
+    return { pathPoints: [], areaPath: "" };
+  }
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const normalized = usable.map((pt, index) => {
-    const x = usable.length > 1 ? (index / (usable.length - 1)) * width : width / 2;
-    const y = height - ((pt.value - min) / range) * height;
-    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  const total = points.length;
+  const pathPoints = [];
+  points.forEach((point, index) => {
+    if (point.value == null) return;
+    const x = total > 1 ? (index / (total - 1)) * width : width / 2;
+    const y = height - ((point.value - min) / range) * height;
+    pathPoints.push({
+      x,
+      y,
+      label: point.label || point.key || "",
+      key: point.key,
+      value: point.value,
+    });
   });
-  const startPoint = normalized[0];
-  const lineSegment = normalized.slice(1).map((point) => `L ${point}`).join(" ");
+  const pathSequence = pathPoints.map((pt) => `${pt.x},${pt.y}`);
+  const startPoint = pathSequence[0];
+  const lineSegment = pathSequence.slice(1).map((point) => `L ${point}`).join(" ");
   const areaPath = startPoint ? `M ${startPoint} ${lineSegment} L ${width},${height} L 0,${height} Z` : "";
-  return { normalized, areaPath };
+  return { pathPoints, areaPath };
 }
 
 function getColumnChartData(points, width, height) {
-  const usable = points.filter((point) => point.value != null);
-  if (!usable.length) {
+  if (!points.length) {
     return [];
   }
-  const values = usable.map((pt) => pt.value);
+  const values = points.map((point) => point.value).filter((value) => value != null);
+  if (!values.length) {
+    return [];
+  }
   const max = Math.max(...values) || 1;
-  const gap = 6;
-  const columnWidth = Math.max((width - gap * (usable.length - 1)) / usable.length, 8);
-  return usable.map((point, index) => {
-    const scaled = (point.value / max) * height;
-    const x = index * (columnWidth + gap);
-    const y = height - scaled;
-    return {
-      key: point.key,
-      x,
-      y: Math.min(y, height - 1),
-      width: columnWidth,
-      height: Math.max(scaled, 2),
-    };
-  });
+  const total = points.length;
+  const slotWidth = total ? width / total : width;
+  const columnWidth = Math.max(slotWidth * 0.6, 6);
+  return points
+    .map((point, index) => {
+      if (point.value == null) return null;
+      const scaled = (point.value / max) * height;
+      const center = total > 0 ? index * slotWidth + slotWidth / 2 : width / 2;
+      return {
+        key: point.key,
+        label: point.label || point.key || "",
+        value: point.value,
+        x: center - columnWidth / 2,
+        y: height - scaled,
+        width: columnWidth,
+        height: Math.max(scaled, 2),
+      };
+    })
+    .filter(Boolean);
 }
 
 function findExtremum(list = [], getter, lookForMax) {
@@ -1972,6 +1992,76 @@ const HISTORY_METRICS = [
     formatter: formatPercentNumber,
   },
   {
+    id: "avg_days_to_close_win",
+    title: "Avg days to close · Win",
+    description: "From start to Closed Win per month.",
+    chart: "line",
+    color: "#1abcfe",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.avg_days_to_close_win),
+    formatter: (value) => formatDaysValue(value),
+  },
+  {
+    id: "avg_days_to_close_lost",
+    title: "Avg days to close · Lost",
+    description: "From start to Closed Lost per month.",
+    chart: "line",
+    color: "#ff6b6b",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.avg_days_to_close_lost),
+    formatter: (value) => formatDaysValue(value),
+  },
+  {
+    id: "avg_days_to_first_batch_open",
+    title: "Avg days to first batch · Open",
+    description: "Open opps reaching first batch.",
+    chart: "line",
+    color: "#f7b731",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.avg_days_to_first_batch_open),
+    formatter: (value) => formatDaysValue(value),
+  },
+  {
+    id: "avg_days_to_first_batch_closed",
+    title: "Avg days to first batch · Closed",
+    description: "Closed opps reaching first batch.",
+    chart: "line",
+    color: "#f39c12",
+    goodWhenHigher: false,
+    extractor: (metrics) => safeNumber(metrics?.avg_days_to_first_batch_closed),
+    formatter: (value) => formatDaysValue(value),
+  },
+  {
+    id: "interview_rate",
+    title: "Interview rate",
+    description: "Interview-eligible candidates who advanced.",
+    chart: "line",
+    color: "#10b981",
+    goodWhenHigher: true,
+    extractor: (metrics = {}) => {
+      const eligible = safeNumber(metrics.interview_eligible_candidate_count);
+      const interviewed = safeNumber(metrics.interviewed_candidate_count);
+      if (!eligible) return null;
+      return (interviewed / eligible) * 100;
+    },
+    formatter: formatPercentNumber,
+  },
+  {
+    id: "hire_rate",
+    title: "Hire rate",
+    description: "Sent candidates that converted into hires.",
+    chart: "line",
+    color: "#f97316",
+    goodWhenHigher: true,
+    extractor: (metrics = {}) => {
+      const sent = safeNumber(metrics.sent_candidate_count);
+      const hired = safeNumber(metrics.hired_candidate_count);
+      if (!sent) return null;
+      return (hired / sent) * 100;
+    },
+    formatter: formatPercentNumber,
+  },
+  {
     id: "sent_vs_interview_ratio",
     title: "Sent vs Interviewed",
     description: "Average share of candidates interviewed vs sent.",
@@ -2002,6 +2092,8 @@ function setupTabs() {
     });
     if (target === "history") {
       refreshHistoryPanel();
+    } else {
+      hideHistoryTooltip();
     }
   };
 
@@ -2044,6 +2136,7 @@ function initializeHistoryUI() {
   historyDom.loading = document.getElementById("historyLoading");
   historyDom.grid = document.getElementById("historyGrid");
   historyDom.tableCard = document.getElementById("historyTableContainer");
+  historyDom.tableHead = document.getElementById("historyTableHead");
   historyDom.tableBody = document.getElementById("historyTableBody");
 
   if (historyDom.startInput) {
@@ -2180,6 +2273,7 @@ function resetHistoryView() {
   renderHistoryHighlights([]);
   renderHistoryCards([]);
   renderHistoryTable([]);
+  hideHistoryTooltip();
 }
 
 async function refreshHistoryPanel() {
@@ -2214,7 +2308,7 @@ async function refreshHistoryPanel() {
 
   renderHistoryHighlights(highlights);
   renderHistoryCards(cards);
-  renderHistoryTable(tableRows);
+  renderHistoryTable(tableRows, cards);
   setHistoryEmptyState(false);
 }
 
@@ -2408,35 +2502,51 @@ function renderHistoryCards(cards = []) {
   if (!cards.length) {
     historyDom.grid.innerHTML = "";
     historyDom.grid.hidden = true;
+    hideHistoryTooltip();
     return;
   }
   historyDom.grid.hidden = false;
   historyDom.grid.innerHTML = cards.map((card) => createHistoryCardMarkup(card)).join("");
+  attachHistoryHoverHandlers();
 }
 
-function renderHistoryTable(rows = []) {
-  if (!historyDom.tableCard || !historyDom.tableBody) return;
+function renderHistoryTable(rows = [], cards = []) {
+  if (!historyDom.tableCard || !historyDom.tableBody || !historyDom.tableHead) return;
   if (!rows.length) {
     historyDom.tableBody.innerHTML = "";
+    historyDom.tableHead.innerHTML = "";
     historyDom.tableCard.hidden = true;
     return;
   }
+  const columns = HISTORY_METRICS;
+  const cardLookup = cards.reduce((acc, card) => {
+    acc[card.id] = {
+      formatter: card.formatter,
+      points: card.points.reduce((map, point) => {
+        map[point.key] = point.value;
+        return map;
+      }, {}),
+    };
+    return acc;
+  }, {});
+
+  historyDom.tableHead.innerHTML =
+    "<th>Month</th>" +
+    columns.map((metric) => `<th>${metric.title}</th>`).join("");
+
   historyDom.tableCard.hidden = false;
   historyDom.tableBody.innerHTML = rows
-    .map(
-      (entry) => `
-        <tr>
-          <td>${entry.label}</td>
-          <td>${formatIntegerDisplay(safeNumber(entry.metrics?.closed_win_month ?? 0))}</td>
-          <td>${formatIntegerDisplay(safeNumber(entry.metrics?.closed_lost_month ?? 0))}</td>
-          <td>${formatPercentNumber(
-            convertPercentValue(entry.metrics?.conversion_rate_last_20)
-          )}</td>
-          <td>${formatPercentNumber(
-            convertPercentValue(entry.metrics?.avg_sent_vs_interview_ratio)
-          )}</td>
-        </tr>`
-    )
+    .map((entry) => {
+      const cells = columns
+        .map((metric) => {
+          const card = cardLookup[metric.id];
+          const value = card?.points?.[entry.monthKey];
+          const formatted = card ? card.formatter(value) : "–";
+          return `<td>${formatted}</td>`;
+        })
+        .join("");
+      return `<tr><td>${entry.label}</td>${cells}</tr>`;
+    })
     .join("");
 }
 
@@ -2449,8 +2559,8 @@ function createHistoryCardMarkup(card) {
   );
   const chartMarkup =
     card.chart === "column"
-      ? renderColumnChart(card.points, card.color)
-      : renderLineChart(card.id, card.points, card.color);
+      ? renderColumnChart(card)
+      : renderLineChart(card);
   return `
     <article class="history-card">
       <div class="history-card__header">
@@ -2480,43 +2590,175 @@ function createHistoryCardMarkup(card) {
     </article>`;
 }
 
-function renderLineChart(id, points, color) {
+function renderLineChart(card) {
   const width = 320;
-  const height = 120;
-  const { normalized, areaPath } = getLineChartData(points, width, height);
-  if (!normalized.length) {
+  const chartHeight = 120;
+  const axisHeight = 24;
+  const svgHeight = chartHeight + axisHeight;
+  const { pathPoints, areaPath } = getLineChartData(card.points, width, chartHeight);
+  if (!pathPoints.length) {
     return `<div class="history-chart__empty">No data for this range.</div>`;
   }
-  const gradientId = `historyLine-${id}`;
+  const gradientId = `historyLine-${card.id}`;
+  const ticks = buildAxisTicks(card.points, width);
+  const polylinePoints = pathPoints.map((pt) => `${pt.x},${pt.y}`).join(" ");
+  const circles = pathPoints
+    .map(
+      (pt) =>
+        `<circle class="history-point" data-history-point="true" data-history-label="${escapeAttribute(
+          pt.label
+        )}" data-history-value="${escapeAttribute(card.formatter(pt.value))}" cx="${pt.x}" cy="${pt.y}" r="5" fill="${
+          card.color
+        }" />`
+    )
+    .join("");
+  const axisMarkup = renderAxis(ticks, width, chartHeight);
   return `
-    <svg viewBox="0 0 ${width} ${height}" class="history-line" role="img" aria-hidden="true" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${width} ${svgHeight}" class="history-line" role="img" aria-hidden="true" preserveAspectRatio="none">
       <defs>
         <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity="0.35"></stop>
-          <stop offset="100%" stop-color="${color}" stop-opacity="0"></stop>
+          <stop offset="0%" stop-color="${card.color}" stop-opacity="0.35"></stop>
+          <stop offset="100%" stop-color="${card.color}" stop-opacity="0"></stop>
         </linearGradient>
       </defs>
       <path d="${areaPath}" fill="url(#${gradientId})" stroke="none"></path>
-      <polyline points="${normalized.join(" ")}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <polyline points="${polylinePoints}" fill="none" stroke="${card.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      ${circles}
+      ${axisMarkup}
     </svg>`;
 }
 
-function renderColumnChart(points, color) {
+function renderColumnChart(card) {
   const width = 320;
-  const height = 120;
-  const bars = getColumnChartData(points, width, height);
+  const chartHeight = 120;
+  const axisHeight = 24;
+  const svgHeight = chartHeight + axisHeight;
+  const bars = getColumnChartData(card.points, width, chartHeight);
   if (!bars.length) {
     return `<div class="history-chart__empty">No data for this range.</div>`;
   }
+  const ticks = buildAxisTicks(card.points, width);
+  const axisMarkup = renderAxis(ticks, width, chartHeight);
   return `
-    <svg viewBox="0 0 ${width} ${height}" class="history-column" role="img" aria-hidden="true" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${width} ${svgHeight}" class="history-column" role="img" aria-hidden="true" preserveAspectRatio="none">
       ${bars
         .map(
           (bar) =>
-            `<rect x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="6" fill="${color}" opacity="0.82"></rect>`
+            `<rect class="history-bar" data-history-point="true" data-history-label="${escapeAttribute(
+              bar.label
+            )}" data-history-value="${escapeAttribute(
+              card.formatter(bar.value)
+            )}" x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="6" fill="${card.color}" opacity="0.82"></rect>`
         )
         .join("")}
+      ${axisMarkup}
     </svg>`;
+}
+
+function renderAxis(ticks, width, chartHeight) {
+  if (!ticks.length) return "";
+  return `
+    <g class="history-axis" aria-hidden="true">
+      <line class="history-axis__line" x1="0" y1="${chartHeight}" x2="${width}" y2="${chartHeight}"></line>
+      ${ticks
+        .map(
+          (tick) => `
+        <line class="history-axis__tick" x1="${tick.x}" y1="${chartHeight}" x2="${tick.x}" y2="${chartHeight + 5}"></line>
+        <text class="history-axis__label" x="${tick.x}" y="${chartHeight + 16}">${tick.label}</text>`
+        )
+        .join("")}
+    </g>`;
+}
+
+function buildAxisTicks(points = [], width) {
+  if (!points.length) return [];
+  const total = points.length;
+  const maxTicks = Math.min(total, 6);
+  const step = Math.max(1, Math.round(total / maxTicks));
+  const ticks = [];
+  points.forEach((point, index) => {
+    const isEdge = index === 0 || index === total - 1;
+    if (index % step !== 0 && !isEdge) {
+      return;
+    }
+    const x = total > 1 ? (index / (total - 1)) * width : width / 2;
+    ticks.push({
+      x,
+      label: simplifyAxisLabel(point.label || point.key || ""),
+    });
+  });
+  return ticks;
+}
+
+function simplifyAxisLabel(label) {
+  if (!label) return "";
+  const parts = label.split(" ");
+  if (parts.length <= 2) return label;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+function escapeAttribute(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+let historyTooltipEl = null;
+
+function attachHistoryHoverHandlers() {
+  if (!historyDom.grid || historyDom.grid._historyHoverAttached) return;
+  historyDom.grid.addEventListener("pointermove", handleHistoryPointerMove);
+  historyDom.grid.addEventListener("pointerleave", hideHistoryTooltip);
+  historyDom.grid._historyHoverAttached = true;
+}
+
+function handleHistoryPointerMove(event) {
+  const target = event.target.closest("[data-history-point]");
+  if (!target) {
+    hideHistoryTooltip();
+    return;
+  }
+  showHistoryTooltip(event, {
+    label: target.getAttribute("data-history-label"),
+    value: target.getAttribute("data-history-value"),
+  });
+}
+
+function getHistoryTooltipElement() {
+  if (historyTooltipEl) return historyTooltipEl;
+  const tooltip = document.createElement("div");
+  tooltip.className = "history-tooltip";
+  tooltip.hidden = true;
+  document.body.appendChild(tooltip);
+  historyTooltipEl = tooltip;
+  return tooltip;
+}
+
+function showHistoryTooltip(event, dataset) {
+  if (!dataset) return;
+  const tooltip = getHistoryTooltipElement();
+  const label = dataset.label || "";
+  const value = dataset.value || "";
+  tooltip.innerHTML = `<strong>${label}</strong><span>${value}</span>`;
+  tooltip.hidden = false;
+  const offset = 16;
+  let x = event.clientX + offset;
+  let y = event.clientY + offset;
+  const rect = tooltip.getBoundingClientRect();
+  const maxX = window.innerWidth - rect.width - 8;
+  const maxY = window.innerHeight - rect.height - 8;
+  x = Math.min(x, maxX);
+  y = Math.min(y, maxY);
+  tooltip.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+function hideHistoryTooltip() {
+  if (historyTooltipEl) {
+    historyTooltipEl.hidden = true;
+  }
 }
 
 function computeHistoryTrend(latest, previous, goodWhenHigher, formatter) {

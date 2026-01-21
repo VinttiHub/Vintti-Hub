@@ -1663,17 +1663,8 @@ def get_candidates_light_fast():
     try:
         conn = get_connection()
         cur  = conn.cursor(cursor_factory=RealDictCursor)
-        blacklist_columns = set(_get_blacklist_columns(conn))
-        has_normalized_column = 'linkedin_normalized' in blacklist_columns
-
-        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_column = _blacklist_linkedin_source_expr(has_normalized_column, 'b')
-        b_linkedin_norm = _linkedin_normalize_sql(b_column)
-
-        params = [blacklist_filter, blacklist_filter, blacklist_filter]
-        cur.execute(f"""
+        cur.execute("""
             WITH active_or_latest AS (
-              -- Prioriza la fila ACTIVA (end_date IS NULL). Si no hay, toma la más reciente por start_date.
               SELECT DISTINCT ON (h.candidate_id)
                      h.candidate_id,
                      h.opportunity_id,
@@ -1683,84 +1674,74 @@ def get_candidates_light_fast():
               ORDER BY h.candidate_id,
                        (h.end_date IS NULL) DESC,
                        h.start_date DESC NULLS LAST
-            ),
-            normalized_candidates AS (
-              SELECT
-                c.candidate_id,
-                c.name,
-                c.country,
-                c.phone,
-                c.linkedin,
-                {c_linkedin_norm} AS linkedin_norm
-              FROM candidates c
-            ),
-            normalized_blacklist AS (
-              SELECT
-                b.blacklist_id,
-                {b_linkedin_norm} AS linkedin_norm,
-                b.candidate_id
-              FROM blacklist b
-            ),
-            candidates_with_flags AS (
-              SELECT
-                nc.candidate_id,
-                nc.name,
-                nc.country,
-                nc.phone,
-                nc.linkedin,
-                CASE
-                  WHEN a.candidate_id IS NULL THEN 'unhired'
-                  WHEN a.end_date IS NULL      THEN 'active'
-                  ELSE 'unhired'
-                END AS status,
-                CASE
-                  WHEN a.end_date IS NULL THEN o.opp_model
-                  ELSE NULL
-                END AS opp_model,
-                COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
-              FROM normalized_candidates nc
-              LEFT JOIN active_or_latest a ON a.candidate_id = nc.candidate_id
-              LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
-              LEFT JOIN LATERAL (
-                SELECT TRUE AS is_blacklisted
-                FROM normalized_blacklist nb
-                WHERE (
-                        nb.linkedin_norm IS NOT NULL
-                    AND nc.linkedin_norm IS NOT NULL
-                    AND nb.linkedin_norm = nc.linkedin_norm
-                )
-                OR (
-                    nb.candidate_id IS NOT NULL
-                    AND nc.candidate_id IS NOT NULL
-                    AND nb.candidate_id = nc.candidate_id
-                )
-                LIMIT 1
-              ) bl ON TRUE
             )
             SELECT
-              candidate_id,
-              name,
-              country,
-              phone,
-              linkedin,
-              status,
-              opp_model,
-              is_blacklisted
-            FROM candidates_with_flags
-            WHERE (%s = 'all')
-               OR (%s = 'only' AND is_blacklisted)
-               OR (%s = 'exclude' AND NOT is_blacklisted)
-            ORDER BY candidate_id DESC;
-        """, params)
+              c.candidate_id,
+              c.name,
+              c.country,
+              c.phone,
+              c.linkedin,
+              CASE
+                WHEN a.candidate_id IS NULL THEN 'unhired'
+                WHEN a.end_date IS NULL      THEN 'active'
+                ELSE 'unhired'
+              END AS status,
+              CASE
+                WHEN a.end_date IS NULL THEN o.opp_model
+                ELSE NULL
+              END AS opp_model
+            FROM candidates c
+            LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
+            LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
+            ORDER BY c.candidate_id DESC;
+        """)
 
         rows = cur.fetchall()
-        updated = _bulk_update_candidate_blacklist(
-            cur,
-            [row.get('candidate_id') for row in rows if row.get('is_blacklisted')],
-            True
-        )
-        if updated:
-            conn.commit()
+
+        blacklist_columns = set(_get_blacklist_columns(conn))
+        has_linkedin_normalized = 'linkedin_normalized' in blacklist_columns
+        select_cols = ['blacklist_id', 'candidate_id', 'linkedin']
+        if has_linkedin_normalized:
+            select_cols.append('linkedin_normalized')
+
+        cur.execute(f"SELECT {', '.join(select_cols)} FROM blacklist")
+        blacklist_entries = cur.fetchall()
+
+        blacklist_candidate_ids = {entry.get('candidate_id') for entry in blacklist_entries if entry.get('candidate_id') is not None}
+        blacklist_linkedin_norms = set()
+        for entry in blacklist_entries:
+            normalized = entry.get('linkedin_normalized') if has_linkedin_normalized else None
+            if not normalized:
+                normalized = _normalize_linkedin(entry.get('linkedin'))
+            if normalized:
+                blacklist_linkedin_norms.add(normalized)
+
+        update_ids = set()
+        for row in rows:
+            candidate_id = row.get('candidate_id')
+            linkedin_norm = _normalize_linkedin(row.get('linkedin'))
+            is_blacklisted = False
+
+            if candidate_id in blacklist_candidate_ids:
+                is_blacklisted = True
+            elif linkedin_norm and linkedin_norm in blacklist_linkedin_norms:
+                is_blacklisted = True
+
+            if is_blacklisted and candidate_id is not None:
+                update_ids.add(candidate_id)
+
+            row['is_blacklisted'] = is_blacklisted
+
+        if blacklist_filter == 'only':
+            rows = [row for row in rows if row.get('is_blacklisted')]
+        elif blacklist_filter == 'exclude':
+            rows = [row for row in rows if not row.get('is_blacklisted')]
+
+        if update_ids:
+            updated = _bulk_update_candidate_blacklist(cur, update_ids, True)
+            if updated:
+                conn.commit()
+
         cur.close(); conn.close()
         return jsonify(rows)
     except Exception as e:

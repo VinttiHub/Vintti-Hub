@@ -849,6 +849,38 @@ body {
   height:100%;
 }
 
+.history-axis{
+  pointer-events:none;
+}
+
+.history-axis__line{
+  stroke:rgba(120,97,168,0.35);
+  stroke-width:1;
+}
+
+.history-axis__tick{
+  stroke:rgba(120,97,168,0.35);
+  stroke-width:1;
+}
+
+.history-axis__label{
+  font-size:0.65rem;
+  fill:#7b6f99;
+  text-anchor:middle;
+}
+
+.history-point{
+  cursor:pointer;
+  stroke:#fff;
+  stroke-width:2;
+  pointer-events:auto;
+}
+
+.history-bar{
+  cursor:pointer;
+  pointer-events:auto;
+}
+
 .history-chart__empty{
   color:var(--text-muted);
   font-weight:600;
@@ -941,6 +973,34 @@ body {
   font-size:0.75rem;
   letter-spacing:0.05em;
   color:var(--text-muted);
+}
+
+.history-tooltip{
+  position:fixed;
+  z-index:9999;
+  background:rgba(30,16,55,0.92);
+  color:#fff;
+  padding:0.45rem 0.65rem;
+  border-radius:8px;
+  font-size:0.8rem;
+  font-weight:600;
+  pointer-events:none;
+  box-shadow:0 10px 25px rgba(16,6,32,0.35);
+  transform:translate(-50%,-50%);
+}
+
+.history-tooltip strong{
+  display:block;
+  font-size:0.75rem;
+  color:#cdd2ff;
+  margin-bottom:0.15rem;
+  text-transform:uppercase;
+  letter-spacing:0.04em;
+}
+
+.history-tooltip span{
+  font-size:0.95rem;
+  font-weight:800;
 }
 
 @media (max-width: 720px){
