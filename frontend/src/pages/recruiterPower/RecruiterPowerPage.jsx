@@ -20,6 +20,9 @@ const RESTRICTED_EMAILS = new Set([
   'agostina@vintti.com',
   'julieta@vintti.com',
 ]);
+const RESTRICTION_EXCEPTIONS = new Set([
+  'agostina@vintti.com',
+]);
 
 const RECRUITER_POWER_ALLOWED = new Set([
   'angie@vintti.com',
@@ -27,6 +30,12 @@ const RECRUITER_POWER_ALLOWED = new Set([
   'agustin@vintti.com',
   'lara@vintti.com',
 ]);
+
+const isRestrictedEmail = (email) => {
+  if (!email) return false;
+  const normalized = String(email).toLowerCase();
+  return RESTRICTED_EMAILS.has(normalized) && !RESTRICTION_EXCEPTIONS.has(normalized);
+};
 
 function RecruiterPowerPage() {
   usePageStylesheet('/assets/css/recruiter-power.css');
@@ -75,7 +84,7 @@ function RecruiterPowerPage() {
 
   useEffect(() => {
     if (!metrics.currentUserEmail) return;
-    if (RESTRICTED_EMAILS.has(metrics.currentUserEmail)) {
+    if (isRestrictedEmail(metrics.currentUserEmail)) {
       setSelectedLead(metrics.currentUserEmail);
     }
   }, [metrics.currentUserEmail, metrics.orderedLeadEmails]);
@@ -85,7 +94,7 @@ function RecruiterPowerPage() {
     if (!metrics.currentUserEmail) {
       return emails;
     }
-    if (RESTRICTED_EMAILS.has(metrics.currentUserEmail)) {
+    if (isRestrictedEmail(metrics.currentUserEmail)) {
       return emails.filter((email) => email === metrics.currentUserEmail);
     }
     return emails;

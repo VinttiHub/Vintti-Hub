@@ -19,6 +19,9 @@ const RESTRICTED_EMAILS = new Set([
   "julieta@vintti.com",
   "paz@vintti.com",
 ]);
+const RESTRICTION_EXCEPTIONS = new Set([
+  "agostina@vintti.com",
+]);
 const RECRUITER_POWER_ALLOWED = new Set([
   "angie@vintti.com",
   "agostina@vintti.com",
@@ -103,6 +106,15 @@ let previousBodyOverflow = "";
 function isoToYMD(iso) {
   if (!iso) return "";
   return String(iso).slice(0, 10);
+}
+
+function isRestrictedEmail(email) {
+  if (!email) return false;
+  const normalized = String(email).toLowerCase();
+  return (
+    RESTRICTED_EMAILS.has(normalized) &&
+    !RESTRICTION_EXCEPTIONS.has(normalized)
+  );
 }
 
 function showRangeError(msg) {
@@ -1470,7 +1482,7 @@ function populateDropdown() {
   const currentEmail = (metricsState.currentUserEmail || "").toLowerCase();
 
   // 🔒 Si el usuario está en la lista restringida, sólo ve su propia opción
-  if (currentEmail && RESTRICTED_EMAILS.has(currentEmail)) {
+  if (isRestrictedEmail(currentEmail)) {
     emails = emails.filter((e) => e.toLowerCase() === currentEmail);
   }
 
@@ -1491,7 +1503,7 @@ function populateDropdown() {
   let shouldRefreshCards = false;
 
   // Si es usuario restringido y su opción existe, la seleccionamos por defecto
-  if (currentEmail && RESTRICTED_EMAILS.has(currentEmail)) {
+  if (isRestrictedEmail(currentEmail)) {
     const ownOption = [...select.options].find(
       (o) => o.value.toLowerCase() === currentEmail
     );
