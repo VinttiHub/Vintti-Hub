@@ -64,6 +64,7 @@ const els = {
   panelBatch: document.querySelector(".candidate-panel__batch"),
   panelBody: document.querySelector(".candidate-panel__body"),
   refreshButton: document.getElementById("refreshOverview"),
+  refreshOverlay: document.getElementById("refreshOverlay"),
 };
 
 const opportunityCache = new Map();
@@ -78,8 +79,7 @@ const pageState = {
   opportunities: [],
   filter: "open",
   accountId: null,
-  rawOpportunities: [],
-  closedCache: new Map(),
+  snapshotCache: new Map(),
   refreshing: false,
 };
 
@@ -100,24 +100,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function hydratePage(accountId) {
   try {
-    const [account, opportunities, cachedClosed] = await Promise.all([
+    const [account, snapshotCache] = await Promise.all([
       fetchJSON(`${API_BASE}/accounts/${accountId}`),
-      fetchJSON(`${API_BASE}/accounts/${accountId}/opportunities`),
-      fetchClosedOpportunityCache(accountId),
+      fetchOverviewSnapshotCache(accountId),
     ]);
 
     currentAccount = account;
     updateAccountHeader(account);
-    pageState.rawOpportunities = Array.isArray(opportunities) ? opportunities : [];
-    pageState.closedCache = cachedClosed;
-    const { enriched } = await enrichWithBatches(
-      pageState.rawOpportunities,
-      cachedClosed
-    );
-    const visibleOpportunities = enriched.filter(
+    pageState.snapshotCache = snapshotCache;
+    const hydratedOpportunities = buildOpportunitiesFromSnapshots(snapshotCache);
+    const visibleOpportunities = hydratedOpportunities.filter(
       (opp) => classifyOpportunity(opp) !== "lost"
     );
     pageState.opportunities = visibleOpportunities;
+    syncOpportunityCache(visibleOpportunities);
     updateHighlights(visibleOpportunities);
     applyOpportunityFilter(pageState.filter);
   } catch (error) {
@@ -154,14 +150,25 @@ function initializeRefreshControls() {
 
 function setRefreshState(isRefreshing) {
   pageState.refreshing = Boolean(isRefreshing);
-  if (!els.refreshButton) return;
-  if (isRefreshing) {
-    els.refreshButton.disabled = true;
-    els.refreshButton.textContent = "Refreshing…";
-  } else {
-    els.refreshButton.disabled = false;
-    els.refreshButton.textContent = els.refreshButton.dataset.defaultLabel || "Refresh data";
+  if (els.refreshButton) {
+    if (isRefreshing) {
+      els.refreshButton.disabled = true;
+      els.refreshButton.textContent = "Refreshing…";
+    } else {
+      els.refreshButton.disabled = false;
+      els.refreshButton.textContent = els.refreshButton.dataset.defaultLabel || "Refresh data";
+    }
   }
+  toggleRefreshOverlay(pageState.refreshing);
+}
+
+function toggleRefreshOverlay(isVisible) {
+  const overlay = els.refreshOverlay;
+  if (!overlay) return;
+  const show = Boolean(isVisible);
+  overlay.classList.toggle("is-visible", show);
+  overlay.setAttribute("aria-hidden", show ? "false" : "true");
+  document.body.classList.toggle("refresh-active", show);
 }
 
 async function handleRefreshClick() {
@@ -169,19 +176,18 @@ async function handleRefreshClick() {
   setRefreshState(true);
   try {
     const opportunities = await fetchJSON(`${API_BASE}/accounts/${pageState.accountId}/opportunities`);
-    const closedList = Array.isArray(opportunities)
-      ? opportunities.filter((opp) => classifyOpportunity(opp) === "closed")
-      : [];
-    if (!closedList.length) {
-      console.info("No closed opportunities to refresh for this account");
+    const list = Array.isArray(opportunities) ? opportunities : [];
+    if (!list.length) {
+      console.info("No opportunities to refresh for this account");
     } else {
-      const { snapshotsToPersist } = await enrichWithBatches(closedList, new Map(), {
+      const { snapshotsToPersist } = await enrichWithBatches(list, pageState.snapshotCache, {
         forceRefreshClosed: true,
+        persistStages: ["open", "closed"],
       });
       if (snapshotsToPersist.length) {
-        await persistClosedOpportunityBatches(pageState.accountId, snapshotsToPersist);
+        await persistOverviewSnapshots(pageState.accountId, snapshotsToPersist);
       } else {
-        console.info("Closed opportunity cache already up to date");
+        console.info("Opportunity cache already up to date");
       }
     }
   } catch (error) {
@@ -205,12 +211,12 @@ async function fetchJSON(url) {
   return res.json();
 }
 
-async function fetchClosedOpportunityCache(accountId) {
+async function fetchOverviewSnapshotCache(accountId) {
   if (!accountId) return new Map();
   try {
     const res = await fetch(`${API_BASE}/accounts/${accountId}/overview-cache`);
     if (!res.ok) {
-      console.warn("Cache request failed with status", res.status);
+      console.warn("Client overview cache request failed with status", res.status);
       return new Map();
     }
     const data = await res.json();
@@ -223,12 +229,12 @@ async function fetchClosedOpportunityCache(accountId) {
     }
     return cache;
   } catch (error) {
-    console.warn("Failed to load cached closed opportunities", error);
+    console.warn("Failed to load client overview cache", error);
     return new Map();
   }
 }
 
-async function persistClosedOpportunityBatches(accountId, snapshots) {
+async function persistOverviewSnapshots(accountId, snapshots) {
   if (!accountId || !Array.isArray(snapshots) || !snapshots.length) return;
   try {
     const payload = snapshots
@@ -236,6 +242,7 @@ async function persistClosedOpportunityBatches(accountId, snapshots) {
         opportunity_id: entry.opportunity_id,
         client_overview_id: entry.client_overview_id ?? null,
         snapshot: entry.snapshot,
+        stage: entry.stage || entry.snapshot?.stage || null,
       }))
       .filter((entry) => entry.opportunity_id && entry.snapshot);
     if (!payload.length) return;
@@ -249,7 +256,7 @@ async function persistClosedOpportunityBatches(accountId, snapshots) {
       throw new Error(text || "Unknown error");
     }
   } catch (error) {
-    console.warn("Failed to persist closed opportunity cache", error);
+    console.warn("Failed to persist client overview cache", error);
   }
 }
 
@@ -268,16 +275,30 @@ function normalizeCachedSnapshot(entry) {
   const opportunity = snapshot.opportunity && typeof snapshot.opportunity === "object"
     ? snapshot.opportunity
     : null;
+  const stage = normalizeSnapshotStage(snapshot.stage ?? entry?.stage);
+  if (stage && snapshot.stage !== stage) {
+    snapshot.stage = stage;
+  }
   return {
     client_overview_id: entry?.client_overview_id ?? snapshot.client_overview_id ?? null,
+    opportunity_id: entry?.opportunity_id ?? snapshot.opportunity_id ?? null,
     batches,
     opportunity,
     rawSnapshot: snapshot,
     serialized: stableSerialize(snapshot),
+    stage,
   };
 }
 
-function makeSnapshotForPersistence(opportunity, clientOverviewId = null) {
+function normalizeSnapshotStage(value) {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "closed") return "closed";
+  if (normalized === "open") return "open";
+  return null;
+}
+
+function makeSnapshotForPersistence(opportunity, clientOverviewId = null, stage = null) {
   if (!opportunity || typeof opportunity !== "object") {
     return { opportunity: {}, batches: [] };
   }
@@ -286,6 +307,10 @@ function makeSnapshotForPersistence(opportunity, clientOverviewId = null) {
     opportunity: deepClone(opportunitySnapshot),
     batches: sanitizeBatchesForSnapshot(batches),
   };
+  const resolvedStage =
+    normalizeSnapshotStage(stage) ||
+    (classifyOpportunity(opportunity) === "closed" ? "closed" : "open");
+  snapshot.stage = resolvedStage;
   if (clientOverviewId != null) {
     snapshot.client_overview_id = clientOverviewId;
     if (snapshot.opportunity && typeof snapshot.opportunity === "object") {
@@ -385,11 +410,66 @@ function formatContact(account) {
   return nameParts.join(" ") || email;
 }
 
-async function enrichWithBatches(opportunities, closedCache = new Map(), options = {}) {
-  const list = Array.isArray(opportunities) ? opportunities : [];
-  const forceRefreshClosed = Boolean(options.forceRefreshClosed);
+function buildOpportunitiesFromSnapshots(cacheMap) {
+  if (!(cacheMap instanceof Map)) return [];
+  const opportunities = Array.from(cacheMap.values())
+    .map((entry) => snapshotEntryToOpportunity(entry))
+    .filter(Boolean);
+  return sortOpportunitiesForDisplay(opportunities);
+}
+
+function snapshotEntryToOpportunity(entry) {
+  if (!entry) return null;
+  const snapshot = entry.rawSnapshot || {};
+  const fromEntry =
+    entry.opportunity && typeof entry.opportunity === "object"
+      ? { ...entry.opportunity }
+      : null;
+  const fromSnapshot =
+    snapshot.opportunity && typeof snapshot.opportunity === "object"
+      ? { ...snapshot.opportunity }
+      : null;
+  const base = fromEntry || fromSnapshot || {};
+  const fallbackId =
+    entry.opportunity_id ??
+    base.opportunity_id ??
+    snapshot.opportunity_id ??
+    (snapshot.opportunity && snapshot.opportunity.opportunity_id) ??
+    null;
+  if (!base.opportunity_id && fallbackId != null) {
+    base.opportunity_id = fallbackId;
+  }
+  if (!base.opportunity_id) return null;
+  const batches = Array.isArray(entry.batches)
+    ? entry.batches
+    : Array.isArray(snapshot.batches)
+    ? snapshot.batches
+    : [];
+  base.batches = batches;
+  if (entry.client_overview_id != null) {
+    base.client_overview_id = entry.client_overview_id;
+  } else if (snapshot.client_overview_id != null) {
+    base.client_overview_id = snapshot.client_overview_id;
+  }
+  const normalizedStage = normalizeSnapshotStage(entry.stage ?? snapshot.stage);
+  if (normalizedStage) {
+    base.__client_overview_stage = normalizedStage;
+  }
+  return base;
+}
+
+function syncOpportunityCache(opportunities) {
+  opportunityCache.clear();
+  (Array.isArray(opportunities) ? opportunities : []).forEach((opportunity) => {
+    if (!opportunity || opportunity.opportunity_id == null) return;
+    opportunityCache.set(String(opportunity.opportunity_id), opportunity);
+  });
+}
+
+function sortOpportunitiesForDisplay(list) {
+  const source = Array.isArray(list) ? list.slice() : [];
   const stageRank = buildStageRank();
-  const sorted = list.slice().sort((a, b) => {
+  return source.sort((a, b) => {
     const rankA = stageRank.get(a?.opp_stage) ?? stageRank.get("__fallback");
     const rankB = stageRank.get(b?.opp_stage) ?? stageRank.get("__fallback");
     if (rankA !== rankB) return rankA - rankB;
@@ -397,9 +477,28 @@ async function enrichWithBatches(opportunities, closedCache = new Map(), options
     const dateB = new Date(b?.nda_signature_or_start_date || b?.created_at || 0);
     return dateB - dateA;
   });
+}
+
+async function enrichWithBatches(opportunities, snapshotCache = new Map(), options = {}) {
+  const list = Array.isArray(opportunities) ? opportunities : [];
+  const forceRefreshClosed = Boolean(options.forceRefreshClosed);
+  const stagesToPersist =
+    Array.isArray(options.persistStages) && options.persistStages.length
+      ? options.persistStages
+      : ["closed"];
+  const persistStages = new Set(
+    stagesToPersist
+      .map((stage) => normalizeSnapshotStage(stage))
+      .filter(Boolean)
+  );
+  if (!persistStages.size) {
+    persistStages.add("closed");
+  }
+
+  const sorted = sortOpportunitiesForDisplay(list);
 
   const enriched = [];
-  const cacheMap = closedCache instanceof Map ? closedCache : new Map();
+  const cacheMap = snapshotCache instanceof Map ? snapshotCache : new Map();
   const snapshotsToPersist = [];
   for (const opp of sorted) {
     const item = { ...opp, batches: [] };
@@ -429,12 +528,16 @@ async function enrichWithBatches(opportunities, closedCache = new Map(), options
             try {
               const batchCandidates = await fetchJSON(`${API_BASE}/batches/${batch.batch_id}/candidates`);
               const normalizedCandidates = Array.isArray(batchCandidates)
-                ? batchCandidates.map((candidate) => ({
-                    ...candidate,
-                    batch_status: candidate.status || candidate.stage || "",
-                    batch_number: batch.batch_number,
-                    presentation_date: batch.presentation_date,
-                  }))
+                ? batchCandidates.map((candidate) => {
+                    const normalizedTests = normalizeCandidateTests(candidate?.tests_documents_s3);
+                    return {
+                      ...candidate,
+                      batch_status: candidate.status || candidate.stage || "",
+                      batch_number: batch.batch_number,
+                      presentation_date: batch.presentation_date,
+                      tests_documents_s3: normalizedTests,
+                    };
+                  })
                 : [];
               enrichedBatches.push({ ...batch, candidates: normalizedCandidates });
             } catch (err) {
@@ -447,22 +550,31 @@ async function enrichWithBatches(opportunities, closedCache = new Map(), options
       } catch (error) {
         console.warn(`Batches not available for opportunity ${opp.opportunity_id}`, error);
       }
+    }
 
-      if (classification === "closed" && forceRefreshClosed) {
-        const snapshot = makeSnapshotForPersistence(
-          item,
-          cachedEntry?.client_overview_id ?? item.client_overview_id ?? null
-        );
-        const previousSerialized = cachedEntry?.serialized || null;
-        const nextSerialized = stableSerialize(snapshot);
-        if (previousSerialized !== nextSerialized) {
-          snapshotsToPersist.push({
-            opportunity_id: item.opportunity_id,
-            client_overview_id: cachedEntry?.client_overview_id ?? null,
-            snapshot,
-          });
-        }
+    if (persistStages.has(classification)) {
+      const snapshot = makeSnapshotForPersistence(
+        item,
+        cachedEntry?.client_overview_id ?? item.client_overview_id ?? null,
+        classification
+      );
+      const previousSerialized = cachedEntry?.serialized || null;
+      const nextSerialized = stableSerialize(snapshot);
+      if (previousSerialized !== nextSerialized) {
+        snapshotsToPersist.push({
+          opportunity_id: item.opportunity_id,
+          client_overview_id: cachedEntry?.client_overview_id ?? null,
+          snapshot,
+          stage: snapshot.stage,
+        });
       }
+    }
+
+    if (
+      !item.__client_overview_stage &&
+      (classification === "open" || classification === "closed")
+    ) {
+      item.__client_overview_stage = classification;
     }
     enriched.push(item);
     opportunityCache.set(String(item.opportunity_id), item);
@@ -663,6 +775,10 @@ function getOpportunityTimeline(opportunity) {
 }
 
 function classifyOpportunity(opportunity) {
+  const overrideStage = normalizeSnapshotStage(
+    opportunity?.__client_overview_stage ?? opportunity?.stage_override
+  );
+  if (overrideStage) return overrideStage;
   const stage = normalizeStage(opportunity?.opp_stage);
   if (LOST_STAGES.has(stage) || stage.includes("lost")) return "lost";
   if (CLOSED_WIN_STAGES.has(stage)) return "closed";
@@ -800,6 +916,8 @@ function buildCandidateCard(candidate, batch) {
   const statusChip = buildStatusChip(statusLabel, statusRaw);
   const countryLabel = formatCandidateCountry(candidate);
   const batchNumber = candidate?.batch_number || batch?.batch_number;
+  const testsDocuments = normalizeCandidateTests(candidate?.tests_documents_s3);
+  const testsSection = renderCandidateTestsSection(testsDocuments);
 
   card.innerHTML = `
     <header>
@@ -819,6 +937,7 @@ function buildCandidateCard(candidate, batch) {
       <li><span>Country</span>${countryLabel}</li>
       <li><span>Email</span>${candidate.email ? `<a href="mailto:${candidate.email}">${candidate.email}</a>` : "—"}</li>
     </ul>
+    ${testsSection}
     <div class="candidate-actions">
       <a class="primary" href="${resumeUrl}" target="_blank" rel="noopener">Client resume ↗</a>
       ${
@@ -967,4 +1086,141 @@ function normalizeText(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeCandidateTests(rawValue) {
+  if (!rawValue) return [];
+  let entries = rawValue;
+  if (typeof rawValue === "string") {
+    try {
+      entries = JSON.parse(rawValue);
+    } catch (error) {
+      return [];
+    }
+  }
+  if (!Array.isArray(entries)) return [];
+  const normalized = [];
+  entries.forEach((entry) => {
+    if (!entry && entry !== "") return;
+    if (typeof entry === "string") {
+      const label = entry.split("/").pop() || entry;
+      normalized.push({
+        key: entry,
+        name: label,
+        url: entry.startsWith("http") ? entry : null,
+      });
+      return;
+    }
+    if (typeof entry === "object") {
+      const key = entry.key && typeof entry.key === "string" ? entry.key : null;
+      const url = entry.url && typeof entry.url === "string" ? entry.url : null;
+      const nameFromKey = key ? key.split("/").pop() : null;
+      const name =
+        (entry.name && String(entry.name).trim()) || nameFromKey || (url || "Document");
+      const sizeValue = Number(entry.size);
+      normalized.push({
+        key,
+        name,
+        url,
+        content_type:
+          entry.content_type && typeof entry.content_type === "string"
+            ? entry.content_type
+            : null,
+        size: Number.isFinite(sizeValue) ? sizeValue : null,
+        uploaded_at:
+          entry.uploaded_at && typeof entry.uploaded_at === "string"
+            ? entry.uploaded_at
+            : null,
+        uploaded_by:
+          entry.uploaded_by && typeof entry.uploaded_by === "string"
+            ? entry.uploaded_by
+            : null,
+      });
+    }
+  });
+  return normalized;
+}
+
+function renderCandidateTestsSection(documents) {
+  const normalized = Array.isArray(documents) ? documents.filter(Boolean) : [];
+  if (!normalized.length) return "";
+  const items = normalized
+    .map((doc, index) => renderCandidateTestRow(doc, index))
+    .filter(Boolean)
+    .join("");
+  if (!items) return "";
+  return `
+    <section class="candidate-tests" aria-label="Tests and supporting files">
+      <p class="candidate-tests__title">Tests & assessments</p>
+      <ul class="candidate-tests__list">
+        ${items}
+      </ul>
+    </section>
+  `;
+}
+
+function renderCandidateTestRow(doc, index = 0) {
+  if (!doc) return "";
+  const title =
+    (doc.name && String(doc.name).trim()) ||
+    (doc.key && String(doc.key).split("/").pop()) ||
+    `Document ${index + 1}`;
+  const escapedTitle = escapeHTML(title);
+  const link = doc.url
+    ? `<a href="${doc.url}" target="_blank" rel="noopener">${escapedTitle}</a>`
+    : `<span>${escapedTitle}</span>`;
+  const metaText = buildCandidateTestMeta(doc);
+  const badge = buildCandidateTestBadge(doc);
+  return `
+    <li>
+      <div>
+        <p class="candidate-tests__name">${link}</p>
+        ${metaText ? `<p class="candidate-tests__meta">${metaText}</p>` : ""}
+      </div>
+      ${badge}
+    </li>
+  `;
+}
+
+function buildCandidateTestMeta(doc) {
+  const parts = [];
+  const uploaded = doc.uploaded_at ? formatCandidateTestDate(doc.uploaded_at) : "";
+  if (uploaded) parts.push(`Uploaded ${uploaded}`);
+  const sizeLabel = formatCandidateTestSize(doc.size);
+  if (sizeLabel) parts.push(sizeLabel);
+  const owner =
+    doc.uploaded_by && String(doc.uploaded_by).trim()
+      ? `By ${escapeHTML(String(doc.uploaded_by).trim())}`
+      : "";
+  if (owner) parts.push(owner);
+  return parts.join(" • ");
+}
+
+function buildCandidateTestBadge(doc) {
+  const type =
+    doc?.content_type && typeof doc.content_type === "string"
+      ? doc.content_type.split("/").pop()
+      : null;
+  if (!type) return "";
+  return `<span class="candidate-tests__badge">${escapeHTML(type.toUpperCase())}</span>`;
+}
+
+function formatCandidateTestDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date)) return "";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatCandidateTestSize(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const precision = size >= 10 ? 0 : 1;
+  return `${size.toFixed(precision)} ${units[unitIndex]}`;
 }

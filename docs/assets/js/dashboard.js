@@ -778,7 +778,14 @@ function openActiveEmployeesDetail(modelKey){
   if (!summary || !modelKey || !summary[modelKey]) return;
   const bucket = summary[modelKey];
   const accounts = Array.isArray(bucket.accounts) ? bucket.accounts.slice() : [];
-  accounts.sort((a, b) => (Number(b?.count) || 0) - (Number(a?.count) || 0));
+  const labelForAccount = (row) => (row?.client_name || '').trim() || `Account #${row?.account_id ?? '—'}`;
+  accounts.sort((a, b) => {
+    const nameA = labelForAccount(a).toLowerCase();
+    const nameB = labelForAccount(b).toLowerCase();
+    if (nameA < nameB) return -1;
+    if (nameA > nameB) return 1;
+    return 0;
+  });
 
   const container = document.createElement('div');
   const totalRow = document.createElement('div');
@@ -793,7 +800,7 @@ function openActiveEmployeesDetail(modelKey){
     emptyLabel: 'No active employees for this model.',
     searchValue: (row) => String(row?.client_name || '').toLowerCase(),
     rowRenderer: (row) => {
-      const label = (row?.client_name || '').trim() || `Account #${row?.account_id ?? '—'}`;
+      const label = labelForAccount(row);
       return [label, fmtInteger(row?.count || 0)];
     }
   });

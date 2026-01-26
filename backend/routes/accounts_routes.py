@@ -19,6 +19,13 @@ from utils.storage_utils import (
 bp = Blueprint('accounts', __name__)
 
 
+def normalize_overview_stage(value):
+    stage = str(value or '').strip().lower()
+    if stage == 'closed':
+        return 'closed'
+    return 'open'
+
+
 def fetch_data_from_table(table_name):
     try:
         conn = get_connection()
@@ -153,6 +160,7 @@ def get_account_overview_cache(account_id):
         for row in rows:
             client_overview_id, acc_id, opportunity_id, data = row
             decoded = None
+            stage = None
             if data:
                 try:
                     decoded = json.loads(data)
@@ -161,13 +169,20 @@ def get_account_overview_cache(account_id):
                         "Failed to decode candidates_batches for account %s opportunity %s",
                         account_id,
                         opportunity_id,
-                    )
+                )
+            if isinstance(decoded, dict):
+                raw_stage = decoded.get('stage')
+                if raw_stage is not None:
+                    normalized = str(raw_stage).strip().lower()
+                    if normalized in ('open', 'closed'):
+                        stage = normalized
             payload.append(
                 {
                     "client_overview_id": client_overview_id,
                     "account_id": acc_id,
                     "opportunity_id": opportunity_id,
                     "snapshot": decoded,
+                    "stage": stage,
                 }
             )
         cursor.close()
@@ -204,6 +219,8 @@ def upsert_account_overview_cache(account_id):
             if not isinstance(snapshot, dict):
                 skipped += 1
                 continue
+            stage = normalize_overview_stage(entry.get('stage') or snapshot.get('stage'))
+            snapshot['stage'] = stage
 
             cursor.execute(
                 """

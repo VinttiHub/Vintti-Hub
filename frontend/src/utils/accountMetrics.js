@@ -54,7 +54,7 @@ export function deriveContractFromHires(hires = []) {
   let hasRecruitingOrBuyout = false;
 
   for (const hire of hires) {
-    if (!hire) continue;
+    if (!hire || !isActiveHire(hire)) continue;
     const model = (hire.opp_model || '').toLowerCase();
     if (model.includes('staff')) hasStaffing = true;
     if (model.includes('recruit')) hasRecruitingOrBuyout = true;

@@ -28,6 +28,8 @@ const RECRUITER_POWER_ALLOWED = new Set([
   "agustin@vintti.com",
   "lara@vintti.com"
 ]);
+const GLOBAL_AVERAGE_KEY = "__all_recruiters_average__";
+const GLOBAL_AVERAGE_LABEL = "All recruiters · average view";
 
 const metricsState = {
   byLead: {},            // { email: { ...metrics } }
@@ -57,6 +59,7 @@ const metricsState = {
   historyLoading: false,
   activeTab: "summary",
   historyDetailCache: {},
+  globalAverageSummary: null,
 };
 const HISTORY_START_YEAR = 2025;
 const HISTORY_START_MONTH_INDEX = 0;
@@ -339,11 +342,6 @@ function getLeadLabel(email, state = metricsState) {
 }
 
 /* 🌟 NUEVO: helpers de animación numérica */
-function parseIntSafe(text) {
-  const n = parseInt(String(text).replace(/[^\d-]/g, ""), 10);
-  return Number.isNaN(n) ? 0 : n;
-}
-
 function parseFloatSafe(text) {
   const n = parseFloat(String(text).replace(/[^\d.-]/g, ""));
   return Number.isNaN(n) ? 0 : n;
@@ -367,6 +365,11 @@ function formatRatioSubtext(numerator, denominator) {
   const safeNum = Number(numerator || 0).toLocaleString("en-US");
   const safeDen = Number(denominator || 0).toLocaleString("en-US");
   return `(${safeNum} / ${safeDen})`;
+}
+function formatAverageCount(value) {
+  if (value == null || Number.isNaN(value)) return "0";
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 function formatDisplayDate(dateString) {
   if (!dateString) return "";
@@ -969,7 +972,9 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     }
     case "churnRange": {
       const churnEntries = getLeadChurnDetails(effectiveLead);
-      const lifetimeHires = Number(selectedMetrics.hire_total_lifetime ?? 0);
+      const lifetimeHires = Number(
+        selectedMetrics.closed_win_total ?? selectedMetrics.hire_total_lifetime ?? 0
+      );
       const churnTotal = Number(selectedMetrics.churn_total ?? 0);
       let churnRate = null;
       if (typeof selectedMetrics.churn_lifetime_rate === "number") {
@@ -1013,6 +1018,276 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     default:
       return null;
   }
+}
+
+const TEAM_METRIC_DETAIL_CONFIG = {
+  closedWinRange: {
+    title: "Closed Win · Selected range",
+    aggregator: "average",
+    metricKey: "closed_win_month",
+    getValue: (row) => safeNumber(row?.closed_win_month),
+    formatValue: (value) => formatIntegerDisplay(value),
+    summaryLabel: "Team average",
+    formatSummaryValue: (value) => formatAverageCount(value),
+  },
+  closedLostRange: {
+    title: "Closed Lost · Selected range",
+    aggregator: "average",
+    metricKey: "closed_lost_month",
+    getValue: (row) => safeNumber(row?.closed_lost_month),
+    formatValue: (value) => formatIntegerDisplay(value),
+    summaryLabel: "Team average",
+    formatSummaryValue: (value) => formatAverageCount(value),
+  },
+  closedWinTotal: {
+    title: "Total Closed Win",
+    aggregator: "sum",
+    metricKey: "closed_win_total",
+    getValue: (row) => safeNumber(row?.closed_win_total),
+    formatValue: (value) => formatIntegerDisplay(value),
+    summaryLabel: "Team total",
+  },
+  closedLostTotal: {
+    title: "Total Closed Lost",
+    aggregator: "sum",
+    metricKey: "closed_lost_total",
+    getValue: (row) => safeNumber(row?.closed_lost_total),
+    formatValue: (value) => formatIntegerDisplay(value),
+    summaryLabel: "Team total",
+  },
+  conversionRange: {
+    title: "Conversion · Last 30 Days",
+    aggregator: "average",
+    metricKey: "conversion_rate_last_20",
+    getValue: (row) => safeNumber(row?.conversion_rate_last_20),
+    formatValue: (value) => formatPercent(value),
+  },
+  conversionLifetime: {
+    title: "Conversion · Lifetime",
+    aggregator: "average",
+    metricKey: "conversion_rate_lifetime",
+    getValue: (row) => safeNumber(row?.conversion_rate_lifetime),
+    formatValue: (value) => formatPercent(value),
+  },
+  avgCloseWin: {
+    title: "Average days to close (Win)",
+    aggregator: "average",
+    metricKey: "avg_days_to_close_win",
+    getValue: (row) => safeNumber(row?.avg_days_to_close_win),
+    formatValue: (value) => formatDaysValue(value),
+  },
+  avgCloseLost: {
+    title: "Average days to close (Lost)",
+    aggregator: "average",
+    metricKey: "avg_days_to_close_lost",
+    getValue: (row) => safeNumber(row?.avg_days_to_close_lost),
+    formatValue: (value) => formatDaysValue(value),
+  },
+  avgBatchOpen: {
+    title: "Average days to first batch (Open)",
+    aggregator: "average",
+    metricKey: "avg_days_to_first_batch_open",
+    getValue: (row) => safeNumber(row?.avg_days_to_first_batch_open),
+    formatValue: (value) => formatDaysValue(value),
+  },
+  avgBatchClosed: {
+    title: "Average days to first batch (Closed)",
+    aggregator: "average",
+    metricKey: "avg_days_to_first_batch_closed",
+    getValue: (row) => safeNumber(row?.avg_days_to_first_batch_closed),
+    formatValue: (value) => formatDaysValue(value),
+  },
+  interviewRate: {
+    title: "Interview rate",
+    aggregator: "average",
+    getValue: (row, leadKey, state) => {
+      const insights = computeInterviewPipelineInsights(getPipelineDetails(leadKey, state));
+      const pct = insights.pct ?? safeNumber(row?.interview_rate?.pct);
+      return {
+        value: pct,
+        meta: {
+          numerator: insights.greenCount,
+          denominator: insights.totalEligible,
+        },
+      };
+    },
+    getSummaryValue: (metrics) => safeNumber(metrics?.interview_rate?.pct),
+    formatValue: (value) => formatPercent(value),
+    buildMeta: ({ metaContext, calcLabel }) => {
+      const ratioText = formatRatioSubtext(metaContext?.numerator, metaContext?.denominator);
+      return ratioText ? `${calcLabel} · ${ratioText}` : calcLabel;
+    },
+  },
+  hireRate: {
+    title: "Hire rate",
+    aggregator: "average",
+    getValue: (row, leadKey, state) => {
+      const insights = computeHirePipelineInsights(getPipelineDetails(leadKey, state));
+      const pct = insights.pct ?? safeNumber(row?.hire_rate?.pct);
+      return {
+        value: pct,
+        meta: {
+          numerator: insights.greenCount,
+          denominator: insights.totalSent,
+        },
+      };
+    },
+    getSummaryValue: (metrics) => safeNumber(metrics?.hire_rate?.pct),
+    formatValue: (value) => formatPercent(value),
+    buildMeta: ({ metaContext, calcLabel }) => {
+      const ratioText = formatRatioSubtext(metaContext?.numerator, metaContext?.denominator);
+      return ratioText ? `${calcLabel} · ${ratioText}` : calcLabel;
+    },
+  },
+  sentVsInterview: {
+    title: "Sent vs Interviewed",
+    aggregator: "average",
+    metricKey: "avg_sent_vs_interview_ratio",
+    getValue: (row) => safeNumber(row?.avg_sent_vs_interview_ratio),
+    formatValue: (value) => formatPercent(value),
+    buildMeta: ({ row, calcLabel }) => {
+      const sample = row?.sent_vs_interview_sample_count || 0;
+      const totals = row?.sent_vs_interview_totals || {};
+      const sent = Number(totals.sent ?? 0);
+      const interviewed = totals.interviewed;
+      const interviewedDisplay =
+        interviewed === null || interviewed === undefined || Number.isNaN(Number(interviewed))
+          ? "—"
+          : Number(interviewed);
+      const parts = [calcLabel];
+      if (sample) parts.push(`Sample: ${sample} opp${sample === 1 ? "" : "s"}`);
+      parts.push(`Totals: ${sent} sent / ${interviewedDisplay} interviewed`);
+      return parts.join(" · ");
+    },
+  },
+  churnRange: {
+    title: "Total churn · Lifetime",
+    aggregator: "sum",
+    metricKey: "churn_total",
+    getValue: (row) => ({
+      value: safeNumber(row?.churn_total),
+      meta: {
+        hires: row?.closed_win_total ?? row?.hire_total_lifetime ?? 0,
+        rate: typeof row?.churn_lifetime_rate === "number" ? row.churn_lifetime_rate : null,
+      },
+    }),
+    formatValue: (value) => formatIntegerDisplay(value),
+    summaryLabel: "Team total",
+    buildMeta: ({ metaContext, calcLabel }) => {
+      const parts = [calcLabel];
+      if (metaContext?.hires != null) parts.push(`Hires: ${metaContext.hires}`);
+      if (metaContext?.rate != null) parts.push(`Rate: ${formatPercent(metaContext.rate)}`);
+      return parts.join(" · ");
+    },
+  },
+  churn90Days: {
+    title: "Total churn · 90-day tenure",
+    aggregator: "sum",
+    metricKey: "left90_total",
+    getValue: (row) => ({
+      value: safeNumber(row?.left90_total ?? row?.left90_within_90),
+      meta: {
+        rate: typeof row?.left90_rate === "number" ? row.left90_rate : null,
+        known: row?.left90_tenure_known ?? 0,
+        missing: row?.left90_tenure_unknown ?? 0,
+      },
+    }),
+    formatValue: (value) => formatIntegerDisplay(value),
+    summaryLabel: "Team total",
+    buildMeta: ({ metaContext, calcLabel }) => {
+      const parts = [calcLabel];
+      if (metaContext?.rate != null) parts.push(`Rate: ${formatPercent(metaContext.rate)}`);
+      parts.push(`Known: ${metaContext?.known ?? 0}`);
+      parts.push(`Missing: ${metaContext?.missing ?? 0}`);
+      return parts.join(" · ");
+    },
+  },
+};
+
+function normalizeAverageDetailValue(result) {
+  if (result && typeof result === "object" && Object.prototype.hasOwnProperty.call(result, "value")) {
+    return {
+      value: result.value,
+      meta: result.meta || null,
+    };
+  }
+  return { value: result, meta: null };
+}
+
+function buildAverageDetailModalPayload(type, overrides = {}, state = metricsState) {
+  const config = TEAM_METRIC_DETAIL_CONFIG[type];
+  const summary = state.globalAverageSummary;
+  if (!config || !summary) return null;
+  const leads = (state.orderedLeadEmails || []).filter((email) => state.byLead[email]);
+  if (!leads.length) return null;
+  const calcLabel = config.aggregator === "sum" ? "Adds to team total" : "Included in average calculation";
+  const items = [];
+  leads.forEach((leadKey) => {
+    const row = state.byLead[leadKey];
+    if (!row) return;
+    const raw = typeof config.getValue === "function" ? config.getValue(row, leadKey, state) : null;
+    const { value, meta } = normalizeAverageDetailValue(raw);
+    if (value == null) return;
+    const itemFormatter =
+      typeof config.formatValue === "function"
+        ? config.formatValue
+        : (val) => String(val);
+    const formattedValue = itemFormatter(value, row, leadKey, state);
+    const metaText =
+      typeof config.buildMeta === "function"
+        ? config.buildMeta({ row, leadKey, state, value, formattedValue, metaContext: meta, calcLabel })
+        : calcLabel;
+    items.push({
+      key: leadKey,
+      primary: getLeadLabel(leadKey, state),
+      secondary: formattedValue,
+      meta: metaText,
+    });
+  });
+  items.sort((a, b) => a.primary.localeCompare(b.primary, undefined, { sensitivity: "base" }));
+
+  if (!items.length) {
+    return {
+      title: config.title,
+      context: "Aggregated team view. No recruiter metrics recorded yet.",
+      summaryLines: [],
+      items: [],
+      emptyMessage: "No recruiter metrics contributed to this calculation yet.",
+    };
+  }
+
+  const summaryMetrics = summary.metrics || {};
+  let summaryValue = null;
+  if (typeof config.getSummaryValue === "function") {
+    summaryValue = config.getSummaryValue(summaryMetrics, summary);
+  } else if (config.metricKey) {
+    summaryValue = summaryMetrics[config.metricKey];
+  }
+  const summaryLabel = config.summaryLabel || (config.aggregator === "sum" ? "Team total" : "Team average");
+  const summaryFormatter =
+    typeof config.formatSummaryValue === "function"
+      ? config.formatSummaryValue
+      : typeof config.formatValue === "function"
+      ? config.formatValue
+      : (val) => String(val);
+  const formattedSummary = summaryValue == null ? "–" : summaryFormatter(summaryValue);
+  const contributorCount = items.length;
+  const summaryLines = [
+    `${summaryLabel}: ${formattedSummary}`,
+    config.aggregator === "sum"
+      ? `Calculation: Sum of ${contributorCount} recruiter${contributorCount === 1 ? "" : "s"}.`
+      : `Calculation: Average of ${contributorCount} recruiter${contributorCount === 1 ? "" : "s"}.`,
+  ];
+  const context =
+    overrides.context ||
+    `Aggregated across ${summary.leadCount} recruiter${summary.leadCount === 1 ? "" : "s"} for this metric.`;
+  return {
+    title: config.title,
+    context,
+    summaryLines,
+    items,
+    emptyMessage: "No recruiter metrics contributed to this calculation yet.",
+  };
 }
 function renderDetailModalContent(detail) {
   if (!detailModalRefs.root) return;
@@ -1097,8 +1372,14 @@ function setupMetricDetailModal() {
   });
 }
 function requestMetricDetail(kind, overrides = {}, sourceState = metricsState) {
-  if (!kind || !metricsState.selectedLead) return;
-  const detail = buildDetailModalPayload(kind, overrides, sourceState);
+  if (!kind) return;
+  let detail = null;
+  if (metricsState.selectedLead) {
+    detail = buildDetailModalPayload(kind, overrides, sourceState);
+  } else if (metricsState.globalAverageSummary) {
+    detail = buildAverageDetailModalPayload(kind, overrides, sourceState);
+  }
+  if (!detail) return;
   if (detail) {
     if (overrides.titleSuffix) {
       detail.title = `${detail.title || "Metric detail"} · ${overrides.titleSuffix}`;
@@ -1134,10 +1415,15 @@ function wireMetricDetailCards() {
 }
 
 function updateCardsForLead(hrLeadEmail) {
-  const key = (hrLeadEmail || "").toLowerCase();
-  const m = metricsState.byLead[key];
-  metricsState.selectedLead = key || "";
-  setDetailCardsEnabled(Boolean(key && m));
+  const normalizedKey = (hrLeadEmail || "").toLowerCase();
+  const isAverageView = !normalizedKey;
+  const effectiveKey = isAverageView ? GLOBAL_AVERAGE_KEY : normalizedKey;
+  const m = metricsState.byLead[effectiveKey];
+  const averageSummary = metricsState.globalAverageSummary;
+  const isAverageActive = isAverageView && Boolean(averageSummary && m);
+  metricsState.selectedLead = isAverageView ? "" : normalizedKey;
+  const canShowDetails = Boolean(m && (!isAverageView || isAverageActive));
+  setDetailCardsEnabled(canShowDetails);
 
   const winMonthEl = $("#closedWinMonthValue");
   const lostMonthEl = $("#closedLostMonthValue");
@@ -1169,7 +1455,9 @@ function updateCardsForLead(hrLeadEmail) {
     lostTotalEl.textContent = "–";
     convEl.textContent = "–";
     helperEl.textContent =
-      "No data available for this recruiter yet. Keep an eye on new opportunities!";
+      isAverageView
+        ? "Team average will appear once recruiter metrics finish loading."
+        : "No data available for this recruiter yet. Keep an eye on new opportunities!";
     if (convLifetimeEl) convLifetimeEl.textContent = "–";
     if (churnTotalEl) churnTotalEl.textContent = "–";
     if (churnTotalHelperEl)
@@ -1195,24 +1483,46 @@ function updateCardsForLead(hrLeadEmail) {
     return;
   }
 
-  const pipelineEntries = getPipelineDetails(key);
-  const interviewInsights = computeInterviewPipelineInsights(pipelineEntries);
-  const hireInsights = computeHirePipelineInsights(pipelineEntries);
+  const pipelineEntries = isAverageActive ? [] : getPipelineDetails(effectiveKey);
+  const interviewInsights = isAverageActive
+    ? averageSummary?.interviewInsights || createEmptyInterviewInsights()
+    : computeInterviewPipelineInsights(pipelineEntries);
+  const hireInsights = isAverageActive
+    ? averageSummary?.hireInsights || createEmptyHireInsights()
+    : computeHirePipelineInsights(pipelineEntries);
+  const averageHelperLabel = isAverageActive
+    ? averageSummary?.leadCount
+      ? `Average per recruiter (${averageSummary.leadCount})`
+      : "Average per recruiter"
+    : "";
+  const averageHelperPrefix = averageHelperLabel ? `${averageHelperLabel} · ` : "";
+  const totalHelperLabel = isAverageActive
+    ? averageSummary?.leadCount
+      ? `Team total (${averageSummary.leadCount} recruiter${averageSummary.leadCount === 1 ? "" : "s"})`
+      : "Team total"
+    : "";
+  const totalHelperPrefix = totalHelperLabel ? `${totalHelperLabel} · ` : "";
+  const countFormatter = isAverageActive
+    ? (value) => formatIntegerDisplay(value)
+    : (value) => Math.round(value);
+  const sumFormatter = isAverageActive
+    ? (value) => formatIntegerDisplay(value)
+    : (value) => Math.round(value);
 
   /* 🌟 NUEVO: animamos los números en vez de cambiarlos brusco */
 
   // --- Closed Win · This Month ---
   const newWinMonth = m.closed_win_month ?? 0;
-  const fromWinMonth = parseIntSafe(winMonthEl.textContent);
+  const fromWinMonth = parseFloatSafe(winMonthEl.textContent);
   animateValue(winMonthEl, fromWinMonth, newWinMonth, {
-    formatter: (v) => Math.round(v),
+    formatter: countFormatter,
   });
 
   // --- Closed Lost · This Month ---
   const newLostMonth = m.closed_lost_month ?? 0;
-  const fromLostMonth = parseIntSafe(lostMonthEl.textContent);
+  const fromLostMonth = parseFloatSafe(lostMonthEl.textContent);
   animateValue(lostMonthEl, fromLostMonth, newLostMonth, {
-    formatter: (v) => Math.round(v),
+    formatter: countFormatter,
   });
 
   /* ✅ COMPARACIÓN CON MES ANTERIOR (texto, sin animación numérica) */
@@ -1234,16 +1544,16 @@ function updateCardsForLead(hrLeadEmail) {
 
   // --- Total Closed Win ---
   const newWinTotal = m.closed_win_total ?? 0;
-  const fromWinTotal = parseIntSafe(winTotalEl.textContent);
+  const fromWinTotal = parseFloatSafe(winTotalEl.textContent);
   animateValue(winTotalEl, fromWinTotal, newWinTotal, {
-    formatter: (v) => Math.round(v),
+    formatter: sumFormatter,
   });
 
   // --- Total Closed Lost ---
   const newLostTotal = m.closed_lost_total ?? 0;
-  const fromLostTotal = parseIntSafe(lostTotalEl.textContent);
+  const fromLostTotal = parseFloatSafe(lostTotalEl.textContent);
   animateValue(lostTotalEl, fromLostTotal, newLostTotal, {
-    formatter: (v) => Math.round(v),
+    formatter: sumFormatter,
   });
 
   // --- Conversion · Last 30 days (antes “Last 20”) ---
@@ -1261,10 +1571,17 @@ function updateCardsForLead(hrLeadEmail) {
   const total = m.last_20_count ?? 0;
   const wins = m.last_20_win ?? 0;
   if (total === 0) {
-    helperEl.textContent =
-      "No closed opportunities in the last 30 days to compute this rate.";
+    helperEl.textContent = isAverageActive
+      ? "Team average unavailable: no closed opportunities recorded in this window."
+      : "No closed opportunities in the last 30 days to compute this rate.";
   } else {
-    helperEl.textContent = `Selected range: ${wins} Closed Win out of ${total} closed opportunities.`;
+    if (isAverageActive) {
+      helperEl.textContent = `${averageHelperLabel || "Average per recruiter"}: ${formatAverageCount(
+        wins
+      )} Closed Win out of ${formatAverageCount(total)} closed opportunities.`;
+    } else {
+      helperEl.textContent = `Selected range: ${wins} Closed Win out of ${total} closed opportunities.`;
+    }
   }
 
   // --- 🌟 NUEVO: Conversion · Lifetime ---
@@ -1350,6 +1667,9 @@ function updateCardsForLead(hrLeadEmail) {
       interviewInsights.greenCount,
       interviewInsights.totalEligible
     );
+    if (isAverageActive && interviewHelperEl.textContent) {
+      interviewHelperEl.textContent = `${averageHelperPrefix}${interviewHelperEl.textContent}`;
+    }
   }
 
   if (hireRateEl && hireHelperEl) {
@@ -1369,6 +1689,9 @@ function updateCardsForLead(hrLeadEmail) {
       hireInsights.greenCount,
       hireInsights.totalSent
     );
+    if (isAverageActive && hireHelperEl.textContent) {
+      hireHelperEl.textContent = `${averageHelperPrefix}${hireHelperEl.textContent}`;
+    }
   }
 
   if (sentVsInterviewEl && sentVsInterviewHelperEl) {
@@ -1392,43 +1715,61 @@ function updateCardsForLead(hrLeadEmail) {
       Number.isNaN(Number(interviewedRaw))
         ? "—"
         : Number(interviewedRaw);
+    const interviewedNumber = interviewedDisplay === "—" ? null : Number(interviewedDisplay);
     if (!sampleCount) {
-      sentVsInterviewHelperEl.textContent =
-        "No opportunities with recruiter interview counts yet.";
+      sentVsInterviewHelperEl.textContent = isAverageActive
+        ? "Team average unavailable: no recruiter interview logs recorded in this window."
+        : "No opportunities with recruiter interview counts yet.";
     } else {
-      sentVsInterviewHelperEl.textContent = `Avg of ${sampleCount} opp${
-        sampleCount === 1 ? "" : "s"
-      } · ${sentTotal} sent / ${interviewedDisplay} interviewed (recruiter logs)`;
+      if (isAverageActive) {
+        const sentAverage = formatAverageCount(sentTotal);
+        const interviewedAverage =
+          interviewedNumber == null ? "—" : formatAverageCount(interviewedNumber);
+        sentVsInterviewHelperEl.textContent = `${averageHelperPrefix}Avg sample: ${formatAverageCount(
+          sampleCount
+        )} opps · ${sentAverage} sent / ${interviewedAverage} interviewed (recruiter logs)`;
+      } else {
+        sentVsInterviewHelperEl.textContent = `Avg of ${sampleCount} opp${
+          sampleCount === 1 ? "" : "s"
+        } · ${sentTotal} sent / ${interviewedDisplay} interviewed (recruiter logs)`;
+      }
     }
   }
 
   // --- Churn · Lifetime ---
   if (churnTotalEl && churnTotalHelperEl) {
     const newChurnTotal = m.churn_total ?? 0;
-    const fromChurnTotal = parseIntSafe(churnTotalEl.textContent);
+    const fromChurnTotal = parseFloatSafe(churnTotalEl.textContent);
     animateValue(churnTotalEl, fromChurnTotal, newChurnTotal, {
-      formatter: (v) => Math.round(v),
+      formatter: sumFormatter,
     });
 
-    const totalHires = m.hire_total_lifetime ?? 0;
+    const totalHires = m.closed_win_total ?? m.hire_total_lifetime ?? 0;
     const churnRate = typeof m.churn_lifetime_rate === "number" ? m.churn_lifetime_rate : null;
     if (totalHires > 0) {
-      const helperParts = [`Hires: ${totalHires}`, `Left: ${newChurnTotal}`];
+      const helperParts = [];
+      if (totalHelperLabel) helperParts.push(totalHelperLabel);
+      helperParts.push(
+        `Hires: ${isAverageActive ? formatIntegerDisplay(totalHires) : totalHires}`,
+        `Left: ${isAverageActive ? formatIntegerDisplay(newChurnTotal) : newChurnTotal}`
+      );
       if (churnRate != null) {
         helperParts.push(`Rate: ${formatPercent(churnRate)}`);
       }
       churnTotalHelperEl.textContent = helperParts.join(" · ");
     } else {
-      churnTotalHelperEl.textContent = "No lifetime hires recorded for this recruiter.";
+      churnTotalHelperEl.textContent = isAverageActive
+        ? "No lifetime hires recorded yet across this recruiter set."
+        : "No lifetime hires recorded for this recruiter.";
     }
   }
 
   // --- Window churn count (90-day card) ---
   if (left90CountEl && left90RateEl) {
     const newLeftCount = m.left90_total ?? m.left90_within_90 ?? 0;
-    const fromLeftCount = parseIntSafe(left90CountEl.textContent);
+    const fromLeftCount = parseFloatSafe(left90CountEl.textContent);
     animateValue(left90CountEl, fromLeftCount, newLeftCount, {
-      formatter: (v) => Math.round(v),
+      formatter: sumFormatter,
     });
 
     const newLeftRate = m.left90_rate;
@@ -1447,13 +1788,21 @@ function updateCardsForLead(hrLeadEmail) {
     if (left90HelperEl) {
       const known = m.left90_tenure_known ?? 0;
       const missing = m.left90_tenure_unknown ?? 0;
-      left90HelperEl.textContent = `Start dates documented: ${known} · Missing: ${missing}`;
+      if (isAverageActive) {
+        const prefix = totalHelperPrefix || "";
+        left90HelperEl.textContent = `${prefix}Start dates documented: ${formatIntegerDisplay(
+          known
+        )} · Missing: ${formatIntegerDisplay(missing)}`;
+      } else {
+        left90HelperEl.textContent = `Start dates documented: ${known} · Missing: ${missing}`;
+      }
     }
   }
 
   // ✨ pequeño “glow” en todas las cards cuando cambian
   animateCardsFlash();
 
+  updatePeriodInfo();
   updateHistoryGlobalMeta();
   if (metricsState.activeTab === "history") {
     refreshHistoryPanel();
@@ -1473,8 +1822,7 @@ function populateDropdown() {
   // Option placeholder
   const defaultOpt = document.createElement("option");
   defaultOpt.value = "";
-  defaultOpt.textContent = "Select recruiter…";
-  defaultOpt.disabled = true;
+  defaultOpt.textContent = GLOBAL_AVERAGE_LABEL;
   defaultOpt.selected = true;
   select.appendChild(defaultOpt);
 
@@ -1539,8 +1887,7 @@ function populateDropdown() {
   if (shouldRefreshCards) {
     updateCardsForLead(metricsState.selectedLead);
   } else {
-    updateHistoryGlobalMeta();
-    resetHistoryView();
+    updateCardsForLead("");
   }
 }
 
@@ -1550,16 +1897,25 @@ function updatePeriodInfo() {
 
   const start = metricsState.rangeStart;
   const end = metricsState.rangeEnd;
+  let averageNotice = "";
+  if (!metricsState.selectedLead && metricsState.globalAverageSummary?.leadCount) {
+    const count = metricsState.globalAverageSummary.leadCount;
+    averageNotice = `Aggregated across ${count} recruiter${count === 1 ? "" : "s"}`;
+  }
 
   if (!start || !end) {
-    el.textContent = "";
+    el.textContent = averageNotice;
     return;
   }
 
   const prettyStart = formatYMDForDisplay(start);
   const prettyEnd = formatYMDForDisplay(end);
 
-  el.textContent = `Selected window: ${prettyStart} — ${prettyEnd}`;
+  let text = `Selected window: ${prettyStart} — ${prettyEnd}`;
+  if (averageNotice) {
+    text += ` · ${averageNotice}`;
+  }
+  el.textContent = text;
 }
 
 function updateLeft90RangeLabel() {
@@ -1644,6 +2000,12 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
     metricsState.sentVsInterviewDetails = normalizeSentVsInterviewDetails(
       data.sent_vs_interview_details
     );
+    metricsState.globalAverageSummary = buildGlobalAverageSummary(metricsState);
+    if (metricsState.globalAverageSummary?.metrics) {
+      metricsState.byLead[GLOBAL_AVERAGE_KEY] = metricsState.globalAverageSummary.metrics;
+    } else if (metricsState.byLead[GLOBAL_AVERAGE_KEY]) {
+      delete metricsState.byLead[GLOBAL_AVERAGE_KEY];
+    }
 
     populateDropdown();
     updatePeriodInfo();
@@ -1760,6 +2122,188 @@ function normalizeSentVsInterviewDetails(raw) {
     });
   });
   return normalized;
+}
+
+function createEmptyInterviewInsights() {
+  return {
+    items: [],
+    totalEligible: 0,
+    totalSent: 0,
+    greenCount: 0,
+    redCount: 0,
+    pct: null,
+  };
+}
+
+function createEmptyHireInsights() {
+  return {
+    items: [],
+    totalSent: 0,
+    greenCount: 0,
+    redCount: 0,
+    pct: null,
+  };
+}
+
+function buildAverageInterviewInsights(leads, state) {
+  if (!leads.length) return createEmptyInterviewInsights();
+  const stats = leads.map((email) => computeInterviewPipelineInsights(getPipelineDetails(email, state)));
+  const avg = (selector) => averageValues(stats.map((item) => selector(item)));
+  const avgPct = averageValues(
+    stats.map((ins, index) => {
+      if (typeof ins.pct === "number") return ins.pct;
+      const row = state.byLead[leads[index]];
+      return typeof row?.interview_rate?.pct === "number" ? row.interview_rate.pct : null;
+    })
+  );
+  return {
+    items: [],
+    totalEligible: avg((item) => item.totalEligible ?? null) ?? 0,
+    totalSent: avg((item) => item.totalSent ?? null) ?? 0,
+    greenCount: avg((item) => item.greenCount ?? null) ?? 0,
+    redCount: avg((item) => item.redCount ?? null) ?? 0,
+    pct: avgPct ?? null,
+  };
+}
+
+function buildAverageHireInsights(leads, state) {
+  if (!leads.length) return createEmptyHireInsights();
+  const stats = leads.map((email) => computeHirePipelineInsights(getPipelineDetails(email, state)));
+  const avg = (selector) => averageValues(stats.map((item) => selector(item)));
+  const avgPct = averageValues(
+    stats.map((ins, index) => {
+      if (typeof ins.pct === "number") return ins.pct;
+      const row = state.byLead[leads[index]];
+      return typeof row?.hire_rate?.pct === "number" ? row.hire_rate.pct : null;
+    })
+  );
+  return {
+    items: [],
+    totalSent: avg((item) => item.totalSent ?? null) ?? 0,
+    greenCount: avg((item) => item.greenCount ?? null) ?? 0,
+    redCount: avg((item) => item.redCount ?? null) ?? 0,
+    pct: avgPct ?? null,
+  };
+}
+
+function buildGlobalAverageSummary(state = metricsState) {
+  const leads = (state.orderedLeadEmails || []).filter((email) => state.byLead[email]);
+  if (!leads.length) return null;
+  const rows = leads.map((email) => state.byLead[email]);
+  const averageFromRows = (selector) => {
+    const values = [];
+    rows.forEach((row, index) => {
+      const raw = selector(row, index);
+      if (raw === null || raw === undefined) return;
+      const numeric = Number(raw);
+      if (Number.isFinite(numeric)) values.push(numeric);
+    });
+    return averageValues(values);
+  };
+
+  const metrics = {
+    hr_lead: GLOBAL_AVERAGE_LABEL,
+    hr_lead_name: GLOBAL_AVERAGE_LABEL,
+    hr_lead_email: GLOBAL_AVERAGE_KEY,
+  };
+
+  const numericFields = [
+    "closed_win_month",
+    "closed_lost_month",
+    "prev_closed_win_month",
+    "prev_closed_lost_month",
+    "closed_win_total",
+    "closed_lost_total",
+    "conversion_rate_last_20",
+    "last_20_count",
+    "last_20_win",
+    "conversion_rate_lifetime",
+    "avg_days_to_close_win",
+    "avg_days_to_close_lost",
+    "avg_days_to_first_batch_open",
+    "avg_days_to_first_batch_closed",
+    "sent_vs_interview_sample_count",
+    "churn_total",
+    "hire_total_lifetime",
+    "churn_tenure_known",
+    "churn_tenure_unknown",
+    "left90_total",
+    "left90_within_90",
+    "left90_tenure_known",
+    "left90_tenure_unknown",
+  ];
+
+  const sumFields = new Set([
+    "closed_win_month",
+    "closed_lost_month",
+    "prev_closed_win_month",
+    "prev_closed_lost_month",
+    "closed_win_total",
+    "closed_lost_total",
+    "churn_total",
+    "hire_total_lifetime",
+    "churn_tenure_known",
+    "churn_tenure_unknown",
+    "left90_total",
+    "left90_within_90",
+    "left90_tenure_known",
+    "left90_tenure_unknown",
+  ]);
+  numericFields.forEach((field) => {
+    if (sumFields.has(field)) {
+      const values = rows
+        .map((row) => safeNumber(row?.[field]))
+        .filter((value) => value != null);
+      if (values.length) {
+        metrics[field] = values.reduce((acc, value) => acc + value, 0);
+      } else {
+        metrics[field] = 0;
+      }
+      return;
+    }
+    const avgValue = averageFromRows((row) => row[field]);
+    if (avgValue != null) {
+      metrics[field] = avgValue;
+    }
+  });
+
+  const avgInterviewPct = averageFromRows((row) => row?.interview_rate?.pct);
+  if (avgInterviewPct != null) {
+    metrics.interview_rate = { pct: avgInterviewPct };
+  }
+  const avgHirePct = averageFromRows((row) => row?.hire_rate?.pct);
+  if (avgHirePct != null) {
+    metrics.hire_rate = { pct: avgHirePct };
+  }
+  const avgSentTotals = averageFromRows((row) => row?.sent_vs_interview_totals?.sent);
+  const avgInterviewTotals = averageFromRows((row) => row?.sent_vs_interview_totals?.interviewed);
+  if (avgSentTotals != null || avgInterviewTotals != null) {
+    metrics.sent_vs_interview_totals = {};
+    if (avgSentTotals != null) metrics.sent_vs_interview_totals.sent = avgSentTotals;
+    if (avgInterviewTotals != null) metrics.sent_vs_interview_totals.interviewed = avgInterviewTotals;
+  }
+
+  const avgChurnRate = averageFromRows((row) => row?.churn_lifetime_rate);
+  if (avgChurnRate != null) {
+    metrics.churn_lifetime_rate = avgChurnRate;
+  }
+  const avgLeft90Rate = averageFromRows((row) => row?.left90_rate);
+  if (avgLeft90Rate != null) {
+    metrics.left90_rate = avgLeft90Rate;
+  }
+  const avgSentInterviewRatio = averageFromRows((row) => row?.avg_sent_vs_interview_ratio);
+  if (avgSentInterviewRatio != null) {
+    metrics.avg_sent_vs_interview_ratio = avgSentInterviewRatio;
+  }
+
+  return {
+    key: GLOBAL_AVERAGE_KEY,
+    label: GLOBAL_AVERAGE_LABEL,
+    leadCount: leads.length,
+    metrics,
+    interviewInsights: buildAverageInterviewInsights(leads, state),
+    hireInsights: buildAverageHireInsights(leads, state),
+  };
 }
 
 function buildDetailStateFromPayload(payload) {
@@ -2376,7 +2920,7 @@ function updateHistoryGlobalMeta() {
   if (!historyDom.globalFilters) return;
   const leadLabel = metricsState.selectedLead
     ? getLeadLabel(metricsState.selectedLead)
-    : "—";
+    : metricsState.globalAverageSummary?.label || "—";
   let rangeLabel = "Rolling 30 days";
   if (metricsState.rangeStart && metricsState.rangeEnd) {
     rangeLabel = `${formatYMDForDisplay(metricsState.rangeStart)} — ${formatYMDForDisplay(

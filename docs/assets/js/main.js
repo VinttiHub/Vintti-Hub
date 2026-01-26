@@ -225,6 +225,40 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
 }
 
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+const batchCountCache = new Map();
+
+function requestBatchCount(opportunityId) {
+  if (!opportunityId) return Promise.resolve(null);
+  if (!batchCountCache.has(opportunityId)) {
+    const promise = fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/batches`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows) => (Array.isArray(rows) ? rows.length : null))
+      .catch((err) => {
+        console.error('Error fetching batches for opportunity', opportunityId, err);
+        return null;
+      });
+    batchCountCache.set(opportunityId, promise);
+  }
+  return batchCountCache.get(opportunityId);
+}
+
+async function hydrateBatchCountCell(opportunityId, cell) {
+  if (!cell) return;
+  if (!opportunityId) {
+    cell.textContent = '—';
+    cell.removeAttribute('data-batch-count');
+    return;
+  }
+  cell.textContent = '…';
+  const count = await requestBatchCount(opportunityId);
+  if (typeof count === 'number') {
+    cell.textContent = count;
+    cell.dataset.batchCount = count;
+  } else {
+    cell.textContent = '—';
+    cell.removeAttribute('data-batch-count');
+  }
+}
 
 // Try to get user_id from storage; if missing, resolve by email and cache it
 // Usa getCurrentUserId({force:true}) para ignorar cache.
@@ -664,7 +698,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
       }
 
       if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9">No data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11">No data available</td></tr>';
         return;
       }
 
@@ -749,8 +783,8 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           async function fetchDaysSinceBatch(opp, tr) {
             const oppId = opp.opportunity_id;
 
-            // 👉 celda de "Days Since Sourcing" (última columna)
-            const daysCell = tr.querySelector('td:last-child');
+            // 👉 celda de "Days Since Sourcing"
+            const daysCell = tr.querySelector('.days-since-cell');
             if (!daysCell) return;
 
             try {
@@ -811,8 +845,12 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
               />
             </td>
             <td>${daysAgo}</td>
-            <td>${daysSinceBatch}</td>
+            <td class="days-since-cell">${daysSinceBatch}</td>
+            <td class="batch-count-cell" data-batch-count="—">—</td>
           `;
+
+          const batchCell = tr.querySelector('.batch-count-cell');
+          hydrateBatchCountCell(opp.opportunity_id, batchCell);
 
           tr.querySelectorAll('td').forEach((cell, index) => {
             cell.setAttribute('data-col-index', index);
@@ -830,7 +868,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           tr.style.opacity = 1;
           tr.style.animation = 'none';
             if (opp.opp_stage === 'Sourcing') {
-              const daysCell = tr.querySelector('td:last-child');
+              const daysCell = tr.querySelector('.days-since-cell');
               if (typeof opp._days_since_batch === 'number') {
                 colorizeSourcingCell(daysCell, opp._days_since_batch);
               } else {
@@ -855,7 +893,7 @@ const table = $('#opportunityTable').DataTable({
   ordering: false,
   columnDefs: [
     { targets: [0], width: "8%" },
-    { targets: [1, 2, 3, 4, 5, 6, 8], width: "10%" },
+    { targets: [1, 2, 3, 4, 5, 6, 8, 9, 10], width: "10%" },
     { targets: 7, width: "25%" },
     {
       targets: 0,

@@ -101,7 +101,7 @@ function deriveContractTypeFromCandidates(hires = []) {
   let hasStaffing = false;
   let hasRecruitingOrBuyout = false;
   hires.forEach(hire => {
-    if (!hire) return;
+    if (!hire || !isActiveHire(hire)) return;
     const model = (hire.opp_model || '').toLowerCase();
     if (model.includes('staff')) hasStaffing = true;
     if (model.includes('recruit')) hasRecruitingOrBuyout = true;
@@ -628,6 +628,8 @@ function fillEmployeesTables(candidates, buyouts = []) {
 
   let hasStaffing = false;
   let hasRecruiting = false;
+  let hasActiveStaffing = false;
+  let hasActiveRecruiting = false;
 
   candidateList.forEach(candidate => {
     // ---------- STAFFING ----------
@@ -1028,6 +1030,9 @@ if (endInputS) {
 
       staffingTableBody.appendChild(row);
       hasStaffing = true;
+      if (isActiveHire(candidate)) {
+        hasActiveStaffing = true;
+      }
     }
 
     // ---------- RECRUITING ----------
@@ -1036,6 +1041,9 @@ if (endInputS) {
       if (row) {
         recruitingTableBody.appendChild(row);
         hasRecruiting = true;
+        if (isActiveHire(candidate)) {
+          hasActiveRecruiting = true;
+        }
       }
     }
   });
@@ -1043,6 +1051,7 @@ if (endInputS) {
   const appendedBuyoutRows = appendBuyoutsToRecruiting(buyouts, candidateLookup, recruitingTableBody);
   if (appendedBuyoutRows > 0) {
     hasRecruiting = true;
+    hasActiveRecruiting = true;
   }
 
   if (!hasStaffing) {
@@ -1098,11 +1107,11 @@ if (endInputS) {
 
   // ------- Contract visual + persistencia -------
   let contractType = '—';
-  if (hasStaffing && !hasRecruiting) {
+  if (hasActiveStaffing && !hasActiveRecruiting) {
     contractType = 'Staffing';
-  } else if (!hasStaffing && hasRecruiting) {
+  } else if (!hasActiveStaffing && hasActiveRecruiting) {
     contractType = 'Recruiting';
-  } else if (hasStaffing && hasRecruiting) {
+  } else if (hasActiveStaffing && hasActiveRecruiting) {
     contractType = 'Mix';
   }
 

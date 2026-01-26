@@ -85,6 +85,23 @@
       </section>
     </aside>
 
+    <div
+      id="refreshOverlay"
+      class="refresh-dialog"
+      role="alertdialog"
+      aria-live="assertive"
+      aria-modal="true"
+      aria-hidden="true"
+    >
+      <div class="refresh-dialog__card">
+        <div class="refresh-dialog__spinner" aria-hidden="true"></div>
+        <div class="refresh-dialog__text">
+          <p class="refresh-dialog__title">Vintti is working</p>
+          <p class="refresh-dialog__body">We're syncing open and closed opportunities. This can take a few minutes.</p>
+        </div>
+      </div>
+    </div>
+
     <script src="./assets/js/account-overview.js" defer></script>
   </body>
 </html>

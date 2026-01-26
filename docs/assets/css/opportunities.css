@@ -609,8 +609,10 @@ body {
   background: linear-gradient(to right, #e3f2fd, #f0f8ff);
 }
 
-/* 2. Centrar columna Days + más espacio Days Since Batch */
-#opportunityTable tbody td:nth-child(9) {
+/* 2. Centrar columnas de Days + Days Since Batch + Batch Count */
+#opportunityTable tbody td:nth-child(9),
+#opportunityTable tbody td:nth-child(10),
+#opportunityTable tbody td:nth-child(11) {
   text-align: center;
 }
 
@@ -674,10 +676,14 @@ body {
   box-shadow: 0 0 0 3px rgba(255, 179, 230, 0.4);
   border-color: #ffb3e6;
 }
-/* Centrar texto en la columna "Days Since Batch" (10ma columna = índice 9) */
-#opportunityTable tbody td:nth-child(10),
-#opportunityTable thead th:nth-child(10) {
+/* Centrar texto en la columna "Batch Count" (11ma columna) */
+#opportunityTable tbody td:nth-child(11),
+#opportunityTable thead th:nth-child(11) {
   text-align: center;
+}
+.batch-count-cell {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .dataTables_length select {
   background-color: #ffffff;
