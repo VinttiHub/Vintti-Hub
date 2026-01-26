@@ -1114,14 +1114,17 @@ document.getElementById('sendApprovalEmailBtn').addEventListener('click', async 
     alert('❌ Failed to send email');
   }
 });
+let presentationTableRequestId = 0;
 async function loadPresentationTable(opportunityId) {
   const tableBody = document.getElementById("presentation-batch-table-body");
   if (!tableBody) return;
+  const requestId = ++presentationTableRequestId;
   tableBody.innerHTML = '';
 
   try {
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const batches = await res.json();
+    if (requestId !== presentationTableRequestId) return;
 
     batches
       .filter(b => b.presentation_date)
@@ -2580,26 +2583,37 @@ function getAccountId() {
     });
   }
 })();
+let batchDetailRequestId = 0;
 async function loadBatchesForOpportunity(opportunityId) {
+  const container = document.getElementById('batch-detail-container');
+  if (!container) return;
+
+  const requestId = ++batchDetailRequestId;
+  container.innerHTML = '';
+
   try {
     const batchesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/batches`);
     const batches = await batchesRes.json();
 
-    const container = document.getElementById('batch-detail-container');
-    container.innerHTML = '';
+    if (requestId !== batchDetailRequestId) return;
 
     for (const batch of batches) {
+      if (requestId !== batchDetailRequestId) return;
       const box = createBatchBox(batch);
       const candidateContainer = box.querySelector('.batch-candidates');
 
       const batchCandidatesRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/batches/${batch.batch_id}/candidates`);
       const batchCandidates = await batchCandidatesRes.json();
 
-      batchCandidates.forEach(c => {
-        const cardElement = createCandidateCard(c, batch.batch_id);
-        candidateContainer.appendChild(cardElement);
-      });
+      if (requestId !== batchDetailRequestId) return;
 
+      for (const candidate of batchCandidates) {
+        if (requestId !== batchDetailRequestId) return;
+        const cardElement = createCandidateCard(candidate, batch.batch_id);
+        candidateContainer.appendChild(cardElement);
+      }
+
+      if (requestId !== batchDetailRequestId) return;
       container.appendChild(box);
     }
   } catch (err) {
