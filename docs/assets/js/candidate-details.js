@@ -2118,7 +2118,15 @@ if (hireRevenue){
         const tbody = document.querySelector("#opportunitiesTable tbody");
         if (!tbody) return;
         tbody.innerHTML = "";
+        const uniqueOpps = []; // keep display order while filtering duplicates
+        const seenIds = new Set();
         (data || []).forEach(opp => {
+          const oppId = opp?.opportunity_id;
+          if (!oppId || seenIds.has(oppId)) return;
+          seenIds.add(oppId);
+          uniqueOpps.push(opp);
+        });
+        uniqueOpps.forEach(opp => {
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${opp.opportunity_id}</td>

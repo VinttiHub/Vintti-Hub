@@ -968,7 +968,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
       };
     }
     case "churnRange": {
-      const churnEntries = getLeadChurnDetails(key);
+      const churnEntries = getLeadChurnDetails(effectiveLead);
       const lifetimeHires = Number(selectedMetrics.hire_total_lifetime ?? 0);
       const churnTotal = Number(selectedMetrics.churn_total ?? 0);
       let churnRate = null;
@@ -998,7 +998,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
       };
     }
     case "churn90Days": {
-      const left90Entries = getLeadChurnDetails(key, { source: "left90" });
+      const left90Entries = getLeadChurnDetails(effectiveLead, { source: "left90" });
       const windowLabel = describeLeft90Window();
       return {
         title: "Total churn · 90-day tenure",
