@@ -47,12 +47,15 @@ const COUNTRY_ALIASES = {
   netherlands: "NL",
 };
 
+const NEW_YORK_TIMEZONE = "America/New_York";
+
 const els = {
   breadcrumb: document.getElementById("breadcrumbTrail"),
   accountName: document.getElementById("accountName"),
   accountTagline: document.getElementById("accountTagline"),
   metaTimezone: document.getElementById("metaTimezone"),
   metaContact: document.getElementById("metaContact"),
+  metaRefreshedAt: document.getElementById("metaRefreshedAt"),
   highlightOpps: document.getElementById("highlightOpportunities"),
   highlightClosed: document.getElementById("highlightClosed"),
   highlightCandidates: document.getElementById("highlightCandidates"),
@@ -65,9 +68,13 @@ const els = {
   panelBody: document.querySelector(".candidate-panel__body"),
   refreshButton: document.getElementById("refreshOverview"),
   refreshOverlay: document.getElementById("refreshOverlay"),
+  refreshProgressBar: document.getElementById("refreshProgressBar"),
+  refreshProgressLabel: document.getElementById("refreshProgressLabel"),
 };
 
 const opportunityCache = new Map();
+const candidateTestsCache = new Map();
+const candidateTestsRequests = new Map();
 let currentAccount = null;
 const panelState = {
   view: "batches",
@@ -80,8 +87,10 @@ const pageState = {
   filter: "open",
   accountId: null,
   snapshotCache: new Map(),
+  lastRefreshedAt: null,
   refreshing: false,
 };
+const REFRESH_PROGRESS_DEFAULT_LABEL = "Preparing sync…";
 
 document.addEventListener("DOMContentLoaded", () => {
   const accountId = new URLSearchParams(window.location.search).get("id");
@@ -100,15 +109,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function hydratePage(accountId) {
   try {
-    const [account, snapshotCache] = await Promise.all([
+    const [account, snapshotPayload] = await Promise.all([
       fetchJSON(`${API_BASE}/accounts/${accountId}`),
       fetchOverviewSnapshotCache(accountId),
     ]);
 
     currentAccount = account;
     updateAccountHeader(account);
-    pageState.snapshotCache = snapshotCache;
-    const hydratedOpportunities = buildOpportunitiesFromSnapshots(snapshotCache);
+    pageState.snapshotCache = snapshotPayload.cache;
+    pageState.lastRefreshedAt = snapshotPayload.updatedAt ?? null;
+    updateRefreshMeta(pageState.lastRefreshedAt);
+    const hydratedOpportunities = buildOpportunitiesFromSnapshots(snapshotPayload.cache);
     const visibleOpportunities = hydratedOpportunities.filter(
       (opp) => classifyOpportunity(opp) !== "lost"
     );
@@ -145,6 +156,10 @@ function initializeFilterControls() {
 function initializeRefreshControls() {
   if (!els.refreshButton) return;
   els.refreshButton.dataset.defaultLabel = els.refreshButton.textContent.trim() || "Refresh data";
+  if (els.refreshProgressLabel && !els.refreshProgressLabel.dataset.defaultLabel) {
+    els.refreshProgressLabel.dataset.defaultLabel =
+      els.refreshProgressLabel.textContent.trim() || REFRESH_PROGRESS_DEFAULT_LABEL;
+  }
   els.refreshButton.addEventListener("click", handleRefreshClick);
 }
 
@@ -159,7 +174,32 @@ function setRefreshState(isRefreshing) {
       els.refreshButton.textContent = els.refreshButton.dataset.defaultLabel || "Refresh data";
     }
   }
+  if (isRefreshing) {
+    resetRefreshProgress();
+  } else {
+    setTimeout(resetRefreshProgress, 400);
+  }
   toggleRefreshOverlay(pageState.refreshing);
+}
+
+function resetRefreshProgress() {
+  updateRefreshProgress(0, REFRESH_PROGRESS_DEFAULT_LABEL, true);
+}
+
+function updateRefreshProgress(value, message, forceLabel = false) {
+  const progressValue = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  const percent = Math.round(progressValue * 100);
+  if (els.refreshProgressBar) {
+    const bar = els.refreshProgressBar.querySelector("span");
+    if (bar) {
+      bar.style.width = `${progressValue * 100}%`;
+    }
+    els.refreshProgressBar.setAttribute("aria-valuenow", String(percent));
+  }
+  if ((message || forceLabel) && els.refreshProgressLabel) {
+    els.refreshProgressLabel.textContent =
+      message || els.refreshProgressLabel.dataset.defaultLabel || REFRESH_PROGRESS_DEFAULT_LABEL;
+  }
 }
 
 function toggleRefreshOverlay(isVisible) {
@@ -173,30 +213,49 @@ function toggleRefreshOverlay(isVisible) {
 
 async function handleRefreshClick() {
   if (pageState.refreshing || !pageState.accountId) return;
+  const refreshTimestamp = getNewYorkTimestampISO();
   setRefreshState(true);
+  updateRefreshProgress(0.05, "Fetching live opportunities…");
   try {
     const opportunities = await fetchJSON(`${API_BASE}/accounts/${pageState.accountId}/opportunities`);
     const list = Array.isArray(opportunities) ? opportunities : [];
     if (!list.length) {
       console.info("No opportunities to refresh for this account");
+      updateRefreshProgress(0.6, "No open opportunities found for this refresh.");
     } else {
+      updateRefreshProgress(0.2, `Syncing ${list.length} ${list.length === 1 ? "opportunity" : "opportunities"}…`);
+      const progressWindow = { start: 0.2, end: 0.78 };
       const { snapshotsToPersist } = await enrichWithBatches(list, pageState.snapshotCache, {
         forceRefreshClosed: true,
         persistStages: ["open", "closed"],
+        refreshTimestamp,
+        onProgress: ({ completed, total, message }) => {
+          const ratio = total ? completed / total : 1;
+          const value =
+            progressWindow.start + ratio * Math.max(0, progressWindow.end - progressWindow.start);
+          updateRefreshProgress(value, message);
+        },
       });
       if (snapshotsToPersist.length) {
+        updateRefreshProgress(0.82, "Saving refreshed batches…");
         await persistOverviewSnapshots(pageState.accountId, snapshotsToPersist);
+        updateRefreshProgress(0.88, "Cached overview updated.");
       } else {
         console.info("Opportunity cache already up to date");
+        updateRefreshProgress(0.85, "Cache already up to date.");
       }
     }
   } catch (error) {
     console.error("Failed to refresh cached opportunities", error);
+    updateRefreshProgress(0.85, "Something went wrong. Retrying state…");
   } finally {
     try {
+      updateRefreshProgress(0.92, "Rebuilding overview…");
       await hydratePage(pageState.accountId);
+      updateRefreshProgress(1, "Overview updated!");
     } catch (refreshError) {
       console.error("Failed to reload overview after refresh", refreshError);
+      updateRefreshProgress(1, "Overview updated with warnings.");
     }
     setRefreshState(false);
   }
@@ -212,25 +271,34 @@ async function fetchJSON(url) {
 }
 
 async function fetchOverviewSnapshotCache(accountId) {
-  if (!accountId) return new Map();
+  if (!accountId) return { cache: new Map(), updatedAt: null };
   try {
     const res = await fetch(`${API_BASE}/accounts/${accountId}/overview-cache`);
     if (!res.ok) {
       console.warn("Client overview cache request failed with status", res.status);
-      return new Map();
+      return { cache: new Map(), updatedAt: null };
     }
     const data = await res.json();
     const cache = new Map();
+    let latestUpdatedAt = null;
     if (Array.isArray(data)) {
       data.forEach((entry) => {
         if (entry?.opportunity_id == null) return;
-        cache.set(String(entry.opportunity_id), normalizeCachedSnapshot(entry));
+        const normalized = normalizeCachedSnapshot(entry);
+        cache.set(String(entry.opportunity_id), normalized);
+        if (normalized.updated_at) {
+          if (!latestUpdatedAt) {
+            latestUpdatedAt = normalized.updated_at;
+          } else if (new Date(normalized.updated_at) > new Date(latestUpdatedAt)) {
+            latestUpdatedAt = normalized.updated_at;
+          }
+        }
       });
     }
-    return cache;
+    return { cache, updatedAt: latestUpdatedAt };
   } catch (error) {
     console.warn("Failed to load client overview cache", error);
-    return new Map();
+    return { cache: new Map(), updatedAt: null };
   }
 }
 
@@ -243,6 +311,7 @@ async function persistOverviewSnapshots(accountId, snapshots) {
         client_overview_id: entry.client_overview_id ?? null,
         snapshot: entry.snapshot,
         stage: entry.stage || entry.snapshot?.stage || null,
+        updated_at: entry.updated_at ?? entry.snapshot?.updated_at ?? null,
       }))
       .filter((entry) => entry.opportunity_id && entry.snapshot);
     if (!payload.length) return;
@@ -279,11 +348,16 @@ function normalizeCachedSnapshot(entry) {
   if (stage && snapshot.stage !== stage) {
     snapshot.stage = stage;
   }
+  const updatedAt = entry?.updated_at ?? snapshot.updated_at ?? null;
+  if (updatedAt && snapshot.updated_at !== updatedAt) {
+    snapshot.updated_at = updatedAt;
+  }
   return {
     client_overview_id: entry?.client_overview_id ?? snapshot.client_overview_id ?? null,
     opportunity_id: entry?.opportunity_id ?? snapshot.opportunity_id ?? null,
     batches,
     opportunity,
+    updated_at: updatedAt,
     rawSnapshot: snapshot,
     serialized: stableSerialize(snapshot),
     stage,
@@ -371,6 +445,7 @@ function showMissingAccountMessage() {
   els.accountName.textContent = "No account selected";
   els.accountTagline.textContent = "Use the Client overview button from Account Details to open this page.";
   els.opportunitiesEmpty.textContent = "Select an account to see its batched candidates.";
+  updateRefreshMeta(null);
 }
 
 function showErrorState(message) {
@@ -455,6 +530,9 @@ function snapshotEntryToOpportunity(entry) {
   if (normalizedStage) {
     base.__client_overview_stage = normalizedStage;
   }
+  if (entry.updated_at) {
+    base.__client_overview_updated_at = entry.updated_at;
+  }
   return base;
 }
 
@@ -482,6 +560,11 @@ function sortOpportunitiesForDisplay(list) {
 async function enrichWithBatches(opportunities, snapshotCache = new Map(), options = {}) {
   const list = Array.isArray(opportunities) ? opportunities : [];
   const forceRefreshClosed = Boolean(options.forceRefreshClosed);
+  const progressCallback = typeof options.onProgress === "function" ? options.onProgress : null;
+  const refreshTimestamp =
+    typeof options.refreshTimestamp === "string" && options.refreshTimestamp.trim()
+      ? options.refreshTimestamp
+      : null;
   const stagesToPersist =
     Array.isArray(options.persistStages) && options.persistStages.length
       ? options.persistStages
@@ -558,6 +641,8 @@ async function enrichWithBatches(opportunities, snapshotCache = new Map(), optio
         cachedEntry?.client_overview_id ?? item.client_overview_id ?? null,
         classification
       );
+      const entryUpdatedAt = refreshTimestamp || snapshot.updated_at || new Date().toISOString();
+      snapshot.updated_at = entryUpdatedAt;
       const previousSerialized = cachedEntry?.serialized || null;
       const nextSerialized = stableSerialize(snapshot);
       if (previousSerialized !== nextSerialized) {
@@ -566,6 +651,7 @@ async function enrichWithBatches(opportunities, snapshotCache = new Map(), optio
           client_overview_id: cachedEntry?.client_overview_id ?? null,
           snapshot,
           stage: snapshot.stage,
+          updated_at: entryUpdatedAt,
         });
       }
     }
@@ -578,6 +664,25 @@ async function enrichWithBatches(opportunities, snapshotCache = new Map(), optio
     }
     enriched.push(item);
     opportunityCache.set(String(item.opportunity_id), item);
+    if (progressCallback) {
+      try {
+        const name = fallbackText(item?.opp_position_name || "opportunity", "Opportunity");
+        const prefix = sorted.length > 1 ? `Syncing ${name}` : `Syncing ${name}`;
+        const label =
+          sorted.length > 1
+            ? `${prefix} (${enriched.length}/${sorted.length})…`
+            : `${prefix}…`;
+        progressCallback({
+          completed: enriched.length,
+          total: sorted.length,
+          opportunity: item,
+          classification,
+          message: label,
+        });
+      } catch (error) {
+        console.warn("Refresh progress callback error", error);
+      }
+    }
   }
   return { enriched, snapshotsToPersist };
 }
@@ -917,7 +1022,16 @@ function buildCandidateCard(candidate, batch) {
   const countryLabel = formatCandidateCountry(candidate);
   const batchNumber = candidate?.batch_number || batch?.batch_number;
   const testsDocuments = normalizeCandidateTests(candidate?.tests_documents_s3);
-  const testsSection = renderCandidateTestsSection(testsDocuments);
+  const shouldHydrateTests = needsCandidateTestsHydration(candidate, testsDocuments);
+  if (!shouldHydrateTests && candidate?.candidate_id && testsDocuments.length) {
+    candidateTestsCache.set(candidate.candidate_id, testsDocuments);
+  }
+  const testsSection = renderCandidateTestsSection(testsDocuments, {
+    candidateId: candidate?.candidate_id,
+    state: shouldHydrateTests ? "loading" : null,
+    statusLabel: shouldHydrateTests ? "Generating download links…" : null,
+    statusVariant: shouldHydrateTests ? "info" : null,
+  });
 
   card.innerHTML = `
     <header>
@@ -947,6 +1061,9 @@ function buildCandidateCard(candidate, batch) {
       }
     </div>
   `;
+  if (shouldHydrateTests) {
+    hydrateCandidateTestsSection(card, candidate, testsDocuments);
+  }
   return card;
 }
 
@@ -1141,7 +1258,7 @@ function normalizeCandidateTests(rawValue) {
   return normalized;
 }
 
-function renderCandidateTestsSection(documents) {
+function renderCandidateTestsSection(documents, options = {}) {
   const normalized = Array.isArray(documents) ? documents.filter(Boolean) : [];
   if (!normalized.length) return "";
   const items = normalized
@@ -1149,14 +1266,96 @@ function renderCandidateTestsSection(documents) {
     .filter(Boolean)
     .join("");
   if (!items) return "";
+  const candidateAttr = options.candidateId ? ` data-candidate-tests="${options.candidateId}"` : "";
+  const stateAttr = options.state ? ` data-tests-state="${options.state}"` : "";
+  const statusClass = options.statusVariant ? ` candidate-tests__status--${options.statusVariant}` : "";
+  const statusLabel = options.statusLabel
+    ? `<p class="candidate-tests__status${statusClass}">${escapeHTML(options.statusLabel)}</p>`
+    : "";
   return `
-    <section class="candidate-tests" aria-label="Tests and supporting files">
+    <section class="candidate-tests"${candidateAttr}${stateAttr} aria-label="Tests and supporting files">
       <p class="candidate-tests__title">Tests & assessments</p>
+      ${statusLabel}
       <ul class="candidate-tests__list">
         ${items}
       </ul>
     </section>
   `;
+}
+
+function needsCandidateTestsHydration(candidate, documents) {
+  const candidateId = candidate?.candidate_id;
+  if (!candidateId || !Array.isArray(documents) || !documents.length) return false;
+  if (candidateTestsCache.has(candidateId)) return false;
+  return documents.some((doc) => !doc || !doc.url);
+}
+
+async function hydrateCandidateTestsSection(card, candidate, fallbackDocuments = []) {
+  const candidateId = candidate?.candidate_id;
+  if (!candidateId || !card) return;
+  const section = card.querySelector(`.candidate-tests[data-candidate-tests="${candidateId}"]`);
+  if (!section) return;
+  section.dataset.testsState = "loading";
+  try {
+    const documents = await fetchCandidateTestsPayload(candidateId);
+    if (!documents.length) {
+      updateCandidateTestSections(candidateId, documents);
+      return;
+    }
+    candidateTestsCache.set(candidateId, documents);
+    updateCandidateTestSections(candidateId, documents);
+  } catch (error) {
+    console.warn("Failed to load candidate tests", candidateId, error);
+    const fallback =
+      (Array.isArray(fallbackDocuments) && fallbackDocuments.length && fallbackDocuments) ||
+      normalizeCandidateTests(candidate?.tests_documents_s3);
+    updateCandidateTestSections(candidateId, fallback, {
+      candidateId,
+      state: "error",
+      statusLabel: "Unable to generate download links.",
+      statusVariant: "error",
+    });
+  }
+}
+
+function updateCandidateTestSections(candidateId, documents, options = {}) {
+  const list =
+    typeof candidateId !== "undefined"
+      ? document.querySelectorAll(`.candidate-tests[data-candidate-tests="${candidateId}"]`)
+      : [];
+  if (!list || !list.length) return;
+  const html = renderCandidateTestsSection(documents, { candidateId, ...options });
+  if (!html) {
+    list.forEach((node) => node.remove());
+    return;
+  }
+  list.forEach((node) => {
+    if (!node.isConnected) return;
+    node.outerHTML = html;
+  });
+}
+
+async function fetchCandidateTestsPayload(candidateId) {
+  if (!candidateId) return [];
+  if (candidateTestsCache.has(candidateId)) {
+    return candidateTestsCache.get(candidateId);
+  }
+  if (candidateTestsRequests.has(candidateId)) {
+    return candidateTestsRequests.get(candidateId);
+  }
+  const request = fetchJSON(`${API_BASE}/candidates/${candidateId}/tests`)
+    .then((payload) => normalizeCandidateTests(payload))
+    .then((documents) => {
+      candidateTestsCache.set(candidateId, documents);
+      candidateTestsRequests.delete(candidateId);
+      return documents;
+    })
+    .catch((error) => {
+      candidateTestsRequests.delete(candidateId);
+      throw error;
+    });
+  candidateTestsRequests.set(candidateId, request);
+  return request;
 }
 
 function renderCandidateTestRow(doc, index = 0) {

@@ -148,7 +148,7 @@ def get_account_overview_cache(account_id):
         cursor = conn.cursor()
         cursor.execute(
             """
-                SELECT client_overview_id, account_id, opportunity_id, candidates_batches
+                SELECT client_overview_id, account_id, opportunity_id, candidates_batches, updated_at
                 FROM client_overview
                 WHERE account_id = %s
                 ORDER BY client_overview_id ASC
@@ -158,7 +158,7 @@ def get_account_overview_cache(account_id):
         rows = cursor.fetchall() or []
         payload = []
         for row in rows:
-            client_overview_id, acc_id, opportunity_id, data = row
+            client_overview_id, acc_id, opportunity_id, data, updated_at = row
             decoded = None
             stage = None
             if data:
@@ -183,6 +183,7 @@ def get_account_overview_cache(account_id):
                     "opportunity_id": opportunity_id,
                     "snapshot": decoded,
                     "stage": stage,
+                    "updated_at": updated_at.isoformat() if isinstance(updated_at, datetime) else None,
                 }
             )
         cursor.close()
@@ -221,6 +222,8 @@ def upsert_account_overview_cache(account_id):
                 continue
             stage = normalize_overview_stage(entry.get('stage') or snapshot.get('stage'))
             snapshot['stage'] = stage
+            updated_at = entry.get('updated_at')
+            snapshot['updated_at'] = updated_at
 
             cursor.execute(
                 """
@@ -275,19 +278,23 @@ def upsert_account_overview_cache(account_id):
                 cursor.execute(
                     """
                         UPDATE client_overview
-                        SET candidates_batches = %s
+                        SET candidates_batches = %s,
+                            updated_at = COALESCE(%s::timestamptz, timezone('America/New_York', now()))
                         WHERE client_overview_id = %s
                     """,
-                    (payload_json, target_id),
+                    (payload_json, updated_at, target_id),
                 )
                 updated += 1
             else:
                 cursor.execute(
                     """
-                        INSERT INTO client_overview (client_overview_id, account_id, opportunity_id, candidates_batches)
-                        VALUES (%s, %s, %s, %s)
+                        INSERT INTO client_overview (client_overview_id, account_id, opportunity_id, candidates_batches, updated_at)
+                        VALUES (
+                            %s, %s, %s, %s,
+                            COALESCE(%s::timestamptz, timezone('America/New_York', now()))
+                        )
                     """,
-                    (target_id, account_id, opportunity_id, payload_json),
+                    (target_id, account_id, opportunity_id, payload_json, updated_at),
                 )
                 saved += 1
 

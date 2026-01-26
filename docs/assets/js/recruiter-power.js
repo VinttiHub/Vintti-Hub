@@ -501,17 +501,51 @@ function sortOpportunitiesByDate(opps = []) {
     return bDate.localeCompare(aDate);
   });
 }
+function normalizeDateToYMD(value) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const match = value.match(/^\d{4}-\d{2}(?:-\d{2})?/);
+    if (match) {
+      const token = match[0];
+      if (token.length === 7) {
+        return `${token}-01`;
+      }
+      return token;
+    }
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+function createDateRangeChecker(start, end) {
+  const normalizedStart = normalizeDateToYMD(start);
+  const normalizedEnd = normalizeDateToYMD(end);
+  if (!normalizedStart || !normalizedEnd) return null;
+  if (normalizedStart > normalizedEnd) return null;
+  return (value) => {
+    const normalizedValue = normalizeDateToYMD(value);
+    if (!normalizedValue) return false;
+    return normalizedValue >= normalizedStart && normalizedValue <= normalizedEnd;
+  };
+}
+function filterEntriesWithinRange(entries = [], rangeChecker, resolver) {
+  if (!rangeChecker || typeof resolver !== "function") return entries;
+  return entries.filter((entry) => {
+    const resolved = resolver(entry);
+    if (!resolved) return false;
+    return rangeChecker(resolved);
+  });
+}
 function filterOpportunities(opps = [], { stage, start, end } = {}) {
   const normalizedStage = stage ? normalizeStage(stage) : null;
-  const hasRange = Boolean(start && end);
+  const isWithinRange = createDateRangeChecker(start, end);
   return opps.filter((item) => {
     if (normalizedStage && normalizeStage(item.opportunity_stage) !== normalizedStage) {
       return false;
     }
-    if (hasRange) {
+    if (isWithinRange) {
       const closeDate = item.close_date;
-      if (!closeDate) return false;
-      if (closeDate < start || closeDate > end) return false;
+      if (!closeDate || !isWithinRange(closeDate)) return false;
     }
     return true;
   });
@@ -575,6 +609,13 @@ function createDurationItems(entries = [], type) {
       meta: metaPieces.join(" · "),
     };
   });
+}
+function resolveDurationEntryDate(entry = {}, metricKey) {
+  if (!entry) return null;
+  if (metricKey === "avgBatchOpen" || metricKey === "avgBatchClosed") {
+    return entry.first_batch_date || entry.close_date || entry.start_reference_date || null;
+  }
+  return entry.close_date || entry.first_batch_date || entry.start_reference_date || null;
 }
 function createPipelineItems(entries = [], options = {}) {
   const { statusResolver } = options;
@@ -770,15 +811,31 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
   if (!selectedMetrics) return null;
   const recruiterName = getLeadLabel(effectiveLead, state);
   const recruiterSuffix = recruiterName ? ` for ${recruiterName}` : "";
-  const opportunities = getLeadOpportunities(effectiveLead, state);
   const rangeStart = options.rangeStart ?? metricsState.rangeStart;
   const rangeEnd = options.rangeEnd ?? metricsState.rangeEnd;
   const readableRange = describeRange(rangeStart, rangeEnd);
+  const rangeChecker = createDateRangeChecker(rangeStart, rangeEnd);
+  const filterDetailEntries = (entries, resolver) =>
+    filterEntriesWithinRange(entries, rangeChecker, resolver);
+  const opportunities = getLeadOpportunities(effectiveLead, state);
   const durationDetails = getLeadDurationDetails(effectiveLead, state);
-  const getDurationItems = (metricKey) => createDurationItems(durationDetails[metricKey] || [], metricKey);
-  const getDurationCount = (metricKey) => (durationDetails[metricKey] || []).length;
-  const pipelineEntries = getPipelineDetails(effectiveLead, state);
-  const sentVsInterviewDetails = getSentVsInterviewDetails(effectiveLead, state);
+  const durationCache = {};
+  const getDurationEntries = (metricKey) => {
+    if (!durationCache[metricKey]) {
+      const rows = durationDetails[metricKey] || [];
+      durationCache[metricKey] = filterDetailEntries(rows, (entry) =>
+        resolveDurationEntryDate(entry, metricKey)
+      );
+    }
+    return durationCache[metricKey];
+  };
+  const getDurationItems = (metricKey) => createDurationItems(getDurationEntries(metricKey), metricKey);
+  const getDurationCount = (metricKey) => getDurationEntries(metricKey).length;
+  const pipelineEntries = filterDetailEntries(getPipelineDetails(effectiveLead, state), (entry) => entry.sent_date);
+  const sentVsInterviewDetails = filterDetailEntries(
+    getSentVsInterviewDetails(effectiveLead, state),
+    (entry) => entry.sent_date || entry.close_date || entry.last_activity_date
+  );
 
   switch (type) {
     case "closedWinRange":
@@ -2118,6 +2175,9 @@ function normalizeSentVsInterviewDetails(raw) {
         sent_candidate_count: sent,
         interviewed_count: interviewed,
         ratio,
+        sent_date: row?.sent_date || row?.first_sent_date || null,
+        close_date: row?.close_date || null,
+        last_activity_date: row?.last_activity_date || null,
       };
     });
   });
@@ -3426,6 +3486,7 @@ function escapeAttribute(value) {
 }
 
 let historyTooltipEl = null;
+let historyHoverTarget = null;
 
 function attachHistoryHoverHandlers(root) {
   if (!root || root._historyHoverAttached) return;
@@ -3433,6 +3494,17 @@ function attachHistoryHoverHandlers(root) {
   root.addEventListener("pointerleave", hideHistoryTooltip);
   root.addEventListener("click", handleHistoryPointClick);
   root._historyHoverAttached = true;
+}
+
+function setHistoryHoverTarget(target) {
+  if (historyHoverTarget === target) return;
+  if (historyHoverTarget) {
+    historyHoverTarget.classList.remove("is-hovered");
+  }
+  historyHoverTarget = target;
+  if (target) {
+    target.classList.add("is-hovered");
+  }
 }
 
 function handleHistoryPointerMove(event) {
@@ -3445,9 +3517,13 @@ function handleHistoryPointerMove(event) {
     hideHistoryTooltip();
     return;
   }
-  showHistoryTooltip(event, {
+  setHistoryHoverTarget(target);
+  showHistoryTooltip({
     label: target.getAttribute("data-history-label"),
     value: target.getAttribute("data-history-value"),
+    anchorRect: target.getBoundingClientRect(),
+    pointerX: event.clientX,
+    pointerY: event.clientY,
   });
 }
 
@@ -3461,28 +3537,42 @@ function getHistoryTooltipElement() {
   return tooltip;
 }
 
-function showHistoryTooltip(event, dataset) {
+function showHistoryTooltip(dataset) {
   if (!dataset) return;
   const tooltip = getHistoryTooltipElement();
   const label = dataset.label || "";
   const value = dataset.value || "";
-  tooltip.innerHTML = `<strong>${label}</strong><span>${value}</span>`;
+  tooltip.innerHTML = `<strong class="history-tooltip__value">${value}</strong><span class="history-tooltip__date">${label}</span>`;
   tooltip.hidden = false;
-  const offset = 16;
-  let x = event.clientX + offset;
-  let y = event.clientY + offset;
-  const rect = tooltip.getBoundingClientRect();
-  const maxX = window.innerWidth - rect.width - 8;
-  const maxY = window.innerHeight - rect.height - 8;
-  x = Math.min(x, maxX);
-  y = Math.min(y, maxY);
-  tooltip.style.transform = `translate(${x}px, ${y}px)`;
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const offset = 14;
+  let x;
+  let y;
+  if (dataset.anchorRect) {
+    const anchor = dataset.anchorRect;
+    x = anchor.left + anchor.width / 2 - tooltipRect.width / 2;
+    y = anchor.top - tooltipRect.height - offset;
+    if (y < 8) {
+      y = anchor.bottom + offset;
+    }
+  } else if (typeof dataset.pointerX === "number" && typeof dataset.pointerY === "number") {
+    x = dataset.pointerX + offset;
+    y = dataset.pointerY + offset;
+  } else {
+    x = 0;
+    y = 0;
+  }
+  const maxX = window.innerWidth - tooltipRect.width - 8;
+  const maxY = window.innerHeight - tooltipRect.height - 8;
+  tooltip.style.transform = `translate(${clamp(x, 8, maxX)}px, ${clamp(y, 8, maxY)}px)`;
 }
 
 function hideHistoryTooltip() {
   if (historyTooltipEl) {
     historyTooltipEl.hidden = true;
   }
+  setHistoryHoverTarget(null);
 }
 
 function findNearestHistoryPoint(root, clientX, clientY) {

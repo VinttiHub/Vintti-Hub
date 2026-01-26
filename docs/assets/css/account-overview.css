@@ -654,6 +654,24 @@ body.panel-open {
   color: var(--text-primary);
 }
 
+.candidate-tests__status {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.candidate-tests__status--info {
+  color: var(--text-muted);
+}
+
+.candidate-tests__status--error {
+  color: #b42318;
+}
+
+.candidate-tests[data-tests-state="loading"] .candidate-tests__list {
+  opacity: 0.6;
+}
+
 .candidate-tests__list {
   list-style: none;
   padding: 0;
@@ -770,6 +788,35 @@ body.refresh-active {
   box-shadow: 0 35px 80px rgba(15, 23, 42, 0.25);
   max-width: 460px;
   width: min(100%, 460px);
+  flex-wrap: wrap;
+}
+
+.refresh-progress {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.refresh-progress__bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(93, 95, 239, 0.12);
+  overflow: hidden;
+}
+
+.refresh-progress__bar span {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5d5fef, #9a6bff);
+  transition: width 0.3s ease;
+}
+
+.refresh-progress__label {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 .refresh-dialog__text {

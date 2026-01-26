@@ -874,11 +874,27 @@ body {
   stroke:#fff;
   stroke-width:2;
   pointer-events:auto;
+  transition:transform 0.2s ease, stroke-width 0.2s ease;
+  transform-origin:center;
+  transform-box:fill-box;
+}
+
+.history-point.is-hovered{
+  stroke-width:3;
+  transform:scale(1.25);
 }
 
 .history-bar{
   cursor:pointer;
   pointer-events:auto;
+  transition:opacity 0.2s ease, transform 0.2s ease;
+  transform-origin:center;
+  transform-box:fill-box;
+}
+
+.history-bar.is-hovered{
+  opacity:1;
+  transform:translateY(-4px);
 }
 
 .history-chart__empty{
@@ -977,6 +993,8 @@ body {
 
 .history-tooltip{
   position:fixed;
+  top:0;
+  left:0;
   z-index:9999;
   background:rgba(30,16,55,0.92);
   color:#fff;
@@ -989,18 +1007,25 @@ body {
   transform:translate(-50%,-50%);
 }
 
-.history-tooltip strong{
+.history-tooltip strong,
+.history-tooltip__value{
   display:block;
-  font-size:0.75rem;
-  color:#cdd2ff;
+  font-size:0.95rem;
+  color:#fff;
+  font-weight:800;
   margin-bottom:0.15rem;
-  text-transform:uppercase;
-  letter-spacing:0.04em;
+  text-transform:none;
+  letter-spacing:0.02em;
 }
 
-.history-tooltip span{
-  font-size:0.95rem;
-  font-weight:800;
+.history-tooltip span,
+.history-tooltip__date{
+  display:block;
+  font-size:0.75rem;
+  font-weight:600;
+  color:#cdd2ff;
+  text-transform:none;
+  letter-spacing:0.02em;
 }
 
 .history-chart-modal{

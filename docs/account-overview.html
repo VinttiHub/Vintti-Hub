@@ -45,6 +45,10 @@
           <p class="eyebrow">Primary contact</p>
           <p id="metaContact">—</p>
         </div>
+        <div class="meta-card">
+          <p class="eyebrow">Data refreshed</p>
+          <p id="metaRefreshedAt">—</p>
+        </div>
       </section>
 
       <section class="opportunities">
@@ -97,7 +101,23 @@
         <div class="refresh-dialog__spinner" aria-hidden="true"></div>
         <div class="refresh-dialog__text">
           <p class="refresh-dialog__title">Vintti is working</p>
-          <p class="refresh-dialog__body">We're syncing open and closed opportunities. This can take a few minutes.</p>
+          <p class="refresh-dialog__body">
+            We're syncing open and closed opportunities. This can take a few minutes.
+          </p>
+        </div>
+        <div class="refresh-progress">
+          <div
+            id="refreshProgressBar"
+            class="refresh-progress__bar"
+            role="progressbar"
+            aria-live="polite"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+          >
+            <span></span>
+          </div>
+          <p class="refresh-progress__label" id="refreshProgressLabel">Preparing sync…</p>
         </div>
       </div>
     </div>
