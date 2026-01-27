@@ -1,0 +1,81 @@
+.main-content.monthly-mood-surface {
+  background-image: var(--monthly-watermark);
+  background-repeat: repeat;
+  background-size: 240px 240px;
+  background-position: center;
+}
+
+.monthly-mood-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 42, 55, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  margin-bottom: 16px;
+}
+
+.monthly-mood-message {
+  margin: 0;
+  font-size: 13px;
+  color: #2b3543;
+  font-weight: 500;
+}
+
+.monthly-mood-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monthly-mood-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.monthly-mood-options {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.monthly-mood-emoji {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.monthly-mood-emoji:hover {
+  transform: translateY(-1px);
+}
+
+.monthly-mood-emoji.selected {
+  border-color: rgba(43, 53, 67, 0.8);
+  box-shadow: 0 0 0 2px rgba(43, 53, 67, 0.18);
+  background: #fff;
+}
+
+.monthly-mood-emoji:focus-visible {
+  outline: 2px solid #1f2a37;
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .monthly-mood-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -7,6 +7,10 @@ const searchInput = document.querySelector("[data-filter-search]");
 const clearFilters = document.querySelector("[data-clear-filters]");
 const refreshButton = document.querySelector("[data-refresh]");
 const emptyState = document.querySelector("[data-empty-state]");
+const refreshOverlay = document.querySelector("[data-refresh-overlay]");
+const refreshBar = document.querySelector("[data-refresh-bar]");
+const refreshText = document.querySelector("[data-refresh-text]");
+const refreshStatus = document.querySelector("[data-refresh-status]");
 const modalOverlay = document.querySelector("[data-modal-overlay]");
 const modalBody = document.querySelector("[data-modal-body]");
 const modalClose = document.querySelector("[data-modal-close]");
@@ -20,6 +24,20 @@ const candidateRanges = {
 };
 
 let companies = [];
+let refreshInterval = null;
+let refreshProgress = 0;
+let statusInterval = null;
+let statusIndex = 0;
+
+const refreshStatuses = [
+  "Looking up LinkedIn...",
+  "Classifying industries...",
+  "Mapping company trails...",
+];
+
+if (refreshOverlay) {
+  refreshOverlay.hidden = true;
+}
 
 const safeList = (value) => {
   if (!value) return [];
@@ -59,6 +77,48 @@ const setRefreshState = (isLoading) => {
   if (!refreshButton) return;
   refreshButton.disabled = isLoading;
   refreshButton.textContent = isLoading ? "Refreshing..." : "Refresh";
+};
+
+const showRefreshOverlay = () => {
+  if (!refreshOverlay || !refreshBar || !refreshText) return;
+  refreshOverlay.hidden = false;
+  refreshProgress = 0;
+  refreshBar.style.width = "0%";
+  refreshText.textContent = "0%";
+  statusIndex = 0;
+  if (refreshStatus) {
+    refreshStatus.textContent = refreshStatuses[statusIndex];
+  }
+
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
+    refreshProgress = Math.min(95, refreshProgress + Math.random() * 8 + 3);
+    refreshBar.style.width = `${Math.round(refreshProgress)}%`;
+    refreshText.textContent = `${Math.round(refreshProgress)}%`;
+  }, 320);
+
+  if (statusInterval) clearInterval(statusInterval);
+  statusInterval = setInterval(() => {
+    statusIndex = (statusIndex + 1) % refreshStatuses.length;
+    if (refreshStatus) {
+      refreshStatus.textContent = refreshStatuses[statusIndex];
+    }
+  }, 2000);
+};
+
+const hideRefreshOverlay = () => {
+  if (!refreshOverlay || !refreshBar || !refreshText) return;
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = null;
+  if (statusInterval) clearInterval(statusInterval);
+  statusInterval = null;
+  refreshProgress = 100;
+  refreshBar.style.width = "100%";
+  refreshText.textContent = "100%";
+
+  setTimeout(() => {
+    refreshOverlay.hidden = true;
+  }, 350);
 };
 
 const fetchHunterRows = async () => {
@@ -111,7 +171,7 @@ const buildCard = (company) => {
     </div>
     <div class="card-meta">
       <div class="meta-stack">
-        <span class="meta-label">Candidates sourced</span>
+        <span class="meta-label">Candidates hired</span>
         <button class="candidate-count" type="button" data-hire-count>
           ${company.candidatesCount}
         </button>
@@ -223,6 +283,7 @@ const loadCompanies = async () => {
 
 const refreshCompanies = async () => {
   setRefreshState(true);
+  showRefreshOverlay();
   try {
     const rows = await refreshHunterRows();
     companies = rows.map(normalizeRow);
@@ -233,6 +294,7 @@ const refreshCompanies = async () => {
     alert("Failed to refresh hunter data. Please try again.");
   } finally {
     setRefreshState(false);
+    hideRefreshOverlay();
   }
 };
 

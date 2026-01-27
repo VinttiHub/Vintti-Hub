@@ -323,20 +323,21 @@ def refresh_hunter():
         conn.commit()
 
         for row in by_company.values():
-            if row.get("industry"):
+            if row.get("industry") and row.get("company_linkedin"):
                 continue
             result = _classify_company(row.get("company") or "")
             if not result:
                 continue
+            industry = row.get("industry") or result.get("industry")
+            company_linkedin = row.get("company_linkedin") or result.get("company_linkedin")
             cur.execute(
                 """
                 UPDATE hunter
                 SET industry = %s,
                     company_linkedin = %s
                 WHERE hunter_id = %s
-                  AND (industry IS NULL OR industry = '')
                 """,
-                (result.get("industry"), result.get("company_linkedin"), row.get("hunter_id")),
+                (industry, company_linkedin, row.get("hunter_id")),
             )
             if cur.rowcount:
                 classified += 1
