@@ -520,12 +520,14 @@ function normalizeDateToYMD(value) {
 function createDateRangeChecker(start, end) {
   const normalizedStart = normalizeDateToYMD(start);
   const normalizedEnd = normalizeDateToYMD(end);
-  if (!normalizedStart || !normalizedEnd) return null;
-  if (normalizedStart > normalizedEnd) return null;
+  if (!normalizedStart && !normalizedEnd) return null;
+  if (normalizedStart && normalizedEnd && normalizedStart > normalizedEnd) return null;
   return (value) => {
     const normalizedValue = normalizeDateToYMD(value);
     if (!normalizedValue) return false;
-    return normalizedValue >= normalizedStart && normalizedValue <= normalizedEnd;
+    if (normalizedStart && normalizedValue < normalizedStart) return false;
+    if (normalizedEnd && normalizedValue > normalizedEnd) return false;
+    return true;
   };
 }
 function filterEntriesWithinRange(entries = [], rangeChecker, resolver) {
@@ -813,8 +815,11 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
   const recruiterSuffix = recruiterName ? ` for ${recruiterName}` : "";
   const rangeStart = options.rangeStart ?? metricsState.rangeStart;
   const rangeEnd = options.rangeEnd ?? metricsState.rangeEnd;
+  const historyRangeMode = options.historyRangeMode || null;
+  const filterRangeStart = historyRangeMode === "capEnd" ? null : rangeStart;
+  const filterRangeEnd = rangeEnd || null;
   const readableRange = describeRange(rangeStart, rangeEnd);
-  const rangeChecker = createDateRangeChecker(rangeStart, rangeEnd);
+  const rangeChecker = createDateRangeChecker(filterRangeStart, filterRangeEnd);
   const filterDetailEntries = (entries, resolver) =>
     filterEntriesWithinRange(entries, rangeChecker, resolver);
   const opportunities = getLeadOpportunities(effectiveLead, state);
@@ -844,7 +849,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
         context: `Closed Win opportunities${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [`Count: ${selectedMetrics.closed_win_month ?? 0}`],
         items: createOpportunityItems(
-          filterOpportunities(opportunities, { stage: "Close Win", start: rangeStart, end: rangeEnd })
+          filterOpportunities(opportunities, { stage: "Close Win", start: filterRangeStart, end: filterRangeEnd })
         ),
         emptyMessage: "No Closed Win opportunities for this recruiter in the selected window.",
       };
@@ -854,7 +859,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
         context: `Closed Lost opportunities${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [`Count: ${selectedMetrics.closed_lost_month ?? 0}`],
         items: createOpportunityItems(
-          filterOpportunities(opportunities, { stage: "Closed Lost", start: rangeStart, end: rangeEnd })
+          filterOpportunities(opportunities, { stage: "Closed Lost", start: filterRangeStart, end: filterRangeEnd })
         ),
         emptyMessage: "No Closed Lost opportunities for this recruiter in the selected window.",
       };
@@ -863,7 +868,9 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
         title: "Total Closed Win",
         context: `Lifetime Closed Win opportunities${recruiterSuffix}.`,
         summaryLines: [`Lifetime total: ${selectedMetrics.closed_win_total ?? 0}`],
-        items: createOpportunityItems(filterOpportunities(opportunities, { stage: "Close Win" })),
+        items: createOpportunityItems(
+          filterOpportunities(opportunities, { stage: "Close Win", start: filterRangeStart, end: filterRangeEnd })
+        ),
         emptyMessage: "No Closed Win opportunities recorded for this recruiter.",
       };
     case "closedLostTotal":
@@ -871,7 +878,9 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
         title: "Total Closed Lost",
         context: `Lifetime Closed Lost opportunities${recruiterSuffix}.`,
         summaryLines: [`Lifetime total: ${selectedMetrics.closed_lost_total ?? 0}`],
-        items: createOpportunityItems(filterOpportunities(opportunities, { stage: "Closed Lost" })),
+        items: createOpportunityItems(
+          filterOpportunities(opportunities, { stage: "Closed Lost", start: filterRangeStart, end: filterRangeEnd })
+        ),
         emptyMessage: "No Closed Lost opportunities recorded for this recruiter.",
       };
     case "conversionRange": {
@@ -886,7 +895,9 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
           `Losses: ${losses}`,
           `Conversion: ${formatPercent(selectedMetrics.conversion_rate_last_20)}`,
         ],
-        items: createOpportunityItems(filterOpportunities(opportunities, { start: rangeStart, end: rangeEnd })),
+        items: createOpportunityItems(
+          filterOpportunities(opportunities, { start: filterRangeStart, end: filterRangeEnd })
+        ),
         emptyMessage: "No closed opportunities for this recruiter in the selected window.",
       };
     }
@@ -903,7 +914,9 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
           `Conversion: ${formatPercent(selectedMetrics.conversion_rate_lifetime)}`,
           `Total closed: ${lifetimeTotal}`,
         ],
-        items: createOpportunityItems(filterOpportunities(opportunities)),
+        items: createOpportunityItems(
+          filterOpportunities(opportunities, { start: filterRangeStart, end: filterRangeEnd })
+        ),
         emptyMessage: "No closed opportunities on record for this recruiter.",
       };
     }
@@ -3602,16 +3615,24 @@ async function handleHistoryPointClick(event) {
   if (!metricId) return;
   const detailKey = HISTORY_METRIC_DETAIL_MAP[metricId];
   if (!detailKey) return;
+  const cardConfig = (historyDom.currentCards || []).find((card) => card.id === metricId);
+  const needsCumulativeRange = Boolean(cardConfig && cardConfig.accumulate);
   const monthLabel = target.getAttribute("data-history-label") || "";
   const titleSuffix = monthLabel || null;
   const appendContext = monthLabel ? `Month selected: ${monthLabel}.` : "";
   const overrideStart = target.getAttribute("data-history-range-start") || null;
   const overrideEnd = target.getAttribute("data-history-range-end") || null;
+  const firstHistoryWindowStart =
+    metricsState.historyMonthlyWindows && metricsState.historyMonthlyWindows.length
+      ? metricsState.historyMonthlyWindows[0].start
+      : null;
+  const cumulativeStart = firstHistoryWindowStart || overrideStart;
   const detailOptions = {
     titleSuffix,
     appendContext,
     rangeStart: overrideStart || undefined,
     rangeEnd: overrideEnd || undefined,
+    historyRangeMode: needsCumulativeRange ? "capEnd" : undefined,
   };
   if (historyDom.chartModal && !historyDom.chartModal.hidden) {
     closeHistoryChartModal();
@@ -3619,7 +3640,8 @@ async function handleHistoryPointClick(event) {
   const leadKey = metricsState.selectedLead;
   if (overrideStart && overrideEnd && leadKey) {
     try {
-      const detailState = await getHistoryDetailState(leadKey, overrideStart, overrideEnd);
+      const fetchStart = needsCumulativeRange ? cumulativeStart || overrideStart : overrideStart;
+      const detailState = await getHistoryDetailState(leadKey, fetchStart, overrideEnd);
       if (detailState) {
         requestMetricDetail(detailKey, detailOptions, detailState);
         return;

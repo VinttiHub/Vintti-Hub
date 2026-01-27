@@ -463,6 +463,12 @@ function updateAccountHeader(account) {
   els.metaContact.textContent = formatContact(account);
 }
 
+function updateRefreshMeta(timestamp) {
+  if (!els.metaRefreshedAt) return;
+  const label = timestamp ? formatNewYorkTimestamp(timestamp) : "Not refreshed yet";
+  els.metaRefreshedAt.textContent = label;
+}
+
 function fallbackText(value, placeholder = "Not available") {
   if (typeof value === "number" && !Number.isNaN(value)) return value.toString();
   return value && String(value).trim() ? String(value).trim() : placeholder;
@@ -483,6 +489,29 @@ function formatContact(account) {
   if (!nameParts.length && !email) return "Not available";
   if (nameParts.length && email) return `${nameParts.join(" ")} · ${email}`;
   return nameParts.join(" ") || email;
+}
+
+function formatNewYorkTimestamp(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date)) return "Not refreshed yet";
+  const options = {
+    timeZone: NEW_YORK_TIMEZONE,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  };
+  const dateLabel = date.toLocaleString("en-US", options);
+  const tzLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: NEW_YORK_TIMEZONE,
+    timeZoneName: "short",
+  })
+    .formatToParts(date)
+    .find((part) => part.type === "timeZoneName")?.value;
+  return tzLabel ? `${dateLabel} ${tzLabel}` : dateLabel;
 }
 
 function buildOpportunitiesFromSnapshots(cacheMap) {

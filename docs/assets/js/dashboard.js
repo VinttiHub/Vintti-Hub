@@ -307,7 +307,10 @@ async function fetchTSHistory({ fromYM = null, toYM = null } = {}) {
   }
 
   const url = `${API}/metrics/ts_history?${params.toString()}`;
-  const r = await fetch(url, { credentials: 'include' });
+  const r = await fetch(url, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
   const arr = await r.json();
   return Array.isArray(arr) ? arr : [];
 }
@@ -558,20 +561,29 @@ function renderTSHistory(data){
 
 // ===== Data fetchers =====
 async function fetchOpportunitiesLight(){
-  const r = await fetch(`${API}/opportunities/light`, { credentials:'include' });
+  const r = await fetch(`${API}/opportunities/light`, {
+    credentials:'include',
+    cache: 'no-store'
+  });
   const arr = await r.json();
   return Array.isArray(arr) ? arr : [];
 }
 
 async function fetchAccountsLight(){
   // tsr/tsf by account (SQL already separated by model)
-  const r = await fetch(`${API}/data/light`, { credentials:'include' });
+  const r = await fetch(`${API}/data/light`, {
+    credentials:'include',
+    cache: 'no-store'
+  });
   const arr = await r.json();
   return Array.isArray(arr) ? arr : [];
 }
 
 async function fetchManagementMetrics(){
-  const r = await fetch(`${API}/metrics/management_dashboard`, { credentials: 'include' });
+  const r = await fetch(`${API}/metrics/management_dashboard`, {
+    credentials: 'include',
+    cache: 'no-store'
+  });
   if (!r.ok) throw new Error(`Management metrics HTTP ${r.status}`);
   return r.json();
 }
