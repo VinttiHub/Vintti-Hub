@@ -28,6 +28,7 @@ const RECRUITER_POWER_ALLOWED = new Set([
   'angie@vintti.com',
   'agostina@vintti.com',
   'agustin@vintti.com',
+  'jazmin@vintti.com',
   'lara@vintti.com',
 ]);
 

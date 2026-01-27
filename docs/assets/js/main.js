@@ -2576,7 +2576,8 @@ async function patchOppFields(oppId, payload) {
     'lara@vintti.com',
     'bahia@vintti.com',
     'agostina@vintti.com',
-    'mia@vintti.com'
+    'mia@vintti.com',
+    'jazmin@vintti.com'
   ]);
 
   const dash = document.getElementById('dashboardLink');
