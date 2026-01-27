@@ -2157,6 +2157,22 @@ function normalizeDurationDetails(raw) {
   });
   return normalized;
 }
+function normalizeLeadDurationBucket(bucket) {
+  const perMetric = {};
+  Object.entries(bucket || {}).forEach(([metricKey, rows]) => {
+    perMetric[metricKey] = (rows || []).map((row, index) => ({
+      opportunity_id: row.opportunity_id || `duration-${metricKey}-${index}`,
+      opportunity_title: row.opportunity_title || "Untitled opportunity",
+      opportunity_client_name: row.opportunity_client_name || "",
+      opportunity_stage: row.opportunity_stage || "",
+      duration_days: row.duration_days ?? null,
+      close_date: row.close_date || null,
+      first_batch_date: row.first_batch_date || null,
+      start_reference_date: row.start_reference_date || null,
+    }));
+  });
+  return perMetric;
+}
 function normalizePipelineDetails(raw) {
   const normalized = {};
   if (!raw || typeof raw !== "object") return normalized;
@@ -3107,12 +3123,14 @@ async function ensureHistoryDataForLead(leadEmail) {
     missing.forEach((window, index) => {
       const payload = responses[index] || {};
       const row = extractLeadHistoryRow(payload.metrics, key);
+      const durationDetails = extractLeadDurationDetails(payload, key);
       cache[window.key] = {
         key: window.key,
         label: window.label,
         start: window.start,
         end: window.end,
         metrics: row,
+        durationDetails,
       };
     });
     metricsState.historyCache[key] = cache;
@@ -3133,6 +3151,18 @@ function extractLeadHistoryRow(rows = [], leadKey) {
       (row) => (row?.hr_lead_email || row?.hr_lead || "").toLowerCase() === target
     ) || null
   );
+}
+function extractLeadDurationDetails(payload, leadKey) {
+  const target = (leadKey || "").toLowerCase();
+  if (!target) return {};
+  const raw = payload?.duration_details;
+  if (!raw || typeof raw !== "object") return {};
+  for (const [email, bucket] of Object.entries(raw)) {
+    if ((email || "").toLowerCase() === target) {
+      return normalizeLeadDurationBucket(bucket);
+    }
+  }
+  return {};
 }
 
 async function fetchHistoryWindow(startYMD, endYMD) {
@@ -3188,6 +3218,7 @@ function getHistoryTimelineForLead(leadKey) {
       start: window.start,
       end: window.end,
       metrics: entry?.metrics || null,
+      durationDetails: entry?.durationDetails || {},
     };
   });
 }
@@ -3209,13 +3240,32 @@ function getFilteredHistoryTimeline(leadKey) {
 }
 
 function buildHistoryMetricCards(timeline = []) {
+  const durationMetricKeyMap = {
+    avg_days_to_close_win: "avgCloseWin",
+    avg_days_to_close_lost: "avgCloseLost",
+    avg_days_to_first_batch_open: "avgBatchOpen",
+    avg_days_to_first_batch_closed: "avgBatchClosed",
+  };
+  const computeDurationValue = (entry, metricKey) => {
+    if (!entry) return null;
+    const rangeChecker = createDateRangeChecker(entry.start, entry.end);
+    const rows = entry.durationDetails?.[metricKey] || [];
+    const filtered = filterEntriesWithinRange(rows, rangeChecker, (row) =>
+      resolveDurationEntryDate(row, metricKey)
+    );
+    const avg = computeDurationAverage(filtered);
+    return avg;
+  };
   return HISTORY_METRICS.map((config) => {
+    const durationMetricKey = durationMetricKeyMap[config.id] || null;
     const basePoints = timeline.map((entry) => ({
       key: entry.monthKey,
       label: entry.label,
       start: entry.start,
       end: entry.end,
-      value: config.extractor(entry.metrics),
+      value: durationMetricKey
+        ? computeDurationValue(entry, durationMetricKey)
+        : config.extractor(entry.metrics),
     }));
     const points = config.accumulate ? accumulateSeries(basePoints) : basePoints;
     const populated = points.filter((pt) => pt.value != null);
