@@ -1,13 +1,15 @@
 import json
 import logging
+import os
 import re
-import time
-
 import openai
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
+from ai_routes import call_openai_with_retry
 from db import get_connection
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 bp = Blueprint("hunter", __name__)
 
@@ -97,24 +99,6 @@ def _strip_code_fences(text: str) -> str:
     return stripped
 
 
-def _call_openai_with_retry(model, messages, temperature=0.2, max_tokens=300, retries=3):
-    for attempt in range(retries):
-        try:
-            return openai.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-        except openai.RateLimitError:
-            logging.warning("OpenAI rate limit reached, retrying in 10s (attempt %s)", attempt + 1)
-            time.sleep(10)
-        except Exception:
-            logging.exception("OpenAI call failed")
-            raise
-    raise Exception("Exceeded maximum retries due to rate limit")
-
-
 def _classify_company(company):
     if not getattr(openai, "api_key", None):
         return None
@@ -141,8 +125,8 @@ def _classify_company(company):
         },
     ]
     try:
-        response = _call_openai_with_retry(
-            model="gpt-4o-mini",
+        response = call_openai_with_retry(
+            model="gpt-4o",
             messages=messages,
             temperature=0.2,
             max_tokens=200,

@@ -151,6 +151,7 @@
       button.type = 'button';
       button.className = 'monthly-mood-emoji';
       button.dataset.mood = option.key;
+      button.dataset.tooltip = option.label;
       button.textContent = option.emoji;
       button.setAttribute('title', option.label);
       button.setAttribute('aria-label', option.label);

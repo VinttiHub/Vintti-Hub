@@ -30,6 +30,7 @@ let statusInterval = null;
 let statusIndex = 0;
 
 const refreshStatuses = [
+  "Loading companies...",
   "Looking up LinkedIn...",
   "Classifying industries...",
   "Mapping company trails...",
@@ -269,6 +270,7 @@ const resetFilters = () => {
 };
 
 const loadCompanies = async () => {
+  showRefreshOverlay();
   try {
     const rows = await fetchHunterRows();
     companies = rows.map(normalizeRow);
@@ -278,6 +280,8 @@ const loadCompanies = async () => {
     console.error("Hunter load failed", err);
     companies = [];
     render();
+  } finally {
+    hideRefreshOverlay();
   }
 };
 
