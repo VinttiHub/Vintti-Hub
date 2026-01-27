@@ -124,6 +124,20 @@
     message.className = 'monthly-mood-message';
     message.textContent = theme.message;
 
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'monthly-mood-dismiss';
+    dismiss.setAttribute('aria-label', 'Hide monthly mood');
+    dismiss.textContent = '×';
+    dismiss.addEventListener('click', () => {
+      try {
+        window.localStorage.setItem('monthly_mood_hidden', todayKey());
+      } catch {
+        // ignore storage errors
+      }
+      section.remove();
+    });
+
     const bar = document.createElement('div');
     bar.className = 'monthly-mood-bar';
     bar.setAttribute('role', 'group');
@@ -170,7 +184,14 @@
     bar.appendChild(label);
     bar.appendChild(options);
 
-    section.appendChild(message);
+    const messageWrap = document.createElement('div');
+    messageWrap.style.display = 'flex';
+    messageWrap.style.alignItems = 'center';
+    messageWrap.style.gap = '8px';
+    messageWrap.appendChild(message);
+    messageWrap.appendChild(dismiss);
+
+    section.appendChild(messageWrap);
     section.appendChild(bar);
 
     return section;
@@ -192,6 +213,16 @@
     ensureWatermark(main, theme.emoji);
 
     if (!main.querySelector('.monthly-mood-banner')) {
+      const hidden = (() => {
+        try {
+          return window.localStorage.getItem('monthly_mood_hidden') === todayKey();
+        } catch {
+          return false;
+        }
+      })();
+      if (hidden) {
+        return;
+      }
       const banner = buildBanner(theme);
       if (main.firstChild) {
         main.insertBefore(banner, main.firstChild);

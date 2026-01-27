@@ -10,16 +10,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 14px;
+  padding: 6px 10px;
   border: 1px solid rgba(31, 42, 55, 0.12);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.74);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .monthly-mood-message {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: #2b3543;
   font-weight: 500;
 }
@@ -31,7 +31,7 @@
 }
 
 .monthly-mood-label {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #6b7280;
@@ -45,17 +45,31 @@
 }
 
 .monthly-mood-emoji {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.8);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.monthly-mood-dismiss {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.monthly-mood-dismiss:hover {
+  color: #2b3543;
 }
 
 .monthly-mood-emoji:hover {
