@@ -20,6 +20,7 @@ const CRM_FILTER_STATE = { salesLead: '', status: '', contract: '' };
 const CRM_SALES_LEAD_OPTIONS = new Map();
 let accountTableInstance = null;
 let crmDataTableFilterRegistered = false;
+let CRM_ALL_ACCOUNT_IDS = [];
 
 /* =========================
    1) Generic helpers
@@ -888,21 +889,27 @@ function setCrmRefreshButtonState(btn, isLoading) {
   btn.textContent = isLoading ? 'Refreshing...' : 'Refresh';
 }
 
-async function refreshCrmDerivedFields() {
+async function refreshCrmDerivedFields(accountIds = null) {
   const btn = document.getElementById('crmRefreshBtn');
   if (!btn || btn.disabled) return;
 
-  const rows = Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'));
-  if (!rows.length) return;
+  const fallbackRows = Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'));
+  const fallbackIds = fallbackRows.map(row => Number(row.dataset.id)).filter(Boolean);
+  const ids = (Array.isArray(accountIds) && accountIds.length)
+    ? accountIds.slice()
+    : (CRM_ALL_ACCOUNT_IDS.length ? CRM_ALL_ACCOUNT_IDS.slice() : fallbackIds);
+  if (!ids.length) return;
 
   setCrmRefreshButtonState(btn, true);
   toggleCrmLoading(true, 'Refreshing account status, contracts, and sales leads...');
-  updateCrmLoadingProgress(0, rows.length);
+  updateCrmLoadingProgress(0, ids.length);
 
   try {
     let doneCount = 0;
-    const tasks = rows.map(row => async () => {
-      const accountId = Number(row.dataset.id);
+    const rowById = new Map(
+      [...document.querySelectorAll('#accountTableBody tr[data-id]')].map(row => [Number(row.dataset.id), row])
+    );
+    const tasks = ids.map(accountId => async () => {
       if (!accountId) return;
 
       try {
@@ -921,13 +928,14 @@ async function refreshCrmDerivedFields() {
         const derivedContract = deriveContractTypeFromCandidates(hires);
         const patch = {};
 
-        const currentStatus = (row.dataset.statusLabel || '').toString().trim().toLowerCase();
+        const row = rowById.get(accountId) || null;
+        const currentStatus = (row?.dataset?.statusLabel || '').toString().trim().toLowerCase();
         if (derivedStatus && derivedStatus.toLowerCase() !== currentStatus) {
           patch.account_status = derivedStatus;
           patch.calculated_status = derivedStatus;
         }
 
-        const currentContract = getRowContractValue(row);
+        const currentContract = row ? getRowContractValue(row) : '';
         if (derivedContract && derivedContract !== currentContract) {
           patch.contract = derivedContract;
         }
@@ -940,7 +948,7 @@ async function refreshCrmDerivedFields() {
           desiredManager = await fetchSuggestedSalesLeadForAccount(accountId);
         }
 
-        const currentLead = (row.dataset.salesLeadCode || '').toString().toLowerCase().trim();
+        const currentLead = (row?.dataset?.salesLeadCode || '').toString().toLowerCase().trim();
         if (desiredManager && desiredManager !== currentLead) {
           patch.account_manager = desiredManager;
         }
@@ -954,14 +962,16 @@ async function refreshCrmDerivedFields() {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        if (patch.account_status) updateRowStatus(row, derivedStatus);
-        if (patch.contract) updateRowContract(row, derivedContract);
-        if (patch.account_manager) updateRowSalesLead(row, patch.account_manager, patch.account_manager);
+        if (row) {
+          if (patch.account_status) updateRowStatus(row, derivedStatus);
+          if (patch.contract) updateRowContract(row, derivedContract);
+          if (patch.account_manager) updateRowSalesLead(row, patch.account_manager, patch.account_manager);
+        }
       } catch (err) {
         console.warn(`⚠️ Could not update derived fields for account ${accountId}:`, err);
       } finally {
         doneCount += 1;
-        updateCrmLoadingProgress(doneCount, rows.length);
+        updateCrmLoadingProgress(doneCount, ids.length);
       }
     });
 
@@ -969,7 +979,7 @@ async function refreshCrmDerivedFields() {
 
     const contractLabels = new Set();
     const statusLabels = new Set();
-    rows.forEach(row => {
+    rowById.forEach(row => {
       const statusTxt = (row.dataset.statusLabel || '').toString().trim();
       if (statusTxt && statusTxt !== '—') statusLabels.add(statusTxt);
       const contractTxt = (row.dataset.contractLabel || '').toString().trim();
@@ -992,11 +1002,6 @@ async function refreshCrmDerivedFields() {
 function initCrmRefreshButton() {
   const btn = document.getElementById('crmRefreshBtn');
   if (!btn) return;
-  const email = getCurrentUserEmail();
-  if (email !== 'angie@vintti.com') {
-    btn.style.display = 'none';
-    return;
-  }
   btn.style.display = 'inline-flex';
   btn.addEventListener('click', () => refreshCrmDerivedFields());
 }
@@ -1500,6 +1505,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
       tableBody.innerHTML = rowsHtml;
 
+      CRM_ALL_ACCOUNT_IDS = data
+        .map(item => Number(item.account_id))
+        .filter(Boolean);
+
       const rowById = new Map(
         [...document.querySelectorAll('#accountTableBody tr')].map(r => [Number(r.dataset.id), r])
       );
@@ -1604,7 +1613,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      refreshCrmDerivedFields();
+      refreshCrmDerivedFields(CRM_ALL_ACCOUNT_IDS);
     } catch (err) {
       console.error('Error fetching account data:', err);
       toggleCrmLoading(false);
