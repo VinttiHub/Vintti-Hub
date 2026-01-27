@@ -140,17 +140,17 @@ def _classify_company(company):
             ),
         },
     ]
-    response = _call_openai_with_retry(
-        model="gpt-4o-mini",
-        messages=messages,
-        temperature=0.2,
-        max_tokens=200,
-    )
-    content = _strip_code_fences(response.choices[0].message.content or "")
     try:
+        response = _call_openai_with_retry(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.2,
+            max_tokens=200,
+        )
+        content = _strip_code_fences(response.choices[0].message.content or "")
         payload = json.loads(content)
     except Exception:
-        logging.warning("Failed to parse OpenAI JSON: %r", content[:200])
+        logging.exception("OpenAI classification failed for company=%r", company)
         return None
 
     industry = payload.get("industry")
@@ -325,7 +325,11 @@ def refresh_hunter():
         for row in by_company.values():
             if row.get("industry") and row.get("company_linkedin"):
                 continue
-            result = _classify_company(row.get("company") or "")
+            try:
+                result = _classify_company(row.get("company") or "")
+            except Exception:
+                logging.exception("Hunter classification failed for company=%r", row.get("company"))
+                result = None
             if not result:
                 continue
             industry = row.get("industry") or result.get("industry")

@@ -184,14 +184,8 @@
     bar.appendChild(label);
     bar.appendChild(options);
 
-    const messageWrap = document.createElement('div');
-    messageWrap.style.display = 'flex';
-    messageWrap.style.alignItems = 'center';
-    messageWrap.style.gap = '8px';
-    messageWrap.appendChild(message);
-    messageWrap.appendChild(dismiss);
-
-    section.appendChild(messageWrap);
+    section.appendChild(message);
+    section.appendChild(dismiss);
     section.appendChild(bar);
 
     return section;
