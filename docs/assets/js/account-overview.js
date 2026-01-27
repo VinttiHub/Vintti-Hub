@@ -792,7 +792,7 @@ function renderOpportunities(opportunities, filter) {
     els.opportunitiesEmpty.hidden = false;
     els.opportunitiesEmpty.textContent =
       filter === "closed"
-        ? "No hired opportunities are ready to showcase yet."
+        ? "No hired candidates are ready to showcase yet."
         : "No open opportunities are live for this account yet.";
     return;
   }
@@ -1054,7 +1054,7 @@ function buildBackButton() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "back-button";
-  button.textContent = "Back to batches";
+  button.innerHTML = "&larr; Back to batches";
   button.addEventListener("click", () => {
     panelState.view = "batches";
     panelState.selectedBatchId = null;
@@ -1106,8 +1106,8 @@ function buildCandidateCard(candidate, batch) {
       ${statusChip}
     </header>
     <ul class="candidate-meta">
-      <li><span>Status</span>${fallbackText(statusLabel)}</li>
-      <li><span>Expected salary</span>${salaryLabel}</li>
+      <li><span>🧭 Status</span>${fallbackText(statusLabel)}</li>
+      <li><span>💵 Expected salary</span>${salaryLabel}</li>
       <li><span>Country</span>${countryLabel}</li>
       <li><span>Email</span>${candidate.email ? `<a href="mailto:${candidate.email}">${candidate.email}</a>` : "—"}</li>
     </ul>

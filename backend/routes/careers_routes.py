@@ -440,6 +440,65 @@ def set_career_sheet_action(opportunity_id):
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route('/careers/<int:opportunity_id>/sheet_action', methods=['GET'])
+def get_career_sheet_action(opportunity_id):
+    try:
+        if not GOOGLE_SHEETS_SPREADSHEET_ID:
+            return jsonify({"error": "Missing GOOGLE_SHEETS_SPREADSHEET_ID"}), 500
+
+        svc = sheets_service()
+        job_id = _resolve_career_job_id(opportunity_id)
+        sheet_title = _sheet_title_from_range(GOOGLE_SHEETS_RANGE or "Open Positions!A:Z")
+        quoted_title = a1_quote(sheet_title)
+
+        values_resp = svc.spreadsheets().values().get(
+            spreadsheetId=GOOGLE_SHEETS_SPREADSHEET_ID,
+            range=f"{quoted_title}!A:AZ"
+        ).execute()
+        rows = values_resp.get("values", [])
+        if not rows:
+            return jsonify({"error": "Sheet appears empty"}), 400
+
+        headers = rows[0]
+        job_col = _find_column_index(headers, SHEET_JOB_ID_HEADERS)
+        action_col = _find_column_index(headers, SHEET_ACTION_HEADERS)
+        if job_col < 0:
+            return jsonify({"error": "Job ID column not found"}), 500
+        if action_col < 0:
+            return jsonify({"error": "Action column not found"}), 400
+
+        job_norm = str(job_id or "").strip().lower()
+        fallback_norm = str(opportunity_id).strip().lower()
+        target_rows = []
+        for idx, row in enumerate(rows[1:], start=2):
+            cell = row[job_col] if job_col < len(row) else ""
+            cell_norm = str(cell or "").strip().lower()
+            if not cell_norm:
+                continue
+            if cell_norm == job_norm or (fallback_norm and cell_norm == fallback_norm):
+                target_rows.append(idx)
+
+        if not target_rows:
+            return jsonify({"error": f"No rows found for Job ID {job_id}"}), 404
+
+        action_value = ""
+        for rn in target_rows:
+            row = rows[rn - 1] if rn - 1 < len(rows) else []
+            cell = row[action_col] if action_col < len(row) else ""
+            if cell:
+                action_value = cell
+
+        return jsonify({
+            "job_id": job_id,
+            "action": action_value,
+            "rows": target_rows
+        }), 200
+
+    except Exception as exc:
+        logging.exception("❌ get_career_sheet_action failed")
+        return jsonify({"error": str(exc)}), 500
+
+
 @bp.route('/sheets/candidates/import', methods=['POST'])
 def import_candidates_from_sheet():
     """

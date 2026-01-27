@@ -15,12 +15,9 @@
     <div class="hunter-shell">
       <section class="hero">
         <div>
-          <div class="banner-badge">🦁 Vintti Hunter</div>
           <h1>🦁 Vintti Hunter</h1>
           <p>
-            A soft, dreamy board to keep tabs on the companies we love. Track
-            how many candidates were hired and which Vintti accounts made the
-            magic happen.
+            A board to track companies on our radar.
           </p>
         </div>
       </section>
@@ -41,7 +38,13 @@
           </select>
         </label>
         <label class="field">
-          Candidate amount
+          <span class="field-label">
+            Candidate amount
+            <span
+              class="info-icon"
+              data-tooltip="Amount of candidates hired by Vintti clients from this company."
+            >i</span>
+          </span>
           <select data-filter-candidates>
             <option value="">Any amount</option>
             <option value="0-5">0 - 5</option>
@@ -51,12 +54,22 @@
             <option value="21+">21+</option>
           </select>
         </label>
+        <button type="button" data-refresh>Refresh</button>
         <button type="button" data-clear-filters>Reset filters</button>
       </section>
 
       <section class="company-grid" data-company-grid></section>
       <div class="empty-state" data-empty-state>
         Nothing in sight yet. Try a different trail.
+      </div>
+    </div>
+    <div class="modal-overlay" data-modal-overlay>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-header">
+          <h2 id="modal-title">Hired candidates</h2>
+          <button class="modal-close" type="button" data-modal-close>✕</button>
+        </div>
+        <div class="modal-body" data-modal-body></div>
       </div>
     </div>
     <script src="./assets/js/hunter.js"></script>

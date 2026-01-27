@@ -612,6 +612,14 @@ function createDurationItems(entries = [], type) {
     };
   });
 }
+function computeDurationAverage(entries = []) {
+  const values = entries
+    .map((entry) => (entry?.duration_days == null ? null : Number(entry.duration_days)))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return null;
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return total / values.length;
+}
 function resolveDurationEntryDate(entry = {}, metricKey) {
   if (!entry) return null;
   if (metricKey === "avgBatchOpen" || metricKey === "avgBatchClosed") {
@@ -816,6 +824,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
   const rangeStart = options.rangeStart ?? metricsState.rangeStart;
   const rangeEnd = options.rangeEnd ?? metricsState.rangeEnd;
   const historyRangeMode = options.historyRangeMode || null;
+  const useFilteredSummary = Boolean(historyRangeMode);
   const filterRangeStart = historyRangeMode === "capEnd" ? null : rangeStart;
   const filterRangeEnd = rangeEnd || null;
   const readableRange = describeRange(rangeStart, rangeEnd);
@@ -922,11 +931,12 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     }
     case "avgCloseWin": {
       const items = getDurationItems("avgCloseWin");
+      const filteredAvg = computeDurationAverage(getDurationEntries("avgCloseWin"));
       return {
         title: "Average days to close (Win)",
         context: `Time elapsed from opportunity start to Closed Win${recruiterSuffix} within ${readableRange}.`,
         summaryLines: [
-          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_close_win)}`,
+          `Average: ${formatDaysSummary(useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_close_win)}`,
           `Opportunities included: ${getDurationCount("avgCloseWin")}`,
         ],
         items,
@@ -935,11 +945,12 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     }
     case "avgCloseLost": {
       const items = getDurationItems("avgCloseLost");
+      const filteredAvg = computeDurationAverage(getDurationEntries("avgCloseLost"));
       return {
         title: "Average days to close (Lost)",
         context: `Time elapsed from opportunity start to Closed Lost${recruiterSuffix} within ${readableRange}.`,
         summaryLines: [
-          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_close_lost)}`,
+          `Average: ${formatDaysSummary(useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_close_lost)}`,
           `Opportunities included: ${getDurationCount("avgCloseLost")}`,
         ],
         items,
@@ -948,11 +959,14 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     }
     case "avgBatchOpen": {
       const items = getDurationItems("avgBatchOpen");
+      const filteredAvg = computeDurationAverage(getDurationEntries("avgBatchOpen"));
       return {
         title: "Average days to first batch (Open)",
         context: `Open opportunities${recruiterSuffix} with start dates inside ${readableRange}, tracking how long it took to send the first batch.`,
         summaryLines: [
-          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_first_batch_open)}`,
+          `Average: ${formatDaysSummary(
+            useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_first_batch_open
+          )}`,
           `Opportunities included: ${getDurationCount("avgBatchOpen")}`,
         ],
         items,
@@ -961,11 +975,14 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     }
     case "avgBatchClosed": {
       const items = getDurationItems("avgBatchClosed");
+      const filteredAvg = computeDurationAverage(getDurationEntries("avgBatchClosed"));
       return {
         title: "Average days to first batch (Closed)",
         context: `Closed opportunities${recruiterSuffix} that had a first batch before closing, limited to ${readableRange}.`,
         summaryLines: [
-          `Average: ${formatDaysSummary(selectedMetrics.avg_days_to_first_batch_closed)}`,
+          `Average: ${formatDaysSummary(
+            useFilteredSummary ? filteredAvg : selectedMetrics.avg_days_to_first_batch_closed
+          )}`,
           `Opportunities included: ${getDurationCount("avgBatchClosed")}`,
         ],
         items,
@@ -3668,7 +3685,7 @@ async function handleHistoryPointClick(event) {
     appendContext,
     rangeStart: overrideStart || undefined,
     rangeEnd: overrideEnd || undefined,
-    historyRangeMode: needsCumulativeRange ? "capEnd" : undefined,
+    historyRangeMode: needsCumulativeRange ? "capEnd" : "window",
   };
   if (historyDom.chartModal && !historyDom.chartModal.hidden) {
     closeHistoryChartModal();

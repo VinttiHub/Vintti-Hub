@@ -1,86 +1,15 @@
-const companies = [
-  {
-    name: "AtlasPay",
-    industry: "Fintech",
-    candidates: 12,
-    accounts: ["Luna L.", "Dario K.", "Mati G."],
-    linkedin: "https://www.linkedin.com/company/atlaspay",
-    location: "New York, NY",
-    signal: "Elephant herd spotted: finance ops + data.",
-  },
-  {
-    name: "Northwind Logistics",
-    industry: "Logistics",
-    candidates: 7,
-    accounts: ["Camila R.", "Josefina M."],
-    linkedin: "https://www.linkedin.com/company/northwind-logistics",
-    location: "Chicago, IL",
-    signal: "Zebra stampede of ops roles.",
-  },
-  {
-    name: "BluePeak Health",
-    industry: "Healthtech",
-    candidates: 18,
-    accounts: ["Paz S.", "Juliana B.", "Lara T."],
-    linkedin: "https://www.linkedin.com/company/bluepeak-health",
-    location: "Austin, TX",
-    signal: "Lion pride: clinical ops growth.",
-  },
-  {
-    name: "Crimson Harbor",
-    industry: "Retail",
-    candidates: 5,
-    accounts: ["Agus L."],
-    linkedin: "https://www.linkedin.com/company/crimson-harbor",
-    location: "Miami, FL",
-    signal: "Gazelle sprint into LATAM retail.",
-  },
-  {
-    name: "Lumen Arcade",
-    industry: "Gaming",
-    candidates: 9,
-    accounts: ["Felipe N.", "Angie D."],
-    linkedin: "https://www.linkedin.com/company/lumen-arcade",
-    location: "Seattle, WA",
-    signal: "Playful pack forming two squads.",
-  },
-  {
-    name: "Nimbus Freight",
-    industry: "Logistics",
-    candidates: 21,
-    accounts: ["Julieta P.", "Constanza V.", "Mariano F."],
-    linkedin: "https://www.linkedin.com/company/nimbus-freight",
-    location: "Dallas, TX",
-    signal: "Rhino-sized hunt for leads + BI.",
-  },
-  {
-    name: "VerdeCraft",
-    industry: "Sustainability",
-    candidates: 6,
-    accounts: ["Agustina V.", "Pilar A."],
-    linkedin: "https://www.linkedin.com/company/verdecrafthq",
-    location: "Denver, CO",
-    signal: "Green corridor: growth backfills.",
-  },
-  {
-    name: "Cobalt Studios",
-    industry: "Media",
-    candidates: 14,
-    accounts: ["Jaz L.", "Mora S."],
-    linkedin: "https://www.linkedin.com/company/cobalt-studios",
-    location: "Los Angeles, CA",
-    signal: "Creative safari, fresh tracks.",
-  },
-];
+const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
 const companyGrid = document.querySelector("[data-company-grid]");
 const industryFilter = document.querySelector("[data-filter-industry]");
 const candidateFilter = document.querySelector("[data-filter-candidates]");
 const searchInput = document.querySelector("[data-filter-search]");
 const clearFilters = document.querySelector("[data-clear-filters]");
-const summaryCount = document.querySelector("[data-summary-count]");
-const summaryCandidates = document.querySelector("[data-summary-candidates]");
+const refreshButton = document.querySelector("[data-refresh]");
 const emptyState = document.querySelector("[data-empty-state]");
+const modalOverlay = document.querySelector("[data-modal-overlay]");
+const modalBody = document.querySelector("[data-modal-body]");
+const modalClose = document.querySelector("[data-modal-close]");
 
 const candidateRanges = {
   "0-5": (count) => count >= 0 && count <= 5,
@@ -90,41 +19,146 @@ const candidateRanges = {
   "21+": (count) => count >= 21,
 };
 
+let companies = [];
+
+const safeList = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      return trimmed.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+};
+
+const normalizeRow = (row) => {
+  const candidates = safeList(row.candidates)
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+  const accounts = safeList(row.accounts).map((value) => String(value));
+  const amount = Number(row.amount_candidates);
+
+  return {
+    hunterId: row.hunter_id,
+    name: row.company || "N/A",
+    industry: row.industry || "Uncategorized",
+    candidatesCount: Number.isFinite(amount) ? amount : candidates.length,
+    candidateIds: candidates,
+    accounts,
+    linkedin: row.company_linkedin,
+  };
+};
+
+const setRefreshState = (isLoading) => {
+  if (!refreshButton) return;
+  refreshButton.disabled = isLoading;
+  refreshButton.textContent = isLoading ? "Refreshing..." : "Refresh";
+};
+
+const fetchHunterRows = async () => {
+  const res = await fetch(`${API_BASE}/hunter`, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Failed to load hunter data");
+  }
+  const data = await res.json();
+  return Array.isArray(data.rows) ? data.rows : [];
+};
+
+const refreshHunterRows = async () => {
+  const res = await fetch(`${API_BASE}/hunter/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source: "hunter-ui" }),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to refresh hunter data");
+  }
+  const data = await res.json();
+  return Array.isArray(data.rows) ? data.rows : [];
+};
+
 const buildCard = (company) => {
   const card = document.createElement("article");
   card.className = "company-card";
+
+  const accountsMarkup = company.accounts.length
+    ? company.accounts.map((account) => `<span class="account-pill">${account}</span>`).join("")
+    : `<span class="account-pill">N/A</span>`;
+
+  const linkedinMarkup = company.linkedin
+    ? `<a class="linkedin-btn" href="${company.linkedin}" target="_blank" rel="noopener">\
+        <img src="./assets/img/linkedin.png" alt="LinkedIn" />\
+        Open LinkedIn\
+      </a>`
+    : `<span class="linkedin-btn is-disabled">\
+        <img src="./assets/img/linkedin.png" alt="LinkedIn" />\
+        LinkedIn unavailable\
+      </span>`;
 
   card.innerHTML = `
     <div class="card-top">
       <div>
         <h3 class="company-name">${company.name}</h3>
-        <div class="signal">${company.location}</div>
+        <div class="signal">Hunter #${company.hunterId ?? "N/A"}</div>
       </div>
       <div class="industry-chip">${company.industry}</div>
     </div>
     <div class="card-meta">
-      <div class="meta-row">
-        <span class="meta-label">Candidates hunted</span>
-        <span class="candidate-count">${company.candidates}</span>
+      <div class="meta-stack">
+        <span class="meta-label">Candidates sourced</span>
+        <button class="candidate-count" type="button" data-hire-count>
+          ${company.candidatesCount}
+        </button>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Vintti accounts</span>
+        <span class="meta-label">Vintti clients</span>
       </div>
       <div class="account-list">
-        ${company.accounts.map((account) => `<span class="account-pill">${account}</span>`).join("")}
+        ${accountsMarkup}
       </div>
-      <div class="signal">${company.signal}</div>
     </div>
     <div class="card-actions">
-      <a class="linkedin-btn" href="${company.linkedin}" target="_blank" rel="noopener">
-        <img src="./assets/img/linkedin.png" alt="LinkedIn" />
-        Open LinkedIn
-      </a>
-      <span class="signal">Last tracks: today</span>
+      ${linkedinMarkup}
     </div>
   `;
 
   return card;
+};
+
+const openModal = (company) => {
+  modalBody.innerHTML = "";
+  const list = document.createElement("div");
+  list.className = "modal-list";
+
+  if (!company.candidateIds.length) {
+    list.innerHTML = `<div class="modal-row">No candidates yet.</div>`;
+  } else {
+    list.innerHTML = company.candidateIds
+      .map(
+        (candidateId) => `
+          <div class="modal-row">
+            <div class="modal-name">Candidate #${candidateId}</div>
+            <a class="modal-role" href="candidate-details.html?id=${encodeURIComponent(candidateId)}" target="_blank" rel="noopener">
+              Open profile
+            </a>
+          </div>
+        `
+      )
+      .join("");
+  }
+
+  modalBody.appendChild(list);
+  modalOverlay.classList.add("is-visible");
+};
+
+const closeModal = () => {
+  modalOverlay.classList.remove("is-visible");
 };
 
 const matchesFilters = (company) => {
@@ -134,7 +168,7 @@ const matchesFilters = (company) => {
 
   const matchesSearch = company.name.toLowerCase().includes(searchValue);
   const matchesIndustry = selectedIndustry ? company.industry === selectedIndustry : true;
-  const matchesCandidates = selectedRange ? candidateRanges[selectedRange](company.candidates) : true;
+  const matchesCandidates = selectedRange ? candidateRanges[selectedRange](company.candidatesCount) : true;
 
   return matchesSearch && matchesIndustry && matchesCandidates;
 };
@@ -143,15 +177,21 @@ const render = () => {
   const filtered = companies.filter(matchesFilters);
 
   companyGrid.innerHTML = "";
-  filtered.forEach((company) => companyGrid.appendChild(buildCard(company)));
-
-  summaryCount.textContent = filtered.length;
-  summaryCandidates.textContent = filtered.reduce((sum, company) => sum + company.candidates, 0);
+  filtered.forEach((company) => {
+    const card = buildCard(company);
+    const countButton = card.querySelector("[data-hire-count]");
+    countButton.addEventListener("click", () => openModal(company));
+    companyGrid.appendChild(card);
+  });
 
   emptyState.style.display = filtered.length ? "none" : "block";
 };
 
 const fillIndustries = () => {
+  const keep = industryFilter.querySelector("option[value='']");
+  industryFilter.innerHTML = "";
+  if (keep) industryFilter.appendChild(keep);
+
   const industries = Array.from(new Set(companies.map((company) => company.industry))).sort();
   industries.forEach((industry) => {
     const option = document.createElement("option");
@@ -168,8 +208,35 @@ const resetFilters = () => {
   render();
 };
 
-fillIndustries();
-render();
+const loadCompanies = async () => {
+  try {
+    const rows = await fetchHunterRows();
+    companies = rows.map(normalizeRow);
+    fillIndustries();
+    render();
+  } catch (err) {
+    console.error("Hunter load failed", err);
+    companies = [];
+    render();
+  }
+};
+
+const refreshCompanies = async () => {
+  setRefreshState(true);
+  try {
+    const rows = await refreshHunterRows();
+    companies = rows.map(normalizeRow);
+    fillIndustries();
+    render();
+  } catch (err) {
+    console.error("Hunter refresh failed", err);
+    alert("Failed to refresh hunter data. Please try again.");
+  } finally {
+    setRefreshState(false);
+  }
+};
+
+loadCompanies();
 
 [industryFilter, candidateFilter].forEach((select) => {
   select.addEventListener("change", render);
@@ -177,3 +244,12 @@ render();
 
 searchInput.addEventListener("input", render);
 clearFilters.addEventListener("click", resetFilters);
+if (refreshButton) refreshButton.addEventListener("click", refreshCompanies);
+
+modalOverlay.addEventListener("click", (event) => {
+  if (event.target === modalOverlay) {
+    closeModal();
+  }
+});
+
+modalClose.addEventListener("click", closeModal);

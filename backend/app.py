@@ -18,6 +18,7 @@ from reminders_routes import bp as reminders_bp
 from reset_password import register_password_reset_routes
 from send_email_endpoint import register_send_email_route
 from utils.services import init_services
+from hunter import bp as hunter_bp
 
 from routes.accounts_routes import bp as accounts_bp
 from routes.auth_routes import bp as auth_bp
@@ -65,6 +66,7 @@ def create_app() -> Flask:
     app.register_blueprint(profile_users_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(bp_candidate_search, url_prefix="")
+    app.register_blueprint(hunter_bp)
 
     @app.after_request
     def apply_cors_headers(response):

@@ -291,6 +291,67 @@ function getOpportunityId() {
   return '';
 }
 
+function setCareerTrafficLight(state) {
+  const el = document.getElementById('career-traffic-light');
+  if (!el) return;
+  const status = state.status || 'off';
+  const tooltip = state.tooltip || '';
+  el.classList.remove('status-published', 'status-archived', 'status-deleted', 'status-off');
+  el.classList.add(`status-${status}`);
+  if (tooltip) {
+    el.setAttribute('data-tooltip', tooltip);
+    el.setAttribute('aria-label', tooltip);
+  }
+}
+
+function normalizeSheetActionValue(val) {
+  return String(val || '').trim().toLowerCase();
+}
+
+function mapSheetActionToStage(actionValue) {
+  const normalized = normalizeSheetActionValue(actionValue);
+  if (normalized === 'archived') {
+    return { status: 'archived', label: 'Archived' };
+  }
+  if (normalized === 'borrar') {
+    return { status: 'deleted', label: 'Deleted' };
+  }
+  if (normalized === 'published' || !normalized) {
+    return { status: 'published', label: 'Published' };
+  }
+  return { status: 'published', label: actionValue };
+}
+
+async function updateCareerSheetTrafficLight() {
+  const oppId = getOpportunityId();
+  if (!oppId) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/careers/${encodeURIComponent(oppId)}/sheet_action`, {
+      method: 'GET'
+    });
+
+    if (res.status === 404) {
+      setCareerTrafficLight({
+        status: 'off',
+        tooltip: 'This opportunity is not published in the career site.'
+      });
+      return;
+    }
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sheet status lookup failed');
+
+    const stage = mapSheetActionToStage(data.action);
+    setCareerTrafficLight({
+      status: stage.status,
+      tooltip: stage.label
+    });
+  } catch (err) {
+    console.warn('⚠️ Unable to load sheet status', err);
+  }
+}
+
 window.hireCandidateId = null;
 function stripHtmlToText(html) {
   if (!html) return '';
@@ -565,6 +626,9 @@ async function setSheetActionForOpportunity(actionValue){
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Sheet update failed');
+
+    const stage = mapSheetActionToStage(actionValue);
+    setCareerTrafficLight({ status: stage.status, tooltip: stage.label });
 
     // 2) Envía email a Angie
     const accionHumana = isArchive ? 'archivar' : 'borrar';
@@ -2207,6 +2271,7 @@ async function publishCareerNow() {
     if (!res.ok) throw new Error(data.error || 'Publish failed');
 
     showFriendlyPopup(`✅ Published! Item ID: ${data.career_id}`);
+    setCareerTrafficLight({ status: 'published', tooltip: 'Published' });
     window.currentOpportunityData = Object.assign({}, window.currentOpportunityData || {}, {
       career_id: data.career_id, career_published: true
     });
@@ -2449,6 +2514,7 @@ async function loadOpportunityData() {
 } catch (err) {
   console.error("❌ Error loading stage from opportunities/light:", err);
 }
+  await updateCareerSheetTrafficLight();
 
  const d = window.currentOpportunityData || {};
  document.getElementById('expected-fee-input').value = d.expected_fee ?? '';

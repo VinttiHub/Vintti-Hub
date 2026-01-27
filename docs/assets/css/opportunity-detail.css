@@ -2918,6 +2918,69 @@ input:checked + .slider::before {
   width: 100%;
 }
 
+.career-traffic-light{
+  position: relative;
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff, #f3f4f6);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  cursor: default;
+}
+
+.career-traffic-light .light{
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d1d5db;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.18);
+}
+
+.career-traffic-light.status-published .light.green{
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.45);
+}
+
+.career-traffic-light.status-archived .light.yellow{
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+.career-traffic-light.status-deleted .light.red{
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.45);
+}
+
+.career-traffic-light.status-off .light{
+  background: #cbd5f5;
+  opacity: 0.55;
+}
+
+.career-traffic-light::after{
+  content: attr(data-tooltip);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.career-traffic-light:hover::after{
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* La fila inferior ya la tienes, la dejo por claridad */
 #header-actions .bottom-actions{
   display:flex;
