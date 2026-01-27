@@ -181,9 +181,17 @@
     bar.appendChild(label);
     bar.appendChild(options);
 
-    section.appendChild(message);
-    section.appendChild(dismiss);
-    section.appendChild(bar);
+    const content = document.createElement('div');
+    content.className = 'monthly-mood-content';
+    content.appendChild(message);
+    content.appendChild(bar);
+
+    const dismissRow = document.createElement('div');
+    dismissRow.className = 'monthly-mood-dismiss-row';
+    dismissRow.appendChild(dismiss);
+
+    section.appendChild(content);
+    section.appendChild(dismissRow);
 
     return section;
   }

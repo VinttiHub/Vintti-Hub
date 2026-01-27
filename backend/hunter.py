@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import time
 import openai
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
@@ -209,6 +210,9 @@ def refresh_hunter():
     if request.method == "OPTIONS":
         return ("", 204)
 
+    started_at = time.time()
+    logging.info("Hunter refresh start")
+
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     inserted = 0
@@ -218,6 +222,7 @@ def refresh_hunter():
     try:
         cur.execute("SELECT COALESCE(MAX(hunter_id), 0) AS max_id FROM hunter")
         next_id = (cur.fetchone() or {}).get("max_id", 0) + 1
+        logging.info("Hunter refresh max_id=%s next_id=%s", next_id - 1, next_id)
 
         cur.execute(
             """
@@ -227,6 +232,7 @@ def refresh_hunter():
             """
         )
         existing_rows = cur.fetchall()
+        logging.info("Hunter refresh existing_rows=%s", len(existing_rows))
         by_company = {}
         for row in existing_rows:
             norm = _normalize_company(row.get("company"))
@@ -242,6 +248,7 @@ def refresh_hunter():
             """
         )
         resume_rows = cur.fetchall()
+        logging.info("Hunter refresh resume_rows=%s", len(resume_rows))
 
         for resume in resume_rows:
             candidate_id = resume.get("candidate_id")
@@ -305,16 +312,24 @@ def refresh_hunter():
                     inserted += 1
 
         conn.commit()
+        logging.info("Hunter refresh inserted=%s updated=%s", inserted, updated)
 
         for row in by_company.values():
             if row.get("industry") and row.get("company_linkedin"):
                 continue
             try:
+                logging.info(
+                    "Hunter classify company=%r industry=%r linkedin=%r",
+                    row.get("company"),
+                    row.get("industry"),
+                    row.get("company_linkedin"),
+                )
                 result = _classify_company(row.get("company") or "")
             except Exception:
                 logging.exception("Hunter classification failed for company=%r", row.get("company"))
                 result = None
             if not result:
+                logging.info("Hunter classify skip company=%r", row.get("company"))
                 continue
             industry = row.get("industry") or result.get("industry")
             company_linkedin = row.get("company_linkedin") or result.get("company_linkedin")
@@ -331,6 +346,7 @@ def refresh_hunter():
                 classified += 1
 
         conn.commit()
+        logging.info("Hunter refresh classified=%s", classified)
 
         cur.execute(
             """
@@ -341,6 +357,8 @@ def refresh_hunter():
             """
         )
         rows = cur.fetchall()
+        elapsed = time.time() - started_at
+        logging.info("Hunter refresh done rows=%s elapsed=%.2fs", len(rows), elapsed)
         return jsonify(
             {
                 "inserted": inserted,
@@ -352,6 +370,8 @@ def refresh_hunter():
     except Exception:
         logging.exception("Hunter refresh failed")
         conn.rollback()
+        elapsed = time.time() - started_at
+        logging.info("Hunter refresh failed elapsed=%.2fs", elapsed)
         return jsonify({"error": "Hunter refresh failed"}), 500
     finally:
         cur.close()
