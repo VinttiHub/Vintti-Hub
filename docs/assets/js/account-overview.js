@@ -245,6 +245,8 @@ async function handleRefreshClick() {
         updateRefreshProgress(0.85, "Cache already up to date.");
       }
     }
+    updateRefreshProgress(0.9, "Pruning inactive hires…");
+    await pruneInactiveOverviewSnapshots(pageState.accountId);
   } catch (error) {
     console.error("Failed to refresh cached opportunities", error);
     updateRefreshProgress(0.85, "Something went wrong. Retrying state…");
@@ -258,6 +260,16 @@ async function handleRefreshClick() {
       updateRefreshProgress(1, "Overview updated with warnings.");
     }
     setRefreshState(false);
+  }
+}
+
+function getNewYorkTimestampISO() {
+  try {
+    const localized = new Date().toLocaleString("en-US", { timeZone: NEW_YORK_TIMEZONE });
+    const zoned = new Date(localized);
+    return Number.isNaN(zoned.getTime()) ? new Date().toISOString() : zoned.toISOString();
+  } catch (error) {
+    return new Date().toISOString();
   }
 }
 
@@ -326,6 +338,23 @@ async function persistOverviewSnapshots(accountId, snapshots) {
     }
   } catch (error) {
     console.warn("Failed to persist client overview cache", error);
+  }
+}
+
+async function pruneInactiveOverviewSnapshots(accountId) {
+  if (!accountId) return null;
+  try {
+    const res = await fetch(`${API_BASE}/accounts/${accountId}/overview-cache/prune-inactive`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Unknown error");
+    }
+    return res.json();
+  } catch (error) {
+    console.warn("Failed to prune inactive hired snapshots", error);
+    return null;
   }
 }
 
@@ -734,7 +763,9 @@ function updateHighlights(opportunities) {
     const hired = collectCandidates(opp).filter(isHiredCandidate);
     return acc + hired.length;
   }, 0);
-  els.highlightCandidates.textContent = padCount(hiredCandidates);
+  if (els.highlightCandidates) {
+    els.highlightCandidates.textContent = padCount(hiredCandidates);
+  }
 }
 
 function applyOpportunityFilter(filter = "open") {
@@ -761,7 +792,7 @@ function renderOpportunities(opportunities, filter) {
     els.opportunitiesEmpty.hidden = false;
     els.opportunitiesEmpty.textContent =
       filter === "closed"
-        ? "No closed opportunities are ready to showcase yet."
+        ? "No hired opportunities are ready to showcase yet."
         : "No open opportunities are live for this account yet.";
     return;
   }
@@ -885,7 +916,7 @@ function getLatestBatch(opportunity) {
 function getOpportunityStatus(opportunity) {
   const classification = classifyOpportunity(opportunity);
   if (classification === "closed") {
-    return { label: "Closed", className: "status-pill--closed" };
+    return { label: "Hired", className: "status-pill--closed" };
   }
   return { label: "Open", className: "status-pill--open" };
 }
@@ -898,7 +929,7 @@ function getOpportunityTimeline(opportunity) {
       opportunity?.opp_closed_date ||
       opportunity?.updated_at ||
       opportunity?.nda_signature_or_start_date;
-    return { label: "Closed", date: formatTimelineDate(closedDate) };
+    return { label: "Hired", date: formatTimelineDate(closedDate) };
   }
   const openDate =
     opportunity?.opp_start_date ||

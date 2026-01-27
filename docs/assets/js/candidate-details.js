@@ -1568,10 +1568,11 @@ function paintWaBtn(){
       const richFactory = window.RichComments && typeof window.RichComments.enhance === 'function';
       const ensureCandidatePatch = (field, value) => {
         if (!candidateId) return;
+        const payloadValue = value === undefined || value === null ? '' : value;
         fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [field]: value || '' })
+          body: JSON.stringify({ [field]: payloadValue })
         }).catch((err) => console.warn(`Failed to update ${field}`, err));
       };
 
@@ -1596,6 +1597,30 @@ function paintWaBtn(){
             const field = id === 'redFlags' ? 'red_flags' : 'comments';
             ensureCandidatePatch(field, ta.value.trim());
           });
+        });
+      }
+
+      const otherProcessInput = document.getElementById('other-process');
+      if (otherProcessInput) {
+        otherProcessInput.value = data.other_process || '';
+        otherProcessInput.addEventListener('blur', () => {
+          ensureCandidatePatch('other_process', otherProcessInput.value.trim());
+        });
+      }
+
+      const vacationsInput = document.getElementById('vacations');
+      if (vacationsInput) {
+        vacationsInput.value = data.vacations || '';
+        vacationsInput.addEventListener('blur', () => {
+          ensureCandidatePatch('vacations', vacationsInput.value.trim());
+        });
+      }
+
+      const usaNationalityInput = document.getElementById('usa-nationality');
+      if (usaNationalityInput) {
+        usaNationalityInput.checked = Boolean(data.usa_nationality);
+        usaNationalityInput.addEventListener('change', () => {
+          ensureCandidatePatch('usa_nationality', usaNationalityInput.checked);
         });
       }
 

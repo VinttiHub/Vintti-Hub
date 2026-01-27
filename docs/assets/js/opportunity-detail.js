@@ -334,6 +334,11 @@ function toggleActiveButton(command, button) {
 }
 // --- SPEED UPS: caché + prewarm de candidatos para búsquedas instantáneas ---
 const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
+  'angie@vintti.com',
+  'agustin@vintti.con',
+  'lara@vintti.com'
+]);
 const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
 let __cands = { data: [], idx: [], ts: 0 };
@@ -413,6 +418,86 @@ function showTinyToast(msg){
   setTimeout(()=>{ el.style.opacity=.0; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(), 220); }, 900);
 }
 
+function getStoredUserEmail(){
+  const stores = [window.localStorage, window.sessionStorage];
+  for (const store of stores) {
+    if (!store) continue;
+    try {
+      const raw = store.getItem('user_email');
+      if (raw) return raw.toLowerCase().trim();
+    } catch {}
+  }
+  return '';
+}
+
+function setupDeleteOpportunityControls(){
+  const btn = document.getElementById('delete-opportunity-btn');
+  const modal = document.getElementById('deleteOpportunityModal');
+  if (!btn || !modal) return;
+
+  const email = getStoredUserEmail();
+  if (!DELETE_OPPORTUNITY_ALLOWED_EMAILS.has(email)) {
+    btn.classList.add('hidden');
+    return;
+  }
+  btn.classList.remove('hidden');
+
+  const cancelBtn = modal.querySelector('.delete-cancel-btn');
+  const confirmBtn = modal.querySelector('.delete-confirm-btn');
+
+  const closeModal = () => {
+    modal.classList.add('hidden');
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Yes, delete';
+    }
+  };
+
+  const openModal = () => {
+    modal.classList.remove('hidden');
+  };
+
+  btn.addEventListener('click', openModal);
+  cancelBtn?.addEventListener('click', closeModal);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+
+  confirmBtn?.addEventListener('click', async () => {
+    const opportunityId = getOpportunityIdStrict();
+    if (!opportunityId) {
+      alert('Invalid opportunity ID.');
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting...';
+
+    try {
+      const res = await fetch(`${API_BASE}/opportunities/${opportunityId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || 'Delete failed');
+      }
+
+      const fallback = document.getElementById('goBackButton')?.getAttribute('data-fallback') || '/opportunities.html';
+      window.location.assign(fallback);
+    } catch (err) {
+      console.error('Delete opportunity failed:', err);
+      alert('Unable to delete this opportunity. Please try again.');
+      closeModal();
+    }
+  });
+}
+
 function buildIndex(list) {
   return list.map(c => ({ ...c, _haystack: norm(`${c.name} ${c.linkedin} ${c.phone}`) }));
 }
@@ -446,6 +531,7 @@ async function getCandidatesCached() {
 
 // 🔥 Precalienta en cuanto carga la página (mitiga cold start del backend)
 document.addEventListener('DOMContentLoaded', () => { getCandidatesCached(); });
+document.addEventListener('DOMContentLoaded', setupDeleteOpportunityControls);
 
 document.getElementById('closeSignOffPopup')?.addEventListener('click', () => {
   document.getElementById('signOffPopup')?.classList.add('hidden');

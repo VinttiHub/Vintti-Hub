@@ -26,6 +26,26 @@ def normalize_overview_stage(value):
     return 'open'
 
 
+def has_active_hire(cursor, opportunity_id):
+    """Return True if an opportunity still has an active hire."""
+    if opportunity_id is None:
+        return False
+    cursor.execute(
+        """
+            SELECT 1
+            FROM hire_opportunity
+            WHERE opportunity_id = %s
+              AND (
+                    end_date IS NULL
+                    OR LOWER(COALESCE(status, '')) = 'active'
+                  )
+            LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    return cursor.fetchone() is not None
+
+
 def fetch_data_from_table(table_name):
     try:
         conn = get_connection()
@@ -208,7 +228,7 @@ def upsert_account_overview_cache(account_id):
         cursor.execute("SELECT COALESCE(MAX(client_overview_id), 0) FROM client_overview")
         next_id = cursor.fetchone()[0] or 0
 
-        saved, updated, skipped = 0, 0, 0
+        saved, updated, skipped, deleted = 0, 0, 0, 0
         for entry in entries:
             try:
                 opportunity_id = int(entry.get('opportunity_id'))
@@ -266,6 +286,17 @@ def upsert_account_overview_cache(account_id):
 
             payload_json = json.dumps(snapshot, sort_keys=True)
 
+            should_remove_for_inactive_hire = stage == 'closed' and not has_active_hire(cursor, opportunity_id)
+            if should_remove_for_inactive_hire:
+                if existing_id is not None:
+                    cursor.execute(
+                        "DELETE FROM client_overview WHERE client_overview_id = %s",
+                        (existing_id,),
+                    )
+                    deleted += 1
+                skipped += 1
+                continue
+
             if existing_id is not None:
                 existing_serialized = (
                     json.dumps(existing_snapshot, sort_keys=True)
@@ -301,9 +332,59 @@ def upsert_account_overview_cache(account_id):
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({'inserted': saved, 'updated': updated, 'skipped': skipped}), 200
+        return jsonify({'inserted': saved, 'updated': updated, 'deleted': deleted, 'skipped': skipped}), 200
     except Exception as e:
         logging.exception("❌ upsert_account_overview_cache failed")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/accounts/<int:account_id>/overview-cache/prune-inactive', methods=['POST'])
+def prune_inactive_client_overview(account_id):
+    """Remove client_overview rows whose hires are no longer active."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+                SELECT client_overview_id, opportunity_id, candidates_batches
+                FROM client_overview
+                WHERE account_id = %s
+            """,
+            (account_id,),
+        )
+        rows = cursor.fetchall() or []
+        stale_ids = []
+        for client_overview_id, opportunity_id, payload in rows:
+            if not opportunity_id:
+                stale_ids.append(client_overview_id)
+                continue
+            stage = None
+            if payload:
+                try:
+                    decoded = json.loads(payload)
+                except Exception:
+                    decoded = None
+                if isinstance(decoded, dict):
+                    stage = normalize_overview_stage(decoded.get('stage'))
+            if stage != 'closed':
+                continue
+            if not has_active_hire(cursor, opportunity_id):
+                stale_ids.append(client_overview_id)
+        deleted = 0
+        if stale_ids:
+            cursor.execute(
+                "DELETE FROM client_overview WHERE client_overview_id = ANY(%s)",
+                (stale_ids,),
+            )
+            deleted = cursor.rowcount or len(stale_ids)
+            conn.commit()
+        else:
+            conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({'deleted': deleted})
+    except Exception as e:
+        logging.exception("❌ prune_inactive_client_overview failed")
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/opportunities/<int:opportunity_id>')
@@ -339,6 +420,72 @@ def get_opportunity_by_id(opportunity_id):
         return jsonify(opportunity)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route('/opportunities/<int:opportunity_id>', methods=['DELETE'])
+def delete_opportunity(opportunity_id):
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'opportunity'
+            ORDER BY ordinal_position
+            """
+        )
+        opp_cols = [row[0] for row in cursor.fetchall()]
+
+        cursor.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'opportunity_deleted'
+            ORDER BY ordinal_position
+            """
+        )
+        deleted_cols = [row[0] for row in cursor.fetchall()]
+
+        cols = [col for col in opp_cols if col in deleted_cols]
+        if not cols:
+            conn.rollback()
+            return jsonify({"error": "No matching columns between opportunity and opportunity_deleted"}), 500
+
+        col_list = ", ".join(cols)
+        cursor.execute(
+            f"""
+            INSERT INTO opportunity_deleted ({col_list})
+            SELECT {col_list}
+            FROM opportunity
+            WHERE opportunity_id = %s
+            """,
+            (opportunity_id,),
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": "Opportunity not found"}), 404
+
+        cursor.execute(
+            "DELETE FROM opportunity WHERE opportunity_id = %s",
+            (opportunity_id,),
+        )
+
+        conn.commit()
+        return jsonify({"message": "Opportunity deleted"}), 200
+    except Exception as e:
+        logging.exception("❌ delete_opportunity failed")
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @bp.route('/opportunities', methods=['POST'])
 def create_opportunity():

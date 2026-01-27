@@ -54,8 +54,11 @@
     <!-- ========== Overview ========== -->
     <section id="overview" class="detail-section">
       <div class="section-header">
-        <h2 class="overview-title">Overview</h2>
-        <p class="section-subtext"></p>
+        <div class="section-title">
+          <h2 class="overview-title">Overview</h2>
+          <p class="section-subtext"></p>
+        </div>
+        <button id="delete-opportunity-btn" class="danger-action hidden" type="button">Delete Opportunity</button>
       </div>
 
       <!-- Summary card: stage, IDs, dates, signed, hire, comments -->
@@ -758,6 +761,19 @@ the Vintti team</textarea>
           <button id="saveDraftCareerBtn">Save Draft</button>
           <button id="publishCareerBtn" class="header-btn">Publish</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Delete Opportunity Modal ===== -->
+  <div id="deleteOpportunityModal" class="opportunity-delete-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteOppTitle" aria-describedby="deleteOppDesc">
+    <div class="opportunity-delete-card" role="document">
+      <div class="opportunity-delete-icon" aria-hidden="true">!</div>
+      <h3 id="deleteOppTitle">Delete this opportunity?</h3>
+      <p id="deleteOppDesc">Are you sure you want to delete this opportunity? This action cannot be reversed.</p>
+      <div class="opportunity-delete-actions">
+        <button type="button" class="delete-cancel-btn">Cancel</button>
+        <button type="button" class="delete-confirm-btn">Yes, delete</button>
       </div>
     </div>
   </div>

@@ -862,6 +862,9 @@ def get_candidate_by_id(candidate_id):
                 nc.salary_range,
                 nc.red_flags,
                 nc.comments,
+                nc.other_process,
+                nc.vacations,
+                nc.usa_nationality,
                 nc.created_by,
                 nc.created_at,
                 nc.linkedin_scrapper,
@@ -1016,7 +1019,10 @@ def update_candidate_fields(candidate_id):
         'candidate_succes',
         'check_hr_lead',
         'address',
-        'dni'
+        'dni',
+        'other_process',
+        'vacations',
+        'usa_nationality'
     ]
 
     updates = []
@@ -1027,6 +1033,8 @@ def update_candidate_fields(candidate_id):
             val = data[field]
             # 👉 fuerza tipos especiales
             if field == 'check_hr_lead':
+                val = to_bool(val)
+            if field == 'usa_nationality':
                 val = to_bool(val)
             updates.append(f"{field} = %s")
             values.append(val)
@@ -1656,10 +1664,6 @@ def get_candidates_light_fast():
       - Hay hire_opportunity con end_date IS NULL => status='active' y opp_model viene de opportunity.
       - No hay hire activo (o solo cerrados)     => status='unhired' y opp_model=NULL.
     """
-    blacklist_filter = (request.args.get('blacklist_filter') or 'all').strip().lower()
-    if blacklist_filter not in ('all', 'only', 'exclude'):
-        blacklist_filter = 'all'
-
     try:
         conn = get_connection()
         cur  = conn.cursor(cursor_factory=RealDictCursor)
@@ -1697,50 +1701,6 @@ def get_candidates_light_fast():
         """)
 
         rows = cur.fetchall()
-
-        blacklist_columns = set(_get_blacklist_columns(conn))
-        has_linkedin_normalized = 'linkedin_normalized' in blacklist_columns
-        select_cols = ['blacklist_id', 'candidate_id', 'linkedin']
-        if has_linkedin_normalized:
-            select_cols.append('linkedin_normalized')
-
-        cur.execute(f"SELECT {', '.join(select_cols)} FROM blacklist")
-        blacklist_entries = cur.fetchall()
-
-        blacklist_candidate_ids = {entry.get('candidate_id') for entry in blacklist_entries if entry.get('candidate_id') is not None}
-        blacklist_linkedin_norms = set()
-        for entry in blacklist_entries:
-            normalized = entry.get('linkedin_normalized') if has_linkedin_normalized else None
-            if not normalized:
-                normalized = _normalize_linkedin(entry.get('linkedin'))
-            if normalized:
-                blacklist_linkedin_norms.add(normalized)
-
-        update_ids = set()
-        for row in rows:
-            candidate_id = row.get('candidate_id')
-            linkedin_norm = _normalize_linkedin(row.get('linkedin'))
-            is_blacklisted = False
-
-            if candidate_id in blacklist_candidate_ids:
-                is_blacklisted = True
-            elif linkedin_norm and linkedin_norm in blacklist_linkedin_norms:
-                is_blacklisted = True
-
-            if is_blacklisted and candidate_id is not None:
-                update_ids.add(candidate_id)
-
-            row['is_blacklisted'] = is_blacklisted
-
-        if blacklist_filter == 'only':
-            rows = [row for row in rows if row.get('is_blacklisted')]
-        elif blacklist_filter == 'exclude':
-            rows = [row for row in rows if not row.get('is_blacklisted')]
-
-        if update_ids:
-            updated = _bulk_update_candidate_blacklist(cur, update_ids, True)
-            if updated:
-                conn.commit()
 
         cur.close(); conn.close()
         return jsonify(rows)
