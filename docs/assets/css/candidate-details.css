@@ -2774,7 +2774,7 @@ html body .month-year .btn-clear:active{
 /* estado checked con gradiente pastel y sparkles */
 .pretty-check input:checked{
   border-color: transparent;
-  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  background: linear-gradient(180deg, var(--accent-2, #93c5fd), var(--accent, #3b82f6));
   box-shadow: 0 6px 18px rgba(124,58,237,.25);
 }
 .pretty-check input:checked::before{

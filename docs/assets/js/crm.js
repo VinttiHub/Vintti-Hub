@@ -101,6 +101,23 @@ function deriveStatusFrom(opps = [], hires = []) {
   return 'Lead in Process';
 }
 
+function deriveContractTypeFromCandidates(hires = []) {
+  if (!Array.isArray(hires) || hires.length === 0) return null;
+  let hasStaffing = false;
+  let hasRecruitingOrBuyout = false;
+  hires.forEach(hire => {
+    if (!hire || !isActiveHire(hire)) return;
+    const model = (hire.opp_model || '').toLowerCase();
+    if (model.includes('staff')) hasStaffing = true;
+    if (model.includes('recruit')) hasRecruitingOrBuyout = true;
+    if (hasBuyout(hire)) hasRecruitingOrBuyout = true;
+  });
+  if (hasStaffing && hasRecruitingOrBuyout) return 'Mix';
+  if (hasStaffing) return 'Staffing';
+  if (hasRecruitingOrBuyout) return 'Recruiting';
+  return null;
+}
+
 // Ranking for DataTables ordering by account status
 function statusRank(statusText){
   const s = norm(statusText);
@@ -182,6 +199,27 @@ function toggleCrmLoading(show, message) {
   if (textEl && message) textEl.textContent = message;
   overlay.classList.toggle('hidden', !show);
   overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+}
+
+function updateCrmLoadingProgress(done = 0, total = 0) {
+  const bar = document.getElementById('crmLoadingBar');
+  const percentEl = document.getElementById('crmLoadingPercent');
+  const track = document.getElementById('crmLoadingProgress');
+  if (!bar || !percentEl || !track) return;
+  const safeTotal = Math.max(0, Number(total) || 0);
+  const safeDone = Math.max(0, Math.min(safeTotal, Number(done) || 0));
+
+  if (safeTotal <= 0) {
+    track.style.display = 'none';
+    percentEl.textContent = '';
+    bar.style.width = '0%';
+    return;
+  }
+
+  const pct = Math.max(0, Math.min(100, Math.round((safeDone / safeTotal) * 100)));
+  track.style.display = 'block';
+  bar.style.width = pct + '%';
+  percentEl.textContent = `${pct}% (${safeDone}/${safeTotal})`;
 }
 
 function createOption(value, label) {
@@ -410,7 +448,7 @@ async function runWithConcurrency(tasks, limit = 6) {
   await Promise.all(workers);
 }
 
-async function fetchAccountStatusDetails(accountId) {
+async function fetchAccountOppsAndHires(accountId) {
   const [oppsRes, hiresRes] = await Promise.all([
     fetch(`${API_BASE}/accounts/${accountId}/opportunities`),
     fetch(`${API_BASE}/accounts/${accountId}/opportunities/candidates`)
@@ -418,6 +456,11 @@ async function fetchAccountStatusDetails(accountId) {
   if (!oppsRes.ok) throw new Error(`Opps HTTP ${oppsRes.status}`);
   if (!hiresRes.ok) throw new Error(`Candidates HTTP ${hiresRes.status}`);
   const [opps, hires] = await Promise.all([oppsRes.json(), hiresRes.json()]);
+  return { opps, hires };
+}
+
+async function fetchAccountStatusDetails(accountId) {
+  const { opps, hires } = await fetchAccountOppsAndHires(accountId);
   return deriveStatusFrom(opps, hires);
 }
 
@@ -715,6 +758,52 @@ function updateRowSalesLead(rowEl, email, displayName) {
   return meta;
 }
 
+function updateRowStatus(rowEl, statusText) {
+  if (!rowEl) return;
+  const td = rowEl.querySelector('td.status-td');
+  if (td) {
+    td.innerHTML = renderAccountStatusChip(statusText);
+    td.dataset.order = String(statusRank(statusText));
+  }
+  rowEl.dataset.statusLabel = statusText;
+  rowEl.dataset.statusCode = norm(statusText);
+}
+
+function updateRowContract(rowEl, contractText) {
+  if (!rowEl) return;
+  const cell = rowEl.querySelector('td.muted-cell');
+  if (cell) {
+    if (contractText) {
+      cell.textContent = contractText;
+    } else {
+      cell.innerHTML = '<span class="placeholder">No hires yet</span>';
+    }
+  }
+  const label = deriveContractLabel(contractText);
+  rowEl.dataset.contractLabel = label;
+  rowEl.dataset.contractCode = norm(label);
+}
+
+function getRowContractValue(rowEl) {
+  const label = (rowEl?.dataset?.contractLabel || '').toString().trim();
+  if (!label || label === 'No Contract') return '';
+  return label;
+}
+
+async function fetchSuggestedSalesLeadForAccount(accountId) {
+  if (!accountId) return null;
+  try {
+    const res = await fetch(`${API_BASE}/accounts/${accountId}/sales-lead/suggest`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const suggested = (data?.suggested_sales_lead || '').toString().trim().toLowerCase();
+    return suggested || null;
+  } catch (err) {
+    console.warn('⚠️ Could not fetch sales lead suggestion:', err);
+    return null;
+  }
+}
+
 async function assignManagersFromStatus(summary = {}, rowById = new Map(), onProgress) {
   if (!summary || !rowById) return 0;
   const tasks = [];
@@ -780,6 +869,136 @@ function kickoffCrmStatusPipeline({ ids = [], rowById = new Map() }) {
       updateSortToast(1);
       setTimeout(hideSortToast, 400);
     });
+}
+
+/* =========================
+   6b) CRM refresh (status + contract + sales lead)
+   ========================= */
+
+function getCurrentUserEmail() {
+  return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase()
+    .trim();
+}
+
+function setCrmRefreshButtonState(btn, isLoading) {
+  if (!btn) return;
+  btn.disabled = isLoading;
+  btn.classList.toggle('is-loading', isLoading);
+  btn.textContent = isLoading ? 'Refreshing...' : 'Refresh';
+}
+
+async function refreshCrmDerivedFields() {
+  const btn = document.getElementById('crmRefreshBtn');
+  if (!btn || btn.disabled) return;
+
+  const rows = Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'));
+  if (!rows.length) return;
+
+  setCrmRefreshButtonState(btn, true);
+  toggleCrmLoading(true, 'Refreshing account status, contracts, and sales leads...');
+  updateCrmLoadingProgress(0, rows.length);
+
+  try {
+    let doneCount = 0;
+    const tasks = rows.map(row => async () => {
+      const accountId = Number(row.dataset.id);
+      if (!accountId) return;
+
+      try {
+        let opps = [];
+        let hires = [];
+        try {
+          const payload = await fetchAccountOppsAndHires(accountId);
+          opps = payload.opps;
+          hires = payload.hires;
+        } catch (err) {
+          console.warn(`⚠️ Could not load data for account ${accountId}:`, err);
+          return;
+        }
+
+        const derivedStatus = deriveStatusFrom(opps, hires);
+        const derivedContract = deriveContractTypeFromCandidates(hires);
+        const patch = {};
+
+        const currentStatus = (row.dataset.statusLabel || '').toString().trim().toLowerCase();
+        if (derivedStatus && derivedStatus.toLowerCase() !== currentStatus) {
+          patch.account_status = derivedStatus;
+          patch.calculated_status = derivedStatus;
+        }
+
+        const currentContract = getRowContractValue(row);
+        if (derivedContract && derivedContract !== currentContract) {
+          patch.contract = derivedContract;
+        }
+
+        let desiredManager = null;
+        const normalizedStatus = (derivedStatus || '').toLowerCase().trim();
+        if (normalizedStatus === 'active client') {
+          desiredManager = 'lara@vintti.com';
+        } else if (normalizedStatus === 'lead in process') {
+          desiredManager = await fetchSuggestedSalesLeadForAccount(accountId);
+        }
+
+        const currentLead = (row.dataset.salesLeadCode || '').toString().toLowerCase().trim();
+        if (desiredManager && desiredManager !== currentLead) {
+          patch.account_manager = desiredManager;
+        }
+
+        if (!Object.keys(patch).length) return;
+
+        const res = await fetch(`${API_BASE}/accounts/${accountId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        if (patch.account_status) updateRowStatus(row, derivedStatus);
+        if (patch.contract) updateRowContract(row, derivedContract);
+        if (patch.account_manager) updateRowSalesLead(row, patch.account_manager, patch.account_manager);
+      } catch (err) {
+        console.warn(`⚠️ Could not update derived fields for account ${accountId}:`, err);
+      } finally {
+        doneCount += 1;
+        updateCrmLoadingProgress(doneCount, rows.length);
+      }
+    });
+
+    await runWithConcurrency(tasks, 6);
+
+    const contractLabels = new Set();
+    const statusLabels = new Set();
+    rows.forEach(row => {
+      const statusTxt = (row.dataset.statusLabel || '').toString().trim();
+      if (statusTxt && statusTxt !== '—') statusLabels.add(statusTxt);
+      const contractTxt = (row.dataset.contractLabel || '').toString().trim();
+      if (contractTxt) contractLabels.add(contractTxt);
+    });
+    populateContractFilter(Array.from(contractLabels));
+    populateStatusFilter(Array.from(statusLabels));
+
+    if (accountTableInstance) {
+      accountTableInstance.draw();
+      updateCrmEmptyState(accountTableInstance);
+    }
+  } finally {
+    toggleCrmLoading(false);
+    updateCrmLoadingProgress(0, 0);
+    setCrmRefreshButtonState(btn, false);
+  }
+}
+
+function initCrmRefreshButton() {
+  const btn = document.getElementById('crmRefreshBtn');
+  if (!btn) return;
+  const email = getCurrentUserEmail();
+  if (email !== 'angie@vintti.com') {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = 'inline-flex';
+  btn.addEventListener('click', () => refreshCrmDerivedFields());
 }
 
 /* =========================
@@ -1209,6 +1428,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
 
 document.addEventListener('DOMContentLoaded', () => {
   initCrmFilterControls();
+  initCrmRefreshButton();
   loadSalesLeadFilterOptions();
   updateCrmEmptyState(null);
   toggleCrmLoading(true, 'Loading CRM accounts…');
@@ -1383,6 +1603,8 @@ document.addEventListener('DOMContentLoaded', () => {
           console.error('❌ Error updating priority:', error);
         }
       });
+
+      refreshCrmDerivedFields();
     } catch (err) {
       console.error('Error fetching account data:', err);
       toggleCrmLoading(false);

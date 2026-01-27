@@ -46,6 +46,40 @@ def has_active_hire(cursor, opportunity_id):
     return cursor.fetchone() is not None
 
 
+def has_buyout_info(cursor, opportunity_id):
+    """Return True if an opportunity has buyout info in hire_opportunity or buyouts."""
+    if opportunity_id is None:
+        return False
+    cursor.execute(
+        """
+            SELECT 1
+            FROM hire_opportunity
+            WHERE opportunity_id = %s
+              AND (
+                    (buyout_dolar IS NOT NULL AND NULLIF(TRIM(CAST(buyout_dolar AS TEXT)), '') IS NOT NULL)
+                    OR (buyout_daterange IS NOT NULL AND NULLIF(TRIM(CAST(buyout_daterange AS TEXT)), '') IS NOT NULL)
+                  )
+            LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    if cursor.fetchone() is not None:
+        return True
+    cursor.execute(
+        """
+            SELECT 1
+            FROM buyouts b
+            JOIN opportunity o
+              ON o.account_id = b.account_id
+             AND o.candidato_contratado = b.candidate_id
+            WHERE o.opportunity_id = %s
+            LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    return cursor.fetchone() is not None
+
+
 def fetch_data_from_table(table_name):
     try:
         conn = get_connection()
@@ -286,7 +320,11 @@ def upsert_account_overview_cache(account_id):
 
             payload_json = json.dumps(snapshot, sort_keys=True)
 
-            should_remove_for_inactive_hire = stage == 'closed' and not has_active_hire(cursor, opportunity_id)
+            should_remove_for_inactive_hire = (
+                stage == 'closed'
+                and not has_active_hire(cursor, opportunity_id)
+                and not has_buyout_info(cursor, opportunity_id)
+            )
             if should_remove_for_inactive_hire:
                 if existing_id is not None:
                     cursor.execute(
@@ -368,7 +406,7 @@ def prune_inactive_client_overview(account_id):
                     stage = normalize_overview_stage(decoded.get('stage'))
             if stage != 'closed':
                 continue
-            if not has_active_hire(cursor, opportunity_id):
+            if not has_active_hire(cursor, opportunity_id) and not has_buyout_info(cursor, opportunity_id):
                 stale_ids.append(client_overview_id)
         deleted = 0
         if stale_ids:

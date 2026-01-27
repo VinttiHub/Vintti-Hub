@@ -2561,7 +2561,11 @@ function averageValues(values = []) {
 
 function buildMonthlyWindows(startYear, startMonthIndex) {
   const windows = [];
-  const formatter = new Intl.DateTimeFormat("en", { month: "short", year: "numeric" });
+  const formatter = new Intl.DateTimeFormat("en", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
   const now = new Date();
   const endCursor = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
   for (let cursor = Date.UTC(startYear, startMonthIndex, 1); cursor <= endCursor; ) {
@@ -3123,6 +3127,21 @@ async function fetchHistoryWindow(startYMD, endYMD) {
   return resp.json();
 }
 
+async function fetchRecruiterMetrics(params = {}) {
+  const url = new URL(`${API_BASE}/recruiter-metrics`);
+  if (params.start && params.end) {
+    url.searchParams.set("start", params.start);
+    url.searchParams.set("end", params.end);
+  }
+  const resp = await fetch(url.toString(), { credentials: "include" });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (data?.status && data.status !== "ok") {
+    throw new Error(data.message || "Unexpected response");
+  }
+  return data;
+}
+
 async function getHistoryDetailState(leadKey, rangeStart, rangeEnd) {
   const normalizedLead = (leadKey || "").toLowerCase();
   if (!normalizedLead || !rangeStart || !rangeEnd) return null;
@@ -3488,6 +3507,18 @@ function simplifyAxisLabel(label) {
   if (parts.length <= 2) return label;
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
+function formatHistoryMonthLabel(monthKey) {
+  if (!monthKey) return "";
+  const [year, month] = String(monthKey).split("-");
+  if (!year || !month) return monthKey;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+  if (Number.isNaN(date.getTime())) return monthKey;
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
 
 function escapeAttribute(value) {
   if (value == null) return "";
@@ -3531,8 +3562,11 @@ function handleHistoryPointerMove(event) {
     return;
   }
   setHistoryHoverTarget(target);
+  const monthKey = target.getAttribute("data-history-key") || "";
+  const monthLabel =
+    formatHistoryMonthLabel(monthKey) || target.getAttribute("data-history-label") || "";
   showHistoryTooltip({
-    label: target.getAttribute("data-history-label"),
+    label: monthLabel,
     value: target.getAttribute("data-history-value"),
     anchorRect: target.getBoundingClientRect(),
     pointerX: event.clientX,
@@ -3617,7 +3651,9 @@ async function handleHistoryPointClick(event) {
   if (!detailKey) return;
   const cardConfig = (historyDom.currentCards || []).find((card) => card.id === metricId);
   const needsCumulativeRange = Boolean(cardConfig && cardConfig.accumulate);
-  const monthLabel = target.getAttribute("data-history-label") || "";
+  const monthKey = target.getAttribute("data-history-key") || "";
+  const monthLabel =
+    formatHistoryMonthLabel(monthKey) || target.getAttribute("data-history-label") || "";
   const titleSuffix = monthLabel || null;
   const appendContext = monthLabel ? `Month selected: ${monthLabel}.` : "";
   const overrideStart = target.getAttribute("data-history-range-start") || null;

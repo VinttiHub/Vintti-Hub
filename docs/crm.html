@@ -155,6 +155,25 @@
       font-size: 0.95rem;
       color: #1f2937;
     }
+    .crm-loading-progress {
+      width: 100%;
+      height: 10px;
+      background: rgba(11, 61, 145, 0.12);
+      border-radius: 999px;
+      margin: 16px 0 8px;
+      overflow: hidden;
+    }
+    .crm-loading-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #0b3d91, #cdff30);
+      transition: width 0.2s ease;
+    }
+    .crm-loading-percent {
+      font-size: 0.85rem;
+      color: #1f2937;
+      margin: 0;
+    }
   </style>
 </head>
 
@@ -164,6 +183,10 @@
       <div class="crm-loading-spinner" aria-hidden="true"></div>
       <p class="crm-loading-title">Loading CRM</p>
       <p class="crm-loading-text">Fetching accounts and calculating statuses…</p>
+      <div class="crm-loading-progress" id="crmLoadingProgress" aria-hidden="true">
+        <div class="crm-loading-bar" id="crmLoadingBar" style="width:0%"></div>
+      </div>
+      <p class="crm-loading-percent" id="crmLoadingPercent" aria-live="polite"></p>
     </div>
   </div>
   <!-- ====================== SIDEBAR ====================== -->
@@ -262,7 +285,12 @@
     <!-- Top bar: title + primary action -->
     <header class="page-header">
       <h1 class="page-title">CRM</h1>
-      <button class="new-btn" onclick="openPopup()">New</button>
+      <div class="page-actions">
+        <button class="refresh-btn" id="crmRefreshBtn" type="button" style="display:none;">
+          Refresh
+        </button>
+        <button class="new-btn" onclick="openPopup()">New</button>
+      </div>
     </header>
 
     <section class="filters-top-bar" aria-label="Table filters">
