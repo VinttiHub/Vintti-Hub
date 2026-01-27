@@ -13,46 +13,21 @@
   </head>
   <body class="hunter-body">
     <div class="hunter-shell">
-      <div class="safari-banner">
-        <div class="banner-badge">🦁 Vintti Hunter</div>
-        <div class="banner-text">
-          Safari mode on. Spot the companies, count the captures, and keep the
-          team hydrated. This is internal, so have fun with it.
-        </div>
-      </div>
-
       <section class="hero">
         <div>
-          <h1>Company Safari Board</h1>
+          <div class="banner-badge">🦁 Vintti Hunter</div>
+          <h1>🦁 Vintti Hunter</h1>
           <p>
-            We hunt talent, not animals. Think of this as the watering hole: who
-            is hiring, how many candidates we placed, and which Vintti accounts
-            led the charge.
+            A soft, dreamy board to keep tabs on the companies we love. Track
+            how many candidates were hired and which Vintti accounts made the
+            magic happen.
           </p>
-          <div class="summary-bar">
-            <span>
-              Showing <span class="summary-highlight" data-summary-count>0</span>
-              companies
-            </span>
-            <span>
-              Total candidates hunted:
-              <span class="summary-highlight" data-summary-candidates>0</span>
-            </span>
-          </div>
         </div>
-        <aside class="hero-note">
-          <h2>Trail map</h2>
-          <ul>
-            <li>Industry filter = pick your biome.</li>
-            <li>Candidate count = spot the big herds.</li>
-            <li>LinkedIn button = peek at their habitat.</li>
-          </ul>
-        </aside>
       </section>
 
       <section class="toolbar">
         <label class="field">
-          Track a company
+          Search company
           <input
             type="search"
             placeholder="Try AtlasPay or Nimbus..."
@@ -60,13 +35,13 @@
           />
         </label>
         <label class="field">
-          Industry biome
+          Industry
           <select data-filter-industry>
             <option value="">All industries</option>
           </select>
         </label>
         <label class="field">
-          Candidate herd size
+          Candidate amount
           <select data-filter-candidates>
             <option value="">Any amount</option>
             <option value="0-5">0 - 5</option>
@@ -76,7 +51,7 @@
             <option value="21+">21+</option>
           </select>
         </label>
-        <button type="button" data-clear-filters>Reset trail</button>
+        <button type="button" data-clear-filters>Reset filters</button>
       </section>
 
       <section class="company-grid" data-company-grid></section>
