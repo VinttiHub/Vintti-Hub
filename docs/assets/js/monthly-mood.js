@@ -130,12 +130,8 @@
     dismiss.setAttribute('aria-label', 'Hide monthly mood');
     dismiss.textContent = '×';
     dismiss.addEventListener('click', () => {
-      try {
-        window.localStorage.setItem('monthly_mood_hidden', todayKey());
-      } catch {
-        // ignore storage errors
-      }
       section.remove();
+      showReopenButton();
     });
 
     const bar = document.createElement('div');
@@ -207,22 +203,13 @@
     ensureWatermark(main, theme.emoji);
 
     if (!main.querySelector('.monthly-mood-banner')) {
-      const hidden = (() => {
-        try {
-          return window.localStorage.getItem('monthly_mood_hidden') === todayKey();
-        } catch {
-          return false;
-        }
-      })();
-      if (hidden) {
-        return;
-      }
       const banner = buildBanner(theme);
       if (main.firstChild) {
         main.insertBefore(banner, main.firstChild);
       } else {
         main.appendChild(banner);
       }
+      removeReopenButton();
       fetchTodayMood()
         .then((mood) => {
           applySelectedMood(banner, mood);
@@ -231,6 +218,25 @@
           console.warn('Failed to load today mood', error);
         });
     }
+  }
+
+  function showReopenButton() {
+    const main = document.querySelector('.main-content');
+    if (!main || main.querySelector('.monthly-mood-reopen')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'monthly-mood-reopen';
+    button.textContent = 'Show mood bar';
+    button.addEventListener('click', () => {
+      button.remove();
+      insertBannerIfNeeded();
+    });
+    main.insertBefore(button, main.firstChild);
+  }
+
+  function removeReopenButton() {
+    const existing = document.querySelector('.monthly-mood-reopen');
+    if (existing) existing.remove();
   }
 
   function scheduleInit() {
