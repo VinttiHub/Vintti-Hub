@@ -60,6 +60,21 @@ const normalizeRow = (row) => {
   const candidates = safeList(row.candidates)
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value));
+  const candidateDetails = safeList(row.candidate_details)
+    .map((item) => {
+      if (item && typeof item === "object") {
+        const id = Number(item.id ?? item.candidate_id);
+        return {
+          id,
+          name: item.name ? String(item.name) : null,
+        };
+      }
+      return { id: Number(item), name: null };
+    })
+    .filter((item) => Number.isFinite(item.id));
+  const candidateProfiles = candidateDetails.length
+    ? candidateDetails
+    : candidates.map((id) => ({ id, name: null }));
   const accounts = safeList(row.accounts).map((value) => String(value));
   const amount = Number(row.amount_candidates);
 
@@ -69,6 +84,7 @@ const normalizeRow = (row) => {
     industry: row.industry || "Uncategorized",
     candidatesCount: Number.isFinite(amount) ? amount : candidates.length,
     candidateIds: candidates,
+    candidateProfiles,
     accounts,
     linkedin: row.company_linkedin,
   };
@@ -197,15 +213,15 @@ const openModal = (company) => {
   const list = document.createElement("div");
   list.className = "modal-list";
 
-  if (!company.candidateIds.length) {
+  if (!company.candidateProfiles.length) {
     list.innerHTML = `<div class="modal-row">No candidates yet.</div>`;
   } else {
-    list.innerHTML = company.candidateIds
+    list.innerHTML = company.candidateProfiles
       .map(
-        (candidateId) => `
+        (candidate) => `
           <div class="modal-row">
-            <div class="modal-name">Candidate #${candidateId}</div>
-            <a class="modal-role" href="candidate-details.html?id=${encodeURIComponent(candidateId)}" target="_blank" rel="noopener">
+            <div class="modal-name">${candidate.name || `Candidate #${candidate.id}`}</div>
+            <a class="modal-action" href="candidate-details.html?id=${encodeURIComponent(candidate.id)}" target="_blank" rel="noopener">
               Open profile
             </a>
           </div>

@@ -69,6 +69,16 @@ def _normalize_candidate_ids(value):
     return ids
 
 
+def _normalize_account_ids(value):
+    ids = []
+    for item in _parse_json_list(value):
+        try:
+            ids.append(int(item))
+        except Exception:
+            continue
+    return ids
+
+
 def _extract_companies(work_experience):
     if not work_experience:
         return []
@@ -209,11 +219,34 @@ def _classify_companies_async(rows):
         conn.close()
 
 
-def _serialize_hunter_rows(rows):
+def _fetch_candidate_names(cur, rows):
+    candidate_ids = set()
+    for row in rows:
+        candidate_ids.update(_normalize_candidate_ids(row.get("candidates")))
+    if not candidate_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT candidate_id, name
+        FROM candidates
+        WHERE candidate_id = ANY(%s)
+        """,
+        (list(candidate_ids),),
+    )
+    return {row.get("candidate_id"): row.get("name") for row in cur.fetchall()}
+
+
+def _serialize_hunter_rows(rows, candidate_names=None):
     serialized = []
     for row in rows:
         candidates = _normalize_candidate_ids(row.get("candidates"))
-        accounts = _parse_json_list(row.get("accounts"))
+        accounts = _normalize_account_ids(row.get("accounts"))
+        candidate_details = []
+        if candidate_names:
+            for candidate_id in candidates:
+                candidate_details.append(
+                    {"id": candidate_id, "name": candidate_names.get(candidate_id)}
+                )
         serialized.append(
             {
                 "hunter_id": row.get("hunter_id"),
@@ -221,6 +254,7 @@ def _serialize_hunter_rows(rows):
                 "industry": row.get("industry"),
                 "amount_candidates": row.get("amount_candidates") or len(candidates),
                 "candidates": candidates,
+                "candidate_details": candidate_details,
                 "accounts": accounts,
                 "company_linkedin": row.get("company_linkedin"),
             }
@@ -244,7 +278,8 @@ def get_hunter():
             """
         )
         rows = cur.fetchall()
-        return jsonify({"rows": _serialize_hunter_rows(rows)})
+        candidate_names = _fetch_candidate_names(cur, rows)
+        return jsonify({"rows": _serialize_hunter_rows(rows, candidate_names)})
     except Exception:
         logging.exception("Failed to fetch hunter rows")
         return jsonify({"error": "Failed to fetch hunter rows"}), 500
@@ -275,6 +310,22 @@ def refresh_hunter():
 
         cur.execute(
             """
+            SELECT candidate_id, account_id
+            FROM hire_opportunity
+            WHERE account_id IS NOT NULL
+            """
+        )
+        hire_rows = cur.fetchall()
+        candidate_accounts = {}
+        for row in hire_rows:
+            candidate_id = row.get("candidate_id")
+            account_id = row.get("account_id")
+            if candidate_id is None or account_id is None:
+                continue
+            candidate_accounts.setdefault(candidate_id, set()).add(int(account_id))
+
+        cur.execute(
+            """
             SELECT hunter_id, company, industry, amount_candidates, candidates,
                    accounts, company_linkedin
             FROM hunter
@@ -287,6 +338,7 @@ def refresh_hunter():
             norm = _normalize_company(row.get("company"))
             if norm:
                 row["candidates"] = _normalize_candidate_ids(row.get("candidates"))
+                row["accounts"] = _normalize_account_ids(row.get("accounts"))
                 by_company[norm] = row
 
         cur.execute(
@@ -360,6 +412,22 @@ def refresh_hunter():
                     next_id += 1
                     inserted += 1
 
+        for row in by_company.values():
+            account_ids = set()
+            for candidate_id in row.get("candidates") or []:
+                account_ids.update(candidate_accounts.get(candidate_id, set()))
+            accounts_list = sorted(account_ids)
+            existing_accounts = sorted(set(row.get("accounts") or []))
+            if accounts_list != existing_accounts:
+                cur.execute(
+                    """
+                    UPDATE hunter
+                    SET accounts = %s
+                    WHERE hunter_id = %s
+                    """,
+                    (json.dumps(accounts_list) if accounts_list else None, row.get("hunter_id")),
+                )
+
         conn.commit()
         logging.info("Hunter refresh inserted=%s updated=%s", inserted, updated)
 
@@ -393,6 +461,7 @@ def refresh_hunter():
             """
         )
         rows = cur.fetchall()
+        candidate_names = _fetch_candidate_names(cur, rows)
         elapsed = time.time() - started_at
         logging.info("Hunter refresh done rows=%s elapsed=%.2fs", len(rows), elapsed)
         return jsonify(
@@ -400,7 +469,7 @@ def refresh_hunter():
                 "inserted": inserted,
                 "updated": updated,
                 "classified": classified,
-                "rows": _serialize_hunter_rows(rows),
+                "rows": _serialize_hunter_rows(rows, candidate_names),
             }
         )
     except Exception:
