@@ -128,6 +128,7 @@
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
     dismiss.className = 'monthly-mood-dismiss';
+    dismiss.dataset.action = 'close-monthly-mood';
     dismiss.setAttribute('aria-label', 'Hide monthly mood');
     dismiss.textContent = '×';
     dismiss.addEventListener('click', () => {
@@ -256,6 +257,13 @@
     installRouteWatcher();
     insertBannerIfNeeded();
   }
+
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('.monthly-mood-dismiss');
+    if (!trigger) return;
+    const banner = trigger.closest('.monthly-mood-banner');
+    if (banner) banner.remove();
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
