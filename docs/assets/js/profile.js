@@ -155,6 +155,66 @@ function resolveInitials(name="", provided=""){
   if (clean) return clean.toUpperCase();
   return initialsFromName(name);
 }
+
+const TEAM_MOOD_OPTIONS = [
+  { key: "energetic", emoji: "🔋", label: "Energetic" },
+  { key: "good", emoji: "🙂", label: "Good" },
+  { key: "neutral", emoji: "⚪", label: "Neutral" },
+  { key: "low_energy", emoji: "🪫", label: "Low Energy" },
+  { key: "stressed", emoji: "🌪️", label: "Stressed" }
+];
+const TEAM_MOOD_BY_KEY = new Map(TEAM_MOOD_OPTIONS.map((opt) => [opt.key, opt]));
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderTeamMoods(items){
+  const host = document.getElementById("orgMoodBoard");
+  if (!host) return;
+
+  if (!Array.isArray(items) || items.length === 0){
+    host.innerHTML = `<div class="org-mood-empty">No moods registered today yet.</div>`;
+    return;
+  }
+
+  const cards = items.map((entry) => {
+    const moodKey = String(entry.mood || "").trim();
+    const info = TEAM_MOOD_BY_KEY.get(moodKey) || { emoji: "✨", label: moodKey || "Mood" };
+    const nickname = entry.nickname || `User ${entry.user_id || ""}`.trim();
+    return `
+      <div class="org-mood-item" data-uid="${escapeHtml(entry.user_id || "")}">
+        <div class="org-mood-emoji" aria-hidden="true">${escapeHtml(info.emoji)}</div>
+        <div class="org-mood-meta">
+          <div class="org-mood-name">${escapeHtml(nickname)}</div>
+          <div class="org-mood-label">${escapeHtml(info.label)}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  host.innerHTML = cards;
+}
+
+async function loadTeamMoods(){
+  const host = document.getElementById("orgMoodBoard");
+  if (!host) return;
+  host.innerHTML = `<div class="org-mood-empty">Loading moods...</div>`;
+  try{
+    const res = await api(`/moods/today/team`, { method: "GET", cache: "no-store" });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    renderTeamMoods(data);
+  }catch(err){
+    console.error("loadTeamMoods error:", err);
+    host.innerHTML = `<div class="org-mood-empty">Could not load team moods.</div>`;
+  }
+}
 // ===== Team PTO (helpers) =====
 const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
 const ADMIN_ALLOWED_EMAILS = new Set([
@@ -1730,6 +1790,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     await loadMyRequests(uid);
     await loadBalances(uid);
     setupBalanceCardTables();
+    loadTeamMoods();
 
     // Existing: enable Team PTO for certain user_ids
     if (TEAM_ALLOWED.has(Number(uid))) {

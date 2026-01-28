@@ -559,6 +559,103 @@ input:focus, select:focus, textarea:focus{
   font-style: italic;
 }
 
+.org-mood-card{
+  margin: 26px auto 0;
+  max-width: 980px;
+  text-align: left;
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(248,250,252,0.75));
+  border: 1px solid rgba(148,163,184,0.28);
+  border-radius: 20px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 14px 30px rgba(15,23,42,0.08);
+}
+
+.org-mood-head{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.org-mood-title{
+  margin: 0;
+  font-size: clamp(18px, 2.2vw, 22px);
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.org-mood-sub{
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.org-mood-board{
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.org-mood-item{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(148,163,184,0.2);
+  box-shadow: 0 10px 18px rgba(15,23,42,0.06);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.org-mood-item:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 14px 22px rgba(15,23,42,0.08);
+}
+
+.org-mood-emoji{
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: linear-gradient(135deg, rgba(224,231,255,0.8), rgba(186,230,253,0.7));
+  border: 1px solid rgba(148,163,184,0.3);
+}
+
+.org-mood-meta{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.org-mood-name{
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.org-mood-label{
+  font-size: 12.5px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.org-mood-empty{
+  grid-column: 1 / -1;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.8);
+  border: 1px dashed rgba(148,163,184,0.4);
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
 /* =========================================================
    Approvals History — Approved & Rejected (6 columnas limpias)
    ========================================================= */

@@ -18,11 +18,11 @@
   ];
 
   const MOOD_OPTIONS = [
-    { key: 'energetic', emoji: '🔋', label: 'energetic' },
-    { key: 'good', emoji: '🙂', label: 'good' },
-    { key: 'neutral', emoji: '⚪', label: 'neutral' },
-    { key: 'low_energy', emoji: '🪫', label: 'low_energy' },
-    { key: 'stressed', emoji: '🌪️', label: 'stressed' },
+    { key: 'energetic', emoji: '🔋', label: 'Energetic' },
+    { key: 'good', emoji: '🙂', label: 'Good' },
+    { key: 'neutral', emoji: '⚪', label: 'Neutral' },
+    { key: 'low_energy', emoji: '🪫', label: 'Low Energy' },
+    { key: 'stressed', emoji: '🌪️', label: 'Stressed' },
   ];
 
   let lastPath = null;

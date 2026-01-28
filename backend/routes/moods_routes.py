@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from flask import Blueprint, jsonify, request, g
+from psycopg2.extras import RealDictCursor
 
 from db import get_connection
 
@@ -94,5 +95,44 @@ def save_mood():
         cur.close()
         conn.close()
         return jsonify({"mood": mood, "clicked_at": clicked_at.isoformat() if clicked_at else None})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.get("/moods/today/team")
+def get_today_team_moods():
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    t.user_id,
+                    t.nickname,
+                    t.mood,
+                    t.clicked_at
+                FROM (
+                    SELECT DISTINCT ON (m.user_id)
+                        m.user_id,
+                        COALESCE(NULLIF(u.nickname, ''), NULLIF(u.user_name, ''), u.email_vintti, CONCAT('User ', m.user_id)) AS nickname,
+                        m.mood,
+                        m.clicked_at
+                    FROM moods m
+                    JOIN users u ON u.user_id = m.user_id
+                    LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
+                    WHERE m.clicked_at::date = CURRENT_DATE
+                      AND COALESCE(aua.is_active, TRUE)
+                    ORDER BY m.user_id, m.clicked_at DESC
+                ) t
+                ORDER BY LOWER(t.nickname) ASC
+                """
+            )
+            rows = cur.fetchall() or []
+        conn.close()
+        for row in rows:
+            clicked_at = row.get("clicked_at")
+            if hasattr(clicked_at, "isoformat"):
+                row["clicked_at"] = clicked_at.isoformat()
+        return jsonify(rows)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
