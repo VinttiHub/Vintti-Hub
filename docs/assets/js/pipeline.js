@@ -725,7 +725,7 @@ document.addEventListener("DOMContentLoaded", () => {
       'client-process': 'En proceso con Cliente',
       'applicant': 'Applicant'  
     };
-    const stageOrder = ['applicant', 'contacted', 'no-advance', 'first-interview', 'client-process'];
+    const stageOrder = ['applicant', 'contacted', 'first-interview', 'no-advance', 'client-process'];
     const stageIndexLookup = stageOrder.reduce((acc, key, idx) => {
       acc[key] = idx;
       return acc;
