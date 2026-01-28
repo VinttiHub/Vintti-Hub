@@ -132,7 +132,6 @@
     dismiss.textContent = '×';
     dismiss.addEventListener('click', () => {
       section.remove();
-      showReopenButton();
     });
 
     const bar = document.createElement('div');
@@ -215,7 +214,6 @@
       } else {
         main.appendChild(banner);
       }
-      removeReopenButton();
       fetchTodayMood()
         .then((mood) => {
           applySelectedMood(banner, mood);
@@ -224,25 +222,6 @@
           console.warn('Failed to load today mood', error);
         });
     }
-  }
-
-  function showReopenButton() {
-    const main = document.querySelector('.main-content');
-    if (!main || main.querySelector('.monthly-mood-reopen')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'monthly-mood-reopen';
-    button.textContent = 'Show mood bar';
-    button.addEventListener('click', () => {
-      button.remove();
-      insertBannerIfNeeded();
-    });
-    main.insertBefore(button, main.firstChild);
-  }
-
-  function removeReopenButton() {
-    const existing = document.querySelector('.monthly-mood-reopen');
-    if (existing) existing.remove();
   }
 
   function scheduleInit() {
