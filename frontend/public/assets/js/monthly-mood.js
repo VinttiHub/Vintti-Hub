@@ -186,13 +186,9 @@
     content.className = 'monthly-mood-content';
     content.appendChild(message);
     content.appendChild(bar);
-
-    const dismissRow = document.createElement('div');
-    dismissRow.className = 'monthly-mood-dismiss-row';
-    dismissRow.appendChild(dismiss);
+    content.appendChild(dismiss);
 
     section.appendChild(content);
-    section.appendChild(dismissRow);
 
     return section;
   }
