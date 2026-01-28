@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import time
+import threading
 import openai
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
@@ -161,6 +162,53 @@ def _classify_company(company):
     return {"industry": industry, "company_linkedin": linkedin}
 
 
+def _classify_companies_async(rows):
+    if not rows:
+        return
+    logging.info("Hunter classification job start rows=%s", len(rows))
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        classified = 0
+        for row in rows:
+            company = row.get("company") or ""
+            try:
+                logging.info(
+                    "Hunter classify company=%r industry=%r linkedin=%r",
+                    company,
+                    row.get("industry"),
+                    row.get("company_linkedin"),
+                )
+                result = _classify_company(company)
+            except Exception:
+                logging.exception("Hunter classification failed for company=%r", company)
+                result = None
+            if not result:
+                logging.info("Hunter classify skip company=%r", company)
+                continue
+            industry = row.get("industry") or result.get("industry")
+            company_linkedin = row.get("company_linkedin") or result.get("company_linkedin")
+            cur.execute(
+                """
+                UPDATE hunter
+                SET industry = %s,
+                    company_linkedin = %s
+                WHERE hunter_id = %s
+                """,
+                (industry, company_linkedin, row.get("hunter_id")),
+            )
+            if cur.rowcount:
+                classified += 1
+        conn.commit()
+        logging.info("Hunter classification job done classified=%s", classified)
+    except Exception:
+        logging.exception("Hunter classification job failed")
+        conn.rollback()
+    finally:
+        cur.close()
+        conn.close()
+
+
 def _serialize_hunter_rows(rows):
     serialized = []
     for row in rows:
@@ -218,6 +266,7 @@ def refresh_hunter():
     inserted = 0
     updated = 0
     classified = 0
+    to_classify = []
 
     try:
         cur.execute("SELECT COALESCE(MAX(hunter_id), 0) AS max_id FROM hunter")
@@ -317,36 +366,23 @@ def refresh_hunter():
         for row in by_company.values():
             if row.get("industry") and row.get("company_linkedin"):
                 continue
-            try:
-                logging.info(
-                    "Hunter classify company=%r industry=%r linkedin=%r",
-                    row.get("company"),
-                    row.get("industry"),
-                    row.get("company_linkedin"),
-                )
-                result = _classify_company(row.get("company") or "")
-            except Exception:
-                logging.exception("Hunter classification failed for company=%r", row.get("company"))
-                result = None
-            if not result:
-                logging.info("Hunter classify skip company=%r", row.get("company"))
-                continue
-            industry = row.get("industry") or result.get("industry")
-            company_linkedin = row.get("company_linkedin") or result.get("company_linkedin")
-            cur.execute(
-                """
-                UPDATE hunter
-                SET industry = %s,
-                    company_linkedin = %s
-                WHERE hunter_id = %s
-                """,
-                (industry, company_linkedin, row.get("hunter_id")),
+            to_classify.append(
+                {
+                    "hunter_id": row.get("hunter_id"),
+                    "company": row.get("company"),
+                    "industry": row.get("industry"),
+                    "company_linkedin": row.get("company_linkedin"),
+                }
             )
-            if cur.rowcount:
-                classified += 1
 
-        conn.commit()
-        logging.info("Hunter refresh classified=%s", classified)
+        if to_classify:
+            threading.Thread(
+                target=_classify_companies_async,
+                args=(to_classify,),
+                daemon=True,
+            ).start()
+            classified = len(to_classify)
+            logging.info("Hunter refresh queued_classifications=%s", classified)
 
         cur.execute(
             """
