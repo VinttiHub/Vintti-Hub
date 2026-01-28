@@ -77,7 +77,7 @@ const candidateTestsCache = new Map();
 const candidateTestsRequests = new Map();
 let currentAccount = null;
 const panelState = {
-  view: "batches",
+  view: "candidates",
   selectedBatchId: null,
   opportunityId: null,
   opportunity: null,
@@ -473,7 +473,7 @@ function deepClone(payload) {
 function showMissingAccountMessage() {
   els.accountName.textContent = "No account selected";
   els.accountTagline.textContent = "Use the Client overview button from Account Details to open this page.";
-  els.opportunitiesEmpty.textContent = "Select an account to see its batched candidates.";
+  els.opportunitiesEmpty.textContent = "Select an account to see its candidates.";
   updateRefreshMeta(null);
 }
 
@@ -673,7 +673,7 @@ async function enrichWithBatches(opportunities, snapshotCache = new Map(), optio
                     const normalizedTests = normalizeCandidateTests(candidate?.tests_documents_s3);
                     return {
                       ...candidate,
-                      batch_status: candidate.status || candidate.stage || "",
+                      batch_status: candidate.batch_status ?? candidate.status ?? "",
                       batch_number: batch.batch_number,
                       presentation_date: batch.presentation_date,
                       tests_documents_s3: normalizedTests,
@@ -884,6 +884,8 @@ function collectCandidates(opportunity) {
         map.set(candidate.candidate_id, {
           ...candidate,
           batch_number: batch.batch_number,
+          batch_id: batch.batch_id,
+          batch_status: candidate.batch_status ?? candidate.status ?? "",
           presentation_date: batch.presentation_date,
         });
       }
@@ -959,15 +961,22 @@ function openPanel(opportunityId) {
   if (!data) return;
   panelState.opportunityId = opportunityId;
   panelState.opportunity = data;
-  panelState.view = "batches";
+  panelState.view = "candidates";
   panelState.selectedBatchId = null;
   const batches = getSortedBatches(data);
+  const candidates = collectCandidates(data);
   els.panelTitle.textContent = data.opp_position_name || "Opportunity";
-  els.panelBatch.textContent = batches.length
-    ? `${batches.length} ${batches.length === 1 ? "batch" : "batches"} ready for review`
-    : "No batches recorded yet";
+  if (!candidates.length) {
+    els.panelBatch.textContent = "No candidates recorded yet";
+  } else {
+    const candidateLabel = candidates.length === 1 ? "candidate" : "candidates";
+    const batchLabel = batches.length
+      ? `${batches.length} ${batches.length === 1 ? "batch" : "batches"}`
+      : "no batches";
+    els.panelBatch.textContent = `${candidates.length} ${candidateLabel} · ${batchLabel}`;
+  }
 
-  renderBatchList(batches);
+  renderCandidateListFromOpportunity(candidates);
 
   els.panel?.setAttribute("aria-hidden", "false");
   els.panel?.classList.add("is-visible");
@@ -1050,6 +1059,25 @@ function renderCandidateList(batch) {
   });
 }
 
+function renderCandidateListFromOpportunity(candidates) {
+  els.panelBody.innerHTML = "";
+  if (!Array.isArray(candidates) || !candidates.length) {
+    const empty = document.createElement("p");
+    empty.className = "candidate-panel__empty";
+    empty.textContent = "No candidates are assigned to this opportunity yet.";
+    els.panelBody.appendChild(empty);
+    return;
+  }
+  const sorted = candidates.slice().sort((a, b) => {
+    const nameA = (a?.name || "").toLowerCase();
+    const nameB = (b?.name || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+  sorted.forEach((candidate) => {
+    els.panelBody.appendChild(buildCandidateCard(candidate));
+  });
+}
+
 function buildBackButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -1076,11 +1104,16 @@ function buildCandidateCard(candidate, batch) {
     : "#";
   const linkedinUrl = normalizeLinkedin(candidate?.linkedin);
   const salaryLabel = candidate?.salary_range ? `$${candidate.salary_range}` : "—";
-  const statusRaw = candidate?.batch_status || candidate?.stage || "Batch ready";
+  const defaultStatus = "Client interviewing/testing";
+  let statusRaw = candidate?.batch_status || candidate?.status || defaultStatus;
+  if (translateStatus(statusRaw) === "Contacted") {
+    statusRaw = defaultStatus;
+  }
   const statusLabel = translateStatus(statusRaw);
   const statusChip = buildStatusChip(statusLabel, statusRaw);
   const countryLabel = formatCandidateCountry(candidate);
-  const batchNumber = candidate?.batch_number || batch?.batch_number;
+  const presentationDate = candidate?.presentation_date || batch?.presentation_date || null;
+  const presentationLabel = presentationDate ? `Presented ${formatDate(presentationDate)}` : "Presentation date TBD";
   const testsDocuments = normalizeCandidateTests(candidate?.tests_documents_s3);
   const shouldHydrateTests = needsCandidateTestsHydration(candidate, testsDocuments);
   if (!shouldHydrateTests && candidate?.candidate_id && testsDocuments.length) {
@@ -1097,19 +1130,15 @@ function buildCandidateCard(candidate, batch) {
     <header>
       <div class="avatar avatar--large" data-initials="${initials}"></div>
       <div>
-        <p class="eyebrow candidate-card__batch">${
-          batchNumber ? `Batch #${batchNumber}` : "Batch"
-        }</p>
+        <p class="candidate-card__presentation">${presentationLabel}</p>
         <p class="candidate-name">${fallbackText(candidate?.name, "Unnamed candidate")}</p>
-        <p class="candidate-role">${fallbackText(candidate?.stage || candidate?.role || candidate?.title, "Pipeline candidate")}</p>
       </div>
       ${statusChip}
     </header>
     <ul class="candidate-meta">
-      <li><span>🧭 Status</span>${fallbackText(statusLabel)}</li>
-      <li><span>💵 Expected salary</span>${salaryLabel}</li>
+      <li><span>Status 🧭</span>${fallbackText(statusLabel)}</li>
+      <li><span>Expected salary 💵</span>${salaryLabel}</li>
       <li><span>Country</span>${countryLabel}</li>
-      <li><span>Email</span>${candidate.email ? `<a href="mailto:${candidate.email}">${candidate.email}</a>` : "—"}</li>
     </ul>
     ${testsSection}
     <div class="candidate-actions">
@@ -1185,7 +1214,7 @@ function formatDate(value) {
   if (!value) return "TBD";
   const date = new Date(value);
   if (Number.isNaN(date)) return "TBD";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function translateStatus(value) {
@@ -1216,7 +1245,7 @@ function padCount(value) {
 }
 
 function isHiredCandidate(candidate) {
-  const status = String(candidate?.batch_status || candidate?.stage || "").toLowerCase();
+  const status = String(candidate?.batch_status || candidate?.status || "").toLowerCase();
   return status.includes("hire") || status.includes("contrat");
 }
 

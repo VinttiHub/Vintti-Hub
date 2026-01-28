@@ -667,6 +667,12 @@ body.panel-open {
   color: var(--text-muted);
 }
 
+.candidate-card__presentation {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 .candidate-meta {
   list-style: none;
   padding: 0;
