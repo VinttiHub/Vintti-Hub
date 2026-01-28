@@ -27,6 +27,7 @@
 
   let lastPath = null;
   let observer = null;
+  let hiddenThisSession = false;
 
   const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -132,6 +133,7 @@
     dismiss.setAttribute('aria-label', 'Hide monthly mood');
     dismiss.textContent = '×';
     dismiss.addEventListener('click', () => {
+      hiddenThisSession = true;
       section.remove();
     });
 
@@ -209,6 +211,7 @@
     ensureWatermark(main, theme.emoji);
 
     if (!main.querySelector('.monthly-mood-banner')) {
+      if (hiddenThisSession) return;
       const banner = buildBanner(theme);
       if (main.firstChild) {
         main.insertBefore(banner, main.firstChild);
@@ -262,7 +265,10 @@
     const trigger = event.target.closest('.monthly-mood-dismiss');
     if (!trigger) return;
     const banner = trigger.closest('.monthly-mood-banner');
-    if (banner) banner.remove();
+    if (banner) {
+      hiddenThisSession = true;
+      banner.remove();
+    }
   });
 
   if (document.readyState === 'loading') {
