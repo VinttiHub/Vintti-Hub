@@ -65,7 +65,8 @@
 
   function isTargetPath(pathname) {
     const normalized = normalizePath(pathname);
-    return TARGET_PATHS.has(normalized);
+    if (TARGET_PATHS.has(normalized)) return true;
+    return [...TARGET_PATHS].some((segment) => normalized.endsWith(segment));
   }
 
   function ensureWatermark(main, emoji) {
