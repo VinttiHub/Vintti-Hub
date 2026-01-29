@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- ---------- Meta ---------- -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sidebar</title>
+  <script src="./assets/js/auth-guard.js"></script>
+  <script src="./assets/js/monthly-mood.js?v=2" defer></script>
+  <meta name="theme-color" content="#0B3D91">
+
+  <!-- ---------- Icons & Favicons ---------- -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
+
+  <!-- ---------- Fonts ---------- -->
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- ---------- Vendor CSS ---------- -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+  <!-- ---------- App CSS ---------- -->
+  <link rel="stylesheet" href="./assets/css/sidebar.css" />
+  <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=2" />
+</head>
+
+<body class="light-mode">
+  <!-- =========================================================
+       Sidebar
+    ========================================================== -->
+<aside class="sidebar">
+
+  <div class="sidebar-top">
+    
+
+    <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="logo" />
+    <button class="sidebar-mini-toggle" id="sidebarMiniToggle" type="button" aria-label="Toggle sidebar">
+      <img src="../icons/sidebar.png" width="22" height="22" alt="Sidebar icon">
+    </button>
+  </div>
+
+  <div class="sidebar-scroll">
+    <nav class="sidebar-nav">
+      <!-- Sección 1: Core -->
+      <p class="sidebar-section-label">CORE</p>
+
+      <a class="menu-item" href="candidates.html" data-tooltip="Candidates">
+        <span class="menu-icon"><i class="fa-solid fa-user-group"></i></span>
+        <span class="menu-label">Candidates</span>
+      </a>
+
+      <a class="menu-item" href="crm.html">
+        <span class="menu-icon"><i class="fa-solid fa-building"></i></span>
+        <span class="menu-label">CRM</span>
+      </a>
+
+      <a class="menu-item active" href="opportunities.html">
+        <span class="menu-icon"><i class="fa-solid fa-chart-line"></i></span>
+        <span class="menu-label">Opportunities</span>
+      </a>
+
+      <a class="menu-item" href="hunter.html">
+        <span class="menu-icon"><i class="fa-solid fa-paw"></i></span>
+        <span class="menu-label">Hunter</span>
+      </a>
+
+      <a class="menu-item" id="candidateSearchLink" href="candidate-search.html" style="display:none;">
+        <span class="menu-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <span class="menu-label">Candidate Search</span>
+      </a>
+
+      <a class="menu-item" href="equipments.html" id="equipmentsLink">
+        <span class="menu-icon"><i class="fa-solid fa-laptop"></i></span>
+        <span class="menu-label">Equipments</span>
+      </a>
+
+      <!-- Sección 2: Insights -->
+      <p class="sidebar-section-label">INSIGHTS</p>
+
+      <a class="menu-item" id="summaryLink" href="opportunities-summary.html" style="display:none;">
+        <span class="menu-icon"><i class="fa-solid fa-chart-column"></i></span>
+        <span class="menu-label">Opportunities Summary</span>
+      </a>
+
+      <a
+        class="menu-item"
+        id="dashboardLink"
+        href="https://dashboard.vintti.com/public/dashboard/a6d74a9c-7ffb-4bec-b202-b26cdb57ff84?meses=3&metric_arpa=&metrica=revenue&tab=5-growth-%26-revenue"
+        target="_blank"
+        rel="noopener"
+      >
+        <span class="menu-icon"><i class="fa-solid fa-gauge-high"></i></span>
+        <span class="menu-label">Dashboard</span>
+      </a>
+
+      <a class="menu-item" href="control-dashboard.html" id="managementMetricsLink">
+        <span class="menu-icon"><i class="fa-solid fa-chart-bar"></i></span>
+        <span class="menu-label">Management Metrics</span>
+      </a>
+
+      <a class="menu-item" id="recruiterPowerLink" href="recruiter-power.html" style="display:none;">
+        <span class="menu-icon"><i class="fa-solid fa-bolt"></i></span>
+        <span class="menu-label">Recruiter Power</span>
+      </a>
+
+      <a
+        class="menu-item"
+        id="salesLink"
+        href="https://dashboard.vintti.com/public/dashboard/8e7a1373-cfc1-4549-81da-24566d81c9d3?month_ndacw=&month_ndas="
+        target="_blank"
+        rel="noopener"
+      >
+        <span class="menu-icon"><i class="fa-solid fa-rocket"></i></span>
+        <span class="menu-label">Sales Force</span>
+      </a>
+    </nav>
+  </div>
+  
+  <a href="profile.html" class="profile-tile" id="sidebarProfile">
+    <span class="profile-avatar">
+      <img id="profileAvatarImg" alt="" />
+      <span id="profileAvatarInitials" class="profile-initials" aria-hidden="true">—</span>
+    </span>
+    <span class="profile-meta">
+      <span id="profileName" class="profile-name">-</span>
+      <span id="profileEmail" class="profile-email"></span>
+    </span>
+  </a>
+
+</aside>
+<script src="./assets/js/sidebar.js" defer></script>
+</body>
+
+</html>
