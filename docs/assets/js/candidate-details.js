@@ -1411,6 +1411,18 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
           });
         });
       }
+
+      const ownComputerToggle = document.getElementById('own-computer-toggle');
+      if (ownComputerToggle) {
+        ownComputerToggle.checked = Boolean(data.compu_propia);
+        ownComputerToggle.addEventListener('change', () => {
+          fetch(`${API_CANDIDATES}/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ compu_propia: ownComputerToggle.checked })
+          });
+        });
+      }
       // Mapeo de campos (overview)
       const overviewFields = {
         'field-name': 'name',

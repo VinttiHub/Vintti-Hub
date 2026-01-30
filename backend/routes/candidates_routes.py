@@ -877,6 +877,7 @@ def get_candidate_by_id(candidate_id):
                 nc.check_hr_lead,
                 nc.address,
                 nc.dni,
+                nc.compu_propia,
                 bl.blacklist_id,
                 COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted
             FROM normalized_candidate nc
@@ -1022,7 +1023,8 @@ def update_candidate_fields(candidate_id):
         'dni',
         'other_process',
         'vacations',
-        'usa_nationality'
+        'usa_nationality',
+        'compu_propia'
     ]
 
     updates = []
@@ -1035,6 +1037,8 @@ def update_candidate_fields(candidate_id):
             if field == 'check_hr_lead':
                 val = to_bool(val)
             if field == 'usa_nationality':
+                val = to_bool(val)
+            if field == 'compu_propia':
                 val = to_bool(val)
             updates.append(f"{field} = %s")
             values.append(val)
