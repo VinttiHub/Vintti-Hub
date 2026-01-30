@@ -2,7 +2,6 @@ const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
 const companyGrid = document.querySelector("[data-company-grid]");
 const industryFilter = document.querySelector("[data-filter-industry]");
-const candidateFilter = document.querySelector("[data-filter-candidates]");
 const searchInput = document.querySelector("[data-filter-search]");
 const clearFilters = document.querySelector("[data-clear-filters]");
 const refreshButton = document.querySelector("[data-refresh]");
@@ -11,17 +10,6 @@ const refreshOverlay = document.querySelector("[data-refresh-overlay]");
 const refreshBar = document.querySelector("[data-refresh-bar]");
 const refreshText = document.querySelector("[data-refresh-text]");
 const refreshStatus = document.querySelector("[data-refresh-status]");
-const modalOverlay = document.querySelector("[data-modal-overlay]");
-const modalBody = document.querySelector("[data-modal-body]");
-const modalClose = document.querySelector("[data-modal-close]");
-
-const candidateRanges = {
-  "0-5": (count) => count >= 0 && count <= 5,
-  "6-10": (count) => count >= 6 && count <= 10,
-  "11-15": (count) => count >= 11 && count <= 15,
-  "16-20": (count) => count >= 16 && count <= 20,
-  "21+": (count) => count >= 21,
-};
 
 let companies = [];
 let refreshInterval = null;
@@ -67,15 +55,32 @@ const normalizeRow = (row) => {
         return {
           id,
           name: item.name ? String(item.name) : null,
+          position: item.position ? String(item.position) : null,
+        };
+      }
+      return { id: Number(item), name: null, position: null };
+    })
+    .filter((item) => Number.isFinite(item.id));
+  const candidateProfiles = candidateDetails.length
+    ? candidateDetails
+    : candidates.map((id) => ({ id, name: null, position: null }));
+  const accountDetails = safeList(row.account_details)
+    .map((item) => {
+      if (item && typeof item === "object") {
+        const id = Number(item.id ?? item.account_id);
+        return {
+          id,
+          name: item.name ? String(item.name) : null,
         };
       }
       return { id: Number(item), name: null };
     })
     .filter((item) => Number.isFinite(item.id));
-  const candidateProfiles = candidateDetails.length
-    ? candidateDetails
-    : candidates.map((id) => ({ id, name: null }));
-  const accounts = safeList(row.accounts).map((value) => String(value));
+  const accounts = accountDetails.length
+    ? accountDetails
+    : safeList(row.accounts)
+        .map((value) => ({ id: Number(value), name: null }))
+        .filter((item) => Number.isFinite(item.id));
   const amount = Number(row.amount_candidates);
 
   return {
@@ -165,7 +170,12 @@ const buildCard = (company) => {
   card.className = "company-card";
 
   const accountsMarkup = company.accounts.length
-    ? company.accounts.map((account) => `<span class="account-pill">${account}</span>`).join("")
+    ? company.accounts
+        .map((account) => {
+          const label = account.name || `Account #${account.id}`;
+          return `<span class="account-pill">${label}</span>`;
+        })
+        .join("")
     : `<span class="account-pill">N/A</span>`;
 
   const linkedinMarkup = company.linkedin
@@ -189,9 +199,13 @@ const buildCard = (company) => {
     <div class="card-meta">
       <div class="meta-stack">
         <span class="meta-label">Candidates hired</span>
-        <button class="candidate-count" type="button" data-hire-count>
-          ${company.candidatesCount}
+        <button class="candidate-toggle" type="button" data-candidate-toggle aria-expanded="false" aria-controls="candidate-panel-${company.hunterId}">
+          <span class="candidate-count">${company.candidatesCount}</span>
+          <span class="candidate-arrow" aria-hidden="true">▾</span>
         </button>
+      </div>
+      <div class="candidate-panel" id="candidate-panel-${company.hunterId}" data-candidate-panel hidden>
+        ${renderCandidatePanel(company)}
       </div>
       <div class="meta-row">
         <span class="meta-label">Vintti clients</span>
@@ -208,56 +222,63 @@ const buildCard = (company) => {
   return card;
 };
 
-const openModal = (company) => {
-  modalBody.innerHTML = "";
-  const list = document.createElement("div");
-  list.className = "modal-list";
-
+const renderCandidatePanel = (company) => {
   if (!company.candidateProfiles.length) {
-    list.innerHTML = `<div class="modal-row">No candidates yet.</div>`;
-  } else {
-    list.innerHTML = company.candidateProfiles
-      .map(
-        (candidate) => `
-          <div class="modal-row">
-            <div class="modal-name">${candidate.name || `Candidate #${candidate.id}`}</div>
-            <a class="modal-action" href="candidate-details.html?id=${encodeURIComponent(candidate.id)}" target="_blank" rel="noopener">
-              Open profile
-            </a>
-          </div>
-        `
-      )
-      .join("");
+    return `<div class="candidate-empty">No candidates yet.</div>`;
   }
 
-  modalBody.appendChild(list);
-  modalOverlay.classList.add("is-visible");
-};
-
-const closeModal = () => {
-  modalOverlay.classList.remove("is-visible");
+  return company.candidateProfiles
+    .map((candidate) => {
+      const name = candidate.name || `Candidate #${candidate.id}`;
+      const position = candidate.position || "Role not set";
+      return `
+        <div class="candidate-row">
+          <div class="candidate-info">
+            <div class="candidate-name">${name}</div>
+            <div class="candidate-position">${position}</div>
+          </div>
+          <a class="candidate-link" href="candidate-details.html?id=${encodeURIComponent(candidate.id)}" target="_blank" rel="noopener">
+            Open profile
+          </a>
+        </div>
+      `;
+    })
+    .join("");
 };
 
 const matchesFilters = (company) => {
   const searchValue = searchInput.value.trim().toLowerCase();
   const selectedIndustry = industryFilter.value;
-  const selectedRange = candidateFilter.value;
 
   const matchesSearch = company.name.toLowerCase().includes(searchValue);
   const matchesIndustry = selectedIndustry ? company.industry === selectedIndustry : true;
-  const matchesCandidates = selectedRange ? candidateRanges[selectedRange](company.candidatesCount) : true;
 
-  return matchesSearch && matchesIndustry && matchesCandidates;
+  return matchesSearch && matchesIndustry;
 };
 
 const render = () => {
-  const filtered = companies.filter(matchesFilters);
+  const filtered = companies
+    .filter(matchesFilters)
+    .sort((a, b) => {
+      if (b.candidatesCount !== a.candidatesCount) {
+        return b.candidatesCount - a.candidatesCount;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   companyGrid.innerHTML = "";
   filtered.forEach((company) => {
     const card = buildCard(company);
-    const countButton = card.querySelector("[data-hire-count]");
-    countButton.addEventListener("click", () => openModal(company));
+    const toggleButton = card.querySelector("[data-candidate-toggle]");
+    const panel = card.querySelector("[data-candidate-panel]");
+    if (toggleButton && panel) {
+      toggleButton.addEventListener("click", () => {
+        const isExpanded = toggleButton.getAttribute("aria-expanded") === "true";
+        toggleButton.setAttribute("aria-expanded", String(!isExpanded));
+        panel.hidden = isExpanded;
+        card.classList.toggle("is-open", !isExpanded);
+      });
+    }
     companyGrid.appendChild(card);
   });
 
@@ -280,7 +301,6 @@ const fillIndustries = () => {
 
 const resetFilters = () => {
   industryFilter.value = "";
-  candidateFilter.value = "";
   searchInput.value = "";
   render();
 };
@@ -320,18 +340,10 @@ const refreshCompanies = async () => {
 
 loadCompanies();
 
-[industryFilter, candidateFilter].forEach((select) => {
+[industryFilter].forEach((select) => {
   select.addEventListener("change", render);
 });
 
 searchInput.addEventListener("input", render);
 clearFilters.addEventListener("click", resetFilters);
 if (refreshButton) refreshButton.addEventListener("click", refreshCompanies);
-
-modalOverlay.addEventListener("click", (event) => {
-  if (event.target === modalOverlay) {
-    closeModal();
-  }
-});
-
-modalClose.addEventListener("click", closeModal);

@@ -236,16 +236,77 @@ def _fetch_candidate_names(cur, rows):
     return {row.get("candidate_id"): row.get("name") for row in cur.fetchall()}
 
 
-def _serialize_hunter_rows(rows, candidate_names=None):
+def _fetch_candidate_positions(cur, rows):
+    candidate_ids = set()
+    for row in rows:
+        candidate_ids.update(_normalize_candidate_ids(row.get("candidates")))
+    if not candidate_ids:
+        return {}
+    cur.execute(
+        """
+        WITH ranked AS (
+            SELECT
+                h.candidate_id,
+                h.opportunity_id,
+                h.start_date,
+                h.end_date,
+                ROW_NUMBER() OVER (
+                    PARTITION BY h.candidate_id
+                    ORDER BY (h.end_date IS NULL) DESC,
+                             h.start_date DESC NULLS LAST
+                ) AS rn
+            FROM hire_opportunity h
+            WHERE h.candidate_id = ANY(%s)
+        )
+        SELECT r.candidate_id, o.opp_position_name
+        FROM ranked r
+        LEFT JOIN opportunity o ON o.opportunity_id = r.opportunity_id
+        WHERE r.rn = 1
+        """,
+        (list(candidate_ids),),
+    )
+    return {row.get("candidate_id"): row.get("opp_position_name") for row in cur.fetchall()}
+
+
+def _fetch_account_names(cur, rows):
+    account_ids = set()
+    for row in rows:
+        account_ids.update(_normalize_account_ids(row.get("accounts")))
+    if not account_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT account_id, client_name
+        FROM account
+        WHERE account_id = ANY(%s)
+        """,
+        (list(account_ids),),
+    )
+    return {row.get("account_id"): row.get("client_name") for row in cur.fetchall()}
+
+
+def _serialize_hunter_rows(rows, candidate_names=None, candidate_positions=None, account_names=None):
     serialized = []
     for row in rows:
         candidates = _normalize_candidate_ids(row.get("candidates"))
         accounts = _normalize_account_ids(row.get("accounts"))
         candidate_details = []
-        if candidate_names:
+        if candidate_names or candidate_positions:
             for candidate_id in candidates:
                 candidate_details.append(
-                    {"id": candidate_id, "name": candidate_names.get(candidate_id)}
+                    {
+                        "id": candidate_id,
+                        "name": candidate_names.get(candidate_id) if candidate_names else None,
+                        "position": candidate_positions.get(candidate_id)
+                        if candidate_positions
+                        else None,
+                    }
+                )
+        account_details = []
+        if account_names:
+            for account_id in accounts:
+                account_details.append(
+                    {"id": account_id, "name": account_names.get(account_id)}
                 )
         serialized.append(
             {
@@ -256,6 +317,7 @@ def _serialize_hunter_rows(rows, candidate_names=None):
                 "candidates": candidates,
                 "candidate_details": candidate_details,
                 "accounts": accounts,
+                "account_details": account_details,
                 "company_linkedin": row.get("company_linkedin"),
             }
         )
@@ -279,7 +341,15 @@ def get_hunter():
         )
         rows = cur.fetchall()
         candidate_names = _fetch_candidate_names(cur, rows)
-        return jsonify({"rows": _serialize_hunter_rows(rows, candidate_names)})
+        candidate_positions = _fetch_candidate_positions(cur, rows)
+        account_names = _fetch_account_names(cur, rows)
+        return jsonify(
+            {
+                "rows": _serialize_hunter_rows(
+                    rows, candidate_names, candidate_positions, account_names
+                )
+            }
+        )
     except Exception:
         logging.exception("Failed to fetch hunter rows")
         return jsonify({"error": "Failed to fetch hunter rows"}), 500
@@ -462,6 +532,8 @@ def refresh_hunter():
         )
         rows = cur.fetchall()
         candidate_names = _fetch_candidate_names(cur, rows)
+        candidate_positions = _fetch_candidate_positions(cur, rows)
+        account_names = _fetch_account_names(cur, rows)
         elapsed = time.time() - started_at
         logging.info("Hunter refresh done rows=%s elapsed=%.2fs", len(rows), elapsed)
         return jsonify(
@@ -469,7 +541,9 @@ def refresh_hunter():
                 "inserted": inserted,
                 "updated": updated,
                 "classified": classified,
-                "rows": _serialize_hunter_rows(rows, candidate_names),
+                "rows": _serialize_hunter_rows(
+                    rows, candidate_names, candidate_positions, account_names
+                ),
             }
         )
     except Exception:
