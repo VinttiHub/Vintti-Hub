@@ -244,26 +244,44 @@ def _fetch_candidate_positions(cur, rows):
         return {}
     cur.execute(
         """
-        WITH ranked AS (
+        WITH candidate_links AS (
             SELECT
                 h.candidate_id,
                 h.opportunity_id,
+                1 AS priority,
                 h.start_date,
-                h.end_date,
-                ROW_NUMBER() OVER (
-                    PARTITION BY h.candidate_id
-                    ORDER BY (h.end_date IS NULL) DESC,
-                             h.start_date DESC NULLS LAST
-                ) AS rn
+                h.end_date
             FROM hire_opportunity h
             WHERE h.candidate_id = ANY(%s)
+            UNION ALL
+            SELECT
+                oc.candidate_id,
+                oc.opportunity_id,
+                2 AS priority,
+                NULL AS start_date,
+                NULL AS end_date
+            FROM opportunity_candidates oc
+            WHERE oc.candidate_id = ANY(%s)
+        ),
+        ranked AS (
+            SELECT
+                candidate_id,
+                opportunity_id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY candidate_id
+                    ORDER BY priority ASC,
+                             (end_date IS NULL) DESC,
+                             start_date DESC NULLS LAST,
+                             opportunity_id DESC
+                ) AS rn
+            FROM candidate_links
         )
         SELECT r.candidate_id, o.opp_position_name
         FROM ranked r
         LEFT JOIN opportunity o ON o.opportunity_id = r.opportunity_id
         WHERE r.rn = 1
         """,
-        (list(candidate_ids),),
+        (list(candidate_ids), list(candidate_ids)),
     )
     return {row.get("candidate_id"): row.get("opp_position_name") for row in cur.fetchall()}
 
@@ -388,6 +406,22 @@ def refresh_hunter():
         hire_rows = cur.fetchall()
         candidate_accounts = {}
         for row in hire_rows:
+            candidate_id = row.get("candidate_id")
+            account_id = row.get("account_id")
+            if candidate_id is None or account_id is None:
+                continue
+            candidate_accounts.setdefault(candidate_id, set()).add(int(account_id))
+
+        cur.execute(
+            """
+            SELECT oc.candidate_id, o.account_id
+            FROM opportunity_candidates oc
+            JOIN opportunity o ON o.opportunity_id = oc.opportunity_id
+            WHERE o.account_id IS NOT NULL
+            """
+        )
+        opportunity_rows = cur.fetchall()
+        for row in opportunity_rows:
             candidate_id = row.get("candidate_id")
             account_id = row.get("account_id")
             if candidate_id is None or account_id is None:
