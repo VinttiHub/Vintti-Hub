@@ -469,48 +469,12 @@ def delete_opportunity(opportunity_id):
         cursor = conn.cursor()
 
         cursor.execute(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = 'opportunity'
-            ORDER BY ordinal_position
-            """
-        )
-        opp_cols = [row[0] for row in cursor.fetchall()]
-
-        cursor.execute(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = 'opportunity_deleted'
-            ORDER BY ordinal_position
-            """
-        )
-        deleted_cols = [row[0] for row in cursor.fetchall()]
-
-        cols = [col for col in opp_cols if col in deleted_cols]
-        if not cols:
-            conn.rollback()
-            return jsonify({"error": "No matching columns between opportunity and opportunity_deleted"}), 500
-
-        col_list = ", ".join(cols)
-        cursor.execute(
-            f"""
-            INSERT INTO opportunity_deleted ({col_list})
-            SELECT {col_list}
-            FROM opportunity
-            WHERE opportunity_id = %s
-            """,
+            "DELETE FROM opportunity WHERE opportunity_id = %s",
             (opportunity_id,),
         )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": "Opportunity not found"}), 404
-
-        cursor.execute(
-            "DELETE FROM opportunity WHERE opportunity_id = %s",
-            (opportunity_id,),
-        )
 
         conn.commit()
         return jsonify({"message": "Opportunity deleted"}), 200

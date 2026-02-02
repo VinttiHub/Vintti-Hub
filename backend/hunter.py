@@ -303,6 +303,73 @@ def _fetch_account_names(cur, rows):
     return {row.get("account_id"): row.get("client_name") for row in cur.fetchall()}
 
 
+def _merge_hunter_by_linkedin(cur):
+    cur.execute(
+        """
+        SELECT hunter_id, company, industry, amount_candidates, candidates,
+               accounts, company_linkedin
+        FROM hunter
+        WHERE company_linkedin IS NOT NULL
+          AND TRIM(company_linkedin) <> ''
+        ORDER BY hunter_id ASC
+        """
+    )
+    rows = cur.fetchall()
+    groups = {}
+    for row in rows:
+        linkedin = (row.get("company_linkedin") or "").strip()
+        if not linkedin:
+            continue
+        groups.setdefault(linkedin, []).append(row)
+
+    for linkedin, group in groups.items():
+        if len(group) <= 1:
+            continue
+        canonical = group[0]
+        canonical_id = canonical.get("hunter_id")
+        candidates = set()
+        accounts = set()
+        industry = canonical.get("industry")
+
+        for row in group:
+            candidates.update(_normalize_candidate_ids(row.get("candidates")))
+            accounts.update(_normalize_account_ids(row.get("accounts")))
+            if not industry and row.get("industry"):
+                industry = row.get("industry")
+
+        candidates_list = sorted(candidates)
+        accounts_list = sorted(accounts)
+
+        cur.execute(
+            """
+            UPDATE hunter
+            SET company = %s,
+                industry = %s,
+                amount_candidates = %s,
+                candidates = %s,
+                accounts = %s
+            WHERE hunter_id = %s
+            """,
+            (
+                canonical.get("company"),
+                industry,
+                len(candidates_list),
+                json.dumps(candidates_list) if candidates_list else None,
+                json.dumps(accounts_list) if accounts_list else None,
+                canonical_id,
+            ),
+        )
+
+        duplicate_ids = [row.get("hunter_id") for row in group[1:]]
+        cur.execute(
+            """
+            DELETE FROM hunter
+            WHERE hunter_id = ANY(%s)
+            """,
+            (duplicate_ids,),
+        )
+
+
 def _serialize_hunter_rows(rows, candidate_names=None, candidate_positions=None, account_names=None):
     serialized = []
     for row in rows:
@@ -579,6 +646,8 @@ def refresh_hunter():
             ).start()
             classified = len(to_classify)
             logging.info("Hunter refresh queued_classifications=%s", classified)
+
+        _merge_hunter_by_linkedin(cur)
 
         cur.execute(
             """
