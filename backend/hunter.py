@@ -405,12 +405,14 @@ def refresh_hunter():
         )
         hire_rows = cur.fetchall()
         candidate_accounts = {}
+        hired_candidate_ids = set()
         for row in hire_rows:
             candidate_id = row.get("candidate_id")
             account_id = row.get("account_id")
             if candidate_id is None or account_id is None:
                 continue
             candidate_accounts.setdefault(candidate_id, set()).add(int(account_id))
+            hired_candidate_ids.add(candidate_id)
 
         cur.execute(
             """
@@ -441,19 +443,26 @@ def refresh_hunter():
         for row in existing_rows:
             norm = _normalize_company(row.get("company"))
             if norm:
-                row["candidates"] = _normalize_candidate_ids(row.get("candidates"))
-                row["accounts"] = _normalize_account_ids(row.get("accounts"))
+                row["candidates"] = []
+                row["accounts"] = []
+                row["amount_candidates"] = 0
                 by_company[norm] = row
 
-        cur.execute(
-            """
-            SELECT candidate_id, work_experience
-            FROM resume
-            WHERE work_experience IS NOT NULL
-            """
-        )
-        resume_rows = cur.fetchall()
+        resume_rows = []
+        if hired_candidate_ids:
+            cur.execute(
+                """
+                SELECT candidate_id, work_experience
+                FROM resume
+                WHERE work_experience IS NOT NULL
+                  AND candidate_id = ANY(%s)
+                """,
+                (list(hired_candidate_ids),),
+            )
+            resume_rows = cur.fetchall()
         logging.info("Hunter refresh resume_rows=%s", len(resume_rows))
+
+        companies_seen = set()
 
         for resume in resume_rows:
             candidate_id = resume.get("candidate_id")
@@ -464,6 +473,7 @@ def refresh_hunter():
                 norm = _normalize_company(company)
                 if not norm:
                     continue
+                companies_seen.add(norm)
                 if norm in by_company:
                     row = by_company[norm]
                     if candidate_id in row["candidates"]:
@@ -515,6 +525,20 @@ def refresh_hunter():
                     }
                     next_id += 1
                     inserted += 1
+
+        stale_norms = [norm for norm in by_company if norm not in companies_seen]
+        for norm in stale_norms:
+            row = by_company.get(norm)
+            if not row:
+                continue
+            cur.execute(
+                """
+                DELETE FROM hunter
+                WHERE hunter_id = %s
+                """,
+                (row.get("hunter_id"),),
+            )
+            by_company.pop(norm, None)
 
         for row in by_company.values():
             account_ids = set()
