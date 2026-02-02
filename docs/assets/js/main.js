@@ -968,6 +968,25 @@ if (!window.__typeFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
   window.__typeFilterExtRegistered = true;
 }
 
+window.__daysRangeFilterState = window.__daysRangeFilterState || { min: null, max: null };
+
+if (!window.__daysRangeFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
+  $.fn.dataTable.ext.search.push((settings, rowData, rowIndex) => {
+    if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
+    const range = window.__daysRangeFilterState;
+    if (!range || (range.min == null && range.max == null)) return true;
+    const row = settings.aoData?.[rowIndex]?.nTr;
+    const cell = row?.children?.[8];
+    const raw = String(cell?.textContent || '').trim();
+    const value = parseInt(raw, 10);
+    if (Number.isNaN(value)) return false;
+    if (range.min != null && value < range.min) return false;
+    if (range.max != null && value > range.max) return false;
+    return true;
+  });
+  window.__daysRangeFilterExtRegistered = true;
+}
+
 const accountSearchInput = document.getElementById('accountSearchInput');
 if (accountSearchInput) {
   accountSearchInput.addEventListener('input', () => {
@@ -981,6 +1000,27 @@ if (positionSearchInput) {
   positionSearchInput.addEventListener('input', () => {
     const value = positionSearchInput.value;
     table.column(2).search(value, true, false).draw(); // columna 2 = Position
+  });
+}
+
+function parseDaysRangeValue(value) {
+  const clean = String(value || '').trim();
+  if (!clean) return { min: null, max: null };
+  if (clean.endsWith('+')) {
+    const min = parseInt(clean.slice(0, -1), 10);
+    return { min: Number.isNaN(min) ? null : min, max: null };
+  }
+  const parts = clean.split('-').map((part) => parseInt(part, 10));
+  const min = Number.isNaN(parts[0]) ? null : parts[0];
+  const max = Number.isNaN(parts[1]) ? null : parts[1];
+  return { min, max };
+}
+
+const daysRangeFilter = document.getElementById('daysRangeFilter');
+if (daysRangeFilter) {
+  daysRangeFilter.addEventListener('change', () => {
+    window.__daysRangeFilterState = parseDaysRangeValue(daysRangeFilter.value);
+    table.draw();
   });
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)
@@ -1379,10 +1419,51 @@ function playCloseWinCelebration(onDone) {
   }, CLOSE_WIN_CELEBRATION_DURATION);
 }
 
+function updateStageDropdownStyle(select, stage) {
+  if (!select) return;
+  select.classList.forEach((cls) => {
+    if (cls.startsWith('stage-color-')) select.classList.remove(cls);
+  });
+  const newClass = 'stage-color-' + String(stage || '').toLowerCase().replace(/\s/g, '-');
+  if (newClass !== 'stage-color-') select.classList.add(newClass);
+}
+
+function requiresStageConfirm(stage) {
+  return !['Sourcing', 'Interviewing', 'Close Win', 'Closed Lost'].includes(stage);
+}
+
+function openStageConfirmPopup({ newStage, onConfirm, onCancel }) {
+  const popup = document.getElementById('stageConfirmPopup');
+  const message = document.getElementById('stageConfirmMessage');
+  const yesBtn = document.getElementById('stageConfirmYes');
+  const noBtn = document.getElementById('stageConfirmNo');
+  if (!popup || !message || !yesBtn || !noBtn) return;
+
+  message.textContent = `Are you sure you want to change this stage to "${newStage}"?`;
+  popup.style.display = 'flex';
+
+  const cleanup = () => {
+    popup.style.display = 'none';
+    yesBtn.onclick = null;
+    noBtn.onclick = null;
+  };
+
+  yesBtn.onclick = async () => {
+    cleanup();
+    if (typeof onConfirm === 'function') await onConfirm();
+  };
+
+  noBtn.onclick = () => {
+    cleanup();
+    if (typeof onCancel === 'function') onCancel();
+  };
+}
+
 document.addEventListener('change', async (e) => {
     if (e.target && e.target.classList.contains('stage-dropdown')) {
       const newStage = e.target.value;
       const opportunityId = e.target.getAttribute('data-id');
+      const previousStage = e.target.getAttribute('data-current-stage') || '';
 
       if (e.target.disabled) {
         alert("This stage is final and cannot be changed.");
@@ -1407,18 +1488,33 @@ document.addEventListener('change', async (e) => {
       openCloseLostPopup(opportunityId, e.target);
       return;
     }
-    await patchOpportunityStage(opportunityId, newStage, e.target);
-    const select = e.target;
-if (select.classList.contains('stage-dropdown')) {
-  // Elimina clases anteriores
-  select.classList.forEach(cls => {
-    if (cls.startsWith('stage-color-')) select.classList.remove(cls);
-  });
+    if (requiresStageConfirm(newStage)) {
+      e.target.value = previousStage;
+      updateStageDropdownStyle(e.target, previousStage);
+      openStageConfirmPopup({
+        newStage,
+        onConfirm: async () => {
+          e.target.value = newStage;
+          updateStageDropdownStyle(e.target, newStage);
+          const ok = await patchOpportunityStage(opportunityId, newStage, e.target);
+          if (!ok) {
+            e.target.value = previousStage;
+            updateStageDropdownStyle(e.target, previousStage);
+          }
+        },
+        onCancel: () => {
+          e.target.value = previousStage;
+          updateStageDropdownStyle(e.target, previousStage);
+        }
+      });
+      return;
+    }
 
-  // Agrega la nueva clase
-  const newClass = 'stage-color-' + newStage.toLowerCase().replace(/\s/g, '-');
-  select.classList.add(newClass);
-}
+    const ok = await patchOpportunityStage(opportunityId, newStage, e.target);
+    if (!ok) {
+      e.target.value = previousStage;
+      updateStageDropdownStyle(e.target, previousStage);
+    }
 
   }
 });
@@ -2145,7 +2241,7 @@ function getStageDropdown(currentStage, opportunityId) {
   const normalized = currentStage?.toLowerCase().replace(/\s/g, '-') || '';
   const isFinalStage = currentStage === 'Close Win' || currentStage === 'Closed Lost';
 
-  let dropdown = `<select class="stage-dropdown stage-color-${normalized}" data-id="${opportunityId}" ${isFinalStage ? 'disabled' : ''}>`;
+  let dropdown = `<select class="stage-dropdown stage-color-${normalized}" data-id="${opportunityId}" data-current-stage="${escapeAttribute(currentStage || '')}" ${isFinalStage ? 'disabled' : ''}>`;
 
   stages.forEach(stage => {
     const selected = stage === currentStage ? 'selected' : '';
@@ -2478,6 +2574,10 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
     const result = await response.json();
 
     if (response.ok) {
+      if (dropdownElement) {
+        dropdownElement.setAttribute('data-current-stage', newStage);
+        updateStageDropdownStyle(dropdownElement, newStage);
+      }
       const toast = document.getElementById('stage-toast');
       toast.textContent = '✨ Stage updated!';
       toast.style.display = 'inline-block';
@@ -2488,13 +2588,16 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
       setTimeout(() => {
         toast.style.display = 'none';
       }, 3000);
+      return true;
     } else {
       console.error('❌ Error updating stage:', result.error || result);
       alert('Error updating stage: ' + (result.error || 'Unexpected error'));
+      return false;
     }
   } catch (err) {
     console.error('❌ Network error updating stage:', err);
     alert('Network error. Please try again.');
+    return false;
   }
 }
 function openCloseLostPopup(opportunityId, dropdownElement) {

@@ -2299,3 +2299,51 @@ body.dark-mode .profile-tile{
 #popup input::placeholder{
   opacity: .6;
 }
+
+/* Apple-style confirm popup */
+.apple-confirm {
+  background: rgba(15, 20, 30, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.apple-confirm__content {
+  max-width: 360px;
+  text-align: center;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+}
+
+.apple-confirm__message {
+  margin: 8px 0 18px;
+  color: #2b2b2b;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.apple-confirm__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.apple-confirm__btn {
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-weight: 600;
+  border: 1px solid #d0d0d0;
+  background: #f2f2f7;
+  color: #1c1c1e;
+  min-width: 96px;
+}
+
+.apple-confirm__btn:hover {
+  filter: brightness(0.98);
+}
+
+.apple-confirm__yes {
+  background: #0a84ff;
+  border-color: #0a84ff;
+  color: #fff;
+}

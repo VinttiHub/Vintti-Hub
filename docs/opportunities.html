@@ -104,6 +104,19 @@
         <div class="multi-select hidden" id="filterType"></div>
       </div>
 
+      <!-- Days Range Filter -->
+      <div class="text-filter text-filter--compact">
+        <select id="daysRangeFilter" class="filter-select">
+          <option value="">All days</option>
+          <option value="1-5">1-5</option>
+          <option value="6-10">6-10</option>
+          <option value="11-15">11-15</option>
+          <option value="16-20">16-20</option>
+          <option value="21-30">21-30</option>
+          <option value="31+">31+</option>
+        </select>
+      </div>
+
       <!-- Account Text Search -->
       <div class="text-filter text-filter--grow">
         <input type="text" id="accountSearchInput" placeholder="Search account..." autocomplete="off" />
@@ -321,6 +334,21 @@
     <button id="saveInterviewingStartDate" type="button">Save</button>
   </div>
 </div>
+
+  <!-- Stage change confirm -->
+  <div id="stageConfirmPopup" class="popup-overlay apple-confirm" style="display:none;"
+       role="dialog" aria-modal="true" aria-labelledby="stageConfirmTitle">
+    <div class="popup-content apple-confirm__content">
+      <h2 id="stageConfirmTitle" class="popup-title">Change stage?</h2>
+      <p id="stageConfirmMessage" class="apple-confirm__message">
+        Are you sure you want to change this stage?
+      </p>
+      <div class="apple-confirm__actions">
+        <button id="stageConfirmNo" type="button" class="apple-confirm__btn">No</button>
+        <button id="stageConfirmYes" type="button" class="apple-confirm__btn apple-confirm__yes">Yes</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Stage toast -->
   <div id="stage-toast" role="status" aria-live="polite">✨ Stage updated!</div>
