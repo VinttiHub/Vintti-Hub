@@ -16,20 +16,28 @@
   <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
   <meta name="theme-color" content="#0B3D91">
 
+  <!-- ====== Vendor CSS ====== -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <!-- ===== Styles & Scripts (kept paths/names) ===== -->
-  <link rel="stylesheet" href="assets/css/equipments.css" />
+  <link rel="stylesheet" href="./assets/css/sidebar.css" />
+  <link rel="stylesheet" href="./assets/css/equipments.css" />
   <script defer src="assets/js/equipments.js"></script>
+  
 </head>
 
-<body>
-  <main class="page">
+<body class="light-mode">
+  <div id="sidebarMount"></div>
+  <main class="main-content page">
+
     <!-- ========== Header ========== -->
     <header class="header">
       <div class="header-left">
         <!-- Back button (kept ids/classes) -->
-        <button class="btn ghost" id="backBtn" aria-label="Go back">
+        <!-- <button class="btn ghost" id="backBtn" aria-label="Go back">
           <span class="icon" aria-hidden="true">←</span> Go back
-        </button>
+        </button> -->
 
         <!-- Page title + subtitle -->
         <div>
@@ -202,5 +210,9 @@
 
   <!-- Toast (JS toggles hidden) -->
   <div id="toast" class="toast" hidden></div>
+  <script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js" defer></script>
+  
+
 </body>
 </html>

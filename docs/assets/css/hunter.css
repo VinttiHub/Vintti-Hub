@@ -589,3 +589,14 @@ body.hunter-body {
     padding: 20px;
   }
 }
+.main-content.page {
+  flex: 1;
+  display: flex;
+  justify-content: center;   
+}
+
+.hunter-shell {
+  width: 100%;
+  max-width: 1200px;         /* o 1280px */
+  padding: 32px 24px;        /* aire lateral */
+}

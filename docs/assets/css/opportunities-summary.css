@@ -16,15 +16,7 @@
   --radius: 18px;
 }
 /* ——— Asegurar que el degradé llene toda la página ——— */
-html, body { height: 100%; }
-body {
-  min-height: 100vh;
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif;
-  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
-  background-attachment: fixed; /* mantiene el gradiente hasta el fondo */
-  color: #333;
-}
+
 
 /* ——— Glass Tech SIN borde ——— */
 .opportunity-summary-table{
@@ -36,7 +28,6 @@ body {
   backdrop-filter: blur(12px) saturate(1.05);
   -webkit-backdrop-filter: blur(12px) saturate(1.05);
   box-shadow: var(--glass-shadow);
-  overflow: hidden;
 }
 
 .summary-container {
@@ -247,15 +238,6 @@ body {
   #summaryTable th, #summaryTable td { padding: 12px; font-size: .9rem; }
 }
 /* === Layout: centrar contenido === */
-html, body { height: 100%; }
-
-body{
-  min-height: 100vh;
-  display: grid;
-  grid-template-rows: 1fr auto; /* fila 1: contenido centrado / fila 2: last-updated */
-  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
-  background-attachment: fixed;
-}
 
 /* Centra el bloque principal (titulo + tabla) */
 .summary-container{
@@ -266,12 +248,6 @@ body{
   padding: 3rem 2rem;
 }
 
-/* Mantén el "Last updated" en la parte baja y centrado */
-#lastUpdated{
-  justify-self: center;
-  align-self: end;
-  margin: 1.6rem 0 2.4rem;
-}
 
 /* El botón Go Back ya es absolute, no se ve afectado */
 .go-back-button{ position: absolute; top: 24px; left: 32px; }
@@ -609,3 +585,71 @@ body{
 /* Evitá velo de hover en el tfoot */
 #summaryTable tfoot .totals-row th,
 #summaryTable tfoot .totals-row td{ box-shadow: none !important; }
+
+/* Fondo SOLO del área de contenido (no del body entero) */
+.main-content{
+  background: linear-gradient(180deg, #f7f8fb 0%, #eef1f5 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Contenedor centrado y ancho “bonito” */
+.main-content .page,
+.summary-container{
+  width: min(1200px, 92vw);
+  margin: 0 auto;
+}
+
+/* Espaciado vertical como la screenshot */
+.summary-container{
+  padding: 48px 24px 28px;
+}
+
+/* Last updated centrado abajo */
+#lastUpdated{
+  text-align: center;
+  margin: 18px 0 28px;
+}
+
+.main-content{
+  flex: 1 1 auto !important;
+  min-width: 0 !important;       
+  overflow-x: hidden !important; 
+}
+
+.main-content.page{
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+.summary-container{
+  width: 100% !important;        
+  max-width: 1200px !important;  
+  min-width: 0 !important;
+  margin: 0 auto !important;
+  box-sizing: border-box;
+}
+
+.summary-table-wrap{
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;  
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+#summaryTable{
+  width: max-content !important; 
+  min-width: 100% !important;    
+  table-layout: auto !important; 
+}
+
+.opportunity-summary-table{
+  overflow: visible !important;
+  max-width: 100% !important;
+}
+
+body{
+  overflow-x: hidden !important;
+}

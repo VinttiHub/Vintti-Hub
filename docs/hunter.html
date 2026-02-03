@@ -5,13 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vintti Hunter</title>
     <script src="./assets/js/auth-guard.js"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+
+    <!-- ===== App Icons / Theming (kept as-is) ===== -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/icons/vintti-hub-180.png">
+  <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#0B3D91">
+  <meta name="theme-color" content="#0B3D91">
+
+  <!-- ====== Vendor CSS ====== -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="./assets/css/sidebar.css" />
     <link rel="stylesheet" href="./assets/css/hunter.css" />
   </head>
   <body class="hunter-body">
+    <div id="sidebarMount"></div>
+    <main class="main-content page">
     <div class="hunter-shell">
       <section class="hero">
         <div>
@@ -59,6 +73,9 @@
         <div class="refresh-meta" data-refresh-text>0%</div>
       </div>
     </div>
+    </main>
+    <script src="./assets/js/avatar-map.js" defer></script>
+    <script src="./assets/js/sidebar.js" defer></script>
     <script src="./assets/js/hunter.js"></script>
   </body>
 </html>

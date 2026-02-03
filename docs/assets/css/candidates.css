@@ -1055,3 +1055,55 @@ body.dark-mode .profile-tile{
 .profile-tile{
   position: static;
 }
+
+.table-container{
+  max-width: 100%;
+  border-radius: 22px;    
+  overflow: hidden;        
+  background: #fff;         
+}
+
+.table-container .dataTables_wrapper,
+.table-container .dataTables_scroll,
+.table-container .dataTables_scrollBody{
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+#candidatesTable{
+  width: 100% !important;
+}
+
+body{
+  display: flex !important;
+  margin: 0;
+}
+
+#sidebarMount{
+  flex: 0 0 auto;
+}
+
+.main-content{
+  flex: 1 1 auto !important;
+  min-width: 0 !important; 
+  width: auto !important;
+}
+
+/* ✅ el card (redondito) recorta */
+.table-container{
+  max-width: 100%;
+  border-radius: 22px;    
+  overflow: hidden;        
+  background: #fff;         
+}
+
+.table-container .dataTables_wrapper,
+.table-container .dataTables_scroll,
+.table-container .dataTables_scrollBody{
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+#candidatesTable{
+  width: 100% !important;
+}

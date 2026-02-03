@@ -183,3 +183,9 @@ body.dark-mode .filter-select {
     width: 100%;
   }
 }
+
+main.main-content{
+  flex: 1 1 auto;
+  min-width: 0;
+  background-color: #f7f8fb;
+}

@@ -341,3 +341,51 @@ input:focus, select:focus{
   .pretty-table thead th,
   .pretty-table tbody td{ padding: 14px 18px; }
 }
+
+
+/* ===========================
+   FIX LAYOUT: Equipments igual a Candidates
+   (PEGA ESTO AL FINAL)
+=========================== */
+
+
+
+/* =========================
+   MAIN CONTENT UNIVERSAL
+   (cópialo tal cual)
+========================= */
+
+/* layout base: sidebar + main */
+body{
+  display: flex;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* el mount del sidebar no se estira */
+#sidebarMount{
+  flex: 0 0 auto;
+}
+
+/* main siempre ocupa lo restante */
+.main-content{
+  flex: 1 1 auto;
+  min-width: 0;           /* clave: evita overflow/encogimiento raro */
+  width: 100%;
+  padding: 30px;
+}
+
+/* si alguna página usa .page, que NO se centre ni limite */
+.main-content .page,
+main.page{
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* scroll horizontal: solo donde lo necesitas (tablas/cards), NO global */
+.main-content{
+  overflow-x: visible;    /* <- cambia esto (tu hidden te mata tablas) */
+}
+

@@ -4,12 +4,16 @@
   <meta charset="UTF-8" />
   <title>Opportunities Summary</title>
   <script src="./assets/js/auth-guard.js"></script>
+  <link rel="stylesheet" href="./assets/css/sidebar.css" />
   <link rel="stylesheet" href="./assets/css/opportunities-summary.css" />
 </head>
 <body>
-  <button class="go-back-button" onclick="window.history.back()">
+  <div id="sidebarMount"></div>
+  <main class="main-content page">
+    <div class="page"></div>
+  <!-- <button class="go-back-button" onclick="window.history.back()">
   ← Go Back
-</button>
+</button> -->
 
   <div class="summary-container">
     <header class="summary-header">
@@ -18,6 +22,7 @@
     </header>
 
     <div class="opportunity-summary-table">
+      <div class="summary-table-wrap">
     <table id="summaryTable">
       <thead>
         <tr>
@@ -52,6 +57,8 @@
       </tfoot>
     </table>
     </div>
+    </div>
+    
     <!-- Drilldown de oportunidades por HR Lead + Stage -->
 <section id="drilldownWrapper" class="drilldown hidden">
   <header class="drilldown-header">
@@ -77,7 +84,12 @@
 </section>
 
   </div>
+  
 <div id="lastUpdated" class="last-updated"></div>
+</div>
+</main>
+<script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js" defer></script>
   <script src="./assets/js/opportunities-summary.js"></script>
 </body>
 </html>

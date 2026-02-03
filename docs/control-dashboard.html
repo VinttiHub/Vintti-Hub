@@ -13,10 +13,13 @@
 
   <!-- ===== App assets ===== -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/css/sidebar.css" />
   <link rel="stylesheet" href="./assets/css/dashboard.css">
 </head>
 <body>
-  <div class="page">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+  <div class="content">
     <!-- =====================================================
          TOP BAR
          ===================================================== -->
@@ -28,7 +31,7 @@
     <!-- =====================================================
          MAIN CONTENT
          ===================================================== -->
-    <main class="content">
+    
 
       <!-- =====================================================
            CARD: Opportunities — Pipeline
@@ -247,7 +250,7 @@
         </div>
       </section>
 
-    </main>
+    
   </div>
 
   <!-- =====================================================
@@ -278,8 +281,11 @@
       <div class="metrics-dialog__body" id="metricsDialogBody"></div>
     </div>
   </div>
+  </main>
 
   <!-- ===== JS ===== -->
+   <script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js" defer></script>
   <script src="./assets/js/dashboard.js"></script>
 </body>
 </html>

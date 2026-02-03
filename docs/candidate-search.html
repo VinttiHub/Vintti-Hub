@@ -6,9 +6,12 @@
   <title>Buscar Candidatos</title>
   <script src="./assets/js/auth-guard.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="./assets/css/sidebar.css" />
   <link rel="stylesheet" href="./assets/css/candidate-search.css"/>
 </head>
 <body class="light-mode">
+  <div id="sidebarMount"></div>
+  <main class="main-content page">
   <header class="hero">
     <h1 class="title">🔎 Vintti Candidate Finder</h1>
     <div class="search-wrap">
@@ -18,7 +21,7 @@
     <div id="chips" class="chips hidden" aria-live="polite"></div>
   </header>
 
-  <main class="grid">
+  <div class="grid">
     <section class="col">
       <h2 class="col-title">🌱 Vintti Talent</h2>
 
@@ -56,7 +59,7 @@
         <button id="cs-more" class="search-btn small hidden" type="button">Cargar más</button>
       </div>
     </section>
-  </main>
+  </div>
 
   <template id="card-tpl">
     <a class="card" target="_self">
@@ -78,7 +81,9 @@
       </div>
     </a>
   </template>
-
+  </main>
+  <script src="./assets/js/avatar-map.js" defer></script>
+  <script src="./assets/js/sidebar.js" defer></script>
   <script src="./assets/js/candidate-search.js" defer></script>
 </body>
 </html>
