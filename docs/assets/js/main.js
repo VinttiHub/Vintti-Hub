@@ -1427,6 +1427,9 @@ function updateStageDropdownStyle(select, stage) {
   const newClass = 'stage-color-' + String(stage || '').toLowerCase().replace(/\s/g, '-');
   if (newClass !== 'stage-color-') select.classList.add(newClass);
 }
+if (typeof window !== 'undefined') {
+  window.updateStageDropdownStyle = updateStageDropdownStyle;
+}
 
 function requiresStageConfirm(stage) {
   return !['Sourcing', 'Interviewing', 'Close Win', 'Closed Lost'].includes(stage);
@@ -2576,7 +2579,9 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
     if (response.ok) {
       if (dropdownElement) {
         dropdownElement.setAttribute('data-current-stage', newStage);
-        updateStageDropdownStyle(dropdownElement, newStage);
+        if (typeof window.updateStageDropdownStyle === 'function') {
+          window.updateStageDropdownStyle(dropdownElement, newStage);
+        }
       }
       const toast = document.getElementById('stage-toast');
       toast.textContent = '✨ Stage updated!';
