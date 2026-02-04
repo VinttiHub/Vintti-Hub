@@ -349,6 +349,26 @@ async function api(path, opts = {}) {
   return r;
 }
 window.api = api;
+
+async function logOpportunityTrack(buttonId) {
+  if (!buttonId) return;
+  try {
+    const userId = await getCurrentUserId();
+    if (userId == null) return;
+    await fetch(`${API_BASE}/tracks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, button: String(buttonId) }),
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.debug('Track log failed:', err);
+  }
+}
+
+function trackIdFromEl(el, fallback) {
+  return el?.id || el?.getAttribute('data-track-id') || fallback || '';
+}
 // ——— Helpers de nombre/escape ———
 function escapeHtml(s){
   return String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
@@ -840,6 +860,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
                 type="text"
                 class="comment-input"
                 data-id="${opp.opportunity_id}"
+                id="opp-comment-${opp.opportunity_id}"
                 data-original-value="${escapeAttribute(plainComment)}"
                 value="${escapeAttribute(plainComment)}"
               />
@@ -1554,6 +1575,7 @@ document.addEventListener('change', async e => {
 
     // 3) Enviar email de asignación de búsqueda (HR Lead + Angie)
     sendHRLeadAssignmentEmail(oppId, newLead);
+    logOpportunityTrack(trackIdFromEl(e.target, `opp-hr-lead-${oppId}`));
 
   } catch (err) {
     console.error('❌ Network error updating HR Lead:', err);
@@ -1585,6 +1607,7 @@ document.addEventListener('change', async e => {
       const current = wrap.querySelector('.sales-lead');
       if (current) current.outerHTML = salesDisplayHTML(newLead);
     }
+    logOpportunityTrack(trackIdFromEl(el, `opp-sales-lead-${oppId}`));
   } catch (err) {
     console.error('❌ Error updating sales lead:', err);
     alert('Error updating Sales Lead. Please try again.');
@@ -1617,6 +1640,7 @@ document.addEventListener('blur', async (e) => {
       return;
     }
     input.dataset.originalValue = newComment;
+    logOpportunityTrack(trackIdFromEl(input, `opp-comment-${oppId}`));
   } catch (err) {
     console.error('Error updating comment', err);
   }
@@ -2108,6 +2132,7 @@ if (createOpportunityForm && createButton) {
 
       if (response.ok) {
         alert('Opportunity created successfully!');
+        logOpportunityTrack('createOpportunityBtn');
         closePopup();
         location.reload();
       } else {
@@ -2244,7 +2269,7 @@ function getStageDropdown(currentStage, opportunityId) {
   const normalized = currentStage?.toLowerCase().replace(/\s/g, '-') || '';
   const isFinalStage = currentStage === 'Close Win' || currentStage === 'Closed Lost';
 
-  let dropdown = `<select class="stage-dropdown stage-color-${normalized}" data-id="${opportunityId}" data-current-stage="${escapeAttribute(currentStage || '')}" ${isFinalStage ? 'disabled' : ''}>`;
+  let dropdown = `<select class="stage-dropdown stage-color-${normalized}" id="opp-stage-${opportunityId}" data-id="${opportunityId}" data-current-stage="${escapeAttribute(currentStage || '')}" ${isFinalStage ? 'disabled' : ''}>`;
 
   stages.forEach(stage => {
     const selected = stage === currentStage ? 'selected' : '';
@@ -2344,6 +2369,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
           });
 
           await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+          logOpportunityTrack('saveSourcingDate');
           closeSourcingPopup();
         };
       } else {
@@ -2370,6 +2396,7 @@ function openSourcingPopup(opportunityId, dropdownElement) {
           });
 
           await patchOpportunityStage(opportunityId, 'Sourcing', dropdownElement);
+          logOpportunityTrack('saveNewSourcing');
           closeNewSourcingPopup();
         };
       }
@@ -2531,6 +2558,7 @@ function openCloseWinPopup(opportunityId, dropdownElement) {
 
       // 3) Cambiar stage
       await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
+      logOpportunityTrack('saveCloseWin');
 
       // 4) Cerrar y redirigir
       popup.style.display = 'none';
@@ -2590,6 +2618,8 @@ async function patchOpportunityStage(opportunityId, newStage, dropdownElement) {
       void toast.offsetWidth; // forzar reflow
       toast.classList.add('sparkle-show');
 
+      logOpportunityTrack(trackIdFromEl(dropdownElement, `opp-stage-${opportunityId}`));
+
       setTimeout(() => {
         toast.style.display = 'none';
       }, 3000);
@@ -2639,6 +2669,7 @@ function openCloseLostPopup(opportunityId, dropdownElement) {
     });
 
     await patchOpportunityStage(opportunityId, 'Closed Lost', dropdownElement);
+    logOpportunityTrack('saveCloseLost');
     closeCloseLostPopup();
   };
 }
@@ -2825,6 +2856,7 @@ function getHRLeadCell(opp) {
     <div class="hr-lead-cell-wrap" style="position:relative;min-height:28px;">
       ${hrDisplayHTML(email)}
       <select class="hr-lead-dropdown"
+              id="opp-hr-lead-${opp.opportunity_id}"
               data-id="${opp.opportunity_id}"
               style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;">
         ${generateHROptions(opp.opp_hr_lead)}
@@ -2932,6 +2964,7 @@ function getSalesLeadCell(opp) {
       ${salesDisplayHTML(email || fullName)}
       <span class="sr-only" style="display:none">${fullName}</span>
       <select class="sales-lead-dropdown"
+              id="opp-sales-lead-${opp.opportunity_id}"
               data-id="${opp.opportunity_id}"
               style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;">
         ${window.generateSalesOptions(email)}

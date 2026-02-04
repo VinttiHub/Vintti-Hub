@@ -26,6 +26,7 @@ from routes.candidates_routes import bp as candidates_bp
 from routes.careers_routes import bp as careers_bp
 from routes.metrics_routes import bp as metrics_bp
 from routes.system_routes import bp as system_bp
+from routes.tracks_routes import bp as tracks_bp
 from routes.users_routes import bp as users_api_bp
 from routes.moods_routes import bp as moods_bp
 
@@ -61,6 +62,7 @@ def create_app() -> Flask:
     app.register_blueprint(candidates_bp)
     app.register_blueprint(metrics_bp)
     app.register_blueprint(moods_bp)
+    app.register_blueprint(tracks_bp)
     app.register_blueprint(careers_bp)
     app.register_blueprint(reminders_bp)
     app.register_blueprint(coresignal_bp)
