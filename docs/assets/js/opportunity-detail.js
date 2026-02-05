@@ -499,37 +499,6 @@ function getCandidateIdFromPayload(candidate) {
   return id ? id : null;
 }
 
-async function detachCandidatesFromOpportunity(opportunityId) {
-  const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
-    credentials: 'include'
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => '');
-    throw new Error(t || 'Failed to load candidates for opportunity');
-  }
-  const data = await res.json().catch(() => []);
-  const list = Array.isArray(data) ? data : [];
-  const ids = Array.from(new Set(list.map(getCandidateIdFromPayload).filter(Boolean)));
-  if (!ids.length) return;
-
-  const failures = [];
-  await Promise.all(ids.map(async (id) => {
-    const r = await fetch(`${API_BASE}/candidates/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: null })
-    });
-    if (!r.ok) {
-      const t = await r.text().catch(() => '');
-      failures.push({ id, status: r.status, error: t });
-    }
-  }));
-
-  if (failures.length) {
-    throw new Error(`Failed to detach ${failures.length} candidate(s) from this opportunity.`);
-  }
-}
-
 function setupDeleteOpportunityControls(){
   const btn = document.getElementById('delete-opportunity-btn');
   const modal = document.getElementById('deleteOpportunityModal');
@@ -579,7 +548,6 @@ function setupDeleteOpportunityControls(){
     confirmBtn.textContent = 'Deleting...';
 
     try {
-      await detachCandidatesFromOpportunity(opportunityId);
       const res = await fetch(`${API_BASE}/opportunities/${opportunityId}`, {
         method: 'DELETE',
         credentials: 'include'
