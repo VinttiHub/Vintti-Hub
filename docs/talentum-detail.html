@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Talentum</title>
+  <script src="./assets/js/auth-guard.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./assets/css/talentum.css" />
+</head>
+<body class="talentum">
+  <div class="talentum-shell">
+    <header class="talentum-header">
+      <div class="title-wrap">
+        <p class="eyebrow">Talentum</p>
+        <h1>Opportunity intelligence, softened.</h1>
+      </div>
+      <div class="user-pill" id="userPill">Loading user…</div>
+    </header>
+
+    <section class="talentum-main">
+      <section class="chat-panel">
+        <div class="panel-head">
+          <div>
+            <h3>Talentum Chat</h3>
+            <p id="chatSubtitle">Loading opportunity…</p>
+          </div>
+          <div class="chat-status" id="chatStatus">Idle</div>
+        </div>
+        <div class="chat-window" id="chatMessages" aria-live="polite"></div>
+        <form class="chat-input" id="chatForm">
+          <input id="chatInput" type="text" placeholder="Ask for a different focus…" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
+      </section>
+
+      <section class="candidates-panel">
+        <div class="panel-head">
+          <div>
+            <h3>Candidates</h3>
+            <p id="candidateSubtitle">Loading applicants…</p>
+          </div>
+          <div class="candidate-count" id="candidateCount">0 matches</div>
+        </div>
+
+        <div class="filters-card">
+          <div class="filters-title">
+            <span>Active filters</span>
+            <span class="filters-status" id="filtersStatus">Idle</span>
+          </div>
+          <div class="filters-grid" id="filtersGrid"></div>
+        </div>
+
+        <div class="candidates-grid" id="candidatesGrid"></div>
+        <div class="empty-state" id="candidatesEmpty">Loading applicants…</div>
+      </section>
+    </section>
+  </div>
+
+  <script src="./assets/js/talentum-detail.js"></script>
+</body>
+</html>
