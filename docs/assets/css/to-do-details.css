@@ -10,12 +10,12 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 32px 16px 48px;
+  padding: 24px 18px 36px;
 }
 
 .notebook {
   position: relative;
-  width: min(960px, 100%);
+  width: min(1400px, 100%);
   border-radius: 28px;
   padding: 32px 32px 36px 72px;
   background: repeating-linear-gradient(
@@ -140,6 +140,68 @@ body {
   gap: 12px;
 }
 
+.notebook__form {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  border: 1px dashed rgba(204, 186, 200, 0.8);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.notebook__field {
+  display: grid;
+  gap: 6px;
+}
+
+.notebook__field label {
+  font-size: 12px;
+  color: #8b4b6e;
+}
+
+.notebook__field input,
+.notebook__field select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(206, 186, 202, 0.9);
+  font-family: 'Onest', sans-serif;
+  font-size: 13px;
+  background: #fff;
+}
+
+.notebook__field select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #8a4d6f 50%),
+    linear-gradient(135deg, #8a4d6f 50%, transparent 50%),
+    linear-gradient(to right, rgba(238, 210, 224, 0.6), rgba(238, 210, 224, 0.6));
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%,
+    calc(100% - 36px) 50%;
+  background-size: 6px 6px, 6px 6px, 1px 18px;
+  background-repeat: no-repeat;
+  padding-right: 42px;
+}
+
+.notebook__submit {
+  justify-self: start;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  background: linear-gradient(120deg, #f3c3d7, #f0adc8);
+  color: #3d1f31;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notebook__error {
+  font-size: 12px;
+  color: #c6466c;
+  margin: 0;
+}
+
 .team-board {
   display: grid;
   grid-template-columns: minmax(180px, 240px) 1fr;
@@ -250,6 +312,7 @@ body {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(230, 210, 225, 0.9);
+  cursor: grab;
 }
 
 .note-task__checkbox {
@@ -272,6 +335,22 @@ body {
 .note-task.is-done .note-task__text {
   text-decoration: line-through;
   opacity: 0.65;
+}
+
+.note-task--sub {
+  background: rgba(255, 255, 255, 0.8);
+  border-style: dashed;
+}
+
+.note-list {
+  display: grid;
+  gap: 12px;
+}
+
+.note-list--sub {
+  margin: 8px 0 12px 32px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(214, 188, 206, 0.6);
 }
 
 .note-task__meta {

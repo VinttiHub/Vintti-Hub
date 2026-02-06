@@ -62,6 +62,7 @@
     wrapper.className = 'todo-item';
     if (task.check) wrapper.classList.add('is-done');
     if (!task.check && isOverdue(task.due_date)) wrapper.classList.add('is-overdue');
+    if (task.subtask) wrapper.classList.add('todo-item--sub');
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -108,7 +109,26 @@
     }
 
     clearEmptyState();
-    tasks.forEach((task) => list.appendChild(buildItem(task)));
+    const sortTasks = (items) =>
+      [...items].sort((a, b) => {
+        const aOrder = Number(a.orden) || 0;
+        const bOrder = Number(b.orden) || 0;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return (a.to_do_id || 0) - (b.to_do_id || 0);
+      });
+
+    const topTasks = sortTasks(tasks.filter((task) => !task.subtask));
+    const subTasks = tasks.filter((task) => task.subtask);
+    const byParent = new Map();
+    subTasks.forEach((task) => {
+      if (!byParent.has(task.subtask)) byParent.set(task.subtask, []);
+      byParent.get(task.subtask).push(task);
+    });
+    topTasks.forEach((task) => {
+      list.appendChild(buildItem(task));
+      const children = sortTasks(byParent.get(task.to_do_id) || []);
+      children.forEach((child) => list.appendChild(buildItem(child)));
+    });
   };
 
   const fetchTasks = async () => {

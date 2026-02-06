@@ -1,0 +1,364 @@
+:root {
+  --bg: #f7f2f3;
+  --bg-alt: #fef8f5;
+  --ink: #1f1f24;
+  --muted: #6f6670;
+  --accent: #e6a4b4;
+  --accent-strong: #d8778f;
+  --mint: #c5e5d7;
+  --lavender: #d7d8f0;
+  --border: rgba(31, 31, 36, 0.08);
+  --shadow: 0 22px 60px rgba(31, 31, 36, 0.12);
+  --glass: rgba(255, 255, 255, 0.72);
+  --radius: 22px;
+  --mono: "Manrope", sans-serif;
+  --display: "Playfair Display", serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body.talentum {
+  font-family: var(--mono);
+  color: var(--ink);
+  background: radial-gradient(circle at top left, #fdebf0 0%, transparent 40%),
+              radial-gradient(circle at top right, #e8f6f2 0%, transparent 42%),
+              linear-gradient(180deg, var(--bg) 0%, var(--bg-alt) 100%);
+  min-height: 100vh;
+}
+
+.talentum-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 20px 60px;
+}
+
+.talentum-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.title-wrap h1 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  letter-spacing: 0.02em;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: var(--accent-strong);
+  margin-bottom: 6px;
+}
+
+.user-pill {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+  box-shadow: var(--shadow);
+}
+
+.opportunities-section {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin-bottom: 28px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.section-head h2 {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  margin-bottom: 4px;
+}
+
+.section-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.filters-pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(230, 164, 180, 0.18);
+  color: var(--accent-strong);
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.opportunities-table-wrap {
+  overflow-x: auto;
+}
+
+.opportunities-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.opportunities-table th,
+.opportunities-table td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.opportunities-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.opportunities-table tbody tr {
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+
+.opportunities-table tbody tr:hover {
+  background: rgba(230, 164, 180, 0.12);
+}
+
+.opportunities-table tbody tr.active {
+  background: rgba(199, 209, 241, 0.35);
+  border-radius: 12px;
+}
+
+.talentum-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.chat-panel,
+.candidates-panel {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel-head h3 {
+  font-family: var(--display);
+  font-size: 1.2rem;
+}
+
+.chat-status,
+.candidate-count {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(197, 229, 215, 0.6);
+  color: #2d6a4f;
+}
+
+.chat-window {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 18px;
+  padding: 18px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+}
+
+.chat-message {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.chat-message.user {
+  margin-left: auto;
+  background: rgba(230, 164, 180, 0.35);
+  color: #4c2b35;
+}
+
+.chat-message.assistant {
+  background: rgba(215, 216, 240, 0.45);
+  color: #37364a;
+}
+
+.chat-message.typing {
+  font-style: italic;
+  color: var(--muted);
+}
+
+.chat-input {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+.chat-input button {
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-strong);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.chat-input button:hover {
+  transform: translateY(-1px);
+}
+
+.filters-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.filters-title {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.filters-status {
+  color: var(--accent-strong);
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.filter-chip {
+  background: rgba(215, 216, 240, 0.55);
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  color: #36364a;
+}
+
+.filter-chip span {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.candidates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.candidate-card {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 12px 30px rgba(31, 31, 36, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidate-card h4 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.candidate-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.candidate-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.candidate-tag {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(197, 229, 215, 0.6);
+  color: #2d6a4f;
+  font-size: 0.7rem;
+}
+
+.candidate-link {
+  margin-top: auto;
+  text-decoration: none;
+  color: var(--accent-strong);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 24px;
+  font-size: 0.9rem;
+}
+
+.loading-row td {
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .talentum-main {
+    grid-template-columns: 1fr;
+  }
+
+  .talentum-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

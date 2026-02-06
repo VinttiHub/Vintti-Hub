@@ -229,6 +229,172 @@ JOB DESCRIPTION (verbatim):
             return resp, 500
 
 
+    @app.route('/ai/jd_to_talentum_filters', methods=['POST', 'OPTIONS'])
+    def jd_to_talentum_filters():
+        """
+        Recibe: { "job_description": "<texto o HTML del JD>" }
+        Devuelve: { "position": str, "salary": str, "years_experience": str, "industry": str, "country": str }
+        *No inventa información; solo extrae lo explícito del JD.*
+        """
+        if request.method == 'OPTIONS':
+            resp = app.response_class(status=204)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+            return resp
+
+        try:
+            data = request.get_json(force=True) or {}
+            raw_jd = (data.get('job_description') or '').strip()
+            if not raw_jd:
+                return jsonify({"error": "job_description is required"}), 400
+
+            import re
+            jd_plain = re.sub(r'<[^>]+>', ' ', raw_jd)
+            jd_plain = re.sub(r'\s+', ' ', jd_plain).strip()
+
+            prompt = f"""
+You are a strict job description parser.
+Read ONLY the provided job description text and return a STRICT JSON object with EXACTLY these fields:
+
+- position: title/role name as written in the JD.
+- salary: compensation, range, or currency details as written in the JD.
+- years_experience: years of experience requirement as written in the JD.
+- industry: industry or domain as written in the JD.
+- country: country or location as written in the JD.
+
+Rules:
+- DO NOT invent or infer beyond the text.
+- If a field is missing, return an empty string.
+- Output valid, minified JSON. No markdown, no commentary, no code fences.
+- Keep original language from the JD for extracted values.
+
+JOB DESCRIPTION (verbatim):
+---
+{jd_plain}
+---
+"""
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=500
+            )
+
+            content = (chat.choices[0].message.content or "").strip()
+            import json
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+            try:
+                obj = json.loads(cleaned)
+            except Exception:
+                obj = {}
+
+            def as_text(v):
+                if v is None:
+                    return ""
+                if isinstance(v, list):
+                    return " ".join(str(x).strip() for x in v if str(x).strip())
+                return str(v).strip()
+
+            result = {
+                "position": as_text(obj.get("position", "")),
+                "salary": as_text(obj.get("salary", "")),
+                "years_experience": as_text(obj.get("years_experience", "")),
+                "industry": as_text(obj.get("industry", "")),
+                "country": as_text(obj.get("country", "")),
+            }
+
+            resp = jsonify(result)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 200
+
+        except Exception as e:
+            logging.error("❌ /ai/jd_to_talentum_filters failed\n" + traceback.format_exc())
+            resp = jsonify({"error": str(e)})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 500
+
+
+    @app.route('/ai/talentum_chat_update', methods=['POST', 'OPTIONS'])
+    def talentum_chat_update():
+        """
+        Recibe: { "message": "<user text>", "current_filters": {...} }
+        Devuelve: { "updated_filters": {...}, "response": "<assistant text>" }
+        """
+        if request.method == 'OPTIONS':
+            resp = app.response_class(status=204)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+            return resp
+
+        try:
+            data = request.get_json(force=True) or {}
+            message = (data.get('message') or '').strip()
+            current_filters = data.get('current_filters') or {}
+
+            if not message:
+                return jsonify({"error": "message is required"}), 400
+
+            prompt = f"""
+You are a recruiting assistant updating filters.
+Current filters (JSON):
+{json.dumps(current_filters, ensure_ascii=False)}
+
+User message:
+\"\"\"{message}\"\"\"
+
+Update ONLY these fields: position, salary, years_experience, industry, country.
+Rules:
+- If the user explicitly asks to remove or ignore a filter, set that field to "".
+- If the user adds constraints, update or add the field accordingly.
+- If the message is unrelated, keep filters unchanged.
+- DO NOT invent data. Use only what the user says.
+
+Return STRICT JSON:
+{{"updated_filters": {{...}}, "response": "<short Spanish summary of changes>" }}
+"""
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=350
+            )
+
+            content = (chat.choices[0].message.content or "").strip()
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+            try:
+                payload = json.loads(cleaned)
+            except Exception:
+                payload = {}
+
+            updated = payload.get("updated_filters")
+            if not isinstance(updated, dict):
+                updated = current_filters
+
+            response = payload.get("response")
+            if not isinstance(response, str) or not response.strip():
+                response = "Listo, actualicé los filtros con tu mensaje."
+
+            resp = jsonify({"updated_filters": updated, "response": response.strip()})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 200
+
+        except Exception as e:
+            logging.error("❌ /ai/talentum_chat_update failed\n" + traceback.format_exc())
+            resp = jsonify({"error": str(e)})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 500
+
+
     @app.route('/ai/improve_tools', methods=['POST'])
     def improve_tools_section():
         try:

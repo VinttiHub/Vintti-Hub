@@ -4,11 +4,26 @@
 
   const myList = document.getElementById('myTasks');
   const myEmpty = document.getElementById('myEmpty');
+  const myForm = document.getElementById('myTaskForm');
+  const myDescription = document.getElementById('myTaskDescription');
+  const myDate = document.getElementById('myTaskDate');
+  const myParent = document.getElementById('myTaskParent');
+  const myError = document.getElementById('myTaskError');
   const teamNotes = document.getElementById('teamNotes');
   const teamList = document.getElementById('teamTasks');
   const teamEmpty = document.getElementById('teamEmpty');
   const teamTitle = document.getElementById('teamTitle');
   const teamTab = document.getElementById('teamTab');
+  const teamForm = document.getElementById('teamTaskForm');
+  const teamDescription = document.getElementById('teamTaskDescription');
+  const teamDate = document.getElementById('teamTaskDate');
+  const teamParent = document.getElementById('teamTaskParent');
+  const teamError = document.getElementById('teamTaskError');
+
+  let myTasks = [];
+  let teamUsers = [];
+  let teamTasks = new Map();
+  let currentTeamUserId = null;
 
   const formatDate = (raw) => {
     if (!raw) return '';
@@ -21,15 +36,19 @@
     });
   };
 
-  const buildMyTask = (task) => {
+  const buildMyTask = (task, editable) => {
     const row = document.createElement('label');
     row.className = 'note-task';
     if (task.check) row.classList.add('is-done');
+    row.dataset.todoId = task.to_do_id;
+    row.dataset.parent = task.subtask || 'root';
+    row.draggable = editable;
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'note-task__checkbox';
     checkbox.checked = Boolean(task.check);
+    checkbox.disabled = !editable;
 
     const textWrap = document.createElement('div');
     const text = document.createElement('div');
@@ -62,30 +81,15 @@
     return row;
   };
 
-  const buildTeamTask = (task) => {
-    const row = document.createElement('div');
-    row.className = 'note-task';
-    if (task.check) row.classList.add('is-done');
-
-    const badge = document.createElement('span');
-    badge.className = 'note-task__badge';
-    badge.textContent = task.user_name || `User ${task.user_id}`;
-
-    const textWrap = document.createElement('div');
-    const text = document.createElement('div');
-    text.className = 'note-task__text';
-    text.textContent = task.description || '';
-    const meta = document.createElement('div');
-    meta.className = 'note-task__meta';
-    meta.textContent = task.team ? `${task.team} team` : 'Team';
-    textWrap.append(text, meta);
-
-    const date = document.createElement('span');
-    date.className = 'note-task__date';
-    date.textContent = formatDate(task.due_date);
-
-    row.append(badge, textWrap, date);
+  const buildTaskRow = (task, editable) => {
+    const row = buildMyTask(task, editable);
+    if (task.subtask) row.classList.add('note-task--sub');
     return row;
+  };
+
+  const setError = (el, message) => {
+    el.textContent = message;
+    el.hidden = !message;
   };
 
   const pastelClasses = ['team-note--mint', 'team-note--butter', 'team-note--sky', 'team-note--lilac'];
@@ -105,19 +109,112 @@
     });
   };
 
-  const renderList = (container, items, emptyEl, builder) => {
+  const sortTasks = (tasks) => {
+    return [...tasks].sort((a, b) => {
+      const aOrder = Number(a.orden) || 0;
+      const bOrder = Number(b.orden) || 0;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.to_do_id || 0) - (b.to_do_id || 0);
+    });
+  };
+
+  const renderParentOptions = (selectEl, tasks) => {
+    selectEl.innerHTML = '';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = 'No parent';
+    selectEl.appendChild(blank);
+    tasks
+      .filter((task) => !task.subtask)
+      .forEach((task) => {
+        const opt = document.createElement('option');
+        opt.value = String(task.to_do_id);
+        opt.textContent = task.description || `Task ${task.to_do_id}`;
+        selectEl.appendChild(opt);
+      });
+  };
+
+  const renderTaskList = (container, tasks, emptyEl, editable, ownerId) => {
     container.innerHTML = '';
-    if (!items.length) {
+    if (!tasks.length) {
       emptyEl.hidden = false;
       return;
     }
     emptyEl.hidden = true;
-    items.forEach((item) => container.appendChild(builder(item)));
+
+    const topTasks = sortTasks(tasks.filter((task) => !task.subtask));
+    const byParent = new Map();
+    tasks
+      .filter((task) => task.subtask)
+      .forEach((task) => {
+        if (!byParent.has(task.subtask)) byParent.set(task.subtask, []);
+        byParent.get(task.subtask).push(task);
+      });
+
+    const list = document.createElement('div');
+    list.className = 'note-list';
+    list.dataset.parent = 'root';
+    topTasks.forEach((task) => {
+      list.appendChild(buildTaskRow(task, editable));
+      const children = sortTasks(byParent.get(task.to_do_id) || []);
+      if (children.length) {
+        const subList = document.createElement('div');
+        subList.className = 'note-list note-list--sub';
+        subList.dataset.parent = String(task.to_do_id);
+        children.forEach((child) => subList.appendChild(buildTaskRow(child, editable)));
+        list.appendChild(subList);
+      }
+    });
+    container.appendChild(list);
+    if (editable) enableDrag(list, ownerId);
+  };
+
+  const enableDrag = (root, ownerId) => {
+    let dragged = null;
+    root.querySelectorAll('.note-list').forEach((list) => {
+      list.addEventListener('dragstart', (event) => {
+        const item = event.target.closest('.note-task');
+        if (!item || !item.draggable) return;
+        dragged = item;
+        event.dataTransfer.effectAllowed = 'move';
+      });
+      list.addEventListener('dragover', (event) => {
+        if (!dragged) return;
+        const target = event.target.closest('.note-task');
+        if (!target || target === dragged) return;
+        if (target.dataset.parent !== dragged.dataset.parent) return;
+        event.preventDefault();
+        const rect = target.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2;
+        list.insertBefore(dragged, after ? target.nextSibling : target);
+      });
+      list.addEventListener('drop', async (event) => {
+        if (!dragged) return;
+        event.preventDefault();
+        const parentId = list.dataset.parent || 'root';
+        const items = Array.from(list.querySelectorAll('.note-task'))
+          .filter((item) => item.dataset.parent === parentId)
+          .map((item, index) => ({
+            to_do_id: Number(item.dataset.todoId),
+            orden: index + 1,
+          }));
+        await fetch(`${API_BASE}/to_do/reorder`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ user_id: ownerId, items }),
+        });
+        dragged = null;
+      });
+      list.addEventListener('dragend', () => {
+        dragged = null;
+      });
+    });
   };
 
   const loadMyTasks = async () => {
     if (!userId) {
-      renderList(myList, [], myEmpty, buildMyTask);
+      renderTaskList(myList, [], myEmpty, true, userId);
       myEmpty.textContent = 'Log in to see your saved tasks.';
       return;
     }
@@ -127,9 +224,11 @@
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
-      renderList(myList, Array.isArray(data) ? data : [], myEmpty, buildMyTask);
+      myTasks = Array.isArray(data) ? data : [];
+      renderTaskList(myList, myTasks, myEmpty, true, userId);
+      renderParentOptions(myParent, myTasks);
     } catch (error) {
-      renderList(myList, [], myEmpty, buildMyTask);
+      renderTaskList(myList, [], myEmpty, true, userId);
       myEmpty.textContent = 'Could not load tasks right now.';
     }
   };
@@ -149,42 +248,45 @@
       const tasksData = tasksRes.ok ? await tasksRes.json() : [];
 
       teamTab.hidden = false;
-      const byUser = new Map();
-      reports.forEach((report) => {
-        byUser.set(report.user_id, {
-          user_id: report.user_id,
-          user_name: report.user_name || `User ${report.user_id}`,
-          team: report.team || 'Team',
-          tasks: [],
-        });
-      });
+      teamUsers = reports.map((report) => ({
+        user_id: report.user_id,
+        user_name: report.user_name || `User ${report.user_id}`,
+        team: report.team || 'Team',
+      }));
+      teamTasks = new Map();
+      teamUsers.forEach((user) => teamTasks.set(user.user_id, []));
       if (Array.isArray(tasksData)) {
         tasksData.forEach((task) => {
-          const holder = byUser.get(task.user_id);
-          if (holder && task.to_do_id) holder.tasks.push(task);
+          if (!task.to_do_id) return;
+          const holder = teamTasks.get(task.user_id);
+          if (holder) holder.push(task);
         });
       }
 
-      const users = Array.from(byUser.values());
-      renderTeamNotes(users);
+      renderTeamNotes(teamUsers);
       const activate = (user) => {
         teamTitle.textContent = `${user.user_name}'s tasks`;
-        renderList(teamList, user.tasks, teamEmpty, buildTeamTask);
+        currentTeamUserId = user.user_id;
+        const tasks = teamTasks.get(user.user_id) || [];
+        renderTaskList(teamList, tasks, teamEmpty, true, user.user_id);
+        renderParentOptions(teamParent, tasks);
         Array.from(teamNotes.children).forEach((note) => {
           note.classList.toggle('is-active', Number(note.dataset.userId) === user.user_id);
         });
       };
       teamTitle.textContent = 'Pick a teammate';
-      renderList(teamList, [], teamEmpty, buildTeamTask);
+      renderTaskList(teamList, [], teamEmpty, true, userId);
       teamNotes.addEventListener('click', (event) => {
         const button = event.target.closest('.team-note');
         if (!button) return;
-        const selected = users.find((u) => u.user_id === Number(button.dataset.userId));
+        const selected = teamUsers.find((u) => u.user_id === Number(button.dataset.userId));
         const isActive = button.classList.contains('is-active');
         if (isActive) {
           Array.from(teamNotes.children).forEach((note) => note.classList.remove('is-active'));
           teamTitle.textContent = 'Pick a teammate';
-          renderList(teamList, [], teamEmpty, buildTeamTask);
+          renderTaskList(teamList, [], teamEmpty, true, userId);
+          currentTeamUserId = null;
+          renderParentOptions(teamParent, []);
           return;
         }
         if (selected) activate(selected);
@@ -210,6 +312,91 @@
         panel.hidden = false;
       }
     });
+  });
+
+  myForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    setError(myError, '');
+
+    const description = myDescription.value.trim();
+    const dueDate = myDate.value;
+    const parentId = myParent.value ? Number(myParent.value) : null;
+
+    if (!description || !dueDate) {
+      setError(myError, 'Add a task and due date.');
+      return;
+    }
+    if (!userId) {
+      setError(myError, 'Log in to add tasks.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/to_do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          user_id: userId,
+          description,
+          due_date: dueDate,
+          subtask: parentId,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const newTask = await res.json();
+      myTasks = [...myTasks, newTask];
+      renderTaskList(myList, myTasks, myEmpty, true, userId);
+      renderParentOptions(myParent, myTasks);
+      myDescription.value = '';
+      myDate.value = '';
+      myParent.value = '';
+    } catch (error) {
+      setError(myError, 'Could not add task right now.');
+    }
+  });
+
+  teamForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    setError(teamError, '');
+    if (!currentTeamUserId) {
+      setError(teamError, 'Pick a teammate first.');
+      return;
+    }
+
+    const description = teamDescription.value.trim();
+    const dueDate = teamDate.value;
+    const parentId = teamParent.value ? Number(teamParent.value) : null;
+
+    if (!description || !dueDate) {
+      setError(teamError, 'Add a task and due date.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/to_do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          user_id: currentTeamUserId,
+          description,
+          due_date: dueDate,
+          subtask: parentId,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const newTask = await res.json();
+      const existing = teamTasks.get(currentTeamUserId) || [];
+      teamTasks.set(currentTeamUserId, [...existing, newTask]);
+      renderTaskList(teamList, teamTasks.get(currentTeamUserId), teamEmpty, true, currentTeamUserId);
+      renderParentOptions(teamParent, teamTasks.get(currentTeamUserId));
+      teamDescription.value = '';
+      teamDate.value = '';
+      teamParent.value = '';
+    } catch (error) {
+      setError(teamError, 'Could not add task right now.');
+    }
   });
 
   loadMyTasks();

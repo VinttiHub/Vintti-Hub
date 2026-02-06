@@ -1192,6 +1192,12 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   white-space: nowrap;
 }
 
+.todo-item--sub {
+  margin-left: 18px;
+  border-style: dashed;
+  background: #fff7fb;
+}
+
 .todo-empty {
   font-size: 12px;
   color: #9b6f86;
