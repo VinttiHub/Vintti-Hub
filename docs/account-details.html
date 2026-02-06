@@ -217,24 +217,21 @@
   </aside>
 
   <div class="todo-chat">
-    <button type="button" class="todo-bubble" id="todoBubble" aria-label="Open helper" aria-expanded="false">
-      <span class="todo-bubble__face" aria-hidden="true">
-        <span class="todo-bubble__eye"></span>
-        <span class="todo-bubble__eye"></span>
-        <span class="todo-bubble__smile"></span>
-      </span>
+    <button type="button" class="todo-bubble" id="todoBubble" aria-label="Open Vintti Buddy" aria-expanded="false">
+      <img class="todo-bubble__img" src="./assets/img/vinttibuddy.png" alt="Vintti Buddy" />
     </button>
 
     <section class="todo-panel" id="todoPanel" role="dialog" aria-labelledby="todoTitle" hidden>
       <div class="todo-panel__header">
         <div>
           <p class="todo-panel__eyebrow">Your tiny assistant</p>
-          <h2 class="todo-panel__title" id="todoTitle">Task sparkles</h2>
+          <h2 class="todo-panel__title" id="todoTitle">Vintti Buddy</h2>
         </div>
         <button type="button" class="todo-panel__close" id="todoClose" aria-label="Close">&times;</button>
       </div>
       <p class="todo-panel__intro">
-        Hi! I'm here to help you organize. Add a new task and I can remind you when it is close to the due date.
+        Your Vintti Buddy is here to help you organize your tasks. Add a new task and I can remind you when it is close
+        to the due date.
       </p>
       <div class="todo-list" id="todoList"></div>
       <p class="todo-empty" id="todoEmpty" hidden>No tasks yet.</p>
