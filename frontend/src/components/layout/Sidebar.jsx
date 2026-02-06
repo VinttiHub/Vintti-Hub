@@ -143,6 +143,11 @@ function Sidebar({ collapsed }) {
           <span className="menu-label">Opportunities</span>
         </NavLink>
 
+        <a className="menu-item" href="talentum.html">
+          <span className="menu-icon">🅣</span>
+          <span className="menu-label">Talentum</span>
+        </a>
+
         {showCandidateSearch && (
           <NavLink to="/candidate-search" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
             <span className="menu-icon"><i className="fa-solid fa-magnifying-glass" /></span>

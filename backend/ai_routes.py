@@ -306,7 +306,6 @@ JOB DESCRIPTION (verbatim):
             )
 
             content = (chat.choices[0].message.content or "").strip()
-            import json
             cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
             try:
                 obj = json.loads(cleaned)
