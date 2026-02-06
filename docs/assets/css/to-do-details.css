@@ -334,7 +334,7 @@ body {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(230, 210, 225, 0.9);
-  cursor: grab;
+  cursor: default;
 }
 
 .note-task__checkbox {
@@ -362,6 +362,17 @@ body {
   border-radius: 999px;
   font-size: 11px;
   cursor: pointer;
+}
+
+.note-task__move {
+  border: none;
+  background: #eef6ff;
+  color: #3f5c7a;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .note-task__delete {

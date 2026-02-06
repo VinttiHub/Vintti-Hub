@@ -422,6 +422,7 @@ Given filters (from JD/chat) and a candidate summary, return a STRICT JSON objec
 Rules:
 - 10 means the candidate clearly matches all filters.
 - 1 means almost no match.
+- Country/location match is critical when a country filter is present.
 - Be conservative if data is missing.
 - Output only valid minified JSON.
 
@@ -460,6 +461,73 @@ CANDIDATE:
 
         except Exception as e:
             logging.error("❌ /ai/talentum_score failed\n" + traceback.format_exc())
+            resp = jsonify({"error": str(e)})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 500
+
+
+    @app.route('/ai/talentum_score_explain', methods=['POST', 'OPTIONS'])
+    def talentum_score_explain():
+        """
+        Recibe: { "filters": {...}, "candidate": {...}, "score": <int> }
+        Devuelve: { "reason": "<one sentence>" }
+        """
+        if request.method == 'OPTIONS':
+            resp = app.response_class(status=204)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+            return resp
+
+        try:
+            data = request.get_json(force=True) or {}
+            filters = data.get('filters') or {}
+            candidate = data.get('candidate') or {}
+            score = data.get('score')
+
+            prompt = f"""
+You are a recruiter assistant.
+Given filters, candidate summary, and the assigned score, return a SHORT explanation in Spanish.
+Return STRICT JSON: {{"reason":"<one sentence max>"}}
+Keep it factual and brief.
+
+FILTERS:
+{json.dumps(filters, ensure_ascii=False)}
+
+CANDIDATE:
+{json.dumps(candidate, ensure_ascii=False)}
+
+SCORE:
+{score}
+"""
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=120
+            )
+
+            content = (chat.choices[0].message.content or "").strip()
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+            try:
+                payload = json.loads(cleaned)
+            except Exception:
+                payload = {}
+
+            reason = payload.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                reason = "El score refleja el match general entre filtros y perfil."
+
+            resp = jsonify({"reason": reason.strip()})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 200
+
+        except Exception as e:
+            logging.error("❌ /ai/talentum_score_explain failed\n" + traceback.format_exc())
             resp = jsonify({"error": str(e)})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'

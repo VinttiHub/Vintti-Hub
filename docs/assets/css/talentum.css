@@ -429,6 +429,8 @@ body.talentum {
   font-size: 0.78rem;
   font-weight: 600;
   text-align: center;
+  border: none;
+  cursor: pointer;
 }
 
 .candidate-meta {

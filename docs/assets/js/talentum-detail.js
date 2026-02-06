@@ -11,6 +11,7 @@ const state = {
     country: "",
   },
   candidates: [],
+  candidateById: new Map(),
 };
 
 const els = {
@@ -380,7 +381,9 @@ function renderCandidates() {
     card.innerHTML = `
       <div class="candidate-head">
         <h4>${escapeHtml(candidate.profile.name)}</h4>
-        <span class="candidate-score">${escapeHtml(score)}</span>
+        <button class="candidate-score" data-candidate-id="${candidate.profile.id}" type="button">${escapeHtml(
+          score
+        )}</button>
       </div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
@@ -395,6 +398,8 @@ function candidateSummaryForScoring(candidate) {
   const core = parseJSONSafe(candidate.detail?.coresignal_scrapper);
   const headline = extractFirstFromKeys(core || {}, ["headline", "title", "position"]);
   const summary = extractFirstFromKeys(core || {}, ["summary"]);
+  const filterCountry = String(state.filters.country || "").trim().toLowerCase();
+  const candidateCountry = String(candidate.profile.country || "").trim().toLowerCase();
   return {
     name: candidate.profile.name,
     position: candidate.profile.position,
@@ -404,6 +409,7 @@ function candidateSummaryForScoring(candidate) {
     salary_range: candidate.detail?.salary_range || "",
     headline: headline || "",
     summary: summary || "",
+    country_match: filterCountry && candidateCountry ? filterCountry === candidateCountry : null,
   };
 }
 
@@ -452,6 +458,20 @@ async function scoreCandidates(candidates) {
     };
     next();
   });
+}
+
+async function explainCandidateScore(candidate) {
+  const payload = {
+    filters: state.filters,
+    candidate: candidateSummaryForScoring(candidate),
+    score: candidate.score,
+  };
+  const resp = await fetchJSON(`${API_BASE}/ai/talentum_score_explain`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return resp?.reason || "El score refleja el match general entre filtros y perfil.";
 }
 
 async function hydrateCandidate(pipelineCandidate) {
@@ -510,11 +530,12 @@ async function loadApplicants(opportunityId) {
   );
 
   state.candidates = detailed;
+  state.candidateById = new Map(detailed.map((entry) => [entry.profile.id, entry]));
   renderCandidates();
   await scoreCandidates(state.candidates);
 }
 
-function handleChatSubmit(event) {
+async function handleChatSubmit(event) {
   event.preventDefault();
   const message = els.chatInput.value.trim();
   if (!message) return;
@@ -526,32 +547,30 @@ function handleChatSubmit(event) {
 
   const typing = appendMessage("assistant", "Actualizando filtros…", { typing: true });
 
-  fetchJSON(`${API_BASE}/ai/talentum_chat_update`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, current_filters: state.filters }),
-  })
-    .then((resp) => {
-      if (typing) typing.remove();
-      if (resp.updated_filters) {
-        state.filters = { ...state.filters, ...resp.updated_filters };
-        renderFilters();
-        renderCandidates();
-        setCandidateSubtitle("Re-scoring applicants…");
-        return scoreCandidates(state.candidates);
-      }
-      appendMessage("assistant", resp.response || "Filtros actualizados.");
-    })
-    .catch((err) => {
-      console.warn("Chat update failed", err);
-      if (typing) typing.remove();
-      appendMessage("assistant", "No pude actualizar los filtros, sigo con los actuales.");
-    })
-    .finally(() => {
-      setChatStatus("Ready");
-      setFiltersStatus("Ready");
-      setCandidateSubtitle("Applicants sorted by match score.");
+  try {
+    const resp = await fetchJSON(`${API_BASE}/ai/talentum_chat_update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, current_filters: state.filters }),
     });
+    if (typing) typing.remove();
+    if (resp.updated_filters) {
+      state.filters = { ...state.filters, ...resp.updated_filters };
+      renderFilters();
+      renderCandidates();
+      setCandidateSubtitle("Re-scoring applicants…");
+      await scoreCandidates(state.candidates);
+    }
+    appendMessage("assistant", resp.response || "Filtros actualizados.");
+  } catch (err) {
+    console.warn("Chat update failed", err);
+    if (typing) typing.remove();
+    appendMessage("assistant", "No pude actualizar los filtros, sigo con los actuales.");
+  } finally {
+    setChatStatus("Ready");
+    setFiltersStatus("Ready");
+    setCandidateSubtitle("Applicants sorted by match score.");
+  }
 }
 
 async function init() {
@@ -572,6 +591,25 @@ async function init() {
 
   if (els.chatForm) {
     els.chatForm.addEventListener("submit", handleChatSubmit);
+  }
+  if (els.candidatesGrid) {
+    els.candidatesGrid.addEventListener("click", async (event) => {
+      const button = event.target.closest(".candidate-score");
+      if (!button) return;
+      const candidateId = Number(button.dataset.candidateId);
+      const candidate = state.candidateById.get(candidateId);
+      if (!candidate) return;
+      setChatStatus("Explaining");
+      try {
+        const reason = await explainCandidateScore(candidate);
+        appendMessage("assistant", reason);
+      } catch (err) {
+        console.warn("Score explanation failed", err);
+        appendMessage("assistant", "No pude explicar el score en este momento.");
+      } finally {
+        setChatStatus("Ready");
+      }
+    });
   }
 }
 

@@ -42,7 +42,7 @@
     if (task.check) row.classList.add('is-done');
     row.dataset.todoId = task.to_do_id;
     row.dataset.parent = task.subtask || 'root';
-    row.draggable = editable;
+    row.draggable = false;
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -81,6 +81,24 @@
     });
 
     if (editable) {
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'note-task__move';
+      up.textContent = '↑';
+      up.addEventListener('click', (event) => {
+        event.stopPropagation();
+        moveTask(tasksRef, ownerId, task, -1);
+      });
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'note-task__move';
+      down.textContent = '↓';
+      down.addEventListener('click', (event) => {
+        event.stopPropagation();
+        moveTask(tasksRef, ownerId, task, 1);
+      });
+
       const sub = document.createElement('button');
       sub.type = 'button';
       sub.className = 'note-task__sub';
@@ -93,7 +111,7 @@
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'note-task__delete';
-      del.textContent = '✕';
+      del.textContent = '🗑️';
       del.addEventListener('click', async (event) => {
         event.stopPropagation();
         try {
@@ -117,7 +135,7 @@
           setError(ownerId === userId ? myError : teamError, 'Could not delete task.');
         }
       });
-      row.append(checkbox, textWrap, date, sub, del);
+      row.append(checkbox, textWrap, date, up, down, sub, del);
     } else {
       row.append(checkbox, textWrap, date);
     }
@@ -197,6 +215,7 @@
   };
 
   const enableDrag = (root, ownerId, tasksRef) => {
+    if (!root || !tasksRef) return;
     let dragged = null;
     root.querySelectorAll('.note-list').forEach((list) => {
       list.addEventListener('dragstart', (event) => {
@@ -245,6 +264,33 @@
         dragged = null;
       });
     });
+  };
+
+  const moveTask = async (tasksRef, ownerId, task, direction) => {
+    const parentKey = task.subtask || null;
+    const siblings = sortTasks(tasksRef.filter((entry) => (entry.subtask || null) === parentKey));
+    const index = siblings.findIndex((entry) => entry.to_do_id === task.to_do_id);
+    if (index === -1) return;
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= siblings.length) return;
+    const reordered = [...siblings];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+    const payload = reordered.map((entry, idx) => ({
+      to_do_id: entry.to_do_id,
+      orden: idx + 1,
+    }));
+    payload.forEach((entry) => {
+      const target = tasksRef.find((t) => t.to_do_id === entry.to_do_id);
+      if (target) target.orden = entry.orden;
+    });
+    await fetch(`${API_BASE}/to_do/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ user_id: ownerId, items: payload }),
+    });
+    refreshCurrentView(ownerId);
   };
 
   const persistOrder = async (ownerId, items) => {
