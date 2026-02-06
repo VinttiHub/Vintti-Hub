@@ -225,40 +225,86 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
 }
 
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
-const batchCountCache = new Map();
+// const batchCountCache = new Map();
 
-function requestBatchCount(opportunityId) {
-  if (!opportunityId) return Promise.resolve(null);
-  if (!batchCountCache.has(opportunityId)) {
-    const promise = fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/batches`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((rows) => (Array.isArray(rows) ? rows.length : null))
-      .catch((err) => {
-        console.error('Error fetching batches for opportunity', opportunityId, err);
-        return null;
+const candidatesCountCache = new Map();
+
+// function requestBatchCount(opportunityId) {
+//   if (!opportunityId) return Promise.resolve(null);
+//   if (!batchCountCache.has(opportunityId)) {
+//     const promise = fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/batches`)
+//       .then((res) => (res.ok ? res.json() : []))
+//       .then((rows) => (Array.isArray(rows) ? rows.length : null))
+//       .catch((err) => {
+//         console.error('Error fetching batches for opportunity', opportunityId, err);
+//         return null;
+//       });
+//     batchCountCache.set(opportunityId, promise);
+//   }
+//   return batchCountCache.get(opportunityId);
+// }
+
+function requestCandidatesCount(opportunityId) {
+  if (!opportunityId) return Promise.resolve(0);
+
+  if (!candidatesCountCache.has(opportunityId)) {
+    const promise = fetch(
+      `${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/candidates_count`,
+      { credentials: 'include' }
+    )
+      .then(res => res.ok ? res.json() : { candidates_count: 0 })
+      .then(data => Number(data.candidates_count || 0))
+      .catch(err => {
+        console.error('Error fetching candidates count', err);
+        return 0;
       });
-    batchCountCache.set(opportunityId, promise);
+
+    candidatesCountCache.set(opportunityId, promise);
   }
-  return batchCountCache.get(opportunityId);
+
+  return candidatesCountCache.get(opportunityId);
 }
 
-async function hydrateBatchCountCell(opportunityId, cell) {
+
+async function hydrateCandidatesCountCell(opportunityId, cell) {
   if (!cell) return;
+
   if (!opportunityId) {
     cell.textContent = '—';
-    cell.removeAttribute('data-batch-count');
+    cell.removeAttribute('data-candidates-count');
     return;
   }
+
   cell.textContent = '…';
-  const count = await requestBatchCount(opportunityId);
+
+  const count = await requestCandidatesCount(opportunityId);
+
   if (typeof count === 'number') {
-    cell.textContent = count;
-    cell.dataset.batchCount = count;
+    cell.textContent = String(count);
+    cell.dataset.candidatesCount = String(count);
   } else {
     cell.textContent = '—';
-    cell.removeAttribute('data-batch-count');
+    cell.removeAttribute('data-candidates-count');
   }
 }
+
+// async function hydrateBatchCountCell(opportunityId, cell) {
+//   if (!cell) return;
+//   if (!opportunityId) {
+//     cell.textContent = '—';
+//     cell.removeAttribute('data-batch-count');
+//     return;
+//   }
+//   cell.textContent = '…';
+//   const count = await requestBatchCount(opportunityId);
+//   if (typeof count === 'number') {
+//     cell.textContent = count;
+//     cell.dataset.batchCount = count;
+//   } else {
+//     cell.textContent = '—';
+//     cell.removeAttribute('data-batch-count');
+//   }
+// }
 
 // Try to get user_id from storage; if missing, resolve by email and cache it
 // Usa getCurrentUserId({force:true}) para ignorar cache.
@@ -867,11 +913,15 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
             </td>
             <td>${daysAgo}</td>
             <td class="days-since-cell">${daysSinceBatch}</td>
-            <td class="batch-count-cell" data-batch-count="—">—</td>
+            <td class="candidates-count-cell" data-candidates-count="—">—</td>
+
           `;
 
-          const batchCell = tr.querySelector('.batch-count-cell');
-          hydrateBatchCountCell(opp.opportunity_id, batchCell);
+          // const batchCell = tr.querySelector('.batch-count-cell');
+          // hydrateBatchCountCell(opp.opportunity_id, batchCell);
+          const cCell = tr.querySelector('.candidates-count-cell');
+          hydrateCandidatesCountCell(opp.opportunity_id, cCell);
+
 
           tr.querySelectorAll('td').forEach((cell, index) => {
             cell.setAttribute('data-col-index', index);
