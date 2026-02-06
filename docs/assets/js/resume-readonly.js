@@ -2,8 +2,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const candidateId = urlParams.get("id");
   const isPdfExport = urlParams.has("pdf_export");
+  const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
   const bodyEl = document.body;
   const downloadBtn = document.getElementById("readonly-download-btn");
+  const ratingEl = document.getElementById("resume-rating");
+  const ratingButtons = ratingEl ? Array.from(ratingEl.querySelectorAll(".rating-star")) : [];
+  const ratingComment = document.getElementById("resume-rating-comment");
+  const ratingTextarea = document.getElementById("resume-rating-text");
+  const ratingSubmit = document.getElementById("resume-rating-submit");
+  const ratingStatus = document.getElementById("resume-rating-status");
+  let currentStars = 0;
   let candidateFileName = "resume";
   if (downloadBtn) downloadBtn.disabled = true;
   if (bodyEl) {
@@ -16,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (isPdfExport) {
     document.documentElement.style.backgroundColor = "#fff";
+    if (ratingEl) ratingEl.remove();
     if (bodyEl) {
       bodyEl.style.backgroundColor = "#fff";
       bodyEl.style.paddingTop = "32px";
@@ -105,6 +114,85 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
   };
+
+  const setRatingStatus = (message, tone) => {
+    if (!ratingStatus) return;
+    ratingStatus.textContent = message || "";
+    if (tone) {
+      ratingStatus.dataset.tone = tone;
+    } else {
+      delete ratingStatus.dataset.tone;
+    }
+  };
+
+  const renderStars = (value) => {
+    ratingButtons.forEach((btn) => {
+      const starValue = Number(btn.dataset.star);
+      const active = starValue <= value;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    if (ratingComment) {
+      const shouldShow = value > 0;
+      ratingComment.classList.toggle("is-visible", shouldShow);
+      ratingComment.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+    }
+    if (ratingSubmit && ratingTextarea) {
+      ratingSubmit.disabled = ratingTextarea.value.trim().length === 0;
+    }
+  };
+
+  const patchResume = async (payload) => {
+    const response = await fetch(`${API_BASE}/resumes/${candidateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error("Unable to save feedback.");
+    }
+    return response.json().catch(() => ({}));
+  };
+
+  if (ratingButtons.length) {
+    ratingButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!candidateId) return;
+        const value = Number(btn.dataset.star);
+        if (!value || value === currentStars) return;
+        currentStars = value;
+        renderStars(currentStars);
+        setRatingStatus("Saving...", "loading");
+        try {
+          await patchResume({ stars: currentStars });
+          setRatingStatus("Thanks for the rating!", "success");
+        } catch (err) {
+          console.error("Unable to save rating", err);
+          setRatingStatus("Unable to save rating right now.", "error");
+        }
+      });
+    });
+  }
+
+  if (ratingTextarea && ratingSubmit) {
+    ratingTextarea.addEventListener("input", () => {
+      ratingSubmit.disabled = ratingTextarea.value.trim().length === 0;
+    });
+
+    ratingSubmit.addEventListener("click", async () => {
+      if (!candidateId) return;
+      const comment = ratingTextarea.value.trim();
+      if (!comment) return;
+      setRatingStatus("Sending...", "loading");
+      try {
+        await patchResume({ stars: currentStars || 0, comments_stars: comment });
+        setRatingStatus("Message sent. Thank you!", "success");
+      } catch (err) {
+        console.error("Unable to save comment", err);
+        setRatingStatus("Unable to save message right now.", "error");
+      }
+    });
+  }
 // Muestra esto cuando no hay fecha
 const NO_DATE_LABEL = "No date assigned";
 
@@ -178,7 +266,7 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
   }
 
   try {
-    const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/resumes/${candidateId}`);
+    const res = await fetch(`${API_BASE}/resumes/${candidateId}`);
     const data = await res.json();
     console.log("📦 Resume completo recibido:", data);
 
@@ -189,12 +277,26 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     console.log("🛠️ Tools:", data.tools);
     console.log("📹 Video Link:", data.video_link);
     // Nombre del candidato (fetch adicional)
-    const nameRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}`);
+    const nameRes = await fetch(`${API_BASE}/candidates/${candidateId}`);
     const nameData = await nameRes.json();
     const displayName = nameData.name || "Unnamed Candidate";
     document.getElementById("candidateNameTitle").textContent = displayName;
     candidateFileName = displayName;
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
+
+    if (ratingEl) {
+      const initialStars = Number(data.stars) || 0;
+      currentStars = initialStars;
+      if (ratingTextarea && typeof data.comments_stars === "string") {
+        ratingTextarea.value = data.comments_stars;
+      }
+      renderStars(currentStars);
+      if (ratingComment && ratingTextarea && ratingTextarea.value.trim().length > 0) {
+        ratingComment.classList.add("is-visible");
+        ratingComment.setAttribute("aria-hidden", "false");
+        if (ratingSubmit) ratingSubmit.disabled = false;
+      }
+    }
 
     // 🧠 About
 // 🧠 About

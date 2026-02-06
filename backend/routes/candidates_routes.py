@@ -2135,6 +2135,8 @@ def resumes(candidate_id):
                     tools, 
                     languages,
                     video_link,
+                    stars,
+                    comments_stars,
                     extract_cv_pdf,
                     cv_pdf_s3
                 FROM resume
@@ -2150,6 +2152,8 @@ def resumes(candidate_id):
                     "tools": "[]",
                     "languages": "[]",
                     "video_link": "",
+                    "stars": 0,
+                    "comments_stars": "",
                     "extract_cv_pdf": "",
                     "cv_pdf_s3": ""
                 })
@@ -2194,7 +2198,7 @@ def resumes(candidate_id):
             except Exception:
                 pass
 
-        allowed_fields = ['about','work_experience','education','tools','languages','video_link']
+        allowed_fields = ['about','work_experience','education','tools','languages','video_link','stars','comments_stars']
 
         conn = get_connection()
         cursor = conn.cursor()

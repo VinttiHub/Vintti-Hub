@@ -1958,14 +1958,36 @@ body.dark-mode .profile-tile{
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
   font-size: 12px;
-  color: #8c4a6a;
+  color: #6a3353;
   text-decoration: none;
+  background: #fff0f7;
+  border: 1px solid rgba(230, 180, 205, 0.8);
+  border-radius: 999px;
+  box-shadow: 0 8px 16px rgba(224, 150, 185, 0.15);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+  animation: todoPulse 1.8s ease-in-out infinite;
 }
 
 .todo-panel__details:hover {
-  color: #6e3c5f;
+  color: #4f233d;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(224, 150, 185, 0.2);
+  animation-play-state: paused;
+}
+
+@keyframes todoPulse {
+  0% {
+    box-shadow: 0 8px 16px rgba(224, 150, 185, 0.15);
+  }
+  50% {
+    box-shadow: 0 10px 22px rgba(224, 150, 185, 0.35);
+  }
+  100% {
+    box-shadow: 0 8px 16px rgba(224, 150, 185, 0.15);
+  }
 }
 
 .todo-panel__eyebrow {

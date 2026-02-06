@@ -102,19 +102,29 @@ body {
 }
 
 .notebook__tab {
-  border: 1px solid rgba(198, 142, 172, 0.5);
-  background: #fff7fb;
+  border: none;
+  background: transparent;
   color: #8a4362;
-  padding: 8px 16px;
-  border-radius: 999px;
+  padding: 6px 2px;
   cursor: pointer;
   font-weight: 600;
+  font-size: 14px;
 }
 
 .notebook__tab.is-active {
-  background: #f7bfd8;
   color: #3d1f31;
-  border-color: transparent;
+  position: relative;
+}
+
+.notebook__tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 3px;
+  border-radius: 999px;
+  background: #f2a9c8;
 }
 
 .notebook__panel {

@@ -17,6 +17,25 @@
       </div>
     </header>
 
+    <div id="resume-rating" class="resume-rating" aria-label="Rate this resume">
+      <div class="resume-rating-header">Rate this resume</div>
+      <div class="resume-rating-stars" role="radiogroup" aria-label="Rate this resume">
+        <button type="button" class="rating-star" data-star="1" aria-label="1 star" aria-pressed="false">★</button>
+        <button type="button" class="rating-star" data-star="2" aria-label="2 stars" aria-pressed="false">★</button>
+        <button type="button" class="rating-star" data-star="3" aria-label="3 stars" aria-pressed="false">★</button>
+        <button type="button" class="rating-star" data-star="4" aria-label="4 stars" aria-pressed="false">★</button>
+        <button type="button" class="rating-star" data-star="5" aria-label="5 stars" aria-pressed="false">★</button>
+      </div>
+      <div id="resume-rating-comment" class="resume-rating-comment" aria-hidden="true">
+        <label for="resume-rating-text">Would you like to leave us a message?</label>
+        <textarea id="resume-rating-text" rows="3" placeholder="Share a quick note (optional)"></textarea>
+        <div class="resume-rating-actions">
+          <button type="button" id="resume-rating-submit" class="resume-rating-send" disabled>Send</button>
+          <span id="resume-rating-status" class="resume-rating-status" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+
     <div class="cv-container">
     <h1 id="candidateNameTitle" class="cv-title">Candidate Name</h1>
     <p id="candidateCountry" class="cv-country">—</p>
