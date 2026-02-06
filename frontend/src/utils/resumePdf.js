@@ -1,10 +1,10 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
-const PAGE_MARGIN = 40;
-const BODY_FONT_SIZE = 11;
-const HEADING_FONT_SIZE = 14;
-const TITLE_FONT_SIZE = 22;
-const SECTION_SPACING = 12;
+const PAGE_MARGIN = 18;
+const BODY_FONT_SIZE = 14.5;
+const HEADING_FONT_SIZE = 18;
+const TITLE_FONT_SIZE = 28;
+const SECTION_SPACING = 14;
 
 function parseJsonArray(value) {
   if (!value) return [];
@@ -193,7 +193,7 @@ export async function downloadResumePdf({ candidate, resume }) {
     .map((bit) => (bit || '').toString().trim())
     .filter(Boolean);
 
-  drawLine('Vintti · Top Candidate Profile', { font: boldFont, size: 10, color: rgb(0.4, 0.4, 0.4) });
+  drawLine('Vintti · Top Candidate Profile', { font: boldFont, size: 12, color: rgb(0.4, 0.4, 0.4) });
   cursorY -= 6;
   const candidateName = candidate?.name || 'Candidate';
   drawLine(candidateName, { font: boldFont, size: TITLE_FONT_SIZE });
