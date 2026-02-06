@@ -155,7 +155,9 @@
               tasks: [],
             });
           }
-          byUser.get(task.user_id).tasks.push(task);
+          if (task.to_do_id) {
+            byUser.get(task.user_id).tasks.push(task);
+          }
         });
         const users = Array.from(byUser.values());
         renderTeamNotes(users);
@@ -167,7 +169,8 @@
           });
         };
         if (users.length) {
-          activate(users[0]);
+          teamTitle.textContent = 'Pick a teammate';
+          renderList(teamList, [], teamEmpty, buildTeamTask);
         } else {
           teamTitle.textContent = 'No team tasks yet';
           renderList(teamList, [], teamEmpty, buildTeamTask);

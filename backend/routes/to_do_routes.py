@@ -126,15 +126,15 @@ def to_do_team():
         cur.execute(
             """
             SELECT
-              t.to_do_id,
-              t.user_id,
+              u.user_id,
               u.user_name,
               u.team,
+              t.to_do_id,
               t.description,
               t.due_date::text AS due_date,
               t."check"
-            FROM to_do t
-            JOIN users u ON u.user_id = t.user_id
+            FROM users u
+            LEFT JOIN to_do t ON t.user_id = u.user_id
             WHERE u.lider = %s
             ORDER BY LOWER(u.user_name) ASC, t.due_date NULLS LAST, t.to_do_id ASC
             """,
