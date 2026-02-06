@@ -180,6 +180,13 @@
         const button = event.target.closest('.team-note');
         if (!button) return;
         const selected = users.find((u) => u.user_id === Number(button.dataset.userId));
+        const isActive = button.classList.contains('is-active');
+        if (isActive) {
+          Array.from(teamNotes.children).forEach((note) => note.classList.remove('is-active'));
+          teamTitle.textContent = 'Pick a teammate';
+          renderList(teamList, [], teamEmpty, buildTeamTask);
+          return;
+        }
         if (selected) activate(selected);
       });
     } catch (error) {
