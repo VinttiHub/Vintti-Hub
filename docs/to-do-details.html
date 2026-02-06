@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vintti Buddy Notes</title>
+  <script src="./assets/js/auth-guard.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&family=Caveat:wght@600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./assets/css/to-do-details.css" />
+</head>
+<body>
+  <main class="notebook">
+    <header class="notebook__header">
+      <button class="notebook__back" type="button" onclick="history.back()">← Back</button>
+      <p class="notebook__eyebrow">Vintti Buddy</p>
+      <h1 class="notebook__title">Your task notebook</h1>
+      <p class="notebook__subtitle">A cozy place to see what is next and keep the sparkle going.</p>
+    </header>
+
+    <div class="notebook__tabs">
+      <button class="notebook__tab is-active" type="button" data-tab="my">My tasks</button>
+      <button class="notebook__tab" type="button" data-tab="team" id="teamTab" hidden>Manage team</button>
+    </div>
+
+    <section class="notebook__panel is-active" id="tab-my">
+      <div class="notebook__list" id="myTasks"></div>
+      <p class="notebook__empty" id="myEmpty" hidden>No tasks yet. Add a few from the buddy bubble.</p>
+    </section>
+
+    <section class="notebook__panel" id="tab-team" hidden>
+      <div class="notebook__list" id="teamTasks"></div>
+      <p class="notebook__empty" id="teamEmpty" hidden>No team tasks yet.</p>
+    </section>
+  </main>
+
+  <script src="./assets/js/to-do-details.js" defer></script>
+</body>
+</html>

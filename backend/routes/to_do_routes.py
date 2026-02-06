@@ -102,3 +102,47 @@ def to_do_item(to_do_id: int):
         return jsonify(row)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/to_do/team', methods=['GET', 'OPTIONS'])
+def to_do_team():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    leader_id = request.args.get('leader_id', type=int) or request.args.get('user_id', type=int)
+    if not leader_id:
+        return jsonify({"error": "leader_id is required"}), 400
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        cur.execute("SELECT COUNT(*) AS cnt FROM users WHERE lider = %s", (leader_id,))
+        if cur.fetchone()['cnt'] == 0:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "forbidden (not a leader of anyone)"}), 403
+
+        cur.execute(
+            """
+            SELECT
+              t.to_do_id,
+              t.user_id,
+              u.user_name,
+              u.team,
+              t.description,
+              t.due_date::text AS due_date,
+              t."check"
+            FROM to_do t
+            JOIN users u ON u.user_id = t.user_id
+            WHERE u.lider = %s
+            ORDER BY LOWER(u.user_name) ASC, t.due_date NULLS LAST, t.to_do_id ASC
+            """,
+            (leader_id,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify(rows)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500

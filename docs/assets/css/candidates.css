@@ -1062,6 +1062,20 @@ body.dark-mode .profile-tile{
   gap: 12px;
 }
 
+.todo-panel__details {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #8c4a6a;
+  text-decoration: none;
+}
+
+.todo-panel__details:hover {
+  color: #6e3c5f;
+}
+
 .todo-panel__eyebrow {
   font-size: 11px;
   letter-spacing: 0.08em;
