@@ -133,6 +133,21 @@ body.talentum {
   display: block;
 }
 
+.filter-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.filter-controls button {
+  border: 1px solid var(--border);
+  background: rgba(215, 216, 240, 0.4);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
 .filter-option {
   display: flex;
   align-items: center;
@@ -396,6 +411,24 @@ body.talentum {
 .candidate-card h4 {
   font-size: 1rem;
   font-weight: 600;
+}
+
+.candidate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.candidate-score {
+  min-width: 30px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(230, 164, 180, 0.4);
+  color: #4c2b35;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .candidate-meta {

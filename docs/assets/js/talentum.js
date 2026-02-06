@@ -1,5 +1,31 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 
+const HIDDEN_HR_FILTER_EMAILS = new Set(
+  [
+    "bahia@vintti.com",
+    "sol@vintti.com",
+    "agustin@vintti.com",
+    "agustina.ferrari@vintti.com",
+  ].map((email) => email.toLowerCase())
+);
+
+const SALES_ALLOWED_EMAILS = new Set(
+  ["agustin@vintti.com", "bahia@vintti.com", "lara@vintti.com", "mariano@vintti.com"].map((email) =>
+    email.toLowerCase()
+  )
+);
+
+const SALES_ALLOWED_NAME_OVERRIDES = new Map([
+  ["agustin@vintti.com", "Agustin"],
+  ["bahia@vintti.com", "Bahia"],
+  ["lara@vintti.com", "Lara"],
+  ["mariano@vintti.com", "Mariano"],
+]);
+
+const SALES_ALLOWED_NAMES = new Set(
+  Array.from(SALES_ALLOWED_NAME_OVERRIDES.values()).map((name) => name.toLowerCase())
+);
+
 const state = {
   opportunities: [],
   currentOpportunity: null,
@@ -117,12 +143,29 @@ function prettyNameFromEmail(email) {
 }
 
 function displaySalesLead(opp) {
+  const email = normalizeText(opp.opp_sales_lead);
+  if (email && SALES_ALLOWED_NAME_OVERRIDES.has(email)) {
+    return SALES_ALLOWED_NAME_OVERRIDES.get(email);
+  }
   return opp.sales_lead_name || opp.opp_sales_lead || "Unassigned";
 }
 
 function displayHrLead(opp) {
   const email = normalizeText(opp.opp_hr_lead);
   return state.hrLeadDirectory[email] || prettyNameFromEmail(opp.opp_hr_lead) || "Unassigned";
+}
+
+function isAllowedSalesLead(opp) {
+  const email = normalizeText(opp.opp_sales_lead);
+  if (email) return SALES_ALLOWED_EMAILS.has(email);
+  const name = normalizeText(opp.sales_lead_name);
+  if (name) return SALES_ALLOWED_NAMES.has(name);
+  return true;
+}
+
+function isHiddenHrLead(opp) {
+  const email = normalizeText(opp.opp_hr_lead);
+  return !!email && HIDDEN_HR_FILTER_EMAILS.has(email);
 }
 
 function parseDaysRangeValue(value) {
@@ -183,10 +226,17 @@ function buildFilterOptions(opportunities) {
 
   opportunities.forEach((opp) => {
     if (opp.opp_stage) stages.add(opp.opp_stage);
-    if (displaySalesLead(opp)) salesLeads.add(displaySalesLead(opp));
-    if (displayHrLead(opp)) hrLeads.add(displayHrLead(opp));
+    if (isAllowedSalesLead(opp) && displaySalesLead(opp)) {
+      salesLeads.add(displaySalesLead(opp));
+    }
+    if (!isHiddenHrLead(opp) && displayHrLead(opp)) {
+      hrLeads.add(displayHrLead(opp));
+    }
     if (opp.opp_type) types.add(opp.opp_type);
   });
+
+  if (!salesLeads.has("Unassigned")) salesLeads.add("Unassigned");
+  if (!hrLeads.has("Unassigned")) hrLeads.add("Unassigned");
 
   state.filterOptions = {
     stages: Array.from(stages).sort((a, b) => a.localeCompare(b)),
@@ -204,6 +254,32 @@ function buildFilterOptions(opportunities) {
 function renderFilterMenu(targetEl, options, stateSet, onChange) {
   if (!targetEl) return;
   targetEl.innerHTML = "";
+  const controls = document.createElement("div");
+  controls.className = "filter-controls";
+
+  const selectAllBtn = document.createElement("button");
+  selectAllBtn.type = "button";
+  selectAllBtn.textContent = "Select all";
+  selectAllBtn.addEventListener("click", () => {
+    stateSet.clear();
+    options.forEach((label) => stateSet.add(String(label || "").toLowerCase()));
+    renderFilterMenu(targetEl, options, stateSet, onChange);
+    onChange();
+  });
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.textContent = "Clear";
+  clearBtn.addEventListener("click", () => {
+    stateSet.clear();
+    renderFilterMenu(targetEl, options, stateSet, onChange);
+    onChange();
+  });
+
+  controls.appendChild(selectAllBtn);
+  controls.appendChild(clearBtn);
+  targetEl.appendChild(controls);
+
   options.forEach((label) => {
     const option = document.createElement("label");
     option.className = "filter-option";

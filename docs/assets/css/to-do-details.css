@@ -354,6 +354,16 @@ body {
   white-space: nowrap;
 }
 
+.note-task__sub {
+  border: none;
+  background: #f7f0ff;
+  color: #7a4a73;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .note-task__delete {
   border: none;
   background: #fde7f1;

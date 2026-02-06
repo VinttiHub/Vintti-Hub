@@ -7,7 +7,6 @@
   const myForm = document.getElementById('myTaskForm');
   const myDescription = document.getElementById('myTaskDescription');
   const myDate = document.getElementById('myTaskDate');
-  const myParent = document.getElementById('myTaskParent');
   const myError = document.getElementById('myTaskError');
   const myToggle = document.getElementById('myTaskToggle');
   const teamNotes = document.getElementById('teamNotes');
@@ -18,7 +17,6 @@
   const teamForm = document.getElementById('teamTaskForm');
   const teamDescription = document.getElementById('teamTaskDescription');
   const teamDate = document.getElementById('teamTaskDate');
-  const teamParent = document.getElementById('teamTaskParent');
   const teamError = document.getElementById('teamTaskError');
   const teamToggle = document.getElementById('teamTaskToggle');
 
@@ -83,6 +81,15 @@
     });
 
     if (editable) {
+      const sub = document.createElement('button');
+      sub.type = 'button';
+      sub.className = 'note-task__sub';
+      sub.textContent = '+ Subtask';
+      sub.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await promptSubtask(ownerId, task.to_do_id);
+      });
+
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'note-task__delete';
@@ -110,7 +117,7 @@
           setError(ownerId === userId ? myError : teamError, 'Could not delete task.');
         }
       });
-      row.append(checkbox, textWrap, date, del);
+      row.append(checkbox, textWrap, date, sub, del);
     } else {
       row.append(checkbox, textWrap, date);
     }
@@ -152,22 +159,6 @@
       if (aOrder !== bOrder) return aOrder - bOrder;
       return (a.to_do_id || 0) - (b.to_do_id || 0);
     });
-  };
-
-  const renderParentOptions = (selectEl, tasks) => {
-    selectEl.innerHTML = '';
-    const blank = document.createElement('option');
-    blank.value = '';
-    blank.textContent = 'No parent';
-    selectEl.appendChild(blank);
-    tasks
-      .filter((task) => !task.subtask)
-      .forEach((task) => {
-        const opt = document.createElement('option');
-        opt.value = String(task.to_do_id);
-        opt.textContent = task.description || `Task ${task.to_do_id}`;
-        selectEl.appendChild(opt);
-      });
   };
 
   const renderTaskList = (container, tasks, emptyEl, editable, ownerId) => {
@@ -216,10 +207,14 @@
       });
       list.addEventListener('dragover', (event) => {
         if (!dragged) return;
-        const target = event.target.closest('.note-task');
-        if (!target || target === dragged) return;
-        if (target.dataset.parent !== dragged.dataset.parent) return;
         event.preventDefault();
+        const target = event.target.closest('.note-task');
+        if (!target) {
+          list.appendChild(dragged);
+          return;
+        }
+        if (target === dragged) return;
+        if (target.dataset.parent !== dragged.dataset.parent) return;
         const rect = target.getBoundingClientRect();
         const after = event.clientY > rect.top + rect.height / 2;
         list.insertBefore(dragged, after ? target.nextSibling : target);
@@ -318,7 +313,6 @@
       const data = await res.json();
       myTasks = Array.isArray(data) ? data : [];
       renderTaskList(myList, myTasks, myEmpty, true, userId);
-      renderParentOptions(myParent, myTasks);
     } catch (error) {
       renderTaskList(myList, [], myEmpty, true, userId);
       myEmpty.textContent = 'Could not load tasks right now.';
@@ -361,7 +355,6 @@
         currentTeamUserId = user.user_id;
         const tasks = teamTasks.get(user.user_id) || [];
         renderTaskList(teamList, tasks, teamEmpty, true, user.user_id);
-        renderParentOptions(teamParent, tasks);
         Array.from(teamNotes.children).forEach((note) => {
           note.classList.toggle('is-active', Number(note.dataset.userId) === user.user_id);
         });
@@ -378,7 +371,6 @@
           teamTitle.textContent = 'Pick a teammate';
           renderTaskList(teamList, [], teamEmpty, true, userId);
           currentTeamUserId = null;
-          renderParentOptions(teamParent, []);
           return;
         }
         if (selected) activate(selected);
@@ -412,7 +404,6 @@
 
     const description = myDescription.value.trim();
     const dueDate = myDate.value;
-    const parentId = myParent.value ? Number(myParent.value) : null;
 
     if (!description || !dueDate) {
       setError(myError, 'Add a task and due date.');
@@ -432,17 +423,14 @@
           user_id: userId,
           description,
           due_date: dueDate,
-          subtask: parentId,
         }),
       });
       if (!res.ok) throw new Error('Failed');
       const newTask = await res.json();
       myTasks = [...myTasks, newTask];
       renderTaskList(myList, myTasks, myEmpty, true, userId);
-      renderParentOptions(myParent, myTasks);
       myDescription.value = '';
       myDate.value = '';
-      myParent.value = '';
     } catch (error) {
       setError(myError, 'Could not add task right now.');
     }
@@ -458,7 +446,6 @@
 
     const description = teamDescription.value.trim();
     const dueDate = teamDate.value;
-    const parentId = teamParent.value ? Number(teamParent.value) : null;
 
     if (!description || !dueDate) {
       setError(teamError, 'Add a task and due date.');
@@ -474,7 +461,6 @@
           user_id: currentTeamUserId,
           description,
           due_date: dueDate,
-          subtask: parentId,
         }),
       });
       if (!res.ok) throw new Error('Failed');
@@ -482,14 +468,45 @@
       const existing = teamTasks.get(currentTeamUserId) || [];
       teamTasks.set(currentTeamUserId, [...existing, newTask]);
       renderTaskList(teamList, teamTasks.get(currentTeamUserId), teamEmpty, true, currentTeamUserId);
-      renderParentOptions(teamParent, teamTasks.get(currentTeamUserId));
       teamDescription.value = '';
       teamDate.value = '';
-      teamParent.value = '';
     } catch (error) {
       setError(teamError, 'Could not add task right now.');
     }
   });
+
+  const promptSubtask = async (ownerId, parentId) => {
+    const description = window.prompt('Subtask name?');
+    if (!description) return;
+    const dueDate = window.prompt('Due date (YYYY-MM-DD)?');
+    if (!dueDate) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/to_do`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          user_id: ownerId,
+          description: description.trim(),
+          due_date: dueDate,
+          subtask: parentId,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const newTask = await res.json();
+      if (ownerId === userId) {
+        myTasks = [...myTasks, newTask];
+        renderTaskList(myList, myTasks, myEmpty, true, userId);
+      } else {
+        const existing = teamTasks.get(ownerId) || [];
+        teamTasks.set(ownerId, [...existing, newTask]);
+        renderTaskList(teamList, teamTasks.get(ownerId), teamEmpty, true, ownerId);
+      }
+    } catch (error) {
+      setError(ownerId === userId ? myError : teamError, 'Could not add subtask.');
+    }
+  };
 
   const bindToggle = (button, form) => {
     if (!button || !form) return;

@@ -130,6 +130,9 @@ async function loadOpportunity(opportunityId) {
     setCandidateSubtitle("Unable to load applicants.");
   }
 
+  if (state.candidates.length) {
+    setCandidateSubtitle("Applicants sorted by match score.");
+  }
   setChatStatus("Ready");
   setFiltersStatus("Ready");
 }
@@ -351,17 +354,23 @@ function matchesFilters(profile) {
 }
 
 function renderCandidates() {
-  const filtered = state.candidates.filter((candidate) => matchesFilters(candidate.profile));
+  const sorted = [...state.candidates].sort((a, b) => {
+    const scoreA = a.score ?? 0;
+    const scoreB = b.score ?? 0;
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    return (a.profile.name || "").localeCompare(b.profile.name || "");
+  });
   els.candidatesGrid.innerHTML = "";
-  els.candidatesEmpty.style.display = filtered.length ? "none" : "block";
-  els.candidatesEmpty.textContent = filtered.length
+  els.candidatesEmpty.style.display = sorted.length ? "none" : "block";
+  els.candidatesEmpty.textContent = sorted.length
     ? ""
-    : "No candidates match the active filters.";
-  els.candidateCount.textContent = `${filtered.length} matches`;
+    : "No applicants available.";
+  els.candidateCount.textContent = `${sorted.length} applicants`;
 
-  filtered.forEach((candidate) => {
+  sorted.forEach((candidate) => {
     const card = document.createElement("div");
     card.className = "candidate-card";
+    const score = Number.isFinite(candidate.score) ? candidate.score : "—";
     const tags = [candidate.profile.position, candidate.profile.industry, candidate.profile.country]
       .filter(Boolean)
       .slice(0, 3)
@@ -369,13 +378,79 @@ function renderCandidates() {
       .join("");
 
     card.innerHTML = `
-      <h4>${escapeHtml(candidate.profile.name)}</h4>
+      <div class="candidate-head">
+        <h4>${escapeHtml(candidate.profile.name)}</h4>
+        <span class="candidate-score">${escapeHtml(score)}</span>
+      </div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
       <a class="candidate-link" href="candidate-details.html?id=${candidate.profile.id}" target="_blank" rel="noopener">Open profile →</a>
     `;
     els.candidatesGrid.appendChild(card);
+  });
+}
+
+function candidateSummaryForScoring(candidate) {
+  const core = parseJSONSafe(candidate.detail?.coresignal_scrapper);
+  const headline = extractFirstFromKeys(core || {}, ["headline", "title", "position"]);
+  const summary = extractFirstFromKeys(core || {}, ["summary"]);
+  return {
+    name: candidate.profile.name,
+    position: candidate.profile.position,
+    industry: candidate.profile.industry,
+    years_experience: candidate.profile.years,
+    country: candidate.profile.country,
+    salary_range: candidate.detail?.salary_range || "",
+    headline: headline || "",
+    summary: summary || "",
+  };
+}
+
+async function scoreCandidate(candidate) {
+  try {
+    const payload = {
+      filters: state.filters,
+      candidate: candidateSummaryForScoring(candidate),
+    };
+    const resp = await fetchJSON(`${API_BASE}/ai/talentum_score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const score = Number(resp?.score);
+    candidate.score = Number.isFinite(score) ? score : 1;
+  } catch (err) {
+    console.warn("Scoring failed", err);
+    candidate.score = 1;
+  }
+}
+
+async function scoreCandidates(candidates) {
+  const queue = [...candidates];
+  const concurrency = 3;
+  let active = 0;
+
+  return new Promise((resolve) => {
+    const next = () => {
+      if (!queue.length && active === 0) {
+        resolve();
+        return;
+      }
+      while (active < concurrency && queue.length) {
+        const candidate = queue.shift();
+        active += 1;
+        scoreCandidate(candidate)
+          .then(() => {
+            renderCandidates();
+          })
+          .finally(() => {
+            active -= 1;
+            next();
+          });
+      }
+    };
+    next();
   });
 }
 
@@ -436,6 +511,7 @@ async function loadApplicants(opportunityId) {
 
   state.candidates = detailed;
   renderCandidates();
+  await scoreCandidates(state.candidates);
 }
 
 function handleChatSubmit(event) {
@@ -461,6 +537,8 @@ function handleChatSubmit(event) {
         state.filters = { ...state.filters, ...resp.updated_filters };
         renderFilters();
         renderCandidates();
+        setCandidateSubtitle("Re-scoring applicants…");
+        return scoreCandidates(state.candidates);
       }
       appendMessage("assistant", resp.response || "Filtros actualizados.");
     })
@@ -472,6 +550,7 @@ function handleChatSubmit(event) {
     .finally(() => {
       setChatStatus("Ready");
       setFiltersStatus("Ready");
+      setCandidateSubtitle("Applicants sorted by match score.");
     });
 }
 

@@ -395,6 +395,77 @@ Return STRICT JSON:
             return resp, 500
 
 
+    @app.route('/ai/talentum_score', methods=['POST', 'OPTIONS'])
+    def talentum_score():
+        """
+        Recibe: { "filters": {...}, "candidate": {...} }
+        Devuelve: { "score": 1-10 }
+        """
+        if request.method == 'OPTIONS':
+            resp = app.response_class(status=204)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+            return resp
+
+        try:
+            data = request.get_json(force=True) or {}
+            filters = data.get('filters') or {}
+            candidate = data.get('candidate') or {}
+
+            prompt = f"""
+You are a strict recruiter match scorer.
+Given filters (from JD/chat) and a candidate summary, return a STRICT JSON object:
+{{"score": <integer 1-10>}}
+
+Rules:
+- 10 means the candidate clearly matches all filters.
+- 1 means almost no match.
+- Be conservative if data is missing.
+- Output only valid minified JSON.
+
+FILTERS:
+{json.dumps(filters, ensure_ascii=False)}
+
+CANDIDATE:
+{json.dumps(candidate, ensure_ascii=False)}
+"""
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=120
+            )
+
+            content = (chat.choices[0].message.content or "").strip()
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+            try:
+                payload = json.loads(cleaned)
+            except Exception:
+                payload = {}
+
+            score = payload.get("score")
+            try:
+                score = int(score)
+            except Exception:
+                score = 1
+            score = max(1, min(10, score))
+
+            resp = jsonify({"score": score})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 200
+
+        except Exception as e:
+            logging.error("❌ /ai/talentum_score failed\n" + traceback.format_exc())
+            resp = jsonify({"error": str(e)})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 500
+
+
     @app.route('/ai/improve_tools', methods=['POST'])
     def improve_tools_section():
         try:
