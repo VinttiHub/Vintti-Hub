@@ -30,6 +30,41 @@
         </div>
         <div class="filters-pill" id="hrFilterPill">Filter: all HR leads</div>
       </div>
+      <div class="talentum-filters" id="talentumFilters">
+        <div class="filter-group">
+          <button class="filter-toggle" type="button" data-filter="stage">Stage</button>
+          <div class="filter-menu" id="filterStageMenu"></div>
+        </div>
+        <div class="filter-group">
+          <button class="filter-toggle" type="button" data-filter="sales">Sales Lead</button>
+          <div class="filter-menu" id="filterSalesMenu"></div>
+        </div>
+        <div class="filter-group">
+          <button class="filter-toggle" type="button" data-filter="hr">HR Lead</button>
+          <div class="filter-menu" id="filterHrMenu"></div>
+        </div>
+        <div class="filter-group">
+          <button class="filter-toggle" type="button" data-filter="type">Type</button>
+          <div class="filter-menu" id="filterTypeMenu"></div>
+        </div>
+        <div class="filter-group filter-group--compact">
+          <select id="daysRangeFilter" class="filter-select">
+            <option value="">All days</option>
+            <option value="1-5">1-5</option>
+            <option value="6-10">6-10</option>
+            <option value="11-15">11-15</option>
+            <option value="16-20">16-20</option>
+            <option value="21-30">21-30</option>
+            <option value="31+">31+</option>
+          </select>
+        </div>
+        <div class="filter-group filter-group--grow">
+          <input type="text" id="accountSearchInput" placeholder="Search account..." autocomplete="off" />
+        </div>
+        <div class="filter-group filter-group--grow">
+          <input type="text" id="positionSearchInput" placeholder="Search position..." autocomplete="off" />
+        </div>
+      </div>
       <div class="opportunities-table-wrap">
         <table class="opportunities-table" aria-label="Opportunities list">
           <thead>

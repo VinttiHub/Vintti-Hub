@@ -505,6 +505,8 @@
 
   bindToggle(myToggle, myForm);
   bindToggle(teamToggle, teamForm);
+  if (myForm) myForm.setAttribute('hidden', '');
+  if (teamForm) teamForm.setAttribute('hidden', '');
 
   loadMyTasks();
   loadTeamTasks();

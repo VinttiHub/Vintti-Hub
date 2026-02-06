@@ -78,6 +78,80 @@ body.talentum {
   margin-bottom: 28px;
 }
 
+.talentum-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16px;
+}
+
+.filter-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-group--grow {
+  flex: 1 1 180px;
+}
+
+.filter-group--compact {
+  min-width: 120px;
+}
+
+.filter-toggle {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(215, 216, 240, 0.4);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.filter-menu {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow);
+  display: none;
+  z-index: 10;
+}
+
+.filter-menu.open {
+  display: block;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--ink);
+  padding: 4px 2px;
+}
+
+.filter-select,
+.filter-group input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 0.8rem;
+}
+
 .section-head {
   display: flex;
   align-items: center;
