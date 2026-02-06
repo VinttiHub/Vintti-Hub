@@ -4,8 +4,10 @@
 
   const myList = document.getElementById('myTasks');
   const myEmpty = document.getElementById('myEmpty');
+  const teamNotes = document.getElementById('teamNotes');
   const teamList = document.getElementById('teamTasks');
   const teamEmpty = document.getElementById('teamEmpty');
+  const teamTitle = document.getElementById('teamTitle');
   const teamTab = document.getElementById('teamTab');
 
   const formatDate = (raw) => {
@@ -86,6 +88,23 @@
     return row;
   };
 
+  const pastelClasses = ['team-note--mint', 'team-note--butter', 'team-note--sky', 'team-note--lilac'];
+
+  const renderTeamNotes = (users) => {
+    teamNotes.innerHTML = '';
+    users.forEach((user, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `team-note ${pastelClasses[index % pastelClasses.length]}`;
+      btn.dataset.userId = user.user_id;
+      btn.innerHTML = `
+        <div class="team-note__name">${user.user_name}</div>
+        <div class="team-note__meta">${user.team || 'Team'}</div>
+      `;
+      teamNotes.appendChild(btn);
+    });
+  };
+
   const renderList = (container, items, emptyEl, builder) => {
     container.innerHTML = '';
     if (!items.length) {
@@ -126,7 +145,39 @@
       const data = await res.json();
       if (Array.isArray(data)) {
         teamTab.hidden = false;
-        renderList(teamList, data, teamEmpty, buildTeamTask);
+        const byUser = new Map();
+        data.forEach((task) => {
+          if (!byUser.has(task.user_id)) {
+            byUser.set(task.user_id, {
+              user_id: task.user_id,
+              user_name: task.user_name || `User ${task.user_id}`,
+              team: task.team || 'Team',
+              tasks: [],
+            });
+          }
+          byUser.get(task.user_id).tasks.push(task);
+        });
+        const users = Array.from(byUser.values());
+        renderTeamNotes(users);
+        const activate = (user) => {
+          teamTitle.textContent = `${user.user_name}'s tasks`;
+          renderList(teamList, user.tasks, teamEmpty, buildTeamTask);
+          Array.from(teamNotes.children).forEach((note) => {
+            note.classList.toggle('is-active', Number(note.dataset.userId) === user.user_id);
+          });
+        };
+        if (users.length) {
+          activate(users[0]);
+        } else {
+          teamTitle.textContent = 'No team tasks yet';
+          renderList(teamList, [], teamEmpty, buildTeamTask);
+        }
+        teamNotes.addEventListener('click', (event) => {
+          const button = event.target.closest('.team-note');
+          if (!button) return;
+          const selected = users.find((u) => u.user_id === Number(button.dataset.userId));
+          if (selected) activate(selected);
+        });
       }
     } catch (error) {
       teamTab.hidden = true;

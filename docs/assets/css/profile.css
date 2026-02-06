@@ -303,6 +303,83 @@ input:focus, select:focus, textarea:focus{
   padding:0;
   line-height:1;
 }
+.admin-card + .admin-card{
+  margin-top:28px;
+}
+.admin-users{
+  margin-top:18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.admin-user-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  padding:14px 16px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:#fff;
+}
+.admin-user-meta{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.admin-user-name{
+  font-weight:700;
+  color:var(--text);
+}
+.admin-user-details{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+  font-size:13px;
+  color:var(--muted);
+}
+.admin-user-role{
+  padding:3px 8px;
+  border-radius:999px;
+  background:rgba(15,23,42,0.08);
+  color:var(--text);
+  font-size:12px;
+  font-weight:600;
+}
+.admin-user-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.admin-users-empty{
+  color:var(--muted);
+  padding:6px 0;
+}
+.btn.danger{
+  background:#fee2e2;
+  border-color:#fca5a5;
+  color:#7f1d1d;
+}
+.btn.danger:hover{
+  background:#fecaca;
+}
+.admin-delete__body{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.admin-delete__email{
+  font-weight:600;
+  color:var(--text);
+}
+.admin-delete__actions{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:16px;
+}
 
 /* ---------- Lists / Cards ---------- */
 .list{ margin-top: 28px; }
@@ -2795,4 +2872,15 @@ input:focus, select:focus, textarea:focus{
 #requestsTable.requests-table .row .cell:nth-child(5),
 #requestsTable.requests-table .row .cell:nth-child(6){
   justify-content: center;     /* Status + Action */
+}
+
+@media (max-width: 700px){
+  .admin-user-row{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .admin-user-actions{
+    width:100%;
+    justify-content:flex-end;
+  }
 }

@@ -354,6 +354,50 @@ def create_hub_user():
     )
 
 
+@bp.delete("/users/<int:user_id>")
+def delete_hub_user(user_id: int):
+    requester_id = _current_user_id()
+    if not requester_id:
+        return _friendly_error("Please log in again to continue.", 401)
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT user_id, email_vintti FROM users WHERE user_id = %s",
+                (requester_id,),
+            )
+            requester = cur.fetchone()
+            if not requester:
+                return _friendly_error("You need an active Hub session to continue.", 401)
+
+            requester_email = normalize_email(requester.get("email_vintti"))
+            if requester_email not in ADMIN_ALLOWED_EMAILS:
+                return _friendly_error("You do not have access to this tool.", 403)
+
+            if int(user_id) == int(requester_id):
+                return _friendly_error("You cannot delete your own account.", 400)
+
+            cur.execute(
+                "SELECT user_id, user_name, email_vintti FROM users WHERE user_id = %s",
+                (user_id,),
+            )
+            target = cur.fetchone()
+            if not target:
+                return _friendly_error("User not found.", 404)
+
+            cur.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        logging.exception("Failed to delete Hub user via admin route")
+        return _friendly_error("We could not delete that user right now. Please try again later.", 500)
+    finally:
+        conn.close()
+
+    return jsonify({"ok": True, "deleted_user_id": user_id}), 200
+
+
 def _send_invite_email(
     target_email: str, full_name: str, token: str, invited_by: Optional[str]
 ) -> bool:

@@ -509,6 +509,19 @@
       </div>
     </form>
   </div>
+
+  <div class="admin-card admin-card--users">
+    <header class="admin-card__head">
+      <div>
+        <p class="eyebrow">User management</p>
+        <h2 class="admin-card__title">Manage teammates</h2>
+        <p class="admin-card__sub">Delete a user if they should no longer have a profile. This removes their row from the users table.</p>
+      </div>
+      <span class="admin-chip">Admins only</span>
+    </header>
+
+    <div id="adminUsersList" class="admin-users" aria-live="polite"></div>
+  </div>
 </section>
 
   </main>
@@ -561,6 +574,27 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ——— Modal: Delete User ——— -->
+<div id="adminDeleteModal" class="modal" aria-hidden="true">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog admin-delete" role="dialog" aria-modal="true" aria-labelledby="adminDeleteTitle">
+    <header class="modal__head">
+      <h3 id="adminDeleteTitle">Delete user</h3>
+      <button class="modal__close" title="Close" data-close-modal>×</button>
+    </header>
+    <div class="admin-delete__body">
+      <p>Are you sure you want to delete <span id="adminDeleteName">this user</span>?</p>
+      <p class="muted">This process can't be undone.</p>
+      <p class="admin-delete__email" id="adminDeleteEmail"></p>
+    </div>
+    <div class="admin-delete__actions">
+      <button type="button" class="btn" data-close-modal>Cancel</button>
+      <button type="button" class="btn danger" id="adminDeleteConfirm">Delete user</button>
+      <span id="adminDeleteStatus" class="toast" role="status" aria-live="polite"></span>
     </div>
   </div>
 </div>

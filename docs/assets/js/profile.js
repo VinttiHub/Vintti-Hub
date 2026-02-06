@@ -118,9 +118,18 @@ function showToast(el, text, ok=true){
   setTimeout(()=> el.textContent = "", 3500);
 }
 function openTimeoffModal(){ $("#timeoffModal").classList.add("active"); $("#timeoffModal").setAttribute("open",""); }
+function closeModal(modal){
+  if (!modal) return;
+  modal.classList.remove("active");
+  modal.removeAttribute("open");
+  if (modal.id === "adminDeleteModal"){
+    ADMIN_DELETE_TARGET = null;
+    setAdminDeleteStatus("");
+  }
+}
 function closeTimeoffModal(){
   const m = $("#timeoffModal");
-  m.classList.remove("active"); m.removeAttribute("open");
+  closeModal(m);
 }
 
 function showSuccessSplash(){
@@ -134,7 +143,10 @@ function showSuccessSplash(){
 document.addEventListener("click", (e)=>{
   const t = e.target;
   if (t.matches("#btnOpenTimeoff")) { e.preventDefault(); openTimeoffModal(); }
-  if (t.matches("[data-close-modal]")) { e.preventDefault(); closeTimeoffModal(); }
+  if (t.matches("[data-close-modal]")) {
+    e.preventDefault();
+    closeModal(t.closest(".modal"));
+  }
   const removeBtn = t.closest?.("[data-leaderof-remove]");
   if (removeBtn){
     e.preventDefault();
@@ -143,6 +155,20 @@ document.addEventListener("click", (e)=>{
       ADMIN_LEADER_OF_SELECTED.delete(id);
       renderLeaderOfTags();
     }
+  }
+
+  const adminDeleteBtn = t.closest?.("[data-admin-delete]");
+  if (adminDeleteBtn){
+    e.preventDefault();
+    const userId = Number(adminDeleteBtn.getAttribute("data-admin-delete"));
+    if (!userId) return;
+    const cached = ADMIN_USERS_CACHE.find((user)=> Number(user?.user_id) === userId);
+    const user = cached || {
+      user_id: userId,
+      user_name: adminDeleteBtn.getAttribute("data-user-name") || "",
+      email_vintti: adminDeleteBtn.getAttribute("data-user-email") || ""
+    };
+    openAdminDeleteModal(user);
   }
 });
 
@@ -231,6 +257,9 @@ const ADMIN_LEADER_BY_ID = new Map();
 const ADMIN_LEADER_OF_SELECTED = new Map();
 let ADMIN_LEADER_OPTIONS = [];
 let ADMIN_LEADER_LOADED = false;
+let ADMIN_USERS_CACHE = [];
+let ADMIN_DELETE_TARGET = null;
+let ADMIN_DELETE_STATUS_TIMER = null;
 const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 
 function calcVacation(user){
@@ -1306,11 +1335,155 @@ async function onAdminCreateSubmit(ev){
     clearLeaderOfSelection();
     setAdminStatus(data.message || "User created.", true);
     await ensureAdminLeaderOptions(true);
+    await loadAdminUsersList();
   }catch(err){
     console.error("admin create error:", err);
     setAdminStatus(err?.message || "Could not create user.", false);
   }finally{
     if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function setAdminDeleteStatus(text, ok=true){
+  const toast = document.getElementById("adminDeleteStatus");
+  if (!toast) return;
+  toast.textContent = text;
+  toast.style.color = ok ? "#0f766e" : "#b91c1c";
+  if (ADMIN_DELETE_STATUS_TIMER){
+    clearTimeout(ADMIN_DELETE_STATUS_TIMER);
+  }
+  if (text){
+    ADMIN_DELETE_STATUS_TIMER = setTimeout(()=> {
+      toast.textContent = "";
+    }, 4500);
+  }
+}
+
+function openAdminDeleteModal(user){
+  const modal = document.getElementById("adminDeleteModal");
+  if (!modal) return;
+  ADMIN_DELETE_TARGET = user;
+  const name = (user?.user_name || "this user").trim() || "this user";
+  const email = (user?.email_vintti || "").trim();
+  const nameEl = document.getElementById("adminDeleteName");
+  const emailEl = document.getElementById("adminDeleteEmail");
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = email ? email : "";
+  setAdminDeleteStatus("");
+  modal.classList.add("active");
+  modal.setAttribute("open", "");
+}
+
+function renderAdminUsers(users){
+  const host = document.getElementById("adminUsersList");
+  if (!host) return;
+  host.innerHTML = "";
+  if (!Array.isArray(users) || users.length === 0){
+    host.innerHTML = `<div class="admin-users-empty">No users found.</div>`;
+    return;
+  }
+  const sorted = [...users].sort((a, b)=>{
+    const aKey = (a?.user_name || a?.email_vintti || "").toLowerCase();
+    const bKey = (b?.user_name || b?.email_vintti || "").toLowerCase();
+    if (aKey < bKey) return -1;
+    if (aKey > bKey) return 1;
+    return (Number(a?.user_id) || 0) - (Number(b?.user_id) || 0);
+  });
+  const frag = document.createDocumentFragment();
+  sorted.forEach((user)=>{
+    const row = document.createElement("div");
+    row.className = "admin-user-row";
+
+    const meta = document.createElement("div");
+    meta.className = "admin-user-meta";
+    const name = document.createElement("div");
+    name.className = "admin-user-name";
+    name.textContent = (user?.user_name || "Unnamed user").trim() || "Unnamed user";
+    const details = document.createElement("div");
+    details.className = "admin-user-details";
+    const email = (user?.email_vintti || "").trim();
+    const detailsText = document.createElement("span");
+    detailsText.textContent = email ? `${email} · ID ${user?.user_id || "—"}` : `ID ${user?.user_id || "—"}`;
+    details.appendChild(detailsText);
+    if (user?.role){
+      const role = document.createElement("span");
+      role.className = "admin-user-role";
+      role.textContent = String(user.role);
+      details.appendChild(role);
+    }
+    meta.append(name, details);
+
+    const actions = document.createElement("div");
+    actions.className = "admin-user-actions";
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn danger";
+    del.textContent = "Delete";
+    del.setAttribute("data-admin-delete", String(user?.user_id || ""));
+    del.setAttribute("data-user-name", String(user?.user_name || ""));
+    del.setAttribute("data-user-email", String(user?.email_vintti || ""));
+    if (CURRENT_USER_ID && Number(user?.user_id) === Number(CURRENT_USER_ID)){
+      del.disabled = true;
+      del.title = "You cannot delete your own account.";
+    }
+    actions.appendChild(del);
+
+    row.append(meta, actions);
+    frag.appendChild(row);
+  });
+  host.appendChild(frag);
+}
+
+async function loadAdminUsersList(){
+  const host = document.getElementById("adminUsersList");
+  if (host){
+    host.innerHTML = `<div class="admin-users-empty">Loading users...</div>`;
+  }
+  try{
+    const res = await api(`/users`, { method: "GET" });
+    if (!res.ok) throw new Error("Could not load users.");
+    const rows = await res.json();
+    ADMIN_USERS_CACHE = Array.isArray(rows) ? rows : [];
+    renderAdminUsers(ADMIN_USERS_CACHE);
+  }catch(err){
+    console.error("admin user list error:", err);
+    if (host){
+      host.innerHTML = `<div class="admin-users-empty">Could not load users.</div>`;
+    }
+  }
+}
+
+async function onAdminDeleteConfirm(){
+  if (!ADMIN_DELETE_TARGET?.user_id) return;
+  const confirmBtn = document.getElementById("adminDeleteConfirm");
+  const userId = Number(ADMIN_DELETE_TARGET.user_id);
+  if (!userId) return;
+  if (confirmBtn) confirmBtn.disabled = true;
+  setAdminDeleteStatus("Deleting user…", true);
+  try{
+    const res = await api(`/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
+    const data = await res.json().catch(()=>null);
+    if (!res.ok || !data?.ok){
+      const msg = data?.error || data?.message || "Could not delete user.";
+      throw new Error(msg);
+    }
+    setAdminDeleteStatus("User deleted.", true);
+    closeModal(document.getElementById("adminDeleteModal"));
+    await loadAdminUsersList();
+    await ensureAdminLeaderOptions(true);
+  }catch(err){
+    console.error("admin delete error:", err);
+    setAdminDeleteStatus(err?.message || "Could not delete user.", false);
+  }finally{
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+}
+
+function setupAdminDeleteControls(){
+  const confirmBtn = document.getElementById("adminDeleteConfirm");
+  if (confirmBtn && !confirmBtn.dataset.bound){
+    confirmBtn.addEventListener("click", onAdminDeleteConfirm);
+    confirmBtn.dataset.bound = "1";
   }
 }
 
@@ -1904,6 +2077,8 @@ async function loadMe(uid){
   if (ADMIN_ALLOWED_EMAILS.has(normalizedEmail)){
     enableAdminTab();
     setupAdminForm();
+    setupAdminDeleteControls();
+    loadAdminUsersList();
   }
 
   // Vista

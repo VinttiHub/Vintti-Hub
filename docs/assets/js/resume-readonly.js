@@ -137,9 +137,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       ratingComment.classList.toggle("is-visible", shouldShow);
       ratingComment.setAttribute("aria-hidden", shouldShow ? "false" : "true");
     }
-    if (ratingSubmit && ratingTextarea) {
-      ratingSubmit.disabled = ratingTextarea.value.trim().length === 0;
-    }
   };
 
   const patchResume = async (payload) => {
@@ -175,18 +172,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   if (ratingTextarea && ratingSubmit) {
-    ratingTextarea.addEventListener("input", () => {
-      ratingSubmit.disabled = ratingTextarea.value.trim().length === 0;
-    });
-
     ratingSubmit.addEventListener("click", async () => {
       if (!candidateId) return;
       const comment = ratingTextarea.value.trim();
-      if (!comment) return;
       setRatingStatus("Sending...", "loading");
       try {
-        await patchResume({ stars: currentStars || 0, comments_stars: comment });
-        setRatingStatus("Message sent. Thank you!", "success");
+        const payload = { stars: currentStars || 0 };
+        if (comment) payload.comments_stars = comment;
+        await patchResume(payload);
+        setRatingStatus(comment ? "Message sent. Thank you!" : "Rating saved. Thank you!", "success");
       } catch (err) {
         console.error("Unable to save comment", err);
         setRatingStatus("Unable to save message right now.", "error");
@@ -294,7 +288,6 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
       if (ratingComment && ratingTextarea && ratingTextarea.value.trim().length > 0) {
         ratingComment.classList.add("is-visible");
         ratingComment.setAttribute("aria-hidden", "false");
-        if (ratingSubmit) ratingSubmit.disabled = false;
       }
     }
 
