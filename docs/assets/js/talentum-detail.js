@@ -63,6 +63,24 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function fetchTalentumFilters(jobDescription, retries = 1) {
+  try {
+    return await fetchJSON(`${API_BASE}/ai/jd_to_talentum_filters`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ job_description: jobDescription }),
+    });
+  } catch (err) {
+    const msg = String(err || "");
+    const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("rate limit");
+    if (retries > 0 && isRateLimit) {
+      await sleep(800);
+      return fetchTalentumFilters(jobDescription, retries - 1);
+    }
+    throw err;
+  }
+}
+
 async function fetchChatUpdate(payload, retries = 1) {
   try {
     return await fetchJSON(`${API_BASE}/ai/talentum_chat_update`, {
@@ -181,11 +199,7 @@ async function extractFiltersFromOpportunity(opportunity) {
     return;
   }
 
-  const result = await fetchJSON(`${API_BASE}/ai/jd_to_talentum_filters`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_description: rawJD }),
-  });
+  const result = await fetchTalentumFilters(rawJD);
 
   state.filters = {
     position: result.position || opportunity.opp_position_name || "",

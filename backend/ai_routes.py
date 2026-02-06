@@ -268,6 +268,13 @@ JOB DESCRIPTION (verbatim):
             import re
             jd_plain = re.sub(r'<[^>]+>', ' ', raw_jd)
             jd_plain = re.sub(r'\s+', ' ', jd_plain).strip()
+            cache_key = json.dumps({"job_description": jd_plain}, sort_keys=True, ensure_ascii=False)
+            cached = _talentum_cache_get(cache_key)
+            if cached:
+                resp = jsonify(cached)
+                resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+                resp.headers['Access-Control-Allow-Credentials'] = 'true'
+                return resp, 200
 
             prompt = f"""
 You are a strict job description parser.
@@ -321,6 +328,7 @@ JOB DESCRIPTION (verbatim):
                 "country": as_text(obj.get("country", "")),
             }
 
+            _talentum_cache_set(cache_key, result)
             resp = jsonify(result)
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -331,7 +339,8 @@ JOB DESCRIPTION (verbatim):
             resp = jsonify({"error": str(e)})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
-            return resp, 500
+            status = 429 if "rate limit" in str(e).lower() else 500
+            return resp, status
 
 
     @app.route('/ai/talentum_chat_update', methods=['POST', 'OPTIONS'])
