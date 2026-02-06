@@ -327,7 +327,7 @@ body {
 
 .note-task {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: 12px;
   align-items: center;
   padding: 10px 14px;
@@ -335,6 +335,12 @@ body {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(230, 210, 225, 0.9);
   cursor: default;
+}
+
+.note-task__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .note-task__checkbox {
@@ -392,7 +398,7 @@ body {
 }
 
 .note-task--sub {
-  background: rgba(255, 255, 255, 0.8);
+  background: transparent;
   border-style: dashed;
 }
 
@@ -402,9 +408,24 @@ body {
 }
 
 .note-list--sub {
-  margin: 8px 0 12px 32px;
-  padding-left: 12px;
-  border-left: 2px solid rgba(214, 188, 206, 0.6);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.note-task__subtasks {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-left: 34px;
+}
+
+.note-subtask {
+  background: transparent;
+  border: 1px dashed rgba(210, 185, 202, 0.7);
+  box-shadow: none;
+  padding: 6px 12px;
 }
 
 .note-task__meta {

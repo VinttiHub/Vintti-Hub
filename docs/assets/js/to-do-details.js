@@ -81,6 +81,9 @@
     });
 
     if (editable) {
+      const actions = document.createElement('div');
+      actions.className = 'note-task__actions';
+
       const up = document.createElement('button');
       up.type = 'button';
       up.className = 'note-task__move';
@@ -135,7 +138,8 @@
           setError(ownerId === userId ? myError : teamError, 'Could not delete task.');
         }
       });
-      row.append(checkbox, textWrap, date, up, down, sub, del);
+      actions.append(up, down, sub, del);
+      row.append(checkbox, textWrap, date, actions);
     } else {
       row.append(checkbox, textWrap, date);
     }
@@ -200,15 +204,20 @@
     list.className = 'note-list';
     list.dataset.parent = 'root';
     topTasks.forEach((task) => {
-      list.appendChild(buildTaskRow(task, editable, ownerId, tasks));
+      const parentRow = buildTaskRow(task, editable, ownerId, tasks);
       const children = sortTasks(byParent.get(task.to_do_id) || []);
       if (children.length) {
-        const subList = document.createElement('div');
-        subList.className = 'note-list note-list--sub';
-        subList.dataset.parent = String(task.to_do_id);
-        children.forEach((child) => subList.appendChild(buildTaskRow(child, editable, ownerId, tasks)));
-        list.appendChild(subList);
+        const subContainer = document.createElement('div');
+        subContainer.className = 'note-task__subtasks';
+        subContainer.dataset.parent = String(task.to_do_id);
+        children.forEach((child) => {
+          const subRow = buildTaskRow(child, editable, ownerId, tasks);
+          subRow.classList.add('note-subtask');
+          subContainer.appendChild(subRow);
+        });
+        parentRow.appendChild(subContainer);
       }
+      list.appendChild(parentRow);
     });
     container.appendChild(list);
     if (editable) enableDrag(list, ownerId, tasks);

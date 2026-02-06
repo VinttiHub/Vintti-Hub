@@ -32,6 +32,21 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 from openai import OpenAI
 from PyPDF2 import PdfReader  # fallback local
 
+TALENTUM_CHAT_CACHE = {}
+TALENTUM_CHAT_CACHE_TTL = 5 * 60
+
+def _talentum_cache_get(key):
+    entry = TALENTUM_CHAT_CACHE.get(key)
+    if not entry:
+        return None
+    if time.time() - entry["ts"] > TALENTUM_CHAT_CACHE_TTL:
+        TALENTUM_CHAT_CACHE.pop(key, None)
+        return None
+    return entry.get("value")
+
+def _talentum_cache_set(key, value):
+    TALENTUM_CHAT_CACHE[key] = {"ts": time.time(), "value": value}
+
 def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> str:
     """
     Sube el PDF a OpenAI Files (purpose=assistants) y lo pasa al modelo como input_file.
@@ -341,6 +356,18 @@ JOB DESCRIPTION (verbatim):
             if not message:
                 return jsonify({"error": "message is required"}), 400
 
+            cache_key = json.dumps(
+                {"message": message, "filters": current_filters},
+                sort_keys=True,
+                ensure_ascii=False
+            )
+            cached = _talentum_cache_get(cache_key)
+            if cached:
+                resp = jsonify(cached)
+                resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+                resp.headers['Access-Control-Allow-Credentials'] = 'true'
+                return resp, 200
+
             prompt = f"""
 You are a recruiting assistant updating filters.
 Current filters (JSON):
@@ -382,7 +409,9 @@ Return STRICT JSON:
             if not isinstance(response, str) or not response.strip():
                 response = "Listo, actualicé los filtros con tu mensaje."
 
-            resp = jsonify({"updated_filters": updated, "response": response.strip()})
+            result = {"updated_filters": updated, "response": response.strip()}
+            _talentum_cache_set(cache_key, result)
+            resp = jsonify(result)
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
             return resp, 200
@@ -392,7 +421,8 @@ Return STRICT JSON:
             resp = jsonify({"error": str(e)})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
-            return resp, 500
+            status = 429 if "rate limit" in str(e).lower() else 500
+            return resp, status
 
 
     @app.route('/ai/talentum_score', methods=['POST', 'OPTIONS'])
@@ -423,6 +453,7 @@ Rules:
 - 10 means the candidate clearly matches all filters.
 - 1 means almost no match.
 - Country/location match is critical when a country filter is present.
+- If country_match is true and there is no explicit contradiction, do not score below 4.
 - Be conservative if data is missing.
 - Output only valid minified JSON.
 
@@ -528,6 +559,88 @@ SCORE:
 
         except Exception as e:
             logging.error("❌ /ai/talentum_score_explain failed\n" + traceback.format_exc())
+            resp = jsonify({"error": str(e)})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 500
+
+
+    @app.route('/ai/talentum_score_batch', methods=['POST', 'OPTIONS'])
+    def talentum_score_batch():
+        """
+        Recibe: { "filters": {...}, "candidates": [ { "id": <int>, ... } ] }
+        Devuelve: { "scores": [ { "id": <int>, "score": <1-10> } ] }
+        """
+        if request.method == 'OPTIONS':
+            resp = app.response_class(status=204)
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+            resp.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
+            return resp
+
+        try:
+            data = request.get_json(force=True) or {}
+            filters = data.get('filters') or {}
+            candidates = data.get('candidates') or []
+            if not isinstance(candidates, list) or not candidates:
+                return jsonify({"scores": []}), 200
+
+            prompt = f"""
+You are a strict recruiter match scorer.
+Given filters (from JD/chat) and a list of candidate summaries, return a STRICT JSON object:
+{{"scores":[{{"id":<int>,"score":<1-10>}}, ...]}}
+
+Rules:
+- 10 means the candidate clearly matches all filters.
+- 1 means almost no match.
+- Country/location match is critical when a country filter is present.
+- If country_match is true and there is no explicit contradiction, do not score below 4.
+- Be conservative if data is missing.
+- Output only valid minified JSON.
+
+FILTERS:
+{json.dumps(filters, ensure_ascii=False)}
+
+CANDIDATES:
+{json.dumps(candidates, ensure_ascii=False)}
+"""
+
+            chat = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=400
+            )
+
+            content = (chat.choices[0].message.content or "").strip()
+            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+            try:
+                payload = json.loads(cleaned)
+            except Exception:
+                payload = {}
+
+            scores = payload.get("scores")
+            if not isinstance(scores, list):
+                scores = []
+
+            normalized = []
+            for item in scores:
+                try:
+                    cand_id = int(item.get("id"))
+                    score = int(item.get("score"))
+                except Exception:
+                    continue
+                score = max(1, min(10, score))
+                normalized.append({"id": cand_id, "score": score})
+
+            resp = jsonify({"scores": normalized})
+            resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
+            resp.headers['Access-Control-Allow-Credentials'] = 'true'
+            return resp, 200
+
+        except Exception as e:
+            logging.error("❌ /ai/talentum_score_batch failed\n" + traceback.format_exc())
             resp = jsonify({"error": str(e)})
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
