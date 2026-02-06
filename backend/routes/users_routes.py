@@ -63,6 +63,33 @@ def users_list_or_by_email():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route('/users/reports')
+def users_by_leader():
+    leader_id = request.args.get("leader_id") or request.args.get("user_id")
+    if not leader_id:
+        return jsonify({"error": "leader_id is required"}), 400
+
+    try:
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT user_id, user_name, email_vintti, team
+                FROM users
+                WHERE lider = %s
+                ORDER BY LOWER(user_name) ASC
+                """,
+                (leader_id,),
+            )
+            rows = cur.fetchall()
+        conn.close()
+        return jsonify([dict(row) for row in rows])
+    except Exception as exc:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({"error": str(exc)}), 500
+
+
 def _list_users_by_role(role_type: str):
     try:
         conn = get_connection()

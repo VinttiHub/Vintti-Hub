@@ -137,51 +137,51 @@
   const loadTeamTasks = async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`${API_BASE}/to_do/team?leader_id=${encodeURIComponent(userId)}`, {
+      const reportsRes = await fetch(`${API_BASE}/users/reports?leader_id=${encodeURIComponent(userId)}`, {
         credentials: 'include',
       });
-      if (res.status === 403) return;
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        teamTab.hidden = false;
-        const byUser = new Map();
-        data.forEach((task) => {
-          if (!byUser.has(task.user_id)) {
-            byUser.set(task.user_id, {
-              user_id: task.user_id,
-              user_name: task.user_name || `User ${task.user_id}`,
-              team: task.team || 'Team',
-              tasks: [],
-            });
-          }
-          if (task.to_do_id) {
-            byUser.get(task.user_id).tasks.push(task);
-          }
+      const reports = reportsRes.ok ? await reportsRes.json() : [];
+      if (!Array.isArray(reports) || reports.length === 0) return;
+
+      const tasksRes = await fetch(`${API_BASE}/to_do/team?leader_id=${encodeURIComponent(userId)}`, {
+        credentials: 'include',
+      });
+      const tasksData = tasksRes.ok ? await tasksRes.json() : [];
+
+      teamTab.hidden = false;
+      const byUser = new Map();
+      reports.forEach((report) => {
+        byUser.set(report.user_id, {
+          user_id: report.user_id,
+          user_name: report.user_name || `User ${report.user_id}`,
+          team: report.team || 'Team',
+          tasks: [],
         });
-        const users = Array.from(byUser.values());
-        renderTeamNotes(users);
-        const activate = (user) => {
-          teamTitle.textContent = `${user.user_name}'s tasks`;
-          renderList(teamList, user.tasks, teamEmpty, buildTeamTask);
-          Array.from(teamNotes.children).forEach((note) => {
-            note.classList.toggle('is-active', Number(note.dataset.userId) === user.user_id);
-          });
-        };
-        if (users.length) {
-          teamTitle.textContent = 'Pick a teammate';
-          renderList(teamList, [], teamEmpty, buildTeamTask);
-        } else {
-          teamTitle.textContent = 'No team tasks yet';
-          renderList(teamList, [], teamEmpty, buildTeamTask);
-        }
-        teamNotes.addEventListener('click', (event) => {
-          const button = event.target.closest('.team-note');
-          if (!button) return;
-          const selected = users.find((u) => u.user_id === Number(button.dataset.userId));
-          if (selected) activate(selected);
+      });
+      if (Array.isArray(tasksData)) {
+        tasksData.forEach((task) => {
+          const holder = byUser.get(task.user_id);
+          if (holder && task.to_do_id) holder.tasks.push(task);
         });
       }
+
+      const users = Array.from(byUser.values());
+      renderTeamNotes(users);
+      const activate = (user) => {
+        teamTitle.textContent = `${user.user_name}'s tasks`;
+        renderList(teamList, user.tasks, teamEmpty, buildTeamTask);
+        Array.from(teamNotes.children).forEach((note) => {
+          note.classList.toggle('is-active', Number(note.dataset.userId) === user.user_id);
+        });
+      };
+      teamTitle.textContent = 'Pick a teammate';
+      renderList(teamList, [], teamEmpty, buildTeamTask);
+      teamNotes.addEventListener('click', (event) => {
+        const button = event.target.closest('.team-note');
+        if (!button) return;
+        const selected = users.find((u) => u.user_id === Number(button.dataset.userId));
+        if (selected) activate(selected);
+      });
     } catch (error) {
       teamTab.hidden = true;
     }
