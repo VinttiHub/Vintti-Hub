@@ -29,6 +29,7 @@ from routes.system_routes import bp as system_bp
 from routes.tracks_routes import bp as tracks_bp
 from routes.users_routes import bp as users_api_bp
 from routes.moods_routes import bp as moods_bp
+from routes.to_do_routes import bp as to_do_bp
 
 
 def create_app() -> Flask:
@@ -64,6 +65,7 @@ def create_app() -> Flask:
     app.register_blueprint(moods_bp)
     app.register_blueprint(tracks_bp)
     app.register_blueprint(careers_bp)
+    app.register_blueprint(to_do_bp)
     app.register_blueprint(reminders_bp)
     app.register_blueprint(coresignal_bp)
     app.register_blueprint(profile_bp)

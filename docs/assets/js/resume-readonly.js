@@ -730,7 +730,7 @@ function getFlagEmoji(countryName) {
 }
 
 const PDF_PAGE = { width: 595.28, height: 841.89 };
-const PDF_PAGE_MARGIN = 24;
+const PDF_PAGE_MARGIN = 0;
 
 function sanitizeFilename(value) {
   if (!value) return "resume";

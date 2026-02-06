@@ -454,6 +454,77 @@ body[data-pdf-export="true"] .resume-download-button {
   display: none;
 }
 
+body[data-exporting="true"] .cv-header,
+body[data-pdf-export="true"] .cv-header {
+  max-width: none;
+  margin: 8px 8px 0;
+}
+
+body[data-exporting="true"] .cv-container,
+body[data-pdf-export="true"] .cv-container {
+  max-width: none;
+  width: calc(100% - 16px);
+  margin: 8px;
+  padding: 14px 16px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-exporting="true"] .resume-page-root,
+body[data-pdf-export="true"] .resume-page-root {
+  padding-bottom: 24px;
+}
+
+body[data-exporting="true"],
+body[data-pdf-export="true"] {
+  background: #fff;
+}
+
+body[data-exporting="true"] .cv-title,
+body[data-pdf-export="true"] .cv-title {
+  font-size: 42px;
+}
+
+body[data-exporting="true"] .cv-country,
+body[data-pdf-export="true"] .cv-country {
+  font-size: 18px;
+}
+
+body[data-exporting="true"] .cv-heading,
+body[data-pdf-export="true"] .cv-heading {
+  font-size: 16px;
+}
+
+body[data-exporting="true"] .cv-heading::before,
+body[data-pdf-export="true"] .cv-heading::before {
+  font-size: 18px;
+}
+
+body[data-exporting="true"] .cv-card,
+body[data-pdf-export="true"] .cv-card {
+  font-size: 17px;
+}
+
+body[data-exporting="true"] .cv-entry-title,
+body[data-pdf-export="true"] .cv-entry-title {
+  font-size: 18px;
+}
+
+body[data-exporting="true"] .cv-entry-company,
+body[data-pdf-export="true"] .cv-entry-company {
+  font-size: 16px;
+}
+
+body[data-exporting="true"] .cv-entry-left,
+body[data-pdf-export="true"] .cv-entry-left {
+  font-size: 15px;
+}
+
+body[data-exporting="true"] .cv-entry-summary,
+body[data-pdf-export="true"] .cv-entry-summary {
+  font-size: 17px;
+}
+
 @media (max-width: 640px) {
   .resume-download-button {
     right: 16px;
@@ -462,4 +533,3 @@ body[data-pdf-export="true"] .resume-download-button {
     letter-spacing: 0.05em;
   }
 }
-

@@ -216,12 +216,45 @@
     <ul id="discount-list"></ul>
   </aside>
 
+  <div class="todo-chat">
+    <button type="button" class="todo-bubble" id="todoBubble" aria-label="Open helper" aria-expanded="false">
+      <span class="todo-bubble__face" aria-hidden="true">
+        <span class="todo-bubble__eye"></span>
+        <span class="todo-bubble__eye"></span>
+        <span class="todo-bubble__smile"></span>
+      </span>
+    </button>
+
+    <section class="todo-panel" id="todoPanel" role="dialog" aria-labelledby="todoTitle" hidden>
+      <div class="todo-panel__header">
+        <div>
+          <p class="todo-panel__eyebrow">Your tiny assistant</p>
+          <h2 class="todo-panel__title" id="todoTitle">Task sparkles</h2>
+        </div>
+        <button type="button" class="todo-panel__close" id="todoClose" aria-label="Close">&times;</button>
+      </div>
+      <p class="todo-panel__intro">
+        Hi! I'm here to help you organize. Add a new task and I can remind you when it is close to the due date.
+      </p>
+      <div class="todo-list" id="todoList"></div>
+      <p class="todo-empty" id="todoEmpty" hidden>No tasks yet.</p>
+      <form class="todo-form" id="todoForm">
+        <input type="text" id="todoDescription" name="description" placeholder="Presentation task" autocomplete="off" />
+        <input type="date" id="todoDate" name="due_date" />
+        <button type="submit">Add task</button>
+        <p class="todo-form-error" id="todoFormError" hidden></p>
+      </form>
+    </section>
+    <div class="todo-toast" id="todoToast" role="status" aria-live="polite"></div>
+  </div>
+
   <!-- ===== Scripts (deferred) ===== -->
   <!-- Litepicker JS (used by your page JS). Loaded deferred to avoid blocking. -->
   <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js" defer></script>
 
   <script src="./assets/js/rich-comment-box.js" defer></script>
   <script src="./assets/js/inactive-info-dialog.js" defer></script>
+  <script src="./assets/js/to-do-chat.js" defer></script>
   <!-- Page logic (kept path & name). Defer improves first paint and keeps execution order. -->
   <script src="./assets/js/account-details.js" defer></script>
 
