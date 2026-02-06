@@ -150,6 +150,24 @@ body {
   background: rgba(255, 255, 255, 0.75);
 }
 
+.notebook__composer {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.notebook__toggle {
+  justify-self: start;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  background: linear-gradient(120deg, #f3c3d7, #f0adc8);
+  color: #3d1f31;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 18px rgba(224, 150, 185, 0.2);
+}
+
 .notebook__field {
   display: grid;
   gap: 6px;
@@ -330,6 +348,17 @@ body {
   font-size: 12px;
   color: #8b647a;
   white-space: nowrap;
+}
+
+.note-task__delete {
+  border: none;
+  background: #fde7f1;
+  color: #b14c74;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .note-task.is-done .note-task__text {

@@ -24,22 +24,25 @@
     </div>
 
     <section class="notebook__panel is-active" id="tab-my">
-      <form class="notebook__form" id="myTaskForm">
-        <div class="notebook__field">
-          <label for="myTaskDescription">New task</label>
-          <input type="text" id="myTaskDescription" placeholder="Task to tackle" />
-        </div>
-        <div class="notebook__field">
-          <label for="myTaskDate">Due date</label>
-          <input type="date" id="myTaskDate" />
-        </div>
-        <div class="notebook__field">
-          <label for="myTaskParent">Subtask of (optional)</label>
-          <select id="myTaskParent"></select>
-        </div>
-        <button type="submit" class="notebook__submit">Add task</button>
-        <p class="notebook__error" id="myTaskError" hidden></p>
-      </form>
+      <div class="notebook__composer">
+        <button type="button" class="notebook__toggle" id="myTaskToggle">Add new task</button>
+        <form class="notebook__form" id="myTaskForm" hidden>
+          <div class="notebook__field">
+            <label for="myTaskDescription">New task</label>
+            <input type="text" id="myTaskDescription" placeholder="Task to tackle" />
+          </div>
+          <div class="notebook__field">
+            <label for="myTaskDate">Due date</label>
+            <input type="date" id="myTaskDate" />
+          </div>
+          <div class="notebook__field">
+            <label for="myTaskParent">Subtask of (optional)</label>
+            <select id="myTaskParent"></select>
+          </div>
+          <button type="submit" class="notebook__submit">Add task</button>
+          <p class="notebook__error" id="myTaskError" hidden></p>
+        </form>
+      </div>
       <div class="notebook__list" id="myTasks"></div>
       <p class="notebook__empty" id="myEmpty" hidden>No tasks yet. Add a few from the buddy bubble.</p>
     </section>
@@ -49,22 +52,25 @@
         <div class="team-board__notes" id="teamNotes"></div>
         <div class="team-board__details">
           <h2 class="team-board__title" id="teamTitle">Pick a teammate</h2>
-          <form class="notebook__form" id="teamTaskForm">
-            <div class="notebook__field">
-              <label for="teamTaskDescription">New task for teammate</label>
-              <input type="text" id="teamTaskDescription" placeholder="Task to add" />
-            </div>
-            <div class="notebook__field">
-              <label for="teamTaskDate">Due date</label>
-              <input type="date" id="teamTaskDate" />
-            </div>
-            <div class="notebook__field">
-              <label for="teamTaskParent">Subtask of (optional)</label>
-              <select id="teamTaskParent"></select>
-            </div>
-            <button type="submit" class="notebook__submit">Add task</button>
-            <p class="notebook__error" id="teamTaskError" hidden></p>
-          </form>
+          <div class="notebook__composer">
+            <button type="button" class="notebook__toggle" id="teamTaskToggle">Add new task</button>
+            <form class="notebook__form" id="teamTaskForm" hidden>
+              <div class="notebook__field">
+                <label for="teamTaskDescription">New task for teammate</label>
+                <input type="text" id="teamTaskDescription" placeholder="Task to add" />
+              </div>
+              <div class="notebook__field">
+                <label for="teamTaskDate">Due date</label>
+                <input type="date" id="teamTaskDate" />
+              </div>
+              <div class="notebook__field">
+                <label for="teamTaskParent">Subtask of (optional)</label>
+                <select id="teamTaskParent"></select>
+              </div>
+              <button type="submit" class="notebook__submit">Add task</button>
+              <p class="notebook__error" id="teamTaskError" hidden></p>
+            </form>
+          </div>
           <div class="notebook__list" id="teamTasks"></div>
           <p class="notebook__empty" id="teamEmpty" hidden>Select a post-it to see tasks.</p>
         </div>

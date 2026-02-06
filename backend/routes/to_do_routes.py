@@ -82,17 +82,32 @@ def to_do_collection():
         return jsonify({"error": str(exc)}), 500
 
 
-@bp.route('/to_do/<int:to_do_id>', methods=['PATCH', 'OPTIONS'])
+@bp.route('/to_do/<int:to_do_id>', methods=['PATCH', 'DELETE', 'OPTIONS'])
 def to_do_item(to_do_id: int):
     if request.method == 'OPTIONS':
         return ('', 204)
 
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
-    check_value = data.get('check')
+    if user_id is None:
+        return jsonify({"error": "user_id is required"}), 400
 
-    if user_id is None or check_value is None:
-        return jsonify({"error": "user_id and check are required"}), 400
+    if request.method == 'DELETE':
+        try:
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM to_do WHERE subtask = %s AND user_id = %s", (to_do_id, user_id))
+            cur.execute("DELETE FROM to_do WHERE to_do_id = %s AND user_id = %s", (to_do_id, user_id))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return jsonify({"ok": True})
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    check_value = data.get('check')
+    if check_value is None:
+        return jsonify({"error": "check is required"}), 400
 
     try:
         conn = get_connection()

@@ -18,6 +18,7 @@
 
   let hasLoaded = false;
   let toastTimer = null;
+  let currentTasks = [];
 
   const formatDate = (raw) => {
     if (!raw) return '';
@@ -63,6 +64,8 @@
     if (task.check) wrapper.classList.add('is-done');
     if (!task.check && isOverdue(task.due_date)) wrapper.classList.add('is-overdue');
     if (task.subtask) wrapper.classList.add('todo-item--sub');
+    wrapper.dataset.todoId = task.to_do_id;
+    wrapper.dataset.parent = task.subtask || 'root';
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -90,6 +93,10 @@
           body: JSON.stringify({ user_id: userId, check: nextValue }),
         });
         if (!res.ok) throw new Error('Failed to update task');
+        if (nextValue) {
+          await moveTaskToEnd(task);
+          renderTasks(currentTasks);
+        }
       } catch (error) {
         checkbox.checked = !nextValue;
         wrapper.classList.toggle('is-done', checkbox.checked);
@@ -109,13 +116,7 @@
     }
 
     clearEmptyState();
-    const sortTasks = (items) =>
-      [...items].sort((a, b) => {
-        const aOrder = Number(a.orden) || 0;
-        const bOrder = Number(b.orden) || 0;
-        if (aOrder !== bOrder) return aOrder - bOrder;
-        return (a.to_do_id || 0) - (b.to_do_id || 0);
-      });
+    currentTasks = tasks;
 
     const topTasks = sortTasks(tasks.filter((task) => !task.subtask));
     const subTasks = tasks.filter((task) => task.subtask);
@@ -130,6 +131,14 @@
       children.forEach((child) => list.appendChild(buildItem(child)));
     });
   };
+
+  const sortTasks = (items) =>
+    [...items].sort((a, b) => {
+      const aOrder = Number(a.orden) || 0;
+      const bOrder = Number(b.orden) || 0;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.to_do_id || 0) - (b.to_do_id || 0);
+    });
 
   const fetchTasks = async () => {
     if (!userId) {
@@ -228,8 +237,8 @@
 
       if (!res.ok) throw new Error('Failed to add task');
       const newTask = await res.json();
-      const item = buildItem(newTask);
-      list.prepend(item);
+      currentTasks = [newTask, ...currentTasks];
+      renderTasks(currentTasks);
       clearEmptyState();
       descriptionInput.value = '';
       dateInput.value = '';
@@ -239,4 +248,26 @@
       formError.hidden = false;
     }
   });
+
+  const moveTaskToEnd = async (task) => {
+    const parentKey = task.subtask || null;
+    const siblings = sortTasks(currentTasks.filter((entry) => (entry.subtask || null) === parentKey));
+    const remaining = siblings.filter((entry) => entry.to_do_id !== task.to_do_id);
+    const reordered = [...remaining, task];
+    const payload = reordered.map((entry, index) => ({
+      to_do_id: entry.to_do_id,
+      orden: index + 1,
+    }));
+    currentTasks = currentTasks.map((entry) => {
+      const update = payload.find((item) => item.to_do_id === entry.to_do_id);
+      return update ? { ...entry, orden: update.orden } : entry;
+    });
+    if (!userId) return;
+    await fetch(`${API_BASE}/to_do/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ user_id: userId, items: payload }),
+    });
+  };
 })();

@@ -9,6 +9,7 @@
   const myDate = document.getElementById('myTaskDate');
   const myParent = document.getElementById('myTaskParent');
   const myError = document.getElementById('myTaskError');
+  const myToggle = document.getElementById('myTaskToggle');
   const teamNotes = document.getElementById('teamNotes');
   const teamList = document.getElementById('teamTasks');
   const teamEmpty = document.getElementById('teamEmpty');
@@ -19,6 +20,7 @@
   const teamDate = document.getElementById('teamTaskDate');
   const teamParent = document.getElementById('teamTaskParent');
   const teamError = document.getElementById('teamTaskError');
+  const teamToggle = document.getElementById('teamTaskToggle');
 
   let myTasks = [];
   let teamUsers = [];
@@ -36,7 +38,7 @@
     });
   };
 
-  const buildMyTask = (task, editable) => {
+  const buildMyTask = (task, editable, ownerId, tasksRef) => {
     const row = document.createElement('label');
     row.className = 'note-task';
     if (task.check) row.classList.add('is-done');
@@ -68,21 +70,55 @@
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ user_id: userId, check: nextValue }),
+          body: JSON.stringify({ user_id: ownerId, check: nextValue }),
         });
         if (!res.ok) throw new Error('Failed');
+        if (nextValue) {
+          await moveTaskToEnd(tasksRef, ownerId, task);
+        }
       } catch (error) {
         checkbox.checked = !nextValue;
         row.classList.toggle('is-done', checkbox.checked);
       }
     });
 
-    row.append(checkbox, textWrap, date);
+    if (editable) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'note-task__delete';
+      del.textContent = '✕';
+      del.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        try {
+          const res = await fetch(`${API_BASE}/to_do/${task.to_do_id}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ user_id: ownerId }),
+          });
+          if (!res.ok) throw new Error('Failed');
+          tasksRef = tasksRef.filter((entry) => entry.to_do_id !== task.to_do_id && entry.subtask !== task.to_do_id);
+          if (ownerId === userId) {
+            myTasks = tasksRef;
+          } else {
+            teamTasks.set(ownerId, tasksRef);
+          }
+          const siblings = tasksRef.filter((entry) => (entry.subtask || null) === (task.subtask || null));
+          await persistOrder(ownerId, siblings);
+          refreshCurrentView(ownerId);
+        } catch (error) {
+          setError(ownerId === userId ? myError : teamError, 'Could not delete task.');
+        }
+      });
+      row.append(checkbox, textWrap, date, del);
+    } else {
+      row.append(checkbox, textWrap, date);
+    }
     return row;
   };
 
-  const buildTaskRow = (task, editable) => {
-    const row = buildMyTask(task, editable);
+  const buildTaskRow = (task, editable, ownerId, tasksRef) => {
+    const row = buildMyTask(task, editable, ownerId, tasksRef);
     if (task.subtask) row.classList.add('note-task--sub');
     return row;
   };
@@ -155,21 +191,21 @@
     list.className = 'note-list';
     list.dataset.parent = 'root';
     topTasks.forEach((task) => {
-      list.appendChild(buildTaskRow(task, editable));
+      list.appendChild(buildTaskRow(task, editable, ownerId, tasks));
       const children = sortTasks(byParent.get(task.to_do_id) || []);
       if (children.length) {
         const subList = document.createElement('div');
         subList.className = 'note-list note-list--sub';
         subList.dataset.parent = String(task.to_do_id);
-        children.forEach((child) => subList.appendChild(buildTaskRow(child, editable)));
+        children.forEach((child) => subList.appendChild(buildTaskRow(child, editable, ownerId, tasks)));
         list.appendChild(subList);
       }
     });
     container.appendChild(list);
-    if (editable) enableDrag(list, ownerId);
+    if (editable) enableDrag(list, ownerId, tasks);
   };
 
-  const enableDrag = (root, ownerId) => {
+  const enableDrag = (root, ownerId, tasksRef) => {
     let dragged = null;
     root.querySelectorAll('.note-list').forEach((list) => {
       list.addEventListener('dragstart', (event) => {
@@ -204,12 +240,68 @@
           credentials: 'include',
           body: JSON.stringify({ user_id: ownerId, items }),
         });
+        items.forEach((item) => {
+          const entry = tasksRef.find((task) => task.to_do_id === item.to_do_id);
+          if (entry) entry.orden = item.orden;
+        });
         dragged = null;
       });
       list.addEventListener('dragend', () => {
         dragged = null;
       });
     });
+  };
+
+  const persistOrder = async (ownerId, items) => {
+    if (!items.length) return;
+    const ordered = sortTasks(items);
+    const payload = ordered.map((task, index) => ({
+      to_do_id: task.to_do_id,
+      orden: index + 1,
+    }));
+    payload.forEach((entry) => {
+      const task = items.find((t) => t.to_do_id === entry.to_do_id);
+      if (task) task.orden = entry.orden;
+    });
+    await fetch(`${API_BASE}/to_do/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ user_id: ownerId, items: payload }),
+    });
+  };
+
+  const moveTaskToEnd = async (tasksRef, ownerId, task) => {
+    const parentKey = task.subtask || null;
+    const siblings = sortTasks(tasksRef.filter((entry) => (entry.subtask || null) === parentKey));
+    const remaining = siblings.filter((entry) => entry.to_do_id !== task.to_do_id);
+    const reordered = [...remaining, task];
+    const payload = reordered.map((entry, index) => ({
+      to_do_id: entry.to_do_id,
+      orden: index + 1,
+    }));
+    payload.forEach((entry) => {
+      const target = tasksRef.find((t) => t.to_do_id === entry.to_do_id);
+      if (target) target.orden = entry.orden;
+    });
+    await fetch(`${API_BASE}/to_do/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ user_id: ownerId, items: payload }),
+    });
+    refreshCurrentView(ownerId);
+  };
+
+  const refreshCurrentView = (ownerId) => {
+    if (ownerId === userId) {
+      renderTaskList(myList, myTasks, myEmpty, true, userId);
+      renderParentOptions(myParent, myTasks);
+      return;
+    }
+    const tasks = teamTasks.get(ownerId) || [];
+    renderTaskList(teamList, tasks, teamEmpty, true, ownerId);
+    renderParentOptions(teamParent, tasks);
   };
 
   const loadMyTasks = async () => {
@@ -398,6 +490,21 @@
       setError(teamError, 'Could not add task right now.');
     }
   });
+
+  const bindToggle = (button, form) => {
+    if (!button || !form) return;
+    button.addEventListener('click', () => {
+      const isHidden = form.hasAttribute('hidden');
+      if (isHidden) {
+        form.removeAttribute('hidden');
+      } else {
+        form.setAttribute('hidden', '');
+      }
+    });
+  };
+
+  bindToggle(myToggle, myForm);
+  bindToggle(teamToggle, teamForm);
 
   loadMyTasks();
   loadTeamTasks();
