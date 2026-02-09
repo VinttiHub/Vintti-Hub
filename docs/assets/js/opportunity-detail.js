@@ -1414,13 +1414,7 @@ let countryChoices = null;
 let cityChoices = null;
 let toolsChoices = null;
 
-// Lista de países de LATAM (inglés corto)
-const LATAM_COUNTRIES = [
-  "Latin America", 
-  "Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Ecuador",
-  "El Salvador","Guatemala","Honduras","Mexico","United States","Canada","Nicaragua","Panama","Paraguay",
-  "Peru","Puerto Rico","Dominican Republic","Uruguay","Venezuela"
-];
+const CAREER_COUNTRIES = ["Europe", "USA"];
 
 const OPD_US_STATE_MAP = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
@@ -1438,30 +1432,28 @@ const OPD_US_STATE_MAP = {
 const OPD_USA_STATE_REGEX = /^USA\s+([A-Z]{2})$/i;
 
 
-// Ciudades por país (principales) — puedes ampliar cuando quieras
+const EUROPE_COUNTRIES = [
+  "España",
+  "Inglaterra",
+  "Francia",
+  "Alemania",
+  "Italia",
+  "Portugal",
+  "Países Bajos",
+  "Irlanda",
+  "Bélgica",
+  "Suecia",
+  "Suiza",
+  "Dinamarca"
+];
+const USA_STATES = Object.values(OPD_US_STATE_MAP);
+const CITY_ALL_LABELS = {
+  Europe: "All Europe",
+  USA: "All USA"
+};
 const CITIES_BY_COUNTRY = {
-  "Argentina": ["Buenos Aires","Córdoba","Rosario","Mendoza","La Plata"],
-  "Bolivia": ["La Paz","Santa Cruz de la Sierra","Cochabamba"],
-  "Brazil": ["São Paulo","Rio de Janeiro","Belo Horizonte","Brasília","Curitiba","Porto Alegre","Recife","Salvador"],
-  "Chile": ["Santiago","Valparaíso","Viña del Mar","Concepción"],
-  "Colombia": ["Bogotá","Medellín","Cali","Barranquilla","Bucaramanga","Cartagena"],
-  "Costa Rica": ["San José","Alajuela","Heredia","Cartago"],
-  "Cuba": ["La Habana","Santiago de Cuba","Camagüey"],
-  "Ecuador": ["Quito","Guayaquil","Cuenca"],
-  "El Salvador": ["San Salvador","Santa Ana","San Miguel"],
-  "Guatemala": ["Guatemala City","Quetzaltenango","Mixco"],
-  "Honduras": ["Tegucigalpa","San Pedro Sula","La Ceiba"],
-  "Mexico": ["Mexico City","Guadalajara","Monterrey","Puebla","Querétaro","Tijuana"],
-  "United States": ["New York","Los Angeles","Chicago","Miami","San Francisco"],
-  "Canada": ["Toronto","Vancouver","Montreal","Calgary","Ottawa"],
-  "Nicaragua": ["Managua","León","Masaya"],
-  "Panama": ["Panama City","Colón","David"],
-  "Paraguay": ["Asunción","Ciudad del Este","Encarnación"],
-  "Peru": ["Lima","Arequipa","Trujillo"],
-  "Puerto Rico": ["San Juan","Ponce","Mayagüez"],
-  "Dominican Republic": ["Santo Domingo","Santiago de los Caballeros","La Romana"],
-  "Uruguay": ["Montevideo","Punta del Este","Salto"],
-  "Venezuela": ["Caracas","Maracaibo","Valencia","Barquisimeto"]
+  Europe: EUROPE_COUNTRIES,
+  USA: USA_STATES
 };
 function normalizeCountryKey(country){
   const value = (country || '').trim();
@@ -1621,14 +1613,14 @@ setSelectByApproxValue(document.getElementById('career-modality'),  data.career_
 
 // ===== Country (Choices MULTI) =====
 countryEl.innerHTML =
-  LATAM_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('');
+  CAREER_COUNTRIES.map(c => `<option value="${c}">${c}</option>`).join('');
 
 // Lee lo guardado (string, json o array) y normaliza
 const savedCountries = toArray(data.career_country);
 
 // Si hay países guardados que no están en la lista base, los agregamos
 savedCountries.forEach(c=>{
-  if (!LATAM_COUNTRIES.includes(c)) {
+  if (!CAREER_COUNTRIES.includes(c)) {
     countryEl.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`);
   }
 });
@@ -1687,23 +1679,13 @@ const buildCityChoices = (countries, presetCity='') => {
   if (cityGroupEl) cityGroupEl.style.display = '';
   const country = countries[0];
 
-  // 1 país = "Latin America" → City fijo en "Any Country"
-  if (country === 'Latin America') {
-    cityEl.disabled = false;
-    cityEl.innerHTML = `<option value="Any Country">Any Country</option>`;
-    window.cityChoices = new Choices(cityEl, { searchEnabled:false, shouldSort:false });
-    try { window.cityChoices.setChoiceByValue('Any Country'); } catch {}
-    saveCareerField('career_city', 'Any Country');
-    window.currentOpportunityData.career_city = 'Any Country';
-    return;
-  }
-
-  // 1 país normal → poblar ciudades
   const cities = CITIES_BY_COUNTRY[country] || [];
   cityEl.innerHTML = '';
   if (cities.length) {
     cityEl.disabled = false;
     const list = [...cities];
+    const allLabel = CITY_ALL_LABELS[country];
+    if (allLabel && !list.includes(allLabel)) list.unshift(allLabel);
     if (presetCity && !list.includes(presetCity)) list.unshift(presetCity);
 
     cityEl.insertAdjacentHTML('beforeend',

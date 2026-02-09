@@ -11,7 +11,6 @@ const state = {
     country: "",
   },
   candidates: [],
-  candidateById: new Map(),
 };
 
 const els = {
@@ -356,23 +355,17 @@ function matchesFilters(profile) {
 }
 
 function renderCandidates() {
-  const sorted = [...state.candidates].sort((a, b) => {
-    const scoreA = a.score ?? 0;
-    const scoreB = b.score ?? 0;
-    if (scoreB !== scoreA) return scoreB - scoreA;
-    return (a.profile.name || "").localeCompare(b.profile.name || "");
-  });
+  const filtered = state.candidates.filter((candidate) => matchesFilters(candidate.profile));
   els.candidatesGrid.innerHTML = "";
-  els.candidatesEmpty.style.display = sorted.length ? "none" : "block";
-  els.candidatesEmpty.textContent = sorted.length
+  els.candidatesEmpty.style.display = filtered.length ? "none" : "block";
+  els.candidatesEmpty.textContent = filtered.length
     ? ""
-    : "No applicants available.";
-  els.candidateCount.textContent = `${sorted.length} applicants`;
+    : "No candidates match the active filters.";
+  els.candidateCount.textContent = `${filtered.length} matches`;
 
-  sorted.forEach((candidate) => {
+  filtered.forEach((candidate) => {
     const card = document.createElement("div");
     card.className = "candidate-card";
-    const score = Number.isFinite(candidate.score) ? candidate.score : "—";
     const tags = [candidate.profile.position, candidate.profile.industry, candidate.profile.country]
       .filter(Boolean)
       .slice(0, 3)
@@ -380,12 +373,7 @@ function renderCandidates() {
       .join("");
 
     card.innerHTML = `
-      <div class="candidate-head">
-        <h4>${escapeHtml(candidate.profile.name)}</h4>
-        <button class="candidate-score" data-candidate-id="${candidate.profile.id}" type="button">${escapeHtml(
-          score
-        )}</button>
-      </div>
+      <h4>${escapeHtml(candidate.profile.name)}</h4>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
@@ -393,85 +381,6 @@ function renderCandidates() {
     `;
     els.candidatesGrid.appendChild(card);
   });
-}
-
-function candidateSummaryForScoring(candidate) {
-  const core = parseJSONSafe(candidate.detail?.coresignal_scrapper);
-  const headline = extractFirstFromKeys(core || {}, ["headline", "title", "position"]);
-  const filterCountry = String(state.filters.country || "").trim().toLowerCase();
-  const candidateCountry = String(candidate.profile.country || "").trim().toLowerCase();
-  return {
-    id: candidate.profile.id,
-    name: candidate.profile.name,
-    position: candidate.profile.position,
-    industry: candidate.profile.industry,
-    years_experience: candidate.profile.years,
-    country: candidate.profile.country,
-    salary_range: candidate.detail?.salary_range || "",
-    headline: headline || "",
-    country_match: filterCountry && candidateCountry ? filterCountry === candidateCountry : null,
-  };
-}
-
-async function scoreCandidate(candidate) {
-  try {
-    const payload = {
-      filters: state.filters,
-      candidate: candidateSummaryForScoring(candidate),
-    };
-    const resp = await fetchJSON(`${API_BASE}/ai/talentum_score`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const score = Number(resp?.score);
-    candidate.score = Number.isFinite(score) ? score : 1;
-  } catch (err) {
-    console.warn("Scoring failed", err);
-    candidate.score = 1;
-  }
-}
-
-async function scoreCandidates(candidates) {
-  const queue = [...candidates];
-  const concurrency = 3;
-  let active = 0;
-
-  return new Promise((resolve) => {
-    const next = () => {
-      if (!queue.length && active === 0) {
-        resolve();
-        return;
-      }
-      while (active < concurrency && queue.length) {
-        const candidate = queue.shift();
-        active += 1;
-        scoreCandidate(candidate)
-          .then(() => {
-            renderCandidates();
-          })
-          .finally(() => {
-            active -= 1;
-            next();
-          });
-      }
-    };
-    next();
-  });
-}
-
-async function explainCandidateScore(candidate) {
-  const payload = {
-    filters: state.filters,
-    candidate: candidateSummaryForScoring(candidate),
-    score: candidate.score,
-  };
-  const resp = await fetchJSON(`${API_BASE}/ai/talentum_score_explain`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return resp?.reason || "El score refleja el match general entre filtros y perfil.";
 }
 
 async function hydrateCandidate(pipelineCandidate) {
@@ -530,9 +439,7 @@ async function loadApplicants(opportunityId) {
   );
 
   state.candidates = detailed;
-  state.candidateById = new Map(detailed.map((entry) => [entry.profile.id, entry]));
   renderCandidates();
-  await scoreCandidates(state.candidates);
 }
 
 async function handleChatSubmit(event) {
@@ -558,8 +465,6 @@ async function handleChatSubmit(event) {
       state.filters = { ...state.filters, ...resp.updated_filters };
       renderFilters();
       renderCandidates();
-      setCandidateSubtitle("Re-scoring applicants…");
-      await scoreCandidates(state.candidates);
     }
     appendMessage("assistant", resp.response || "Filtros actualizados.");
   } catch (err) {
@@ -569,7 +474,7 @@ async function handleChatSubmit(event) {
   } finally {
     setChatStatus("Ready");
     setFiltersStatus("Ready");
-    setCandidateSubtitle("Applicants sorted by match score.");
+    setCandidateSubtitle("Applicants filtered by active filters.");
   }
 }
 
@@ -591,25 +496,6 @@ async function init() {
 
   if (els.chatForm) {
     els.chatForm.addEventListener("submit", handleChatSubmit);
-  }
-  if (els.candidatesGrid) {
-    els.candidatesGrid.addEventListener("click", async (event) => {
-      const button = event.target.closest(".candidate-score");
-      if (!button) return;
-      const candidateId = Number(button.dataset.candidateId);
-      const candidate = state.candidateById.get(candidateId);
-      if (!candidate) return;
-      setChatStatus("Explaining");
-      try {
-        const reason = await explainCandidateScore(candidate);
-        appendMessage("assistant", reason);
-      } catch (err) {
-        console.warn("Score explanation failed", err);
-        appendMessage("assistant", "No pude explicar el score en este momento.");
-      } finally {
-        setChatStatus("Ready");
-      }
-    });
   }
 }
 
