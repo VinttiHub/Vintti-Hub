@@ -86,6 +86,13 @@ function escapeHtml(value) {
   });
 }
 
+function stripHtmlToText(value) {
+  return String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function appendMessage(role, text, options = {}) {
   if (!els.chatMessages) return null;
   const message = document.createElement("div");
@@ -117,8 +124,10 @@ async function loadOpportunity(opportunityId) {
   }
 
   try {
-    await extractFiltersFromOpportunity(opportunity);
-    appendMessage("assistant", "Listo, extraje los filtros del job description.");
+    const extracted = await extractFiltersFromOpportunity(opportunity);
+    if (extracted) {
+      appendMessage("assistant", "Listo, extraje los filtros del job description.");
+    }
   } catch (err) {
     console.warn("Filter extraction failed", err);
     appendMessage("assistant", "No pude leer el job description, sigo con filtros vacios.");
@@ -145,7 +154,8 @@ async function extractFiltersFromOpportunity(opportunity) {
     opportunity.career_requirements ||
     "";
 
-  if (!rawJD) {
+  const plainJD = stripHtmlToText(rawJD);
+  if (!plainJD) {
     state.filters = {
       position: opportunity.opp_position_name || "",
       salary: "",
@@ -154,7 +164,8 @@ async function extractFiltersFromOpportunity(opportunity) {
       country: opportunity.career_country || "",
     };
     renderFilters();
-    return;
+    appendMessage("assistant", "Esta opp no tiene job description.");
+    return false;
   }
 
   const result = await fetchJSON(`${API_BASE}/ai/jd_to_talentum_filters`, {
@@ -172,6 +183,7 @@ async function extractFiltersFromOpportunity(opportunity) {
   };
 
   renderFilters();
+  return true;
 }
 
 function renderFilters() {

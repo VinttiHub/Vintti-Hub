@@ -17,21 +17,33 @@
       </div>
     </header>
 
-    <div id="resume-rating" class="resume-rating" aria-label="Rate this resume">
-      <div class="resume-rating-header">Rate this resume</div>
-      <div class="resume-rating-stars" role="radiogroup" aria-label="Rate this resume">
-        <button type="button" class="rating-star" data-star="1" aria-label="1 star" aria-pressed="false">★</button>
-        <button type="button" class="rating-star" data-star="2" aria-label="2 stars" aria-pressed="false">★</button>
-        <button type="button" class="rating-star" data-star="3" aria-label="3 stars" aria-pressed="false">★</button>
-        <button type="button" class="rating-star" data-star="4" aria-label="4 stars" aria-pressed="false">★</button>
-        <button type="button" class="rating-star" data-star="5" aria-label="5 stars" aria-pressed="false">★</button>
+    <div id="resume-rating" class="resume-rating" aria-label="Rate this candidate">
+      <button type="button" id="resume-rating-toggle" class="resume-rating-toggle" aria-expanded="false">
+        <span>Rate this candidate</span>
+        <span class="resume-rating-toggle-icon" aria-hidden="true">✦</span>
+      </button>
+      <div id="resume-rating-bubble" class="resume-rating-bubble" role="status">
+        Please rate this candidate — your comments help us improve.
       </div>
-      <div id="resume-rating-comment" class="resume-rating-comment" aria-hidden="true">
-        <label for="resume-rating-text">Would you like to leave us a message?</label>
-        <textarea id="resume-rating-text" rows="3" placeholder="Share a quick note (optional)"></textarea>
-        <div class="resume-rating-actions">
-          <button type="button" id="resume-rating-submit" class="resume-rating-send" disabled>Send</button>
-          <span id="resume-rating-status" class="resume-rating-status" aria-live="polite"></span>
+      <div class="resume-rating-panel" role="dialog" aria-label="Rate this candidate">
+        <div class="resume-rating-panel-head">
+          <div class="resume-rating-header">Rate this candidate</div>
+          <button type="button" id="resume-rating-close" class="resume-rating-close" aria-label="Close rating panel">✕</button>
+        </div>
+        <div class="resume-rating-stars" role="radiogroup" aria-label="Rate this candidate">
+          <button type="button" class="rating-star" data-star="1" aria-label="1 star" aria-pressed="false">★</button>
+          <button type="button" class="rating-star" data-star="2" aria-label="2 stars" aria-pressed="false">★</button>
+          <button type="button" class="rating-star" data-star="3" aria-label="3 stars" aria-pressed="false">★</button>
+          <button type="button" class="rating-star" data-star="4" aria-label="4 stars" aria-pressed="false">★</button>
+          <button type="button" class="rating-star" data-star="5" aria-label="5 stars" aria-pressed="false">★</button>
+        </div>
+        <div id="resume-rating-comment" class="resume-rating-comment" aria-hidden="true">
+          <label for="resume-rating-text">Share a quick note (optional)</label>
+          <textarea id="resume-rating-text" rows="3" placeholder="Your feedback helps us improve."></textarea>
+          <div class="resume-rating-actions">
+            <button type="button" id="resume-rating-submit" class="resume-rating-send" disabled>Send</button>
+            <span id="resume-rating-status" class="resume-rating-status" aria-live="polite"></span>
+          </div>
         </div>
       </div>
     </div>

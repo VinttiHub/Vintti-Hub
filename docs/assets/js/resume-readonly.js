@@ -11,6 +11,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ratingTextarea = document.getElementById("resume-rating-text");
   const ratingSubmit = document.getElementById("resume-rating-submit");
   const ratingStatus = document.getElementById("resume-rating-status");
+  const ratingToggle = document.getElementById("resume-rating-toggle");
+  const ratingClose = document.getElementById("resume-rating-close");
+  const ratingBubble = document.getElementById("resume-rating-bubble");
   let currentStars = 0;
   let candidateFileName = "resume";
   if (downloadBtn) downloadBtn.disabled = true;
@@ -125,6 +128,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
+  const setRatingOpen = (isOpen) => {
+    if (!ratingEl) return;
+    ratingEl.classList.toggle("is-open", isOpen);
+    if (ratingToggle) {
+      ratingToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+  };
+
+  const setRatingBubble = (hasRating) => {
+    if (!ratingBubble) return;
+    ratingBubble.textContent = hasRating
+      ? "Thanks for rating this candidate."
+      : "Please rate this candidate — your comments help us improve.";
+  };
+
+  if (ratingToggle) {
+    ratingToggle.addEventListener("click", () => {
+      const isOpen = ratingEl?.classList.contains("is-open");
+      setRatingOpen(!isOpen);
+    });
+  }
+
+  if (ratingClose) {
+    ratingClose.addEventListener("click", () => {
+      setRatingOpen(false);
+    });
+  }
+
   const renderStars = (value) => {
     ratingButtons.forEach((btn) => {
       const starValue = Number(btn.dataset.star);
@@ -137,6 +168,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       ratingComment.classList.toggle("is-visible", shouldShow);
       ratingComment.setAttribute("aria-hidden", shouldShow ? "false" : "true");
     }
+    setRatingBubble(value > 0);
   };
 
   const patchResume = async (payload) => {
@@ -162,7 +194,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         setRatingStatus("Saving...", "loading");
         try {
           await patchResume({ stars: currentStars });
-          setRatingStatus("Thanks for the rating!", "success");
+          setRatingStatus("Thanks for rating this candidate.", "success");
+          setRatingBubble(true);
         } catch (err) {
           console.error("Unable to save rating", err);
           setRatingStatus("Unable to save rating right now.", "error");
@@ -181,6 +214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (comment) payload.comments_stars = comment;
         await patchResume(payload);
         setRatingStatus(comment ? "Message sent. Thank you!" : "Rating saved. Thank you!", "success");
+        setRatingBubble(true);
       } catch (err) {
         console.error("Unable to save comment", err);
         setRatingStatus("Unable to save message right now.", "error");
@@ -285,6 +319,7 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
         ratingTextarea.value = data.comments_stars;
       }
       renderStars(currentStars);
+      setRatingOpen(false);
       if (ratingComment && ratingTextarea && ratingTextarea.value.trim().length > 0) {
         ratingComment.classList.add("is-visible");
         ratingComment.setAttribute("aria-hidden", "false");

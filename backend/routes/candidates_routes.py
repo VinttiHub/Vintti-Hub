@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 import re
@@ -7,6 +8,7 @@ from datetime import date, datetime
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
+import requests
 from werkzeug.utils import secure_filename
 
 from db import get_connection
@@ -76,6 +78,107 @@ def _normalize_linkedin(value):
 
     clean = clean.lstrip('/')
     return clean
+
+
+def _build_star_row(stars):
+    safe_stars = max(0, min(5, int(stars or 0)))
+    filled = "&#9733;" * safe_stars
+    empty = "&#9734;" * (5 - safe_stars)
+    return f"{filled}{empty}"
+
+
+def _rating_email_html(candidate_name, client_name, stars, comments):
+    safe_candidate = html.escape(candidate_name or "Candidate")
+    safe_client = html.escape(client_name or "Client")
+    safe_comments = html.escape(comments or "—")
+    star_row = _build_star_row(stars)
+    rating_value = f"{int(stars or 0)}/5"
+
+    return f"""
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7ff;margin:0;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:16px;box-shadow:0 20px 50px rgba(15,23,42,0.12);overflow:hidden;font-family:Arial,sans-serif;color:#0f172a;">
+            <tr>
+              <td style="padding:22px 24px;background:linear-gradient(135deg,#eaf0ff,#f8fbff);border-bottom:1px solid #e2e8f0;">
+                <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#64748b;font-weight:600;">New Candidate Rating</div>
+                <div style="font-size:20px;font-weight:700;margin-top:6px;">{safe_candidate}</div>
+                <div style="font-size:14px;color:#475569;margin-top:4px;">Client: {safe_client}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 24px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:10px 0;font-size:13px;color:#64748b;">Rating</td>
+                    <td style="padding:10px 0;font-size:16px;font-weight:700;color:#0f172a;text-align:right;">{rating_value}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" style="padding:0 0 14px 0;font-size:18px;color:#f5b400;letter-spacing:2px;text-align:left;">{star_row}</td>
+                  </tr>
+                </table>
+                <div style="padding:14px 16px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
+                  <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;margin-bottom:6px;">Comments</div>
+                  <div style="font-size:14px;color:#0f172a;line-height:1.5;">{safe_comments}</div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px 22px 24px;font-size:12px;color:#94a3b8;">
+                This message was sent automatically from Vintti Hub.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    """
+
+
+def _send_rating_email(to_email, subject, html_body):
+    if not to_email:
+        return False
+    payload = {"to": [to_email], "subject": subject, "body": html_body}
+    try:
+        resp = requests.post(
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email",
+            json=payload,
+            timeout=30
+        )
+        if not resp.ok:
+            logging.error("Send rating email failed: %s %s", resp.status_code, resp.text)
+        return resp.ok
+    except Exception:
+        logging.exception("Send rating email failed")
+        return False
+
+
+def _fetch_rating_email_context(candidate_id, cur):
+    cur.execute("SELECT name FROM candidates WHERE candidate_id = %s", (candidate_id,))
+    row = cur.fetchone()
+    candidate_name = row[0] if row else "Candidate"
+
+    cur.execute("""
+        SELECT o.opp_sales_lead, a.client_name
+        FROM opportunity o
+        JOIN opportunity_candidates oc
+          ON oc.opportunity_id = o.opportunity_id
+        LEFT JOIN account a
+          ON a.account_id = o.account_id
+        WHERE oc.candidate_id = %s
+          AND o.opp_sales_lead IS NOT NULL
+          AND TRIM(o.opp_sales_lead) <> ''
+        ORDER BY o.opportunity_id DESC
+        LIMIT 1
+    """, (candidate_id,))
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "candidate_name": candidate_name,
+        "sales_lead_email": row[0],
+        "client_name": row[1] or "Client"
+    }
 
 
 def _linkedin_normalize_sql(column):
@@ -2170,6 +2273,7 @@ def resumes(candidate_id):
         logging.info("📥 PATCH /resumes/%s", candidate_id)
         data = request.get_json(silent=True) or {}
         allow_clear = (request.args.get('allow_clear', 'false').lower() == 'true')
+        rating_payload = any(field in data for field in ("stars", "comments_stars"))
 
         def _is_blank(v):
             if v is None: return True
@@ -2208,6 +2312,15 @@ def resumes(candidate_id):
             cursor.execute("INSERT INTO resume (candidate_id) VALUES (%s)", (candidate_id,))
             conn.commit()
 
+        previous_stars = 0
+        previous_comments = ""
+        if rating_payload:
+            cursor.execute("SELECT stars, comments_stars FROM resume WHERE candidate_id = %s", (candidate_id,))
+            row = cursor.fetchone()
+            if row:
+                previous_stars = row[0] or 0
+                previous_comments = row[1] or ""
+
         updates, values = [], []
         for field in allowed_fields:
             if field in data:
@@ -2230,6 +2343,32 @@ def resumes(candidate_id):
             WHERE candidate_id = %s
         """, values)
         conn.commit()
+
+        if rating_payload:
+            new_stars = previous_stars
+            new_comments = previous_comments
+            if "stars" in data:
+                try:
+                    new_stars = int(data.get("stars") or 0)
+                except (TypeError, ValueError):
+                    new_stars = 0
+            if "comments_stars" in data:
+                new_comments = data.get("comments_stars") or ""
+
+            changed = (new_stars != previous_stars) or (new_comments.strip() != (previous_comments or "").strip())
+            meaningful = (new_stars > 0) or bool((new_comments or "").strip())
+            if changed and meaningful:
+                ctx = _fetch_rating_email_context(candidate_id, cursor)
+                if ctx and ctx.get("sales_lead_email"):
+                    subject = f"New candidate rating — {ctx['candidate_name']} ({ctx['client_name']})"
+                    html_body = _rating_email_html(
+                        ctx["candidate_name"],
+                        ctx["client_name"],
+                        new_stars,
+                        new_comments
+                    )
+                    _send_rating_email(ctx["sales_lead_email"], subject, html_body)
+
         cursor.close(); conn.close()
         return jsonify({'success': True}), 200
 

@@ -274,39 +274,106 @@ html, body {
 /* ========================= RATING ========================= */
 .resume-rating {
   position: fixed;
-  top: 18px;
-  left: 18px;
+  top: 22px;
+  left: 22px;
   z-index: 220;
-  width: 220px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: linear-gradient(140deg, rgba(255, 255, 255, 0.92), rgba(245, 248, 255, 0.65));
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(18px) saturate(160%);
-  color: #111827;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.resume-rating-toggle {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(235, 241, 255, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(18px) saturate(160%);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
   gap: 10px;
+}
+
+.resume-rating-toggle-icon {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.resume-rating-bubble {
+  display: none;
+  max-width: 240px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.2);
+}
+
+.resume-rating:not(.is-open) .resume-rating-bubble {
+  display: block;
+}
+
+.resume-rating-panel {
+  display: none;
+  width: min(420px, calc(100vw - 48px));
+  padding: 20px 22px;
+  border-radius: 24px;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.86), rgba(232, 241, 255, 0.65));
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(24px) saturate(170%);
+  color: #111827;
+  gap: 14px;
+  flex-direction: column;
+}
+
+.resume-rating.is-open .resume-rating-panel {
+  display: flex;
+  animation: rating-pop 0.2s ease;
+}
+
+.resume-rating-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.resume-rating-close {
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .resume-rating-header {
   font-size: 12px;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #64748b;
+  color: #475569;
   font-weight: 600;
 }
 
 .resume-rating-stars {
   display: flex;
-  gap: 6px;
+  gap: 10px;
 }
 
 .rating-star {
   border: none;
   background: transparent;
-  font-size: 20px;
+  font-size: 26px;
   color: rgba(250, 204, 21, 0.4);
   cursor: pointer;
   padding: 0;
@@ -409,6 +476,17 @@ html, body {
 body[data-exporting="true"] .resume-rating,
 body[data-pdf-export="true"] .resume-rating {
   display: none;
+}
+
+@keyframes rating-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ================================ TIMELINE ================================ */
