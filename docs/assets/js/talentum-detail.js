@@ -12,8 +12,6 @@ const state = {
   },
   candidates: [],
   candidateById: new Map(),
-  scoreCache: new Map(),
-  scoreKey: "",
 };
 
 const els = {
@@ -59,45 +57,6 @@ async function fetchJSON(url, options = {}) {
   return res.json();
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchTalentumFilters(jobDescription, retries = 1) {
-  try {
-    return await fetchJSON(`${API_BASE}/ai/jd_to_talentum_filters`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ job_description: jobDescription }),
-    });
-  } catch (err) {
-    const msg = String(err || "");
-    const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("rate limit");
-    if (retries > 0 && isRateLimit) {
-      await sleep(800);
-      return fetchTalentumFilters(jobDescription, retries - 1);
-    }
-    throw err;
-  }
-}
-
-async function fetchChatUpdate(payload, retries = 1) {
-  try {
-    return await fetchJSON(`${API_BASE}/ai/talentum_chat_update`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch (err) {
-    const msg = String(err || "");
-    const isRateLimit = msg.includes("429") || msg.toLowerCase().includes("rate limit");
-    if (retries > 0 && isRateLimit) {
-      await sleep(800);
-      return fetchChatUpdate(payload, retries - 1);
-    }
-    throw err;
-  }
-}
 
 function setChatStatus(text) {
   if (els.chatStatus) els.chatStatus.textContent = text;
@@ -199,7 +158,11 @@ async function extractFiltersFromOpportunity(opportunity) {
     return;
   }
 
-  const result = await fetchTalentumFilters(rawJD);
+  const result = await fetchJSON(`${API_BASE}/ai/jd_to_talentum_filters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_description: rawJD }),
+  });
 
   state.filters = {
     position: result.position || opportunity.opp_position_name || "",
@@ -450,69 +413,51 @@ function candidateSummaryForScoring(candidate) {
   };
 }
 
-function buildScoreKey() {
-  return JSON.stringify({
-    position: state.filters.position || "",
-    salary: state.filters.salary || "",
-    years_experience: state.filters.years_experience || "",
-    industry: state.filters.industry || "",
-    country: state.filters.country || "",
-  });
+async function scoreCandidate(candidate) {
+  try {
+    const payload = {
+      filters: state.filters,
+      candidate: candidateSummaryForScoring(candidate),
+    };
+    const resp = await fetchJSON(`${API_BASE}/ai/talentum_score`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const score = Number(resp?.score);
+    candidate.score = Number.isFinite(score) ? score : 1;
+  } catch (err) {
+    console.warn("Scoring failed", err);
+    candidate.score = 1;
+  }
 }
 
 async function scoreCandidates(candidates) {
-  const scoreKey = buildScoreKey();
-  state.scoreKey = scoreKey;
-  const payloadCandidates = [];
-  const missing = [];
+  const queue = [...candidates];
+  const concurrency = 3;
+  let active = 0;
 
-  candidates.forEach((candidate) => {
-    const cacheKey = `${candidate.profile.id}|${scoreKey}`;
-    if (state.scoreCache.has(cacheKey)) {
-      candidate.score = state.scoreCache.get(cacheKey);
-    } else {
-      missing.push(candidate);
-      payloadCandidates.push(candidateSummaryForScoring(candidate));
-    }
+  return new Promise((resolve) => {
+    const next = () => {
+      if (!queue.length && active === 0) {
+        resolve();
+        return;
+      }
+      while (active < concurrency && queue.length) {
+        const candidate = queue.shift();
+        active += 1;
+        scoreCandidate(candidate)
+          .then(() => {
+            renderCandidates();
+          })
+          .finally(() => {
+            active -= 1;
+            next();
+          });
+      }
+    };
+    next();
   });
-
-  if (!missing.length) {
-    renderCandidates();
-    return;
-  }
-
-  try {
-    const chunkSize = 25;
-    for (let i = 0; i < payloadCandidates.length; i += chunkSize) {
-      const chunk = payloadCandidates.slice(i, i + chunkSize);
-      const resp = await fetchJSON(`${API_BASE}/ai/talentum_score_batch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filters: state.filters, candidates: chunk }),
-      });
-      const scores = Array.isArray(resp?.scores) ? resp.scores : [];
-      const scoreMap = new Map(scores.map((item) => [Number(item.id), Number(item.score)]));
-
-      missing.forEach((candidate) => {
-        if (!scoreMap.has(candidate.profile.id)) return;
-        const score = scoreMap.get(candidate.profile.id);
-        const safeScore = Number.isFinite(score) ? score : 1;
-        candidate.score = safeScore;
-        state.scoreCache.set(`${candidate.profile.id}|${scoreKey}`, safeScore);
-      });
-    }
-
-    missing.forEach((candidate) => {
-      if (candidate.score == null) candidate.score = 1;
-    });
-  } catch (err) {
-    console.warn("Batch scoring failed", err);
-    missing.forEach((candidate) => {
-      candidate.score = 1;
-    });
-  }
-
-  renderCandidates();
 }
 
 async function explainCandidateScore(candidate) {
@@ -603,7 +548,11 @@ async function handleChatSubmit(event) {
   const typing = appendMessage("assistant", "Actualizando filtros…", { typing: true });
 
   try {
-    const resp = await fetchChatUpdate({ message, current_filters: state.filters });
+    const resp = await fetchJSON(`${API_BASE}/ai/talentum_chat_update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, current_filters: state.filters }),
+    });
     if (typing) typing.remove();
     if (resp.updated_filters) {
       state.filters = { ...state.filters, ...resp.updated_filters };
