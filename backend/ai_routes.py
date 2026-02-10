@@ -151,6 +151,7 @@ def register_ai_routes(app):
         try:
             data = request.get_json(force=True) or {}
             raw_jd = (data.get('job_description') or '').strip()
+            opp_id = data.get('opportunity_id')
             if not raw_jd:
                 return jsonify({"error": "job_description is required"}), 400
 
@@ -158,6 +159,7 @@ def register_ai_routes(app):
             import re
             jd_plain = re.sub(r'<[^>]+>', ' ', raw_jd)
             jd_plain = re.sub(r'\s+', ' ', jd_plain).strip()
+            logging.info("📄 Talentum JD extract opp_id=%s len=%s", opp_id, len(jd_plain or ""))
 
             prompt = f"""
 You are an ATS-friendly job description analyzer.

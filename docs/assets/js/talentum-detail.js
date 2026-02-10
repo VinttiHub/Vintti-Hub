@@ -129,8 +129,18 @@ async function loadOpportunity(opportunityId) {
       appendMessage("assistant", "Listo, extraje los filtros del job description.");
     }
   } catch (err) {
-    console.warn("Filter extraction failed", err);
-    appendMessage("assistant", "No pude leer el job description, sigo con filtros vacios.");
+    console.warn(
+      "Filter extraction failed",
+      {
+        opportunityId: opportunity?.opportunity_id,
+        position: opportunity?.opp_position_name,
+        hasHrJD: Boolean(opportunity?.hr_job_description),
+        hasCareerDesc: Boolean(opportunity?.career_description),
+        hasCareerReqs: Boolean(opportunity?.career_requirements),
+        rawError: err,
+      }
+    );
+    appendMessage("assistant", "Esta opp no tiene job description.");
   }
 
   try {
@@ -171,7 +181,7 @@ async function extractFiltersFromOpportunity(opportunity) {
   const result = await fetchJSON(`${API_BASE}/ai/jd_to_talentum_filters`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_description: rawJD }),
+    body: JSON.stringify({ job_description: rawJD, opportunity_id: opportunity?.opportunity_id }),
   });
 
   state.filters = {
