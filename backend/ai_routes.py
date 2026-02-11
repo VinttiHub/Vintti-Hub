@@ -9,6 +9,7 @@ import logging
 import json
 import time
 import random
+import threading
 from flask import Flask, jsonify, request
 import requests
 import re
@@ -1300,17 +1301,30 @@ Return STRICT JSON:
             return jsonify({"error": str(e)}), 500
 
 
-def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=5):
+# Simple in-process throttle to avoid burst rate limits.
+_openai_lock = threading.Lock()
+_openai_next_allowed = 0.0
+
+
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=6):
         base_delay = 2.0
-        max_delay = 30.0
+        max_delay = 60.0
+        min_interval = 2.0
         for attempt in range(retries):
             try:
+                with _openai_lock:
+                    now = time.monotonic()
+                    wait_for = max(0.0, _openai_next_allowed - now)
+                    if wait_for > 0:
+                        time.sleep(wait_for)
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
+                with _openai_lock:
+                    _openai_next_allowed = time.monotonic() + min_interval
                 return response
             except openai.RateLimitError as e:
                 retry_after = None
@@ -1329,6 +1343,8 @@ def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, re
                     # Exponential backoff with jitter to avoid thundering herd
                     delay = min(max_delay, base_delay * (2 ** attempt))
                     delay = delay + random.uniform(0.0, 0.5 * delay)
+                with _openai_lock:
+                    _openai_next_allowed = time.monotonic() + delay
                 logging.warning(
                     "⏳ Rate limit reached, retrying in %.1fs... (Attempt %s)",
                     delay, attempt + 1
