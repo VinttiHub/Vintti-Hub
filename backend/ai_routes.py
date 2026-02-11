@@ -8,6 +8,7 @@ import traceback
 import logging
 import json
 import time
+import random
 from flask import Flask, jsonify, request
 import requests
 import re
@@ -880,7 +881,7 @@ Return STRICT JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=7000
+                max_tokens=2500
             )
 
             if not completion.choices or not hasattr(completion.choices[0], "message"):
@@ -1299,7 +1300,9 @@ Return STRICT JSON:
             return jsonify({"error": str(e)}), 500
 
 
-def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=5):
+        base_delay = 2.0
+        max_delay = 30.0
         for attempt in range(retries):
             try:
                 response = openai.chat.completions.create(
@@ -1310,10 +1313,27 @@ def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, re
                 )
                 return response
             except openai.RateLimitError as e:
-                logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")
+                retry_after = None
                 if hasattr(e, 'response') and e.response is not None:
-                    logging.warning("🔎 Response headers: %s", e.response.headers)
-                time.sleep(10)
+                    headers = e.response.headers
+                    logging.warning("🔎 Response headers: %s", headers)
+                    retry_after = headers.get("retry-after")
+                if retry_after is not None:
+                    try:
+                        delay = float(retry_after)
+                    except ValueError:
+                        delay = None
+                else:
+                    delay = None
+                if delay is None:
+                    # Exponential backoff with jitter to avoid thundering herd
+                    delay = min(max_delay, base_delay * (2 ** attempt))
+                    delay = delay + random.uniform(0.0, 0.5 * delay)
+                logging.warning(
+                    "⏳ Rate limit reached, retrying in %.1fs... (Attempt %s)",
+                    delay, attempt + 1
+                )
+                time.sleep(delay)
             except Exception as e:
                 logging.error("❌ Error en llamada a OpenAI: " + str(e))
                 raise e
