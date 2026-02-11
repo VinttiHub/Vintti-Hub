@@ -8,8 +8,6 @@ import traceback
 import logging
 import json
 import time
-import random
-import threading
 from flask import Flask, jsonify, request
 import requests
 import re
@@ -882,7 +880,7 @@ Return STRICT JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=2500
+                max_tokens=7000
             )
 
             if not completion.choices or not hasattr(completion.choices[0], "message"):
@@ -1301,55 +1299,21 @@ Return STRICT JSON:
             return jsonify({"error": str(e)}), 500
 
 
-# Simple in-process throttle to avoid burst rate limits.
-_openai_lock = threading.Lock()
-_openai_next_allowed = 0.0
-
-
-def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=6):
-        base_delay = 2.0
-        max_delay = 60.0
-        min_interval = 2.0
+def call_openai_with_retry(model, messages, temperature=0.7, max_tokens=1200, retries=3):
         for attempt in range(retries):
             try:
-                with _openai_lock:
-                    now = time.monotonic()
-                    wait_for = max(0.0, _openai_next_allowed - now)
-                    if wait_for > 0:
-                        time.sleep(wait_for)
                 response = openai.chat.completions.create(
                     model=model,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
-                with _openai_lock:
-                    _openai_next_allowed = time.monotonic() + min_interval
                 return response
             except openai.RateLimitError as e:
-                retry_after = None
+                logging.warning(f"⏳ Rate limit reached, retrying in 10s... (Attempt {attempt + 1})")
                 if hasattr(e, 'response') and e.response is not None:
-                    headers = e.response.headers
-                    logging.warning("🔎 Response headers: %s", headers)
-                    retry_after = headers.get("retry-after")
-                if retry_after is not None:
-                    try:
-                        delay = float(retry_after)
-                    except ValueError:
-                        delay = None
-                else:
-                    delay = None
-                if delay is None:
-                    # Exponential backoff with jitter to avoid thundering herd
-                    delay = min(max_delay, base_delay * (2 ** attempt))
-                    delay = delay + random.uniform(0.0, 0.5 * delay)
-                with _openai_lock:
-                    _openai_next_allowed = time.monotonic() + delay
-                logging.warning(
-                    "⏳ Rate limit reached, retrying in %.1fs... (Attempt %s)",
-                    delay, attempt + 1
-                )
-                time.sleep(delay)
+                    logging.warning("🔎 Response headers: %s", e.response.headers)
+                time.sleep(10)
             except Exception as e:
                 logging.error("❌ Error en llamada a OpenAI: " + str(e))
                 raise e
