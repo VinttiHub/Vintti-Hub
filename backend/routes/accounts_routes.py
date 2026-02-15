@@ -10,6 +10,7 @@ from psycopg2.extras import RealDictCursor, execute_values
 
 from db import get_connection
 from utils import services
+from utils.hr_lead_todo import create_assignment_todo, create_replacement_todo, create_stage_todos
 from utils.storage_utils import (
     get_account_pdf_keys,
     make_account_pdf_payload,
@@ -618,17 +619,32 @@ def update_opportunity_stage(opportunity_id):
 
     try:
         conn = get_connection()
-        cursor = conn.cursor()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT opp_stage
+                    FROM opportunity
+                    WHERE opportunity_id = %s
+                    """,
+                    (opportunity_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return jsonify({"error": "Opportunity not found"}), 404
+                previous_stage = row.get("opp_stage")
 
-        cursor.execute("""
-            UPDATE opportunity
-            SET opp_stage = %s
-            WHERE opportunity_id = %s
-        """, (new_stage, opportunity_id))
+                cursor.execute(
+                    """
+                    UPDATE opportunity
+                    SET opp_stage = %s
+                    WHERE opportunity_id = %s
+                    """,
+                    (new_stage, opportunity_id),
+                )
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+                if (previous_stage or "").strip() != (new_stage or "").strip():
+                    create_stage_todos(cursor, opportunity_id, new_stage)
 
         return jsonify({'success': True}), 200
 
@@ -840,7 +856,18 @@ def update_opportunity_fields(opportunity_id):
     try:
         conn = get_connection()
         with conn:
-            with conn.cursor() as cursor:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                previous = None
+                if "opp_hr_lead" in data or "replacement_of" in data:
+                    cursor.execute(
+                        """
+                        SELECT opp_hr_lead, replacement_of
+                        FROM opportunity
+                        WHERE opportunity_id = %s
+                        """,
+                        (opportunity_id,),
+                    )
+                    previous = cursor.fetchone() or {}
                 # 1) Update de opportunity (sin ::date — ya enviamos objetos date)
                 if updates:
                     logging.info("🛠 SET %s", ', '.join(updates))
@@ -877,6 +904,17 @@ def update_opportunity_fields(opportunity_id):
                              WHERE candidate_id = %s
                         """, ('Client hired', candidate_hired_id))
                     logging.info("🟢 candidates_batches actualizado")
+
+                if previous is not None:
+                    new_hr_lead = (data.get("opp_hr_lead") or "").strip() if "opp_hr_lead" in data else None
+                    old_hr_lead = (previous.get("opp_hr_lead") or "").strip()
+                    if new_hr_lead and new_hr_lead != old_hr_lead:
+                        create_assignment_todo(cursor, opportunity_id, new_hr_lead)
+
+                    if "replacement_of" in data:
+                        new_replacement = data.get("replacement_of")
+                        if new_replacement and new_replacement != previous.get("replacement_of"):
+                            create_replacement_todo(cursor, opportunity_id)
 
         return jsonify({'success': True}), 200
 

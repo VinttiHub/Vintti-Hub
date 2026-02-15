@@ -1376,6 +1376,61 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
       const hireAddressInput = document.getElementById('hire-address');
       const hireDniInput     = document.getElementById('hire-dni');
       const API_CANDIDATES   = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+      const timezoneSelect = document.getElementById('timezoneSelect');
+      const timezoneTrigger = document.getElementById('timezoneTrigger');
+      const timezoneTriggerLabel = document.getElementById('timezoneTriggerLabel');
+      const timezoneDropdown = document.getElementById('timezoneDropdown');
+      const timezoneInputs = timezoneSelect ? Array.from(timezoneSelect.querySelectorAll('input[type="checkbox"]')) : [];
+      const parseTimezoneValue = (value) => (value || '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const formatTimezoneLabel = (values) => {
+        if (!values.length) return 'Select timezones';
+        if (values.length === 1) return values[0];
+        return `${values.length} selected`;
+      };
+      const setDropdownOpen = (isOpen) => {
+        if (!timezoneDropdown || !timezoneTrigger) return;
+        timezoneDropdown.hidden = !isOpen;
+        timezoneTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      };
+
+      if (timezoneSelect && timezoneTrigger && timezoneDropdown) {
+        const selections = new Set(parseTimezoneValue(data.timezone));
+        timezoneInputs.forEach((input) => {
+          input.checked = selections.has(input.value);
+        });
+        if (timezoneTriggerLabel) {
+          const selected = timezoneInputs.filter((input) => input.checked).map((input) => input.value);
+          timezoneTriggerLabel.textContent = formatTimezoneLabel(selected);
+        }
+
+        timezoneTrigger.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setDropdownOpen(timezoneDropdown.hidden);
+        });
+
+        timezoneDropdown.addEventListener('change', () => {
+          const selected = timezoneInputs.filter((input) => input.checked).map((input) => input.value);
+          if (timezoneTriggerLabel) {
+            timezoneTriggerLabel.textContent = formatTimezoneLabel(selected);
+          }
+          const payload = selected.length ? selected.join(', ') : null;
+          fetch(`${API_CANDIDATES}/candidates/${candidateId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timezone: payload })
+          });
+        });
+
+        document.addEventListener('click', (event) => {
+          if (!timezoneSelect.contains(event.target)) {
+            setDropdownOpen(false);
+          }
+        });
+      }
 
       // Pre-cargar valores desde candidates.address y candidates.dni
       if (hireAddressInput) {

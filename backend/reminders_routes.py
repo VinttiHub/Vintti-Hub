@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify
 from psycopg2.extras import RealDictCursor
 from db import get_connection   # ya lo tienes
+from utils.hr_lead_todo import run_scheduled_todos
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -546,3 +547,14 @@ def send_due_reminders():
 
         conn.commit()
         return jsonify({"sent": sent})
+
+
+@bp.route("/reminders/hr_lead_todos/run", methods=["POST"])
+def run_hr_lead_todos():
+    try:
+        with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+            report = run_scheduled_todos(cur)
+            conn.commit()
+        return jsonify(report), 200
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500

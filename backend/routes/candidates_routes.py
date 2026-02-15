@@ -521,6 +521,7 @@ def create_candidate_without_opportunity():
     linkedin_normalized = _normalize_linkedin(linkedin_clean)
     phone_digits = _normalize_phone_digits(phone_raw)
     country = (data.get('country') or '').strip() or None
+    timezone = (data.get('timezone') or '').strip() or None
     red_flags = data.get('red_flags')
     comments = data.get('comments')
     english_level = data.get('english_level')
@@ -629,13 +630,13 @@ def create_candidate_without_opportunity():
             INSERT INTO candidates (
                 candidate_id, name, email, phone, linkedin,
                 red_flags, comments, english_level, salary_range,
-                country, stage, created_by, created_at
+                country, timezone, stage, created_by, created_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """, (
             new_candidate_id, name_db, email, phone_digits, linkedin_clean,
             red_flags, comments, english_level, salary_range,
-            country, stage, created_by
+            country, timezone, stage, created_by
         ))
 
         conn.commit()
@@ -958,6 +959,7 @@ def get_candidate_by_id(candidate_id):
             SELECT
                 nc.name,
                 nc.country,
+                nc.timezone,
                 nc.phone,
                 nc.email,
                 nc.linkedin,
@@ -1108,6 +1110,7 @@ def update_candidate_fields(candidate_id):
     allowed_fields = [
         'name',
         'country',
+        'timezone',
         'phone',
         'email',
         'linkedin',

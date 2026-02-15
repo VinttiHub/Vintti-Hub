@@ -9,6 +9,7 @@
   const myDate = document.getElementById('myTaskDate');
   const myError = document.getElementById('myTaskError');
   const myToggle = document.getElementById('myTaskToggle');
+  const backButton = document.getElementById('todoBackButton');
   const teamNotes = document.getElementById('teamNotes');
   const teamList = document.getElementById('teamTasks');
   const teamEmpty = document.getElementById('teamEmpty');
@@ -24,6 +25,34 @@
   let teamUsers = [];
   let teamTasks = new Map();
   let currentTeamUserId = null;
+
+  const getReturnUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const fromParam = params.get('from');
+    if (fromParam) return fromParam;
+    if (document.referrer) return document.referrer;
+    return '';
+  };
+
+  const isSafeReturn = (value) => {
+    try {
+      const url = new URL(value, window.location.href);
+      return url.origin === window.location.origin;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const returnUrl = getReturnUrl();
+  if (backButton) {
+    backButton.addEventListener('click', () => {
+      if (returnUrl && isSafeReturn(returnUrl)) {
+        window.location.href = returnUrl;
+      } else {
+        window.history.back();
+      }
+    });
+  }
 
   const formatDate = (raw) => {
     if (!raw) return '';

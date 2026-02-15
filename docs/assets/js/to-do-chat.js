@@ -15,6 +15,8 @@
   const descriptionInput = chat.querySelector('#todoDescription');
   const dateInput = chat.querySelector('#todoDate');
   const formError = chat.querySelector('#todoFormError');
+  const detailsLink = chat.querySelector('.todo-panel__details');
+  const openMode = chat.dataset.todoOpen || 'panel';
 
   let hasLoaded = false;
   let toastTimer = null;
@@ -181,8 +183,23 @@
     panel.hidden = true;
   };
 
+  const buildDetailsUrl = () => {
+    const href = detailsLink?.getAttribute('href') || 'to-do-details.html';
+    const url = new URL(href, window.location.href);
+    url.searchParams.set('from', window.location.href);
+    return url.toString();
+  };
+
+  const openDetailsTab = () => {
+    window.open(buildDetailsUrl(), '_blank', 'noopener');
+  };
+
   bubble.addEventListener('click', (event) => {
     event.stopPropagation();
+    if (openMode === 'new-tab') {
+      openDetailsTab();
+      return;
+    }
     if (chat.classList.contains('is-open')) {
       closePanel();
     } else {

@@ -1414,7 +1414,32 @@ let countryChoices = null;
 let cityChoices = null;
 let toolsChoices = null;
 
-const CAREER_COUNTRIES = ["Europe", "USA"];
+const CAREER_COUNTRIES = [
+  "Europe",
+  "USA",
+  "Argentina",
+  "Bolivia",
+  "Brazil",
+  "Chile",
+  "Colombia",
+  "Costa Rica",
+  "Cuba",
+  "Ecuador",
+  "El Salvador",
+  "Guatemala",
+  "Honduras",
+  "Mexico",
+  "United States",
+  "Canada",
+  "Nicaragua",
+  "Panama",
+  "Paraguay",
+  "Peru",
+  "Puerto Rico",
+  "Dominican Republic",
+  "Uruguay",
+  "Venezuela"
+];
 
 const OPD_US_STATE_MAP = {
   AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SidebarLayout from '../../components/layout/SidebarLayout.jsx';
 import LogoutFab from '../../components/common/LogoutFab.jsx';
@@ -203,6 +203,26 @@ function CandidateDetailPage() {
 }
 
 function OverviewTab({ candidateId, candidate, comments, onCommentsChange, onSaveComments, onUpdateField, equipments, onOpenAi }) {
+  const [timezoneOpen, setTimezoneOpen] = useState(false);
+  const timezoneRef = useRef(null);
+  const [timezoneSelections, setTimezoneSelections] = useState(() => new Set(parseTimezoneList(candidate?.timezone)));
+
+  useEffect(() => {
+    setTimezoneSelections(new Set(parseTimezoneList(candidate?.timezone)));
+  }, [candidate?.timezone]);
+
+  useEffect(() => {
+    const handleOutside = (event) => {
+      if (!timezoneRef.current || timezoneRef.current.contains(event.target)) return;
+      setTimezoneOpen(false);
+    };
+    document.addEventListener('click', handleOutside);
+    return () => document.removeEventListener('click', handleOutside);
+  }, []);
+
+  const orderedSelections = US_TIMEZONES.filter((zone) => timezoneSelections.has(zone));
+  const timezoneLabel = formatTimezoneLabel(orderedSelections);
+
   return (
     <div id="overview" className="tab-content active">
       <div className="field">
@@ -231,6 +251,45 @@ function OverviewTab({ candidateId, candidate, comments, onCommentsChange, onSav
                 </option>
               ))}
             </select>
+          </div>
+          <div className="field">
+            <label>Timezone</label>
+            <div className="timezone-select" ref={timezoneRef}>
+              <button
+                type="button"
+                className="timezone-trigger"
+                aria-expanded={timezoneOpen ? 'true' : 'false'}
+                onClick={() => setTimezoneOpen((prev) => !prev)}
+              >
+                <span>{timezoneLabel}</span>
+                <span className="timezone-caret" aria-hidden="true">▾</span>
+              </button>
+              {timezoneOpen && (
+                <div className="timezone-dropdown">
+                  <div className="timezone-options">
+                    {US_TIMEZONES.map((timezone) => (
+                      <label key={timezone} className="timezone-option">
+                        <input
+                          type="checkbox"
+                          checked={timezoneSelections.has(timezone)}
+                          onChange={(event) => {
+                            setTimezoneSelections((prev) => {
+                              const next = new Set(prev);
+                              if (event.target.checked) next.add(timezone);
+                              else next.delete(timezone);
+                              const payload = next.size ? Array.from(next).join(', ') : null;
+                              onUpdateField({ timezone: payload });
+                              return next;
+                            });
+                          }}
+                        />
+                        {timezone}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="field">
             <label>Phone</label>
@@ -587,5 +646,48 @@ const COUNTRIES = [
   'Uruguay',
   'Venezuela',
 ];
+
+const US_TIMEZONES = [
+  'America/New_York',
+  'America/Detroit',
+  'America/Kentucky/Louisville',
+  'America/Kentucky/Monticello',
+  'America/Indiana/Indianapolis',
+  'America/Indiana/Vincennes',
+  'America/Indiana/Winamac',
+  'America/Indiana/Marengo',
+  'America/Indiana/Petersburg',
+  'America/Indiana/Vevay',
+  'America/Chicago',
+  'America/Indiana/Knox',
+  'America/Indiana/Tell_City',
+  'America/Menominee',
+  'America/North_Dakota/Center',
+  'America/North_Dakota/New_Salem',
+  'America/North_Dakota/Beulah',
+  'America/Denver',
+  'America/Boise',
+  'America/Phoenix',
+  'America/Los_Angeles',
+  'America/Anchorage',
+  'America/Juneau',
+  'America/Sitka',
+  'America/Metlakatla',
+  'America/Yakutat',
+  'America/Nome',
+  'America/Adak',
+  'Pacific/Honolulu',
+];
+
+const parseTimezoneList = (value) => (value || '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
+const formatTimezoneLabel = (values) => {
+  if (!values.length) return 'Select timezones';
+  if (values.length === 1) return values[0];
+  return `${values.length} selected`;
+};
 
 export default CandidateDetailPage;
