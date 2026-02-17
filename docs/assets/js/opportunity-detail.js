@@ -1049,14 +1049,15 @@ document.getElementById('details-sales-lead').addEventListener('change', async (
 });
 
 document.getElementById('details-hr-lead').addEventListener('change', async (e) => {
-  const emailValue = e.target.value;
+  const emailValue = String(e.target.value || '').trim().toLowerCase();
+  const valueToSend = emailValue || null;
   console.log('🟡 HR Lead changed:', emailValue);
 
-  await updateOpportunityField('opp_hr_lead', emailValue);
+  await updateOpportunityField('opp_hr_lead', valueToSend);
 
   // ✅ Si se asigna, eliminar la alerta si existe
   const alertBox = document.getElementById('hr-alert');
-  if (alertBox) alertBox.remove();
+  if (alertBox && valueToSend) alertBox.remove();
 });
 
 
@@ -2452,7 +2453,7 @@ async function loadOpportunityData() {
           const salesOptions = normalizeList(salesLeads);
 
           if (hrLeadSelect) {
-            hrLeadSelect.innerHTML = `<option value="">Select HR Lead...</option>`;
+            hrLeadSelect.innerHTML = `<option value="">Assign HR Lead</option>`;
             recruiterOptions.forEach(person => {
               const opt = document.createElement('option');
               opt.value = person.email;

@@ -589,7 +589,7 @@ window.generateHROptions = function generateHROptions(currentValue) {
   const isHiddenSelection = !!normalized && HIDDEN_HR_FILTER_EMAILS.has(normalized);
 
   const shouldSelectDefault = !isKnown && (!normalized || isHiddenSelection);
-  let html = `<option disabled ${shouldSelectDefault ? 'selected' : ''}>Assign HR Lead</option>`;
+  let html = `<option value="" ${shouldSelectDefault ? 'selected' : ''}>Assign HR Lead</option>`;
   visibleHrUsers.forEach((user) => {
     const email = user.email_vintti;
     const selected = normalized && email === normalized ? 'selected' : '';
@@ -1596,10 +1596,8 @@ document.addEventListener('change', async e => {
   if (!e.target.classList.contains('hr-lead-dropdown')) return;
 
   const oppId   = e.target.dataset.id;
-  const newLead = (e.target.value || '').toLowerCase().trim();
-
-  // Si por alguna razón seleccionan algo vacío o placeholder, no hacemos nada
-  if (!newLead) return;
+  const rawLead = (e.target.value || '').toLowerCase().trim();
+  const newLead = rawLead || null;
 
   try {
     // 1) Persistir en backend
@@ -1620,12 +1618,14 @@ document.addEventListener('change', async e => {
     const wrap = e.target.closest('.hr-lead-cell-wrap');
     if (wrap) {
       const current = wrap.querySelector('.hr-lead');
-      if (current) current.outerHTML = hrDisplayHTML(newLead);
+      if (current) current.outerHTML = hrDisplayHTML(newLead || '');
     }
 
     // 3) Enviar email de asignación de búsqueda (HR Lead + Angie)
-    sendHRLeadAssignmentEmail(oppId, newLead);
-    logOpportunityTrack(trackIdFromEl(e.target, `opp-hr-lead-${oppId}`));
+    if (newLead) {
+      sendHRLeadAssignmentEmail(oppId, newLead);
+      logOpportunityTrack(trackIdFromEl(e.target, `opp-hr-lead-${oppId}`));
+    }
 
   } catch (err) {
     console.error('❌ Network error updating HR Lead:', err);
