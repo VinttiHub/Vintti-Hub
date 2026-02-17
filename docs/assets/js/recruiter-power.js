@@ -18,6 +18,7 @@ const RESTRICTED_EMAILS = new Set([
   "agostina@vintti.com",
   "julieta@vintti.com",
   "paz@vintti.com",
+  "valentina@vintti.com",
 ]);
 const RESTRICTION_EXCEPTIONS = new Set([
   "agostina@vintti.com",
@@ -26,7 +27,8 @@ const RECRUITER_POWER_ALLOWED = new Set([
   "angie@vintti.com",
   "agostina@vintti.com",
   "agustin@vintti.com",
-  "lara@vintti.com"
+  "lara@vintti.com",
+  "valentina@vintti.com"
 ]);
 const GLOBAL_AVERAGE_KEY = "__all_recruiters_average__";
 const GLOBAL_AVERAGE_LABEL = "All recruiters · average view";

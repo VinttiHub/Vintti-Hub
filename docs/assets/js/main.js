@@ -2819,7 +2819,8 @@ async function patchOppFields(oppId, payload) {
     'pilar@vintti.com',
     'pilar.fernandez@vintti.com',
     'julieta@vintti.com',
-    'paz@vintti.com'
+    'paz@vintti.com',
+    'valentina@vintti.com'
   ]);
 
   // Mantener flex para icono + texto alineados
@@ -2845,11 +2846,14 @@ const HR_INITIALS_BY_EMAIL = {
   'josefina@vintti.com':                'JP',
   'constanza@vintti.com':               'CL',
   'julieta@vintti.com':                 'JG',
-  'paz@vintti.com':                     'PL'
+  'paz@vintti.com':                     'PL',
+  'valentina@vintti.com':               'VV'
 };
 
 function initialsForHRLead(emailOrName) {
   const s = String(emailOrName || '').trim().toLowerCase();
+
+  if (!s) return '—';
 
   if (HR_INITIALS_BY_EMAIL[s]) return HR_INITIALS_BY_EMAIL[s];
 
@@ -2863,6 +2867,7 @@ function initialsForHRLead(emailOrName) {
   if (s.includes('agostina') && s.includes('ferrari'))  return 'AF';
   if (s.includes('agostina')) return 'AC';
   if (s.includes('jazmin'))   return 'JP';
+  if (s.includes('valentina')) return 'VV';
   if (s.includes('paz'))      return 'PZ';
 
   return '—';

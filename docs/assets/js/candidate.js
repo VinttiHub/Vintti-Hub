@@ -1213,7 +1213,8 @@ function installAdvancedFilters(table) {
     'pilar@vintti.com',
     'pilar.fernandez@vintti.com',
     'julieta@vintti.com',
-    'paz@vintti.com'
+    'paz@vintti.com',
+    'valentina@vintti.com'
   ]);
 
   // Mantener flex para icono + texto alineados

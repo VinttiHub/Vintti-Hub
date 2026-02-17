@@ -19,6 +19,7 @@ const RESTRICTED_EMAILS = new Set([
   'pilar.fernandez@vintti.com',
   'agostina@vintti.com',
   'julieta@vintti.com',
+  'valentina@vintti.com',
 ]);
 const RESTRICTION_EXCEPTIONS = new Set([
   'agostina@vintti.com',
@@ -30,6 +31,7 @@ const RECRUITER_POWER_ALLOWED = new Set([
   'agustin@vintti.com',
   'jazmin@vintti.com',
   'lara@vintti.com',
+  'valentina@vintti.com',
 ]);
 
 const isRestrictedEmail = (email) => {

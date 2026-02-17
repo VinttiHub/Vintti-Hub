@@ -121,7 +121,8 @@
 
     setDisplay('recruiterPowerLink', new Set([
       'angie@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com','agustina.barbero@vintti.com',
-      'constanza@vintti.com','pilar@vintti.com','pilar.fernandez@vintti.com','julieta@vintti.com','paz@vintti.com'
+      'constanza@vintti.com','pilar@vintti.com','pilar.fernandez@vintti.com','julieta@vintti.com','paz@vintti.com',
+      'valentina@vintti.com'
     ]).has(email));
 
     setDisplay('equipmentsLink', new Set([
@@ -390,4 +391,3 @@ localStorage.setItem('sidebarCollapsed', 'true');
 
   document.addEventListener('DOMContentLoaded', loadSidebar);
 })();
-
