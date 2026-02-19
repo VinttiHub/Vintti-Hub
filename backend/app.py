@@ -30,7 +30,6 @@ from routes.tracks_routes import bp as tracks_bp
 from routes.users_routes import bp as users_api_bp
 from routes.moods_routes import bp as moods_bp
 from routes.to_do_routes import bp as to_do_bp
-from routes.billing_routes import bp as billing_bp
 from routes.public_bonus_routes import bp as public_bonus_bp
 
 
@@ -77,7 +76,6 @@ def create_app() -> Flask:
     app.register_blueprint(admin_bp)
     app.register_blueprint(bp_candidate_search, url_prefix="")
     app.register_blueprint(hunter_bp)
-    app.register_blueprint(billing_bp)
     app.register_blueprint(public_bonus_bp)
 
     @app.after_request
