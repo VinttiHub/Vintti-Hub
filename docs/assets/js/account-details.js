@@ -18,7 +18,11 @@ function dateInputValue(v) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-const API_BASE_URL = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const API_BASE_URL =
+  (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+
 let buyoutReloadTimer = null;
 let ACCOUNT_DETAIL_RECORD = null;
 let ACCOUNT_DETAIL_OPPORTUNITIES = [];
@@ -2348,4 +2352,374 @@ function isRealISODate(v) {
 function fmtISODate(v) {
   // devuelve vacío si no hay fecha real
   return isRealISODate(v) ? new Date(v).toLocaleDateString('en-US') : '';
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+
+    // activar botón
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    // mostrar/ocultar secciones
+    document.querySelectorAll(".tab-content").forEach(sec => {
+      const on = sec.id === tab;
+      sec.classList.toggle("active", on);
+      sec.hidden = !on;
+    });
+
+    // cargar billing.html en iframe cuando abres invoice
+    if (tab === "invoice") {
+      loadBonusRequests().catch(console.error);
+  const frame = document.getElementById("billingFrame");
+  if (!frame) return;
+
+  const url = new URL(window.location.href);
+
+  // intenta varias keys comunes:
+  const accountId =
+    url.searchParams.get("account_id") ||
+    url.searchParams.get("id") ||
+    url.searchParams.get("accountId");
+
+  console.log("Invoice tab open. accountId =", accountId);
+
+  if (!accountId) {
+    frame.srcdoc = `<div style="font-family:Onest,system-ui;padding:20px;color:#fff;background:#0b0d10">
+      No encontré account_id en la URL 😭 <br/>
+      Agrega ?account_id=123 o ajusta el JS a tu parámetro real.
+    </div>`;
+    return;
+  }
+
+  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+  frame.src = `billing.html?account_id=${encodeURIComponent(accountId)}&month=${month}`;
+}
+
+  });
+});
+
+document.getElementById('requestBonusBtn')?.addEventListener('click', () => {
+  const params = new URLSearchParams(window.location.search);
+  const accountId = params.get('id'); // porque account-details usa ?id=32
+
+  if (!accountId) {
+    alert('Missing account id in URL');
+    return;
+  }
+
+  const url = `bonus-form.html?account_id=${encodeURIComponent(accountId)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+});
+
+function getAccountIdFromUrl(){
+  const p = new URLSearchParams(window.location.search);
+  return p.get("id") || p.get("account_id") || null;
+}
+
+document.getElementById("requestBonusBtn")?.addEventListener("click", () => {
+  const accountId = getAccountIdFromUrl();
+  if (!accountId) {
+    alert("Account id missing in Account Details URL");
+    return;
+  }
+
+  // si bonus-form.html está en la misma carpeta /docs:
+  const url = `bonus-form.html?id=${encodeURIComponent(accountId)}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+});
+
+//FORM DATAAA
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    document.querySelectorAll(".tab-content").forEach(sec => {
+      const on = sec.id === tab;
+      sec.classList.toggle("active", on);
+      sec.hidden = !on;
+    });
+
+    if (tab === "invoice") {
+      const frame = document.getElementById("billingFrame");
+      if (!frame) return;
+
+      const params = new URLSearchParams(window.location.search);
+      const accountId = params.get("id"); // en account-details usas ?id=32
+
+      if (!accountId) {
+        frame.srcdoc = `<div style="padding:20px;font-family:Onest,system-ui">Missing account id</div>`;
+        return;
+      }
+
+      const month = new Date().toISOString().slice(0, 7);
+      frame.src = `billing.html?account_id=${encodeURIComponent(accountId)}&month=${month}`;
+    }
+  });
+});
+
+
+
+//form data
+
+function getAccountId() {
+  const p = new URLSearchParams(window.location.search);
+  return p.get("id") || p.get("account_id");
+}
+
+function money(currency, amount) {
+  const n = Number(amount || 0);
+  return `${currency || ""} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim();
+}
+
+function badge(status) {
+  const s = String(status || "pending").toLowerCase();
+  return `<span class="badge ${s}">${s}</span>`;
+}
+
+async function loadBonusRequests(){
+  console.log("➡️ loadBonusRequests running");
+console.log("accountId =", getAccountId());
+
+  const tbody = document.getElementById("bonusTbody");
+  if (!tbody) return;
+
+  const accountId = getAccountId();
+  if (!accountId) {
+    tbody.innerHTML = `<tr><td colspan="7">Missing account id</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = `<tr><td colspan="7">Loading…</td></tr>`;
+
+  const url = `${API_BASE_URL}/public/bonus_request/account/${encodeURIComponent(accountId)}`;
+  const res = await fetch(url, { credentials: "include" });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    tbody.innerHTML = `<tr><td colspan="7">Error ${res.status}: ${txt}</td></tr>`;
+    return;
+  }
+
+  const data = await res.json();
+  const items = data.items || [];
+
+    // 1) pinta tabla primero SIEMPRE
+  tbody.innerHTML = items.map(b => {
+    const employee =
+  b.candidate_id
+    ? (b.candidate_name || `Candidate #${b.candidate_id}`)
+    : (b.employee_name_manual || "—");
+
+    const inv = b.invoice_target === "specific_month"
+      ? `Specific (${String(b.target_month || "").slice(0,7)})`
+      : "Next invoice";
+
+    return `
+      <tr>
+        <td>${String(b.created_date || "").slice(0,10)}</td>
+        <td>${employee}</td>
+        <td>${money(b.currency, b.amount)}</td>
+        <td>${String(b.payout_date || "").slice(0,10)}</td>
+        <td>${inv}</td>
+        <td>${badge(b.status)}</td>
+        <td>${b.approver_name || "—"}</td>
+      </tr>
+    `;
+  }).join("");
+
+  // 2) luego crea ToDos SIN romper la UI
+  items.forEach(b => {
+  const payoutRaw =
+    b.payout_date ?? b.payout ?? b.payout_at ?? b.payoutDate ?? b.payout_datetime;
+
+  const payoutISO = toISODateOrNull(payoutRaw); // YYYY-MM-DD o null
+
+  if (!payoutISO) {
+    console.warn("⚠️ Bonus sin payout parseable:", {
+      bonus_request_id: b.bonus_request_id,
+      payoutRaw,
+      keys: Object.keys(b || {})
+    });
+    return; // 👈 NO crees ToDo si no hay payout real
+  }
+
+  const employee =
+  b.candidate_id ? (b.candidate_name || `Candidate #${b.candidate_id}`) : (b.employee_name_manual || "Employee");
+
+
+  const amt = `${b.currency || ""} ${Number(b.amount || 0).toFixed(2)}`.trim();
+const accLabel =
+  getCurrentAccountName() ||
+  (b.account_name || "").trim() ||
+  `account #${b.account_id}`;
+
+  upsertTodoTask({
+    sourceKey: `bonus_request:${b.bonus_request_id}`,
+    description: `Pagar bono ${amt} a ${employee} (${accLabel})`,
+    due_date: payoutISO,
+  }).catch(err => console.warn("upsertTodoTask failed:", err));
+});
+
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Si invoice ya está activo al cargar, carga bonus de una vez
+  const activeTab = document.querySelector(".tab-btn.active")?.dataset?.tab;
+  if (activeTab === "invoice") {
+    loadBonusRequests().catch(err => console.error("loadBonusRequests failed:", err));
+  }
+
+  // Botón Reload
+  document.getElementById("btnReloadBonus")?.addEventListener("click", () => {
+    loadBonusRequests().catch(err => console.error("reload failed:", err));
+  });
+});
+
+// TODO FORM
+
+
+async function apiFetch(path, opts = {}) {
+  const url = `${API_BASE_URL}${path}`;
+  const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+
+  const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(url, { credentials: "include", ...opts, headers });
+  const ct = res.headers.get("content-type") || "";
+  const payload = ct.includes("application/json") ? await res.json() : await res.text();
+
+  if (!res.ok) {
+    const msg = payload?.error || payload?.message || (typeof payload === "string" ? payload : "Request failed");
+    throw new Error(msg);
+  }
+  return payload;
+}
+
+// async function upsertTodoTask({ sourceKey, description, due_date, forceUserId = null }) {
+//   const userId = forceUserId ?? (Number(localStorage.getItem("user_id")) || null);
+//   if (!userId) return;
+
+//   const tasks = await apiFetch(`/to_do?user_id=${encodeURIComponent(userId)}`);
+//   const list = Array.isArray(tasks) ? tasks : [];
+//   const marker = `[AUTO:${sourceKey}]`;
+
+//   const existing = list.find(t => (t.description || "").includes(marker));
+
+//   const safeDue = toISODateOrNull(due_date);   // ✅ CLAVE
+//   const payload = {
+//     user_id: userId,
+//     description: `${marker} ${description}`,
+//     due_date: safeDue,                         // null o YYYY-MM-DD
+//     check: existing ? Boolean(existing.check) : false,
+//   };
+
+//   if (existing) {
+//     await apiFetch(`/to_do/${existing.to_do_id}`, {
+//       method: "PATCH",
+//       body: JSON.stringify(payload),
+//     });
+//   } else {
+//     await apiFetch(`/to_do`, {
+//       method: "POST",
+//       body: JSON.stringify(payload),
+//     });
+//   }
+// }
+
+function toISODateOrNull(v){
+  if (!v) return null;
+  const s = String(v).trim();
+
+  // ya viene ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // timestamp ISO
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+
+  // NO aceptamos "Fri, 27 Fe" etc -> null
+  const d = new Date(s);
+  if (isNaN(d)) return null;
+
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function todayISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+async function upsertTodoTask({ sourceKey, description, due_date, forceUserId=null }){
+  const userId = forceUserId ?? (Number(localStorage.getItem("user_id")) || null);
+  if (!userId) throw new Error("Missing localStorage user_id");
+
+  const safeDue = toISODateOrNull(due_date); // ✅ solo ISO o null
+  if (!safeDue) throw new Error(`Invalid due_date for ${sourceKey}: ${due_date}`);
+
+  const tasks = await apiFetch(`/to_do?user_id=${encodeURIComponent(userId)}`);
+  const list = Array.isArray(tasks) ? tasks : [];
+  const marker = `[AUTO:${sourceKey}]`;
+  const existing = list.find(t => (t.description || "").includes(marker));
+
+  if (existing) {
+    await apiFetch(`/to_do/${existing.to_do_id}`, {
+      method: "DELETE",
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  await apiFetch(`/to_do`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      description: `${marker} ${description}`,
+      due_date: safeDue, // ✅ payout real
+    }),
+  });
+}
+
+const AGUSTIN_USER_ID = 1;        // ✅ ya lo tienes
+const LARA_USER_ID    = 2;      // 👈 pon el ID real de Lara
+
+const TODO_ASSIGNEES = [AGUSTIN_USER_ID, LARA_USER_ID];
+
+async function createBonusTodosForApprovers(b){
+  const payoutRaw =
+    b.payout_date ?? b.payout ?? b.payout_at ?? b.payoutDate ?? b.payout_datetime;
+
+  const payoutISO = toISODateOrNull(payoutRaw);
+  if (!payoutISO) return;
+
+  const employee = b.candidate_id
+    ? (b.candidate_name || `Candidate #${b.candidate_id}`)
+    : (b.employee_name_manual || "Employee");
+
+  const amt = `${b.currency || ""} ${Number(b.amount || 0).toFixed(2)}`.trim();
+
+  const accLabel =
+    getCurrentAccountName() ||
+    (b.account_name || "").trim() ||
+    `account #${b.account_id}`;
+
+  await Promise.allSettled(
+    TODO_ASSIGNEES.map(uid =>
+      upsertTodoTask({
+        // ✅ mismo bonus, pero distinto “marker” por usuario para que no choquen
+        sourceKey: `bonus_request:${b.bonus_request_id}:assignee:${uid}`,
+        description: `Pagar bono ${amt} a ${employee} (${accLabel})`,
+        due_date: payoutISO,
+        forceUserId: uid
+      })
+    )
+  );
 }

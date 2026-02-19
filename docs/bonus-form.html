@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Employee Bonus Request • Vintti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./assets/css/bonus-form.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="shell">
+      <header class="hero">
+        <div class="brand">
+          <div class="logo">V</div>
+          <div>
+            <h1>Bonus request</h1>
+            <p>Complete this form to add a bonus as an adjustment to the next invoice.</p>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="meta-card">
+            <span class="meta-label">Estimated time</span>
+            <strong>2–3 min</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Support</span>
+            <strong>billing@vintti.com</strong>
+          </div>
+        </div>
+      </header>
+
+      <form class="form" id="bonusForm">
+        <!-- 1) Bonus details -->
+        <section class="card">
+          <div class="card-head">
+            <h2>1) Bonus details</h2>
+            <p>This will be reflected as an invoice adjustment.</p>
+          </div>
+
+          <div class="grid">
+            <label class="field">
+              <span>Bonus amount</span>
+              <div class="money">
+                <select name="currency" required>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+                <input
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g., 250"
+                  required
+                />
+              </div>
+              <small class="hint">Numbers only. If special fees/taxes apply, add details in notes.</small>
+            </label>
+
+            <label class="field">
+              <span>Employee payout date</span>
+              <input name="payout_date" type="date" required />
+              <small class="hint">For example: payroll date or the agreed payout date.</small>
+            </label>
+
+            <label class="field">
+              <span>Type</span>
+              <select name="bonus_type" required>
+                <option value="one_time">One-time bonus</option>
+                <option value="recurring">Recurring bonus</option>
+                <option value="commission">Commission</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Which invoice should include this?</span>
+              <select name="invoice_target" required>
+                <option value="next_invoice">Next invoice</option>
+                <option value="specific_month">Specific month</option>
+              </select>
+            </label>
+
+            <label class="field field-full hidden" id="targetMonthWrap">
+              <span>Target month</span>
+              <input name="target_month" type="month" />
+              <small class="hint">If you choose “Specific month”, select it here.</small>
+            </label>
+          </div>
+        </section>
+
+        <!-- 2) Employee -->
+        <section class="card">
+          <div class="card-head">
+            <h2>2) Employee</h2>
+            <p>This helps us identify the employee correctly.</p>
+          </div>
+
+          <div class="grid">
+            <label class="field">
+                <span>Employee</span>
+                <select name="candidate_id" id="employeeSelect" required>
+                    <option value="">Loading employees...</option>
+                </select>
+                <small class="hint">Choose the employee. If not listed, select “Other”.</small>
+                </label>
+
+                <label class="field hidden" id="employeeOtherWrap">
+                <span>Employee name (manual)</span>
+                <input name="employee_name_manual" id="employeeNameManual" type="text" placeholder="e.g., Ana Perez" />
+                </label>
+
+
+            <!-- <label class="field">
+              <span>Employee email (optional)</span>
+              <input name="employee_email" type="email" placeholder="ana@company.com" />
+            </label> -->
+
+            <label class="field">
+              <span>Role / Title (optional)</span>
+              <input name="employee_role" type="text" placeholder="e.g., Sales Ops" />
+            </label>
+
+            <label class="field">
+              <span>Employee country (optional)</span>
+              <input name="employee_country" type="text" placeholder="e.g., United States" />
+            </label>
+          </div>
+        </section>
+
+        <!-- 3) Context -->
+        <section class="card">
+          <div class="card-head">
+            <h2>3) Context and approval</h2>
+            <p>This helps us process the request without back-and-forth.</p>
+          </div>
+
+          <div class="grid">
+            <label class="field field-full">
+              <span>Reason / context</span>
+              <textarea
+                name="reason"
+                rows="3"
+                placeholder="e.g., Q1 performance, project completion bonus, etc."
+                required
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Approved by</span>
+              <input name="approver_name" type="text" placeholder="Full name" required />
+            </label>
+
+            <!-- <label class="field">
+              <span>Approver email</span>
+              <input name="approver_email" type="email" placeholder="approver@company.com" required />
+            </label>
+
+            <label class="field">
+              <span>Confirmation email</span>
+              <input name="notify_email" type="email" placeholder="finance@company.com" required />
+              <small class="hint">Can be the same as the approver email.</small>
+            </label> -->
+
+            <label class="field">
+              <span>Priority</span>
+              <select name="priority">
+                <option value="normal" selected>Normal</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+
+            <label class="field field-full">
+              <span>Additional notes (optional)</span>
+              <textarea
+                name="notes"
+                rows="3"
+                placeholder="e.g., internal reference, ticket ID, special conditions..."
+              ></textarea>
+            </label>
+          </div>
+        </section>
+
+        <!-- Review -->
+        <section class="card review">
+          <div class="card-head">
+            <h2>Summary</h2>
+            <p>Please review before submitting.</p>
+          </div>
+
+          <div class="review-grid" id="reviewBox">
+            <div class="review-item">
+              <span class="k">Bonus</span>
+              <strong class="v" data-review="amount">—</strong>
+            </div>
+            <div class="review-item">
+              <span class="k">Payout date</span>
+              <strong class="v" data-review="payout_date">—</strong>
+            </div>
+            <div class="review-item">
+              <span class="k">Employee</span>
+              <strong class="v" data-review="employee_name">—</strong>
+            </div>
+            <div class="review-item">
+              <span class="k">Invoice</span>
+              <strong class="v" data-review="invoice_target">—</strong>
+            </div>
+          </div>
+
+          <label class="checkbox">
+            <input type="checkbox" name="confirm" required />
+            <span>I confirm the information above is accurate.</span>
+          </label>
+        </section>
+
+        <footer class="actions">
+          <button type="button" class="btn ghost" id="btnClear">Clear</button>
+          <button type="submit" class="btn primary">Submit request</button>
+        </footer>
+
+        <p class="fineprint">
+          By submitting, you authorize Vintti to process this adjustment and reflect it on invoicing as applicable.
+        </p>
+      </form>
+    </section>
+  </main>
+
+  <script src="./assets/js/bonus-form.js"></script>
+
+</body>
+</html>

@@ -1,5 +1,9 @@
 (() => {
-  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API_BASE =
+  (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+
   const userId = Number(window.localStorage.getItem('user_id')) || null;
 
   const myList = document.getElementById('myTasks');
@@ -612,3 +616,4 @@
   loadMyTasks();
   loadTeamTasks();
 })();
+

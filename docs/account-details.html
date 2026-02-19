@@ -33,7 +33,14 @@
     <div class="tab-selector" role="tablist" aria-label="Account sections">
       <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
       <button class="tab-btn" data-tab="employees" role="tab" aria-selected="false" aria-controls="employees">Employees</button>
+      <button class="tab-btn" data-tab="invoice" role="tab" aria-selected="false" aria-controls="invoice">Invoice</button>    
+    <button class="tab-btn" id="requestBonusBtn" type="button">Request bonus</button>
     </div>
+
+    <!-- <button class="btn btn-primary" id="btnBonusForm">
+    Request bonus
+  </button> -->
+
 
     <!-- =========================
          TAB: OVERVIEW
@@ -206,6 +213,54 @@
         </table>
       </div>
     </section>
+
+    <section class="tab-content" id="invoice" role="tabpanel" hidden>
+  <div class="card">
+    <h2>Invoice</h2>
+
+    <section id="bonusSection" class="card">
+      <div class="card-header">
+        <h3>Bonus requests</h3>
+        <button id="btnReloadBonus" type="button" class="btn btn-ghost">Reload</button>
+      </div>
+
+      <table class="bonus-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Employee</th>
+            <th>Amount</th>
+            <th>Payout</th>
+            <th>Invoice</th>
+            <th>Status</th>
+            <th>Approver</th>
+          </tr>
+        </thead>
+        <tbody id="bonusTbody">
+          <tr><td colspan="7">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+</section>
+
+
+
+
+    <!-- <section class="tab-content" id="invoice" role="tabpanel" aria-labelledby="invoice-tab" hidden>
+      <div class="card">
+        <h2>Invoice</h2>
+        <p class="subtle">Billing config + adjustments + invoices</p>
+
+        <iframe
+          id="billingFrame"
+          class="billing-frame"
+          src=""
+          loading="lazy"
+          referrerpolicy="no-referrer"
+        ></iframe>
+      </div>
+    </section> -->
   </main>
 
   <!-- ===== Discounts floating alert ===== -->

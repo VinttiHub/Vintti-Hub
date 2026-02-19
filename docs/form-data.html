@@ -1,0 +1,35 @@
+<section class="card bonus-card" id="bonusRequestsCard">
+  <div class="card-head">
+    <div>
+      <h3>Bonus requests</h3>
+      <p>Submitted bonus requests for this account.</p>
+    </div>
+
+    <div class="card-actions">
+      <button class="btn btn-ghost" id="btnReloadBonus">Reload bonus</button>
+    </div>
+  </div>
+
+  <div class="bonus-table-wrap">
+    <table class="bonus-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Employee</th>
+          <th>Amount</th>
+          <th>Payout</th>
+          <th>Invoice</th>
+          <th>Status</th>
+          <th>Approver</th>
+        </tr>
+      </thead>
+      <tbody id="bonusTbody">
+        <tr><td colspan="7" class="muted">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bonus-empty hidden" id="bonusEmpty">
+    No bonus requests yet for this account.
+  </div>
+</section>
