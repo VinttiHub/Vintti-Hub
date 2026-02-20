@@ -624,8 +624,11 @@ function computeDurationAverage(entries = []) {
 }
 function resolveDurationEntryDate(entry = {}, metricKey) {
   if (!entry) return null;
-  if (metricKey === "avgBatchOpen" || metricKey === "avgBatchClosed") {
-    return entry.first_batch_date || entry.close_date || entry.start_reference_date || null;
+  if (metricKey === "avgBatchOpen") {
+    return entry.start_reference_date || entry.first_batch_date || entry.close_date || null;
+  }
+  if (metricKey === "avgBatchClosed") {
+    return entry.close_date || entry.first_batch_date || entry.start_reference_date || null;
   }
   return entry.close_date || entry.first_batch_date || entry.start_reference_date || null;
 }

@@ -324,6 +324,7 @@ def register_recruiter_metrics_routes(app):
                 ) FILTER (
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
+                      AND fb.first_batch_date >= b.start_reference_date
                       AND b.opp_stage NOT IN ('Close Win', 'Closed Lost')
                       AND b.start_reference_date >= %(win_start)s
                       AND b.start_reference_date <  %(win_end)s
@@ -335,6 +336,9 @@ def register_recruiter_metrics_routes(app):
                     WHERE fb.first_batch_date IS NOT NULL
                       AND b.start_reference_date IS NOT NULL
                       AND b.opp_stage IN ('Close Win', 'Closed Lost')
+                      AND b.close_date IS NOT NULL
+                      AND fb.first_batch_date >= b.start_reference_date
+                      AND fb.first_batch_date <= b.close_date
                       AND b.close_date >= %(win_start)s
                       AND b.close_date <  %(win_end)s
                 ) AS avg_days_to_first_batch_closed
@@ -630,6 +634,7 @@ def register_recruiter_metrics_routes(app):
                           AND b.start_reference_date >= %(win_start)s
                           AND b.start_reference_date <  %(win_end)s
                           AND fb.first_batch_date IS NOT NULL
+                          AND fb.first_batch_date >= b.start_reference_date
                         THEN (fb.first_batch_date - b.start_reference_date)::int
                         ELSE NULL
                     END
@@ -640,8 +645,11 @@ def register_recruiter_metrics_routes(app):
                         WHEN b.opp_stage IN ('Close Win', 'Closed Lost')
                           AND b.close_date >= %(win_start)s
                           AND b.close_date <  %(win_end)s
+                          AND b.close_date IS NOT NULL
                           AND fb.first_batch_date IS NOT NULL
                           AND b.start_reference_date IS NOT NULL
+                          AND fb.first_batch_date >= b.start_reference_date
+                          AND fb.first_batch_date <= b.close_date
                         THEN (fb.first_batch_date - b.start_reference_date)::int
                         ELSE NULL
                     END
