@@ -2,9 +2,16 @@ from flask import Blueprint, request, jsonify
 from psycopg2.extras import RealDictCursor
 from db import get_connection
 from datetime import date
+import logging
+import os
 import re
+from html import escape
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email
 
 bp = Blueprint("public_bonus", __name__, url_prefix="/public/bonus_request")
+
+BONUS_EMAIL_RECIPIENTS = ["fatimag811@gmail.com", "pgonzales@vintti.com"]
 
 def _safe_date(s):
     if not s: return None
@@ -23,6 +30,50 @@ def _safe_target_month(s):
         return date.fromisoformat(raw[:10])
     except Exception:
         return None
+
+def _send_bonus_request_email(
+    bonus_request_id: int,
+    account_name: str,
+    candidate_label: str,
+    currency: str,
+    amount,
+    payout_date,
+    approver_name: str,
+    reason: str,
+):
+    api_key = os.environ.get("SENDGRID_API_KEY")
+    if not api_key:
+        raise RuntimeError("SENDGRID_API_KEY not configured")
+
+    amount_num = float(amount) if amount not in (None, "") else 0.0
+    amount_text = f"{currency} {amount_num:,.2f}".strip()
+    payout_text = payout_date.isoformat() if hasattr(payout_date, "isoformat") else (str(payout_date or "N/A"))
+    subject = f"Bonus Request #{bonus_request_id} | {candidate_label} | {account_name}"
+
+    html_body = f"""
+    <p>Hi team,</p>
+    <p>A new bonus request was submitted and is pending review.</p>
+    <ul>
+      <li><strong>Bonus request ID:</strong> {bonus_request_id}</li>
+      <li><strong>Account:</strong> {escape(account_name or "N/A")}</li>
+      <li><strong>Candidate / Employee:</strong> {escape(candidate_label or "N/A")}</li>
+      <li><strong>Amount:</strong> {escape(amount_text)}</li>
+      <li><strong>Payout date:</strong> {escape(payout_text)}</li>
+      <li><strong>Approved by:</strong> {escape(approver_name or "N/A")}</li>
+      <li><strong>Reason:</strong> {escape(reason or "N/A")}</li>
+    </ul>
+    <p>This request was also created in ToDo automatically.</p>
+    <p>— Vintti HUB</p>
+    """
+
+    msg = Mail(
+        from_email=Email("hub@vintti-hub.com", name="Vintti HUB"),
+        to_emails=BONUS_EMAIL_RECIPIENTS,
+        subject=subject,
+        html_content=html_body,
+    )
+    sg = SendGridAPIClient(api_key)
+    sg.send(msg)
 
 @bp.route("/submit", methods=["POST", "OPTIONS"])
 def submit_bonus_request():
@@ -217,7 +268,27 @@ def submit_bonus_request():
             """, (owner_user_id, todo_desc, payout_date, next_order))
 
         conn.commit()
-        return jsonify({"ok": True, "bonus_request_id": bonus_request_id})
+
+        email_warning = None
+        try:
+            _send_bonus_request_email(
+                bonus_request_id=bonus_request_id,
+                account_name=account_name,
+                candidate_label=candidate_label,
+                currency=currency,
+                amount=amount,
+                payout_date=payout_date,
+                approver_name=data.get("approver_name"),
+                reason=data.get("reason"),
+            )
+        except Exception as email_exc:
+            logging.exception("bonus request email failed")
+            email_warning = str(email_exc)
+
+        payload = {"ok": True, "bonus_request_id": bonus_request_id}
+        if email_warning:
+            payload["email_warning"] = email_warning
+        return jsonify(payload)
     except Exception as exc:
         if conn:
             conn.rollback()
