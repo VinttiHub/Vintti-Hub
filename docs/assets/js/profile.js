@@ -241,6 +241,350 @@ async function loadTeamMoods(){
     host.innerHTML = `<div class="org-mood-empty">Could not load team moods.</div>`;
   }
 }
+
+const ORG_ROOT_USER_ID = 1;
+const ORG_USER_DETAILS_CACHE = new Map();
+
+function toLeaderId(raw){
+  const id = Number(raw);
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
+
+function sortOrgUsers(users){
+  return [...users].sort((a, b)=>{
+    const teamA = String(a?.team || "").toLowerCase();
+    const teamB = String(b?.team || "").toLowerCase();
+    if (teamA !== teamB) return teamA.localeCompare(teamB);
+    return String(a?.user_name || "").localeCompare(String(b?.user_name || ""), undefined, { sensitivity: "base" });
+  });
+}
+
+function safeOrgChildren(parentId, childrenByLeaderId, pathIds=new Set()){
+  const rawChildren = sortOrgUsers(childrenByLeaderId.get(parentId) || []);
+  return rawChildren.filter((child)=>{
+    const cid = Number(child?.user_id);
+    if (!Number.isFinite(cid) || cid <= 0) return false;
+    if (cid === Number(parentId)) return false; // self-cycle
+    return !pathIds.has(cid); // ancestor-cycle
+  });
+}
+
+function getOrgRoleValue(user){
+  const direct = String(user?.role ?? user?.rol ?? user?.role_type ?? "").trim();
+  if (direct) return direct;
+  const row = user && typeof user === "object" ? user : null;
+  if (!row) return "";
+  for (const [key, value] of Object.entries(row)){
+    const normalized = String(key || "").trim().toLowerCase();
+    if (normalized === "role" || normalized === "rol" || normalized === "role_type"){
+      const found = String(value ?? "").trim();
+      if (found) return found;
+    }
+  }
+  return "";
+}
+
+function formatOrgRoleHtml(rawRole){
+  const clean = String(rawRole || "").trim();
+  if (!clean) return "Sin rol";
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 2){
+    return `${escapeHtml(parts[0])}<br>${escapeHtml(parts[1])}`;
+  }
+  return escapeHtml(clean);
+}
+
+function hasOrgRole(user){
+  return getOrgRoleValue(user).length > 0;
+}
+
+function mergeOrgUser(baseUser, nextUser){
+  const base = baseUser && typeof baseUser === "object" ? baseUser : {};
+  const next = nextUser && typeof nextUser === "object" ? nextUser : {};
+  return { ...base, ...next };
+}
+
+async function fetchOrgUserDetails(userId){
+  const uid = Number(userId);
+  if (!Number.isFinite(uid) || uid <= 0) return null;
+  if (ORG_USER_DETAILS_CACHE.has(uid)) return ORG_USER_DETAILS_CACHE.get(uid);
+  try{
+    const res = await api(`/users/${encodeURIComponent(uid)}`, { method: "GET", cache: "no-store" });
+    if (!res.ok){
+      ORG_USER_DETAILS_CACHE.set(uid, null);
+      return null;
+    }
+    const row = await res.json();
+    const payload = row && typeof row === "object" ? row : null;
+    ORG_USER_DETAILS_CACHE.set(uid, payload);
+    return payload;
+  }catch(err){
+    console.warn("fetchOrgUserDetails warning:", err);
+    ORG_USER_DETAILS_CACHE.set(uid, null);
+    return null;
+  }
+}
+
+function renderOrgPersonCard(user, { isRoot=false, isLeader=false, isLeaf=false } = {}){
+  const id = Number(user?.user_id);
+  const rawNickname = String(user?.nickname || "").trim();
+  const fallbackShortName = String(user?.user_name || "").trim().split(/\s+/)[0] || "";
+  const displayName = rawNickname || fallbackShortName || `User ${id || ""}`.trim();
+  const name = escapeHtml(displayName);
+  const rawRole = getOrgRoleValue(user);
+  const role = formatOrgRoleHtml(rawRole);
+  const initials = escapeHtml(resolveInitials(displayName, user?.initials || ""));
+  const avatarSrc = resolveProfileAvatarSource({
+    avatar_url: user?.avatar_url,
+    email_vintti: user?.email_vintti,
+    user_id: id
+  });
+  const safeAvatarSrc = escapeHtml(avatarSrc || "");
+  const avatarMarkup = safeAvatarSrc
+    ? `
+      <div class="org-avatar">
+        <img data-org-avatar class="org-avatar-img" src="${safeAvatarSrc}" alt="${name}" loading="lazy" />
+        <span class="org-avatar-fallback" style="display:none;">${initials}</span>
+      </div>
+    `
+    : `<div class="org-avatar is-fallback"><span class="org-avatar-fallback">${initials}</span></div>`;
+  const cardClasses = [
+    "org-person",
+    isRoot ? "is-root" : "",
+    !isRoot && isLeader ? "is-leader" : "",
+    !isRoot && isLeaf ? "is-leaf" : ""
+  ].filter(Boolean).join(" ");
+  return `
+    <article class="${cardClasses}" data-uid="${escapeHtml(id || "")}">
+      ${avatarMarkup}
+      <h3 class="org-person-name">${name}</h3>
+      <div class="org-person-role">${role}</div>
+    </article>
+  `;
+}
+
+function renderOrgBranch(parentId, childrenByLeaderId, depth=1, pathIds=new Set()){
+  if (depth > 10) return "";
+  const children = safeOrgChildren(parentId, childrenByLeaderId, pathIds);
+  if (!children.length) return "";
+  const cls = ["org-children", children.length >= 6 ? "is-dense" : ""].filter(Boolean).join(" ");
+  return `
+    <div class="${cls}" data-depth="${depth}">
+      ${children.map((child)=>{
+        const cid = Number(child?.user_id);
+        const nextPath = new Set(pathIds);
+        if (Number.isFinite(cid) && cid > 0) nextPath.add(cid);
+        const hasChildren = safeOrgChildren(cid, childrenByLeaderId, nextPath).length > 0;
+        return `
+          <div class="org-node">
+            <span class="org-connector" aria-hidden="true"></span>
+            ${renderOrgPersonCard(child, { isLeader: hasChildren, isLeaf: !hasChildren })}
+            ${renderOrgBranch(cid, childrenByLeaderId, depth + 1, nextPath)}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderOrgChartLayout(root, childrenByLeaderId){
+  const host = document.getElementById("orgChartTree");
+  if (!host) return;
+  if (!root){
+    host.innerHTML = `<div class="org-mood-empty">Could not resolve an org chart root.</div>`;
+    return;
+  }
+
+  const rootId = Number(root?.user_id);
+  const rootPath = new Set();
+  if (Number.isFinite(rootId) && rootId > 0) rootPath.add(rootId);
+  const departmentLeads = safeOrgChildren(rootId, childrenByLeaderId, rootPath);
+
+  if (!departmentLeads.length){
+    host.innerHTML = `
+      <div class="org-board">
+        <div class="org-root-wrap">${renderOrgPersonCard(root, { isRoot: true })}</div>
+      </div>
+    `;
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="org-board">
+      <div class="org-root-wrap">${renderOrgPersonCard(root, { isRoot: true, isLeader: true })}</div>
+      <div class="org-root-stem" aria-hidden="true"></div>
+      <div class="org-dept-grid">
+        ${departmentLeads.map((lead)=>{
+          const leadId = Number(lead?.user_id);
+          const path = new Set(rootPath);
+          if (Number.isFinite(leadId) && leadId > 0) path.add(leadId);
+          const deptLabel = escapeHtml(String(lead?.team || lead?.user_name || "Team").toUpperCase());
+          return `
+            <section class="org-dept">
+              <div class="org-dept-pill">${deptLabel}</div>
+              <span class="org-dept-stem" aria-hidden="true"></span>
+              ${renderOrgPersonCard(lead, { isLeader: true, isLeaf: false })}
+              ${renderOrgBranch(leadId, childrenByLeaderId, 1, path)}
+            </section>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+  hydrateOrgAvatars(host);
+}
+
+function hydrateOrgAvatars(root){
+  if (!root) return;
+  root.querySelectorAll("[data-org-avatar]").forEach((img)=>{
+    const fallback = img.nextElementSibling;
+    const showFallback = ()=>{
+      img.style.display = "none";
+      if (fallback) fallback.style.display = "grid";
+    };
+    img.onload = ()=>{
+      img.style.display = "block";
+      if (fallback) fallback.style.display = "none";
+    };
+    img.onerror = showFallback;
+    if (img.complete && img.naturalWidth === 0){
+      showFallback();
+    }
+  });
+}
+
+function renderOrgChart(users){
+  const host = document.getElementById("orgChartTree");
+  if (!host) return;
+
+  if (!Array.isArray(users) || users.length === 0){
+    host.innerHTML = `<div class="org-mood-empty">No users found to build the org chart.</div>`;
+    return;
+  }
+
+  const byId = new Map();
+  users.forEach((user)=>{
+    const uid = Number(user?.user_id);
+    if (Number.isFinite(uid) && uid > 0) byId.set(uid, user);
+  });
+
+  const childrenByLeaderId = new Map();
+  users.forEach((user)=>{
+    const leaderId = toLeaderId(user?.lider);
+    if (!leaderId) return;
+    const list = childrenByLeaderId.get(leaderId) || [];
+    list.push(user);
+    childrenByLeaderId.set(leaderId, list);
+  });
+
+  let root = byId.get(ORG_ROOT_USER_ID) || null;
+  if (!root){
+    root = users.find((user)=> !toLeaderId(user?.lider)) || users[0] || null;
+  }
+  if (!root){
+    host.innerHTML = `<div class="org-mood-empty">Could not resolve an org chart root.</div>`;
+    return;
+  }
+
+  renderOrgChartLayout(root, childrenByLeaderId);
+}
+
+function renderOrgChartFromTree(root, childrenByLeaderId){
+  renderOrgChartLayout(root, childrenByLeaderId);
+}
+
+async function fetchOrgTreeFromReports(rootId, seedUsers=[]){
+  const childrenByLeaderId = new Map();
+  const visited = new Set();
+  const byId = new Map();
+  const seededById = new Map();
+
+  (Array.isArray(seedUsers) ? seedUsers : []).forEach((user)=>{
+    const uid = Number(user?.user_id);
+    if (!Number.isFinite(uid) || uid <= 0) return;
+    const clean = user && typeof user === "object" ? user : {};
+    seededById.set(uid, clean);
+    byId.set(uid, clean);
+  });
+
+  let root = null;
+  try{
+    const rootRes = await api(`/users/${encodeURIComponent(rootId)}`, { method: "GET", cache: "no-store" });
+    if (rootRes.ok){
+      const rootData = await rootRes.json();
+      const rid = Number(rootData?.user_id || rootId);
+      const seeded = seededById.get(rid) || byId.get(rid) || null;
+      root = mergeOrgUser(seeded, rootData);
+      if (root?.user_id) byId.set(Number(root.user_id), root);
+    }
+  }catch(err){
+    console.warn("org root fetch warning:", err);
+  }
+
+  async function walk(leaderId){
+    const lid = Number(leaderId);
+    if (!Number.isFinite(lid) || lid <= 0 || visited.has(lid)) return;
+    visited.add(lid);
+
+    const res = await api(`/users/reports?leader_id=${encodeURIComponent(lid)}`, { method: "GET", cache: "no-store" });
+    if (!res.ok){
+      if (res.status === 403 || res.status === 404) {
+        childrenByLeaderId.set(lid, []);
+        return;
+      }
+      throw new Error(await res.text());
+    }
+    const reports = await res.json();
+    const cleanReports = (Array.isArray(reports) ? reports : []).filter((report)=>{
+      const rid = Number(report?.user_id);
+      return Number.isFinite(rid) && rid > 0 && rid !== lid; // guard self-reference
+    });
+    const normalizedReports = await Promise.all(cleanReports.map(async (report)=>{
+      const uid = Number(report?.user_id);
+      if (!Number.isFinite(uid) || uid <= 0) return report;
+      let merged = mergeOrgUser(seededById.get(uid), report);
+      if (!hasOrgRole(merged)){
+        const detail = await fetchOrgUserDetails(uid);
+        if (detail) merged = mergeOrgUser(merged, detail);
+      }
+      byId.set(uid, merged);
+      return merged;
+    }));
+    childrenByLeaderId.set(lid, normalizedReports);
+    await Promise.all(normalizedReports.map((report)=> walk(report?.user_id)));
+  }
+
+  await walk(rootId);
+
+  if (!root){
+    root = byId.get(Number(rootId)) || null;
+  }
+
+  return { root, childrenByLeaderId };
+}
+
+async function loadOrgChart(){
+  const host = document.getElementById("orgChartTree");
+  if (!host) return;
+  host.innerHTML = `<div class="org-mood-empty">Loading team chart...</div>`;
+  try{
+    const res = await api(`/users`, { method: "GET", cache: "no-store" });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : [];
+    const hasLeaderData = rows.some((row)=> Object.prototype.hasOwnProperty.call(row || {}, "lider"));
+    if (hasLeaderData){
+      renderOrgChart(rows);
+      return;
+    }
+
+    const tree = await fetchOrgTreeFromReports(ORG_ROOT_USER_ID, rows);
+    renderOrgChartFromTree(tree?.root, tree?.childrenByLeaderId || new Map());
+  }catch(err){
+    console.error("loadOrgChart error:", err);
+    host.innerHTML = `<div class="org-mood-empty">Could not load org chart.</div>`;
+  }
+}
 // ===== Team PTO (helpers) =====
 const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
 const ADMIN_ALLOWED_EMAILS = new Set([
@@ -1963,6 +2307,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     await loadMyRequests(uid);
     await loadBalances(uid);
     setupBalanceCardTables();
+    loadOrgChart();
     loadTeamMoods();
 
     // Existing: enable Team PTO for certain user_ids

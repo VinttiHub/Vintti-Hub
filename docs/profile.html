@@ -350,10 +350,12 @@
     </div>
 
     <div class="org-image-card">
-      <img src="./assets/img/organigrama.png" alt="Vintti Team Org Chart" class="org-img">
+      <div id="orgChartTree" class="org-tree-wrap" aria-live="polite">
+        <div class="org-mood-empty">Loading team chart...</div>
+      </div>
     </div>
 
-    <p class="org-note">✨ Tap the chart to zoom if needed</p>
+    <p class="org-note">✨ Team chart generated from the database</p>
 
     <section class="org-mood-card" aria-label="Team moods today">
       <header class="org-mood-head">

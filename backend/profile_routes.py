@@ -150,8 +150,9 @@ def _add_initials(row: Dict[str, Any], name_key: str = "user_name") -> Dict[str,
 def get_user(user_id: int):
     q = """
     SELECT
-      user_id, user_name, email_vintti, role, emergency_contact,
+      user_id, user_name, nickname, email_vintti, role, emergency_contact,
       ingreso_vintti_date, fecha_nacimiento, avatar_url,
+      team, lider,
       COALESCE(vacaciones_acumuladas, 0)    AS vacaciones_acumuladas,
       COALESCE(vacaciones_habiles, 0)       AS vacaciones_habiles,
       COALESCE(vacaciones_consumidas, 0)    AS vacaciones_consumidas,

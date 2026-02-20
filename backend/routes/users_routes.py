@@ -22,6 +22,7 @@ def users_list_or_by_email():
                 SELECT
                   user_id,
                   user_name,
+                  nickname,
                   email_vintti,
                   role,
                   emergency_contact,
@@ -33,7 +34,8 @@ def users_list_or_by_email():
                   COALESCE(vacaciones_consumidas, 0)   AS vacaciones_consumidas,
                   COALESCE(vintti_days_consumidos, 0)  AS vintti_days_consumidos,
                   COALESCE(feriados_consumidos, 0)     AS feriados_consumidos,
-                  team
+                  team,
+                  lider
                 FROM users
             """
 
@@ -74,7 +76,15 @@ def users_by_leader():
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
-                SELECT user_id, user_name, email_vintti, team
+                SELECT
+                  user_id,
+                  user_name,
+                  nickname,
+                  email_vintti,
+                  role,
+                  avatar_url,
+                  team,
+                  lider
                 FROM users
                 WHERE lider = %s
                 ORDER BY LOWER(user_name) ASC
