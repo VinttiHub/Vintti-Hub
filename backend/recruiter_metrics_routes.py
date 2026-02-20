@@ -176,6 +176,27 @@ def register_recruiter_metrics_routes(app):
             WHERE sent_date >= %(win_start)s
               AND sent_date <  %(win_end)s  -- rango aplicado al evento “batch enviado”
         ),
+        closed_opportunities_in_window AS (
+            SELECT
+                b.opp_hr_lead,
+                b.opportunity_id,
+                b.opp_stage
+            FROM base b
+            WHERE b.close_date >= %(win_start)s
+              AND b.close_date <  %(win_end)s
+              AND b.opp_stage IN ('Close Win', 'Closed Lost')
+        ),
+        sent_candidates_for_closed_opps AS (
+            SELECT
+                co.opp_hr_lead,
+                sc.opportunity_id,
+                sc.candidate_id,
+                sc.candidate_status
+            FROM closed_opportunities_in_window co
+            JOIN sent_candidates sc
+                ON sc.opportunity_id = co.opportunity_id
+            WHERE sc.candidate_id IS NOT NULL
+        ),
         ratio_per_opportunity AS (
             SELECT
                 s.opp_hr_lead,
@@ -202,30 +223,35 @@ def register_recruiter_metrics_routes(app):
         ),
         pipeline_rates AS (
             SELECT
-                opp_hr_lead,
-                COUNT(*) AS sent_candidate_count,
-                COUNT(*) FILTER (
-                    WHERE COALESCE(candidate_status, '') <> 'Client rejected CV'
-                ) AS interview_eligible_candidate_count,
-                COUNT(*) FILTER (
-                    WHERE candidate_status IN (
-                        'Client hired',
-                        'Client rejected after interviewing',
-                        'Client interviewing/testing'
-                    )
-                ) AS interviewed_candidate_count
-            FROM sent_in_window
-            GROUP BY opp_hr_lead
+                s.opp_hr_lead,
+                COUNT(DISTINCT (s.opportunity_id::text || '-' || s.candidate_id::text)) AS sent_candidate_count,
+                COUNT(DISTINCT (
+                    CASE
+                        WHEN COALESCE(s.candidate_status, '') <> 'Client rejected CV'
+                        THEN (s.opportunity_id::text || '-' || s.candidate_id::text)
+                        ELSE NULL
+                    END
+                )) AS interview_eligible_candidate_count,
+                COUNT(DISTINCT (
+                    CASE
+                        WHEN s.candidate_status IN (
+                            'Client hired',
+                            'Client rejected after interviewing',
+                            'Client interviewing/testing'
+                        )
+                        THEN (s.opportunity_id::text || '-' || s.candidate_id::text)
+                        ELSE NULL
+                    END
+                )) AS interviewed_candidate_count
+            FROM sent_candidates_for_closed_opps s
+            GROUP BY s.opp_hr_lead
         ),
         hired_by_lead AS (
             SELECT
-                s.opp_hr_lead,
-                COUNT(DISTINCT (s.opportunity_id::text || '-' || s.candidate_id::text)) AS hired_candidate_count
-            FROM sent_in_window s
-            JOIN hire_opportunity h
-                ON h.opportunity_id = s.opportunity_id
-               AND h.candidate_id = s.candidate_id
-            GROUP BY s.opp_hr_lead
+                co.opp_hr_lead,
+                COUNT(*) FILTER (WHERE co.opp_stage = 'Close Win') AS hired_candidate_count
+            FROM closed_opportunities_in_window co
+            GROUP BY co.opp_hr_lead
         ),
         lifetime_hires AS (
             SELECT
@@ -633,13 +659,23 @@ def register_recruiter_metrics_routes(app):
                 o.opp_hr_lead,
                 u.user_name AS hr_lead_name,
                 o.opp_position_name AS opportunity_title,
-                a.client_name AS opportunity_client_name
+                a.client_name AS opportunity_client_name,
+                o.opp_stage,
+                o.opp_close_date::date AS close_date
             FROM opportunity o
             LEFT JOIN users u
                 ON LOWER(u.email_vintti) = LOWER(o.opp_hr_lead)
             LEFT JOIN account a
                 ON a.account_id = o.account_id
             WHERE o.opp_hr_lead IS NOT NULL
+        ),
+        closed_opps AS (
+            SELECT
+                *
+            FROM base
+            WHERE close_date >= %(win_start)s
+              AND close_date <  %(win_end)s
+              AND opp_stage IN ('Close Win', 'Closed Lost')
         ),
         batches AS (
             SELECT
@@ -658,12 +694,14 @@ def register_recruiter_metrics_routes(app):
                 b.opportunity_id,
                 b.opportunity_title,
                 b.opportunity_client_name,
+                b.opp_stage AS opportunity_stage,
+                b.close_date,
                 cb.candidate_id,
                 cb.batch_id,
                 bt.batch_number,
                 bt.sent_date,
                 cb.status AS candidate_status
-            FROM base b
+            FROM closed_opps b
             JOIN batches bt
                 ON bt.opportunity_id = b.opportunity_id
             JOIN candidates_batches cb
@@ -677,6 +715,8 @@ def register_recruiter_metrics_routes(app):
             sc.opportunity_id,
             sc.opportunity_title,
             sc.opportunity_client_name,
+            sc.opportunity_stage,
+            sc.close_date,
             sc.candidate_id,
             c.name AS candidate_name,
             c.email AS candidate_email,
@@ -708,9 +748,7 @@ def register_recruiter_metrics_routes(app):
         LEFT JOIN hire_opportunity h
             ON h.opportunity_id = sc.opportunity_id
            AND h.candidate_id = sc.candidate_id
-        WHERE sc.sent_date >= %(win_start)s
-          AND sc.sent_date <  %(win_end)s
-        ORDER BY sc.hr_lead_email, sc.sent_date DESC NULLS LAST, sc.opportunity_id, sc.candidate_id;
+        ORDER BY sc.hr_lead_email, sc.close_date DESC NULLS LAST, sc.sent_date DESC NULLS LAST, sc.opportunity_id, sc.candidate_id;
         """
 
         sent_vs_interview_details_sql = """
@@ -1110,6 +1148,8 @@ def register_recruiter_metrics_routes(app):
                     "opportunity_id": row.get("opportunity_id"),
                     "opportunity_title": row.get("opportunity_title"),
                     "opportunity_client_name": row.get("opportunity_client_name"),
+                    "opportunity_stage": row.get("opportunity_stage"),
+                    "close_date": _iso_date_or_none(row.get("close_date")),
                     "batch_id": row.get("batch_id"),
                     "batch_number": batch_number,
                     "sent_date": _iso_date_or_none(row.get("sent_date")),

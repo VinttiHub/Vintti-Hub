@@ -1015,19 +1015,21 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
       };
     }
     case "hireRate": {
-      const totalSent = pipelineEntries.length;
+      const hireRateData = selectedMetrics.hire_rate || {};
       const hireInsights = computeHirePipelineInsights(pipelineEntries);
+      const totalSentRaw = Number(hireRateData.sent);
+      const hiredRaw = Number(hireRateData.hired);
+      const totalSent = Number.isFinite(totalSentRaw) ? totalSentRaw : pipelineEntries.length;
+      const hiredCount = Number.isFinite(hiredRaw) ? hiredRaw : hireInsights.greenCount;
+      const notHiredCount = Math.max(totalSent - hiredCount, 0);
       const computedRate =
-        hireInsights.pct ??
-        (typeof selectedMetrics.hire_rate?.pct === "number"
-          ? selectedMetrics.hire_rate.pct
-          : null);
+        (typeof hireRateData.pct === "number" ? hireRateData.pct : null) ?? hireInsights.pct;
       return {
         title: "Hire rate",
         context: `Sent candidates${recruiterSuffix} between ${readableRange}.`,
         summaryLines: [
-          `Hired candidates: ${hireInsights.greenCount}`,
-          `Not hired candidates: ${hireInsights.redCount}`,
+          `Hired candidates: ${hiredCount}`,
+          `Not hired candidates: ${notHiredCount}`,
           `Rate: ${formatPercent(computedRate)}`,
           `Sent candidates: ${totalSent}`,
         ],
@@ -1764,7 +1766,7 @@ function updateCardsForLead(hrLeadEmail) {
   if (hireRateEl && hireHelperEl) {
     const hireRate = m.hire_rate || {};
     const newHirePct =
-      hireInsights.pct ?? (typeof hireRate.pct === "number" ? hireRate.pct : null);
+      (typeof hireRate.pct === "number" ? hireRate.pct : null) ?? hireInsights.pct;
     if (newHirePct == null) {
       hireRateEl.textContent = "–";
     } else {
@@ -1774,9 +1776,13 @@ function updateCardsForLead(hrLeadEmail) {
         formatter: (v) => formatPercent(v),
       });
     }
+    const hireSentRaw = Number(hireRate.sent);
+    const hireHiredRaw = Number(hireRate.hired);
+    const helperHired = Number.isFinite(hireHiredRaw) ? hireHiredRaw : hireInsights.greenCount;
+    const helperSent = Number.isFinite(hireSentRaw) ? hireSentRaw : hireInsights.totalSent;
     hireHelperEl.textContent = formatRatioSubtext(
-      hireInsights.greenCount,
-      hireInsights.totalSent
+      helperHired,
+      helperSent
     );
     if (isAverageActive && hireHelperEl.textContent) {
       hireHelperEl.textContent = `${averageHelperPrefix}${hireHelperEl.textContent}`;

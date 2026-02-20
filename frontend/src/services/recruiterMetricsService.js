@@ -4,8 +4,9 @@ export async function fetchRecruiterMetrics(params = {}) {
   const url = new URL(`${API_BASE_URL}/recruiter-metrics`);
   if (params.start) url.searchParams.set('start', params.start);
   if (params.end) url.searchParams.set('end', params.end);
+  url.searchParams.set('_ts', String(Date.now()));
 
-  const res = await fetch(url.toString(), { credentials: 'include' });
+  const res = await fetch(url.toString(), { credentials: 'include', cache: 'no-store' });
   if (!res.ok) throw new Error(`Failed to load recruiter metrics: ${res.status}`);
   return res.json();
 }
