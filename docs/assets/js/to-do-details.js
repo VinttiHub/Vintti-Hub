@@ -29,6 +29,7 @@
   let teamUsers = [];
   let teamTasks = new Map();
   let currentTeamUserId = null;
+  const AUTO_REFRESH_MS = 15000;
 
   const getReturnUrl = () => {
     const params = new URLSearchParams(window.location.search);
@@ -615,5 +616,14 @@
 
   loadMyTasks();
   loadTeamTasks();
-})();
 
+  // Keep personal ToDo updated when tasks are created externally.
+  window.setInterval(() => {
+    if (document.hidden) return;
+    loadMyTasks();
+  }, AUTO_REFRESH_MS);
+
+  window.addEventListener('focus', () => {
+    loadMyTasks();
+  });
+})();

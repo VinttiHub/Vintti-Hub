@@ -8,8 +8,6 @@ const API_BASE =
 
 
   const form = document.getElementById("bonusForm");
-  const targetWrap = document.getElementById("targetMonthWrap");
-  const invoiceTarget = form.elements["invoice_target"];
 
   const employeeSelect = document.getElementById("employeeSelect");
   const employeeOtherWrap = document.getElementById("employeeOtherWrap");
@@ -19,19 +17,16 @@ const API_BASE =
     return new URLSearchParams(window.location.search).get(name);
   }
 
+  function getTokenFromUrl(){
+    return qs("t");
+  }
+
   function fmtDate(val){
     if(!val) return "—";
     try {
       const d = new Date(val + "T00:00:00");
       return d.toLocaleDateString("en-US", { year:"numeric", month:"short", day:"2-digit" });
     } catch { return val; }
-  }
-
-  function toggleTargetMonth(){
-    const isSpecific = invoiceTarget.value === "specific_month";
-    targetWrap.classList.toggle("hidden", !isSpecific);
-    form.elements["target_month"].required = isSpecific;
-    updateReview();
   }
 
   function toggleEmployeeOther(){
@@ -46,7 +41,6 @@ const API_BASE =
     const currency = form.elements["currency"].value || "";
     const amount = form.elements["amount"].value ? Number(form.elements["amount"].value).toFixed(2) : "";
     const payout = form.elements["payout_date"].value || "";
-    const inv = form.elements["invoice_target"].value || "";
 
     const employeeLabel =
       employeeSelect.value && employeeSelect.value !== "__other__"
@@ -57,17 +51,10 @@ const API_BASE =
     const rAmount = document.querySelector('[data-review="amount"]');
     const rPayout = document.querySelector('[data-review="payout_date"]');
     const rEmp   = document.querySelector('[data-review="employee_name"]');
-    const rInv   = document.querySelector('[data-review="invoice_target"]');
 
     if (rAmount) rAmount.textContent = amountText;
     if (rPayout) rPayout.textContent = payout ? fmtDate(payout) : "—";
     if (rEmp) rEmp.textContent = employeeLabel || "—";
-    if (rInv) {
-      rInv.textContent =
-        inv === "specific_month"
-          ? `Specific month (${form.elements["target_month"].value || "—"})`
-          : "Next invoice";
-    }
   }
 
  async function loadPublicContext(){
@@ -147,23 +134,35 @@ async function submitPublicRequest(){
   // 1) payload primero
   const payload = Object.fromEntries(new FormData(form).entries());
 
-  // 2) account_id desde URL
+  // 2) account_id/token desde URL (público)
   const accountId = getAccountIdFromUrl();
-  if (!accountId) {
-    alert("Missing account_id in URL. Example: bonus-form.html?account_id=32");
+  const token = getTokenFromUrl();
+
+  if (!accountId && !token) {
+    alert("Missing account_id or token in URL.");
     return;
   }
-  payload.account_id = Number(accountId);
+  if (accountId) payload.account_id = Number(accountId);
 
-  // 3) normalizar employee
-  if (payload.employee_id && payload.employee_id !== "__other__") {
+  // 3) normalizar candidate/manual
+  if (payload.candidate_id && payload.candidate_id !== "__other__") {
     payload.employee_name_manual = "";
   } else {
-    payload.employee_id = null;
+    payload.candidate_id = null;
   }
 
+  if (!payload.candidate_id && !payload.employee_name_manual?.trim()) {
+    alert("Please select an employee or type the employee name.");
+    return;
+  }
+
+  payload.invoice_target = "next_invoice";
+  payload.target_month = "";
+
   // 4) POST (sin token)
-  const url = `${API_BASE}/public/bonus_request/submit`;
+  const url = token
+    ? `${API_BASE}/public/bonus_request/submit?t=${encodeURIComponent(token)}`
+    : `${API_BASE}/public/bonus_request/submit`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -179,14 +178,12 @@ async function submitPublicRequest(){
   showSuccess();
 
   form.reset();
-  toggleTargetMonth();
   // si ya no usas token, NO recargues contexto por token:
   // await loadPublicContext();
   updateReview();
 }
 
   // events
-  invoiceTarget.addEventListener("change", toggleTargetMonth);
   employeeSelect.addEventListener("change", toggleEmployeeOther);
   form.addEventListener("input", updateReview);
 
@@ -194,7 +191,6 @@ async function submitPublicRequest(){
   if (btnClear){
     btnClear.addEventListener("click", async () => {
       form.reset();
-      toggleTargetMonth();
       await loadPublicContext();
       updateReview();
     });
@@ -218,7 +214,6 @@ async function submitPublicRequest(){
 
 
   // init
-  toggleTargetMonth();
   loadPublicContext().then(updateReview).catch(console.error);
 
 
@@ -228,5 +223,3 @@ async function submitPublicRequest(){
 // }
 
 })();
-
-

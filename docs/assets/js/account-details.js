@@ -205,7 +205,9 @@ document.body.style.backgroundColor = 'var(--bg)';
   setupStatusChipEvents();
 
   // Tabs
-  const tabs = document.querySelectorAll('.tab-btn');
+  const tabs = Array.from(document.querySelectorAll('.tab-btn')).filter(
+    (tab) => tab.hasAttribute('data-tab')
+  );
   const contents = document.querySelectorAll('.tab-content');
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
@@ -213,9 +215,14 @@ document.body.style.backgroundColor = 'var(--bg)';
       tab.classList.add('active');
       const target = tab.getAttribute('data-tab');
       contents.forEach(c => {
-        c.classList.remove('active');
-        if (c.id === target) c.classList.add('active');
+        const on = c.id === target;
+        c.classList.toggle('active', on);
+        c.hidden = !on;
       });
+
+      if (target === 'invoice') {
+        loadBonusRequests().catch(console.error);
+      }
     });
   });
 
@@ -2354,65 +2361,6 @@ function fmtISODate(v) {
   return isRealISODate(v) ? new Date(v).toLocaleDateString('en-US') : '';
 }
 
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const tab = btn.dataset.tab;
-
-    // activar botón
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    // mostrar/ocultar secciones
-    document.querySelectorAll(".tab-content").forEach(sec => {
-      const on = sec.id === tab;
-      sec.classList.toggle("active", on);
-      sec.hidden = !on;
-    });
-
-    // cargar billing.html en iframe cuando abres invoice
-    if (tab === "invoice") {
-      loadBonusRequests().catch(console.error);
-  const frame = document.getElementById("billingFrame");
-  if (!frame) return;
-
-  const url = new URL(window.location.href);
-
-  // intenta varias keys comunes:
-  const accountId =
-    url.searchParams.get("account_id") ||
-    url.searchParams.get("id") ||
-    url.searchParams.get("accountId");
-
-  console.log("Invoice tab open. accountId =", accountId);
-
-  if (!accountId) {
-    frame.srcdoc = `<div style="font-family:Onest,system-ui;padding:20px;color:#fff;background:#0b0d10">
-      No encontré account_id en la URL 😭 <br/>
-      Agrega ?account_id=123 o ajusta el JS a tu parámetro real.
-    </div>`;
-    return;
-  }
-
-  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-  frame.src = `billing.html?account_id=${encodeURIComponent(accountId)}&month=${month}`;
-}
-
-  });
-});
-
-document.getElementById('requestBonusBtn')?.addEventListener('click', () => {
-  const params = new URLSearchParams(window.location.search);
-  const accountId = params.get('id'); // porque account-details usa ?id=32
-
-  if (!accountId) {
-    alert('Missing account id in URL');
-    return;
-  }
-
-  const url = `bonus-form.html?account_id=${encodeURIComponent(accountId)}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
-});
-
 function getAccountIdFromUrl(){
   const p = new URLSearchParams(window.location.search);
   return p.get("id") || p.get("account_id") || null;
@@ -2425,43 +2373,11 @@ document.getElementById("requestBonusBtn")?.addEventListener("click", () => {
     return;
   }
 
-  // si bonus-form.html está en la misma carpeta /docs:
-  const url = `bonus-form.html?id=${encodeURIComponent(accountId)}`;
+  const url = `bonus-form.html?account_id=${encodeURIComponent(accountId)}`;
   window.open(url, "_blank", "noopener,noreferrer");
 });
 
 //FORM DATAAA
-
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const tab = btn.dataset.tab;
-
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    document.querySelectorAll(".tab-content").forEach(sec => {
-      const on = sec.id === tab;
-      sec.classList.toggle("active", on);
-      sec.hidden = !on;
-    });
-
-    if (tab === "invoice") {
-      const frame = document.getElementById("billingFrame");
-      if (!frame) return;
-
-      const params = new URLSearchParams(window.location.search);
-      const accountId = params.get("id"); // en account-details usas ?id=32
-
-      if (!accountId) {
-        frame.srcdoc = `<div style="padding:20px;font-family:Onest,system-ui">Missing account id</div>`;
-        return;
-      }
-
-      const month = new Date().toISOString().slice(0, 7);
-      frame.src = `billing.html?account_id=${encodeURIComponent(accountId)}&month=${month}`;
-    }
-  });
-});
 
 
 

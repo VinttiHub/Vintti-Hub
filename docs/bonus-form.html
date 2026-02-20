@@ -61,7 +61,8 @@
             <label class="field">
               <span>Employee payout date</span>
               <input name="payout_date" type="date" required />
-              <small class="hint">For example: payroll date or the agreed payout date.</small>
+              <small class="hint">Select the date the employee will receive the bonus.
+    This will be included in that month’s invoice.</small>
             </label>
 
             <label class="field">
@@ -74,19 +75,6 @@
               </select>
             </label>
 
-            <label class="field">
-              <span>Which invoice should include this?</span>
-              <select name="invoice_target" required>
-                <option value="next_invoice">Next invoice</option>
-                <option value="specific_month">Specific month</option>
-              </select>
-            </label>
-
-            <label class="field field-full hidden" id="targetMonthWrap">
-              <span>Target month</span>
-              <input name="target_month" type="month" />
-              <small class="hint">If you choose “Specific month”, select it here.</small>
-            </label>
           </div>
         </section>
 
@@ -201,10 +189,6 @@
             <div class="review-item">
               <span class="k">Employee</span>
               <strong class="v" data-review="employee_name">—</strong>
-            </div>
-            <div class="review-item">
-              <span class="k">Invoice</span>
-              <strong class="v" data-review="invoice_target">—</strong>
             </div>
           </div>
 
