@@ -1,9 +1,77 @@
+import html
+import logging
+import os
+from datetime import date, timedelta
+
+import requests
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import RealDictCursor
 
 from db import get_connection
 
 bp = Blueprint('to_do', __name__)
+APP_BASE_URL = os.environ.get('APP_BASE_URL', 'https://7m6mw95m8y.us-east-2.awsapprunner.com').rstrip('/')
+
+
+def _todo_reminder_email_html(user_name: str, groups: dict[str, list[dict]]) -> str:
+    safe_name = html.escape(user_name or 'there')
+    detail_url = 'https://vinttihub.vintti.com/to-do-details.html'
+
+    sections = []
+    labels = {
+        'overdue': 'Overdue',
+        'today': 'Due today',
+        'soon': 'Due soon',
+    }
+    for key in ('overdue', 'today', 'soon'):
+        items = groups.get(key) or []
+        if not items:
+            continue
+        lis = []
+        for task in items:
+            due = html.escape(str(task.get('due_date') or ''))
+            desc = html.escape(task.get('description') or '')
+            suffix = ' (Subtask)' if task.get('subtask') else ''
+            lis.append(f'<li><b>{due}</b> — {desc}{suffix}</li>')
+        sections.append(
+            f"""
+            <div style="margin:14px 0">
+              <div style="font-weight:600;margin-bottom:6px">{labels[key]} ({len(items)})</div>
+              <ul style="margin:0;padding-left:18px">{''.join(lis)}</ul>
+            </div>
+            """
+        )
+
+    return f"""
+    <div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1f2937">
+      <p>Hi {safe_name},</p>
+      <p>This is a reminder about tasks in your Vintti Hub ToDo that are due soon or overdue.</p>
+      {''.join(sections)}
+      <p style="margin-top:16px">
+        <a href="{detail_url}" target="_blank" rel="noopener"
+           style="display:inline-block;padding:10px 14px;border-radius:8px;background:#111827;color:#fff;text-decoration:none">
+          Open ToDo
+        </a>
+      </p>
+      <p style="color:#6b7280;font-size:12px">You received this because you have pending tasks assigned to your user.</p>
+    </div>
+    """
+
+
+def _send_email_via_endpoint(subject: str, html_body: str, to: list[str], base_url: str | None = None) -> bool:
+    try:
+        resolved_base = (base_url or APP_BASE_URL).rstrip('/')
+        response = requests.post(
+            f'{resolved_base}/send_email',
+            json={'to': to, 'subject': subject, 'body': html_body},
+            timeout=30,
+        )
+        if not response.ok:
+            logging.error('ToDo reminder email failed: %s %s', response.status_code, response.text)
+        return response.ok
+    except Exception:
+        logging.exception('ToDo reminder email exception')
+        return False
 
 
 @bp.route('/to_do', methods=['GET', 'POST', 'OPTIONS'])
@@ -215,3 +283,159 @@ def to_do_reorder():
         return jsonify({"ok": True})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/to_do/reminders/send', methods=['POST', 'OPTIONS'])
+def to_do_send_reminders():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    data = request.get_json(silent=True) or {}
+    target_user_id = data.get('user_id')
+    target_email = (data.get('email') or '').strip().lower() or None
+    days_ahead = data.get('days_ahead', 2)
+    include_overdue = bool(data.get('include_overdue', True))
+    dry_run = bool(data.get('dry_run', False))
+    email_api_base = (data.get('email_api_base') or '').strip().rstrip('/') or request.host_url.rstrip('/') or APP_BASE_URL
+
+    try:
+        days_ahead = int(days_ahead)
+    except Exception:
+        return jsonify({"error": "days_ahead must be an integer"}), 400
+
+    if days_ahead < 0 or days_ahead > 14:
+        return jsonify({"error": "days_ahead must be between 0 and 14"}), 400
+
+    today = date.today()
+    due_limit = today + timedelta(days=days_ahead)
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT
+              u.user_id,
+              COALESCE(NULLIF(u.user_name, ''), SPLIT_PART(u.email_vintti, '@', 1), 'User') AS user_name,
+              LOWER(TRIM(u.email_vintti)) AS email_vintti,
+              t.to_do_id,
+              t.description,
+              t.due_date::date AS due_date,
+              t.subtask
+            FROM to_do t
+            JOIN users u ON u.user_id = t.user_id
+            WHERE COALESCE(t."check", FALSE) = FALSE
+              AND t.due_date IS NOT NULL
+              AND t.due_date::date <= %s
+              AND LOWER(TRIM(COALESCE(u.email_vintti, ''))) <> ''
+        """
+        params = [due_limit]
+
+        if not include_overdue:
+            query += ' AND t.due_date::date >= %s'
+            params.append(today)
+        if target_user_id is not None:
+            query += ' AND u.user_id = %s'
+            params.append(target_user_id)
+        if target_email:
+            query += ' AND LOWER(TRIM(u.email_vintti)) = %s'
+            params.append(target_email)
+
+        query += ' ORDER BY LOWER(TRIM(u.email_vintti)) ASC, t.due_date::date ASC, t.orden NULLS LAST, t.to_do_id ASC'
+        cur.execute(query, tuple(params))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    by_user: dict[tuple[int, str], dict] = {}
+    for row in rows:
+        due = row.get('due_date')
+        if due is None:
+            continue
+        key = (int(row['user_id']), row['email_vintti'])
+        bucket = by_user.setdefault(
+            key,
+            {
+                'user_id': int(row['user_id']),
+                'user_name': row.get('user_name') or 'User',
+                'email': row['email_vintti'],
+                'overdue': [],
+                'today': [],
+                'soon': [],
+            },
+        )
+        task = {
+            'to_do_id': row.get('to_do_id'),
+            'description': row.get('description') or '',
+            'due_date': str(due),
+            'subtask': row.get('subtask'),
+        }
+        if due < today:
+            bucket['overdue'].append(task)
+        elif due == today:
+            bucket['today'].append(task)
+        else:
+            bucket['soon'].append(task)
+
+    sent = []
+    skipped = []
+
+    for payload in by_user.values():
+        total = len(payload['overdue']) + len(payload['today']) + len(payload['soon'])
+        if total == 0:
+            continue
+
+        subject_bits = []
+        if payload['overdue']:
+            subject_bits.append(f"{len(payload['overdue'])} overdue")
+        if payload['today']:
+            subject_bits.append(f"{len(payload['today'])} due today")
+        if payload['soon']:
+            subject_bits.append(f"{len(payload['soon'])} due soon")
+        subject = f"Vintti Hub ToDo reminder: {', '.join(subject_bits)}"
+
+        html_body = _todo_reminder_email_html(payload['user_name'], {
+            'overdue': payload['overdue'],
+            'today': payload['today'],
+            'soon': payload['soon'],
+        })
+
+        preview = {
+            'user_id': payload['user_id'],
+            'email': payload['email'],
+            'counts': {
+                'overdue': len(payload['overdue']),
+                'today': len(payload['today']),
+                'soon': len(payload['soon']),
+            },
+            'subject': subject,
+        }
+
+        if dry_run:
+            skipped.append({**preview, 'reason': 'dry_run'})
+            continue
+
+        ok = _send_email_via_endpoint(subject, html_body, [payload['email']], base_url=email_api_base)
+        if ok:
+            sent.append(preview)
+        else:
+            skipped.append({**preview, 'reason': 'send_failed'})
+
+    return jsonify({
+        'ok': True,
+        'filters': {
+            'user_id': target_user_id,
+            'email': target_email,
+            'days_ahead': days_ahead,
+            'include_overdue': include_overdue,
+            'dry_run': dry_run,
+            'email_api_base': email_api_base,
+            'today': str(today),
+            'due_limit': str(due_limit),
+        },
+        'users_found': len(by_user),
+        'sent': sent,
+        'skipped': skipped,
+    }), 200

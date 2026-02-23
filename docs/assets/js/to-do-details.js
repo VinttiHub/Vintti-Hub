@@ -116,6 +116,7 @@
 
     checkbox.addEventListener('change', async () => {
       const nextValue = checkbox.checked;
+      task.check = nextValue;
       row.classList.toggle('is-done', nextValue);
       try {
         const res = await fetch(`${API_BASE}/to_do/${task.to_do_id}`, {
@@ -129,6 +130,7 @@
           await moveTaskToEnd(tasksRef, ownerId, task);
         }
       } catch (error) {
+        task.check = !nextValue;
         checkbox.checked = !nextValue;
         row.classList.toggle('is-done', checkbox.checked);
       }

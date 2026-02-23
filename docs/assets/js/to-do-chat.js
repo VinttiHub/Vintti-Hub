@@ -104,6 +104,7 @@
 
     checkbox.addEventListener('change', async () => {
       const nextValue = checkbox.checked;
+      task.check = nextValue;
       wrapper.classList.toggle('is-done', nextValue);
       if (nextValue) showToast('Good job!');
 
@@ -120,6 +121,7 @@
           renderTasks(currentTasks);
         }
       } catch (error) {
+        task.check = !nextValue;
         checkbox.checked = !nextValue;
         wrapper.classList.toggle('is-done', checkbox.checked);
         showToast('Oops, try again.');
