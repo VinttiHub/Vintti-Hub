@@ -6,15 +6,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const bodyEl = document.body;
   const downloadBtn = document.getElementById("readonly-download-btn");
   const ratingEl = document.getElementById("resume-rating");
-  const ratingButtons = ratingEl ? Array.from(ratingEl.querySelectorAll(".rating-star")) : [];
-  const ratingComment = document.getElementById("resume-rating-comment");
-  const ratingTextarea = document.getElementById("resume-rating-text");
-  const ratingSubmit = document.getElementById("resume-rating-submit");
+  const ratingButtons = ratingEl ? Array.from(ratingEl.querySelectorAll(".rating-choice")) : [];
   const ratingStatus = document.getElementById("resume-rating-status");
   const ratingToggle = document.getElementById("resume-rating-toggle");
   const ratingClose = document.getElementById("resume-rating-close");
   const ratingBubble = document.getElementById("resume-rating-bubble");
-  let currentStars = 0;
+  let currentRating = "";
   let candidateFileName = "resume";
   if (downloadBtn) downloadBtn.disabled = true;
   if (bodyEl) {
@@ -156,19 +153,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  const renderStars = (value) => {
+  const renderRating = (value) => {
     ratingButtons.forEach((btn) => {
-      const starValue = Number(btn.dataset.star);
-      const active = starValue <= value;
+      const active = btn.dataset.value === value;
       btn.classList.toggle("is-active", active);
       btn.setAttribute("aria-pressed", active ? "true" : "false");
     });
-    if (ratingComment) {
-      const shouldShow = value > 0;
-      ratingComment.classList.toggle("is-visible", shouldShow);
-      ratingComment.setAttribute("aria-hidden", shouldShow ? "false" : "true");
-    }
-    setRatingBubble(value > 0);
+    setRatingBubble(Boolean(value));
   };
 
   const patchResume = async (payload) => {
@@ -187,13 +178,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     ratingButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!candidateId) return;
-        const value = Number(btn.dataset.star);
-        if (!value || value === currentStars) return;
-        currentStars = value;
-        renderStars(currentStars);
+        const value = btn.dataset.value;
+        if (!value || value === currentRating) return;
+        currentRating = value;
+        renderRating(currentRating);
         setRatingStatus("Saving...", "loading");
         try {
-          await patchResume({ stars: currentStars });
+          await patchResume({ comments_stars: currentRating });
           setRatingStatus("Thanks for rating this candidate.", "success");
           setRatingBubble(true);
         } catch (err) {
@@ -201,24 +192,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           setRatingStatus("Unable to save rating right now.", "error");
         }
       });
-    });
-  }
-
-  if (ratingTextarea && ratingSubmit) {
-    ratingSubmit.addEventListener("click", async () => {
-      if (!candidateId) return;
-      const comment = ratingTextarea.value.trim();
-      setRatingStatus("Sending...", "loading");
-      try {
-        const payload = { stars: currentStars || 0 };
-        if (comment) payload.comments_stars = comment;
-        await patchResume(payload);
-        setRatingStatus(comment ? "Message sent. Thank you!" : "Rating saved. Thank you!", "success");
-        setRatingBubble(true);
-      } catch (err) {
-        console.error("Unable to save comment", err);
-        setRatingStatus("Unable to save message right now.", "error");
-      }
     });
   }
 // Muestra esto cuando no hay fecha
@@ -313,17 +286,10 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     if (ratingEl) {
-      const initialStars = Number(data.stars) || 0;
-      currentStars = initialStars;
-      if (ratingTextarea && typeof data.comments_stars === "string") {
-        ratingTextarea.value = data.comments_stars;
-      }
-      renderStars(currentStars);
+      const initialRating = typeof data.comments_stars === "string" ? data.comments_stars : "";
+      currentRating = initialRating === "great" || initialRating === "bad" ? initialRating : "";
+      renderRating(currentRating);
       setRatingOpen(false);
-      if (ratingComment && ratingTextarea && ratingTextarea.value.trim().length > 0) {
-        ratingComment.classList.add("is-visible");
-        ratingComment.setAttribute("aria-hidden", "false");
-      }
     }
 
     // 🧠 About

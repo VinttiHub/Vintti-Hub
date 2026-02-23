@@ -103,7 +103,7 @@
     };
 
     setDisplay('candidateSearchLink', new Set([
-      'agustina.barbero@vintti.com','agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
+      'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
       'pilar@vintti.com','pilar.fernandez@vintti.com','angie@vintti.com','agostina@vintti.com',
       'julieta@vintti.com','paz@vintti.com'
     ]).has(email));
@@ -120,7 +120,7 @@
     setDisplay('managementMetricsLink', dashOk);
 
     setDisplay('recruiterPowerLink', new Set([
-      'angie@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com','agustina.barbero@vintti.com',
+      'angie@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
       'constanza@vintti.com','pilar@vintti.com','pilar.fernandez@vintti.com','julieta@vintti.com','paz@vintti.com',
       'valentina@vintti.com'
     ]).has(email));

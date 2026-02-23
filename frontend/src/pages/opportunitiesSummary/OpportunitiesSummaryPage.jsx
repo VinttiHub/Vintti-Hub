@@ -11,7 +11,6 @@ const HR_LEADS = [
   { email: 'pilar.fernandez@vintti.com', label: 'Pilar Fernandez' },
   { email: 'agostina@vintti.com', label: 'Agostina' },
   { email: 'jazmin@vintti.com', label: 'Jazmín' },
-  { email: 'agustina.barbero@vintti.com', label: 'Agustina Barbero' },
   { email: 'constanza@vintti.com', label: 'Constanza' },
   { email: 'julieta@vintti.com', label: 'Julieta Godoy' },
 ];

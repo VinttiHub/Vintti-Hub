@@ -659,7 +659,6 @@ window.AVATAR_BY_EMAIL = Object.assign(
     'pilar@vintti.com':    'pilar.png',
     'agustin@vintti.com':  'agus.png',
     'agustina@vintti.com': 'agustina_valentini.png',
-    'agustina.barbero@vintti.com': 'agustina.png',
     'mariano@vintti.com': 'mariano.png',
     'vianney@vintti.com': 'vianney.png'
   },
@@ -1321,7 +1320,6 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'angie@vintti.com',
     'agostina@vintti.com',
     'agostin@vintti.com',
-    'agustina.barbero@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'constanza@vintti.com',
@@ -1363,7 +1361,6 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
   const CANDIDATE_SEARCH_ALLOWED = new Set([
-    'agustina.barbero@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'constanza@vintti.com',

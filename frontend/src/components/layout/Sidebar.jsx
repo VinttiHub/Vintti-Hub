@@ -14,7 +14,6 @@ const SUMMARY_ALLOWED = new Set([
 ]);
 
 const CANDIDATE_SEARCH_ALLOWED = new Set([
-  'agustina.barbero@vintti.com',
   'agustin@vintti.com',
   'lara@vintti.com',
   'constanza@vintti.com',

@@ -70,10 +70,25 @@
     });
   };
 
+  const daysUntil = (raw) => {
+    if (!raw) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(due.getTime())) return null;
+    return Math.round((due - today) / 86400000);
+  };
+
+  const isNearDue = (raw) => {
+    const days = daysUntil(raw);
+    return days !== null && days >= 0 && days <= 2;
+  };
+
   const buildMyTask = (task, editable, ownerId, tasksRef) => {
     const row = document.createElement('label');
     row.className = 'note-task';
     if (task.check) row.classList.add('is-done');
+    if (!task.check && isNearDue(task.due_date)) row.classList.add('is-near-due');
     row.dataset.todoId = task.to_do_id;
     row.dataset.parent = task.subtask || 'root';
     row.draggable = false;
@@ -92,7 +107,12 @@
 
     const date = document.createElement('span');
     date.className = 'note-task__date';
-    date.textContent = formatDate(task.due_date);
+    const formattedDate = formatDate(task.due_date);
+    if (!task.check && isNearDue(task.due_date) && formattedDate) {
+      date.textContent = `${formattedDate} ⏳`;
+    } else {
+      date.textContent = formattedDate;
+    }
 
     checkbox.addEventListener('change', async () => {
       const nextValue = checkbox.checked;

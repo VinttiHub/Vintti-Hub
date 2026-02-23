@@ -13,7 +13,6 @@ const EXCLUDED_EMAILS = new Set([
 ]);
 
 const RESTRICTED_EMAILS = new Set([
-  'agustina.barbero@vintti.com',
   'constanza@vintti.com',
   'pilar@vintti.com',
   'pilar.fernandez@vintti.com',

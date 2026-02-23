@@ -17,7 +17,6 @@ WHERE (u.role ILIKE '%recruit%')
         'pilar.fernandez@vintti.com',
         'jazmin@vintti.com',
         'agostina@vintti.com',
-        'agustina.barbero@vintti.com',
         'agustina.ferrari@vintti.com',
         'josefina@vintti.com',
         'constanza@vintti.com',

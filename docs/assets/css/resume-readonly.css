@@ -391,99 +391,63 @@ html, body {
   font-weight: 600;
 }
 
-.resume-rating-stars {
+.resume-rating-choices {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.rating-star {
-  border: none;
-  background: transparent;
-  font-size: 26px;
-  color: rgba(250, 204, 21, 0.4);
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.15s ease, color 0.15s ease;
-}
-
-.rating-star:hover {
-  transform: translateY(-1px);
-  color: rgba(250, 204, 21, 0.75);
-}
-
-.rating-star.is-active {
-  color: #facc15;
-  text-shadow: 0 6px 12px rgba(250, 204, 21, 0.35);
-}
-
-.resume-rating-comment {
-  display: grid;
-  gap: 8px;
-  opacity: 0;
-  max-height: 0;
-  overflow: hidden;
-  transform: translateY(-4px);
-  transition: opacity 0.2s ease, max-height 0.2s ease, transform 0.2s ease;
-}
-
-.resume-rating-comment.is-visible {
-  opacity: 1;
-  max-height: 200px;
-  transform: translateY(0);
-}
-
-.resume-rating-comment label {
-  font-size: 12px;
-  color: #334155;
-  font-weight: 600;
-}
-
-.resume-rating-comment textarea {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(203, 213, 225, 0.6);
-  padding: 10px 12px;
-  font-size: 13px;
-  resize: vertical;
+.rating-choice {
+  border: 1px solid rgba(15, 23, 42, 0.14);
   background: rgba(255, 255, 255, 0.78);
-  color: #111827;
-  font-family: "Onest", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0f172a;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+    color 0.15s ease;
 }
 
-.resume-rating-comment textarea:focus-visible {
-  outline: 2px solid rgba(0, 59, 255, 0.35);
-  outline-offset: 2px;
+.rating-choice-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.rating-choice--good {
+  --choice-color: #16a34a;
+  --choice-bg: rgba(22, 163, 74, 0.16);
+  --choice-border: rgba(22, 163, 74, 0.4);
+}
+
+.rating-choice--bad {
+  --choice-color: #dc2626;
+  --choice-bg: rgba(220, 38, 38, 0.14);
+  --choice-border: rgba(220, 38, 38, 0.4);
+}
+
+.rating-choice:hover {
+  transform: translateY(-1px);
+  border-color: var(--choice-border);
+  background: var(--choice-bg);
+  color: var(--choice-color);
+}
+
+.rating-choice.is-active {
+  border-color: var(--choice-border);
+  background: var(--choice-bg);
+  color: var(--choice-color);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.14);
 }
 
 .resume-rating-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.resume-rating-send {
-  border: none;
-  border-radius: 999px;
-  padding: 6px 14px;
-  background: rgba(245, 158, 11, 0.2);
-  color: #6b3c00;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
-}
-
-.resume-rating-send:hover:not(:disabled) {
-  background: #f59e0b;
-  color: #2e1a00;
-  transform: translateY(-1px);
-}
-
-.resume-rating-send:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
+  min-height: 18px;
 }
 
 .resume-rating-status {

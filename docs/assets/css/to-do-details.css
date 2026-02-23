@@ -337,6 +337,11 @@ body {
   cursor: default;
 }
 
+.note-task.is-near-due {
+  border-color: rgba(236, 140, 140, 0.45);
+  background: #fff4f2;
+}
+
 .note-task__actions {
   display: inline-flex;
   align-items: center;

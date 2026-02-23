@@ -41,6 +41,20 @@
     return due < today;
   };
 
+  const daysUntil = (raw) => {
+    if (!raw) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(due.getTime())) return null;
+    return Math.round((due - today) / 86400000);
+  };
+
+  const isNearDue = (raw) => {
+    const days = daysUntil(raw);
+    return days !== null && days >= 0 && days <= 2;
+  };
+
   const showToast = (message) => {
     if (!toast) return;
     toast.textContent = message;
@@ -65,6 +79,7 @@
     wrapper.className = 'todo-item';
     if (task.check) wrapper.classList.add('is-done');
     if (!task.check && isOverdue(task.due_date)) wrapper.classList.add('is-overdue');
+    if (!task.check && isNearDue(task.due_date)) wrapper.classList.add('is-near-due');
     if (task.subtask) wrapper.classList.add('todo-item--sub');
     wrapper.dataset.todoId = task.to_do_id;
     wrapper.dataset.parent = task.subtask || 'root';
@@ -80,7 +95,12 @@
 
     const date = document.createElement('span');
     date.className = 'todo-item__date';
-    date.textContent = formatDate(task.due_date);
+    const formattedDate = formatDate(task.due_date);
+    if (!task.check && isNearDue(task.due_date) && formattedDate) {
+      date.textContent = `${formattedDate} ⏳`;
+    } else {
+      date.textContent = formattedDate;
+    }
 
     checkbox.addEventListener('change', async () => {
       const nextValue = checkbox.checked;

@@ -1206,7 +1206,6 @@ function installAdvancedFilters(table) {
     'angie@vintti.com',
     'agostina@vintti.com',
     'agostin@vintti.com',
-    'agustina.barbero@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'constanza@vintti.com',
@@ -1248,7 +1247,6 @@ function installAdvancedFilters(table) {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
   const CANDIDATE_SEARCH_ALLOWED = new Set([
-    'agustina.barbero@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'constanza@vintti.com',

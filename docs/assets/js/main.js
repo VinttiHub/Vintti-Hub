@@ -1322,9 +1322,7 @@ function nameToEmail(label, isHR){
     if (lower.includes('pilar'))                                 return 'pilar@vintti.com';
 
     if (lower.includes('jazmin'))                                 return 'jazmin@vintti.com';
-    if (lower.includes('agostina') && lower.includes('barbero'))  return 'agustina.barbero@vintti.com';
     if (lower.includes('agostina') && lower.includes('ferrari'))  return 'agustina.ferrari@vintti.com';
-    if (lower === 'agustina barbero')                             return 'agustina.barbero@vintti.com';
     if (lower === 'agustina ferrari')                             return 'agustina.ferrari@vintti.com';
     if (lower.includes('agostina'))                               return 'agostina@vintti.com';
   } else {
@@ -1741,7 +1739,6 @@ if (candidateSearchLink) {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
   const CANDIDATE_SEARCH_ALLOWED = new Set([
-    'agustina.barbero@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'constanza@vintti.com',
@@ -2812,7 +2809,6 @@ async function patchOppFields(oppId, payload) {
     'angie@vintti.com',
     'agostina@vintti.com',
     'agostin@vintti.com',
-    'agustina.barbero@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com',
     'constanza@vintti.com',
@@ -2842,7 +2838,6 @@ const HR_INITIALS_BY_EMAIL = {
   'jazmin@vintti.com':                  'JP',
   'pilar@vintti.com':                   'PL', 
   'pilar.fernandez@vintti.com':         'PF', 
-  'agustina.barbero@vintti.com':        'AB',
   'josefina@vintti.com':                'JP',
   'constanza@vintti.com':               'CL',
   'julieta@vintti.com':                 'JG',
@@ -2863,7 +2858,6 @@ function initialsForHRLead(emailOrName) {
   // fallback histórico (si solo dice "Pilar", asumimos la de siempre)
   if (s === 'pilar' || (s.includes('pilar') && !s.includes('fernandez'))) return 'PL';
 
-  if (s.includes('agostina') && s.includes('barbero'))  return 'AB';
   if (s.includes('agostina') && s.includes('ferrari'))  return 'AF';
   if (s.includes('agostina')) return 'AC';
   if (s.includes('jazmin'))   return 'JP';

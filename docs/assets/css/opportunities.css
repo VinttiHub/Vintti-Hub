@@ -2050,6 +2050,11 @@ body.dark-mode .profile-tile{
   background: #fff1f6;
 }
 
+.todo-item.is-near-due {
+  border-color: rgba(236, 140, 140, 0.5);
+  background: #fff4f2;
+}
+
 .todo-item.is-done {
   opacity: 0.7;
 }
