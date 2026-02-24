@@ -2585,7 +2585,19 @@ async function upsertTodoTask({ sourceKey, description, due_date, forceUserId=nu
   const tasks = await apiFetch(`/to_do?user_id=${encodeURIComponent(userId)}`);
   const list = Array.isArray(tasks) ? tasks : [];
   const marker = `[AUTO:${sourceKey}]`;
+  const fullDescription = `${marker} ${description}`;
   const existing = list.find(t => (t.description || "").includes(marker));
+
+  // Si ya existe y no cambió nada relevante, no recrees (preserva el check).
+  if (existing) {
+    const existingDue = toISODateOrNull(existing.due_date);
+    const existingDesc = String(existing.description || "");
+    if (existingDue === safeDue && existingDesc === fullDescription) {
+      return existing;
+    }
+  }
+
+  const shouldRestoreChecked = Boolean(existing?.check);
 
   if (existing) {
     await apiFetch(`/to_do/${existing.to_do_id}`, {
@@ -2594,14 +2606,22 @@ async function upsertTodoTask({ sourceKey, description, due_date, forceUserId=nu
     });
   }
 
-  await apiFetch(`/to_do`, {
+  const created = await apiFetch(`/to_do`, {
     method: "POST",
     body: JSON.stringify({
       user_id: userId,
-      description: `${marker} ${description}`,
+      description: fullDescription,
       due_date: safeDue, // ✅ payout real
     }),
   });
+
+  // Si tocó recrear una tarea ya completada, restaura el check.
+  if (shouldRestoreChecked && created?.to_do_id) {
+    await apiFetch(`/to_do/${created.to_do_id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ user_id: userId, check: true }),
+    });
+  }
 }
 
 const AGUSTIN_USER_ID = 1;        // ✅ ya lo tienes

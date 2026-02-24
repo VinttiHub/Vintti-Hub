@@ -11,7 +11,8 @@ from sendgrid.helpers.mail import Mail, Email
 
 bp = Blueprint("public_bonus", __name__, url_prefix="/public/bonus_request")
 
-BONUS_EMAIL_RECIPIENTS = ["fatimag811@gmail.com", "pgonzales@vintti.com"]
+BONUS_EMAIL_FALLBACK_RECIPIENTS = ["agustin@vintti.com", "lara@vintti.com", "pgonzales@vintti.com"]
+BONUS_EMAIL_RECIPIENT_USER_IDS = [1, 2, 12]
 
 def _safe_date(s):
     if not s: return None
@@ -32,6 +33,7 @@ def _safe_target_month(s):
         return None
 
 def _send_bonus_request_email(
+    to_emails: list[str],
     bonus_request_id: int,
     account_name: str,
     candidate_label: str,
@@ -44,6 +46,8 @@ def _send_bonus_request_email(
     api_key = os.environ.get("SENDGRID_API_KEY")
     if not api_key:
         raise RuntimeError("SENDGRID_API_KEY not configured")
+    if not to_emails:
+        raise RuntimeError("No bonus email recipients configured")
 
     amount_num = float(amount) if amount not in (None, "") else 0.0
     amount_text = f"{currency} {amount_num:,.2f}".strip()
@@ -68,12 +72,44 @@ def _send_bonus_request_email(
 
     msg = Mail(
         from_email=Email("hub@vintti-hub.com", name="Vintti HUB"),
-        to_emails=BONUS_EMAIL_RECIPIENTS,
+        to_emails=to_emails,
         subject=subject,
         html_content=html_body,
     )
     sg = SendGridAPIClient(api_key)
     sg.send(msg)
+
+
+def _resolve_bonus_email_recipients(cur) -> list[str]:
+    recipients = []
+    seen = set()
+
+    for user_id in BONUS_EMAIL_RECIPIENT_USER_IDS:
+        try:
+            cur.execute(
+                """
+                SELECT LOWER(TRIM(email_vintti)) AS email
+                FROM users
+                WHERE user_id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone() or {}
+            email = (row.get("email") or "").strip().lower()
+            if email and email not in seen:
+                seen.add(email)
+                recipients.append(email)
+        except Exception:
+            logging.exception("Failed resolving bonus email recipient for user_id=%s", user_id)
+
+    for email in BONUS_EMAIL_FALLBACK_RECIPIENTS:
+        clean = str(email or "").strip().lower()
+        if clean and clean not in seen:
+            seen.add(clean)
+            recipients.append(clean)
+
+    return recipients
 
 @bp.route("/submit", methods=["POST", "OPTIONS"])
 def submit_bonus_request():
@@ -221,6 +257,7 @@ def submit_bonus_request():
 
         acc_row = cur.fetchone()
         account_name = acc_row["client_name"] if acc_row and acc_row.get("client_name") else f"Account #{account_id_int}"
+        bonus_email_recipients = _resolve_bonus_email_recipients(cur)
 
 
         TODO_OWNER_USER_IDS = [1, 2]
@@ -272,6 +309,7 @@ def submit_bonus_request():
         email_warning = None
         try:
             _send_bonus_request_email(
+                to_emails=bonus_email_recipients,
                 bonus_request_id=bonus_request_id,
                 account_name=account_name,
                 candidate_label=candidate_label,
@@ -371,17 +409,69 @@ def public_context():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    # ✅ AJUSTA SQL a tus tablas reales
+    # Activos para el selector del bonus:
+    # - hires activos (hire_opportunity)
+    # - buyouts activos (tabla buyouts)
+    # Dedupe por candidate_id para no repetir personas.
     cur.execute("""
-    SELECT DISTINCT
-        c.candidate_id,
-        c.name AS full_name
-    FROM hire_opportunity ho
-    JOIN candidates c ON c.candidate_id = ho.candidate_id
-    WHERE ho.account_id = %s
-        AND ho.carga_inactive IS NULL
-    ORDER BY c.name ASC
-    """, (account_id,))
+    WITH hire_rows AS (
+      SELECT
+        ho.candidate_id,
+        c.name AS full_name,
+        CASE
+          WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+          WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+            THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
+          ELSE NULL
+        END AS start_d,
+        CASE
+          WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+          WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NOT NULL
+            THEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
+          ELSE NULL
+        END AS end_d
+      FROM hire_opportunity ho
+      JOIN candidates c ON c.candidate_id = ho.candidate_id
+      WHERE ho.account_id = %s
+        AND ho.candidate_id IS NOT NULL
+    ),
+    buyout_rows AS (
+      SELECT
+        b.candidate_id,
+        COALESCE(c.name, CONCAT('Candidate #', b.candidate_id::text)) AS full_name,
+        CASE
+          WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+            THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
+          ELSE NULL
+        END AS start_d,
+        CASE
+          WHEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NOT NULL
+            THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date
+          ELSE NULL
+        END AS end_d
+      FROM buyouts b
+      LEFT JOIN candidates c ON c.candidate_id = b.candidate_id
+      WHERE b.account_id = %s
+        AND b.candidate_id IS NOT NULL
+    ),
+    active_rows AS (
+      SELECT candidate_id, full_name
+      FROM hire_rows
+      WHERE (start_d IS NULL OR start_d <= CURRENT_DATE)
+        AND (end_d IS NULL OR end_d >= CURRENT_DATE)
+      UNION
+      SELECT candidate_id, full_name
+      FROM buyout_rows
+      WHERE (start_d IS NULL OR start_d <= CURRENT_DATE)
+        AND (end_d IS NULL OR end_d >= CURRENT_DATE)
+    )
+    SELECT
+      candidate_id,
+      MIN(full_name) AS full_name
+    FROM active_rows
+    GROUP BY candidate_id
+    ORDER BY LOWER(MIN(full_name)) ASC
+    """, (account_id, account_id))
     rows = cur.fetchall()
     cur.close()
     conn.close()

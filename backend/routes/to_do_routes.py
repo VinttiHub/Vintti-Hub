@@ -1,6 +1,7 @@
 import html
 import logging
 import os
+import re
 from datetime import date, timedelta
 
 import requests
@@ -11,6 +12,18 @@ from db import get_connection
 
 bp = Blueprint('to_do', __name__)
 APP_BASE_URL = os.environ.get('APP_BASE_URL', 'https://7m6mw95m8y.us-east-2.awsapprunner.com').rstrip('/')
+BONUS_TODO_MARKER_RE = re.compile(r'\[AUTO:bonus_request:(\d+)(?::assignee:\d+)?\]')
+
+
+def _extract_bonus_request_id(description: str | None) -> int | None:
+    text = str(description or '')
+    match = BONUS_TODO_MARKER_RE.search(text)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except Exception:
+        return None
 
 
 def _todo_reminder_email_html(user_name: str, groups: dict[str, list[dict]]) -> str:
@@ -180,6 +193,7 @@ def to_do_item(to_do_id: int):
     try:
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        checked = bool(check_value)
         cur.execute(
             """
             UPDATE to_do
@@ -187,7 +201,7 @@ def to_do_item(to_do_id: int):
             WHERE to_do_id = %s AND user_id = %s
             RETURNING to_do_id, user_id, description, due_date::text AS due_date, "check", orden, subtask
             """,
-            (bool(check_value), to_do_id, user_id),
+            (checked, to_do_id, user_id),
         )
         row = cur.fetchone()
         if not row:
@@ -195,6 +209,39 @@ def to_do_item(to_do_id: int):
             conn.close()
             return jsonify({"error": "to_do item not found"}), 404
 
+        # Si es una tarea auto-generada desde bonus request y la marcan como hecha,
+        # reflejamos el cambio en el CRM (pending -> approved).
+        if checked:
+            bonus_request_id = _extract_bonus_request_id(row.get('description'))
+            if bonus_request_id:
+                savepoint_created = False
+                try:
+                    # Aisla errores del sync para no romper el check del ToDo.
+                    cur.execute("SAVEPOINT todo_bonus_sync")
+                    savepoint_created = True
+                    cur.execute(
+                        """
+                        UPDATE bonus_requests
+                        SET status = 'approved',
+                            updated_at = NOW()
+                        WHERE bonus_request_id = %s
+                          AND status = 'pending'
+                        """,
+                        (bonus_request_id,),
+                    )
+                except Exception:
+                    if savepoint_created:
+                        try:
+                            cur.execute("ROLLBACK TO SAVEPOINT todo_bonus_sync")
+                        except Exception:
+                            logging.exception('Failed to rollback savepoint todo_bonus_sync')
+                    logging.exception('Failed to sync bonus_request status from ToDo check (bonus_request_id=%s)', bonus_request_id)
+                finally:
+                    if savepoint_created:
+                        try:
+                            cur.execute("RELEASE SAVEPOINT todo_bonus_sync")
+                        except Exception:
+                            pass
         conn.commit()
         cur.close()
         conn.close()
