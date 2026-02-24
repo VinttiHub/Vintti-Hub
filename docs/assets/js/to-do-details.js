@@ -30,6 +30,9 @@
   let teamTasks = new Map();
   let currentTeamUserId = null;
   const AUTO_REFRESH_MS = 15000;
+  const TODO_REMINDER_DAYS_AHEAD = 2;
+  const TODO_REMINDER_KEY_PREFIX = 'todo_due_reminder_signature_v1';
+  let todoReminderRequestInFlight = false;
 
   const getReturnUrl = () => {
     const params = new URLSearchParams(window.location.search);
@@ -84,6 +87,61 @@
     return days !== null && days >= 0 && days <= 2;
   };
 
+  const localDateKey = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const buildReminderSignature = (tasks) => {
+    const dueSoonPending = (Array.isArray(tasks) ? tasks : [])
+      .filter((task) => {
+        if (!task || task.check || !task.due_date) return false;
+        const days = daysUntil(task.due_date);
+        return days !== null && days <= TODO_REMINDER_DAYS_AHEAD;
+      })
+      .sort((a, b) => (a.to_do_id || 0) - (b.to_do_id || 0))
+      .map((task) => {
+        const days = daysUntil(task.due_date);
+        return `${task.to_do_id || 'x'}:${task.due_date}:${days}`;
+      });
+
+    if (!dueSoonPending.length) return '';
+    return `${localDateKey()}|${dueSoonPending.join('|')}`;
+  };
+
+  const maybeSendMyTodoReminder = async (tasks) => {
+    if (!userId || todoReminderRequestInFlight) return;
+
+    const signature = buildReminderSignature(tasks);
+    if (!signature) return;
+
+    const storageKey = `${TODO_REMINDER_KEY_PREFIX}:${userId}`;
+    if (window.localStorage.getItem(storageKey) === signature) return;
+
+    todoReminderRequestInFlight = true;
+    try {
+      const res = await fetch(`${API_BASE}/to_do/reminders/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          user_id: userId,
+          days_ahead: TODO_REMINDER_DAYS_AHEAD,
+          include_overdue: true,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to send ToDo reminder');
+      window.localStorage.setItem(storageKey, signature);
+    } catch (error) {
+      console.warn('⚠️ ToDo reminder email was not sent:', error);
+    } finally {
+      todoReminderRequestInFlight = false;
+    }
+  };
+
   const buildMyTask = (task, editable, ownerId, tasksRef) => {
     const row = document.createElement('label');
     row.className = 'note-task';
@@ -128,6 +186,9 @@
         if (!res.ok) throw new Error('Failed');
         if (nextValue) {
           await moveTaskToEnd(tasksRef, ownerId, task);
+        }
+        if (ownerId === userId) {
+          maybeSendMyTodoReminder(myTasks);
         }
       } catch (error) {
         task.check = !nextValue;
@@ -424,6 +485,7 @@
       const data = await res.json();
       myTasks = Array.isArray(data) ? data : [];
       renderTaskList(myList, myTasks, myEmpty, true, userId);
+      maybeSendMyTodoReminder(myTasks);
     } catch (error) {
       renderTaskList(myList, [], myEmpty, true, userId);
       myEmpty.textContent = 'Could not load tasks right now.';
@@ -540,6 +602,7 @@
       const newTask = await res.json();
       myTasks = [...myTasks, newTask];
       renderTaskList(myList, myTasks, myEmpty, true, userId);
+      maybeSendMyTodoReminder(myTasks);
       myDescription.value = '';
       myDate.value = '';
     } catch (error) {
@@ -609,6 +672,7 @@
       if (ownerId === userId) {
         myTasks = [...myTasks, newTask];
         renderTaskList(myList, myTasks, myEmpty, true, userId);
+        maybeSendMyTodoReminder(myTasks);
       } else {
         const existing = teamTasks.get(ownerId) || [];
         teamTasks.set(ownerId, [...existing, newTask]);
