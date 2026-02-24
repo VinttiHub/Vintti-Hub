@@ -9,6 +9,7 @@ const EXCLUDED_EMAILS = new Set([
   'agustin@vintti.com',
   'bahia@vintti.com',
   'agustina.ferrari@vintti.com',
+  'agustina.barbero@vintti.com',
   'jazmin@vintti.com',
 ]);
 
