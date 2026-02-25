@@ -1250,9 +1250,7 @@ function buildRow(r, withActions){
 
   const startLbl = fmtDateShort(r.start_date);
   const endLbl   = fmtDateShort(r.end_date);
-  const days = (String(r.kind || '').toLowerCase() === 'vacation')
-    ? businessDaysBetweenISO(r.start_date, r.end_date)
-    : diffDaysInclusive(r.start_date, r.end_date);
+  const days = requestDaysValue(r);
 
   const kClass = ({ vacation:"badge--vac", holiday:"badge--hol", vintti_day:"badge--vd" }[r.kind] || "");
   const kLabel = String(r.kind || "").replace("_"," ").replace(/\b\w/g, m=>m.toUpperCase());
@@ -1289,7 +1287,7 @@ function buildRow(r, withActions){
       </div>
       <div class="cell col-request"><time>${startLbl}</time></div>
       <div class="cell col-return"><time>${endLbl}</time></div>
-      <div class="cell col-days">${days} day${days===1?'':'s'}</div>
+      <div class="cell col-days">${formatDaysLabel(days)}</div>
       <div class="cell col-type"><span class="badge-soft ${kClass}">${kLabel}</span></div>
       <div class="cell col-status"><span class="status ${statusLower}">${r.status}</span></div>
       ${actionsCell}
@@ -2002,6 +2000,64 @@ function diffDaysInclusive(a, b){
   return Math.max(0, Math.round((db - da)/86400000)) + 1;
 }
 
+function requestDaysValue(req){
+  const kind = String(req?.kind || "").toLowerCase();
+  const base = (kind === "vacation")
+    ? businessDaysBetweenISO(req?.start_date, req?.end_date)
+    : diffDaysInclusive(req?.start_date, req?.end_date);
+  if (kind === "vacation" && req?.is_half_day && base >= 1) return 0.5;
+  return base;
+}
+
+function formatDayNumber(n){
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "0";
+  return Number.isInteger(v) ? String(v) : String(v);
+}
+
+function formatDaysLabel(n){
+  const v = Number(n);
+  const safe = Number.isFinite(v) ? v : 0;
+  return `${formatDayNumber(safe)} day${safe === 1 ? "" : "s"}`;
+}
+
+function syncVacationDurationUI(){
+  const kindEl = document.getElementById("kind");
+  const durWrap = document.getElementById("vacationDurationField");
+  const durEl = document.getElementById("vacation_duration");
+  const startEl = document.getElementById("start_date");
+  const endEl = document.getElementById("end_date");
+  if (!kindEl || !durWrap || !durEl || !startEl || !endEl) return;
+
+  const isVacation = kindEl.value === "vacation";
+  durWrap.hidden = !isVacation;
+  durWrap.style.display = isVacation ? "" : "none";
+
+  const isHalf = isVacation && durEl.value === "half_day";
+  endEl.disabled = isHalf;
+  if (isHalf && startEl.value) endEl.value = startEl.value;
+}
+
+function setupTimeoffFormBehavior(){
+  const kindEl = document.getElementById("kind");
+  const durEl = document.getElementById("vacation_duration");
+  const startEl = document.getElementById("start_date");
+  const endEl = document.getElementById("end_date");
+  if (!kindEl || !durEl || !startEl || !endEl) return;
+  if (kindEl.dataset.timeoffBehaviorBound === "1") return;
+
+  kindEl.addEventListener("change", ()=>{
+    if (kindEl.value !== "vacation") durEl.value = "full_day";
+    syncVacationDurationUI();
+  });
+  durEl.addEventListener("change", syncVacationDurationUI);
+  startEl.addEventListener("change", syncVacationDurationUI);
+  endEl.addEventListener("change", syncVacationDurationUI);
+
+  kindEl.dataset.timeoffBehaviorBound = "1";
+  syncVacationDurationUI();
+}
+
 async function loadMyRequests(uid){
   const host = document.getElementById("requestsTable");
   if (!host) return;
@@ -2043,9 +2099,7 @@ host.innerHTML = header + arr.map(x=>{
   const start = fmtDateNice(x.start_date);
   const end   = fmtDateNice(x.end_date);
 
-  const days = (String(x.kind || '').toLowerCase() === 'vacation')
-    ? businessDaysBetweenISO(x.start_date, x.end_date)
-    : diffDaysInclusive(x.start_date, x.end_date);
+  const days = requestDaysValue(x);
 
   const statusCls = String(x.status || '').toLowerCase(); // approved | rejected | pending
   const rowCls = statusCls ? `row--${statusCls}` : '';
@@ -2062,7 +2116,7 @@ host.innerHTML = header + arr.map(x=>{
       </div>
       <div class="cell"><time datetime="${x.start_date}">${start}</time></div>
       <div class="cell"><time datetime="${x.end_date}">${end}</time></div>
-      <div class="cell t-right"><b class="days">${days} day${days===1?'':'s'}</b></div>
+      <div class="cell t-right"><b class="days">${formatDaysLabel(days)}</b></div>
       <div class="cell t-center"><span class="status ${statusCls}">${x.status}</span></div>
       <div class="cell t-center">${actionCell}</div>
     </div>
@@ -2153,7 +2207,7 @@ function renderBalances({
         </div>
       </div>
       <div class="cell t-right">
-        <span class="kpi chip">${availVac} Days</span>
+        <span class="kpi chip">${formatDayNumber(availVac)} Days</span>
       </div>
     </div>
 
@@ -2166,7 +2220,7 @@ function renderBalances({
         </div>
       </div>
       <div class="cell t-right">
-        <span class="kpi chip">${availVD} Days</span>
+        <span class="kpi chip">${formatDayNumber(availVD)} Days</span>
       </div>
     </div>
 
@@ -2179,7 +2233,7 @@ function renderBalances({
         </div>
       </div>
       <div class="cell t-right">
-        <span class="kpi chip">${availHol} Days</span>
+        <span class="kpi chip">${formatDayNumber(availHol)} Days</span>
       </div>
     </div>
   `;
@@ -2207,7 +2261,9 @@ async function onTimeoffSubmit(e){
   e.preventDefault();
   const toast = $("#timeoffToast");
   const start = $("#start_date").value;
-  const end   = $("#end_date").value;
+  const kind  = $("#kind").value;
+  const isHalfDay = kind === "vacation" && $("#vacation_duration")?.value === "half_day";
+  const end   = isHalfDay ? start : $("#end_date").value;
   if (!start || !end){
     showToast(toast, "Please pick start & end dates.", false);
     return;
@@ -2216,13 +2272,18 @@ async function onTimeoffSubmit(e){
     showToast(toast, "End date must be after start date.", false);
     return;
   }
+  if (isHalfDay && start !== end){
+    showToast(toast, "Half day vacation must be a single date.", false);
+    return;
+  }
 
   const payload = {
     user_id: CURRENT_USER_ID,
-    kind: $("#kind").value,               // "vacation" | "holiday" | "vintti_day"
+    kind,               // "vacation" | "holiday" | "vintti_day"
     start_date: start,
     end_date: end,
-    reason: ($("#reason").value || "").trim() || null
+    reason: ($("#reason").value || "").trim() || null,
+    is_half_day: isHalfDay
   };
 
   try{
@@ -2239,6 +2300,7 @@ async function onTimeoffSubmit(e){
 
     showToast(toast, "Request sent. You got it! ✅");
     $("#timeoffForm").reset();
+    syncVacationDurationUI();
     closeTimeoffModal();
     showSuccessSplash();
 
@@ -2329,6 +2391,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       form.addEventListener("submit", onTimeoffSubmit);
       form.dataset.bound = "1";
     }
+    setupTimeoffFormBehavior();
   }catch(err){
     console.error(err);
     alert("Could not load your profile. Please refresh.");
@@ -2517,10 +2580,10 @@ function setupBalanceCardTables(){
         "Vacaciones disponibles"
       ];
       values = [
-        LAST_BALANCES.vac_acc,
-        LAST_BALANCES.vac_work,
-        LAST_BALANCES.vac_used,      // 👈 usa vacaciones_consumidas
-        LAST_BALANCES.vac_available
+        formatDayNumber(LAST_BALANCES.vac_acc),
+        formatDayNumber(LAST_BALANCES.vac_work),
+        formatDayNumber(LAST_BALANCES.vac_used),      // 👈 usa vacaciones_consumidas
+        formatDayNumber(LAST_BALANCES.vac_available)
       ];
     } else if (kind === "vintti_day"){
       headers = [
@@ -2529,9 +2592,9 @@ function setupBalanceCardTables(){
         "Vintti Days disponibles"
       ];
       values = [
-        LAST_BALANCES.vd_total,
-        LAST_BALANCES.vd_used,
-        LAST_BALANCES.vd_available
+        formatDayNumber(LAST_BALANCES.vd_total),
+        formatDayNumber(LAST_BALANCES.vd_used),
+        formatDayNumber(LAST_BALANCES.vd_available)
       ];
     } else if (kind === "holiday"){
       headers = [
@@ -2540,9 +2603,9 @@ function setupBalanceCardTables(){
         "Holidays disponibles"
       ];
       values = [
-        LAST_BALANCES.hol_total,
-        LAST_BALANCES.hol_used,
-        LAST_BALANCES.hol_available
+        formatDayNumber(LAST_BALANCES.hol_total),
+        formatDayNumber(LAST_BALANCES.hol_used),
+        formatDayNumber(LAST_BALANCES.hol_available)
       ];
     }
 
@@ -2572,15 +2635,13 @@ function setupBalanceCardTables(){
         const rowsHtml = approvedOfKind.map(r => {
           const startLabel = fmtDateNice(r.start_date);
           const endLabel   = fmtDateNice(r.end_date);
-          const days = (kindLower === "vacation")
-            ? businessDaysBetweenISO(r.start_date, r.end_date)
-            : diffDaysInclusive(r.start_date, r.end_date);
+          const days = requestDaysValue(r);
 
           return `
             <tr>
               <td>${startLabel}</td>
               <td>${endLabel}</td>
-              <td class="t-right">${days}</td>
+              <td class="t-right">${formatDayNumber(days)}</td>
             </tr>
           `;
         }).join("");

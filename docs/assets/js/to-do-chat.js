@@ -21,6 +21,9 @@
   let hasLoaded = false;
   let toastTimer = null;
   let currentTasks = [];
+  let reminderRequestInFlight = false;
+  const TODO_REMINDER_DAYS_AHEAD = 2;
+  const TODO_REMINDER_KEY_PREFIX = 'todo_due_reminder_signature_v1';
 
   const formatDate = (raw) => {
     if (!raw) return '';
@@ -53,6 +56,61 @@
   const isNearDue = (raw) => {
     const days = daysUntil(raw);
     return days !== null && days >= 0 && days <= 2;
+  };
+
+  const localDateKey = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const buildReminderSignature = (tasks) => {
+    const dueSoonPending = (Array.isArray(tasks) ? tasks : [])
+      .filter((task) => {
+        if (!task || task.check || !task.due_date) return false;
+        const days = daysUntil(task.due_date);
+        return days !== null && days <= TODO_REMINDER_DAYS_AHEAD;
+      })
+      .sort((a, b) => (a.to_do_id || 0) - (b.to_do_id || 0))
+      .map((task) => {
+        const days = daysUntil(task.due_date);
+        return `${task.to_do_id || 'x'}:${task.due_date}:${days}`;
+      });
+
+    if (!dueSoonPending.length) return '';
+    return `${localDateKey()}|${dueSoonPending.join('|')}`;
+  };
+
+  const maybeSendDueReminder = async (tasks) => {
+    if (!userId || reminderRequestInFlight) return;
+
+    const signature = buildReminderSignature(tasks);
+    if (!signature) return;
+
+    const storageKey = `${TODO_REMINDER_KEY_PREFIX}:${userId}`;
+    if (window.localStorage.getItem(storageKey) === signature) return;
+
+    reminderRequestInFlight = true;
+    try {
+      const res = await fetch(`${API_BASE}/to_do/reminders/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          user_id: userId,
+          days_ahead: TODO_REMINDER_DAYS_AHEAD,
+          include_overdue: true,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to send ToDo reminder');
+      window.localStorage.setItem(storageKey, signature);
+    } catch (error) {
+      console.warn('⚠️ ToDo reminder email was not sent:', error);
+    } finally {
+      reminderRequestInFlight = false;
+    }
   };
 
   const showToast = (message) => {
@@ -104,6 +162,7 @@
 
     checkbox.addEventListener('change', async () => {
       const nextValue = checkbox.checked;
+      task.check = nextValue;
       wrapper.classList.toggle('is-done', nextValue);
       if (nextValue) showToast('Good job!');
 
@@ -120,6 +179,7 @@
           renderTasks(currentTasks);
         }
       } catch (error) {
+        task.check = !nextValue;
         checkbox.checked = !nextValue;
         wrapper.classList.toggle('is-done', checkbox.checked);
         showToast('Oops, try again.');
@@ -177,6 +237,7 @@
       if (!res.ok) throw new Error('Failed to load tasks');
       const data = await res.json();
       renderTasks(Array.isArray(data) ? data : []);
+      maybeSendDueReminder(Array.isArray(data) ? data : []);
     } catch (error) {
       renderTasks([]);
       setEmptyState('Could not load tasks. Try again soon.');
@@ -276,6 +337,7 @@
       const newTask = await res.json();
       currentTasks = [newTask, ...currentTasks];
       renderTasks(currentTasks);
+      maybeSendDueReminder(currentTasks);
       clearEmptyState();
       descriptionInput.value = '';
       dateInput.value = '';

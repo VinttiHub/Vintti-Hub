@@ -114,6 +114,57 @@ def _row_to_json(row: Dict[str, Any]) -> Dict[str, Any]:
             except Exception: pass
     return row
 
+_TIMEOFF_HALF_DAY_TOKEN = "[[vhub:half_day]]"
+
+def _parse_timeoff_reason_meta(raw_reason: Optional[Any]) -> tuple[Optional[str], bool]:
+    text = "" if raw_reason is None else str(raw_reason)
+    is_half_day = False
+    kept_lines = []
+    for line in text.splitlines():
+        if line.strip() == _TIMEOFF_HALF_DAY_TOKEN:
+            is_half_day = True
+            continue
+        kept_lines.append(line)
+    clean_reason = "\n".join(kept_lines).strip() or None
+    return clean_reason, is_half_day
+
+def _encode_timeoff_reason(reason: Optional[Any], is_half_day: bool) -> Optional[str]:
+    clean = (str(reason).strip() if reason is not None else "").strip() or None
+    if not is_half_day:
+        return clean
+    return f"{_TIMEOFF_HALF_DAY_TOKEN}\n{clean}" if clean else _TIMEOFF_HALF_DAY_TOKEN
+
+def _normalize_timeoff_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(row, dict):
+        return row
+    clean_reason, is_half_day = _parse_timeoff_reason_meta(row.get("reason"))
+    row["reason"] = clean_reason
+    row["is_half_day"] = bool(is_half_day and str(row.get("kind") or "").lower() == "vacation")
+    return row
+
+def _timeoff_total_days(kind: str, start_value: Any, end_value: Any, *, is_half_day: bool = False) -> float:
+    sd = start_value
+    ed = end_value
+    if isinstance(sd, str):
+        sd = datetime.strptime(sd, "%Y-%m-%d").date()
+    if isinstance(ed, str):
+        ed = datetime.strptime(ed, "%Y-%m-%d").date()
+
+    kind_lower = str(kind or "").lower()
+    if kind_lower == "vacation":
+        base = float(business_days_us(sd, ed))
+        if is_half_day and sd == ed and base >= 1:
+            return 0.5
+        return base
+    return float(max(0, (ed - sd).days) + 1)
+
+def _as_day_number(value: float):
+    try:
+        n = float(value)
+    except Exception:
+        return value
+    return int(n) if n.is_integer() else n
+
 def _normalize_avatar_url(raw: Optional[Any]) -> Optional[str]:
     if raw is None:
         return None
@@ -289,7 +340,7 @@ def leader_list_timeoff():
     conn.close()
     payload = []
     for r in rows:
-        payload.append(_add_initials(_row_to_json(dict(r))))
+        payload.append(_add_initials(_normalize_timeoff_row(_row_to_json(dict(r)))))
     return jsonify(payload)
 
 
@@ -324,6 +375,10 @@ def leader_update_timeoff(req_id: int):
                 return jsonify({"error":"not found"}), 404
             if int(rec["lider"] or 0) != int(leader_id):
                 return jsonify({"error":"forbidden (not your report)"}), 403
+            rec = dict(rec)
+            clean_reason, is_half_day = _parse_timeoff_reason_meta(rec.get("reason"))
+            rec["reason"] = clean_reason
+            rec["is_half_day"] = bool(is_half_day and str(rec.get("kind") or "").lower() == "vacation")
 
             old_status = str(rec["status"] or "").lower()
 
@@ -339,22 +394,13 @@ def leader_update_timeoff(req_id: int):
 
             # 3) Si pasa a APPROVED por primera vez -> descontar saldos
             if new_status == "approved" and old_status != "approved":
-                # días inclusivos: (end - start) + 1
-                from datetime import date as _date, datetime as _dt
-                sd = rec["start_date"]; ed = rec["end_date"]
-                if isinstance(sd, str):
-                    sd = datetime.strptime(sd, "%Y-%m-%d").date()
-                if isinstance(ed, str):
-                    ed = datetime.strptime(ed, "%Y-%m-%d").date()
-
                 k = str(rec["kind"] or "").lower()
-                if k == "vacation":
-                    total_days = business_days_us(sd, ed)  # <-- SOLO vacaciones: días hábiles US
-                else:
-                    # Para VD/Holiday mantenemos conteo inclusivo calendario
-                    total_days = max(0, (ed - sd).days) + 1
-
-                total_days = int(total_days)
+                total_days = _timeoff_total_days(
+                    k,
+                    rec["start_date"],
+                    rec["end_date"],
+                    is_half_day=bool(rec.get("is_half_day"))
+                )
 
                 if total_days > 0:
                     k = str(rec["kind"] or "").lower()
@@ -428,15 +474,14 @@ def leader_update_timeoff(req_id: int):
         start_fmt = fmt_date(rec["start_date"])
         end_fmt   = fmt_date(rec["end_date"])
         try:
-            d1 = datetime.strptime(str(rec["start_date"]), "%Y-%m-%d").date()
-            d2 = datetime.strptime(str(rec["end_date"]), "%Y-%m-%d").date()
             kind_lower = str(rec["kind"] or "").lower()
-            if kind_lower == "vacation":
-                total_days = business_days_us(d1, d2)
-                total_days_label = "Business days"
-            else:
-                total_days = (d2 - d1).days + 1
-                total_days_label = "Days"
+            total_days = _timeoff_total_days(
+                kind_lower,
+                rec["start_date"],
+                rec["end_date"],
+                is_half_day=bool(rec.get("is_half_day"))
+            )
+            total_days_label = "Business days" if kind_lower == "vacation" else "Days"
         except Exception:
             total_days = None
             total_days_label = "Days"
@@ -460,7 +505,7 @@ def leader_update_timeoff(req_id: int):
             f"<li><strong>Dates:</strong> {start_fmt} → {end_fmt}</li>",
         ]
         if total_days is not None:
-            parts.append(f"<li><strong>{total_days_label}:</strong> {total_days}</li>")
+            parts.append(f"<li><strong>{total_days_label}:</strong> {_as_day_number(total_days)}</li>")
         if rec.get("reason"):
             parts.append(f"<li><strong>Note:</strong> {rec['reason']}</li>")
         parts.append("</ul>")
@@ -509,7 +554,7 @@ def list_time_off():
         rows = cur.fetchall()
     conn.close()
 
-    return jsonify([_row_to_json(r) for r in rows])
+    return jsonify([_normalize_timeoff_row(_row_to_json(dict(r))) for r in rows])
 
 @bp.get("/users")
 def list_users():
@@ -535,6 +580,11 @@ def create_time_off():
     start_date = data.get("start_date")
     end_date = data.get("end_date")
     reason = (data.get("reason") or "").strip() or None
+    is_half_day_raw = data.get("is_half_day", False)
+    if isinstance(is_half_day_raw, bool):
+        is_half_day = is_half_day_raw
+    else:
+        is_half_day = str(is_half_day_raw).strip().lower() in {"1", "true", "yes", "on"}
 
     if not user_id or not str(user_id).isdigit():
         return jsonify({"error":"user_id required"}), 400
@@ -548,6 +598,19 @@ def create_time_off():
         return jsonify({"error":"start_date and end_date required"}), 400
     if end_date < start_date:
         return jsonify({"error":"end_date before start_date"}), 400
+    if is_half_day:
+        if kind_raw != "vacation":
+            return jsonify({"error":"half day is only available for vacation"}), 400
+        if start_date != end_date:
+            return jsonify({"error":"half day vacation must use the same start and end date"}), 400
+        try:
+            d = datetime.strptime(start_date, "%Y-%m-%d").date()
+            if business_days_us(d, d) != 1:
+                return jsonify({"error":"half day vacation must be on a business day"}), 400
+        except Exception:
+            return jsonify({"error":"invalid date for half day vacation"}), 400
+
+    stored_reason = _encode_timeoff_reason(reason, is_half_day)
 
     # Insert + fetch requester + leader in one go
     conn = get_connection()
@@ -561,7 +624,7 @@ def create_time_off():
                 INSERT INTO time_off_requests (user_id, kind, start_date, end_date, reason, status, created_at)
                 VALUES (%s, %s, %s, %s, %s, 'pending', NOW() AT TIME ZONE 'UTC')
                 RETURNING id
-            """, (int(user_id), kind_raw, start_date, end_date, reason))
+            """, (int(user_id), kind_raw, start_date, end_date, stored_reason))
             row = cur.fetchone()
             new_id = row["id"]
 
@@ -588,8 +651,6 @@ def create_time_off():
     leader_email = (requester or {}).get("leader_email")
 
     # Compose email
-    from datetime import datetime
-
     # 🏝️ pick an emoji for the kind
     emoji_map = {
         "vacation": "🏖️",
@@ -612,9 +673,7 @@ def create_time_off():
 
     # Calculate number of days requested
     try:
-        d1 = datetime.strptime(start_date, "%Y-%m-%d")
-        d2 = datetime.strptime(end_date, "%Y-%m-%d")
-        num_days = (d2 - d1).days + 1
+        num_days = _timeoff_total_days(kind_raw, start_date, end_date, is_half_day=is_half_day)
     except Exception:
         num_days = None
 
@@ -628,8 +687,9 @@ def create_time_off():
         f"<li><strong>Type:</strong> {kind_label}</li>",
         f"<li><strong>Dates:</strong> {start_fmt} → {end_fmt}</li>",
     ]
-    if num_days:
-        html_parts.append(f"<li><strong>Total days:</strong> {num_days} day{'s' if num_days != 1 else ''}</li>")
+    if num_days is not None:
+        pretty_num_days = _as_day_number(num_days)
+        html_parts.append(f"<li><strong>Total days:</strong> {pretty_num_days} day{'s' if num_days != 1 else ''}</li>")
     if reason:
         html_parts.append(f"<li><strong>Note:</strong> {reason}</li>")
     html_parts.append("</ul>")
