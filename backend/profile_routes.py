@@ -1,7 +1,7 @@
 # profile_routes.py  (extracto limpio y consolidado)
 import logging
 from datetime import date, datetime, timezone, timedelta
-from typing import Optional, Dict, Any, Set
+from typing import Optional, Dict, Any, Set, Tuple
 from flask import Blueprint, request, jsonify, g
 from psycopg2.extras import RealDictCursor
 from db import get_connection
@@ -116,7 +116,7 @@ def _row_to_json(row: Dict[str, Any]) -> Dict[str, Any]:
 
 _TIMEOFF_HALF_DAY_TOKEN = "[[vhub:half_day]]"
 
-def _parse_timeoff_reason_meta(raw_reason: Optional[Any]) -> tuple[Optional[str], bool]:
+def _parse_timeoff_reason_meta(raw_reason: Optional[Any]) -> Tuple[Optional[str], bool]:
     text = "" if raw_reason is None else str(raw_reason)
     is_half_day = False
     kept_lines = []
