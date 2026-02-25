@@ -206,6 +206,16 @@ function OverviewTab({ candidateId, candidate, comments, onCommentsChange, onSav
   const [timezoneOpen, setTimezoneOpen] = useState(false);
   const timezoneRef = useRef(null);
   const [timezoneSelections, setTimezoneSelections] = useState(() => new Set(parseTimezoneList(candidate?.timezone)));
+  const [countrySearch, setCountrySearch] = useState('');
+
+  const filteredCountries = useMemo(() => {
+    const term = countrySearch.trim().toLowerCase();
+    const base = term ? COUNTRIES.filter((country) => country.toLowerCase().includes(term)) : COUNTRIES;
+    if (candidate?.country && !base.includes(candidate.country)) {
+      return [candidate.country, ...base];
+    }
+    return base;
+  }, [countrySearch, candidate?.country]);
 
   useEffect(() => {
     setTimezoneSelections(new Set(parseTimezoneList(candidate?.timezone)));
@@ -239,17 +249,29 @@ function OverviewTab({ candidateId, candidate, comments, onCommentsChange, onSav
         <div className="grid">
           <div className="field">
             <label>Country</label>
+            <input
+              type="text"
+              className="country-search-input"
+              placeholder="Search country…"
+              value={countrySearch}
+              onChange={(event) => setCountrySearch(event.target.value)}
+              aria-label="Search country"
+            />
             <select
               id="field-country"
               value={candidate?.country || ''}
               onChange={(event) => onUpdateField({ country: event.target.value })}
             >
               <option value="">—</option>
-              {COUNTRIES.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
+              {filteredCountries.length === 0 ? (
+                <option disabled>No countries match</option>
+              ) : (
+                filteredCountries.map((country) => (
+                  <option key={country} value={country}>
+                    {country}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="field">
@@ -624,28 +646,45 @@ function HireTab({ hire, hireModel, salaryUpdates, latestUpdate, onHireChange, o
   );
 }
 
-const COUNTRIES = [
-  'Argentina',
-  'Bolivia',
-  'Brazil',
-  'Chile',
-  'Colombia',
-  'Costa Rica',
-  'Cuba',
-  'Dominican Republic',
-  'Ecuador',
-  'El Salvador',
-  'Guatemala',
-  'Honduras',
-  'Mexico',
-  'United States',
-  'Nicaragua',
-  'Panama',
-  'Paraguay',
-  'Peru',
-  'Uruguay',
-  'Venezuela',
-];
+const COUNTRY_REGION_EXCLUSIONS = new Set(['EU', 'EZ', 'UN', 'ZZ', 'QO']);
+const COUNTRIES = getWorldCountryNames();
+
+function getWorldCountryNames() {
+  if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function' && typeof Intl.DisplayNames === 'function') {
+    try {
+      const display = new Intl.DisplayNames(['en'], { type: 'region' });
+      const names = Intl.supportedValuesOf('region')
+        .filter((code) => !COUNTRY_REGION_EXCLUSIONS.has(code))
+        .map((code) => display.of(code))
+        .filter(Boolean);
+      return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+    } catch (error) {
+      console.warn('Intl.supportedValuesOf("region") unavailable, using fallback list.', error);
+    }
+  }
+  return [
+    'Argentina',
+    'Bolivia',
+    'Brazil',
+    'Chile',
+    'Colombia',
+    'Costa Rica',
+    'Cuba',
+    'Dominican Republic',
+    'Ecuador',
+    'El Salvador',
+    'Guatemala',
+    'Honduras',
+    'Mexico',
+    'United States',
+    'Nicaragua',
+    'Panama',
+    'Paraguay',
+    'Peru',
+    'Uruguay',
+    'Venezuela',
+  ];
+}
 
 const US_TIMEZONES = [
   'America/New_York',

@@ -28,7 +28,9 @@ const PHONE_CODE_BY_COUNTRY = {
   'United States': '1',
 };
 
-const COUNTRY_NAMES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
+const COUNTRY_REGION_EXCLUSIONS = new Set(['EU', 'EZ', 'UN', 'ZZ', 'QO']);
+const PHONE_CODE_COUNTRIES = Object.keys(PHONE_CODE_BY_COUNTRY).sort((a, b) => a.localeCompare(b));
+const COUNTRY_NAMES = getWorldCountryNames();
 const DEFAULT_PHONE_COUNTRY = 'Argentina';
 
 const STATUS_OPTIONS = [
@@ -52,6 +54,22 @@ const DEFAULT_FORM = {
   phone: '',
   linkedin: '',
 };
+
+function getWorldCountryNames() {
+  if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function' && typeof Intl.DisplayNames === 'function') {
+    try {
+      const display = new Intl.DisplayNames(['en'], { type: 'region' });
+      const names = Intl.supportedValuesOf('region')
+        .filter((code) => !COUNTRY_REGION_EXCLUSIONS.has(code))
+        .map((code) => display.of(code))
+        .filter(Boolean);
+      return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+    } catch (error) {
+      console.warn('Intl.supportedValuesOf("region") unavailable, using fallback list.', error);
+    }
+  }
+  return PHONE_CODE_COUNTRIES.slice();
+}
 
 function CandidatesPage() {
   usePageStylesheet('/assets/css/candidates.css');
@@ -549,7 +567,7 @@ function CandidateModal({ formState, submitting, formError, duplicateInfo, onCha
                 value={formState.phoneCountry}
                 onChange={onChange}
               >
-                {COUNTRY_NAMES.map((country) => {
+                {PHONE_CODE_COUNTRIES.map((country) => {
                   const code = PHONE_CODE_BY_COUNTRY[country];
                   return (
                     <option key={country} value={country}>

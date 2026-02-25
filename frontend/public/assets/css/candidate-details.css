@@ -1883,6 +1883,14 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
   font-weight: 400 !important;
 }
 
+.country-search-input {
+  margin-bottom: 6px;
+}
+
+#field-country.country-select--expanded {
+  height: auto;
+}
+
 .rich-input * {
   font-family: 'Onest', sans-serif !important;
   font-size: 14px !important;

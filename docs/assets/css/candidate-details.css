@@ -1828,6 +1828,14 @@ input, select, textarea, .rich-input, [contenteditable="true"] {
   font-weight: 400 !important;
 }
 
+.country-search-input {
+  margin-bottom: 6px;
+}
+
+#field-country.country-select--expanded {
+  height: auto;
+}
+
 .rich-input * {
   font-family: 'Onest', sans-serif !important;
   font-size: 14px !important;
@@ -3240,7 +3248,8 @@ html body .month-year .btn-clear:active{
 }
 .timezone-dropdown {
   position: absolute;
-  top: calc(100% + 6px);
+  top: auto;
+  bottom: calc(100% + 6px);
   left: 0;
   right: 0;
   background: #fff;
@@ -3251,7 +3260,7 @@ html body .month-year .btn-clear:active{
   z-index: 3000;
 }
 .timezone-options {
-  max-height: 180px;
+  max-height: 120px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;

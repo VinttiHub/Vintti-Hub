@@ -8,6 +8,7 @@ const STAGE_ORDER_PRIORITY = [
   'Negotiating',
   'Sourcing',
   'Interviewing',
+  'Stop',
   'NDA Sent',
   'Deep Dive',
   'Close Win',
@@ -396,7 +397,7 @@ async function api(path, opts = {}) {
 }
 window.api = api;
 
-async function logOpportunityTrack(buttonId) {
+async function logOpportunityTrack(buttonId, page = 'opp principal') {
   if (!buttonId) return;
   try {
     const userId = await getCurrentUserId();
@@ -404,7 +405,7 @@ async function logOpportunityTrack(buttonId) {
     await fetch(`${API_BASE}/tracks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, button: String(buttonId) }),
+      body: JSON.stringify({ user_id: userId, button: String(buttonId), page: String(page) }),
       credentials: 'include'
     });
   } catch (err) {
@@ -1194,6 +1195,7 @@ const STAGE_DOT_CLASS = {
   'Negotiating': 'stage-dot--negotiating',
   'Interviewing': 'stage-dot--interviewing',
   'Sourcing': 'stage-dot--sourcing',
+  'Stop': 'stage-dot--stop',
   'NDA Sent': 'stage-dot--nda',
   'Deep Dive': 'stage-dot--deep-dive',
   'Close Win': 'stage-dot--close-win',
@@ -1205,6 +1207,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     'Negotiating': 'stage-dot--negotiating',
     'Interviewing': 'stage-dot--interviewing',
     'Sourcing': 'stage-dot--sourcing',
+    'Stop': 'stage-dot--stop',
     'NDA Sent': 'stage-dot--nda',
     'Deep Dive': 'stage-dot--deep-dive',
     'Close Win': 'stage-dot--close-win',
@@ -1501,7 +1504,7 @@ if (typeof window !== 'undefined') {
 }
 
 function requiresStageConfirm(stage) {
-  return !['Sourcing', 'Interviewing', 'Close Win', 'Closed Lost'].includes(stage);
+  return !['Sourcing', 'Interviewing', 'Stop', 'Close Win', 'Closed Lost'].includes(stage);
 }
 
 function openStageConfirmPopup({ newStage, onConfirm, onCancel }) {
@@ -1559,6 +1562,16 @@ document.addEventListener('change', async (e) => {
     if (newStage === 'Closed Lost') {
       openCloseLostPopup(opportunityId, e.target);
       return;
+    }
+    if (newStage === 'Stop') {
+      try {
+        await patchOppFields(opportunityId, { nda_signature_or_start_date: null });
+      } catch (err) {
+        alert(err.message || 'Failed to clear start date.');
+        e.target.value = previousStage;
+        updateStageDropdownStyle(e.target, previousStage);
+        return;
+      }
     }
     if (requiresStageConfirm(newStage)) {
       e.target.value = previousStage;
@@ -2264,6 +2277,8 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
       return '<span class="stage-pill stage-negotiating">Negotiating</span>';
     case 'Interviewing':
       return '<span class="stage-pill stage-interviewing">Interviewing</span>';
+    case 'Stop':
+      return '<span class="stage-pill stage-stop">⏸️ Stop</span>';
     case 'Sourcing':
       return '<span class="stage-pill stage-sourcing">Sourcing</span>';
     case 'NDA Sent':
@@ -2308,6 +2323,7 @@ function getStageDropdown(currentStage, opportunityId) {
     'Closed Lost',
     'Negotiating',
     'Interviewing',
+    'Stop',
     'Sourcing',
     'NDA Sent',
     'Deep Dive'
@@ -2320,7 +2336,8 @@ function getStageDropdown(currentStage, opportunityId) {
 
   stages.forEach(stage => {
     const selected = stage === currentStage ? 'selected' : '';
-    dropdown += `<option value="${stage}" ${selected}>${stage}</option>`;
+    const label = stage === 'Stop' ? '⏸️ Stop' : stage;
+    dropdown += `<option value="${stage}" ${selected}>${label}</option>`;
   });
 
   dropdown += `</select>`;

@@ -27,6 +27,7 @@ const STAGE_OPTIONS = [
   'Closed Lost',
   'Negotiating',
   'Interviewing',
+  'Stop',
   'Sourcing',
   'NDA Sent',
   'Deep Dive',
@@ -35,6 +36,7 @@ const STAGE_OPTIONS = [
 const STAGE_ORDER = [
   'Negotiating',
   'Interviewing',
+  'Stop',
   'Sourcing',
   'NDA Sent',
   'Deep Dive',
@@ -84,6 +86,10 @@ function calculateDaysBetween(startStr, endStr) {
 function stageColor(stage) {
   if (!stage) return '';
   return `stage-color-${String(stage).toLowerCase().replace(/\s+/g, '-')}`;
+}
+
+function stageLabel(stage) {
+  return stage === 'Stop' ? '⏸️ Stop' : stage;
 }
 
 function initialsFromName(value) {
@@ -317,8 +323,17 @@ function OpportunitiesPage() {
 
   async function patchStage(opportunityId, newStage) {
     try {
+      if (newStage === 'Stop') {
+        await updateOpportunityFields(opportunityId, { nda_signature_or_start_date: null });
+      }
       await updateOpportunityStage(opportunityId, newStage);
-      setOpps((prev) => prev.map((opp) => (opp.opportunity_id === opportunityId ? { ...opp, opp_stage: newStage } : opp)));
+      setOpps((prev) => prev.map((opp) => (opp.opportunity_id === opportunityId
+        ? {
+            ...opp,
+            opp_stage: newStage,
+            ...(newStage === 'Stop' ? { nda_signature_or_start_date: null } : null),
+          }
+        : opp)));
       setToast('✨ Stage updated!');
       setTimeout(() => setToast(''), 2500);
       if (newStage === 'Negotiating') {
@@ -535,7 +550,7 @@ function OpportunitiesPage() {
                       });
                     }}
                   />
-                  {stage}
+                  {stageLabel(stage)}
                 </label>
               ))}
             </div>
@@ -632,7 +647,7 @@ function OpportunitiesPage() {
                           onChange={(event) => handleStageChange(opp, event.target.value)}
                         >
                           {STAGE_OPTIONS.map((stage) => (
-                            <option key={stage} value={stage}>{stage}</option>
+                            <option key={stage} value={stage}>{stageLabel(stage)}</option>
                           ))}
                         </select>
                       </td>

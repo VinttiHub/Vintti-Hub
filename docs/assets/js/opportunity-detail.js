@@ -259,6 +259,7 @@ function mountToolsDropdown(selected = []) {
   sel.addEventListener('change', () => {
     const slugs = window.toolsChoices.getValue(true); // ya son slugs (values del <option>)
     saveCareerField('career_tools', slugs);
+    logOpportunityDetailTrack('opp-details-dropdown-career-tools');
   }, { signal: (window.__publishCareerAC || {}).signal });
 }
 
@@ -395,6 +396,7 @@ function toggleActiveButton(command, button) {
 }
 // --- SPEED UPS: caché + prewarm de candidatos para búsquedas instantáneas ---
 const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const TRACK_PAGE = 'opp details';
 const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
   'angie@vintti.com',
   'agustin@vintti.con',
@@ -407,6 +409,33 @@ let __candsInFlight = null;
 
 const quickDebounce = (fn, ms = 120) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+async function getCurrentUserIdSafe() {
+  if (typeof window.getCurrentUserId === 'function') {
+    try {
+      return await window.getCurrentUserId();
+    } catch {}
+  }
+  const raw = window.localStorage?.getItem('user_id') || window.sessionStorage?.getItem('user_id');
+  const id = raw != null ? Number(raw) : null;
+  return Number.isFinite(id) ? id : null;
+}
+
+async function logOpportunityDetailTrack(buttonId) {
+  if (!buttonId) return;
+  try {
+    const userId = await getCurrentUserIdSafe();
+    if (userId == null) return;
+    await fetch(`${API_BASE}/tracks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, button: String(buttonId), page: TRACK_PAGE }),
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.debug('Track log failed:', err);
+  }
+}
 // ===== AUTOSAVE infra para Career fields =====
 const AUTOSAVE_MS = 350; // debounce
 const _autosaveAbort = new Map(); // por-campo -> AbortController
@@ -893,11 +922,15 @@ const overviewCommentsTextarea = document.getElementById('comments-overview-text
 if (richCommentsEnabled && overviewCommentsTextarea) {
   OPPORTUNITY_RICH_COMMENT_HANDLES.overview = window.RichComments.enhance('comments-overview-textarea', {
     placeholder: 'Write internal comments here...',
-    onBlur: (html) => updateOpportunityField('comments', html)
+    onBlur: (html) => {
+      updateOpportunityField('comments', html);
+      logOpportunityDetailTrack('opp-details-comment-overview');
+    }
   });
 } else if (overviewCommentsTextarea) {
   overviewCommentsTextarea.addEventListener('blur', async (e) => {
     await updateOpportunityField('comments', e.target.value);
+    logOpportunityDetailTrack('opp-details-comment-overview');
   });
 }
 
@@ -905,11 +938,15 @@ const clientAboutTextarea = document.getElementById('client-about-textarea');
 if (richCommentsEnabled && clientAboutTextarea) {
   OPPORTUNITY_RICH_COMMENT_HANDLES.clientAbout = window.RichComments.enhance('client-about-textarea', {
     placeholder: 'Client background, culture, values...',
-    onBlur: (html) => updateAccountField('comments', html)
+    onBlur: (html) => {
+      updateAccountField('comments', html);
+      logOpportunityDetailTrack('opp-details-comment-client');
+    }
   });
 } else if (clientAboutTextarea) {
   clientAboutTextarea.addEventListener('blur', async (e) => {
     await updateAccountField('comments', e.target.value);
+    logOpportunityDetailTrack('opp-details-comment-client');
   });
 }
 
@@ -917,10 +954,16 @@ const firstMeetingTextarea = document.getElementById('comments-firstmeeting-text
 if (richCommentsEnabled && firstMeetingTextarea) {
   OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting = window.RichComments.enhance('comments-firstmeeting-textarea', {
     placeholder: 'Summary of the first meeting...',
-    onBlur: (html) => updateOpportunityField('opp_comments', html)
+    onBlur: (html) => {
+      updateOpportunityField('opp_comments', html);
+      logOpportunityDetailTrack('opp-details-comment-firstmeeting');
+    }
   });
 } else if (firstMeetingTextarea) {
-  firstMeetingTextarea.addEventListener('blur', (e) => updateOpportunityField('opp_comments', e.target.value));
+  firstMeetingTextarea.addEventListener('blur', (e) => {
+    updateOpportunityField('opp_comments', e.target.value);
+    logOpportunityDetailTrack('opp-details-comment-firstmeeting');
+  });
 }
 
 document.getElementById('interviewing-process-editor').addEventListener('blur', e => {
@@ -930,8 +973,10 @@ document.getElementById('interviewing-process-editor').addEventListener('blur', 
 document.getElementById('start-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
 });
-document.getElementById('job-description-textarea').addEventListener('blur', e =>
-  updateOpportunityField('hr_job_description', e.target.innerHTML));
+document.getElementById('job-description-textarea').addEventListener('blur', e => {
+  updateOpportunityField('hr_job_description', e.target.innerHTML);
+  logOpportunityDetailTrack('opp-details-jd-save');
+});
 
 document.getElementById('close-date-input').addEventListener('blur', async (e) => {
   await updateOpportunityField('opp_close_date', e.target.value);
@@ -986,6 +1031,7 @@ document.getElementById('model-select').addEventListener('change', async (e) => 
   if (other) other.value = norm;
   if (typeof __fee_apply === 'function') __fee_apply();
   await updateOpportunityField('opp_model', title);
+  logOpportunityDetailTrack('opp-details-dropdown-model');
 });
 
 document.getElementById('years-experience-input').addEventListener('blur', e =>
@@ -1046,6 +1092,7 @@ document.getElementById('details-sales-lead').addEventListener('change', async (
   console.log('🟡 Sales Lead changed:', emailValue);
 
   await updateOpportunityField('opp_sales_lead', emailValue);
+  logOpportunityDetailTrack('opp-details-dropdown-sales-lead');
 });
 
 document.getElementById('details-hr-lead').addEventListener('change', async (e) => {
@@ -1054,6 +1101,7 @@ document.getElementById('details-hr-lead').addEventListener('change', async (e) 
   console.log('🟡 HR Lead changed:', emailValue);
 
   await updateOpportunityField('opp_hr_lead', valueToSend);
+  logOpportunityDetailTrack('opp-details-dropdown-hr-lead');
 
   // ✅ Si se asigna, eliminar la alerta si existe
   const alertBox = document.getElementById('hr-alert');
@@ -1069,6 +1117,7 @@ document.getElementById('details-model').addEventListener('change', async (e) =>
   if (other) other.value = title;
   if (typeof __fee_apply === 'function') __fee_apply();
   await updateOpportunityField('opp_model', title);
+  logOpportunityDetailTrack('opp-details-dropdown-model');
 });
 // AI Assistant logic
 const aiBtn = document.getElementById('ai-assistant-btn');
@@ -1096,6 +1145,7 @@ tabs.forEach((tab, index) => {
 if (tabName === 'Candidates') {
   const opportunityId = getOpportunityId();
   if (opportunityId && opportunityId !== '—') {
+    logOpportunityDetailTrack('opp-details-tab-batches');
     loadBatchesForOpportunity(opportunityId);
     loadPresentationTable(opportunityId);
   } else {
@@ -1148,6 +1198,7 @@ aiGo.addEventListener('click', async () => {
 
       // Guardar en la base de datos
       await updateOpportunityField('hr_job_description', jd);
+      logOpportunityDetailTrack('opp-details-jd-ai-save');
       console.log("✅ Job description saved in DB");
 
       alert("✅ Job description generated!");
@@ -1307,6 +1358,7 @@ async function loadPresentationTable(opportunityId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updated)
           });
+          logOpportunityDetailTrack('opp-details-batch-date-change');
         const ymd = toYMD(inputDate.value);
         const daysCell = tr.querySelector('td.time-col');
         daysCell.textContent = daysSinceYMD(ymd);
@@ -1850,6 +1902,9 @@ if (aiStarBtn) {
     el.addEventListener(evt, () => {
       const raw = (el.type === 'checkbox') ? el.checked : (el.value ?? '');
       saveCareerField(field, xform(raw));
+      if (el.tagName === 'SELECT') {
+        logOpportunityDetailTrack(`opp-details-dropdown-${field}`);
+      }
     }, SIG);
   };
 
@@ -2894,7 +2949,10 @@ function createCandidateCard(c, batchId) {
   dropdown.value = c.status || "Client interviewing/testing";
   setDropdownValue(dropdown, c.status);
 
-  dropdown.addEventListener('change', () => updateCandidateStatus(c.candidate_id, batchId, dropdown.value));
+  dropdown.addEventListener('change', () => {
+    updateCandidateStatus(c.candidate_id, batchId, dropdown.value);
+    logOpportunityDetailTrack(`opp-details-pipeline-status-${dropdown.value || 'unknown'}`);
+  });
 
   cardElement.addEventListener('click', (e) => {
     if (e.target.classList.contains('candidate-status-dropdown') || e.target.classList.contains('delete-candidate-btn')) return;

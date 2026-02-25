@@ -136,6 +136,11 @@ body {
     color: #000;
 }
 
+.stage-stop {
+    background-color: #cbd5e1;
+    color: #1f2937;
+}
+
 .stage-sourcing {
     background-color: #d5ff80;
     color: #000;
@@ -1010,6 +1015,10 @@ body {
   background-color: #e0f0ff !important; /* azul pastel (proceso activo) */
 }
 
+.stage-color-stop {
+  background-color: #e2e8f0 !important; /* gris suave (pausa) */
+}
+
 .stage-color-sourcing {
   background-color: #e4fbe6 !important; /* verde menta pastel (búsqueda/fresco) */
 }
@@ -1167,6 +1176,7 @@ body {
 .stage-dot--negotiating { background: #ffe39a; }
 .stage-dot--interviewing{ background: #d7e9ff; }
 .stage-dot--sourcing    { background: #c8f5e6; }
+.stage-dot--stop        { background: #cbd5e1; }
 .stage-dot--nda         { background: #ffdfc2; }
 .stage-dot--deep-dive   { background: #e0ccff; }
 .stage-dot--close-win   { background: #c8f7c8; }

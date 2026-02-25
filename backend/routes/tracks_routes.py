@@ -13,6 +13,7 @@ def create_track():
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     button = data.get('button')
+    page = data.get('page') or 'opp principal'
 
     if user_id is None or button is None:
         return jsonify({'error': 'user_id and button are required'}), 400
@@ -27,10 +28,10 @@ def create_track():
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO tracks (user_id, button, updated_at)
-            VALUES (%s, %s, NOW())
+            INSERT INTO tracks (user_id, button, page, updated_at)
+            VALUES (%s, %s, %s, NOW())
             """,
-            (user_id, str(button)),
+            (user_id, str(button), str(page)),
         )
         conn.commit()
         cursor.close()
