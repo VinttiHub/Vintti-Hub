@@ -22,6 +22,7 @@ const API_BASE_URL =
   (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
     ? 'http://127.0.0.1:5000'
     : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const TRACK_PAGE = 'account details';
 
 let buyoutReloadTimer = null;
 let ACCOUNT_DETAIL_RECORD = null;
@@ -31,6 +32,33 @@ let ACCOUNT_OPPS_READY = false;
 let ACCOUNT_CANDIDATES_READY = false;
 let ACCOUNT_DERIVED_REFRESHING = false;
 const ACCOUNT_RICH_COMMENT_HANDLES = { comments: null, painPoints: null };
+
+async function getCurrentUserIdSafe() {
+  if (typeof window.getCurrentUserId === 'function') {
+    try {
+      return await window.getCurrentUserId();
+    } catch {}
+  }
+  const raw = window.localStorage?.getItem('user_id') || window.sessionStorage?.getItem('user_id');
+  const id = raw != null ? Number(raw) : null;
+  return Number.isFinite(id) ? id : null;
+}
+
+async function logAccountDetailsTrack(buttonId) {
+  if (!buttonId) return;
+  try {
+    const userId = await getCurrentUserIdSafe();
+    if (userId == null) return;
+    await fetch(`${API_BASE_URL}/tracks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, button: String(buttonId), page: TRACK_PAGE }),
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.debug('Track log failed:', err);
+  }
+}
 
 function norm(value) {
   return (value || '').toString().toLowerCase().trim();
@@ -842,6 +870,7 @@ if (endEl) {
           const oppId = referralInput.dataset.opportunityId;
           const value = referralInput.value;
           updateCandidateField(candidateId, 'referral_dolar', value, oppId);
+          logAccountDetailsTrack(`employees-referral-${candidateId}-${oppId}`);
         });
       }
 
@@ -872,6 +901,7 @@ if (endEl) {
               const start = date1.format('YYYY-MM-DD');
               const end   = date2.format('YYYY-MM-DD');
               updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
+              logAccountDetailsTrack(`employees-referral-range-${candidateId}-${oppId}`);
             });
           }
         };
@@ -910,6 +940,7 @@ if (endEl) {
           if (!y || !m) return;
           // Guardamos como "YYYY-MM" (simple y suficiente para tu UI)
           updateCandidateField(candidateId, 'buyout_daterange', `${y}-${m}`, candidate.opportunity_id);
+          logAccountDetailsTrack(`employees-buyout-range-${candidateId}-${candidate.opportunity_id}`);
         };
         mSel.addEventListener('change', saveBuyout);
         ySel.addEventListener('change', saveBuyout);
@@ -920,6 +951,7 @@ if (endEl) {
           buyoutInput.addEventListener('blur', () => {
             const value = buyoutInput.value;
             updateCandidateField(candidateId, 'buyout_dolar', value, candidate.opportunity_id);
+            logAccountDetailsTrack(`employees-buyout-amount-${candidateId}-${candidate.opportunity_id}`);
           });
         }
       }
@@ -957,6 +989,7 @@ if (endEl) {
               const end   = date2.format('YYYY-MM-DD');
 
               updateCandidateField(candidateId, 'discount_daterange', `[${start},${end}]`, oppId);
+              logAccountDetailsTrack(`employees-discount-range-${candidateId}-${oppId}`);
             });
           }
         };
@@ -976,6 +1009,7 @@ if (endEl) {
           const oppId = discountInput.dataset.opportunityId;
           const value = discountInput.value;
           updateCandidateField(candidateId, 'discount_dolar', value, oppId);
+          logAccountDetailsTrack(`employees-discount-${candidateId}-${oppId}`);
         });
       }
 // === Start/End date (hire_opportunity) — STAFFING ===
@@ -985,6 +1019,7 @@ if (startInputS) {
     const candidateId = startInputS.dataset.candidateId;
     const oppId = startInputS.dataset.opportunityId;
     updateCandidateField(candidateId, 'start_date', startInputS.value || null, oppId);
+    logAccountDetailsTrack(`employees-start-date-${candidateId}-${oppId}`);
   });
 }
 
@@ -1018,6 +1053,7 @@ if (endInputS) {
       }
 
       await persistEndDate();
+      logAccountDetailsTrack(`employees-end-date-${candidateId}-${oppId}`);
 
       if (shouldNotify) {
         await notifyCandidateInactiveEmail({
@@ -1331,6 +1367,7 @@ function createRecruitingRow(candidate, options = {}) {
       input.addEventListener('blur', () => {
         updateBuyoutRow(buyoutId, { [field]: numberOrNull(input.value) })
           .then(() => scheduleBuyoutReload())
+          .then(() => logAccountDetailsTrack(`employees-buyout-${field}-${buyoutId}`))
           .catch((err) => console.error(`Failed to update buyout ${field}`, err));
       });
     };
@@ -1342,6 +1379,7 @@ function createRecruitingRow(candidate, options = {}) {
         const val = String(referralIdInput.value || '').trim() || null;
         updateBuyoutRow(buyoutId, { referral_id: val })
           .then(() => scheduleBuyoutReload())
+          .then(() => logAccountDetailsTrack(`employees-buyout-referral-id-${buyoutId}`))
           .catch((err) => console.error('Failed to update buyout referral_id', err));
       });
     }
@@ -1350,6 +1388,7 @@ function createRecruitingRow(candidate, options = {}) {
       probationInput.addEventListener('blur', () => {
         updateBuyoutRow(buyoutId, { probation: numberOrNull(probationInput.value) })
           .then(() => scheduleBuyoutReload())
+          .then(() => logAccountDetailsTrack(`employees-buyout-probation-${buyoutId}`))
           .catch((err) => console.error('Failed to update buyout probation', err));
       });
     }
@@ -1362,12 +1401,14 @@ function createRecruitingRow(candidate, options = {}) {
       if (isBuyoutRow) {
         updateBuyoutRow(buyoutId, { referral: numberOrNull(value) })
           .then(() => scheduleBuyoutReload())
+          .then(() => logAccountDetailsTrack(`employees-buyout-referral-${buyoutId}`))
           .catch((err) => console.error('Failed to update buyout referral', err));
         return;
       }
       const candidateId = refRecInput.dataset.candidateId;
       const oppId = refRecInput.dataset.opportunityId;
       updateCandidateField(candidateId, 'referral_dolar', value, oppId);
+      logAccountDetailsTrack(`employees-referral-${candidateId}-${oppId}`);
     });
   }
 
@@ -1402,12 +1443,14 @@ function createRecruitingRow(candidate, options = {}) {
           if (isBuyoutRow) {
             updateBuyoutRow(buyoutId, { referral_date_range: `[${start},${end}]` })
               .then(() => scheduleBuyoutReload())
+              .then(() => logAccountDetailsTrack(`employees-buyout-referral-range-${buyoutId}`))
               .catch((err) => console.error('Failed to update buyout referral date range', err));
           } else {
             const candidateId = refRecPickerInput.dataset.candidateId;
             const oppId = refRecPickerInput.dataset.opportunityId;
             if (!candidateId) return;
             updateCandidateField(candidateId, 'referral_daterange', `[${start},${end}]`, oppId);
+            logAccountDetailsTrack(`employees-referral-range-${candidateId}-${oppId}`);
           }
         });
       }
@@ -1426,12 +1469,14 @@ function createRecruitingRow(candidate, options = {}) {
       if (isBuyoutRow) {
         updateBuyoutRow(buyoutId, { start_date: startInput.value || null })
           .then(() => scheduleBuyoutReload())
+          .then(() => logAccountDetailsTrack(`employees-buyout-start-date-${buyoutId}`))
           .catch((err) => console.error('Failed to update buyout start date', err));
         return;
       }
       const candidateId = startInput.dataset.candidateId;
       const oppId = startInput.dataset.opportunityId;
       updateCandidateField(candidateId, 'start_date', startInput.value || null, oppId);
+      logAccountDetailsTrack(`employees-start-date-${candidateId}-${oppId}`);
     });
   }
 
@@ -1441,6 +1486,7 @@ function createRecruitingRow(candidate, options = {}) {
       if (isBuyoutRow) {
         updateBuyoutRow(buyoutId, { end_date: endInput.value || null })
           .then(() => scheduleBuyoutReload())
+          .then(() => logAccountDetailsTrack(`employees-buyout-end-date-${buyoutId}`))
           .catch((err) => console.error('Failed to update buyout end date', err));
         return;
       }
@@ -1471,6 +1517,7 @@ function createRecruitingRow(candidate, options = {}) {
         }
 
         await persistEndDate();
+        logAccountDetailsTrack(`employees-end-date-${candidateId}-${oppId}`);
 
         if (shouldNotify) {
           await notifyCandidateInactiveEmail({

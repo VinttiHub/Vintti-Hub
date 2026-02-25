@@ -387,6 +387,35 @@ const candidateModalRefs = {
   openExistingBtn: null
 };
 
+const TRACK_PAGE = 'candidates principal';
+
+async function getCurrentUserIdSafe() {
+  if (typeof window.getCurrentUserId === 'function') {
+    try {
+      return await window.getCurrentUserId();
+    } catch {}
+  }
+  const raw = window.localStorage?.getItem('user_id') || window.sessionStorage?.getItem('user_id');
+  const id = raw != null ? Number(raw) : null;
+  return Number.isFinite(id) ? id : null;
+}
+
+async function logCandidateTrack(buttonId) {
+  if (!buttonId) return;
+  try {
+    const userId = await getCurrentUserIdSafe();
+    if (userId == null) return;
+    await fetch(`${API_BASE}/tracks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, button: String(buttonId), page: TRACK_PAGE }),
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.debug('Track log failed:', err);
+  }
+}
+
 function setUsStateInputValue(code) {
   if (!candidateModalRefs.usStateInput) return;
   const label = code && CANDIDATE_US_STATE_MAP[code] ? `${CANDIDATE_US_STATE_MAP[code]} (${code})` : '';
@@ -1223,6 +1252,8 @@ async function submitCandidate(values) {
 
     closeCandidateModal();
     showCandidateToast('Candidate created');
+    const createdId = data?.candidate_id ?? data?.id ?? null;
+    logCandidateTrack(createdId != null ? `candidate-create-${createdId}` : 'candidate-create');
     await loadCandidates({ loaderMessage: 'Refreshing candidates…' });
   } catch (err) {
     console.error('❌ Error creating candidate:', err);
