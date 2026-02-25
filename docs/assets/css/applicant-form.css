@@ -4,11 +4,13 @@
   --card: #ffffff;
   --ink: #0e1a2b;
   --muted: #637083;
-  --line: #d8e0ef;
-  --input-bg: #f2f6fb;
+  --line: #e1e6f0;
+  --input-bg: #ffffff;
   --accent: #0b45f5;
   --accent-dark: #0a3ddb;
   --shadow: 0 30px 80px rgba(15, 34, 71, 0.12);
+  --soft-shadow: 0 18px 40px rgba(15, 34, 71, 0.08);
+  --focus: 0 0 0 4px rgba(11, 69, 245, 0.15);
 }
 
 * {
@@ -18,7 +20,7 @@
 body {
   margin: 0;
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, #fdfefe 0%, #eef3ff 40%, #f5f7fb 100%);
+  background: radial-gradient(circle at top, #ffffff 0%, #eef3ff 45%, #f3f6fb 100%);
   color: var(--ink);
 }
 
@@ -41,10 +43,26 @@ body {
 
 .form-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
+  flex-direction: column;
+  gap: 18px;
   margin-bottom: 28px;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #edf1f9;
+}
+
+.header-body {
+  max-width: 620px;
+}
+
+.vintti-logo {
+  height: 50px;
+  width: auto;
 }
 
 .eyebrow {
@@ -67,13 +85,14 @@ body {
 }
 
 .header-chip {
-  background: #e7edff;
+  background: #eef2ff;
   color: #2441a6;
   font-weight: 600;
   padding: 10px 16px;
   border-radius: 999px;
   font-size: 14px;
   white-space: nowrap;
+  box-shadow: var(--soft-shadow);
 }
 
 .apply-form {
@@ -102,7 +121,7 @@ body {
 
 .field input,
 .field select {
-  height: 52px;
+  height: 54px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--input-bg);
@@ -110,7 +129,22 @@ body {
   font-size: 15px;
   color: var(--ink);
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 10px 25px rgba(15, 34, 71, 0.06);
+}
+
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #6b7aa0 50%),
+    linear-gradient(135deg, #6b7aa0 50%, transparent 50%);
+  background-position: calc(100% - 22px) 50%, calc(100% - 16px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 44px;
 }
 
 .field input::placeholder {
@@ -119,8 +153,14 @@ body {
 
 .field input:focus,
 .field select:focus {
-  border-color: #a6b8ff;
-  box-shadow: 0 0 0 4px rgba(11, 69, 245, 0.12);
+  border-color: #9bb0ff;
+  box-shadow: var(--focus);
+  transform: translateY(-1px);
+}
+
+.field input:hover,
+.field select:hover {
+  border-color: #c7d2f3;
 }
 
 .upload-card {
@@ -130,8 +170,8 @@ body {
   gap: 20px;
   padding: 18px 22px;
   border-radius: 20px;
-  border: 1px dashed #b8c5e3;
-  background: #f8faff;
+  border: 1px dashed #c4d0f0;
+  background: #f9fbff;
 }
 
 .upload-card h2 {
@@ -158,19 +198,20 @@ body {
 }
 
 .btn-secondary {
-  border: 1px solid #d0d9ee;
+  border: 1px solid #d5def2;
   background: #ffffff;
   color: #1d2f5d;
   border-radius: 999px;
   padding: 10px 18px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
 }
 
 .btn-secondary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(11, 69, 245, 0.12);
+  border-color: #b8c5e3;
 }
 
 .file-name {
@@ -196,14 +237,15 @@ body {
   font-size: 16px;
   font-weight: 700;
   color: #ffffff;
-  background: var(--accent);
+  background: linear-gradient(135deg, #0b45f5 0%, #295bff 100%);
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .btn-primary:hover {
-  background: var(--accent-dark);
+  background: linear-gradient(135deg, #0a3ddb 0%, #1f4be0 100%);
   transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(11, 69, 245, 0.25);
 }
 
 .btn-primary:disabled {
@@ -225,9 +267,34 @@ body {
   color: #c0392b;
 }
 
+.toast {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 14px 20px;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+  font-size: 14px;
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (max-width: 900px) {
   .form-header {
     flex-direction: column;
+  }
+
+  .brand {
+    align-items: flex-start;
   }
 
   .field-grid {
@@ -251,5 +318,10 @@ body {
 
   .btn-primary {
     width: 100%;
+  }
+
+  .toast {
+    left: 20px;
+    right: 20px;
   }
 }

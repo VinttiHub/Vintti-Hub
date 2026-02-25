@@ -9,11 +9,23 @@ const cvButton = document.getElementById("cvButton");
 const cvFilename = document.getElementById("cvFilename");
 const formStatus = document.getElementById("formStatus");
 const submitBtn = document.getElementById("submitBtn");
+const toast = document.getElementById("toast");
+let toastTimer = null;
 
 function setStatus(message, tone) {
   formStatus.textContent = message;
   formStatus.classList.remove("success", "error");
   if (tone) formStatus.classList.add(tone);
+}
+
+function showToast(message) {
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add("is-visible");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("is-visible");
+  }, 3500);
 }
 
 cvButton.addEventListener("click", () => {
@@ -47,7 +59,8 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    setStatus("Application received. We will be in touch soon.", "success");
+    setStatus("", "");
+    showToast("Application received. We will be in touch soon.");
     form.reset();
     cvFilename.textContent = "No file selected";
   } catch (err) {

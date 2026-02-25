@@ -13,12 +13,14 @@
   <main class="apply-page">
     <section class="form-shell">
       <header class="form-header">
-        <div class="header-text">
+        <div class="header-top">
+          <img src="./assets/img/vintti_logo.png" alt="Vintti Logo" class="vintti-logo" />
+          <div class="header-chip">Takes 2-3 minutes</div>
+        </div>
+        <div class="header-body">
           <p class="eyebrow">Join the team</p>
           <h1>Apply in minutes</h1>
-          <p class="subtext">Share your details and upload your CV to get started.</p>
         </div>
-        <div class="header-chip">Takes 2-3 minutes</div>
       </header>
 
       <form id="applicantForm" class="apply-form">
@@ -122,6 +124,7 @@
     </section>
   </main>
 
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script defer src="./assets/js/applicant-form.js"></script>
 </body>
 </html>
