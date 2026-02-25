@@ -593,18 +593,25 @@ function buildEmptyRow() {
 
 function paintCandidateRows(data) {
   if (!candidateState.tbody) return;
-  const rows = (Array.isArray(data) && data.length ? data.map(buildCandidateRow) : [buildEmptyRow()]);
+  const hasRows = Array.isArray(data) && data.length > 0;
+  const rows = hasRows ? data.map(buildCandidateRow) : [buildEmptyRow()];
 
   if (!candidateState.dataTable) {
     const frag = document.createDocumentFragment();
-    rows.forEach(row => frag.appendChild(row));
+    // DataTables cannot parse a manual "empty" row that uses colspan.
+    // Leave tbody empty so DataTables renders its own zero-records state.
+    if (hasRows) {
+      rows.forEach(row => frag.appendChild(row));
+    }
     candidateState.tbody.replaceChildren(frag);
     initDataTable();
     return;
   }
 
   candidateState.dataTable.clear();
-  rows.forEach(row => candidateState.dataTable.row.add(row));
+  if (hasRows) {
+    rows.forEach(row => candidateState.dataTable.row.add(row));
+  }
   candidateState.dataTable.draw();
 }
 
