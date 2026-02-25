@@ -11,7 +11,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const ratingToggle = document.getElementById("resume-rating-toggle");
   const ratingClose = document.getElementById("resume-rating-close");
   const ratingBubble = document.getElementById("resume-rating-bubble");
-  let currentRating = "";
+  const ratingComment = document.getElementById("resume-rating-comment");
+  let currentStars = 0;
+  let currentComment = "";
+  let lastSavedStars = 0;
+  let lastSavedComment = "";
+  let commentSaveTimer = null;
   let candidateFileName = "resume";
   if (downloadBtn) downloadBtn.disabled = true;
   if (bodyEl) {
@@ -133,9 +138,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  const setRatingBubble = (hasRating) => {
+  const setRatingBubble = (hasFeedback) => {
     if (!ratingBubble) return;
-    ratingBubble.textContent = hasRating
+    ratingBubble.textContent = hasFeedback
       ? "Thanks for rating this candidate."
       : "Please rate this candidate — your comments help us improve.";
   };
@@ -155,11 +160,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const renderRating = (value) => {
     ratingButtons.forEach((btn) => {
-      const active = btn.dataset.value === value;
+      const active = Number(btn.dataset.stars) === Number(value);
       btn.classList.toggle("is-active", active);
       btn.setAttribute("aria-pressed", active ? "true" : "false");
     });
-    setRatingBubble(Boolean(value));
+    setRatingBubble(Boolean(value) || Boolean(currentComment.trim()));
   };
 
   const patchResume = async (payload) => {
@@ -174,24 +179,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     return response.json().catch(() => ({}));
   };
 
+  const saveRatingFeedback = async () => {
+    if (!candidateId) return;
+    const trimmedComment = currentComment.trim();
+    if (currentStars === lastSavedStars && trimmedComment === lastSavedComment) return;
+    setRatingStatus("Saving...", "loading");
+    try {
+      await patchResume({ stars: currentStars, comments_stars: trimmedComment });
+      lastSavedStars = currentStars;
+      lastSavedComment = trimmedComment;
+      setRatingStatus("Thanks for rating this candidate.", "success");
+      setRatingBubble(Boolean(currentStars) || Boolean(trimmedComment));
+    } catch (err) {
+      console.error("Unable to save rating", err);
+      setRatingStatus("Unable to save rating right now.", "error");
+    }
+  };
+
   if (ratingButtons.length) {
     ratingButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!candidateId) return;
-        const value = btn.dataset.value;
-        if (!value || value === currentRating) return;
-        currentRating = value;
-        renderRating(currentRating);
-        setRatingStatus("Saving...", "loading");
-        try {
-          await patchResume({ comments_stars: currentRating });
-          setRatingStatus("Thanks for rating this candidate.", "success");
-          setRatingBubble(true);
-        } catch (err) {
-          console.error("Unable to save rating", err);
-          setRatingStatus("Unable to save rating right now.", "error");
-        }
+        const starsValue = Number(btn.dataset.stars);
+        if (!starsValue || starsValue === currentStars) return;
+        currentStars = starsValue;
+        renderRating(currentStars);
+        await saveRatingFeedback();
       });
+    });
+  }
+
+  if (ratingComment) {
+    ratingComment.addEventListener("input", () => {
+      currentComment = ratingComment.value || "";
+      setRatingBubble(Boolean(currentStars) || Boolean(currentComment.trim()));
+      if (commentSaveTimer) window.clearTimeout(commentSaveTimer);
+      commentSaveTimer = window.setTimeout(() => {
+        saveRatingFeedback();
+      }, 600);
+    });
+
+    ratingComment.addEventListener("blur", () => {
+      currentComment = ratingComment.value || "";
+      if (commentSaveTimer) window.clearTimeout(commentSaveTimer);
+      saveRatingFeedback();
     });
   }
 // Muestra esto cuando no hay fecha
@@ -286,9 +316,19 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     if (ratingEl) {
-      const initialRating = typeof data.comments_stars === "string" ? data.comments_stars : "";
-      currentRating = initialRating === "great" || initialRating === "bad" ? initialRating : "";
-      renderRating(currentRating);
+      let initialStars = Number(data.stars || 0);
+      if (!Number.isFinite(initialStars)) initialStars = 0;
+      let initialComments = typeof data.comments_stars === "string" ? data.comments_stars : "";
+      if (!initialStars && (initialComments === "great" || initialComments === "bad")) {
+        initialStars = initialComments === "great" ? 5 : 1;
+        initialComments = "";
+      }
+      currentStars = initialStars;
+      currentComment = initialComments;
+      lastSavedStars = initialStars;
+      lastSavedComment = initialComments.trim();
+      if (ratingComment) ratingComment.value = initialComments;
+      renderRating(currentStars);
       setRatingOpen(false);
     }
 

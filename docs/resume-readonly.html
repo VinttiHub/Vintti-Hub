@@ -35,6 +35,7 @@
             type="button"
             class="rating-choice rating-choice--good"
             data-value="great"
+            data-stars="5"
             aria-label="Great"
             aria-pressed="false"
           >
@@ -45,12 +46,17 @@
             type="button"
             class="rating-choice rating-choice--bad"
             data-value="bad"
+            data-stars="1"
             aria-label="Bad"
             aria-pressed="false"
           >
             <span class="rating-choice-icon" aria-hidden="true">✕</span>
             <span class="rating-choice-label">Bad</span>
           </button>
+        </div>
+        <div class="resume-rating-comment">
+          <label for="resume-rating-comment">Comments</label>
+          <textarea id="resume-rating-comment" placeholder="Add a quick note" rows="3"></textarea>
         </div>
         <div class="resume-rating-actions">
           <span id="resume-rating-status" class="resume-rating-status" aria-live="polite"></span>

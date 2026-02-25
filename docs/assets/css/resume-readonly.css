@@ -397,6 +397,39 @@ html, body {
   flex-wrap: wrap;
 }
 
+.resume-rating-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-rating-comment label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a16207;
+  font-weight: 600;
+}
+
+.resume-rating-comment textarea {
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-family: "Onest", sans-serif;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.82);
+  resize: vertical;
+  min-height: 72px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.resume-rating-comment textarea:focus {
+  outline: none;
+  border-color: var(--rating-accent);
+  box-shadow: 0 0 0 3px var(--rating-accent-soft);
+}
+
 .rating-choice {
   border: 1px solid rgba(15, 23, 42, 0.14);
   background: rgba(255, 255, 255, 0.78);
