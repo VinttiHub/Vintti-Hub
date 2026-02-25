@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from datetime import date, timedelta
+from typing import Dict, List, Optional, Tuple
 
 import requests
 from flask import Blueprint, jsonify, request
@@ -15,7 +16,7 @@ APP_BASE_URL = os.environ.get('APP_BASE_URL', 'https://7m6mw95m8y.us-east-2.awsa
 BONUS_TODO_MARKER_RE = re.compile(r'\[AUTO:bonus_request:(\d+)(?::assignee:\d+)?\]')
 
 
-def _extract_bonus_request_id(description: str | None) -> int | None:
+def _extract_bonus_request_id(description: Optional[str]) -> Optional[int]:
     text = str(description or '')
     match = BONUS_TODO_MARKER_RE.search(text)
     if not match:
@@ -26,7 +27,7 @@ def _extract_bonus_request_id(description: str | None) -> int | None:
         return None
 
 
-def _todo_reminder_email_html(user_name: str, groups: dict[str, list[dict]]) -> str:
+def _todo_reminder_email_html(user_name: str, groups: Dict[str, List[Dict]]) -> str:
     safe_name = html.escape(user_name or 'there')
     detail_url = 'https://vinttihub.vintti.com/to-do-details.html'
 
@@ -71,7 +72,7 @@ def _todo_reminder_email_html(user_name: str, groups: dict[str, list[dict]]) -> 
     """
 
 
-def _send_email_via_endpoint(subject: str, html_body: str, to: list[str], base_url: str | None = None) -> bool:
+def _send_email_via_endpoint(subject: str, html_body: str, to: List[str], base_url: Optional[str] = None) -> bool:
     try:
         resolved_base = (base_url or APP_BASE_URL).rstrip('/')
         response = requests.post(
@@ -396,7 +397,7 @@ def to_do_send_reminders():
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
-    by_user: dict[tuple[int, str], dict] = {}
+    by_user: Dict[Tuple[int, str], Dict] = {}
     for row in rows:
         due = row.get('due_date')
         if due is None:

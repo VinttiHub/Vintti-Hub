@@ -6,6 +6,7 @@ import logging
 import os
 import re
 from html import escape
+from typing import List
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
 
@@ -33,7 +34,7 @@ def _safe_target_month(s):
         return None
 
 def _send_bonus_request_email(
-    to_emails: list[str],
+    to_emails: List[str],
     bonus_request_id: int,
     account_name: str,
     candidate_label: str,
@@ -80,7 +81,7 @@ def _send_bonus_request_email(
     sg.send(msg)
 
 
-def _resolve_bonus_email_recipients(cur) -> list[str]:
+def _resolve_bonus_email_recipients(cur) -> List[str]:
     recipients = []
     seen = set()
 
