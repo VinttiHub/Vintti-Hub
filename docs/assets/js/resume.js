@@ -560,6 +560,189 @@ function pickerToIso(root){
   return (y && m) ? `${y}-${m}-15` : '';
 }
 
+  // ---------- Validación UI (Resume) ----------
+  function setInvalidField(el, invalid){
+    if (!(el instanceof HTMLElement)) return;
+    if (invalid) {
+      if (!el.dataset._resumePrevBorder) el.dataset._resumePrevBorder = el.style.borderColor || '';
+      if (!el.dataset._resumePrevShadow) el.dataset._resumePrevShadow = el.style.boxShadow || '';
+      el.style.borderColor = '#d93025';
+      el.style.boxShadow = '0 0 0 1px rgba(217,48,37,.14)';
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(el.dataset, '_resumePrevBorder')) {
+      el.style.borderColor = el.dataset._resumePrevBorder;
+      delete el.dataset._resumePrevBorder;
+    } else {
+      el.style.removeProperty('border-color');
+    }
+    if (Object.prototype.hasOwnProperty.call(el.dataset, '_resumePrevShadow')) {
+      el.style.boxShadow = el.dataset._resumePrevShadow;
+      delete el.dataset._resumePrevShadow;
+    } else {
+      el.style.removeProperty('box-shadow');
+    }
+  }
+
+  function setInvalidFields(list, invalid){
+    (Array.isArray(list) ? list : [list]).forEach(el => setInvalidField(el, invalid));
+  }
+
+  function ensureCardErrorBox(card){
+    let box = card.querySelector('.cv-card-errors');
+    if (box) return box;
+    box = document.createElement('div');
+    box.className = 'cv-card-errors';
+    box.style.display = 'none';
+    box.style.marginTop = '10px';
+    box.style.padding = '8px 10px';
+    box.style.border = '1px solid rgba(217,48,37,.25)';
+    box.style.background = 'rgba(217,48,37,.05)';
+    box.style.color = '#b3261e';
+    box.style.borderRadius = '10px';
+    box.style.fontSize = '12px';
+    box.style.lineHeight = '1.35';
+    box.style.width = '100%';
+    box.style.flexBasis = '100%';
+    card.appendChild(box);
+    return box;
+  }
+
+  function renderCardErrors(card, messages){
+    const box = ensureCardErrorBox(card);
+    if (!messages.length) {
+      box.innerHTML = '';
+      box.style.display = 'none';
+      return;
+    }
+    box.innerHTML = messages.map(msg => `<div>• ${msg}</div>`).join('');
+    box.style.display = '';
+  }
+
+  function validateWorkCard(card){
+    const titleEl = card.querySelector('.work-title');
+    const companyEl = card.querySelector('.work-company');
+    const descEl = card.querySelector('.work-desc');
+    const currentEl = card.querySelector('.work-current');
+    const startPicker = card.querySelector('.picker-start');
+    const endPicker = card.querySelector('.picker-end');
+    const hStart = card.querySelector('.work-start');
+    const hEnd = card.querySelector('.work-end');
+
+    const title = normalizeText(titleEl?.value);
+    const company = normalizeText(companyEl?.value);
+    const current = !!currentEl?.checked;
+    const start = normalizeISO15(pickerToIso(startPicker) || hStart?.value || '');
+    const end = normalizeISO15(current ? '' : (pickerToIso(endPicker) || hEnd?.value || ''));
+    const descTxt = normalizeText(stripHtmlToText(descEl?.innerHTML || ''));
+
+    const messages = [];
+    const missingTitle = !title;
+    const missingCompany = !company;
+    const missingStart = !start;
+    const missingEndOrCurrent = !current && !end;
+    const invalidDateOrder = !!(start && end && end < start);
+    const missingDesc = !descTxt;
+
+    if (missingTitle) messages.push('Title es obligatorio.');
+    if (missingCompany) messages.push('Company es obligatorio.');
+    if (missingStart) messages.push('Start date es obligatorio (mes y año).');
+    if (missingEndOrCurrent) messages.push('Completa End date o activa el toggle "Current".');
+    if (invalidDateOrder) messages.push('End date no puede ser anterior a Start date.');
+    if (missingDesc) messages.push('Description es obligatoria.');
+
+    setInvalidField(titleEl, missingTitle);
+    setInvalidField(companyEl, missingCompany);
+    setInvalidFields(qsa('select', startPicker || card), missingStart);
+    setInvalidFields(qsa('select', endPicker || card), missingEndOrCurrent || invalidDateOrder);
+    setInvalidField(descEl, missingDesc);
+
+    const currentLabel = currentEl?.closest('label');
+    if (currentLabel) currentLabel.style.color = missingEndOrCurrent ? '#b3261e' : '';
+
+    renderCardErrors(card, messages);
+    return messages.length === 0;
+  }
+
+  function validateEducationCard(card){
+    const instEl = card.querySelector('.edu-inst');
+    const titleEl = card.querySelector('.edu-title');
+    const countryEl = card.querySelector('.edu-country');
+    const descEl = card.querySelector('.edu-desc');
+    const currentEl = card.querySelector('.edu-current');
+    const startPicker = card.querySelector('.picker-start');
+    const endPicker = card.querySelector('.picker-end');
+    const hStart = card.querySelector('.edu-start');
+    const hEnd = card.querySelector('.edu-end');
+
+    const institution = normalizeText(instEl?.value);
+    const title = normalizeText(titleEl?.value);
+    const country = normalizeText(countryEl?.value);
+    const current = !!currentEl?.checked;
+    const start = normalizeISO15(pickerToIso(startPicker) || hStart?.value || '');
+    const end = normalizeISO15(current ? '' : (pickerToIso(endPicker) || hEnd?.value || ''));
+    const descTxt = normalizeText(stripHtmlToText(descEl?.innerHTML || ''));
+
+    const messages = [];
+    const missingInstitution = !institution;
+    const missingTitle = !title;
+    const missingCountry = !country;
+    const missingStart = !start;
+    const missingEndOrCurrent = !current && !end;
+    const invalidDateOrder = !!(start && end && end < start);
+    const missingDesc = !descTxt;
+
+    if (missingInstitution) messages.push('Institution es obligatorio.');
+    if (missingTitle) messages.push('Title/Degree es obligatorio.');
+    if (missingCountry) messages.push('Country es obligatorio.');
+    if (missingStart) messages.push('Start date es obligatorio (mes y año).');
+    if (missingEndOrCurrent) messages.push('Completa End date o activa el toggle "Current".');
+    if (invalidDateOrder) messages.push('End date no puede ser anterior a Start date.');
+    if (missingDesc) messages.push('Description es obligatoria.');
+
+    setInvalidField(instEl, missingInstitution);
+    setInvalidField(titleEl, missingTitle);
+    setInvalidField(countryEl, missingCountry);
+    setInvalidFields(qsa('select', startPicker || card), missingStart);
+    setInvalidFields(qsa('select', endPicker || card), missingEndOrCurrent || invalidDateOrder);
+    setInvalidField(descEl, missingDesc);
+
+    const currentLabel = currentEl?.closest('label');
+    if (currentLabel) currentLabel.style.color = missingEndOrCurrent ? '#b3261e' : '';
+
+    renderCardErrors(card, messages);
+    return messages.length === 0;
+  }
+
+  function validateToolRow(row){
+    const nameEl = row.querySelector('.tool-name');
+    const name = normalizeText(nameEl?.value);
+    const messages = [];
+    if (!name) messages.push('Tool Name es obligatorio.');
+    setInvalidField(nameEl, !name);
+    renderCardErrors(row, messages);
+    return messages.length === 0;
+  }
+
+  function validateLanguageRow(row){
+    const langEl = row.querySelector('.language-name');
+    const language = normalizeText(langEl?.value);
+    const messages = [];
+    if (!language) messages.push('Language es obligatorio.');
+    setInvalidField(langEl, !language);
+    renderCardErrors(row, messages);
+    return messages.length === 0;
+  }
+
+  function validateResumeForm(){
+    let ok = true;
+    qsa('#workExperienceList .cv-card-entry').forEach(card => { if (!validateWorkCard(card)) ok = false; });
+    qsa('#educationList .cv-card-entry').forEach(card => { if (!validateEducationCard(card)) ok = false; });
+    qsa('#toolsList .cv-card-entry').forEach(row => { if (!validateToolRow(row)) ok = false; });
+    qsa('#languagesList .cv-card-entry').forEach(row => { if (!validateLanguageRow(row)) ok = false; });
+    return ok;
+  }
+
 
   // ---------- DOM → Data (normalized, filtered) ----------
   function readResumeFromDOM(){
@@ -645,6 +828,7 @@ const end    = normalizeISO15(endRaw);
   // ---------- DIFF & SAVE ----------
 async function saveNow(){
   if (!hydrated) return;
+  if (!validateResumeForm()) return;
 
   const current = readResumeFromDOM();
 
@@ -784,6 +968,7 @@ window.__resume = Object.assign(window.__resume || {}, {
   scheduleSave,
   saveNow,
   debouncedSave,
+  validate: validateResumeForm,
   sanitizeHTML,
   maybeAutolist,
   isRichEmpty,
@@ -815,6 +1000,7 @@ window.__resume = Object.assign(window.__resume || {}, {
       if (videoEl) videoEl.innerHTML = snapshot.video_link || '';
 
       hydrated = true;
+      validateResumeForm();
     }catch(e){
       console.warn('⚠️ GET /resumes failed', e);
       snapshot = { about:'', education:[], work_experience:[], tools:[], languages:[], video_link:'' };
@@ -835,10 +1021,19 @@ if (videoEl){
   videoEl.addEventListener('blur',  () => markAndSave('video_link'));
 }
 
-  addEduBtn?.addEventListener('click', ()=>{ addEducationEntry(); touched.education=true; scheduleSave(); });
-  addWorkBtn?.addEventListener('click', ()=>{ addWorkExperienceEntry(); touched.work_experience=true; scheduleSave(); });
-  addToolBtn?.addEventListener('click', ()=>{ addToolEntry(); touched.tools=true; scheduleSave(); });
-  addLangBtn?.addEventListener('click', ()=>{ addLanguageEntry(); touched.languages=true; scheduleSave(); });
+  addEduBtn?.addEventListener('click', ()=>{ addEducationEntry(); touched.education=true; validateResumeForm(); scheduleSave(); });
+  addWorkBtn?.addEventListener('click', ()=>{ addWorkExperienceEntry(); touched.work_experience=true; validateResumeForm(); scheduleSave(); });
+  addToolBtn?.addEventListener('click', ()=>{ addToolEntry(); touched.tools=true; validateResumeForm(); scheduleSave(); });
+  addLangBtn?.addEventListener('click', ()=>{ addLanguageEntry(); touched.languages=true; validateResumeForm(); scheduleSave(); });
+
+  const revalidateResumeUI = () => { if (hydrated) validateResumeForm(); };
+  [eduList, workList, toolsList, langsList].forEach(list => {
+    if (!list) return;
+    list.addEventListener('input', revalidateResumeUI);
+    list.addEventListener('change', revalidateResumeUI);
+    list.addEventListener('focusout', () => setTimeout(revalidateResumeUI, 0), true);
+    list.addEventListener('click', () => setTimeout(revalidateResumeUI, 0));
+  });
 
   // Pegar texto plano en todos los contenteditable del resume
 
