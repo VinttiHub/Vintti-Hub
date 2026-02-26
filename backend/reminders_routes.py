@@ -101,7 +101,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     notes_card = _references_card_html(references)
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
-      <p>Hey team — new <b>Close-Win</b> 🎉</p>
+      <p>Hey team — new <b>Signed</b> 🎉</p>
       <p>We’ve just closed <b>{html.escape(client_name or 'Client')}</b>’s <b>{html.escape(opp_position_name or 'role')}</b> with
          <b>{html.escape(candidate_name or 'the candidate')}</b>.</p>
 
@@ -117,7 +117,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
 
       {notes_card}
 
-      <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
+      <p>Please complete your Signed tasks and then tick your checkbox on this page:<br>
         {link}
       </p>
 
@@ -142,7 +142,7 @@ def _initial_email_html_recruiting(
     notes_card = _references_card_html(references)
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
-      <p>Hey team — new <b>Close-Win</b> 🎉</p>
+      <p>Hey team — new <b>Signed</b> 🎉</p>
 
       <p>We’ve just closed <b>{html.escape(client_name or 'Client')}</b>’s <b>{html.escape(opp_position_name or 'role')}</b> with
          <b>{html.escape(candidate_name or 'the candidate')}</b>.</p>
@@ -159,7 +159,7 @@ def _initial_email_html_recruiting(
 
       <p>—</p>
 
-      <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
+      <p>Please complete your Signed tasks and then tick your checkbox on this page:<br>
         {link}
       </p>
 
@@ -250,10 +250,10 @@ def press_and_send(candidate_id):
             )
 
 
-        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, ANGIE_EMAIL]
+        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL]  # lista de destinatarios fija por ahora
 
         # Nuevo subject dinámico
-        subject = f"🎉 Close-Win: {client_name or 'Client'} — {opp_position_name or 'Role'}"
+        subject = f"🎉 Signed: {client_name or 'Client'} — {opp_position_name or 'Role'}"
 
         # O si quieres un formato más limpio y consistente
         # subject = f"New Close-Win 🎉 | {client_name} — {opp_position_name}"
@@ -279,6 +279,7 @@ def _serialize_reminder(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any
     if not row:
         return None
     for k in ("press_date", "last_jaz_sent_at", "last_lar_sent_at", "last_agus_sent_at"):
+
         v = row.get(k)
         if v is not None:
             try:
@@ -379,7 +380,7 @@ def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, re
     # Copys en inglés, tono casual/fluido
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
-      <p>Hey team — new <b>Close-Win</b> 🎉</p>
+      <p>Hey team — new <b>Signed</b> 🎉</p>
       <p>We’ve just closed <b>{html.escape(client_name or 'Client')}</b>’s <b>{html.escape(opp_position_name or 'role')}</b> with
          <b>{html.escape(candidate_name or 'the candidate')}</b>.</p>
 
@@ -395,7 +396,7 @@ def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, re
 
       {notes_card}
 
-      <p>Please complete your Close-Win tasks and then tick your checkbox on this page:<br>
+      <p>Please complete your Signed tasks and then tick your checkbox on this page:<br>
         {link}
       </p>
 
@@ -410,7 +411,7 @@ def _reminder_email_html(candidate_id:int, candidate_name:str, client_name:str, 
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Quick reminder ⏰</p>
-      <p>You still haven’t checked your box for this Close-Win:
+      <p>You still haven’t checked your box for this Signed:
          <b>{html.escape(client_name or 'Client')}</b> — <b>{html.escape(opp_position_name or 'role')}</b>
          with <b>{html.escape(candidate_name or 'the candidate')}</b>.</p>
       <p>When you’re done, please mark it here:<br>{link}</p>
@@ -526,7 +527,7 @@ def send_due_reminders():
             if not r["jaz"] and _should_send(now, press, r["last_jaz_sent_at"]): plan.append(("jaz", JAZ_EMAIL))
             if not r["lar"] and _should_send(now, press, r["last_lar_sent_at"]): plan.append(("lar", LAR_EMAIL))
             if not r["agus"] and _should_send(now, press, r["last_agus_sent_at"]): plan.append(("agus", AGUS_EMAIL))
-
+            
             if not plan:
                 continue
 
@@ -538,7 +539,7 @@ def send_due_reminders():
             )
 
             for key, email in plan:
-                ok = _send_email(subject="Quick reminder — please tick your Close-Win checkbox",
+                ok = _send_email(subject="Quick reminder — please tick your Signed checkbox",
                                  html_body=html_body, to=[email])
                 if ok:
                     sent.append({"reminder_id": rid, "who": key, "to": email})

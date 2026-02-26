@@ -126,6 +126,10 @@ body {
     background-color: #0b3d2e;
 }
 
+.stage-signed {
+    background-color: #0ea5a4;
+}
+
 .stage-negotiating {
     background-color: #f9c6d0;
     color: #000;
@@ -1090,6 +1094,10 @@ body {
     flex: 1 1 100%;
   }
 }
+.stage-color-signed {
+  background-color: #b7f3ef !important; /* aqua pastel para Signed */
+}
+
 .stage-color-close-win {
   background-color: #8bfc9c !important; /* verde pastel suave (éxito) */
 }
@@ -1270,6 +1278,7 @@ body {
 .stage-dot--stop        { background: #cbd5e1; }
 .stage-dot--nda         { background: #ffdfc2; }
 .stage-dot--deep-dive   { background: #e0ccff; }
+.stage-dot--signed      { background: #9debe4; }
 .stage-dot--close-win   { background: #c8f7c8; }
 .stage-dot--closed-lost { background: #ffcccc; }
 
