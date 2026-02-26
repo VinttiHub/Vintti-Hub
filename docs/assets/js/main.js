@@ -227,6 +227,7 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
 }
 
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+
 // const batchCountCache = new Map();
 
 const candidatesCountCache = new Map();
@@ -3062,6 +3063,7 @@ window.getCurrentUserId    = getCurrentUserId;
 // --- evita duplicados por cambios rápidos / re-renders ---
 window._negotiatingEmailSent = window._negotiatingEmailSent || new Set();
 window._closeWinStageEmailSent = window._closeWinStageEmailSent || new Set();
+window._signedResigRefReminderTriggered = window._signedResigRefReminderTriggered || new Set();
 
 /**
  * Obtiene info clave de la opp, resuelve el client_name desde accounts y envía email en HTML.
@@ -3115,7 +3117,7 @@ async function sendNegotiatingReminder(opportunityId){
     // 🔸 En muchos backends el campo se llama "body" y si huele a HTML lo mandan como HTML.
     // 🔸 Para mayor compatibilidad añadimos también "body_html" y una pista "content_type".
     const payload = {
-      to: [hrEmail, 'angie@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
+      to: [hrEmail, 'angie@vintti.com', 'pgonzales@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
       subject,
       body: htmlBody,              // si tu /send_email usa esto, verá HTML
       body_html: htmlBody,         // alternativo común
@@ -3228,6 +3230,29 @@ async function sendCloseWinStageEmail(opportunityId){
   }
 }
 
+async function triggerSignedResigRefReminder(opportunityId){
+  try {
+    if (window._signedResigRefReminderTriggered.has(opportunityId)) return;
+
+    const res = await fetch(`${API_BASE}/reminders/hr_lead_signed_resig_ref/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ opportunity_id: opportunityId })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`hr_lead_signed_resig_ref trigger failed ${res.status}: ${errText}`);
+    }
+
+    window._signedResigRefReminderTriggered.add(opportunityId);
+    console.info('✅ Signed HR Lead resignation/reference reminder trigger processed for opp', opportunityId);
+  } catch (e) {
+    console.error('❌ Failed to trigger Signed HR Lead resignation/reference reminder:', e);
+  }
+}
+
 /**
  * Hook: después de actualizar el stage, dispara mails automáticos por etapa.
  * (Usa tu patchOpportunityStage existente y solo añadimos la llamada)
@@ -3237,8 +3262,8 @@ patchOpportunityStage = async function(opportunityId, newStage, dropdownElement)
   const ok = await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
   if (!ok) return ok;
 
-  if (String(newStage) === 'Negotiating') {
-    sendNegotiatingReminder(opportunityId);
+  if (String(newStage) === 'Signed') {
+    triggerSignedResigRefReminder(opportunityId);
   }
   if (String(newStage) === 'Close Win') {
     sendCloseWinStageEmail(opportunityId);
