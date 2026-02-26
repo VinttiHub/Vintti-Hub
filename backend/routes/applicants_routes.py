@@ -74,6 +74,14 @@ def create_applicant():
     if missing:
         return jsonify({"error": "Missing required fields", "fields": missing}), 400
 
+    raw_opportunity_id = _clean(data.get("opportunity_id"))
+    opportunity_id = None
+    if raw_opportunity_id:
+        try:
+            opportunity_id = int(raw_opportunity_id)
+        except ValueError:
+            return jsonify({"error": "Invalid opportunity_id"}), 400
+
     cv_file = request.files.get("cv")
     if not cv_file:
         return jsonify({"error": "Missing CV file"}), 400
@@ -112,6 +120,7 @@ def create_applicant():
                 linkedin_url,
                 english_level,
                 referral_source,
+                opportunity_id,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -120,7 +129,7 @@ def create_applicant():
                 updated_at
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 NOW(), NOW()
             )
             RETURNING applicant_id
@@ -136,6 +145,7 @@ def create_applicant():
                 _clean(data.get("linkedin_url")),
                 _clean(data.get("english_level")),
                 _clean(data.get("referral_source")),
+                opportunity_id,
                 s3_key,
                 filename_orig,
                 content_type,

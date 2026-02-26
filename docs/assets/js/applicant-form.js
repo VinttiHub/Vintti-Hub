@@ -12,6 +12,28 @@ const submitBtn = document.getElementById("submitBtn");
 const toast = document.getElementById("toast");
 let toastTimer = null;
 
+function applyPrefillFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const roleValue = (params.get("role_position") || "").trim();
+  const areaValue = (params.get("area") || "").trim();
+  const opportunityValue = (params.get("opportunity_id") || "").trim();
+
+  if (roleValue) {
+    const roleInput = form?.elements?.["role_position"];
+    if (roleInput && !roleInput.value) roleInput.value = roleValue;
+  }
+
+  if (areaValue) {
+    const areaInput = form?.elements?.["area"];
+    if (areaInput && !areaInput.value) areaInput.value = areaValue;
+  }
+
+  if (opportunityValue) {
+    const oppInput = document.getElementById("opportunityId");
+    if (oppInput) oppInput.value = opportunityValue;
+  }
+}
+
 function setStatus(message, tone) {
   formStatus.textContent = message;
   formStatus.classList.remove("success", "error");
@@ -36,6 +58,8 @@ cvInput.addEventListener("change", () => {
   const file = cvInput.files && cvInput.files[0];
   cvFilename.textContent = file ? file.name : "No file selected";
 });
+
+applyPrefillFromQuery();
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();

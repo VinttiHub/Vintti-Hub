@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS applicants (
     linkedin_url   TEXT NOT NULL,
     english_level  TEXT NOT NULL,
     referral_source TEXT NOT NULL,
+    opportunity_id INTEGER,
     cv_s3_key      TEXT,
     cv_file_name   TEXT,
     cv_content_type TEXT,

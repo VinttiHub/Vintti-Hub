@@ -402,6 +402,11 @@ const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
   'agustin@vintti.con',
   'lara@vintti.com'
 ]);
+const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
+  'agustina@vintti.com',
+  'angie@vintti.com',
+  'lara@vintti.com'
+]);
 const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
 let __cands = { data: [], idx: [], ts: 0 };
@@ -596,6 +601,32 @@ function setupDeleteOpportunityControls(){
   });
 }
 
+function setupApplicantLinkButton(){
+  const btn = document.getElementById('create-applicant-link-btn');
+  if (!btn) return;
+
+  const email = getStoredUserEmail();
+  if (!APPLICANT_LINK_ALLOWED_EMAILS.has(email)) {
+    btn.classList.add('hidden');
+    return;
+  }
+
+  btn.classList.remove('hidden');
+  btn.addEventListener('click', () => {
+    const position = (document.getElementById('details-opportunity-name')?.value || '').trim();
+    const opportunityId = (document.getElementById('opportunity-id-text')?.getAttribute('data-id') || '').trim();
+    const url = new URL('applicant-form.html', window.location.href);
+    if (position) {
+      url.searchParams.set('role_position', position);
+      url.searchParams.set('area', position);
+    }
+    if (opportunityId) {
+      url.searchParams.set('opportunity_id', opportunityId);
+    }
+    window.open(url.toString(), '_blank', 'noopener');
+  });
+}
+
 function buildIndex(list) {
   return list.map(c => ({ ...c, _haystack: norm(`${c.name} ${c.linkedin} ${c.phone}`) }));
 }
@@ -630,6 +661,7 @@ async function getCandidatesCached() {
 // 🔥 Precalienta en cuanto carga la página (mitiga cold start del backend)
 document.addEventListener('DOMContentLoaded', () => { getCandidatesCached(); });
 document.addEventListener('DOMContentLoaded', setupDeleteOpportunityControls);
+document.addEventListener('DOMContentLoaded', setupApplicantLinkButton);
 
 document.getElementById('closeSignOffPopup')?.addEventListener('click', () => {
   document.getElementById('signOffPopup')?.classList.add('hidden');
