@@ -1618,6 +1618,32 @@ body {
   z-index: 1001;               /* botón por encima de la lista */
 }
 
+/* Signed mode: renderizar la lista inline para que no se superponga con Save */
+#closeWinPopup.signed-mode .popup-content{
+  width: min(520px, 92vw);
+  max-width: 520px;
+  overflow: visible;
+}
+#closeWinPopup.signed-mode .autocomplete-list{
+  position: static;
+  inset: auto;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  max-height: 240px;
+  z-index: auto;
+}
+#closeWinPopup.signed-mode #saveCloseWin{
+  width: 100%;
+  max-width: 220px;
+  margin-top: 4px;
+  z-index: auto;
+}
+
+/* Close Win mode: aseguramos que la lista quede oculta */
+#closeWinPopup.close-win-mode #closeWinHireList{
+  display: none !important;
+}
+
 /* Un pelín de aire antes del botón */
 #closeWinPopup .popup-content label:last-of-type + input[type="date"]{
   margin-bottom: 6px;

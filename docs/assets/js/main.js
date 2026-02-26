@@ -1563,7 +1563,11 @@ document.addEventListener('change', async (e) => {
       return;
     }
     if (newStage === 'Signed') {
-      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target));
+      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target, { mode: 'signed' }));
+      return;
+    }
+    if (newStage === 'Close Win') {
+      openCloseWinPopup(opportunityId, e.target, { mode: 'close-win' });
       return;
     }
     if (newStage === 'Closed Lost') {
@@ -2595,52 +2599,89 @@ function setupCloseWinAutocomplete(){
 }
 
 
-// Popup Close Win
-function openCloseWinPopup(opportunityId, dropdownElement) {
+// Popup Signed / Close Win (same modal, different required fields)
+function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } = {}) {
   const popup = document.getElementById('closeWinPopup');
+  const titleEl = document.getElementById('closeWinTitle');
+  const hireLabel = document.querySelector('label[for="closeWinHireInput"]');
+  const hireBox = document.getElementById('closeWinHireBox');
+  const dateLabel = document.querySelector('label[for="closeWinDate"]');
+  const dateInput = document.getElementById('closeWinDate');
+  const hireInput = document.getElementById('closeWinHireInput');
   popup.style.display = 'flex';
 
-  // inicializa autocomplete
-  setupCloseWinAutocomplete();
+  const isSignedMode = mode === 'signed';
+  popup.classList.toggle('signed-mode', isSignedMode);
+  popup.classList.toggle('close-win-mode', !isSignedMode);
+
+  if (titleEl) titleEl.textContent = isSignedMode ? 'Select Hired Candidate' : 'Set Close Win Date';
+  if (hireLabel) hireLabel.style.display = isSignedMode ? '' : 'none';
+  if (hireBox) hireBox.style.display = isSignedMode ? '' : 'none';
+  if (dateLabel) dateLabel.style.display = isSignedMode ? 'none' : '';
+  if (dateInput) dateInput.style.display = isSignedMode ? 'none' : '';
+
+  if (isSignedMode) {
+    // inicializa autocomplete solo cuando se necesita seleccionar candidato
+    setupCloseWinAutocomplete();
+    cwSelectedId = null;
+    if (hireInput) hireInput.value = '';
+  }
+  if (dateInput) dateInput.value = '';
+  const hireList = document.getElementById('closeWinHireList');
+  if (hireList) hireList.style.display = 'none';
 
   const saveBtn = document.getElementById('saveCloseWin');
   saveBtn.onclick = async () => {
     const date = document.getElementById('closeWinDate').value;
 
-    // ✅ tomamos el ID “real” (no split de texto)
-    const candidateId = cwSelectedId;
-
-    if (!date || !candidateId) {
-      alert('Please select a hire and date.');
-      return;
-    }
-
     try {
-      // 1) Guardar fecha + contratado en opportunity
+      if (isSignedMode) {
+        // ✅ tomamos el ID “real” (no split de texto)
+        const candidateId = cwSelectedId;
+        if (!candidateId) {
+          alert('Please select a hire.');
+          return;
+        }
+
+        // 1) Guardar contratado en opportunity (sin close date en Signed)
+        await patchOppFields(opportunityId, {
+          candidato_contratado: candidateId
+        });
+
+        // 2) Asegurar hire_opportunity
+        const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opportunity_id: Number(opportunityId) })
+        });
+        if (!res2.ok) throw new Error(await res2.text());
+
+        // 3) Cambiar stage
+        await patchOpportunityStage(opportunityId, 'Signed', dropdownElement);
+        logOpportunityTrack('saveSigned');
+
+        // 4) Cerrar y redirigir
+        popup.style.display = 'none';
+        localStorage.setItem('fromCloseWin', 'true');
+        window.location.href = `candidate-details.html?id=${candidateId}#hire`;
+        return;
+      }
+
+      if (!date) {
+        alert('Please select a close date.');
+        return;
+      }
+
+      // Close Win: solo guardar fecha de cierre y cambiar stage
       await patchOppFields(opportunityId, {
-        opp_close_date: date,                // 'YYYY-MM-DD' exacto
-        candidato_contratado: candidateId
+        opp_close_date: date
       });
-
-      // 2) Asegurar hire_opportunity
-      const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opportunity_id: Number(opportunityId) })
-      });
-      if (!res2.ok) throw new Error(await res2.text());
-
-      // 3) Cambiar stage
-      await patchOpportunityStage(opportunityId, 'Signed', dropdownElement);
-      logOpportunityTrack('saveSigned');
-
-      // 4) Cerrar y redirigir
+      await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
+      logOpportunityTrack('saveCloseWin');
       popup.style.display = 'none';
-      localStorage.setItem('fromCloseWin', 'true');
-      window.location.href = `candidate-details.html?id=${candidateId}#hire`;
     } catch (err) {
-      console.error('❌ Signed flow failed:', err);
-      alert(`Signed failed:\n${err.message}`);
+      console.error(`❌ ${isSignedMode ? 'Signed' : 'Close Win'} flow failed:`, err);
+      alert(`${isSignedMode ? 'Signed' : 'Close Win'} failed:\n${err.message}`);
     }
   };
 }
