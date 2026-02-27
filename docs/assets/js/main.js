@@ -5,13 +5,13 @@ let _interviewingOppId = null;
 let _interviewingDropdownEl = null;
 
 const STAGE_ORDER_PRIORITY = [
+  'Signed',
   'Negotiating',
   'Sourcing',
   'Interviewing',
   'Stop',
   'NDA Sent',
   'Deep Dive',
-  'Signed',
   'Close Win',
   'Closed Lost'
 ];
