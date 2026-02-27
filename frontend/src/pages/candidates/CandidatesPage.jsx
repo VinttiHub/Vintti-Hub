@@ -55,6 +55,16 @@ const DEFAULT_FORM = {
   linkedin: '',
 };
 
+function isTrueBlacklistFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes';
+  }
+  return false;
+}
+
 function getWorldCountryNames() {
   if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function' && typeof Intl.DisplayNames === 'function') {
     try {
@@ -380,7 +390,7 @@ function CandidatesPage() {
                 const status = (candidate.status || 'unhired').toLowerCase();
                 const chipClass = status === 'active' ? 'status-active' : 'status-unhired';
                 const phoneDigits = normalizeStoredPhone(candidate.phone, candidate.country);
-                const isBlacklisted = Boolean(candidate.is_blacklisted);
+                const isBlacklisted = isTrueBlacklistFlag(candidate.is_blacklisted);
                 return (
                   <tr
                     key={candidate.candidate_id}

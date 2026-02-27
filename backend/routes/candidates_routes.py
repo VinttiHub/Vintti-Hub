@@ -366,60 +366,30 @@ def get_candidates_light():
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
-        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_linkedin_source = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized, 'b')
-        b_linkedin_norm = _linkedin_normalize_sql(b_linkedin_source)
-        cursor.execute(f"""
-            WITH normalized_candidates AS (
-              SELECT
-                c.candidate_id,
-                c.name,
-                c.country,
-                c.phone,
-                c.linkedin,
-                {c_linkedin_norm} AS linkedin_norm
-              FROM candidates c
-            ),
-            normalized_blacklist AS (
-              SELECT
-                b.blacklist_id,
-                {b_linkedin_norm} AS linkedin_norm,
-                b.candidate_id
-              FROM blacklist b
-            )
+        cursor.execute("""
             SELECT
-              nc.candidate_id,
-              nc.name,
-              nc.country,
-              nc.phone,
-              nc.linkedin,
+              c.candidate_id,
+              c.name,
+              c.country,
+              c.phone,
+              c.linkedin,
               CASE
                 WHEN EXISTS (
                   SELECT 1
                   FROM opportunity o
-                  WHERE o.candidato_contratado = nc.candidate_id
+                  WHERE o.candidato_contratado = c.candidate_id
                 ) THEN '✔️'
                 ELSE '❌'
               END AS employee,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
-            FROM normalized_candidates nc
+            FROM candidates c
             LEFT JOIN LATERAL (
               SELECT TRUE AS is_blacklisted
-              FROM normalized_blacklist nb
-              WHERE (
-                      nb.linkedin_norm IS NOT NULL
-                  AND nc.linkedin_norm IS NOT NULL
-                  AND nb.linkedin_norm = nc.linkedin_norm
-              )
-              OR (
-                  nb.candidate_id IS NOT NULL
-                  AND nc.candidate_id IS NOT NULL
-                  AND nb.candidate_id = nc.candidate_id
-              )
+              FROM blacklist b
+              WHERE b.candidate_id = c.candidate_id
               LIMIT 1
             ) bl ON TRUE
-            ORDER BY nc.candidate_id DESC;
+            ORDER BY c.candidate_id DESC;
         """)
 
         rows = cursor.fetchall()
@@ -444,56 +414,30 @@ def get_candidates():
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
-        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_linkedin_source = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized, 'b')
-        b_linkedin_norm = _linkedin_normalize_sql(b_linkedin_source)
-        cur.execute(f"""
-            WITH normalized_candidates AS (
-              SELECT
-                c.*,
-                {c_linkedin_norm} AS linkedin_norm
-              FROM candidates c
-            ),
-            normalized_blacklist AS (
-              SELECT
-                b.blacklist_id,
-                {b_linkedin_norm} AS linkedin_norm,
-                b.candidate_id
-              FROM blacklist b
-            )
+        cur.execute("""
             SELECT
-              nc.*,
+              c.*,
               CASE
                 WHEN EXISTS (
                   SELECT 1
                   FROM opportunity o
                   JOIN opportunity_candidates oc ON o.opportunity_id = oc.opportunity_id
-                  WHERE oc.candidate_id = nc.candidate_id
-                    AND o.candidato_contratado = nc.candidate_id
+                  WHERE oc.candidate_id = c.candidate_id
+                    AND o.candidato_contratado = c.candidate_id
                   LIMIT 1
                 )
                 THEN '✔️'
                 ELSE '❌'
               END AS employee,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
-            FROM normalized_candidates nc
+            FROM candidates c
             LEFT JOIN LATERAL (
               SELECT TRUE AS is_blacklisted
-              FROM normalized_blacklist nb
-              WHERE (
-                      nb.linkedin_norm IS NOT NULL
-                  AND nc.linkedin_norm IS NOT NULL
-                  AND nb.linkedin_norm = nc.linkedin_norm
-              )
-              OR (
-                  nb.candidate_id IS NOT NULL
-                  AND nc.candidate_id IS NOT NULL
-                  AND nb.candidate_id = nc.candidate_id
-              )
+              FROM blacklist b
+              WHERE b.candidate_id = c.candidate_id
               LIMIT 1
             ) bl ON TRUE
-            ORDER BY nc.candidate_id DESC;
+            ORDER BY c.candidate_id DESC;
         """)
 
         rows = cur.fetchall()
@@ -936,71 +880,44 @@ def get_candidate_by_id(candidate_id):
         conn = get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-        has_blacklist_linkedin_normalized = _has_blacklist_linkedin_normalized(conn)
-        c_linkedin_norm = _linkedin_normalize_sql('c.linkedin')
-        b_linkedin_source = _blacklist_linkedin_source_expr(has_blacklist_linkedin_normalized, 'b')
-        b_linkedin_norm = _linkedin_normalize_sql(b_linkedin_source)
-
-        cursor.execute(f"""
-            WITH normalized_candidate AS (
-                SELECT
-                    c.*,
-                    {c_linkedin_norm} AS linkedin_norm
-                FROM candidates c
-                WHERE c.candidate_id = %s
-            ),
-            normalized_blacklist AS (
-                SELECT
-                    b.blacklist_id,
-                    {b_linkedin_norm} AS linkedin_norm,
-                    b.candidate_id
-                FROM blacklist b
-            )
+        cursor.execute("""
             SELECT
-                nc.name,
-                nc.country,
-                nc.timezone,
-                nc.phone,
-                nc.email,
-                nc.linkedin,
-                nc.english_level,
-                nc.salary_range,
-                nc.red_flags,
-                nc.comments,
-                nc.other_process,
-                nc.vacations,
-                nc.usa_nationality,
-                nc.created_by,
-                nc.created_at,
-                nc.linkedin_scrapper,
-                nc.cv_pdf_scrapper,
-                nc.discount_dolar,
-                nc.discount_daterange,
-                nc.affinda_scrapper,
-                nc.coresignal_scrapper,
-                nc.candidate_succes,
-                nc.check_hr_lead,
-                nc.address,
-                nc.dni,
-                nc.compu_propia,
+                c.name,
+                c.country,
+                c.timezone,
+                c.phone,
+                c.email,
+                c.linkedin,
+                c.english_level,
+                c.salary_range,
+                c.red_flags,
+                c.comments,
+                c.other_process,
+                c.vacations,
+                c.usa_nationality,
+                c.created_by,
+                c.created_at,
+                c.linkedin_scrapper,
+                c.cv_pdf_scrapper,
+                c.discount_dolar,
+                c.discount_daterange,
+                c.affinda_scrapper,
+                c.coresignal_scrapper,
+                c.candidate_succes,
+                c.check_hr_lead,
+                c.address,
+                c.dni,
+                c.compu_propia,
                 bl.blacklist_id,
                 COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted
-            FROM normalized_candidate nc
+            FROM candidates c
             LEFT JOIN LATERAL (
-                SELECT nb.blacklist_id
-                FROM normalized_blacklist nb
-                WHERE (
-                        nb.linkedin_norm IS NOT NULL
-                    AND nc.linkedin_norm IS NOT NULL
-                    AND nb.linkedin_norm = nc.linkedin_norm
-                )
-                OR (
-                    nb.candidate_id IS NOT NULL
-                    AND nc.candidate_id IS NOT NULL
-                    AND nb.candidate_id = nc.candidate_id
-                )
+                SELECT b.blacklist_id
+                FROM blacklist b
+                WHERE b.candidate_id = c.candidate_id
                 LIMIT 1
-            ) bl ON TRUE;
+            ) bl ON TRUE
+            WHERE c.candidate_id = %s
         """, (candidate_id,))
 
         candidate = cursor.fetchone()
@@ -1803,14 +1720,29 @@ def get_candidates_light_fast():
               CASE
                 WHEN a.end_date IS NULL THEN o.opp_model
                 ELSE NULL
-              END AS opp_model
+              END AS opp_model,
+              COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
             FROM candidates c
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
             LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
+            LEFT JOIN LATERAL (
+              SELECT TRUE AS is_blacklisted
+              FROM blacklist b
+              WHERE b.candidate_id = c.candidate_id
+              LIMIT 1
+            ) bl ON TRUE
             ORDER BY c.candidate_id DESC;
         """)
 
         rows = cur.fetchall()
+
+        updated = _bulk_update_candidate_blacklist(
+            cur,
+            [row.get('candidate_id') for row in rows if row.get('is_blacklisted')],
+            True
+        )
+        if updated:
+            conn.commit()
 
         cur.close(); conn.close()
         return jsonify(rows)
