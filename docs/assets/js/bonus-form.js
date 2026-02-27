@@ -171,7 +171,7 @@ async function submitPublicRequest(){
 
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    alert("Something went wrong. Please try again or contact billing@vintti.com.\n" + txt);
+    alert("Something went wrong. Please try again or contact finance@vintti.com.\n" + txt);
     return;
   }
 
