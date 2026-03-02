@@ -23,6 +23,7 @@ function normalizeEmail(value) {
 }
 
 const STAGE_OPTIONS = [
+  'Signed',
   'Close Win',
   'Closed Lost',
   'Negotiating',
@@ -34,6 +35,7 @@ const STAGE_OPTIONS = [
 ];
 
 const STAGE_ORDER = [
+  'Signed',
   'Negotiating',
   'Interviewing',
   'Stop',

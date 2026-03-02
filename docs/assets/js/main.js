@@ -5,6 +5,7 @@ let _interviewingOppId = null;
 let _interviewingDropdownEl = null;
 
 const STAGE_ORDER_PRIORITY = [
+  'Signed',
   'Negotiating',
   'Sourcing',
   'Interviewing',
@@ -226,6 +227,7 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
 }
 
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+
 // const batchCountCache = new Map();
 
 const candidatesCountCache = new Map();
@@ -782,8 +784,8 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
         opp._sort_date = opp.nda_signature_or_start_date || null;
       }
 
-      // Para Close Win / Closed Lost: usar opp_close_date
-      else if (stage === 'Close Win' || stage === 'Closed Lost') {
+      // Para Signed / Close Win / Closed Lost: usar opp_close_date
+      else if (stage === 'Signed' || stage === 'Close Win' || stage === 'Closed Lost') {
         opp._sort_date = opp.opp_close_date || null;
       }
 
@@ -820,9 +822,9 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
         grouped[stage].forEach(opp => {
           let daysAgo = '';
 
-          // 👉 Si la opp está en Close Win o Closed Lost:
+          // 👉 Si la opp está en Signed / Close Win / Closed Lost:
           //    Days = diferencia entre start date y close date
-          if (opp.opp_stage === 'Close Win' || opp.opp_stage === 'Closed Lost') {
+          if (opp.opp_stage === 'Signed' || opp.opp_stage === 'Close Win' || opp.opp_stage === 'Closed Lost') {
             if (opp.nda_signature_or_start_date && opp.opp_close_date) {
               daysAgo = calculateDaysBetween(
                 opp.nda_signature_or_start_date,
@@ -1112,7 +1114,10 @@ const emailToNameMap = { ...(window.userDirectoryByEmail || {}) };
 });
 
 // STAGES (igual que antes)
-const uniqueStages = [...new Set(data.map(d => d.opp_stage).filter(Boolean))].sort((a, b) => {
+const uniqueStages = [...new Set([
+  ...data.map(d => d.opp_stage).filter(Boolean),
+  'Signed'
+])].sort((a, b) => {
   const idxA = STAGE_ORDER_PRIORITY.indexOf(a);
   const idxB = STAGE_ORDER_PRIORITY.indexOf(b);
   if (idxA === -1 && idxB === -1) return a.localeCompare(b);
@@ -1198,6 +1203,7 @@ const STAGE_DOT_CLASS = {
   'Stop': 'stage-dot--stop',
   'NDA Sent': 'stage-dot--nda',
   'Deep Dive': 'stage-dot--deep-dive',
+  'Signed': 'stage-dot--signed',
   'Close Win': 'stage-dot--close-win',
   'Closed Lost': 'stage-dot--closed-lost'
 };
@@ -1210,6 +1216,7 @@ function buildMultiFilter(containerId, options, columnIndex, displayName, filter
     'Stop': 'stage-dot--stop',
     'NDA Sent': 'stage-dot--nda',
     'Deep Dive': 'stage-dot--deep-dive',
+    'Signed': 'stage-dot--signed',
     'Close Win': 'stage-dot--close-win',
     'Closed Lost': 'stage-dot--closed-lost'
   };
@@ -1555,8 +1562,12 @@ document.addEventListener('change', async (e) => {
       openInterviewingPopup(opportunityId, e.target);
       return;
     }
+    if (newStage === 'Signed') {
+      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target, { mode: 'signed' }));
+      return;
+    }
     if (newStage === 'Close Win') {
-      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target));
+      openCloseWinPopup(opportunityId, e.target, { mode: 'close-win' });
       return;
     }
     if (newStage === 'Closed Lost') {
@@ -2267,8 +2278,10 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
   .catch(err => console.error('Error loading sales leads:', err));
 
 
-  function getStagePill(stage) {
+function getStagePill(stage) {
   switch (stage) {
+    case 'Signed':
+      return '<span class="stage-pill stage-signed">Signed</span>';
     case 'Close Win':
       return '<span class="stage-pill stage-closewin">Close Win</span>';
     case 'Closed Lost':
@@ -2319,6 +2332,7 @@ document.querySelectorAll('.bubble-button').forEach(bubble => {
 });
 function getStageDropdown(currentStage, opportunityId) {
   const stages = [
+    'Signed',
     'Close Win',
     'Closed Lost',
     'Negotiating',
@@ -2585,52 +2599,89 @@ function setupCloseWinAutocomplete(){
 }
 
 
-// Popup Close Win
-function openCloseWinPopup(opportunityId, dropdownElement) {
+// Popup Signed / Close Win (same modal, different required fields)
+function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } = {}) {
   const popup = document.getElementById('closeWinPopup');
+  const titleEl = document.getElementById('closeWinTitle');
+  const hireLabel = document.querySelector('label[for="closeWinHireInput"]');
+  const hireBox = document.getElementById('closeWinHireBox');
+  const dateLabel = document.querySelector('label[for="closeWinDate"]');
+  const dateInput = document.getElementById('closeWinDate');
+  const hireInput = document.getElementById('closeWinHireInput');
   popup.style.display = 'flex';
 
-  // inicializa autocomplete
-  setupCloseWinAutocomplete();
+  const isSignedMode = mode === 'signed';
+  popup.classList.toggle('signed-mode', isSignedMode);
+  popup.classList.toggle('close-win-mode', !isSignedMode);
+
+  if (titleEl) titleEl.textContent = isSignedMode ? 'Select Hired Candidate' : 'Set Close Win Date';
+  if (hireLabel) hireLabel.style.display = isSignedMode ? '' : 'none';
+  if (hireBox) hireBox.style.display = isSignedMode ? '' : 'none';
+  if (dateLabel) dateLabel.style.display = isSignedMode ? 'none' : '';
+  if (dateInput) dateInput.style.display = isSignedMode ? 'none' : '';
+
+  if (isSignedMode) {
+    // inicializa autocomplete solo cuando se necesita seleccionar candidato
+    setupCloseWinAutocomplete();
+    cwSelectedId = null;
+    if (hireInput) hireInput.value = '';
+  }
+  if (dateInput) dateInput.value = '';
+  const hireList = document.getElementById('closeWinHireList');
+  if (hireList) hireList.style.display = 'none';
 
   const saveBtn = document.getElementById('saveCloseWin');
   saveBtn.onclick = async () => {
     const date = document.getElementById('closeWinDate').value;
 
-    // ✅ tomamos el ID “real” (no split de texto)
-    const candidateId = cwSelectedId;
-
-    if (!date || !candidateId) {
-      alert('Please select a hire and date.');
-      return;
-    }
-
     try {
-      // 1) Guardar fecha + contratado en opportunity
+      if (isSignedMode) {
+        // ✅ tomamos el ID “real” (no split de texto)
+        const candidateId = cwSelectedId;
+        if (!candidateId) {
+          alert('Please select a hire.');
+          return;
+        }
+
+        // 1) Guardar contratado en opportunity (sin close date en Signed)
+        await patchOppFields(opportunityId, {
+          candidato_contratado: candidateId
+        });
+
+        // 2) Asegurar hire_opportunity
+        const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ opportunity_id: Number(opportunityId) })
+        });
+        if (!res2.ok) throw new Error(await res2.text());
+
+        // 3) Cambiar stage
+        await patchOpportunityStage(opportunityId, 'Signed', dropdownElement);
+        logOpportunityTrack('saveSigned');
+
+        // 4) Cerrar y redirigir
+        popup.style.display = 'none';
+        localStorage.setItem('fromCloseWin', 'true');
+        window.location.href = `candidate-details.html?id=${candidateId}#hire`;
+        return;
+      }
+
+      if (!date) {
+        alert('Please select a close date.');
+        return;
+      }
+
+      // Close Win: solo guardar fecha de cierre y cambiar stage
       await patchOppFields(opportunityId, {
-        opp_close_date: date,                // 'YYYY-MM-DD' exacto
-        candidato_contratado: candidateId
+        opp_close_date: date
       });
-
-      // 2) Asegurar hire_opportunity
-      const res2 = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opportunity_id: Number(opportunityId) })
-      });
-      if (!res2.ok) throw new Error(await res2.text());
-
-      // 3) Cambiar stage
       await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
       logOpportunityTrack('saveCloseWin');
-
-      // 4) Cerrar y redirigir
       popup.style.display = 'none';
-      localStorage.setItem('fromCloseWin', 'true');
-      window.location.href = `candidate-details.html?id=${candidateId}#hire`;
     } catch (err) {
-      console.error('❌ Close Win flow failed:', err);
-      alert(`Close Win failed:\n${err.message}`);
+      console.error(`❌ ${isSignedMode ? 'Signed' : 'Close Win'} flow failed:`, err);
+      alert(`${isSignedMode ? 'Signed' : 'Close Win'} failed:\n${err.message}`);
     }
   };
 }
@@ -3052,6 +3103,8 @@ window.getCurrentUserId    = getCurrentUserId;
 
 // --- evita duplicados por cambios rápidos / re-renders ---
 window._negotiatingEmailSent = window._negotiatingEmailSent || new Set();
+window._closeWinStageEmailSent = window._closeWinStageEmailSent || new Set();
+window._signedResigRefReminderTriggered = window._signedResigRefReminderTriggered || new Set();
 
 /**
  * Obtiene info clave de la opp, resuelve el client_name desde accounts y envía email en HTML.
@@ -3105,7 +3158,7 @@ async function sendNegotiatingReminder(opportunityId){
     // 🔸 En muchos backends el campo se llama "body" y si huele a HTML lo mandan como HTML.
     // 🔸 Para mayor compatibilidad añadimos también "body_html" y una pista "content_type".
     const payload = {
-      to: [hrEmail, 'angie@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
+      to: [hrEmail, 'angie@vintti.com', 'pgonzales@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
       subject,
       body: htmlBody,              // si tu /send_email usa esto, verá HTML
       body_html: htmlBody,         // alternativo común
@@ -3135,18 +3188,132 @@ async function sendNegotiatingReminder(opportunityId){
   }
 }
 
+async function sendCloseWinStageEmail(opportunityId){
+  try {
+    if (window._closeWinStageEmailSent.has(opportunityId)) return;
+
+    const oppRes = await fetch(`${API_BASE}/opportunities/${opportunityId}`, { credentials: 'include' });
+    if (!oppRes.ok) throw new Error(`GET opp ${opportunityId} failed ${oppRes.status}`);
+    const opp = await oppRes.json();
+
+    const candidateId = Number(opp?.candidato_contratado);
+    if (!candidateId) {
+      console.warn('⚠️ Close Win email skipped: missing candidato_contratado for opp', opportunityId);
+      return;
+    }
+
+    let candidateName = `Candidate #${candidateId}`;
+    let hireStartDate = '';
+    try {
+      const [candidateRes, hireRes] = await Promise.all([
+        fetch(`${API_BASE}/candidates/${candidateId}`, { credentials: 'include' }),
+        fetch(`${API_BASE}/candidates/${candidateId}/hire?opportunity_id=${encodeURIComponent(opportunityId)}`, { credentials: 'include' })
+      ]);
+
+      if (candidateRes.ok) {
+        const candidate = await candidateRes.json();
+        candidateName = candidate?.name || candidateName;
+      } else {
+        console.warn('⚠️ Close Win email: candidate fetch failed', candidateRes.status, candidateId);
+      }
+
+      if (hireRes.ok) {
+        const hire = await hireRes.json();
+        hireStartDate = String(hire?.start_date || '').slice(0, 10);
+      } else {
+        console.warn('⚠️ Close Win email: hire fetch failed', hireRes.status, candidateId, opportunityId);
+      }
+    } catch (err) {
+      console.warn('⚠️ Close Win email: candidate/hire fetch error', err);
+    }
+
+    const startDate = hireStartDate || String(opp?.opp_close_date || '').slice(0, 10) || '—';
+    const clientName = await resolveAccountName(opp);
+
+    const esc = s => String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+    const subject = `🎉 Close Win: ${candidateName} — Start ${startDate}`;
+    const htmlBody = `
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p>Hey team — new <b>Close Win</b> 🎉</p>
+  <p>
+    <b>Client:</b> ${esc(clientName)}<br>
+    <b>Candidate:</b> ${esc(candidateName)}<br>
+    <b>Start date:</b> ${esc(startDate)}
+  </p>
+  <p style="margin-top:16px">— Vintti HUB</p>
+</div>`.trim();
+
+    const payload = {
+      to: ['agustin@vintti.com', 'lara@vintti.com', 'jazmin@vintti.com'],
+      subject,
+      body: htmlBody,
+      body_html: htmlBody,
+      content_type: 'text/html',
+      html: true
+    };
+
+    const res = await fetch(`${API_BASE}/send_email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(()=> '');
+      throw new Error(`send_email failed ${res.status}: ${errText}`);
+    }
+
+    window._closeWinStageEmailSent.add(opportunityId);
+    console.info('✅ Close Win stage email sent for opp', opportunityId);
+  } catch (e) {
+    console.error('❌ Failed to send Close Win stage email:', e);
+  }
+}
+
+async function triggerSignedResigRefReminder(opportunityId){
+  try {
+    if (window._signedResigRefReminderTriggered.has(opportunityId)) return;
+
+    const res = await fetch(`${API_BASE}/reminders/hr_lead_signed_resig_ref/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ opportunity_id: opportunityId })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`hr_lead_signed_resig_ref trigger failed ${res.status}: ${errText}`);
+    }
+
+    window._signedResigRefReminderTriggered.add(opportunityId);
+    console.info('✅ Signed HR Lead resignation/reference reminder trigger processed for opp', opportunityId);
+  } catch (e) {
+    console.error('❌ Failed to trigger Signed HR Lead resignation/reference reminder:', e);
+  }
+}
+
 /**
- * Hook: después de actualizar el stage, si es Negotiating -> enviar mail.
+ * Hook: después de actualizar el stage, dispara mails automáticos por etapa.
  * (Usa tu patchOpportunityStage existente y solo añadimos la llamada)
  */
-const _origPatchOpportunityStage = window.patchOpportunityStage;
-window.patchOpportunityStage = async function(opportunityId, newStage, dropdownElement){
-  await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
-  // Si salió bien y la etapa es Negotiating, dispara el recordatorio
-  if (String(newStage) === 'Negotiating') {
-    sendNegotiatingReminder(opportunityId);
+const _origPatchOpportunityStage = patchOpportunityStage;
+patchOpportunityStage = async function(opportunityId, newStage, dropdownElement){
+  const ok = await _origPatchOpportunityStage.call(this, opportunityId, newStage, dropdownElement);
+  if (!ok) return ok;
+
+  if (String(newStage) === 'Signed') {
+    triggerSignedResigRefReminder(opportunityId);
   }
+  if (String(newStage) === 'Close Win') {
+    sendCloseWinStageEmail(opportunityId);
+  }
+  return ok;
 };
+if (typeof window !== 'undefined') {
+  window.patchOpportunityStage = patchOpportunityStage;
+}
 // === Log out button ===
 document.addEventListener('DOMContentLoaded', () => {
   const logoutFab = document.getElementById('logoutFab');

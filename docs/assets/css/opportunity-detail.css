@@ -2398,6 +2398,9 @@ input:checked + .slider::before {
 }
 
 /* Colores personalizados por stage */
+.stage-color-signed {
+  background-color: #b7f3ef !important;
+}
 .stage-color-close-win {
   background-color: #8bfc9c !important;
 }

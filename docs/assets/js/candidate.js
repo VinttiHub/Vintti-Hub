@@ -1,4 +1,5 @@
-const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+
 const PHONE_CODE_BY_COUNTRY = {
   Argentina: '54',
   Bolivia: '591',
@@ -511,11 +512,21 @@ function toggleCandidatesLoading(show, message) {
   candidateState.loadingOverlay.setAttribute('aria-busy', show ? 'true' : 'false');
 }
 
+function isTrueBlacklistFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes';
+  }
+  return false;
+}
+
 function getBlacklistFilteredCandidates() {
   const list = Array.isArray(candidateState.data) ? candidateState.data : [];
   const filter = candidateState.blacklistFilter || 'all';
-  if (filter === 'only') return list.filter(candidate => Boolean(candidate.is_blacklisted));
-  if (filter === 'exclude') return list.filter(candidate => !Boolean(candidate.is_blacklisted));
+  if (filter === 'only') return list.filter(candidate => isTrueBlacklistFlag(candidate.is_blacklisted));
+  if (filter === 'exclude') return list.filter(candidate => !isTrueBlacklistFlag(candidate.is_blacklisted));
   return list;
 }
 
@@ -532,7 +543,7 @@ function buildCandidateRow(candidate) {
   const rawPhone = candidate.phone ? String(candidate.phone) : '';
   const phone = rawPhone.replace(/\D/g, '');
   const linkedin = candidate.linkedin || '';
-  const isBlacklisted = Boolean(candidate.is_blacklisted);
+  const isBlacklisted = isTrueBlacklistFlag(candidate.is_blacklisted);
   if (isBlacklisted) {
     tr.classList.add('blacklisted-row');
   }
