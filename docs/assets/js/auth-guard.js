@@ -20,7 +20,7 @@
     const link = document.createElement("link");
     link.id = "mobileStyles";
     link.rel = "stylesheet";
-    link.href = "./assets/css/mobile.css";
+    link.href = "./assets/css/mobile.css?v=3";
     document.head.appendChild(link);
   }
 
