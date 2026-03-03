@@ -815,10 +815,21 @@ body[data-pdf-export="true"] .cv-entry-summary {
 
 @media (max-width: 640px) {
   .resume-rating {
-    width: calc(100% - 32px);
-    left: 16px;
-    right: 16px;
-    top: 12px;
+    position: static;
+    width: auto;
+    left: auto;
+    right: auto;
+    top: auto;
+    margin: 16px 16px 8px;
+  }
+
+  .resume-rating-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .resume-rating-panel {
+    width: 100%;
   }
 
   .resume-download-button {
