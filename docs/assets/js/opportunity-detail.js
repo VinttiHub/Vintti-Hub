@@ -613,18 +613,214 @@ function setupApplicantLinkButton(){
 
   btn.classList.remove('hidden');
   btn.addEventListener('click', () => {
-    const position = (document.getElementById('details-opportunity-name')?.value || '').trim();
-    const opportunityId = (document.getElementById('opportunity-id-text')?.getAttribute('data-id') || '').trim();
-    const url = new URL('applicant-form.html', window.location.href);
-    if (position) {
-      url.searchParams.set('role_position', position);
-      url.searchParams.set('area', position);
-    }
-    if (opportunityId) {
-      url.searchParams.set('opportunity_id', opportunityId);
-    }
-    window.open(url.toString(), '_blank', 'noopener');
+    openApplicantLinkPopup();
   });
+}
+
+function buildApplicantFormUrl(position, opportunityId) {
+  const url = new URL('applicant-form.html', window.location.href);
+  if (position) {
+    url.searchParams.set('role_position', position);
+    url.searchParams.set('area', position);
+  }
+  if (opportunityId) {
+    url.searchParams.set('opportunity_id', opportunityId);
+  }
+  return url.toString();
+}
+
+function setApplicantLinkStatus(message, tone) {
+  const statusEl = document.getElementById('applicantLinkStatus');
+  if (!statusEl) return;
+  statusEl.textContent = message || '';
+  statusEl.classList.remove('error', 'success');
+  if (tone) statusEl.classList.add(tone);
+}
+
+function createOptionRow(value = '') {
+  const row = document.createElement('div');
+  row.className = 'dropdown-option-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Option text';
+  input.value = value;
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'remove-option-btn';
+  removeBtn.textContent = 'Remove';
+  removeBtn.addEventListener('click', () => row.remove());
+
+  row.appendChild(input);
+  row.appendChild(removeBtn);
+  return row;
+}
+
+function resetApplicantLinkPopup() {
+  const popup = document.getElementById('applicantLinkPopup');
+  if (!popup) return;
+  popup.querySelectorAll('.applicant-question').forEach(block => {
+    const typeSelect = block.querySelector('.question-type');
+    const titleInput = block.querySelector('.question-title');
+    const optionsWrap = block.querySelector('.dropdown-options');
+    const optionsList = block.querySelector('.options-list');
+    if (typeSelect) typeSelect.value = '';
+    if (titleInput) titleInput.value = '';
+    if (optionsWrap) optionsWrap.classList.add('hidden');
+    if (optionsList) optionsList.innerHTML = '';
+  });
+  const result = document.getElementById('applicantLinkResult');
+  const linkInput = document.getElementById('applicantLinkUrl');
+  if (result) result.classList.add('hidden');
+  if (linkInput) linkInput.value = '';
+  setApplicantLinkStatus('', '');
+}
+
+function setupApplicantLinkPopupInteractions() {
+  const popup = document.getElementById('applicantLinkPopup');
+  if (!popup || popup.dataset.ready === 'true') return;
+  popup.dataset.ready = 'true';
+
+  popup.querySelectorAll('.applicant-question').forEach(block => {
+    const typeSelect = block.querySelector('.question-type');
+    const optionsWrap = block.querySelector('.dropdown-options');
+    const optionsList = block.querySelector('.options-list');
+    const addBtn = block.querySelector('.add-option-btn');
+
+    typeSelect?.addEventListener('change', () => {
+      const isDropdown = typeSelect.value === 'dropdown';
+      if (!optionsWrap || !optionsList) return;
+      if (isDropdown) {
+        optionsWrap.classList.remove('hidden');
+        if (!optionsList.children.length) {
+          optionsList.appendChild(createOptionRow());
+        }
+      } else {
+        optionsWrap.classList.add('hidden');
+      }
+    });
+
+    addBtn?.addEventListener('click', () => {
+      if (!optionsList) return;
+      optionsList.appendChild(createOptionRow());
+    });
+  });
+
+  const closeBtn = document.getElementById('closeApplicantLinkPopup');
+  closeBtn?.addEventListener('click', () => popup.classList.add('hidden'));
+  popup.addEventListener('click', (e) => {
+    if (e.target === popup) popup.classList.add('hidden');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !popup.classList.contains('hidden')) {
+      popup.classList.add('hidden');
+    }
+  });
+
+  const copyBtn = document.getElementById('copyApplicantLinkBtn');
+  copyBtn?.addEventListener('click', async () => {
+    const linkInput = document.getElementById('applicantLinkUrl');
+    const value = (linkInput?.value || '').trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setApplicantLinkStatus('Link copied to clipboard.', 'success');
+    } catch {
+      linkInput?.select();
+      document.execCommand('copy');
+      setApplicantLinkStatus('Link copied to clipboard.', 'success');
+    }
+  });
+
+  const saveBtn = document.getElementById('saveApplicantLinkBtn');
+  saveBtn?.addEventListener('click', async () => {
+    const opportunityId = getOpportunityIdStrict();
+    if (!opportunityId) {
+      setApplicantLinkStatus('Invalid opportunity ID.', 'error');
+      return;
+    }
+
+    const blocks = Array.from(popup.querySelectorAll('.applicant-question'));
+    const payload = {
+      opportunity_id: Number(opportunityId),
+      question_1: null,
+      question_2: null,
+      question_3: null,
+      answer_question_1: null,
+      answer_question_2: null,
+      answer_question_3: null
+    };
+
+    let hasDropdownError = false;
+    blocks.forEach((block, index) => {
+      const title = (block.querySelector('.question-title')?.value || '').trim();
+      const type = block.querySelector('.question-type')?.value || '';
+      const optionsList = block.querySelectorAll('.options-list input');
+      const options = Array.from(optionsList)
+        .map(input => (input.value || '').trim())
+        .filter(Boolean);
+
+      if (!title) return;
+
+      const qKey = `question_${index + 1}`;
+      const aKey = `answer_question_${index + 1}`;
+
+      payload[qKey] = title;
+
+      if (type === 'dropdown') {
+        if (!options.length) {
+          hasDropdownError = true;
+          return;
+        }
+        payload[aKey] = JSON.stringify(options);
+      } else {
+        payload[aKey] = null;
+      }
+    });
+
+    if (hasDropdownError) {
+      setApplicantLinkStatus('Dropdown questions need at least one option.', 'error');
+      return;
+    }
+
+    saveBtn.disabled = true;
+    setApplicantLinkStatus('Saving questions...', '');
+
+    try {
+      const res = await fetch(`${API_BASE}/linkedin_hub`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to save applicant form.');
+      }
+
+      const position = (document.getElementById('details-opportunity-name')?.value || '').trim();
+      const link = buildApplicantFormUrl(position, opportunityId);
+      const linkInput = document.getElementById('applicantLinkUrl');
+      const result = document.getElementById('applicantLinkResult');
+      if (linkInput) linkInput.value = link;
+      if (result) result.classList.remove('hidden');
+
+      setApplicantLinkStatus('All set! Share this link with the applicant.', 'success');
+    } catch (err) {
+      console.error('Failed to save applicant link data:', err);
+      setApplicantLinkStatus('Unable to save. Please try again.', 'error');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+}
+
+function openApplicantLinkPopup() {
+  const popup = document.getElementById('applicantLinkPopup');
+  if (!popup) return;
+  setupApplicantLinkPopupInteractions();
+  resetApplicantLinkPopup();
+  popup.classList.remove('hidden');
 }
 
 function buildIndex(list) {

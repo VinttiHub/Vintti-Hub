@@ -20,104 +20,130 @@
         <div class="header-body">
           <p class="eyebrow">Join the team</p>
           <h1>Apply in minutes</h1>
+          <p class="subtext">Answer a few quick sections. You can review everything before submitting.</p>
         </div>
       </header>
 
       <form id="applicantForm" class="apply-form">
         <input type="hidden" name="opportunity_id" id="opportunityId" />
-        <div class="field-grid">
-          <label class="field">
-            <span>First Name</span>
-            <input name="first_name" type="text" placeholder="What's your first name?" required />
-          </label>
-
-          <label class="field">
-            <span>Last Name</span>
-            <input name="last_name" type="text" placeholder="What's your last name?" required />
-          </label>
-
-          <label class="field">
-            <span>Email address</span>
-            <input name="email" type="email" placeholder="What's your email address?" required />
-          </label>
-
-          <label class="field">
-            <span>Phone number</span>
-            <input name="phone" type="tel" placeholder="What's your phone number?" required />
-          </label>
-
-          <label class="field">
-            <span>Location</span>
-            <select name="location" required>
-              <option value="" disabled selected>Your location</option>
-              <option value="Argentina">Argentina</option>
-              <option value="Brazil">Brazil</option>
-              <option value="Chile">Chile</option>
-              <option value="Colombia">Colombia</option>
-              <option value="Mexico">Mexico</option>
-              <option value="Other">Other</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Role/position</span>
-            <input name="role_position" type="text" placeholder="Sales & Marketing Assistant" required />
-          </label>
-
-          <label class="field">
-            <span>Area</span>
-            <input name="area" type="text" placeholder="Marketing" required />
-          </label>
-
-          <label class="field">
-            <span>LinkedIn Profile URL</span>
-            <input name="linkedin_url" type="url" placeholder="https://www.linkedin.com/in/" required />
-          </label>
-
-          <label class="field">
-            <span>English level</span>
-            <select name="english_level" required>
-              <option value="" disabled selected>What's your English level?</option>
-              <option value="Beginner">Beginner</option>
-              <option value="Intermediate">Intermediate</option>
-              <option value="Advanced">Advanced</option>
-              <option value="Fluent">Fluent</option>
-              <option value="Native">Native</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>How did you find out about this position?</span>
-            <select name="referral_source" required>
-              <option value="" disabled selected>How did you find out about this position?</option>
-              <option value="LinkedIn">LinkedIn</option>
-              <option value="Referral">Referral</option>
-              <option value="Website">Website</option>
-              <option value="Social Media">Social Media</option>
-              <option value="Other">Other</option>
-            </select>
-          </label>
+        <div class="progress-wrap">
+          <div class="progress-meta">
+            <span class="progress-label">Step <span id="stepIndex">1</span> of <span id="stepTotal">4</span></span>
+            <span class="progress-title" id="stepTitle">Basics</span>
+          </div>
+          <div class="progress-bar" role="presentation">
+            <span id="progressFill"></span>
+          </div>
+          <div class="step-dots" id="stepDots" aria-hidden="true"></div>
         </div>
 
-        <section class="upload-card">
-          <div>
-            <h2>Upload your CV</h2>
-            <p>Accepted: PDF, Word, Excel, PNG, JPG.</p>
-          </div>
-          <div class="upload-actions">
-            <input
-              id="cvInput"
-              name="cv"
-              type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp"
-              required
-            />
-            <button type="button" id="cvButton" class="btn-secondary">Select file</button>
-            <span id="cvFilename" class="file-name">No file selected</span>
+        <section class="form-step is-active" data-step="0" data-title="Basics">
+          <div class="field-grid">
+            <label class="field">
+              <span>First Name</span>
+              <input name="first_name" type="text" placeholder="What's your first name?" required />
+            </label>
+
+            <label class="field">
+              <span>Last Name</span>
+              <input name="last_name" type="text" placeholder="What's your last name?" required />
+            </label>
+
+            <label class="field">
+              <span>Email address</span>
+              <input name="email" type="email" placeholder="What's your email address?" required />
+            </label>
+
+            <label class="field">
+              <span>Phone number</span>
+              <input name="phone" type="tel" placeholder="What's your phone number?" required />
+            </label>
+
+            <label class="field">
+              <span>Location</span>
+              <select name="location" required>
+                <option value="" disabled selected>Your location</option>
+                <option value="Argentina">Argentina</option>
+                <option value="Brazil">Brazil</option>
+                <option value="Chile">Chile</option>
+                <option value="Colombia">Colombia</option>
+                <option value="Mexico">Mexico</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
           </div>
         </section>
 
-        <div class="form-actions">
+        <section class="form-step" data-step="1" data-title="Role focus">
+          <div class="field-grid">
+            <label class="field">
+              <span>Role/position</span>
+              <input name="role_position" type="text" placeholder="Sales & Marketing Assistant" required />
+            </label>
+
+            <label class="field">
+              <span>Area</span>
+              <input name="area" type="text" placeholder="Marketing" required />
+            </label>
+
+            <label class="field">
+              <span>English level</span>
+              <select name="english_level" required>
+                <option value="" disabled selected>What's your English level?</option>
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+                <option value="Fluent">Fluent</option>
+                <option value="Native">Native</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>How did you find out about this position?</span>
+              <select name="referral_source" required>
+                <option value="" disabled selected>How did you find out about this position?</option>
+                <option value="LinkedIn">LinkedIn</option>
+                <option value="Referral">Referral</option>
+                <option value="Website">Website</option>
+                <option value="Social Media">Social Media</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="2" data-title="Profile">
+          <div class="field-grid">
+            <label class="field">
+              <span>LinkedIn Profile URL</span>
+              <input name="linkedin_url" type="url" placeholder="https://www.linkedin.com/in/" required />
+            </label>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="3" data-title="Resume">
+          <div class="upload-card">
+            <div>
+              <h2>Upload your CV</h2>
+              <p>Accepted: PDF, Word, Excel, PNG, JPG.</p>
+            </div>
+            <div class="upload-actions">
+              <input
+                id="cvInput"
+                name="cv"
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp"
+                required
+              />
+              <button type="button" id="cvButton" class="btn-secondary">Select file</button>
+              <span id="cvFilename" class="file-name">No file selected</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="step-nav">
+          <button type="button" class="btn-ghost" data-action="back">Back</button>
+          <button type="button" class="btn-primary" data-action="next">Continue</button>
           <button id="submitBtn" class="btn-primary" type="submit">Apply now</button>
           <span id="formStatus" class="form-status" role="status" aria-live="polite"></span>
         </div>

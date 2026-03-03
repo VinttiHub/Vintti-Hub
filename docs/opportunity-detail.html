@@ -657,6 +657,86 @@ the Vintti team</textarea>
     </div>
   </div>
 
+  <!-- Create applicant link -->
+  <div id="applicantLinkPopup" class="popup hidden">
+    <div class="popup-content applicant-link-popup-content">
+      <span class="close-btn" id="closeApplicantLinkPopup">&times;</span>
+      <h2>Let's create the applicant form</h2>
+      <p class="popup-subtext">Add up to three questions. Dropdowns can include as many options as you want.</p>
+
+      <div class="applicant-question-list">
+        <div class="applicant-question" data-index="1">
+          <div class="question-row">
+            <label>Question 1 type</label>
+            <select class="question-type">
+              <option value="">Select type</option>
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="dropdown">Dropdown</option>
+            </select>
+          </div>
+          <label>Question 1 title</label>
+          <input type="text" class="question-title" placeholder="Write the question title" />
+          <div class="dropdown-options hidden">
+            <label>Dropdown options</label>
+            <div class="options-list"></div>
+            <button type="button" class="add-option-btn">+ Add option</button>
+          </div>
+        </div>
+
+        <div class="applicant-question" data-index="2">
+          <div class="question-row">
+            <label>Question 2 type</label>
+            <select class="question-type">
+              <option value="">Select type</option>
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="dropdown">Dropdown</option>
+            </select>
+          </div>
+          <label>Question 2 title</label>
+          <input type="text" class="question-title" placeholder="Write the question title" />
+          <div class="dropdown-options hidden">
+            <label>Dropdown options</label>
+            <div class="options-list"></div>
+            <button type="button" class="add-option-btn">+ Add option</button>
+          </div>
+        </div>
+
+        <div class="applicant-question" data-index="3">
+          <div class="question-row">
+            <label>Question 3 type</label>
+            <select class="question-type">
+              <option value="">Select type</option>
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="dropdown">Dropdown</option>
+            </select>
+          </div>
+          <label>Question 3 title</label>
+          <input type="text" class="question-title" placeholder="Write the question title" />
+          <div class="dropdown-options hidden">
+            <label>Dropdown options</label>
+            <div class="options-list"></div>
+            <button type="button" class="add-option-btn">+ Add option</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="applicant-link-actions">
+        <button id="saveApplicantLinkBtn" type="button">Let's create the link</button>
+      </div>
+      <div id="applicantLinkStatus" class="applicant-link-status" role="status" aria-live="polite"></div>
+      <div id="applicantLinkResult" class="applicant-link-result hidden">
+        <p>Applicant form link</p>
+        <div class="link-row">
+          <input id="applicantLinkUrl" type="text" readonly />
+          <button id="copyApplicantLinkBtn" type="button">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Publish to career site -->
   <div id="publishCareerPopup" class="popup hidden">
     <div class="popup-content" style="max-width:820px;">

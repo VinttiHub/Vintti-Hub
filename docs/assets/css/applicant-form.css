@@ -101,6 +101,79 @@ body {
   gap: 24px;
 }
 
+.progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f6f8ff;
+  border: 1px solid #e3e9f6;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.progress-title {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  color: #2f3e62;
+}
+
+.progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #e4e9f6;
+  overflow: hidden;
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(120deg, #0b45f5 0%, #5c82ff 100%);
+  transition: width 0.3s ease;
+}
+
+.step-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.step-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #c9d3ec;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.step-dots span.is-active {
+  background: #0b45f5;
+  transform: scale(1.2);
+}
+
+.step-dots span.is-complete {
+  background: #7f97ea;
+}
+
+.form-step {
+  display: none;
+  animation: stepFade 0.35s ease;
+}
+
+.form-step.is-active {
+  display: block;
+}
+
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -223,10 +296,10 @@ body {
   white-space: nowrap;
 }
 
-.form-actions {
+.step-nav {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
 .btn-primary {
@@ -256,9 +329,27 @@ body {
   animation: none;
 }
 
+.btn-ghost {
+  border: 1px solid #d5def2;
+  background: transparent;
+  color: #1d2f5d;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
+}
+
+.btn-ghost:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(11, 69, 245, 0.08);
+  border-color: #b8c5e3;
+}
+
 .form-status {
   font-size: 14px;
   color: var(--muted);
+  margin-left: auto;
 }
 
 .form-status.success {
@@ -275,6 +366,17 @@ body {
   }
   50% {
     box-shadow: 0 0 0 10px rgba(11, 69, 245, 0);
+  }
+}
+
+@keyframes stepFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -322,12 +424,16 @@ body {
     justify-content: space-between;
   }
 
-  .form-actions {
+  .step-nav {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .btn-primary {
+    width: 100%;
+  }
+
+  .btn-ghost {
     width: 100%;
   }
 

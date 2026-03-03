@@ -161,3 +161,79 @@ def create_applicant():
     except Exception as exc:
         logging.exception("Failed to create applicant")
         return jsonify({"error": str(exc)}), 500
+
+
+@bp.route("/linkedin_hub", methods=["POST", "OPTIONS"])
+def create_linkedin_hub_entry():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    data = request.get_json(silent=True) or {}
+    raw_opportunity_id = data.get("opportunity_id")
+    if raw_opportunity_id is None:
+        return jsonify({"error": "Missing opportunity_id"}), 400
+
+    try:
+        opportunity_id = int(raw_opportunity_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid opportunity_id"}), 400
+
+    def _clean_optional(val):
+        s = (val or "").strip()
+        return s or None
+
+    question_1 = _clean_optional(data.get("question_1"))
+    question_2 = _clean_optional(data.get("question_2"))
+    question_3 = _clean_optional(data.get("question_3"))
+
+    answer_1 = _clean_optional(data.get("answer_question_1")) if question_1 else None
+    answer_2 = _clean_optional(data.get("answer_question_2")) if question_2 else None
+    answer_3 = _clean_optional(data.get("answer_question_3")) if question_3 else None
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT COALESCE(MAX(linkedin_hub_id), 0) FROM linkedin_hub")
+        next_id = int(cur.fetchone()[0]) + 1
+
+        cur.execute(
+            """
+            INSERT INTO linkedin_hub (
+                linkedin_hub_id,
+                opportunity_id,
+                question_1,
+                question_2,
+                question_3,
+                answer_question_1,
+                answer_question_2,
+                answer_question_3
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING linkedin_hub_id
+            """,
+            (
+                next_id,
+                opportunity_id,
+                question_1,
+                question_2,
+                question_3,
+                answer_1,
+                answer_2,
+                answer_3,
+            ),
+        )
+        linkedin_hub_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify(
+            {
+                "message": "LinkedIn hub entry created",
+                "linkedin_hub_id": linkedin_hub_id,
+                "opportunity_id": opportunity_id,
+            }
+        ), 201
+    except Exception as exc:
+        logging.exception("Failed to create linkedin_hub entry")
+        return jsonify({"error": str(exc)}), 500
