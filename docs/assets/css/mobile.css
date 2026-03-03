@@ -90,6 +90,8 @@ canvas {
     transition: transform 0.2s ease;
     z-index: 11000;
     box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
+    overflow-y: auto;
+    padding-bottom: 16px;
   }
 
   body.has-app-sidebar.sidebar-open #sidebarMount,
@@ -104,6 +106,10 @@ canvas {
 
   body.has-app-sidebar .sidebar-mini-toggle {
     display: none;
+  }
+
+  body.has-app-sidebar .profile-tile {
+    display: flex !important;
   }
 
   .page-header {
