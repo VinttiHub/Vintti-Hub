@@ -111,6 +111,143 @@
   .card-content {
     min-width: 0;
   }
+
+  .pipeline-section {
+    padding: 18px 16px;
+    min-height: auto;
+  }
+
+  .pipeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .pipeline-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .pipeline-actions button {
+    flex: 1 1 140px;
+  }
+
+  .pipeline-columns {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 12px;
+    gap: 12px;
+    scroll-snap-type: x proximity;
+  }
+
+  .pipeline-columns::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pipeline-columns .column {
+    flex: 0 0 240px;
+    min-width: 240px;
+    scroll-snap-align: start;
+  }
+
+  .pipeline-columns .card-container {
+    min-height: auto;
+    padding: 10px 8px;
+  }
+
+  .batch-table {
+    overflow-x: auto;
+  }
+
+  .batch-table table {
+    min-width: 520px;
+  }
+
+  .batch-detail {
+    padding: 16px;
+  }
+
+  .batch-box {
+    width: 100%;
+  }
+
+  .batch-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tab-selector {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 6px 0;
+  }
+
+  .tab-selector::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn,
+  #requestBonusBtn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .grid-two-cols {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .grid-two-cols p {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .grid-two-cols p strong {
+    font-size: 14px;
+  }
+
+  .grid-two-cols p a,
+  .grid-two-cols p span,
+  .grid-two-cols p input {
+    width: 100%;
+  }
+
+  .accordion-content {
+    padding: 16px;
+  }
+
+  .styled-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .styled-table thead,
+  .styled-table tbody,
+  .styled-table tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  .styled-table th,
+  .styled-table td {
+    padding: 12px 14px;
+  }
+
+  #employees .card {
+    padding: 16px;
+  }
+
+  #employees .styled-table {
+    min-width: 900px;
+  }
 }
 
 @media (max-width: 640px) {
