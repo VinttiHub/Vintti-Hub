@@ -1,0 +1,129 @@
+@media (max-width: 900px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  input,
+  select,
+  textarea,
+  .field input,
+  .field select,
+  .field textarea,
+  .input-group input,
+  .input-group select,
+  .input-group textarea,
+  [contenteditable="true"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px 16px 12px;
+  }
+
+  .detail-nav ul {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    gap: 12px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  .detail-nav ul::-webkit-scrollbar {
+    display: none;
+  }
+
+  .detail-nav .nav-item {
+    white-space: nowrap;
+  }
+
+  .detail-nav .nav-indicator {
+    display: none;
+  }
+
+  .detail-main {
+    padding: 18px 16px 48px;
+  }
+
+  .overview-grid,
+  .grid,
+  .overview-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .input-group {
+    min-width: 0;
+    margin-bottom: 1rem;
+  }
+
+  .input-group.full {
+    grid-column: span 1 !important;
+  }
+
+  .section-header,
+  .overview-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .header-bar,
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .header-row .tabs,
+  .header-bar .tabs,
+  .tabs {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 6px 10px;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs .tab {
+    white-space: nowrap;
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+
+  .overview-layout > .sidebar {
+    width: 100%;
+  }
+
+  .cv-card-entry,
+  .doc-row,
+  .field-group,
+  .card-content {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .detail-title {
+    font-size: 1.2rem;
+  }
+
+  .overview-title {
+    font-size: 1.4rem;
+  }
+
+  .go-back-button,
+  .topbar .back {
+    width: 100%;
+  }
+}
