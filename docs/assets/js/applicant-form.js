@@ -18,6 +18,8 @@ const progressFill = document.getElementById("progressFill");
 const stepDots = document.getElementById("stepDots");
 const backBtn = document.querySelector('[data-action="back"]');
 const nextBtn = document.querySelector('[data-action="next"]');
+const customQuestions = document.getElementById("customQuestions");
+const questionsEmpty = document.getElementById("questionsEmpty");
 let toastTimer = null;
 let currentStep = 0;
 
@@ -125,9 +127,123 @@ function goToStep(nextIndex) {
   updateSteps();
 }
 
+function normalizeOptions(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  const rawStr = String(raw).trim();
+  if (!rawStr) return [];
+  try {
+    const parsed = JSON.parse(rawStr);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === "object") {
+      const options =
+        parsed.options || parsed.choices || parsed.values || parsed.items;
+      if (Array.isArray(options)) return options;
+      const objValues = Object.values(parsed);
+      if (objValues.length) return objValues;
+    }
+  } catch (err) {
+    // Fall back to delimiter-based parsing.
+  }
+  return rawStr
+    .split(/[\n,;|]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function renderCustomQuestions(payload) {
+  if (!customQuestions) return;
+  customQuestions.innerHTML = "";
+
+  const items = [
+    {
+      label: payload?.question_1,
+      options: payload?.answer_question_1,
+      name: "question_1",
+    },
+    {
+      label: payload?.question_2,
+      options: payload?.answer_question_2,
+      name: "question_2",
+    },
+    {
+      label: payload?.question_3,
+      options: payload?.answer_question_3,
+      name: "question_3",
+    },
+  ].filter((item) => item.label);
+
+  if (!items.length) {
+    if (questionsEmpty) questionsEmpty.classList.add("is-visible");
+    return;
+  }
+
+  if (questionsEmpty) questionsEmpty.classList.remove("is-visible");
+
+  items.forEach((item) => {
+    const field = document.createElement("label");
+    field.className = "field";
+    const title = document.createElement("span");
+    title.textContent = item.label;
+    field.appendChild(title);
+
+    const options = normalizeOptions(item.options);
+    if (options.length) {
+      const select = document.createElement("select");
+      select.name = item.name;
+      select.required = true;
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      placeholder.textContent = "Select an option";
+      select.appendChild(placeholder);
+      options.forEach((option) => {
+        const opt = document.createElement("option");
+        opt.value = String(option).trim();
+        opt.textContent = String(option).trim();
+        if (opt.value) select.appendChild(opt);
+      });
+      field.appendChild(select);
+    } else {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.name = item.name;
+      input.placeholder = "Type your answer";
+      input.required = true;
+      field.appendChild(input);
+    }
+
+    customQuestions.appendChild(field);
+  });
+}
+
+async function loadCustomQuestions() {
+  const oppValue = (form?.elements?.["opportunity_id"]?.value || "").trim();
+  if (!oppValue) {
+    renderCustomQuestions(null);
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_BASE}/linkedin_hub?opportunity_id=${encodeURIComponent(oppValue)}`
+    );
+    if (!response.ok) {
+      renderCustomQuestions(null);
+      return;
+    }
+    const payload = await response.json();
+    renderCustomQuestions(payload);
+  } catch (err) {
+    renderCustomQuestions(null);
+  }
+}
+
 applyPrefillFromQuery();
 buildStepDots();
 updateSteps();
+loadCustomQuestions();
 
 backBtn?.addEventListener("click", () => {
   goToStep(currentStep - 1);

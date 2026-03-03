@@ -41,6 +41,11 @@ def _clean(val):
     return (val or "").strip()
 
 
+def _clean_optional(val):
+    value = (val or "").strip()
+    return value or None
+
+
 def _file_size_bytes(file_obj):
     try:
         file_obj.stream.seek(0, os.SEEK_END)
@@ -121,6 +126,9 @@ def create_applicant():
                 english_level,
                 referral_source,
                 opportunity_id,
+                question_1,
+                question_2,
+                question_3,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -130,6 +138,7 @@ def create_applicant():
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s,
                 NOW(), NOW()
             )
             RETURNING applicant_id
@@ -146,6 +155,9 @@ def create_applicant():
                 _clean(data.get("english_level")),
                 _clean(data.get("referral_source")),
                 opportunity_id,
+                _clean_optional(data.get("question_1")),
+                _clean_optional(data.get("question_2")),
+                _clean_optional(data.get("question_3")),
                 s3_key,
                 filename_orig,
                 content_type,
@@ -160,6 +172,78 @@ def create_applicant():
         return jsonify({"message": "Applicant created", "applicant_id": applicant_id}), 201
     except Exception as exc:
         logging.exception("Failed to create applicant")
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route("/linkedin_hub", methods=["GET", "OPTIONS"])
+def get_linkedin_hub_entry():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    raw_opportunity_id = request.args.get("opportunity_id")
+    if raw_opportunity_id is None:
+        return jsonify({"error": "Missing opportunity_id"}), 400
+
+    try:
+        opportunity_id = int(raw_opportunity_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid opportunity_id"}), 400
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                question_1,
+                question_2,
+                question_3,
+                answer_question_1,
+                answer_question_2,
+                answer_question_3
+            FROM linkedin_hub
+            WHERE opportunity_id = %s
+            ORDER BY linkedin_hub_id DESC
+            LIMIT 1
+            """,
+            (opportunity_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not row:
+            return (
+                jsonify(
+                    {
+                        "opportunity_id": opportunity_id,
+                        "question_1": None,
+                        "question_2": None,
+                        "question_3": None,
+                        "answer_question_1": None,
+                        "answer_question_2": None,
+                        "answer_question_3": None,
+                    }
+                ),
+                200,
+            )
+
+        return (
+            jsonify(
+                {
+                    "opportunity_id": opportunity_id,
+                    "question_1": row[0],
+                    "question_2": row[1],
+                    "question_3": row[2],
+                    "answer_question_1": row[3],
+                    "answer_question_2": row[4],
+                    "answer_question_3": row[5],
+                }
+            ),
+            200,
+        )
+    except Exception as exc:
+        logging.exception("Failed to fetch linkedin_hub entry")
         return jsonify({"error": str(exc)}), 500
 
 
