@@ -478,9 +478,12 @@
         <section class="cv-section">
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🧠">About</h2>
-            <button class="star-button" id="about-star-button" data-target="popup-about" title="Add comment">
-              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
-            </button>
+            <div class="cv-heading-actions">
+              <button id="saveAboutBtn" class="resume-save-btn" type="button">Save</button>
+              <button class="star-button" id="about-star-button" data-target="popup-about" title="Add comment">
+                <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              </button>
+            </div>
           </div>
           <div class="cv-card">
             <p id="aboutField">Click here to edit your About section.</p>
@@ -491,53 +494,78 @@
         <section class="cv-section" id="workExperienceSection">
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="💼">Work Experience</h2>
-            <button class="star-button" data-target="popup-work" title="Add comment">
-              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
-            </button>
+            <div class="cv-heading-actions">
+              <button id="saveWorkExperienceBtn" class="resume-save-btn" type="button">Save</button>
+              <button class="star-button" data-target="popup-work" title="Add comment">
+                <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              </button>
+            </div>
           </div>
           <div id="workExperienceList"></div>
-          <button id="addWorkExperienceBtn">Add Work Experience</button>
+          <div class="resume-section-actions">
+            <button id="addWorkExperienceBtn">Add Work Experience</button>
+          </div>
         </section>
 
         <!-- Education -->
         <section class="cv-section" id="educationSection">
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🎓">Education</h2>
-            <button class="star-button" data-target="popup-education" title="Add comment">
-              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
-            </button>
+            <div class="cv-heading-actions">
+              <button id="saveEducationBtn" class="resume-save-btn" type="button">Save</button>
+              <button class="star-button" data-target="popup-education" title="Add comment">
+                <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              </button>
+            </div>
           </div>
           <div id="educationList"></div>
-          <button id="addEducationBtn">Add Education</button>
+          <div class="resume-section-actions">
+            <button id="addEducationBtn">Add Education</button>
+          </div>
         </section>
 
         <!-- Tools -->
         <section class="cv-section" id="toolsSection">
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🛠️">Tools</h2>
-            <button class="star-button" data-target="popup-about" title="Add comment">
-              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
-            </button>
+            <div class="cv-heading-actions">
+              <button id="saveToolsBtn" class="resume-save-btn" type="button">Save</button>
+              <button class="star-button" data-target="popup-about" title="Add comment">
+                <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              </button>
+            </div>
           </div>
           <div class="cv-card" id="toolsList"></div>
-          <button id="addToolBtn">Add Tool</button>
+          <div class="resume-section-actions">
+            <button id="addToolBtn">Add Tool</button>
+          </div>
         </section>
 
         <!-- Languages -->
         <section class="cv-section" id="languagesSection">
           <div class="cv-heading-wrapper">
             <h2 class="cv-heading" data-icon="🌐">Languages</h2>
-            <button class="star-button" data-target="popup-about" title="Add comment">
-              <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
-            </button>
+            <div class="cv-heading-actions">
+              <button id="saveLanguagesBtn" class="resume-save-btn" type="button">Save</button>
+              <button class="star-button" data-target="popup-about" title="Add comment">
+                <img src="assets/img/ai-technology.png" alt="Phone" style="width:20px; height:20px; object-fit:contain;">
+              </button>
+            </div>
           </div>
           <div class="cv-card" id="languagesList"></div>
-          <button id="addLanguageBtn">Add Language</button>
+          <div class="resume-section-actions">
+            <button id="addLanguageBtn">Add Language</button>
+          </div>
         </section>
 
         <!-- Video Link (rich toolbar + contenteditable) -->
         <section class="cv-section">
-          <h2 class="cv-heading" data-icon="📹">Video Link</h2>
+          <div class="cv-heading-wrapper">
+            <h2 class="cv-heading" data-icon="📹">Video Link</h2>
+            <div class="cv-heading-actions">
+              <button id="saveVideoBtn" class="resume-save-btn" type="button">Save</button>
+            </div>
+          </div>
           <div class="cv-card">
             <div class="rich-toolbar" id="video-toolbar">
               <button type="button" data-target="videoLinkInput" data-command="bold"><b>B</b></button>
