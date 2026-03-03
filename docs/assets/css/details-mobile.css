@@ -106,6 +106,31 @@
     width: 100%;
   }
 
+  html[data-theme] #resume #workExperienceList,
+  html[data-theme] #resume #educationList {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  html[data-theme] #resume #workExperienceList .cv-card-entry,
+  html[data-theme] #resume #educationList .cv-card-entry {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  html[data-theme] #resume .cv-card-entry .remove-entry {
+    position: static;
+    align-self: flex-end;
+    margin-bottom: 6px;
+  }
+
+  html[data-theme] #resume .cv-card-entry input.work-title,
+  html[data-theme] #resume .cv-card-entry input.edu-title {
+    width: 100% !important;
+  }
+
   html[data-theme] #opportunities table {
     display: block;
     width: max-content;
