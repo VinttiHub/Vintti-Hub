@@ -560,7 +560,7 @@ function extendSortToastTotal(extra = 0) {
 /* =========================
    3) Controlled concurrency
    ========================= */
-/**prueba deploy */
+
 async function runWithConcurrency(tasks, limit = 6) {
   const queue = tasks.slice();
   const workers = Array.from({ length: limit }, async () => {
