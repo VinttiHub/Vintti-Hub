@@ -353,6 +353,47 @@ localStorage.setItem('sidebarCollapsed', 'true');
     });
   }
 
+  function setupMobileSidebar() {
+    const body = document.body;
+    if (!body) return;
+
+    body.classList.add('has-app-sidebar');
+
+    if (!document.querySelector('.mobile-sidebar-toggle')) {
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'mobile-sidebar-toggle';
+      toggle.setAttribute('aria-label', 'Toggle menu');
+      toggle.innerHTML = '<span class="mobile-sidebar-toggle-icon">|||</span><span>Menu</span>';
+      body.appendChild(toggle);
+
+      toggle.addEventListener('click', () => {
+        body.classList.toggle('sidebar-open');
+      });
+    }
+
+    if (!document.querySelector('.mobile-sidebar-backdrop')) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'mobile-sidebar-backdrop';
+      body.appendChild(backdrop);
+
+      backdrop.addEventListener('click', () => {
+        body.classList.remove('sidebar-open');
+      });
+    }
+
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target && target.closest && target.closest('.sidebar .menu-item')) {
+        body.classList.remove('sidebar-open');
+      }
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') body.classList.remove('sidebar-open');
+    });
+  }
+
   /* -------------------------
      Loader (sidebar.html -> #sidebarMount)
   ------------------------- */
@@ -365,6 +406,7 @@ localStorage.setItem('sidebarCollapsed', 'true');
       applySidebarVisibility();
       setupSidebarCollapse();
       setupSidebarTooltips();
+      setupMobileSidebar();
       await initSidebarProfile();
       document.dispatchEvent(new CustomEvent('sidebar:loaded'));
       return;
@@ -381,6 +423,7 @@ localStorage.setItem('sidebarCollapsed', 'true');
       applySidebarVisibility();
       setupSidebarCollapse();
       setupSidebarTooltips();
+      setupMobileSidebar();
       await initSidebarProfile();
 
       document.dispatchEvent(new CustomEvent('sidebar:loaded'));

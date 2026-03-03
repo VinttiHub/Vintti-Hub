@@ -15,6 +15,17 @@
     return;
   }
 
+  function ensureMobileStyles() {
+    if (document.getElementById("mobileStyles")) return;
+    const link = document.createElement("link");
+    link.id = "mobileStyles";
+    link.rel = "stylesheet";
+    link.href = "./assets/css/mobile.css";
+    document.head.appendChild(link);
+  }
+
+  ensureMobileStyles();
+
   const safeStorage = {
     get(storage, key) {
       try {
