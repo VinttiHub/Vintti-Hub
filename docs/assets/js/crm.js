@@ -21,6 +21,7 @@ const CRM_SALES_LEAD_OPTIONS = new Map();
 let accountTableInstance = null;
 let crmDataTableFilterRegistered = false;
 let CRM_ALL_ACCOUNT_IDS = [];
+const CRM_EXPORT_CACHE = new Map();
 
 /* =========================
    1) Generic helpers
@@ -356,6 +357,125 @@ function populateStatusFilter(values = []) {
   const desired = CRM_FILTER_STATE.status || prev;
   const hasDesired = Array.from(select.options).some(opt => opt.value === desired);
   select.value = hasDesired ? desired : (CRM_FILTER_STATE.status || '');
+}
+
+function csvSafe(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function csvMoneyValue(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function buildCrmExportRecord(item = {}) {
+  const accountId = Number(item.account_id);
+  if (!accountId) return null;
+  const status = (item.account_status || item.calculated_status || '—').toString().trim() || '—';
+  const salesLead = (item.account_manager_name || item.account_manager || 'Unassigned').toString().trim() || 'Unassigned';
+  const contract = deriveContractLabel(item.contract);
+  const priority = (item.priority || '').toString().trim().toUpperCase();
+  return {
+    accountId,
+    clientName: (item.client_name || '—').toString().trim() || '—',
+    status,
+    salesLead,
+    contract,
+    trr: csvMoneyValue(item.trr),
+    tsf: csvMoneyValue(item.tsf),
+    tsr: csvMoneyValue(item.tsr),
+    priority
+  };
+}
+
+function primeCrmExportCache(items = []) {
+  CRM_EXPORT_CACHE.clear();
+  (Array.isArray(items) ? items : []).forEach(item => {
+    const row = buildCrmExportRecord(item);
+    if (row) CRM_EXPORT_CACHE.set(row.accountId, row);
+  });
+}
+
+function updateCrmExportCache(accountId, patch = {}) {
+  const id = Number(accountId);
+  if (!id) return;
+  const current = CRM_EXPORT_CACHE.get(id) || {
+    accountId: id,
+    clientName: '—',
+    status: '—',
+    salesLead: 'Unassigned',
+    contract: 'No Contract',
+    trr: 0,
+    tsf: 0,
+    tsr: 0,
+    priority: ''
+  };
+  CRM_EXPORT_CACHE.set(id, { ...current, ...patch });
+}
+
+function getOrderedCrmExportIds() {
+  if (accountTableInstance) {
+    const indexes = accountTableInstance.rows({ search: 'applied', order: 'applied' }).indexes().toArray();
+    const ids = indexes
+      .map(index => accountTableInstance.row(index).node())
+      .filter(Boolean)
+      .map(node => Number(node.dataset.id))
+      .filter(Boolean);
+    if (ids.length) return ids;
+  }
+  return Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'))
+    .map(row => Number(row.dataset.id))
+    .filter(Boolean);
+}
+
+function downloadCrmCsv() {
+  const orderedIds = getOrderedCrmExportIds();
+  if (!orderedIds.length) {
+    alert('No data available to export.');
+    return;
+  }
+
+  const headers = ['Account ID', 'Client Name', 'Status', 'Sales Lead', 'Contract', 'TRR', 'TSF', 'TSR', 'Priority'];
+  const lines = [headers.map(csvSafe).join(',')];
+
+  orderedIds.forEach(id => {
+    const row = CRM_EXPORT_CACHE.get(id);
+    if (!row) return;
+    lines.push([
+      row.accountId,
+      row.clientName,
+      row.status,
+      row.salesLead,
+      row.contract,
+      row.trr,
+      row.tsf,
+      row.tsr,
+      row.priority
+    ].map(csvSafe).join(','));
+  });
+
+  if (lines.length <= 1) {
+    alert('No rows matched the current table filters.');
+    return;
+  }
+
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  link.href = URL.createObjectURL(blob);
+  link.download = `crm_export_${date}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+function initCrmExportButton() {
+  const btn = document.getElementById('crmExportCsvBtn');
+  if (!btn) return;
+  btn.addEventListener('click', downloadCrmCsv);
 }
 
 /* =========================
@@ -742,6 +862,7 @@ async function patchAccountManager(accountId, email) {
 
 function updateRowSalesLead(rowEl, email, displayName) {
   if (!rowEl) return null;
+  const accountId = Number(rowEl.dataset.id);
   const normalizedEmail = (email || '').toString().trim().toLowerCase();
   const item = {
     account_manager: normalizedEmail,
@@ -755,11 +876,15 @@ function updateRowSalesLead(rowEl, email, displayName) {
   if (meta.code && upsertSalesLeadOption(meta.code, meta.label || meta.code)) {
     renderSalesLeadOptions();
   }
+  updateCrmExportCache(accountId, {
+    salesLead: (meta.label || displayName || normalizedEmail || 'Unassigned').toString().trim() || 'Unassigned'
+  });
   return meta;
 }
 
 function updateRowStatus(rowEl, statusText) {
   if (!rowEl) return;
+  const accountId = Number(rowEl.dataset.id);
   const td = rowEl.querySelector('td.status-td');
   if (td) {
     td.innerHTML = renderAccountStatusChip(statusText);
@@ -767,10 +892,12 @@ function updateRowStatus(rowEl, statusText) {
   }
   rowEl.dataset.statusLabel = statusText;
   rowEl.dataset.statusCode = norm(statusText);
+  updateCrmExportCache(accountId, { status: (statusText || '—').toString().trim() || '—' });
 }
 
 function updateRowContract(rowEl, contractText) {
   if (!rowEl) return;
+  const accountId = Number(rowEl.dataset.id);
   const cell = rowEl.querySelector('td.muted-cell');
   if (cell) {
     if (contractText) {
@@ -782,6 +909,7 @@ function updateRowContract(rowEl, contractText) {
   const label = deriveContractLabel(contractText);
   rowEl.dataset.contractLabel = label;
   rowEl.dataset.contractCode = norm(label);
+  updateCrmExportCache(accountId, { contract: label });
 }
 
 function getRowContractValue(rowEl) {
@@ -1432,6 +1560,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
 document.addEventListener('DOMContentLoaded', () => {
   initCrmFilterControls();
   initCrmRefreshButton();
+  initCrmExportButton();
   loadSalesLeadFilterOptions();
   updateCrmEmptyState(null);
   toggleCrmLoading(true, 'Loading CRM accounts…');
@@ -1460,6 +1589,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase().trim();
       const showPriorityColumn = allowedEmails.includes(currentUserEmail);
+      primeCrmExportCache(data);
 
       const rowsHtml = data.map(item => {
         const contractTxt = item.contract || '<span class="placeholder">No hires yet</span>';
@@ -1605,6 +1735,7 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ priority: newPriority || null })
           });
+          updateCrmExportCache(accountId, { priority: (newPriority || '').toUpperCase() });
           console.log(`✅ Priority updated for account ${accountId}`);
         } catch (error) {
           console.error('❌ Error updating priority:', error);

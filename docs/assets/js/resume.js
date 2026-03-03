@@ -264,6 +264,12 @@ function mountMonthYearPicker(root, { initial='', allowEmpty=true, onChange } = 
   const langsList = byId('languagesList');
   const addLangBtn = byId('addLanguageBtn');
   const videoEl = byId('videoLinkInput');
+  const saveAboutBtn = byId('saveAboutBtn');
+  const saveWorkBtn = byId('saveWorkExperienceBtn');
+  const saveEducationBtn = byId('saveEducationBtn');
+  const saveToolsBtn = byId('saveToolsBtn');
+  const saveLanguagesBtn = byId('saveLanguagesBtn');
+  const saveVideoBtn = byId('saveVideoBtn');
 
   // ---------- Builders ----------
 function addEducationEntry(entry={ institution:'', title:'', country:'', start_date:'', end_date:'', current:false, description:'' }){
@@ -743,6 +749,56 @@ function pickerToIso(root){
     return ok;
   }
 
+  function validateResumeSections(fields = []){
+    const wanted = new Set(Array.isArray(fields) ? fields : [fields]);
+    let ok = true;
+    if (wanted.has('work_experience')) {
+      qsa('#workExperienceList .cv-card-entry').forEach(card => { if (!validateWorkCard(card)) ok = false; });
+    }
+    if (wanted.has('education')) {
+      qsa('#educationList .cv-card-entry').forEach(card => { if (!validateEducationCard(card)) ok = false; });
+    }
+    if (wanted.has('tools')) {
+      qsa('#toolsList .cv-card-entry').forEach(row => { if (!validateToolRow(row)) ok = false; });
+    }
+    if (wanted.has('languages')) {
+      qsa('#languagesList .cv-card-entry').forEach(row => { if (!validateLanguageRow(row)) ok = false; });
+    }
+    return ok;
+  }
+
+  function getSectionValidity({ render = true } = {}){
+    const validity = {
+      work_experience: true,
+      education: true,
+      tools: true,
+      languages: true
+    };
+
+    qsa('#workExperienceList .cv-card-entry').forEach(card => {
+      const ok = validateWorkCard(card);
+      if (!ok) validity.work_experience = false;
+      if (!render && ok) renderCardErrors(card, []);
+    });
+    qsa('#educationList .cv-card-entry').forEach(card => {
+      const ok = validateEducationCard(card);
+      if (!ok) validity.education = false;
+      if (!render && ok) renderCardErrors(card, []);
+    });
+    qsa('#toolsList .cv-card-entry').forEach(row => {
+      const ok = validateToolRow(row);
+      if (!ok) validity.tools = false;
+      if (!render && ok) renderCardErrors(row, []);
+    });
+    qsa('#languagesList .cv-card-entry').forEach(row => {
+      const ok = validateLanguageRow(row);
+      if (!ok) validity.languages = false;
+      if (!render && ok) renderCardErrors(row, []);
+    });
+
+    return validity;
+  }
+
 
   // ---------- DOM → Data (normalized, filtered) ----------
   function readResumeFromDOM(){
@@ -826,15 +882,21 @@ const end    = normalizeISO15(endRaw);
   }
 
   // ---------- DIFF & SAVE ----------
-async function saveNow(){
+async function saveNow(options = {}){
+  const { skipValidation = false, onlyFields = null } = options || {};
   if (!hydrated) return;
-  if (!validateResumeForm()) return;
+  const sectionValidity = skipValidation ? null : getSectionValidity({ render: true });
+  const scopedFields = Array.isArray(onlyFields) && onlyFields.length ? new Set(onlyFields) : null;
 
   const current = readResumeFromDOM();
 
   // arma patch solo con cambios
   const patch = {};
   function maybe(field, val, stringify=false, touchKey=field){
+    if (scopedFields && !scopedFields.has(field)) return;
+    if (!skipValidation && sectionValidity && Object.prototype.hasOwnProperty.call(sectionValidity, field) && !sectionValidity[field]) {
+      return;
+    }
     if (!touched[touchKey]) return;
     const prev = snapshot[field];
     if (!deepEqual(prev, val)){
@@ -963,7 +1025,7 @@ const scheduleSave  = () => {
 };
 
 // --- Exponer internos para helpers globales ---
-window.__resume = Object.assign(window.__resume || {}, {
+  window.__resume = Object.assign(window.__resume || {}, {
   touch: (k) => { try { if (k) touched[k] = true; } catch {} },
   scheduleSave,
   saveNow,
@@ -1014,17 +1076,31 @@ if (aboutEl){
   aboutEl.addEventListener('input', () => markAndSave('about'));
   aboutEl.addEventListener('blur',  () => markAndSave('about'));
 }
-if (videoEl){
+  if (videoEl){
   videoEl.contentEditable = 'true';
   videoEl.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); videoEl.blur(); }});
   videoEl.addEventListener('input', () => markAndSave('video_link'));
   videoEl.addEventListener('blur',  () => markAndSave('video_link'));
 }
 
+  const saveSectionNow = async (fields = []) => {
+    const keys = (Array.isArray(fields) ? fields : [fields]).filter(Boolean);
+    if (!keys.length) return;
+    keys.forEach((k) => { touched[k] = true; });
+    validateResumeSections(keys);
+    await saveNow({ skipValidation: true, onlyFields: keys });
+  };
+
   addEduBtn?.addEventListener('click', ()=>{ addEducationEntry(); touched.education=true; validateResumeForm(); scheduleSave(); });
   addWorkBtn?.addEventListener('click', ()=>{ addWorkExperienceEntry(); touched.work_experience=true; validateResumeForm(); scheduleSave(); });
   addToolBtn?.addEventListener('click', ()=>{ addToolEntry(); touched.tools=true; validateResumeForm(); scheduleSave(); });
   addLangBtn?.addEventListener('click', ()=>{ addLanguageEntry(); touched.languages=true; validateResumeForm(); scheduleSave(); });
+  saveAboutBtn?.addEventListener('click', () => saveSectionNow(['about']));
+  saveWorkBtn?.addEventListener('click', () => saveSectionNow(['work_experience']));
+  saveEducationBtn?.addEventListener('click', () => saveSectionNow(['education']));
+  saveToolsBtn?.addEventListener('click', () => saveSectionNow(['tools']));
+  saveLanguagesBtn?.addEventListener('click', () => saveSectionNow(['languages']));
+  saveVideoBtn?.addEventListener('click', () => saveSectionNow(['video_link']));
 
   const revalidateResumeUI = () => { if (hydrated) validateResumeForm(); };
   [eduList, workList, toolsList, langsList].forEach(list => {
