@@ -288,6 +288,37 @@
     width: 100%;
   }
 
+  /* Candidate Details resume section */
+  #resume .cv-card-entry,
+  #resume .cv-card {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  #resume .cv-card-entry input,
+  #resume .cv-card-entry select,
+  #resume .cv-card-entry textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  #resume .cv-card-entry .month-year,
+  #resume .mr-entry .month-year {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  #resume .cv-card-entry .month-year select,
+  #resume .mr-entry .month-year select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #resume .cv-card-entry .rich-toolbar,
+  #resume .cv-card-entry .rich-input {
+    width: 100% !important;
+  }
+
   .tab-selector::-webkit-scrollbar {
     display: none;
   }
