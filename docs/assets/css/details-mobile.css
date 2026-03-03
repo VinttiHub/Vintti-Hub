@@ -1,4 +1,132 @@
 @media (max-width: 900px) {
+  html[data-theme] .main-content {
+    padding: 16px;
+  }
+
+  html[data-theme] .header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 0;
+    margin-top: 0;
+  }
+
+  html[data-theme] #goBackButton.go-back-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  html[data-theme] .tabs {
+    width: 100%;
+    padding: 6px;
+    gap: 8px;
+    overflow-x: auto;
+    border-radius: 20px;
+  }
+
+  html[data-theme] .tabs .tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  html[data-theme] #overview .overview-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 0;
+  }
+
+  html[data-theme] #overview .grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  html[data-theme] #overview .field {
+    width: 100%;
+  }
+
+  html[data-theme] #overview .field > div,
+  html[data-theme] #overview .field input,
+  html[data-theme] #overview .field select,
+  html[data-theme] #overview .field textarea {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  html[data-theme] #overview #field-name {
+    font-size: 28px;
+    line-height: 1.1;
+  }
+
+  html[data-theme] .timezone-select,
+  html[data-theme] .timezone-trigger,
+  html[data-theme] .timezone-dropdown {
+    width: 100%;
+  }
+
+  html[data-theme] .timezone-dropdown {
+    max-height: 240px;
+    overflow: auto;
+  }
+
+  html[data-theme] .header-buttons-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0 0 12px;
+  }
+
+  html[data-theme] .header-buttons-row .pill {
+    width: 100%;
+    justify-content: center;
+  }
+
+  html[data-theme] #resume .cv-container {
+    padding: 16px;
+    max-width: 100%;
+    border-radius: 14px;
+  }
+
+  html[data-theme] #resume .cv-heading-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  html[data-theme] #resume .cv-heading-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  html[data-theme] #resume .resume-section-actions button {
+    width: 100%;
+  }
+
+  html[data-theme] #opportunities table {
+    display: block;
+    width: max-content;
+    min-width: 720px;
+    overflow-x: auto;
+  }
+
+  html[data-theme] #hire .grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 16px;
+  }
+
+  html[data-theme] #hire #opp-model-pill {
+    width: 100%;
+    text-align: center;
+  }
+
+  html[data-theme] #hire .reminders-list {
+    grid-template-columns: 1fr;
+  }
   body {
     overflow-x: hidden;
   }
