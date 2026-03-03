@@ -669,6 +669,9 @@ function resetApplicantLinkPopup() {
     if (titleInput) titleInput.value = '';
     if (optionsWrap) optionsWrap.classList.add('hidden');
     if (optionsList) optionsList.innerHTML = '';
+    block.classList.remove('has-error');
+    const errorEl = block.querySelector('.question-error');
+    if (errorEl) errorEl.textContent = '';
   });
   const result = document.getElementById('applicantLinkResult');
   const linkInput = document.getElementById('applicantLinkUrl');
@@ -687,6 +690,16 @@ function setupApplicantLinkPopupInteractions() {
     const optionsWrap = block.querySelector('.dropdown-options');
     const optionsList = block.querySelector('.options-list');
     const addBtn = block.querySelector('.add-option-btn');
+    const titleInput = block.querySelector('.question-title');
+    const ensureErrorEl = () => {
+      let errorEl = block.querySelector('.question-error');
+      if (!errorEl) {
+        errorEl = document.createElement('div');
+        errorEl.className = 'question-error';
+        block.appendChild(errorEl);
+      }
+      return errorEl;
+    };
 
     typeSelect?.addEventListener('change', () => {
       const isDropdown = typeSelect.value === 'dropdown';
@@ -698,6 +711,24 @@ function setupApplicantLinkPopupInteractions() {
         }
       } else {
         optionsWrap.classList.add('hidden');
+      }
+      if (!typeSelect.value) {
+        block.classList.remove('has-error');
+        const errorEl = block.querySelector('.question-error');
+        if (errorEl) errorEl.textContent = '';
+      }
+    });
+
+    titleInput?.addEventListener('input', () => {
+      if (!typeSelect?.value) return;
+      if (titleInput.value.trim()) {
+        block.classList.remove('has-error');
+        const errorEl = block.querySelector('.question-error');
+        if (errorEl) errorEl.textContent = '';
+      } else {
+        const errorEl = ensureErrorEl();
+        block.classList.add('has-error');
+        errorEl.textContent = 'Please complete the question title.';
       }
     });
 
@@ -753,6 +784,7 @@ function setupApplicantLinkPopupInteractions() {
     };
 
     let hasDropdownError = false;
+    let hasTitleError = false;
     blocks.forEach((block, index) => {
       const title = (block.querySelector('.question-title')?.value || '').trim();
       const type = block.querySelector('.question-type')?.value || '';
@@ -760,6 +792,19 @@ function setupApplicantLinkPopupInteractions() {
       const options = Array.from(optionsList)
         .map(input => (input.value || '').trim())
         .filter(Boolean);
+
+      if (type && !title) {
+        hasTitleError = true;
+        block.classList.add('has-error');
+        let errorEl = block.querySelector('.question-error');
+        if (!errorEl) {
+          errorEl = document.createElement('div');
+          errorEl.className = 'question-error';
+          block.appendChild(errorEl);
+        }
+        errorEl.textContent = 'Please complete the question title.';
+        return;
+      }
 
       if (!title) return;
 
@@ -781,6 +826,10 @@ function setupApplicantLinkPopupInteractions() {
 
     if (hasDropdownError) {
       setApplicantLinkStatus('Dropdown questions need at least one option.', 'error');
+      return;
+    }
+    if (hasTitleError) {
+      setApplicantLinkStatus('Add a title for every selected question type.', 'error');
       return;
     }
 

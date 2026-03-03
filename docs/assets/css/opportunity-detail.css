@@ -1635,6 +1635,16 @@ input::-webkit-contacts-auto-fill-button {
   box-shadow: 0 10px 24px rgba(234, 199, 240, 0.35);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.applicant-question.has-error {
+  border-color: #f4a7c5;
+  box-shadow: 0 14px 26px rgba(244, 167, 197, 0.35);
+}
+.applicant-question .question-error {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #c43b6b;
+}
 .applicant-question label {
   font-weight: 600;
   font-size: 0.9rem;
