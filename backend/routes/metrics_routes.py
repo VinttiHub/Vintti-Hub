@@ -82,6 +82,8 @@ def get_opportunities_light():
                 o.comments,
                 o.nda_signature_or_start_date,
                 o.opp_close_date,
+                o.motive_close_lost,
+                o.details_close_lost,
                 o.expected_fee,
                 o.expected_revenue,
                 u.user_name AS sales_lead_name,

@@ -433,6 +433,30 @@ body {
     font-family: 'Onest', sans-serif;
 }
 
+.page-header .page-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.page-header .refresh-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    padding: 9px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.page-header .refresh-btn:hover {
+    background: #fff;
+    color: #0044ff;
+    border-color: #fff;
+}
+
 .page-header .new-btn {
     background-color: #cdff30;
     color: #000;
@@ -1050,7 +1074,8 @@ body {
 }
 
 .text-filter input,
-.text-filter select {
+.text-filter select,
+.text-filter button {
   padding: 8px 10px;
   border: 1px solid #e1d0ff;
   border-radius: 14px;
@@ -1063,9 +1088,15 @@ body {
 }
 
 .text-filter input:focus,
-.text-filter select:focus {
+.text-filter select:focus,
+.text-filter button:focus {
   outline: 2px solid #b8a4ff;
   outline-offset: 0;
+}
+
+.text-filter #downloadCsvBtn {
+  width: 100%;
+  padding: 9px 12px;
 }
 
 .text-filter .filter-select {

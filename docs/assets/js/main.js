@@ -143,6 +143,94 @@ function escapeAttribute(value) {
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '&#10;');
 }
+
+function normalizeDateOnly(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const parsed = raw.length <= 10 ? new Date(`${raw}T00:00:00`) : new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+}
+
+function toIsoDate(value) {
+  const d = normalizeDateOnly(value);
+  if (!d) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getOpportunityReferenceDate(opp) {
+  if (!opp || typeof opp !== 'object') return '';
+  const candidates = [
+    opp._sort_date,
+    opp.latest_sourcing_date,
+    opp.nda_signature_or_start_date,
+    opp.opp_close_date,
+  ];
+  for (const candidate of candidates) {
+    const iso = toIsoDate(candidate);
+    if (iso) return iso;
+  }
+  return '';
+}
+
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  let text = value;
+  if (typeof value === 'object') {
+    try {
+      text = JSON.stringify(value);
+    } catch (err) {
+      text = String(value);
+    }
+  }
+  const clean = String(text);
+  if (/[",\n]/.test(clean)) {
+    return `"${clean.replace(/"/g, '""')}"`;
+  }
+  return clean;
+}
+
+function downloadTextFile(filename, content, mimeType = 'text/plain;charset=utf-8;') {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function hydrateClosedLostMotives(opportunities) {
+  if (!Array.isArray(opportunities) || opportunities.length === 0) return;
+  const pendingIds = opportunities
+    .filter((opp) => String(opp?.opp_stage || '').trim() === 'Closed Lost')
+    .filter((opp) => !String(opp?.motive_close_lost || '').trim())
+    .map((opp) => String(opp?.opportunity_id || '').trim())
+    .filter(Boolean);
+
+  if (!pendingIds.length) return;
+
+  Promise.all(pendingIds.map(async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/opportunities/${encodeURIComponent(id)}`, { credentials: 'include' });
+      if (!res.ok) return;
+      const fullOpp = await res.json();
+      const target = opportunities.find((opp) => String(opp?.opportunity_id || '') === id);
+      if (!target) return;
+      if (fullOpp && typeof fullOpp === 'object') {
+        Object.assign(target, fullOpp);
+      }
+    } catch (err) {
+      console.warn('Unable to hydrate closed lost motive for opp', id, err);
+    }
+  })).catch(() => {});
+}
 // --- Email cuando se asigna / cambia HR Lead en una oportunidad ---
 async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
   try {
@@ -752,6 +840,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           }
         }
       }));
+      hydrateClosedLostMotives(data);
       // ✅ Precalcular días para ordenar Sourcing
       const today = new Date();
       for (const opp of data) {
@@ -919,6 +1008,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
             <td class="candidates-count-cell" data-candidates-count="—">—</td>
 
           `;
+          tr.dataset.filterDate = getOpportunityReferenceDate(opp);
 
           // const batchCell = tr.querySelector('.batch-count-cell');
           // hydrateBatchCountCell(opp.opportunity_id, batchCell);
@@ -1095,6 +1185,115 @@ if (daysRangeFilter) {
   daysRangeFilter.addEventListener('change', () => {
     window.__daysRangeFilterState = parseDaysRangeValue(daysRangeFilter.value);
     table.draw();
+  });
+}
+
+window.__dateFromFilterState = window.__dateFromFilterState || { from: null };
+
+if (!window.__dateFromFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
+  $.fn.dataTable.ext.search.push((settings, rowData, rowIndex) => {
+    if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
+    const from = window.__dateFromFilterState?.from;
+    if (!from) return true;
+
+    const row = settings.aoData?.[rowIndex]?.nTr;
+    const rowDate = normalizeDateOnly(row?.dataset?.filterDate || '');
+    if (!rowDate) return false;
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    if (rowDate < from) return false;
+    if (rowDate > today) return false;
+    return true;
+  });
+  window.__dateFromFilterExtRegistered = true;
+}
+
+const dateFromFilter = document.getElementById('dateFromFilter');
+if (dateFromFilter) {
+  dateFromFilter.max = toIsoDate(new Date());
+  dateFromFilter.addEventListener('change', () => {
+    window.__dateFromFilterState = {
+      from: normalizeDateOnly(dateFromFilter.value),
+    };
+    table.draw();
+  });
+}
+
+const downloadCsvBtn = document.getElementById('downloadCsvBtn');
+if (downloadCsvBtn) {
+  downloadCsvBtn.addEventListener('click', () => {
+    try {
+    const filteredNodes = table.rows({ search: 'applied', order: 'applied' }).nodes().toArray();
+    if (!filteredNodes.length) {
+      alert('No rows available to export with the current filters.');
+      return;
+    }
+
+    const opportunitiesById = new Map(
+      (Array.isArray(data) ? data : []).map((opp) => [String(opp.opportunity_id), opp])
+    );
+
+    const headers = [
+      'opportunity_id',
+      'stage_visible',
+      'account_visible',
+      'position_visible',
+      'type_visible',
+      'model_visible',
+      'sales_lead_visible',
+      'hr_lead_visible',
+      'comment_visible',
+      'days_visible',
+      'days_since_batch_visible',
+      'candidates_count_visible',
+      'motive_close_lost',
+      'raw_expected_fee',
+      'raw_expected_revenue',
+      'raw_latest_sourcing_date',
+      'raw_nda_signature_or_start_date',
+      'raw_opp_close_date',
+    ];
+
+    const lines = [headers.map(csvEscape).join(',')];
+
+    filteredNodes.forEach((row) => {
+      const stageSelect = row.querySelector('.stage-dropdown');
+      const opportunityId = String(stageSelect?.dataset?.id || '');
+      const opp = opportunitiesById.get(opportunityId) || {};
+
+      const values = {
+        opportunity_id: opportunityId,
+        stage_visible: stageSelect?.selectedOptions?.[0]?.textContent?.trim() || '',
+        account_visible: row.children?.[1]?.textContent?.trim() || '',
+        position_visible: row.children?.[2]?.textContent?.trim() || '',
+        type_visible: row.querySelector('[data-type-value]')?.getAttribute('data-type-value') || '',
+        model_visible: row.children?.[4]?.textContent?.trim() || '',
+        sales_lead_visible: row.querySelector('.sales-lead-cell .sr-only')?.textContent?.trim() || row.children?.[5]?.textContent?.trim() || '',
+        hr_lead_visible: row.querySelector('.hr-lead-dropdown')?.selectedOptions?.[0]?.textContent?.trim() || row.children?.[6]?.textContent?.trim() || '',
+        comment_visible: row.querySelector('.comment-input')?.value?.trim() || '',
+        days_visible: row.children?.[8]?.textContent?.trim() || '',
+        days_since_batch_visible: row.children?.[9]?.textContent?.trim() || '',
+        candidates_count_visible: row.children?.[10]?.textContent?.trim() || '',
+        motive_close_lost: opp?.motive_close_lost || opp?.details_close_lost || '',
+        raw_expected_fee: opp?.expected_fee ?? '',
+        raw_expected_revenue: opp?.expected_revenue ?? '',
+        raw_latest_sourcing_date: opp?.latest_sourcing_date ?? '',
+        raw_nda_signature_or_start_date: opp?.nda_signature_or_start_date ?? '',
+        raw_opp_close_date: opp?.opp_close_date ?? '',
+      };
+
+      const line = headers.map((header) => csvEscape(values[header])).join(',');
+      lines.push(line);
+    });
+
+    const today = toIsoDate(new Date()) || 'today';
+    downloadTextFile(`opportunities_${today}.csv`, `${lines.join('\n')}\n`, 'text/csv;charset=utf-8;');
+    } catch (err) {
+      console.error('CSV export failed:', err);
+      alert('Could not export CSV. Please try again.');
+    }
   });
 }
 // 🔒 Asegura que allowedHRUsers esté cargado (el fetch /users arriba puede no haber terminado)

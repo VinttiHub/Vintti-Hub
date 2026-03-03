@@ -52,7 +52,10 @@
     <!-- ---------- Page Header ---------- -->
     <header class="page-header">
       <h1 class="page-title">Opportunities</h1>
-      <button class="new-btn" type="button" onclick="openPopup()">New</button>
+      <div class="page-actions">
+        <button class="refresh-btn" id="downloadCsvBtn" type="button">Download CSV</button>
+        <button class="new-btn" type="button" onclick="openPopup()">New</button>
+      </div>
     </header>
 
     <!-- ---------- Filters Bar ---------- -->
@@ -127,6 +130,12 @@
       <div class="text-filter text-filter--grow">
         <input type="text" id="positionSearchInput" placeholder="Search position..." autocomplete="off" />
       </div>
+
+      <!-- Date From Filter (to today) -->
+      <div class="text-filter text-filter--compact">
+        <input type="date" id="dateFromFilter" aria-label="Filter from date" />
+      </div>
+
     </section>
 
     <!-- ---------- Table Card ---------- -->
