@@ -51,6 +51,14 @@
     padding: 18px 16px 48px;
   }
 
+  .overview-actions button {
+    width: 100%;
+  }
+
+  #candidates {
+    padding: 18px 16px;
+  }
+
   .overview-grid,
   .grid,
   .overview-layout {
@@ -179,6 +187,58 @@
     gap: 10px;
   }
 
+  .batch-actions h3 {
+    margin: 0;
+  }
+
+  .batch-actions > div {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .batch-actions .btn-add,
+  .batch-actions .btn-send,
+  .batch-actions .btn-delete {
+    flex: 1 1 140px;
+  }
+
+  .batch-detail .candidate-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .batch-detail .candidate-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .batch-detail .candidate-info-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+
+  .batch-detail .candidate-status-dropdown {
+    width: 100%;
+  }
+
+  #fixedBackContainer {
+    position: static;
+    margin: 12px 16px 0;
+  }
+
+  #fixedBackContainer .go-back-button {
+    width: auto;
+  }
+
+  .detail-header {
+    padding-top: 12px;
+  }
+
   .tab-selector {
     display: flex;
     flex-wrap: nowrap;
@@ -246,7 +306,14 @@
   }
 
   #employees .styled-table {
-    min-width: 900px;
+    min-width: 980px;
+    font-size: 13px;
+  }
+
+  #employees .styled-table th,
+  #employees .styled-table td {
+    padding: 10px 12px;
+    white-space: nowrap;
   }
 }
 
