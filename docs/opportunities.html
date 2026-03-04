@@ -59,9 +59,12 @@
     </header>
 
     <!-- ---------- Filters Bar ---------- -->
-    <section class="filters-top-bar" aria-label="Filters">
-      <!-- DataTables page-length control target -->
-      <div class="dataTables-length-wrapper" id="dataTablesLengthTarget"></div>
+    <details class="filters-collapsible">
+      <summary class="filters-summary">Filters</summary>
+      <div class="filters-body">
+        <section class="filters-top-bar" aria-label="Filters">
+          <!-- DataTables page-length control target -->
+          <div class="dataTables-length-wrapper" id="dataTablesLengthTarget"></div>
 
       <!-- Stage Filter (with dot bar) -->
       <div class="multi-filter" id="filterStageContainer">
@@ -131,12 +134,13 @@
         <input type="text" id="positionSearchInput" placeholder="Search position..." autocomplete="off" />
       </div>
 
-      <!-- Date From Filter (to today) -->
-      <div class="text-filter text-filter--compact">
-        <input type="date" id="dateFromFilter" aria-label="Filter from date" />
+          <!-- Date From Filter (to today) -->
+          <div class="text-filter text-filter--compact">
+            <input type="date" id="dateFromFilter" aria-label="Filter from date" />
+          </div>
+        </section>
       </div>
-
-    </section>
+    </details>
 
     <!-- ---------- Table Card ---------- -->
     <section class="table-card" aria-label="Opportunities table">

@@ -745,6 +745,41 @@ td:nth-child(8) { color: #6ee7b7; } /* Revenue */
 td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   vertical-align: middle;
 }
+
+/* Empleados: alinear y estandarizar inputs dentro de la tabla */
+#employees .card table td {
+  vertical-align: middle;
+}
+
+#employees .card table .input-chip,
+#employees .card table .range-chip,
+#employees .card table .select-chip,
+#employees .card table .discount-input {
+  width: 100%;
+  height: 38px;
+  line-height: 1.1;
+  box-sizing: border-box;
+  display: block;
+}
+
+#employees .card table .currency-wrap {
+  width: 100%;
+}
+
+#employees .card table .currency-wrap > .input-chip {
+  width: 100%;
+}
+
+#employees .card table .buyout-month-wrap {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+#employees .card table .buyout-month-wrap .select-chip {
+  min-width: 0;
+}
 /* === Contracts full-width block === */
 .contracts-block{
   width:100%;

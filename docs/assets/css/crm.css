@@ -1005,4 +1005,30 @@ body.dark-mode .profile-tile{
 @media (max-width: 900px) {
   .sidebar { display: none; }
   .main-content { padding: 20px; }
+
+  .filters-top-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .dataTables-length-wrapper {
+    margin-left: 0;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .multi-filter {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .text-filter {
+    width: 100%;
+  }
+
+  .text-filter input {
+    width: 100%;
+    min-width: 0;
+  }
 }

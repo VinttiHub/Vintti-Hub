@@ -218,52 +218,57 @@
       </div>
     </header>
 
-    <section class="filters-top-bar" aria-label="Table filters">
-      <div class="dataTables-length-wrapper" id="dataTablesLengthTarget" aria-live="polite"></div>
+    <details class="filters-collapsible">
+      <summary class="filters-summary">Filters</summary>
+      <div class="filters-body">
+        <section class="filters-top-bar" aria-label="Table filters">
+          <div class="dataTables-length-wrapper" id="dataTablesLengthTarget" aria-live="polite"></div>
 
-      <div class="multi-filter" id="salesLeadFilterContainer">
-        <div class="filter-header">
-          <label for="salesLeadFilter">Sales Lead</label>
-        </div>
-        <div class="multi-select">
-          <select id="salesLeadFilter" data-filter-key="salesLead" aria-label="Filter by Sales Lead">
-            <option value="">All Sales Leads</option>
-          </select>
-        </div>
-      </div>
+          <div class="multi-filter" id="salesLeadFilterContainer">
+            <div class="filter-header">
+              <label for="salesLeadFilter">Sales Lead</label>
+            </div>
+            <div class="multi-select">
+              <select id="salesLeadFilter" data-filter-key="salesLead" aria-label="Filter by Sales Lead">
+                <option value="">All Sales Leads</option>
+              </select>
+            </div>
+          </div>
 
-      <div class="multi-filter" id="statusFilterContainer">
-        <div class="filter-header">
-          <label for="statusFilter">Status</label>
-        </div>
-        <div class="multi-select">
-          <select id="statusFilter" data-filter-key="status" aria-label="Filter by Status">
-            <option value="">All Statuses</option>
-          </select>
-        </div>
-      </div>
+          <div class="multi-filter" id="statusFilterContainer">
+            <div class="filter-header">
+              <label for="statusFilter">Status</label>
+            </div>
+            <div class="multi-select">
+              <select id="statusFilter" data-filter-key="status" aria-label="Filter by Status">
+                <option value="">All Statuses</option>
+              </select>
+            </div>
+          </div>
 
-      <div class="multi-filter" id="contractFilterContainer">
-        <div class="filter-header">
-          <label for="contractFilter">Contract</label>
-        </div>
-        <div class="multi-select">
-          <select id="contractFilter" data-filter-key="contract" aria-label="Filter by Contract">
-            <option value="">All Contracts</option>
-          </select>
-        </div>
-      </div>
+          <div class="multi-filter" id="contractFilterContainer">
+            <div class="filter-header">
+              <label for="contractFilter">Contract</label>
+            </div>
+            <div class="multi-select">
+              <select id="contractFilter" data-filter-key="contract" aria-label="Filter by Contract">
+                <option value="">All Contracts</option>
+              </select>
+            </div>
+          </div>
 
-      <div class="text-filter">
-        <input
-          type="text"
-          id="searchClientInput"
-          placeholder="Search by Client Name"
-          inputmode="search"
-          aria-label="Search by Client Name"
-        />
+          <div class="text-filter">
+            <input
+              type="text"
+              id="searchClientInput"
+              placeholder="Search by Client Name"
+              inputmode="search"
+              aria-label="Search by Client Name"
+            />
+          </div>
+        </section>
       </div>
-    </section>
+    </details>
 
     <!-- Accounts table (DataTables enhances this) -->
     <table id="accountTable">

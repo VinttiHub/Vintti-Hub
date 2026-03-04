@@ -591,6 +591,15 @@ body {
   width: 100%;
 }
 
+.filters-body--row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+  width: 100%;
+}
+
 /* Lados izquierdo/derecho del toolbar */
 .left-controls {
   display: flex !important;
