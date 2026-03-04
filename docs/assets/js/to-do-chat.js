@@ -2,8 +2,13 @@
   const chat = document.querySelector('.todo-chat');
   if (!chat) return;
 
-  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
-  const userId = Number(window.localStorage.getItem('user_id')) || null;
+  const DEFAULT_API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const configuredApiBase =
+    window.VINTTI_API_BASE ||
+    window.localStorage.getItem('vintti_api_base') ||
+    DEFAULT_API_BASE;
+  const API_BASE = String(configuredApiBase).replace(/\/+$/, '');
+  let userId = null;
 
   const bubble = chat.querySelector('#todoBubble');
   const panel = chat.querySelector('#todoPanel');
@@ -18,12 +23,61 @@
   const detailsLink = chat.querySelector('.todo-panel__details');
   const openMode = chat.dataset.todoOpen || 'panel';
 
-  let hasLoaded = false;
   let toastTimer = null;
   let currentTasks = [];
   let reminderRequestInFlight = false;
+  let resolveUserIdInFlight = null;
   const TODO_REMINDER_DAYS_AHEAD = 2;
   const TODO_REMINDER_KEY_PREFIX = 'todo_due_reminder_signature_v1';
+  const TODO_SYNC_KEY = 'todo_last_sync_v1';
+
+  const syncUserId = () => {
+    userId = Number(window.localStorage.getItem('user_id')) || null;
+    return userId;
+  };
+
+  const resolveUserIdByEmail = async () => {
+    const email = (window.localStorage.getItem('user_email') || window.sessionStorage.getItem('user_email') || '')
+      .toLowerCase()
+      .trim();
+    if (!email) return null;
+    try {
+      const fast = await fetch(`${API_BASE}/users?email=${encodeURIComponent(email)}`, { credentials: 'include' });
+      if (fast.ok) {
+        const arr = await fast.json();
+        const hit = Array.isArray(arr) ? arr.find((u) => (u.email_vintti || '').toLowerCase() === email) : null;
+        if (hit?.user_id != null) {
+          window.localStorage.setItem('user_id', String(hit.user_id));
+          window.localStorage.setItem('user_id_owner_email', email);
+          return Number(hit.user_id);
+        }
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const ensureUserId = async () => {
+    const cached = syncUserId();
+    if (cached) return cached;
+    if (resolveUserIdInFlight) return resolveUserIdInFlight;
+    resolveUserIdInFlight = resolveUserIdByEmail()
+      .catch(() => null)
+      .finally(() => {
+        resolveUserIdInFlight = null;
+      });
+    const resolved = await resolveUserIdInFlight;
+    return resolved || syncUserId();
+  };
+
+  const notifyTodoChange = (reason = 'updated') => {
+    const payload = JSON.stringify({
+      reason,
+      user_id: syncUserId(),
+      at: Date.now(),
+    });
+    window.localStorage.setItem(TODO_SYNC_KEY, payload);
+    window.dispatchEvent(new CustomEvent('todo:changed', { detail: payload }));
+  };
 
   const formatDate = (raw) => {
     if (!raw) return '';
@@ -84,12 +138,13 @@
   };
 
   const maybeSendDueReminder = async (tasks) => {
-    if (!userId || reminderRequestInFlight) return;
+    const activeUserId = syncUserId();
+    if (!activeUserId || reminderRequestInFlight) return;
 
     const signature = buildReminderSignature(tasks);
     if (!signature) return;
 
-    const storageKey = `${TODO_REMINDER_KEY_PREFIX}:${userId}`;
+    const storageKey = `${TODO_REMINDER_KEY_PREFIX}:${activeUserId}`;
     if (window.localStorage.getItem(storageKey) === signature) return;
 
     reminderRequestInFlight = true;
@@ -99,7 +154,7 @@
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          user_id: userId,
+          user_id: activeUserId,
           days_ahead: TODO_REMINDER_DAYS_AHEAD,
           include_overdue: true,
         }),
@@ -167,17 +222,20 @@
       if (nextValue) showToast('Good job!');
 
       try {
+        const activeUserId = syncUserId();
+        if (!activeUserId) throw new Error('Missing user id');
         const res = await fetch(`${API_BASE}/to_do/${task.to_do_id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ user_id: userId, check: nextValue }),
+          body: JSON.stringify({ user_id: activeUserId, check: nextValue }),
         });
         if (!res.ok) throw new Error('Failed to update task');
         if (nextValue) {
           await moveTaskToEnd(task);
           renderTasks(currentTasks);
         }
+        notifyTodoChange(nextValue ? 'completed' : 'unchecked');
       } catch (error) {
         task.check = !nextValue;
         checkbox.checked = !nextValue;
@@ -223,7 +281,8 @@
     });
 
   const fetchTasks = async () => {
-    if (!userId) {
+    const activeUserId = await ensureUserId();
+    if (!activeUserId) {
       renderTasks([]);
       setEmptyState('Log in to save and sync your tasks.');
       return;
@@ -231,7 +290,7 @@
 
     list.classList.add('is-loading');
     try {
-      const res = await fetch(`${API_BASE}/to_do?user_id=${encodeURIComponent(userId)}`, {
+      const res = await fetch(`${API_BASE}/to_do?user_id=${encodeURIComponent(activeUserId)}`, {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to load tasks');
@@ -251,10 +310,7 @@
     panel.hidden = false;
     chat.classList.add('is-open');
     bubble.setAttribute('aria-expanded', 'true');
-    if (!hasLoaded) {
-      fetchTasks();
-      hasLoaded = true;
-    }
+    fetchTasks();
   };
 
   const closePanel = () => {
@@ -315,7 +371,8 @@
       return;
     }
 
-    if (!userId) {
+    const activeUserId = await ensureUserId();
+    if (!activeUserId) {
       formError.textContent = 'Log in to save tasks.';
       formError.hidden = false;
       return;
@@ -327,7 +384,7 @@
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          user_id: userId,
+          user_id: activeUserId,
           description,
           due_date: dueDate,
         }),
@@ -338,6 +395,7 @@
       currentTasks = [newTask, ...currentTasks];
       renderTasks(currentTasks);
       maybeSendDueReminder(currentTasks);
+      notifyTodoChange('created');
       clearEmptyState();
       descriptionInput.value = '';
       dateInput.value = '';
@@ -361,12 +419,26 @@
       const update = payload.find((item) => item.to_do_id === entry.to_do_id);
       return update ? { ...entry, orden: update.orden } : entry;
     });
-    if (!userId) return;
+    const activeUserId = syncUserId();
+    if (!activeUserId) return;
     await fetch(`${API_BASE}/to_do/reorder`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ user_id: userId, items: payload }),
+      body: JSON.stringify({ user_id: activeUserId, items: payload }),
     });
+    notifyTodoChange('reordered');
   };
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === TODO_SYNC_KEY || event.key === 'user_id') fetchTasks();
+  });
+
+  window.addEventListener('todo:changed', () => {
+    fetchTasks();
+  });
+
+  window.addEventListener('focus', () => {
+    fetchTasks();
+  });
 })();

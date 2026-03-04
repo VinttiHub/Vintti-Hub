@@ -20,7 +20,7 @@ function dateInputValue(v) {
 
 const API_BASE_URL =
   (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? 'http://127.0.0.1:5000'
+    ? 'http://127.0.0.1:5500'
     : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 const TRACK_PAGE = 'account details';
 
@@ -2565,6 +2565,21 @@ async function apiFetch(path, opts = {}) {
   return payload;
 }
 
+const TODO_SYNC_KEY = "todo_last_sync_v1";
+function notifyTodoSync(reason = "updated") {
+  try {
+    const payload = JSON.stringify({
+      reason,
+      user_id: Number(localStorage.getItem("user_id")) || null,
+      at: Date.now(),
+    });
+    localStorage.setItem(TODO_SYNC_KEY, payload);
+    window.dispatchEvent(new CustomEvent("todo:changed", { detail: payload }));
+  } catch (error) {
+    console.warn("notifyTodoSync failed:", error);
+  }
+}
+
 // async function upsertTodoTask({ sourceKey, description, due_date, forceUserId = null }) {
 //   const userId = forceUserId ?? (Number(localStorage.getItem("user_id")) || null);
 //   if (!userId) return;
@@ -2651,6 +2666,7 @@ async function upsertTodoTask({ sourceKey, description, due_date, forceUserId=nu
       method: "DELETE",
       body: JSON.stringify({ user_id: userId }),
     });
+    notifyTodoSync("deleted");
   }
 
   const created = await apiFetch(`/to_do`, {
@@ -2669,6 +2685,8 @@ async function upsertTodoTask({ sourceKey, description, due_date, forceUserId=nu
       body: JSON.stringify({ user_id: userId, check: true }),
     });
   }
+  notifyTodoSync("created");
+  return created;
 }
 
 const AGUSTIN_USER_ID = 1;        // ✅ ya lo tienes

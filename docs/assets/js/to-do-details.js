@@ -1,10 +1,12 @@
 (() => {
-  const API_BASE =
-  (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? 'http://127.0.0.1:5000'
-    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const DEFAULT_API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const configuredApiBase =
+    window.VINTTI_API_BASE ||
+    window.localStorage.getItem('vintti_api_base') ||
+    DEFAULT_API_BASE;
+  const API_BASE = String(configuredApiBase).replace(/\/+$/, '');
 
-  const userId = Number(window.localStorage.getItem('user_id')) || null;
+  let userId = null;
 
   const myList = document.getElementById('myTasks');
   const myEmpty = document.getElementById('myEmpty');
@@ -30,9 +32,59 @@
   let teamTasks = new Map();
   let currentTeamUserId = null;
   const AUTO_REFRESH_MS = 15000;
+  let resolveUserIdInFlight = null;
   const TODO_REMINDER_DAYS_AHEAD = 2;
   const TODO_REMINDER_KEY_PREFIX = 'todo_due_reminder_signature_v1';
+  const TODO_SYNC_KEY = 'todo_last_sync_v1';
   let todoReminderRequestInFlight = false;
+
+  const syncUserId = () => {
+    userId = Number(window.localStorage.getItem('user_id')) || null;
+    return userId;
+  };
+
+  const resolveUserIdByEmail = async () => {
+    const email = (window.localStorage.getItem('user_email') || window.sessionStorage.getItem('user_email') || '')
+      .toLowerCase()
+      .trim();
+    if (!email) return null;
+    try {
+      const fast = await fetch(`${API_BASE}/users?email=${encodeURIComponent(email)}`, { credentials: 'include' });
+      if (fast.ok) {
+        const arr = await fast.json();
+        const hit = Array.isArray(arr) ? arr.find((u) => (u.email_vintti || '').toLowerCase() === email) : null;
+        if (hit?.user_id != null) {
+          window.localStorage.setItem('user_id', String(hit.user_id));
+          window.localStorage.setItem('user_id_owner_email', email);
+          return Number(hit.user_id);
+        }
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const ensureUserId = async () => {
+    const cached = syncUserId();
+    if (cached) return cached;
+    if (resolveUserIdInFlight) return resolveUserIdInFlight;
+    resolveUserIdInFlight = resolveUserIdByEmail()
+      .catch(() => null)
+      .finally(() => {
+        resolveUserIdInFlight = null;
+      });
+    const resolved = await resolveUserIdInFlight;
+    return resolved || syncUserId();
+  };
+
+  const notifyTodoChange = (reason = 'updated') => {
+    const payload = JSON.stringify({
+      reason,
+      user_id: syncUserId(),
+      at: Date.now(),
+    });
+    window.localStorage.setItem(TODO_SYNC_KEY, payload);
+    window.dispatchEvent(new CustomEvent('todo:changed', { detail: payload }));
+  };
 
   const getReturnUrl = () => {
     const params = new URLSearchParams(window.location.search);
@@ -113,12 +165,13 @@
   };
 
   const maybeSendMyTodoReminder = async (tasks) => {
-    if (!userId || todoReminderRequestInFlight) return;
+    const activeUserId = syncUserId();
+    if (!activeUserId || todoReminderRequestInFlight) return;
 
     const signature = buildReminderSignature(tasks);
     if (!signature) return;
 
-    const storageKey = `${TODO_REMINDER_KEY_PREFIX}:${userId}`;
+    const storageKey = `${TODO_REMINDER_KEY_PREFIX}:${activeUserId}`;
     if (window.localStorage.getItem(storageKey) === signature) return;
 
     todoReminderRequestInFlight = true;
@@ -128,7 +181,7 @@
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          user_id: userId,
+          user_id: activeUserId,
           days_ahead: TODO_REMINDER_DAYS_AHEAD,
           include_overdue: true,
         }),
@@ -187,9 +240,10 @@
         if (nextValue) {
           await moveTaskToEnd(tasksRef, ownerId, task);
         }
-        if (ownerId === userId) {
+        if (ownerId === syncUserId()) {
           maybeSendMyTodoReminder(myTasks);
         }
+        notifyTodoChange(nextValue ? 'completed' : 'unchecked');
       } catch (error) {
         task.check = !nextValue;
         checkbox.checked = !nextValue;
@@ -243,7 +297,7 @@
           });
           if (!res.ok) throw new Error('Failed');
           tasksRef = tasksRef.filter((entry) => entry.to_do_id !== task.to_do_id && entry.subtask !== task.to_do_id);
-          if (ownerId === userId) {
+          if (ownerId === syncUserId()) {
             myTasks = tasksRef;
           } else {
             teamTasks.set(ownerId, tasksRef);
@@ -251,8 +305,9 @@
           const siblings = tasksRef.filter((entry) => (entry.subtask || null) === (task.subtask || null));
           await persistOrder(ownerId, siblings);
           refreshCurrentView(ownerId);
+          notifyTodoChange('deleted');
         } catch (error) {
-          setError(ownerId === userId ? myError : teamError, 'Could not delete task.');
+          setError(ownerId === syncUserId() ? myError : teamError, 'Could not delete task.');
         }
       });
       actions.append(up, down, sub, del);
@@ -384,6 +439,7 @@
           const entry = tasksRef.find((task) => task.to_do_id === item.to_do_id);
           if (entry) entry.orden = item.orden;
         });
+        notifyTodoChange('reordered');
         dragged = null;
       });
       list.addEventListener('dragend', () => {
@@ -417,6 +473,7 @@
       body: JSON.stringify({ user_id: ownerId, items: payload }),
     });
     refreshCurrentView(ownerId);
+    notifyTodoChange('reordered');
   };
 
   const persistOrder = async (ownerId, items) => {
@@ -436,6 +493,7 @@
       credentials: 'include',
       body: JSON.stringify({ user_id: ownerId, items: payload }),
     });
+    notifyTodoChange('reordered');
   };
 
   const moveTaskToEnd = async (tasksRef, ownerId, task) => {
@@ -458,10 +516,11 @@
       body: JSON.stringify({ user_id: ownerId, items: payload }),
     });
     refreshCurrentView(ownerId);
+    notifyTodoChange('reordered');
   };
 
   const refreshCurrentView = (ownerId) => {
-    if (ownerId === userId) {
+    if (ownerId === syncUserId()) {
       renderTaskList(myList, myTasks, myEmpty, true, userId);
       renderParentOptions(myParent, myTasks);
       return;
@@ -472,19 +531,20 @@
   };
 
   const loadMyTasks = async () => {
-    if (!userId) {
+    const activeUserId = await ensureUserId();
+    if (!activeUserId) {
       renderTaskList(myList, [], myEmpty, true, userId);
       myEmpty.textContent = 'Log in to see your saved tasks.';
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/to_do?user_id=${encodeURIComponent(userId)}`, {
+      const res = await fetch(`${API_BASE}/to_do?user_id=${encodeURIComponent(activeUserId)}`, {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       myTasks = Array.isArray(data) ? data : [];
-      renderTaskList(myList, myTasks, myEmpty, true, userId);
+      renderTaskList(myList, myTasks, myEmpty, true, activeUserId);
       maybeSendMyTodoReminder(myTasks);
     } catch (error) {
       renderTaskList(myList, [], myEmpty, true, userId);
@@ -493,15 +553,16 @@
   };
 
   const loadTeamTasks = async () => {
-    if (!userId) return;
+    const activeUserId = await ensureUserId();
+    if (!activeUserId) return;
     try {
-      const reportsRes = await fetch(`${API_BASE}/users/reports?leader_id=${encodeURIComponent(userId)}`, {
+      const reportsRes = await fetch(`${API_BASE}/users/reports?leader_id=${encodeURIComponent(activeUserId)}`, {
         credentials: 'include',
       });
       const reports = reportsRes.ok ? await reportsRes.json() : [];
       if (!Array.isArray(reports) || reports.length === 0) return;
 
-      const tasksRes = await fetch(`${API_BASE}/to_do/team?leader_id=${encodeURIComponent(userId)}`, {
+      const tasksRes = await fetch(`${API_BASE}/to_do/team?leader_id=${encodeURIComponent(activeUserId)}`, {
         credentials: 'include',
       });
       const tasksData = tasksRes.ok ? await tasksRes.json() : [];
@@ -533,7 +594,7 @@
         });
       };
       teamTitle.textContent = 'Pick a teammate';
-      renderTaskList(teamList, [], teamEmpty, true, userId);
+      renderTaskList(teamList, [], teamEmpty, true, activeUserId);
       teamNotes.addEventListener('click', (event) => {
         const button = event.target.closest('.team-note');
         if (!button) return;
@@ -542,7 +603,7 @@
         if (isActive) {
           Array.from(teamNotes.children).forEach((note) => note.classList.remove('is-active'));
           teamTitle.textContent = 'Pick a teammate';
-          renderTaskList(teamList, [], teamEmpty, true, userId);
+          renderTaskList(teamList, [], teamEmpty, true, activeUserId);
           currentTeamUserId = null;
           return;
         }
@@ -582,7 +643,8 @@
       setError(myError, 'Add a task and due date.');
       return;
     }
-    if (!userId) {
+    const activeUserId = await ensureUserId();
+    if (!activeUserId) {
       setError(myError, 'Log in to add tasks.');
       return;
     }
@@ -593,7 +655,7 @@
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          user_id: userId,
+          user_id: activeUserId,
           description,
           due_date: dueDate,
         }),
@@ -601,8 +663,9 @@
       if (!res.ok) throw new Error('Failed');
       const newTask = await res.json();
       myTasks = [...myTasks, newTask];
-      renderTaskList(myList, myTasks, myEmpty, true, userId);
+      renderTaskList(myList, myTasks, myEmpty, true, activeUserId);
       maybeSendMyTodoReminder(myTasks);
+      notifyTodoChange('created');
       myDescription.value = '';
       myDate.value = '';
     } catch (error) {
@@ -642,6 +705,7 @@
       const existing = teamTasks.get(currentTeamUserId) || [];
       teamTasks.set(currentTeamUserId, [...existing, newTask]);
       renderTaskList(teamList, teamTasks.get(currentTeamUserId), teamEmpty, true, currentTeamUserId);
+      notifyTodoChange('created');
       teamDescription.value = '';
       teamDate.value = '';
     } catch (error) {
@@ -669,7 +733,7 @@
       });
       if (!res.ok) throw new Error('Failed');
       const newTask = await res.json();
-      if (ownerId === userId) {
+      if (ownerId === syncUserId()) {
         myTasks = [...myTasks, newTask];
         renderTaskList(myList, myTasks, myEmpty, true, userId);
         maybeSendMyTodoReminder(myTasks);
@@ -678,8 +742,9 @@
         teamTasks.set(ownerId, [...existing, newTask]);
         renderTaskList(teamList, teamTasks.get(ownerId), teamEmpty, true, ownerId);
       }
+      notifyTodoChange('created');
     } catch (error) {
-      setError(ownerId === userId ? myError : teamError, 'Could not add subtask.');
+      setError(ownerId === syncUserId() ? myError : teamError, 'Could not add subtask.');
     }
   };
 
@@ -711,5 +776,17 @@
 
   window.addEventListener('focus', () => {
     loadMyTasks();
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === TODO_SYNC_KEY || event.key === 'user_id') {
+      loadMyTasks();
+      loadTeamTasks();
+    }
+  });
+
+  window.addEventListener('todo:changed', () => {
+    loadMyTasks();
+    loadTeamTasks();
   });
 })();
