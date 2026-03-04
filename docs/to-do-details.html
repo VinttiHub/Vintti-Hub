@@ -27,7 +27,7 @@
 
     <section class="notebook__panel is-active" id="tab-my">
       <div class="notebook__composer">
-        <button type="button" class="notebook__toggle" id="myTaskToggle">Add new task</button>
+        <button type="button" class="notebook__toggle" id="myTaskToggle">Hide quick add</button>
         <form class="notebook__form" id="myTaskForm" hidden>
           <div class="notebook__field">
             <label for="myTaskDescription">New task</label>
@@ -40,6 +40,26 @@
           <button type="submit" class="notebook__submit">Add task</button>
           <p class="notebook__error" id="myTaskError" hidden></p>
         </form>
+      </div>
+      <div class="todo-insights">
+        <article class="todo-insight">
+          <p class="todo-insight__label">Pending</p>
+          <p class="todo-insight__value" id="myCountPending">0</p>
+        </article>
+        <article class="todo-insight">
+          <p class="todo-insight__label">Due soon</p>
+          <p class="todo-insight__value" id="myCountSoon">0</p>
+        </article>
+        <article class="todo-insight">
+          <p class="todo-insight__label">Done</p>
+          <p class="todo-insight__value" id="myCountDone">0</p>
+        </article>
+      </div>
+      <div class="todo-filters" id="myFilters">
+        <button type="button" class="todo-filter is-active" data-filter="all">All</button>
+        <button type="button" class="todo-filter" data-filter="pending">Pending</button>
+        <button type="button" class="todo-filter" data-filter="soon">Due soon</button>
+        <button type="button" class="todo-filter" data-filter="done">Done</button>
       </div>
       <div class="notebook__list" id="myTasks"></div>
       <p class="notebook__empty" id="myEmpty" hidden>No tasks yet. Add a few from the buddy bubble.</p>

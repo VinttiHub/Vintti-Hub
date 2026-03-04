@@ -1,6 +1,16 @@
 (() => {
+  const currentPage = window.location.pathname.split('/').pop() || '';
   const chat = document.querySelector('.todo-chat');
-  if (!chat) return;
+  const hideFloatingOnly = currentPage === 'candidates.html';
+  const hideFloatingAndStop = currentPage === 'account-details.html';
+  if (hideFloatingAndStop) {
+    if (chat) chat.style.display = 'none';
+    return;
+  }
+  if (hideFloatingOnly && chat) {
+    chat.classList.add('todo-chat--hidden');
+    if (chat.querySelector('#todoPanel')) chat.querySelector('#todoPanel').hidden = true;
+  }
 
   const DEFAULT_API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const configuredApiBase =
@@ -10,18 +20,42 @@
   const API_BASE = String(configuredApiBase).replace(/\/+$/, '');
   let userId = null;
 
-  const bubble = chat.querySelector('#todoBubble');
-  const panel = chat.querySelector('#todoPanel');
-  const closeBtn = chat.querySelector('#todoClose');
-  const list = chat.querySelector('#todoList');
-  const empty = chat.querySelector('#todoEmpty');
-  const toast = chat.querySelector('#todoToast');
-  const form = chat.querySelector('#todoForm');
-  const descriptionInput = chat.querySelector('#todoDescription');
-  const dateInput = chat.querySelector('#todoDate');
-  const formError = chat.querySelector('#todoFormError');
-  const detailsLink = chat.querySelector('.todo-panel__details');
-  const openMode = chat.dataset.todoOpen || 'panel';
+  const bubble = chat?.querySelector('#todoBubble') || null;
+  const panel = chat?.querySelector('#todoPanel') || null;
+  const closeBtn = chat?.querySelector('#todoClose') || null;
+  const list = chat?.querySelector('#todoList') || null;
+  const empty = chat?.querySelector('#todoEmpty') || null;
+  const toast = chat?.querySelector('#todoToast') || null;
+  const form = chat?.querySelector('#todoForm') || null;
+  const descriptionInput = chat?.querySelector('#todoDescription') || null;
+  const dateInput = chat?.querySelector('#todoDate') || null;
+  const formError = chat?.querySelector('#todoFormError') || null;
+  const detailsLink = chat?.querySelector('.todo-panel__details') || null;
+  const openMode = chat?.dataset?.todoOpen || 'panel';
+  const PRIMARY_ENTRY_ID = 'todoPrimaryEntry';
+  let primaryEntry = null;
+  const bubbleLabel = (() => {
+    if (!bubble) return null;
+    let el = bubble.querySelector('.todo-bubble__label');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'todo-bubble__label';
+      el.textContent = 'To-Do';
+      bubble.appendChild(el);
+    }
+    return el;
+  })();
+  const bubbleCount = (() => {
+    if (!bubble) return null;
+    let el = bubble.querySelector('.todo-bubble__count');
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'todo-bubble__count';
+      el.hidden = true;
+      bubble.appendChild(el);
+    }
+    return el;
+  })();
 
   let toastTimer = null;
   let currentTasks = [];
@@ -112,6 +146,122 @@
     return days !== null && days >= 0 && days <= 2;
   };
 
+  const updateBubbleState = (tasks) => {
+    const items = Array.isArray(tasks) ? tasks : [];
+    const pending = items.filter((task) => !task.check).length;
+    const urgent = items.filter((task) => !task.check && (isOverdue(task.due_date) || isNearDue(task.due_date))).length;
+    if (bubble) {
+      if (bubbleLabel) bubbleLabel.textContent = 'To-Do';
+      if (bubbleCount) {
+        bubbleCount.textContent = pending > 99 ? '99+' : String(pending);
+        bubbleCount.hidden = pending === 0;
+      }
+      bubble.classList.toggle('has-pending', pending > 0);
+      bubble.classList.toggle('has-due-soon', urgent > 0);
+      const aria =
+        pending > 0 ? `Open to-do list. You have ${pending} pending tasks.` : 'Open to-do list.';
+      bubble.setAttribute('aria-label', aria);
+      bubble.setAttribute('title', pending > 0 ? `To-Do: ${pending} pending` : 'Open To-Do');
+    }
+
+    const syncBadge = (host, selector) => {
+      if (!host) return;
+      let badge = host.querySelector(selector);
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = selector.replace('.', '');
+        host.appendChild(badge);
+      }
+      badge.textContent = pending > 99 ? '99+' : String(pending);
+      badge.hidden = pending === 0;
+    };
+
+    const sidebarLink = document.getElementById('todoSidebarLink');
+    if (sidebarLink) {
+      syncBadge(sidebarLink, '.todo-access-badge');
+      sidebarLink.classList.toggle('has-pending', pending > 0);
+    }
+
+    const primary = ensurePrimaryEntry();
+    if (primary) {
+      syncBadge(primary, '.todo-primary-entry__count');
+      primary.classList.toggle('has-urgent', urgent > 0);
+      primary.setAttribute('title', pending > 0 ? `To-Do: ${pending} pendientes` : 'Ir a To-Do');
+      chat?.classList.add('todo-chat--secondary');
+    } else {
+      chat?.classList.remove('todo-chat--secondary');
+    }
+  };
+
+  const injectAccessStyles = () => {
+    if (document.getElementById('todoAccessStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'todoAccessStyles';
+    style.textContent = `
+      .todo-primary-entry {
+        border: 1px solid rgba(238, 183, 208, 0.95);
+        background: linear-gradient(135deg, #fff7fb, #ffeef7);
+        color: #5a2441;
+        border-radius: 999px;
+        padding: 10px 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 8px 18px rgba(235, 149, 188, 0.25);
+      }
+      .todo-primary-entry:hover { transform: translateY(-1px); }
+      .todo-primary-entry__count, .todo-access-badge {
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        background: #fff;
+        border: 1px solid rgba(198, 109, 153, 0.42);
+        color: #8a2d58;
+      }
+      .todo-primary-entry.has-urgent { box-shadow: 0 0 0 3px rgba(252, 217, 234, 0.62), 0 10px 24px rgba(236, 137, 183, 0.35); }
+      #todoSidebarLink .menu-label { display: inline-flex; align-items: center; gap: 8px; }
+      #todoSidebarLink.has-pending .menu-icon { color: #0044ff; }
+      .sidebar.collapsed #todoSidebarLink .todo-access-badge { display: none !important; }
+      .todo-chat.todo-chat--hidden { display: none !important; }
+      @media (max-width: 900px) {
+        .todo-primary-entry { padding: 8px 12px; font-size: 13px; }
+        .todo-chat.todo-chat--secondary { opacity: 1; transform: none; }
+      }
+      @media (min-width: 901px) {
+        .todo-chat.todo-chat--secondary { display: none; }
+      }
+    `;
+    document.head.appendChild(style);
+  };
+
+  const ensurePrimaryEntry = () => {
+    const actions = document.querySelector('.page-actions');
+    if (!actions) return null;
+    let entry = document.getElementById(PRIMARY_ENTRY_ID);
+    if (!entry) {
+      entry = document.createElement('button');
+      entry.type = 'button';
+      entry.id = PRIMARY_ENTRY_ID;
+      entry.className = 'todo-primary-entry';
+      entry.innerHTML = '<span>To-Do</span>';
+      entry.addEventListener('click', () => {
+        window.location.href = buildDetailsUrl();
+      });
+      actions.insertBefore(entry, actions.firstChild || null);
+    }
+    primaryEntry = entry;
+    return primaryEntry;
+  };
+
   const localDateKey = () => {
     const d = new Date();
     const y = d.getFullYear();
@@ -179,11 +329,13 @@
   };
 
   const setEmptyState = (message) => {
+    if (!empty) return;
     empty.textContent = message;
     empty.hidden = false;
   };
 
   const clearEmptyState = () => {
+    if (!empty) return;
     empty.hidden = true;
   };
 
@@ -249,17 +401,26 @@
   };
 
   const renderTasks = (tasks) => {
+    const taskList = Array.isArray(tasks) ? tasks : [];
+    if (!list) {
+      currentTasks = taskList;
+      updateBubbleState(taskList);
+      return;
+    }
     list.innerHTML = '';
-    if (!tasks.length) {
+    if (!taskList.length) {
+      currentTasks = [];
+      updateBubbleState([]);
       setEmptyState('No tasks yet. Add your first one.');
       return;
     }
 
     clearEmptyState();
-    currentTasks = tasks;
+    currentTasks = taskList;
+    updateBubbleState(taskList);
 
-    const topTasks = sortTasks(tasks.filter((task) => !task.subtask));
-    const subTasks = tasks.filter((task) => task.subtask);
+    const topTasks = sortTasks(taskList.filter((task) => !task.subtask));
+    const subTasks = taskList.filter((task) => task.subtask);
     const byParent = new Map();
     subTasks.forEach((task) => {
       if (!byParent.has(task.subtask)) byParent.set(task.subtask, []);
@@ -288,20 +449,22 @@
       return;
     }
 
-    list.classList.add('is-loading');
+    list?.classList.add('is-loading');
     try {
       const res = await fetch(`${API_BASE}/to_do?user_id=${encodeURIComponent(activeUserId)}`, {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to load tasks');
       const data = await res.json();
-      renderTasks(Array.isArray(data) ? data : []);
-      maybeSendDueReminder(Array.isArray(data) ? data : []);
+      const tasks = Array.isArray(data) ? data : [];
+      renderTasks(tasks);
+      maybeSendDueReminder(tasks);
     } catch (error) {
       renderTasks([]);
+      updateBubbleState([]);
       setEmptyState('Could not load tasks. Try again soon.');
     } finally {
-      list.classList.remove('is-loading');
+      list?.classList.remove('is-loading');
     }
   };
 
@@ -331,13 +494,13 @@
     window.open(buildDetailsUrl(), '_blank', 'noopener');
   };
 
-  bubble.addEventListener('click', (event) => {
+  bubble?.addEventListener('click', (event) => {
     event.stopPropagation();
     if (openMode === 'new-tab') {
       openDetailsTab();
       return;
     }
-    if (chat.classList.contains('is-open')) {
+    if (chat?.classList.contains('is-open')) {
       closePanel();
     } else {
       openPanel();
@@ -350,6 +513,7 @@
   });
 
   document.addEventListener('click', (event) => {
+    if (!chat) return;
     if (!chat.contains(event.target)) closePanel();
   });
 
@@ -441,4 +605,13 @@
   window.addEventListener('focus', () => {
     fetchTasks();
   });
+
+  document.addEventListener('sidebar:loaded', () => {
+    updateBubbleState(currentTasks);
+  });
+
+  injectAccessStyles();
+  ensurePrimaryEntry();
+  updateBubbleState([]);
+  fetchTasks();
 })();

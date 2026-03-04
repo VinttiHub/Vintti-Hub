@@ -15,6 +15,10 @@
   const myDate = document.getElementById('myTaskDate');
   const myError = document.getElementById('myTaskError');
   const myToggle = document.getElementById('myTaskToggle');
+  const myFilters = document.getElementById('myFilters');
+  const myCountPending = document.getElementById('myCountPending');
+  const myCountSoon = document.getElementById('myCountSoon');
+  const myCountDone = document.getElementById('myCountDone');
   const backButton = document.getElementById('todoBackButton');
   const teamNotes = document.getElementById('teamNotes');
   const teamList = document.getElementById('teamTasks');
@@ -28,6 +32,7 @@
   const teamToggle = document.getElementById('teamTaskToggle');
 
   let myTasks = [];
+  let myFilter = 'all';
   let teamUsers = [];
   let teamTasks = new Map();
   let currentTeamUserId = null;
@@ -139,6 +144,43 @@
     return days !== null && days >= 0 && days <= 2;
   };
 
+  const getDueStatus = (task) => {
+    if (!task || task.check || !task.due_date) return '';
+    const days = daysUntil(task.due_date);
+    if (days === null) return '';
+    if (days < 0) return 'overdue';
+    if (days === 0) return 'today';
+    if (days <= 2) return 'soon';
+    return '';
+  };
+
+  const updateMyInsights = (tasks) => {
+    if (!myCountPending || !myCountSoon || !myCountDone) return;
+    const all = Array.isArray(tasks) ? tasks : [];
+    const pending = all.filter((task) => !task.check).length;
+    const done = all.filter((task) => task.check).length;
+    const soon = all.filter((task) => {
+      const status = getDueStatus(task);
+      return status === 'today' || status === 'soon';
+    }).length;
+    myCountPending.textContent = String(pending);
+    myCountSoon.textContent = String(soon);
+    myCountDone.textContent = String(done);
+  };
+
+  const applyFilter = (tasks, filter) => {
+    if (!Array.isArray(tasks) || !tasks.length) return [];
+    if (filter === 'pending') return tasks.filter((task) => !task.check);
+    if (filter === 'done') return tasks.filter((task) => Boolean(task.check));
+    if (filter === 'soon') {
+      return tasks.filter((task) => {
+        const status = getDueStatus(task);
+        return status === 'today' || status === 'soon';
+      });
+    }
+    return tasks;
+  };
+
   const localDateKey = () => {
     const d = new Date();
     const y = d.getFullYear();
@@ -224,6 +266,28 @@
     } else {
       date.textContent = formattedDate;
     }
+    const dueStatus = getDueStatus(task);
+    if (dueStatus === 'overdue') row.classList.add('is-near-due');
+
+    const metaRow = document.createElement('div');
+    metaRow.className = 'note-task__meta-row';
+    if (formattedDate) metaRow.appendChild(date);
+    const status = document.createElement('span');
+    status.className = 'note-task__status';
+    if (task.check) {
+      status.textContent = 'Done';
+    } else if (dueStatus === 'overdue') {
+      status.textContent = 'Overdue';
+      status.classList.add('note-task__status--overdue');
+    } else if (dueStatus === 'today') {
+      status.textContent = 'Today';
+      status.classList.add('note-task__status--today');
+    } else if (dueStatus === 'soon') {
+      status.textContent = 'Soon';
+      status.classList.add('note-task__status--soon');
+    }
+    if (status.textContent) metaRow.appendChild(status);
+    if (metaRow.childNodes.length) textWrap.appendChild(metaRow);
 
     checkbox.addEventListener('change', async () => {
       const nextValue = checkbox.checked;
@@ -311,9 +375,9 @@
         }
       });
       actions.append(up, down, sub, del);
-      row.append(checkbox, textWrap, date, actions);
+      row.append(checkbox, textWrap, actions);
     } else {
-      row.append(checkbox, textWrap, date);
+      row.append(checkbox, textWrap);
     }
     return row;
   };
@@ -355,17 +419,28 @@
     });
   };
 
-  const renderTaskList = (container, tasks, emptyEl, editable, ownerId) => {
+  const getVisibleTasks = (tasks, filter) => {
+    const filtered = applyFilter(tasks, filter);
+    if (filter === 'all') return filtered;
+    const ids = new Set(filtered.map((task) => task.to_do_id));
+    filtered.forEach((task) => {
+      if (task.subtask) ids.add(task.subtask);
+    });
+    return tasks.filter((task) => ids.has(task.to_do_id));
+  };
+
+  const renderTaskList = (container, tasks, emptyEl, editable, ownerId, filter = 'all') => {
     container.innerHTML = '';
-    if (!tasks.length) {
+    const visibleTasks = getVisibleTasks(tasks, filter);
+    if (!visibleTasks.length) {
       emptyEl.hidden = false;
       return;
     }
     emptyEl.hidden = true;
 
-    const topTasks = sortTasks(tasks.filter((task) => !task.subtask));
+    const topTasks = sortTasks(visibleTasks.filter((task) => !task.subtask));
     const byParent = new Map();
-    tasks
+    visibleTasks
       .filter((task) => task.subtask)
       .forEach((task) => {
         if (!byParent.has(task.subtask)) byParent.set(task.subtask, []);
@@ -521,19 +596,19 @@
 
   const refreshCurrentView = (ownerId) => {
     if (ownerId === syncUserId()) {
-      renderTaskList(myList, myTasks, myEmpty, true, userId);
-      renderParentOptions(myParent, myTasks);
+      updateMyInsights(myTasks);
+      renderTaskList(myList, myTasks, myEmpty, true, userId, myFilter);
       return;
     }
     const tasks = teamTasks.get(ownerId) || [];
     renderTaskList(teamList, tasks, teamEmpty, true, ownerId);
-    renderParentOptions(teamParent, tasks);
   };
 
   const loadMyTasks = async () => {
     const activeUserId = await ensureUserId();
     if (!activeUserId) {
       renderTaskList(myList, [], myEmpty, true, userId);
+      updateMyInsights([]);
       myEmpty.textContent = 'Log in to see your saved tasks.';
       return;
     }
@@ -544,10 +619,12 @@
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       myTasks = Array.isArray(data) ? data : [];
-      renderTaskList(myList, myTasks, myEmpty, true, activeUserId);
+      updateMyInsights(myTasks);
+      renderTaskList(myList, myTasks, myEmpty, true, activeUserId, myFilter);
       maybeSendMyTodoReminder(myTasks);
     } catch (error) {
       renderTaskList(myList, [], myEmpty, true, userId);
+      updateMyInsights([]);
       myEmpty.textContent = 'Could not load tasks right now.';
     }
   };
@@ -663,7 +740,8 @@
       if (!res.ok) throw new Error('Failed');
       const newTask = await res.json();
       myTasks = [...myTasks, newTask];
-      renderTaskList(myList, myTasks, myEmpty, true, activeUserId);
+      updateMyInsights(myTasks);
+      renderTaskList(myList, myTasks, myEmpty, true, activeUserId, myFilter);
       maybeSendMyTodoReminder(myTasks);
       notifyTodoChange('created');
       myDescription.value = '';
@@ -735,7 +813,8 @@
       const newTask = await res.json();
       if (ownerId === syncUserId()) {
         myTasks = [...myTasks, newTask];
-        renderTaskList(myList, myTasks, myEmpty, true, userId);
+        updateMyInsights(myTasks);
+        renderTaskList(myList, myTasks, myEmpty, true, userId, myFilter);
         maybeSendMyTodoReminder(myTasks);
       } else {
         const existing = teamTasks.get(ownerId) || [];
@@ -748,22 +827,39 @@
     }
   };
 
-  const bindToggle = (button, form) => {
+  const bindToggle = (button, form, labels = {}) => {
     if (!button || !form) return;
+    const closedLabel = labels.closedLabel || 'Add new task';
+    const openLabel = labels.openLabel || 'Hide form';
+    button.textContent = form.hasAttribute('hidden') ? closedLabel : openLabel;
     button.addEventListener('click', () => {
       const isHidden = form.hasAttribute('hidden');
       if (isHidden) {
         form.removeAttribute('hidden');
+        button.textContent = openLabel;
       } else {
         form.setAttribute('hidden', '');
+        button.textContent = closedLabel;
       }
     });
   };
 
-  bindToggle(myToggle, myForm);
-  bindToggle(teamToggle, teamForm);
-  if (myForm) myForm.setAttribute('hidden', '');
+  if (myForm) myForm.removeAttribute('hidden');
+  bindToggle(myToggle, myForm, { closedLabel: 'Show quick add', openLabel: 'Hide quick add' });
+  bindToggle(teamToggle, teamForm, { closedLabel: 'Add new task', openLabel: 'Hide form' });
   if (teamForm) teamForm.setAttribute('hidden', '');
+
+  myFilters?.addEventListener('click', (event) => {
+    const button = event.target.closest('.todo-filter');
+    if (!button) return;
+    const nextFilter = button.dataset.filter || 'all';
+    if (nextFilter === myFilter) return;
+    myFilter = nextFilter;
+    Array.from(myFilters.querySelectorAll('.todo-filter')).forEach((chip) => {
+      chip.classList.toggle('is-active', chip.dataset.filter === myFilter);
+    });
+    renderTaskList(myList, myTasks, myEmpty, true, syncUserId(), myFilter);
+  });
 
   loadMyTasks();
   loadTeamTasks();

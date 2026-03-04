@@ -140,6 +140,60 @@ body {
   gap: 12px;
 }
 
+.todo-insights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.todo-insight {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(220, 201, 214, 0.85);
+}
+
+.todo-insight__label {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #91617a;
+}
+
+.todo-insight__value {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #3f2134;
+}
+
+.todo-filters {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+  flex-wrap: wrap;
+}
+
+.todo-filter {
+  border: 1px solid rgba(208, 184, 198, 0.9);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #7f4a66;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.todo-filter.is-active {
+  border-color: rgba(228, 129, 176, 0.8);
+  background: #ffe7f2;
+  color: #4c1f37;
+}
+
 .notebook__form {
   display: grid;
   gap: 12px;
@@ -327,7 +381,7 @@ body {
 
 .note-task {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 10px 14px;
@@ -335,6 +389,12 @@ body {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(230, 210, 225, 0.9);
   cursor: default;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.note-task:hover {
+  border-color: rgba(210, 166, 192, 0.95);
+  transform: translateY(-1px);
 }
 
 .note-task.is-near-due {
@@ -359,10 +419,42 @@ body {
   color: #3d2835;
 }
 
+.note-task__meta-row {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .note-task__date {
   font-size: 12px;
   color: #8b647a;
   white-space: nowrap;
+}
+
+.note-task__status {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.note-task__status--overdue {
+  background: #fee4e1;
+  color: #9f2b2b;
+}
+
+.note-task__status--today {
+  background: #fff0cf;
+  color: #8a5c00;
+}
+
+.note-task__status--soon {
+  background: #e9f2ff;
+  color: #1f5f97;
 }
 
 .note-task__sub {
@@ -400,6 +492,11 @@ body {
 .note-task.is-done .note-task__text {
   text-decoration: line-through;
   opacity: 0.65;
+}
+
+.note-task.is-done .note-task__status {
+  background: #e8f7ef;
+  color: #2f6f4d;
 }
 
 .note-task--sub {
@@ -460,6 +557,10 @@ body {
 
   .notebook__title {
     font-size: 32px;
+  }
+
+  .todo-insights {
+    grid-template-columns: 1fr;
   }
 
   .team-board {
