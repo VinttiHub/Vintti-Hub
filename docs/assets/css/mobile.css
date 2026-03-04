@@ -222,6 +222,11 @@ canvas {
     display: flex;
   }
 
+  .table-controls-wrapper {
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
   .filters-collapsible > .filters-body {
     display: none;
     padding-top: 12px;

@@ -4277,3 +4277,169 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 .main-content {
   scroll-padding-top: 100px; /* agrega margen virtual para los anchors */
 }
+
+/* ===========================
+   Mobile-only compact fixes
+   =========================== */
+@media (max-width: 720px) {
+  body {
+    padding: 16px;
+  }
+
+  .header-row {
+    padding: 12px 14px;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .tabs {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px;
+  }
+
+  .tabs .tab {
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 10px;
+    flex: 1 1 auto;
+  }
+
+  .go-back-button {
+    width: auto;
+    height: auto;
+    padding: 8px 12px;
+    font-size: 12px;
+    margin-left: 0;
+  }
+
+  #overview .overview-layout,
+  .overview-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 12px 0 32px;
+  }
+
+  #overview .overview-layout > .grid,
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 0;
+  }
+
+  #overview .overview-layout > .sidebar {
+    position: static;
+  }
+
+  #overview .field,
+  #hire .field,
+  .field {
+    padding: 12px 14px;
+    border-radius: 14px;
+  }
+
+  #overview .field label,
+  .field label {
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+
+  #field-name {
+    font-size: 22px !important;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .field textarea,
+  .rich-input {
+    min-height: 70px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+  }
+
+  #hire input,
+  #hire select {
+    height: 40px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  #opp-model-pill {
+    font-size: 12px;
+    padding: 6px 10px;
+    margin-bottom: 12px;
+  }
+
+  #salary-updates-box,
+  .full-width-salary-updates {
+    width: 100%;
+  }
+
+  .salary-entry {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 8px;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  .salary-entry button {
+    grid-column: 1 / -1;
+    justify-self: start;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .cv-container {
+    padding: 20px;
+    gap: 28px;
+  }
+
+  .cv-heading {
+    font-size: 14px;
+    letter-spacing: 0.12em;
+  }
+
+  #resume #workExperienceSection #workExperienceList .cv-card-entry,
+  #resume #educationSection #educationList .cv-card-entry {
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+  }
+
+  #resume #workExperienceSection .cv-card-entry,
+  #resume #educationSection .cv-card-entry {
+    grid-template-columns: 1fr !important;
+    padding: 14px 16px !important;
+    row-gap: 6px !important;
+  }
+
+  #resume #workExperienceSection .cv-card-entry .month-year,
+  #resume #educationSection .cv-card-entry .month-year {
+    grid-column: 1 / -1 !important;
+  }
+
+  #toolsSection,
+  #resume #toolsSection #toolsList,
+  #resume #languagesSection #languagesList {
+    gap: 8px;
+  }
+
+  .tool-entry {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .doc-row,
+  .value.two-by-two {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar .doc-card {
+    padding: 14px !important;
+  }
+
+  .tests-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
