@@ -572,6 +572,91 @@
     width: max-content;
     table-layout: auto;
   }
+
+  /* Candidate Details mobile fixes */
+  html[data-theme] * {
+    box-sizing: border-box;
+  }
+
+  html[data-theme] .field.textarea textarea,
+  html[data-theme] .field [contenteditable="true"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  html[data-theme] #overview .field {
+    padding: 12px;
+  }
+
+  html[data-theme] #overview .field label {
+    font-size: 11px;
+  }
+
+  html[data-theme] #resume .cv-heading {
+    font-size: 13px;
+  }
+
+  html[data-theme] #resume .cv-card,
+  html[data-theme] #resume .cv-card-entry {
+    padding: 12px 14px !important;
+  }
+
+  html[data-theme] #resume .cv-card-entry,
+  html[data-theme] #resume .tool-entry,
+  html[data-theme] #resume .language-entry {
+    min-width: 0;
+    width: 100%;
+  }
+
+  html[data-theme] #resume #toolsSection .tool-entry,
+  html[data-theme] #resume #languagesSection .tool-entry,
+  html[data-theme] #resume #languagesSection .language-entry {
+    flex: 1 1 100%;
+  }
+
+  html[data-theme] #resume .cv-card-entry input.work-title,
+  html[data-theme] #resume .cv-card-entry input.edu-title,
+  html[data-theme] #resume .cv-card-entry input.work-company {
+    width: 100% !important;
+  }
+
+  html[data-theme] .mr-row {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-theme] .mr-row .mr-col {
+    min-width: 0;
+  }
+
+  html[data-theme] .mr-entry {
+    padding-right: 16px;
+  }
+
+  html[data-theme] .month-year {
+    flex-wrap: wrap;
+  }
+
+  html[data-theme] .month-year select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  html[data-theme] #hire .grid {
+    padding: 12px;
+  }
+
+  html[data-theme] #hire .field {
+    padding: 12px;
+  }
+
+  html[data-theme] #hire input,
+  html[data-theme] #hire select {
+    font-size: 13px;
+  }
+
+  html[data-theme] .tests-row {
+    width: 100%;
+  }
 }
 
 @media (max-width: 640px) {

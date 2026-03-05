@@ -65,6 +65,16 @@ function isTrueBlacklistFlag(value) {
   return false;
 }
 
+function isTrueResumeFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes';
+  }
+  return false;
+}
+
 function getWorldCountryNames() {
   if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function' && typeof Intl.DisplayNames === 'function') {
     try {
@@ -87,6 +97,7 @@ function CandidatesPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [modelFilter, setModelFilter] = useState('');
+  const [resumeFilter, setResumeFilter] = useState('');
   const [searchValue, setSearchValue] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [formState, setFormState] = useState(() => ({ ...DEFAULT_FORM }));
@@ -118,15 +129,18 @@ function CandidatesPage() {
     return (candidates || []).filter((candidate) => {
       const status = (candidate.status || 'unhired').toLowerCase();
       const model = (candidate.opp_model || '').trim();
+      const hasResume = isTrueResumeFlag(candidate.has_resume);
       if (statusFilter && status !== statusFilter) return false;
       if (modelFilter && model !== modelFilter) return false;
+      if (resumeFilter === 'with' && !hasResume) return false;
+      if (resumeFilter === 'without' && hasResume) return false;
       if (searchValue) {
         const haystack = `${candidate.name || ''}`.toLowerCase();
         if (!haystack.includes(searchValue.toLowerCase())) return false;
       }
       return true;
     });
-  }, [candidates, statusFilter, modelFilter, searchValue]);
+  }, [candidates, statusFilter, modelFilter, resumeFilter, searchValue]);
 
   const totalCount = candidates.length;
   const filteredCount = filteredCandidates.length;
@@ -347,6 +361,18 @@ function CandidatesPage() {
                 {option.label}
               </option>
             ))}
+          </select>
+
+          <label className="sr-only" htmlFor="resumeFilter">Resume</label>
+          <select
+            id="resumeFilter"
+            className="filter-select"
+            value={resumeFilter}
+            onChange={(event) => setResumeFilter(event.target.value)}
+          >
+            <option value="">Resume: All</option>
+            <option value="with">With resume</option>
+            <option value="without">Without resume</option>
           </select>
         </div>
 

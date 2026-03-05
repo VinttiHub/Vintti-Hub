@@ -1712,6 +1712,7 @@ def get_candidates_light_fast():
               c.country,
               c.phone,
               c.linkedin,
+              (r.candidate_id IS NOT NULL) AS has_resume,
               CASE
                 WHEN a.candidate_id IS NULL THEN 'unhired'
                 WHEN a.end_date IS NULL      THEN 'active'
@@ -1725,6 +1726,7 @@ def get_candidates_light_fast():
             FROM candidates c
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
             LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
+            LEFT JOIN resume r            ON r.candidate_id = c.candidate_id
             LEFT JOIN LATERAL (
               SELECT TRUE AS is_blacklisted
               FROM blacklist b

@@ -2313,6 +2313,26 @@ html body .month-year .btn-clear:active{
   appearance: textfield;
 }
 
+/* Prevent Hire tab horizontal overflow */
+#hire {
+  overflow-x: hidden;
+}
+
+#hire .grid {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+#hire .field {
+  min-width: 0;
+}
+
+#hire .field * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* por si Safari infla el date: */
 @supports (-webkit-touch-callout: none){
   #hire input[type="number"],
@@ -3722,6 +3742,8 @@ html body #resume .cv-container {
   box-shadow: 0 10px 30px rgba(15,23,42,0.06) !important;
   max-width: 960px !important;
   margin: 0 auto 40px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 40px !important;
@@ -3731,6 +3753,25 @@ html body #resume .cv-section {
   display: flex !important;
   flex-direction: column !important;
   gap: 14px !important;
+}
+
+/* Prevent Resume tab horizontal overflow */
+#resume {
+  overflow-x: hidden;
+}
+
+#resume .cv-card,
+#resume .cv-card-entry,
+#resume .tool-entry,
+#resume .language-entry {
+  min-width: 0;
+}
+
+#resume .cv-card-entry input,
+#resume .cv-card-entry select,
+#resume .cv-card-entry textarea,
+#resume .cv-card-entry [contenteditable="true"] {
+  max-width: 100%;
 }
 
 

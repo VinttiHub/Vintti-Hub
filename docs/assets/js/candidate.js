@@ -522,6 +522,16 @@ function isTrueBlacklistFlag(value) {
   return false;
 }
 
+function isTrueResumeFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1' || normalized === 'yes';
+  }
+  return false;
+}
+
 function getBlacklistFilteredCandidates() {
   const list = Array.isArray(candidateState.data) ? candidateState.data : [];
   const filter = candidateState.blacklistFilter || 'all';
@@ -539,6 +549,7 @@ function buildCandidateRow(candidate) {
   tr.dataset.id = candidate.candidate_id || '';
   tr.dataset.status = (candidate.status || '').toLowerCase();
   tr.dataset.model = (candidate.opp_model || '').trim();
+  tr.dataset.resume = isTrueResumeFlag(candidate.has_resume) ? 'with' : 'without';
 
   const rawPhone = candidate.phone ? String(candidate.phone) : '';
   const phone = rawPhone.replace(/\D/g, '');
@@ -1364,8 +1375,9 @@ document.addEventListener('click', (e) => {
 function installAdvancedFilters(table) {
   const statusSel = document.getElementById('statusFilter');
   const modelSel  = document.getElementById('modelFilter');
+  const resumeSel = document.getElementById('resumeFilter');
 
-  if (!statusSel && !modelSel) return;
+  if (!statusSel && !modelSel && !resumeSel) return;
 
   // Filtro custom usando los data-attrs del <tr>
   $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
@@ -1374,20 +1386,24 @@ function installAdvancedFilters(table) {
     const tr      = table.row(dataIndex).node();
     const rStatus = (tr?.dataset?.status || '').toLowerCase();   // 'active'|'unhired'|''
     const rModel  = (tr?.dataset?.model  || '');                  // 'Recruiting'|'Staffing'|''
+    const rResume = (tr?.dataset?.resume || '');                 // 'with'|'without'
 
     const wantStatus = (statusSel?.value || '').toLowerCase();    // '', 'active', 'unhired'
     const wantModel  = (modelSel?.value  || '');                  // '', 'Recruiting', 'Staffing'
+    const wantResume = (resumeSel?.value || '');                  // '', 'with', 'without'
 
     const passStatus = !wantStatus || rStatus === wantStatus;
     const passModel  = !wantModel  || rModel  === wantModel;
+    const passResume = !wantResume || rResume === wantResume;
 
-    return passStatus && passModel;
+    return passStatus && passModel && passResume;
   });
 
   const redraw = () => $('#candidatesTable').DataTable().draw();
 
   statusSel?.addEventListener('change', redraw);
   modelSel?.addEventListener('change', redraw);
+  resumeSel?.addEventListener('change', redraw);
 }
 // Inject Dashboard + Management Metrics for allowed users 
 // --- Equipments(visibilidad por email) ---
