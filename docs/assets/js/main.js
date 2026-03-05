@@ -1195,8 +1195,8 @@ if (!window.__dateFromFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
     if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
     const from = window.__dateRangeFilterState?.from || null;
     const explicitTo = window.__dateRangeFilterState?.to || null;
+    if (!from && !explicitTo) return true;
     const to = explicitTo || normalizeDateOnly(new Date());
-    if (!from && !to) return true;
 
     const row = settings.aoData?.[rowIndex]?.nTr;
     const rowDate = normalizeDateOnly(row?.dataset?.filterDate || '');
