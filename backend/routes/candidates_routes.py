@@ -1727,6 +1727,7 @@ def get_candidates_light_fast():
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
             LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
             LEFT JOIN resume r            ON r.candidate_id = c.candidate_id
+                                         AND r.about IS NOT NULL
             LEFT JOIN LATERAL (
               SELECT TRUE AS is_blacklisted
               FROM blacklist b

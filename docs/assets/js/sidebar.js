@@ -394,6 +394,21 @@ localStorage.setItem('sidebarCollapsed', 'true');
     });
   }
 
+  function ensureDesktopFiltersVisible() {
+    const mq = window.matchMedia('(min-width: 901px)');
+
+    const sync = () => {
+      document.querySelectorAll('details.filters-collapsible').forEach(details => {
+        if (mq.matches) details.setAttribute('open', '');
+        else details.removeAttribute('open');
+      });
+    };
+
+    sync();
+    if (mq.addEventListener) mq.addEventListener('change', sync);
+    else if (mq.addListener) mq.addListener(sync);
+  }
+
   /* -------------------------
      Loader (sidebar.html -> #sidebarMount)
   ------------------------- */
@@ -407,6 +422,7 @@ localStorage.setItem('sidebarCollapsed', 'true');
       setupSidebarCollapse();
       setupSidebarTooltips();
       setupMobileSidebar();
+      ensureDesktopFiltersVisible();
       await initSidebarProfile();
       document.dispatchEvent(new CustomEvent('sidebar:loaded'));
       return;
@@ -424,6 +440,7 @@ localStorage.setItem('sidebarCollapsed', 'true');
       setupSidebarCollapse();
       setupSidebarTooltips();
       setupMobileSidebar();
+      ensureDesktopFiltersVisible();
       await initSidebarProfile();
 
       document.dispatchEvent(new CustomEvent('sidebar:loaded'));
