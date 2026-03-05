@@ -98,6 +98,12 @@
     justify-content: center;
   }
 
+  html[data-theme] .header-buttons-row #client-version-btn,
+  html[data-theme] .header-buttons-row #ai-action-button {
+    width: 100%;
+    justify-content: center;
+  }
+
   html[data-theme] #resume .cv-container {
     padding: 18px 14px !important;
     max-width: 100% !important;
@@ -158,6 +164,38 @@
 
   html[data-theme] #resume .cv-card-entry input.work-title,
   html[data-theme] #resume .cv-card-entry input.edu-title {
+    width: 100% !important;
+  }
+
+  /* Resume: readable text + safe wrapping on mobile */
+  html[data-theme] #resume .cv-card,
+  html[data-theme] #resume .cv-card-entry,
+  html[data-theme] #resume .rich-input,
+  html[data-theme] #resume .cv-card-entry input,
+  html[data-theme] #resume .cv-card-entry textarea,
+  html[data-theme] #resume .cv-card-entry [contenteditable="true"] {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  html[data-theme] #resume .cv-card-entry input.work-title,
+  html[data-theme] #resume .cv-card-entry input.edu-title,
+  html[data-theme] #resume .cv-card-entry input.work-company {
+    font-size: 15px !important;
+    line-height: 1.3;
+  }
+
+  html[data-theme] #resume .cv-card,
+  html[data-theme] #resume .rich-input {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  html[data-theme] #resume .cv-card-entry .month-year {
+    width: 100%;
+  }
+
+  html[data-theme] #resume .cv-card-entry .month-year select {
     width: 100% !important;
   }
 

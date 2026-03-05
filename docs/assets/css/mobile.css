@@ -57,6 +57,12 @@ canvas {
   display: none;
 }
 
+@media (min-width: 901px) {
+  details.filters-collapsible:not([open]) > .filters-body {
+    display: block !important;
+  }
+}
+
 .mobile-sidebar-toggle {
   display: none;
   position: fixed;
