@@ -1188,37 +1188,60 @@ if (daysRangeFilter) {
   });
 }
 
-window.__dateFromFilterState = window.__dateFromFilterState || { from: null };
+window.__dateRangeFilterState = window.__dateRangeFilterState || { from: null, to: null };
 
 if (!window.__dateFromFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
   $.fn.dataTable.ext.search.push((settings, rowData, rowIndex) => {
     if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
-    const from = window.__dateFromFilterState?.from;
-    if (!from) return true;
+    const from = window.__dateRangeFilterState?.from || null;
+    const explicitTo = window.__dateRangeFilterState?.to || null;
+    const to = explicitTo || normalizeDateOnly(new Date());
+    if (!from && !to) return true;
 
     const row = settings.aoData?.[rowIndex]?.nTr;
     const rowDate = normalizeDateOnly(row?.dataset?.filterDate || '');
     if (!rowDate) return false;
 
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    if (rowDate < from) return false;
-    if (rowDate > today) return false;
+    if (from && rowDate < from) return false;
+    if (rowDate > to) return false;
     return true;
   });
   window.__dateFromFilterExtRegistered = true;
 }
 
 const dateFromFilter = document.getElementById('dateFromFilter');
-if (dateFromFilter) {
-  dateFromFilter.max = toIsoDate(new Date());
-  dateFromFilter.addEventListener('change', () => {
-    window.__dateFromFilterState = {
-      from: normalizeDateOnly(dateFromFilter.value),
-    };
-    table.draw();
-  });
+const dateToFilter = document.getElementById('dateToFilter');
+
+function updateDateRangeFilterState() {
+  const from = normalizeDateOnly(dateFromFilter?.value || '');
+  const rawTo = normalizeDateOnly(dateToFilter?.value || '');
+  const today = normalizeDateOnly(new Date());
+  const to = rawTo || today;
+
+  window.__dateRangeFilterState = { from, to: rawTo };
+
+  if (dateFromFilter) {
+    dateFromFilter.max = toIsoDate(to);
+  }
+  if (dateToFilter) {
+    dateToFilter.max = toIsoDate(today);
+    dateToFilter.min = from ? toIsoDate(from) : '';
+  }
+
+  if (table?.draw) table.draw();
+}
+
+if (dateFromFilter || dateToFilter) {
+  const todayIso = toIsoDate(new Date());
+  if (dateFromFilter) {
+    dateFromFilter.max = todayIso;
+    dateFromFilter.addEventListener('change', updateDateRangeFilterState);
+  }
+  if (dateToFilter) {
+    dateToFilter.max = todayIso;
+    dateToFilter.addEventListener('change', updateDateRangeFilterState);
+  }
+  updateDateRangeFilterState();
 }
 
 const downloadCsvBtn = document.getElementById('downloadCsvBtn');
