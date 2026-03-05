@@ -407,7 +407,13 @@ const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
   'agostina@vintti.com',
   'agustina@vintti.com',
   'angie@vintti.com',
-  'lara@vintti.com'
+  'lara@vintti.com',
+  'paz@vintti.com',
+  'constanza@vintti.com',
+  'valentina@vintti.com',
+  'pilar@vintti.com',
+  'julieta@vintti.com',
+  'pilar.fernandez@vintti.com'
 ]);
 const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
