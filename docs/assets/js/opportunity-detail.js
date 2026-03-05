@@ -403,6 +403,7 @@ const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
   'lara@vintti.com'
 ]);
 const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
+  'agustin@vintti.com',
   'agostina@vintti.com',
   'agustina@vintti.com',
   'angie@vintti.com',
@@ -532,16 +533,15 @@ async function getRecruiterEmailSet() {
   if (__recruiterEmails) return __recruiterEmails;
   if (__recruiterEmailsInFlight) return __recruiterEmailsInFlight;
 
-  __recruiterEmailsInFlight = fetch(`${API_BASE}/users/recruiters`, { credentials: 'include' })
+  __recruiterEmailsInFlight = fetch(`${API_BASE}/users`, { credentials: 'include' })
     .then(res => res.json())
     .then(data => {
       const emails = new Set();
       if (Array.isArray(data)) {
         data.forEach(item => {
-          const raw = typeof item === 'string'
-            ? item
-            : item?.email || item?.user_email || item?.userEmail || '';
-          const email = (raw || '').toLowerCase().trim();
+          const role = String(item?.role || '').toLowerCase().trim();
+          if (!role.includes('recruiter')) return;
+          const email = (item?.email_vintti || '').toLowerCase().trim();
           if (email) emails.add(email);
         });
       }
