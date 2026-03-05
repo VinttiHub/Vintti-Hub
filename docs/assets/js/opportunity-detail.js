@@ -403,6 +403,7 @@ const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
   'lara@vintti.com'
 ]);
 const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
+  'agostina@vintti.com',
   'agustina@vintti.com',
   'angie@vintti.com',
   'lara@vintti.com'
@@ -411,6 +412,8 @@ const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
 
 let __cands = { data: [], idx: [], ts: 0 };
 let __candsInFlight = null;
+let __recruiterEmails = null;
+let __recruiterEmailsInFlight = null;
 
 const quickDebounce = (fn, ms = 120) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
@@ -525,6 +528,36 @@ function getStoredUserEmail(){
   return '';
 }
 
+async function getRecruiterEmailSet() {
+  if (__recruiterEmails) return __recruiterEmails;
+  if (__recruiterEmailsInFlight) return __recruiterEmailsInFlight;
+
+  __recruiterEmailsInFlight = fetch(`${API_BASE}/users/recruiters`, { credentials: 'include' })
+    .then(res => res.json())
+    .then(data => {
+      const emails = new Set();
+      if (Array.isArray(data)) {
+        data.forEach(item => {
+          const raw = typeof item === 'string'
+            ? item
+            : item?.email || item?.user_email || item?.userEmail || '';
+          const email = (raw || '').toLowerCase().trim();
+          if (email) emails.add(email);
+        });
+      }
+      __recruiterEmails = emails;
+      return emails;
+    })
+    .catch(err => {
+      console.warn('Failed to load recruiter directory:', err);
+      __recruiterEmails = new Set();
+      return __recruiterEmails;
+    })
+    .finally(() => { __recruiterEmailsInFlight = null; });
+
+  return __recruiterEmailsInFlight;
+}
+
 function getCandidateIdFromPayload(candidate) {
   if (!candidate || typeof candidate !== 'object') return null;
   const raw = candidate.candidate_id ?? candidate.id ?? candidate.candidateId ?? null;
@@ -601,12 +634,17 @@ function setupDeleteOpportunityControls(){
   });
 }
 
-function setupApplicantLinkButton(){
+async function setupApplicantLinkButton(){
   const btn = document.getElementById('create-applicant-link-btn');
   if (!btn) return;
 
   const email = getStoredUserEmail();
-  if (!APPLICANT_LINK_ALLOWED_EMAILS.has(email)) {
+  let isAllowed = APPLICANT_LINK_ALLOWED_EMAILS.has(email);
+  if (!isAllowed) {
+    const recruiterEmails = await getRecruiterEmailSet();
+    isAllowed = recruiterEmails.has(email);
+  }
+  if (!isAllowed) {
     btn.classList.add('hidden');
     return;
   }
