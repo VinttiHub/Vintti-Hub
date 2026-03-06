@@ -319,6 +319,7 @@ const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 // const batchCountCache = new Map();
 
 const candidatesCountCache = new Map();
+const interviewedCountCache = new Map();
 
 // function requestBatchCount(opportunityId) {
 //   if (!opportunityId) return Promise.resolve(null);
@@ -340,8 +341,7 @@ function requestCandidatesCount(opportunityId) {
 
   if (!candidatesCountCache.has(opportunityId)) {
     const promise = fetch(
-      `${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/candidates_count`,
-      { credentials: 'include' }
+      `${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/candidates_count`
     )
       .then(res => res.ok ? res.json() : { candidates_count: 0 })
       .then(data => Number(data.candidates_count || 0))
@@ -354,6 +354,26 @@ function requestCandidatesCount(opportunityId) {
   }
 
   return candidatesCountCache.get(opportunityId);
+}
+
+function requestInterviewedCount(opportunityId) {
+  if (!opportunityId) return Promise.resolve(0);
+
+  if (!interviewedCountCache.has(opportunityId)) {
+    const promise = fetch(
+      `${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}/interviewed_count`
+    )
+      .then(res => res.ok ? res.json() : { interviewed_count: 0 })
+      .then(data => Number(data.interviewed_count || 0))
+      .catch(err => {
+        console.error('Error fetching interviewed count', err);
+        return 0;
+      });
+
+    interviewedCountCache.set(opportunityId, promise);
+  }
+
+  return interviewedCountCache.get(opportunityId);
 }
 
 
@@ -376,6 +396,28 @@ async function hydrateCandidatesCountCell(opportunityId, cell) {
   } else {
     cell.textContent = '—';
     cell.removeAttribute('data-candidates-count');
+  }
+}
+
+async function hydrateInterviewedCountCell(opportunityId, cell) {
+  if (!cell) return;
+
+  if (!opportunityId) {
+    cell.textContent = '—';
+    cell.removeAttribute('data-interviewed-count');
+    return;
+  }
+
+  cell.textContent = '…';
+
+  const count = await requestInterviewedCount(opportunityId);
+
+  if (typeof count === 'number') {
+    cell.textContent = String(count);
+    cell.dataset.interviewedCount = String(count);
+  } else {
+    cell.textContent = '—';
+    cell.removeAttribute('data-interviewed-count');
   }
 }
 
@@ -856,7 +898,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
       }
 
       if (!Array.isArray(data) || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11">No data available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12">No data available</td></tr>';
         return;
       }
 
@@ -1006,6 +1048,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
             <td>${daysAgo}</td>
             <td class="days-since-cell">${daysSinceBatch}</td>
             <td class="candidates-count-cell" data-candidates-count="—">—</td>
+            <td class="interviewed-count-cell" data-interviewed-count="—">—</td>
 
           `;
           tr.dataset.filterDate = getOpportunityReferenceDate(opp);
@@ -1014,6 +1057,8 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           // hydrateBatchCountCell(opp.opportunity_id, batchCell);
           const cCell = tr.querySelector('.candidates-count-cell');
           hydrateCandidatesCountCell(opp.opportunity_id, cCell);
+          const iCell = tr.querySelector('.interviewed-count-cell');
+          hydrateInterviewedCountCell(opp.opportunity_id, iCell);
 
 
           tr.querySelectorAll('td').forEach((cell, index) => {
@@ -1057,7 +1102,7 @@ const table = $('#opportunityTable').DataTable({
   ordering: false,
   columnDefs: [
     { targets: [0], width: "8%" },
-    { targets: [1, 2, 3, 4, 5, 6, 8, 9, 10], width: "10%" },
+    { targets: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11], width: "10%" },
     { targets: 7, width: "25%" },
     {
       targets: 0,
@@ -1271,6 +1316,7 @@ if (downloadCsvBtn) {
       'days_visible',
       'days_since_batch_visible',
       'candidates_count_visible',
+      'interviewed_count_visible',
       'motive_close_lost',
       'raw_expected_fee',
       'raw_expected_revenue',
@@ -1299,6 +1345,7 @@ if (downloadCsvBtn) {
         days_visible: row.children?.[8]?.textContent?.trim() || '',
         days_since_batch_visible: row.children?.[9]?.textContent?.trim() || '',
         candidates_count_visible: row.children?.[10]?.textContent?.trim() || '',
+        interviewed_count_visible: row.children?.[11]?.textContent?.trim() || '',
         motive_close_lost: opp?.motive_close_lost || opp?.details_close_lost || '',
         raw_expected_fee: opp?.expected_fee ?? '',
         raw_expected_revenue: opp?.expected_revenue ?? '',

@@ -1957,6 +1957,44 @@ def get_candidates_count(opportunity_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/opportunities/<opportunity_id>/interviewed_count', methods=['GET'])
+def get_interviewed_count(opportunity_id):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+                SELECT COUNT(DISTINCT cb.candidate_id)
+                FROM batch b
+                JOIN candidates_batches cb
+                  ON cb.batch_id = b.batch_id
+                WHERE b.opportunity_id = %s
+                  AND (
+                        cb.status IS NULL
+                        OR LOWER(TRIM(cb.status)) = 'client interviewing/testing'
+                        OR LOWER(TRIM(cb.status)) = 'null'
+                      )
+            """,
+            (opportunity_id,),
+        )
+
+        count = cursor.fetchone()[0] or 0
+
+        cursor.close()
+        conn.close()
+
+        return jsonify(
+            {
+                "opportunity_id": opportunity_id,
+                "interviewed_count": int(count),
+            }
+        )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/batches/<int:batch_id>', methods=['PATCH'])
 def update_batch(batch_id):
     try:
