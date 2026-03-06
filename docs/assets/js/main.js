@@ -2948,11 +2948,34 @@ function openCloseWinPopup(opportunityId, dropdownElement, { mode = 'signed' } =
       await patchOpportunityStage(opportunityId, 'Close Win', dropdownElement);
       logOpportunityTrack('saveCloseWin');
       popup.style.display = 'none';
+
+      const hiredCandidateId = await getHiredCandidateIdFromOpportunity(opportunityId);
+      if (hiredCandidateId) {
+        localStorage.setItem('fromCloseWin', 'true');
+        window.location.href = `candidate-details.html?id=${hiredCandidateId}#hire`;
+      } else {
+        alert('Close Win saved, but no hired candidate is linked yet.');
+      }
     } catch (err) {
       console.error(`❌ ${isSignedMode ? 'Signed' : 'Close Win'} flow failed:`, err);
       alert(`${isSignedMode ? 'Signed' : 'Close Win'} failed:\n${err.message}`);
     }
   };
+}
+
+async function getHiredCandidateIdFromOpportunity(opportunityId) {
+  try {
+    const res = await fetch(`${API_BASE}/opportunities/${encodeURIComponent(opportunityId)}`, {
+      credentials: 'include'
+    });
+    if (!res.ok) return null;
+    const opp = await res.json();
+    const hiredId = Number(opp?.candidato_contratado);
+    return Number.isFinite(hiredId) && hiredId > 0 ? hiredId : null;
+  } catch (err) {
+    console.warn('Could not resolve hired candidate for Close Win redirect:', err);
+    return null;
+  }
 }
 
 function loadCandidatesForCloseWin() {
