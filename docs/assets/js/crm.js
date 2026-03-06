@@ -1104,6 +1104,10 @@ async function refreshCrmDerivedFields(accountIds = null) {
 
     await runWithConcurrency(tasks, 6);
 
+    if (accountTableInstance) {
+      accountTableInstance.rows().invalidate('dom');
+    }
+
     const contractLabels = new Set();
     const statusLabels = new Set();
     rowById.forEach(row => {
