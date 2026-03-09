@@ -451,6 +451,12 @@ body.talentum {
   font-size: 0.8rem;
 }
 
+.candidate-link.muted {
+  color: var(--muted);
+  font-weight: 500;
+  cursor: default;
+}
+
 .empty-state {
   text-align: center;
   color: var(--muted);

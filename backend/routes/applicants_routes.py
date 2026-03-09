@@ -56,6 +56,60 @@ def _file_size_bytes(file_obj):
         return None
 
 
+@bp.route("/applicants", methods=["GET", "OPTIONS"])
+def get_applicants():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    raw_opportunity_id = request.args.get("opportunity_id")
+    if raw_opportunity_id is None:
+        return jsonify({"error": "Missing opportunity_id"}), 400
+
+    try:
+        opportunity_id = int(raw_opportunity_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid opportunity_id"}), 400
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT
+                applicant_id,
+                first_name,
+                last_name,
+                email,
+                phone,
+                location,
+                role_position,
+                area,
+                linkedin_url,
+                english_level,
+                referral_source,
+                opportunity_id,
+                question_1,
+                question_2,
+                question_3,
+                created_at,
+                updated_at
+            FROM applicants
+            WHERE opportunity_id = %s
+            ORDER BY updated_at DESC
+            """,
+            (opportunity_id,),
+        )
+        rows = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]
+        data = [dict(zip(colnames, row)) for row in rows]
+        cur.close()
+        conn.close()
+        return jsonify(data)
+    except Exception as exc:
+        logging.exception("Failed to fetch applicants")
+        return jsonify({"error": str(exc)}), 500
+
+
 @bp.route("/applicants", methods=["POST", "OPTIONS"])
 def create_applicant():
     if request.method == "OPTIONS":

@@ -108,10 +108,6 @@ function normalizeText(value) {
   return String(value || "").toLowerCase().trim();
 }
 
-function normalizeStage(value) {
-  return normalizeText(value).replace(/\s+/g, "-");
-}
-
 async function loadOpportunity(opportunityId) {
   setChatStatus("Loading");
   setFiltersStatus("Extracting");
@@ -215,66 +211,6 @@ function renderFilters() {
   });
 }
 
-function parseJSONSafe(value) {
-  if (!value) return null;
-  if (typeof value === "object") return value;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function flattenStrings(value, bucket) {
-  if (value == null) return;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed) bucket.push(trimmed);
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((item) => flattenStrings(item, bucket));
-    return;
-  }
-  if (typeof value === "object") {
-    Object.values(value).forEach((item) => flattenStrings(item, bucket));
-  }
-}
-
-function extractFirstFromKeys(source, keys) {
-  if (!source || typeof source !== "object") return "";
-  for (const key of keys) {
-    if (source[key]) return String(source[key]);
-  }
-  return "";
-}
-
-function extractPosition(core) {
-  if (!core) return "";
-  const headline = extractFirstFromKeys(core, ["headline", "title", "position"]);
-  if (headline) return headline;
-  const positions = core.positions || core.position || [];
-  if (Array.isArray(positions)) {
-    const first = positions.find((item) => item && (item.title || item.position));
-    return first ? String(first.title || first.position) : "";
-  }
-  return "";
-}
-
-function extractIndustry(core) {
-  return extractFirstFromKeys(core || {}, ["industry", "industry_name", "sector"]);
-}
-
-function extractCountry(core, fallback) {
-  const direct = extractFirstFromKeys(core || {}, ["country", "location_country"]);
-  if (direct) return direct;
-  const location = extractFirstFromKeys(core || {}, ["location", "location_name"]);
-  if (location && location.includes(",")) {
-    return location.split(",").pop().trim();
-  }
-  return fallback || location || "";
-}
-
 function parseNumber(value) {
   if (!value) return null;
   const cleaned = String(value).toLowerCase().replace(/[ ,]/g, "");
@@ -308,36 +244,33 @@ function findYearsFromText(text) {
   return Number.isFinite(num) ? num : null;
 }
 
-function extractYears(core, fallbackText) {
-  if (!core) return findYearsFromText(fallbackText);
-  const numericKeys = ["total_experience", "years_experience", "experience_years"];
-  for (const key of numericKeys) {
-    if (core[key] != null) {
-      const num = Number(core[key]);
-      if (Number.isFinite(num)) return num;
-    }
-  }
-  const summary = extractFirstFromKeys(core, ["summary", "headline"]);
-  return findYearsFromText(summary || fallbackText);
-}
-
-function buildCandidateProfile(pipelineCandidate, detailCandidate) {
-  const core = parseJSONSafe(detailCandidate?.coresignal_scrapper);
-  const texts = [];
-  flattenStrings(core, texts);
-  const searchableText = `${texts.join(" ")} ${detailCandidate?.country || ""} ${detailCandidate?.salary_range || ""}`;
+function buildApplicantProfile(applicant) {
+  const fullName = `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim();
+  const fallbackName = fullName || applicant.email || "Unnamed";
+  const searchableText = [
+    applicant.role_position,
+    applicant.area,
+    applicant.location,
+    applicant.english_level,
+    applicant.referral_source,
+    applicant.question_1,
+    applicant.question_2,
+    applicant.question_3,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return {
-    id: pipelineCandidate.candidate_id,
-    name: detailCandidate?.name || pipelineCandidate.name || "Unnamed",
-    country: detailCandidate?.country || pipelineCandidate.country || "",
-    position: extractPosition(core) || detailCandidate?.position || "",
-    industry: extractIndustry(core) || "",
-    years: extractYears(core, searchableText),
-    salaryRange: parseSalaryRange(detailCandidate?.salary_range || pipelineCandidate.employee_salary),
+    id: applicant.applicant_id,
+    name: fallbackName,
+    country: applicant.location || "",
+    position: applicant.role_position || "",
+    industry: applicant.area || "",
+    years: null,
+    salaryRange: null,
     searchableText,
-    linkedin: detailCandidate?.linkedin || "",
-    core,
+    linkedin: applicant.linkedin_url || "",
+    core: null,
   };
 }
 
@@ -439,6 +372,9 @@ function renderCandidates() {
       .slice(0, 3)
       .map((tag) => `<span class="candidate-tag">${escapeHtml(tag)}</span>`)
       .join("");
+    const profileLink = candidate.profile.linkedin
+      ? `<a class="candidate-link" href="${escapeHtml(candidate.profile.linkedin)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
+      : `<span class="candidate-link muted">No LinkedIn</span>`;
 
     card.innerHTML = `
       <h4>${escapeHtml(candidate.profile.name)}</h4>
@@ -446,68 +382,30 @@ function renderCandidates() {
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
-      <a class="candidate-link" href="candidate-details.html?id=${candidate.profile.id}" target="_blank" rel="noopener">Open profile →</a>
+      ${profileLink}
     `;
     els.candidatesGrid.appendChild(card);
   });
 }
 
-async function hydrateCandidate(pipelineCandidate) {
-  const detail = await fetchJSON(`${API_BASE}/candidates/${pipelineCandidate.candidate_id}`);
-  const hasCore = detail?.coresignal_scrapper && String(detail.coresignal_scrapper).trim();
-
-  if (!hasCore && detail?.linkedin) {
-    try {
-      await fetch(`${API_BASE}/coresignal/candidates/${pipelineCandidate.candidate_id}/sync`, {
-        method: "POST",
-      });
-      return await fetchJSON(`${API_BASE}/candidates/${pipelineCandidate.candidate_id}`);
-    } catch (err) {
-      console.warn("Coresignal sync failed", err);
-    }
-  }
-
-  return detail;
-}
-
 async function loadApplicants(opportunityId) {
   setCandidateSubtitle("Fetching applicants…");
-  const candidates = await fetchJSON(`${API_BASE}/opportunities/${opportunityId}/candidates`);
-  const applicants = (Array.isArray(candidates) ? candidates : []).filter((candidate) => {
-    const stage = normalizeStage(candidate.stage || candidate.stage_pipeline);
-    return stage === "applicant";
-  });
+  const applicants = await fetchJSON(`${API_BASE}/applicants?opportunity_id=${opportunityId}`);
+  const list = Array.isArray(applicants) ? applicants : [];
 
-  if (!applicants.length) {
+  if (!list.length) {
     state.candidates = [];
     renderCandidates();
     setCandidateSubtitle("No applicants in pipeline.");
     return;
   }
 
-  setCandidateSubtitle("Syncing CoreSignal and scoring applicants…");
-  const detailed = await Promise.all(
-    applicants.map(async (candidate) => {
-      try {
-        const detail = await hydrateCandidate(candidate);
-        return {
-          pipeline: candidate,
-          detail,
-          profile: buildCandidateProfile(candidate, detail),
-        };
-      } catch (err) {
-        console.warn("Candidate hydrate failed", err);
-        const fallbackDetail = { name: candidate.name, country: candidate.country };
-        return {
-          pipeline: candidate,
-          detail: fallbackDetail,
-          profile: buildCandidateProfile(candidate, fallbackDetail),
-        };
-      }
-    })
-  );
-
-  state.candidates = detailed;
+  setCandidateSubtitle("Scoring applicants…");
+  state.candidates = list.map((applicant) => ({
+    pipeline: applicant,
+    detail: applicant,
+    profile: buildApplicantProfile(applicant),
+  }));
   renderCandidates();
 }
 
