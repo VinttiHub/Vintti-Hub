@@ -533,14 +533,21 @@ body.panel-open {
   border-radius: 28px 0 0 28px;
   padding: 2.5rem clamp(1.25rem, 3vw, 2.5rem);
   box-shadow: -22px 0 65px rgba(15, 23, 42, 0.2);
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .candidate-panel__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ffffff;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
+  padding-bottom: 1rem;
 }
 
 .candidate-panel__title {
@@ -553,6 +560,9 @@ body.panel-open {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 1rem;
 }
 
 .batch-card {
@@ -637,6 +647,16 @@ body.panel-open {
   padding: 1.15rem 1.25rem;
   background: linear-gradient(135deg, #ffffff, #f6faff);
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.candidate-card--rejected {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: linear-gradient(135deg, #fff5f5, #ffe9e9);
+}
+
+.candidate-card--in-process {
+  border-color: rgba(22, 163, 74, 0.35);
+  background: linear-gradient(135deg, #f0fdf4, #e6faee);
 }
 
 .candidate-card header {

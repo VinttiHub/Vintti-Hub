@@ -1050,6 +1050,8 @@ function renderCandidateList(batch) {
     return;
   }
   const sorted = candidates.slice().sort((a, b) => {
+    const priorityDiff = getCandidateSortPriority(a) - getCandidateSortPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
     const nameA = (a?.name || "").toLowerCase();
     const nameB = (b?.name || "").toLowerCase();
     return nameA.localeCompare(nameB);
@@ -1069,6 +1071,8 @@ function renderCandidateListFromOpportunity(candidates) {
     return;
   }
   const sorted = candidates.slice().sort((a, b) => {
+    const priorityDiff = getCandidateSortPriority(a) - getCandidateSortPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
     const nameA = (a?.name || "").toLowerCase();
     const nameB = (b?.name || "").toLowerCase();
     return nameA.localeCompare(nameB);
@@ -1111,6 +1115,7 @@ function buildCandidateCard(candidate, batch) {
   }
   const statusLabel = translateStatus(statusRaw);
   const statusChip = buildStatusChip(statusLabel, statusRaw);
+  card.classList.add(getCandidateCardToneClass(statusRaw, statusLabel));
   const countryLabel = formatCandidateCountry(candidate);
   const presentationDate = candidate?.presentation_date || batch?.presentation_date || null;
   const presentationLabel = presentationDate ? `Presented ${formatDate(presentationDate)}` : "Presentation date TBD";
@@ -1154,6 +1159,21 @@ function buildCandidateCard(candidate, batch) {
     hydrateCandidateTestsSection(card, candidate, testsDocuments);
   }
   return card;
+}
+
+function getCandidateCardToneClass(rawStatus, displayStatus) {
+  const source = normalizeText(`${rawStatus || ""} ${displayStatus || ""}`);
+  if (source.includes("reject") || source.includes("rechaz")) {
+    return "candidate-card--rejected";
+  }
+  return "candidate-card--in-process";
+}
+
+function getCandidateSortPriority(candidate) {
+  const statusRaw = candidate?.batch_status || candidate?.status || "";
+  const statusLabel = translateStatus(statusRaw);
+  const toneClass = getCandidateCardToneClass(statusRaw, statusLabel);
+  return toneClass === "candidate-card--rejected" ? 1 : 0;
 }
 
 function getInitials(name) {
