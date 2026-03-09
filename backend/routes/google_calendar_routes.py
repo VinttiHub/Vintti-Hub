@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # Python 3.8 fallback
+    from backports.zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, redirect, request
 from psycopg2.extras import RealDictCursor
