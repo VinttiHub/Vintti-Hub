@@ -245,7 +245,7 @@ def google_calendar_events():
         try:
             tzinfo = ZoneInfo(timezone_name)
         except Exception:
-            return jsonify({"error": f"Invalid timezone: {timezone_name}"}), 400
+            tzinfo = timezone.utc
 
         try:
             start_dt = datetime.fromisoformat(start_raw).replace(tzinfo=tzinfo)
@@ -284,7 +284,7 @@ def google_calendar_events():
     try:
         tzinfo = ZoneInfo(timezone_name)
     except Exception:
-        return jsonify({"error": f"Invalid timezone: {timezone_name}"}), 400
+        tzinfo = timezone.utc
 
     day_start = _parse_date(payload.get("date"), tzinfo)
     day_end = day_start + timedelta(days=1)

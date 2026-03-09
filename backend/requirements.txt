@@ -12,3 +12,4 @@ google-api-python-client
 google-auth
 PyPDF2>=3.0.0
 backports.zoneinfo; python_version < "3.9"
+tzdata; python_version < "3.9"
