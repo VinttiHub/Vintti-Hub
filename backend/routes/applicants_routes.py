@@ -91,6 +91,10 @@ def get_applicants():
                 question_1,
                 question_2,
                 question_3,
+                cv_s3_key,
+                cv_file_name,
+                cv_content_type,
+                cv_size_bytes,
                 created_at,
                 updated_at
             FROM applicants

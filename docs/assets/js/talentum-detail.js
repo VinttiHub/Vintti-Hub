@@ -11,6 +11,12 @@ const state = {
     country: "",
   },
   candidates: [],
+  applicantQuestions: {
+    question_1: "Question 1",
+    question_2: "Question 2",
+    question_3: "Question 3",
+  },
+  selectedApplicantId: null,
 };
 
 const els = {
@@ -26,6 +32,10 @@ const els = {
   filtersStatus: document.getElementById("filtersStatus"),
   candidatesGrid: document.getElementById("candidatesGrid"),
   candidatesEmpty: document.getElementById("candidatesEmpty"),
+  applicantDrawer: document.getElementById("applicantDrawer"),
+  drawerClose: document.getElementById("drawerClose"),
+  drawerTitle: document.getElementById("drawerTitle"),
+  drawerBody: document.getElementById("drawerBody"),
 };
 
 function getStoredEmail() {
@@ -146,11 +156,26 @@ async function loadOpportunity(opportunityId) {
     setCandidateSubtitle("Unable to load applicants.");
   }
 
+  try {
+    await loadApplicantQuestions(opportunityId);
+  } catch (err) {
+    console.warn("Failed to load applicant questions", err);
+  }
+
   if (state.candidates.length) {
     setCandidateSubtitle("Applicants sorted by match score.");
   }
   setChatStatus("Ready");
   setFiltersStatus("Ready");
+}
+
+async function loadApplicantQuestions(opportunityId) {
+  const data = await fetchJSON(`${API_BASE}/linkedin_hub?opportunity_id=${opportunityId}`);
+  state.applicantQuestions = {
+    question_1: data?.question_1 || "Question 1",
+    question_2: data?.question_2 || "Question 2",
+    question_3: data?.question_3 || "Question 3",
+  };
 }
 
 async function extractFiltersFromOpportunity(opportunity) {
@@ -235,6 +260,20 @@ function parseSalaryRange(value) {
   const min = Math.min(...nums);
   const max = Math.max(...nums);
   return { min, max };
+}
+
+function formatBytes(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "—";
+  if (num < 1024) return `${num} B`;
+  const units = ["KB", "MB", "GB"];
+  let size = num;
+  let unitIndex = -1;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
 function findYearsFromText(text) {
@@ -367,6 +406,7 @@ function renderCandidates() {
   scored.forEach((candidate) => {
     const card = document.createElement("div");
     card.className = "candidate-card";
+    card.dataset.applicantId = candidate.profile.id;
     const tags = [candidate.profile.position, candidate.profile.industry, candidate.profile.country]
       .filter(Boolean)
       .slice(0, 3)
@@ -407,6 +447,61 @@ async function loadApplicants(opportunityId) {
     profile: buildApplicantProfile(applicant),
   }));
   renderCandidates();
+}
+
+function renderApplicantDrawer(applicant) {
+  if (!applicant || !els.drawerBody || !els.drawerTitle) return;
+  const name = `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim() || applicant.email || "Applicant";
+  els.drawerTitle.textContent = name;
+
+  const questions = state.applicantQuestions || {};
+  const linkedinLink = applicant.linkedin_url
+    ? `<a class="drawer-link" href="${escapeHtml(applicant.linkedin_url)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
+    : "<span class=\"drawer-value\">—</span>";
+
+  els.drawerBody.innerHTML = `
+    <div class="drawer-section">
+      <h4>Overview</h4>
+      <div class="drawer-item"><span class="drawer-label">Email</span><span class="drawer-value">${escapeHtml(applicant.email || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Phone</span><span class="drawer-value">${escapeHtml(applicant.phone || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(applicant.location || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">LinkedIn</span>${linkedinLink}</div>
+    </div>
+    <div class="drawer-section">
+      <h4>Role</h4>
+      <div class="drawer-item"><span class="drawer-label">Position</span><span class="drawer-value">${escapeHtml(applicant.role_position || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Area</span><span class="drawer-value">${escapeHtml(applicant.area || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">English</span><span class="drawer-value">${escapeHtml(applicant.english_level || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Referral</span><span class="drawer-value">${escapeHtml(applicant.referral_source || "—")}</span></div>
+    </div>
+    <div class="drawer-section">
+      <h4>Files</h4>
+      <div class="drawer-item"><span class="drawer-label">CV</span><span class="drawer-value">${escapeHtml(applicant.cv_file_name || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Size</span><span class="drawer-value">${formatBytes(applicant.cv_size_bytes)}</span></div>
+    </div>
+    <div class="drawer-section">
+      <h4>Screening</h4>
+      <p class="drawer-label">${escapeHtml(questions.question_1 || "Question 1")}</p>
+      <p class="drawer-answer">${escapeHtml(applicant.question_1 || "—")}</p>
+      <p class="drawer-label">${escapeHtml(questions.question_2 || "Question 2")}</p>
+      <p class="drawer-answer">${escapeHtml(applicant.question_2 || "—")}</p>
+      <p class="drawer-label">${escapeHtml(questions.question_3 || "Question 3")}</p>
+      <p class="drawer-answer">${escapeHtml(applicant.question_3 || "—")}</p>
+    </div>
+  `;
+}
+
+function openApplicantDrawer(applicant) {
+  state.selectedApplicantId = applicant?.applicant_id || null;
+  renderApplicantDrawer(applicant);
+  if (els.applicantDrawer) els.applicantDrawer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("drawer-open");
+}
+
+function closeApplicantDrawer() {
+  state.selectedApplicantId = null;
+  if (els.applicantDrawer) els.applicantDrawer.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("drawer-open");
 }
 
 async function handleChatSubmit(event) {
@@ -463,6 +558,23 @@ async function init() {
 
   if (els.chatForm) {
     els.chatForm.addEventListener("submit", handleChatSubmit);
+  }
+
+  if (els.candidatesGrid) {
+    els.candidatesGrid.addEventListener("click", (event) => {
+      if (event.target.closest("a")) return;
+      const card = event.target.closest(".candidate-card");
+      if (!card) return;
+      const applicantId = Number(card.dataset.applicantId);
+      const selected = state.candidates.find((entry) => entry.profile.id === applicantId);
+      if (selected?.pipeline) {
+        openApplicantDrawer(selected.pipeline);
+      }
+    });
+  }
+
+  if (els.drawerClose) {
+    els.drawerClose.addEventListener("click", closeApplicantDrawer);
   }
 }
 
