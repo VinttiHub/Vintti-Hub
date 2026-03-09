@@ -189,7 +189,8 @@ def _fetch_rejection_alert_context(cur, batch_id):
         SELECT
             b.opportunity_id,
             o.opp_position_name,
-            COALESCE(a.client_name, 'Client') AS client_name
+            COALESCE(a.client_name, 'Client') AS client_name,
+            o.opp_hr_lead
         FROM batch b
         LEFT JOIN opportunity o
           ON o.opportunity_id = b.opportunity_id
@@ -208,6 +209,7 @@ def _fetch_rejection_alert_context(cur, batch_id):
         "opportunity_id": row[0],
         "position_name": row[1] or "Role",
         "client_name": row[2] or "Client",
+        "hr_lead_email": (row[3] or "").strip().lower(),
     }
 
 
@@ -267,7 +269,12 @@ def _send_rejection_threshold_email(context, rejected_total):
         context.get("opportunity_id"),
         rejected_total,
     )
-    payload = {"to": [_REJECTION_ALERT_EMAIL], "subject": subject, "body": body}
+    recipients = [_REJECTION_ALERT_EMAIL]
+    hr_lead_email = (context.get("hr_lead_email") or "").strip().lower()
+    if hr_lead_email and hr_lead_email not in recipients:
+        recipients.append(hr_lead_email)
+
+    payload = {"to": recipients, "subject": subject, "body": body}
     try:
         resp = requests.post(
             "https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email",
