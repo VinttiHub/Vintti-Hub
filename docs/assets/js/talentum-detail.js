@@ -348,44 +348,90 @@ function matchesTextFilter(candidateValue, filterValue, fallbackText) {
   return haystack.includes(needle);
 }
 
-function matchesFilters(profile) {
-  if (!matchesTextFilter(profile.position, state.filters.position, profile.searchableText)) return false;
-  if (!matchesTextFilter(profile.industry, state.filters.industry, profile.searchableText)) return false;
-  if (!matchesTextFilter(profile.country, state.filters.country, profile.searchableText)) return false;
+function hasActiveFilters() {
+  return Object.values(state.filters || {}).some((value) => String(value || "").trim());
+}
 
-  if (state.filters.years_experience) {
-    const filterYears = parseNumber(state.filters.years_experience) || findYearsFromText(state.filters.years_experience);
-    if (filterYears != null) {
-      if (profile.years != null) {
-        if (profile.years < filterYears) return false;
-      } else if (!matchesTextFilter("", state.filters.years_experience, profile.searchableText)) {
-        return false;
-      }
-    }
+function scoreTextMatch(candidateValue, filterValue, fallbackText) {
+  if (!filterValue) return null;
+  const haystack = normalizeText(candidateValue || fallbackText);
+  const needle = normalizeText(filterValue);
+  if (!haystack || !needle) return 0;
+  if (haystack.includes(needle)) return 2;
+  const tokens = needle.split(/[\s,\/\-]+/).filter(Boolean);
+  if (!tokens.length) return 0;
+  return tokens.some((token) => haystack.includes(token)) ? 1 : 0;
+}
+
+function scoreYearsMatch(profile) {
+  if (!state.filters.years_experience) return null;
+  const filterYears = parseNumber(state.filters.years_experience) || findYearsFromText(state.filters.years_experience);
+  if (filterYears == null) return 0;
+  if (profile.years != null) {
+    if (profile.years >= filterYears) return 2;
+    if (filterYears - profile.years <= 2) return 1;
+    return 0;
   }
+  return matchesTextFilter("", state.filters.years_experience, profile.searchableText) ? 1 : 0;
+}
 
-  if (state.filters.salary) {
-    const filterRange = parseSalaryRange(state.filters.salary);
-    if (filterRange && profile.salaryRange) {
-      if (profile.salaryRange.max < filterRange.min || profile.salaryRange.min > filterRange.max) return false;
-    } else if (!matchesTextFilter("", state.filters.salary, profile.searchableText)) {
-      return false;
-    }
+function isRangeNear(range, target) {
+  if (!range || !target) return false;
+  if (range.max < target.min) {
+    return (target.min - range.max) / Math.max(target.min, 1) <= 0.1;
   }
+  if (range.min > target.max) {
+    return (range.min - target.max) / Math.max(target.max, 1) <= 0.1;
+  }
+  return false;
+}
 
-  return true;
+function scoreSalaryMatch(profile) {
+  if (!state.filters.salary) return null;
+  const filterRange = parseSalaryRange(state.filters.salary);
+  if (filterRange && profile.salaryRange) {
+    const overlap = !(profile.salaryRange.max < filterRange.min || profile.salaryRange.min > filterRange.max);
+    if (overlap) return 2;
+    return isRangeNear(profile.salaryRange, filterRange) ? 1 : 0;
+  }
+  return matchesTextFilter("", state.filters.salary, profile.searchableText) ? 1 : 0;
+}
+
+function computeMatchScore(profile) {
+  if (!hasActiveFilters()) return 10;
+
+  const points = [];
+  points.push(scoreTextMatch(profile.position, state.filters.position, profile.searchableText));
+  points.push(scoreTextMatch(profile.industry, state.filters.industry, profile.searchableText));
+  points.push(scoreTextMatch(profile.country, state.filters.country, profile.searchableText));
+  points.push(scoreYearsMatch(profile));
+  points.push(scoreSalaryMatch(profile));
+
+  const scored = points.filter((value) => value != null);
+  const maxPoints = scored.length * 2;
+  if (!maxPoints) return 10;
+  const total = scored.reduce((sum, value) => sum + value, 0);
+  const ratio = total / maxPoints;
+  const scaled = Math.round(ratio * 9) + 1;
+  return Math.min(10, Math.max(1, scaled));
 }
 
 function renderCandidates() {
-  const filtered = state.candidates.filter((candidate) => matchesFilters(candidate.profile));
-  els.candidatesGrid.innerHTML = "";
-  els.candidatesEmpty.style.display = filtered.length ? "none" : "block";
-  els.candidatesEmpty.textContent = filtered.length
-    ? ""
-    : "No candidates match the active filters.";
-  els.candidateCount.textContent = `${filtered.length} matches`;
+  const scored = state.candidates
+    .map((candidate) => ({
+      ...candidate,
+      score: computeMatchScore(candidate.profile),
+    }))
+    .sort((a, b) => b.score - a.score);
 
-  filtered.forEach((candidate) => {
+  els.candidatesGrid.innerHTML = "";
+  els.candidatesEmpty.style.display = scored.length ? "none" : "block";
+  els.candidatesEmpty.textContent = scored.length
+    ? ""
+    : "No applicants yet.";
+  els.candidateCount.textContent = `${scored.length} applicants`;
+
+  scored.forEach((candidate) => {
     const card = document.createElement("div");
     card.className = "candidate-card";
     const tags = [candidate.profile.position, candidate.profile.industry, candidate.profile.country]
@@ -396,6 +442,7 @@ function renderCandidates() {
 
     card.innerHTML = `
       <h4>${escapeHtml(candidate.profile.name)}</h4>
+      <div class="candidate-score">Match ${candidate.score}/10</div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
@@ -438,7 +485,7 @@ async function loadApplicants(opportunityId) {
     return;
   }
 
-  setCandidateSubtitle("Syncing CoreSignal and filtering applicants…");
+  setCandidateSubtitle("Syncing CoreSignal and scoring applicants…");
   const detailed = await Promise.all(
     applicants.map(async (candidate) => {
       try {
@@ -496,7 +543,7 @@ async function handleChatSubmit(event) {
   } finally {
     setChatStatus("Ready");
     setFiltersStatus("Ready");
-    setCandidateSubtitle("Applicants filtered by active filters.");
+    setCandidateSubtitle("Applicants sorted by match score.");
   }
 }
 
