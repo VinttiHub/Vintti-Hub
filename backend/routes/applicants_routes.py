@@ -56,6 +56,47 @@ def _file_size_bytes(file_obj):
         return None
 
 
+@bp.route("/applicants/<int:applicant_id>/cv", methods=["GET", "OPTIONS"])
+def get_applicant_cv(applicant_id):
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT cv_s3_key, cv_file_name, cv_content_type
+            FROM applicants
+            WHERE applicant_id = %s
+            """,
+            (applicant_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not row or not row[0]:
+            return jsonify({"error": "CV not found"}), 404
+
+        s3_key, filename, content_type = row
+        safe_name = filename or "applicant_cv"
+        url = services.s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": services.S3_BUCKET,
+                "Key": s3_key,
+                "ResponseContentDisposition": f'attachment; filename="{safe_name}"',
+                "ResponseContentType": content_type or "application/octet-stream",
+            },
+            ExpiresIn=3600,
+        )
+        return jsonify({"url": url, "file_name": safe_name})
+    except Exception as exc:
+        logging.exception("Failed to get applicant CV")
+        return jsonify({"error": str(exc)}), 500
+
+
 @bp.route("/applicants", methods=["GET", "OPTIONS"])
 def get_applicants():
     if request.method == "OPTIONS":

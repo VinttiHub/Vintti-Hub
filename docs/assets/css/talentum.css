@@ -551,7 +551,8 @@ body.talentum {
 .drawer-item {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 16px;
   font-size: 0.85rem;
   padding: 6px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -570,6 +571,9 @@ body.talentum {
   text-align: right;
   font-weight: 600;
   color: #2b2b32;
+  flex: 1;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .drawer-answer {
@@ -582,6 +586,28 @@ body.talentum {
   color: var(--accent-strong);
   font-weight: 600;
   text-decoration: none;
+}
+
+.screening-item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.screening-item:last-child {
+  border-bottom: none;
+}
+
+.screening-question {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.screening-answer {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2b2b32;
 }
 
 .loading-row td {

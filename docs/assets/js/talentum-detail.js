@@ -262,6 +262,75 @@ function parseSalaryRange(value) {
   return { min, max };
 }
 
+const COUNTRY_DIRECTORY = [
+  { name: "argentina", code: "AR", dial: "+54", aliases: ["arg", "ar"] },
+  { name: "bolivia", code: "BO", dial: "+591", aliases: ["bol"] },
+  { name: "brazil", code: "BR", dial: "+55", aliases: ["brasil", "bra", "br"] },
+  { name: "chile", code: "CL", dial: "+56", aliases: ["chi", "cl"] },
+  { name: "colombia", code: "CO", dial: "+57", aliases: ["col", "co"] },
+  { name: "costa rica", code: "CR", dial: "+506", aliases: ["cr"] },
+  { name: "dominican republic", code: "DO", dial: "+1", aliases: ["dominicana", "do"] },
+  { name: "ecuador", code: "EC", dial: "+593", aliases: ["ec"] },
+  { name: "el salvador", code: "SV", dial: "+503", aliases: ["sv"] },
+  { name: "guatemala", code: "GT", dial: "+502", aliases: ["gt"] },
+  { name: "honduras", code: "HN", dial: "+504", aliases: ["hn"] },
+  { name: "mexico", code: "MX", dial: "+52", aliases: ["méxico", "mx"] },
+  { name: "nicaragua", code: "NI", dial: "+505", aliases: ["ni"] },
+  { name: "panama", code: "PA", dial: "+507", aliases: ["panamá", "pa"] },
+  { name: "paraguay", code: "PY", dial: "+595", aliases: ["py"] },
+  { name: "peru", code: "PE", dial: "+51", aliases: ["perú", "pe"] },
+  { name: "puerto rico", code: "PR", dial: "+1", aliases: ["pr"] },
+  { name: "spain", code: "ES", dial: "+34", aliases: ["españa", "espana", "es"] },
+  { name: "uruguay", code: "UY", dial: "+598", aliases: ["uy"] },
+  { name: "venezuela", code: "VE", dial: "+58", aliases: ["ve"] },
+  { name: "united states", code: "US", dial: "+1", aliases: ["usa", "u.s.", "us", "united states of america", "estados unidos"] },
+  { name: "canada", code: "CA", dial: "+1", aliases: ["can", "ca"] },
+];
+
+function countryCodeToFlag(code) {
+  if (!code || code.length !== 2) return "";
+  const upper = code.toUpperCase();
+  const first = upper.charCodeAt(0) - 65 + 0x1f1e6;
+  const second = upper.charCodeAt(1) - 65 + 0x1f1e6;
+  return String.fromCodePoint(first, second);
+}
+
+function resolveCountryInfo(location) {
+  const needle = normalizeText(location);
+  if (!needle) return null;
+  for (const entry of COUNTRY_DIRECTORY) {
+    if (needle.includes(entry.name)) return entry;
+    if ((entry.aliases || []).some((alias) => needle.includes(alias))) return entry;
+  }
+  return null;
+}
+
+const LATAM_COUNTRIES = new Set(
+  COUNTRY_DIRECTORY
+    .filter((entry) => entry.code && !["US", "CA", "ES"].includes(entry.code))
+    .map((entry) => entry.name)
+);
+
+function isLatinAmericaFilter(value) {
+  const needle = normalizeText(value);
+  return needle.includes("latin america") || needle.includes("latam");
+}
+
+function isLatinAmericaLocation(value) {
+  const needle = normalizeText(value);
+  if (!needle) return false;
+  return Array.from(LATAM_COUNTRIES).some((name) => needle.includes(name));
+}
+
+function formatPhoneNumber(phone, countryInfo) {
+  if (!phone) return "—";
+  const cleaned = String(phone).trim();
+  if (!cleaned) return "—";
+  if (cleaned.startsWith("+")) return cleaned;
+  if (countryInfo?.dial) return `${countryInfo.dial} ${cleaned}`;
+  return cleaned;
+}
+
 function formatBytes(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "—";
@@ -326,6 +395,9 @@ function hasActiveFilters() {
 
 function scoreTextMatch(candidateValue, filterValue, fallbackText) {
   if (!filterValue) return null;
+  if (isLatinAmericaFilter(filterValue)) {
+    return isLatinAmericaLocation(candidateValue || fallbackText) ? 2 : 0;
+  }
   const haystack = normalizeText(candidateValue || fallbackText);
   const needle = normalizeText(filterValue);
   if (!haystack || !needle) return 0;
@@ -455,16 +527,25 @@ function renderApplicantDrawer(applicant) {
   els.drawerTitle.textContent = name;
 
   const questions = state.applicantQuestions || {};
+  const countryInfo = resolveCountryInfo(applicant.location);
+  const locationLabel = countryInfo?.code
+    ? `${countryCodeToFlag(countryInfo.code)} ${applicant.location || "—"}`
+    : (applicant.location || "—");
+  const phoneLabel = formatPhoneNumber(applicant.phone, countryInfo);
   const linkedinLink = applicant.linkedin_url
     ? `<a class="drawer-link" href="${escapeHtml(applicant.linkedin_url)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
+    : "<span class=\"drawer-value\">—</span>";
+  const cvName = escapeHtml(applicant.cv_file_name || "CV file");
+  const cvLink = applicant.cv_s3_key
+    ? `<a class="drawer-link" id="cvDownloadLink" href="#" target="_blank" rel="noopener">Download ${cvName}</a>`
     : "<span class=\"drawer-value\">—</span>";
 
   els.drawerBody.innerHTML = `
     <div class="drawer-section">
       <h4>Overview</h4>
       <div class="drawer-item"><span class="drawer-label">Email</span><span class="drawer-value">${escapeHtml(applicant.email || "—")}</span></div>
-      <div class="drawer-item"><span class="drawer-label">Phone</span><span class="drawer-value">${escapeHtml(applicant.phone || "—")}</span></div>
-      <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(applicant.location || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Phone</span><span class="drawer-value">${escapeHtml(phoneLabel)}</span></div>
+      <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(locationLabel)}</span></div>
       <div class="drawer-item"><span class="drawer-label">LinkedIn</span>${linkedinLink}</div>
     </div>
     <div class="drawer-section">
@@ -476,19 +557,45 @@ function renderApplicantDrawer(applicant) {
     </div>
     <div class="drawer-section">
       <h4>Files</h4>
-      <div class="drawer-item"><span class="drawer-label">CV</span><span class="drawer-value">${escapeHtml(applicant.cv_file_name || "—")}</span></div>
+      <div class="drawer-item"><span class="drawer-label">CV</span>${cvLink}</div>
       <div class="drawer-item"><span class="drawer-label">Size</span><span class="drawer-value">${formatBytes(applicant.cv_size_bytes)}</span></div>
     </div>
     <div class="drawer-section">
       <h4>Screening</h4>
-      <p class="drawer-label">${escapeHtml(questions.question_1 || "Question 1")}</p>
-      <p class="drawer-answer">${escapeHtml(applicant.question_1 || "—")}</p>
-      <p class="drawer-label">${escapeHtml(questions.question_2 || "Question 2")}</p>
-      <p class="drawer-answer">${escapeHtml(applicant.question_2 || "—")}</p>
-      <p class="drawer-label">${escapeHtml(questions.question_3 || "Question 3")}</p>
-      <p class="drawer-answer">${escapeHtml(applicant.question_3 || "—")}</p>
+      <div class="screening-item">
+        <p class="screening-question">${escapeHtml(questions.question_1 || "Question 1")}</p>
+        <p class="screening-answer">${escapeHtml(applicant.question_1 || "—")}</p>
+      </div>
+      <div class="screening-item">
+        <p class="screening-question">${escapeHtml(questions.question_2 || "Question 2")}</p>
+        <p class="screening-answer">${escapeHtml(applicant.question_2 || "—")}</p>
+      </div>
+      <div class="screening-item">
+        <p class="screening-question">${escapeHtml(questions.question_3 || "Question 3")}</p>
+        <p class="screening-answer">${escapeHtml(applicant.question_3 || "—")}</p>
+      </div>
     </div>
   `;
+
+  if (applicant.cv_s3_key) {
+    loadApplicantCvLink(applicant.applicant_id);
+  }
+}
+
+async function loadApplicantCvLink(applicantId) {
+  const link = document.getElementById("cvDownloadLink");
+  if (!link) return;
+  link.textContent = "Loading CV…";
+  try {
+    const data = await fetchJSON(`${API_BASE}/applicants/${applicantId}/cv`);
+    link.href = data.url;
+    link.textContent = `Download ${data.file_name || "CV"}`;
+    if (data.file_name) link.setAttribute("download", data.file_name);
+  } catch (err) {
+    console.warn("Failed to load CV link", err);
+    link.textContent = "CV unavailable";
+    link.removeAttribute("href");
+  }
 }
 
 function openApplicantDrawer(applicant) {
