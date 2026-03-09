@@ -532,8 +532,9 @@ function renderApplicantDrawer(applicant) {
     ? `${countryCodeToFlag(countryInfo.code)} ${applicant.location || "—"}`
     : (applicant.location || "—");
   const phoneLabel = formatPhoneNumber(applicant.phone, countryInfo);
-  const linkedinLink = applicant.linkedin_url
-    ? `<a class="drawer-link" href="${escapeHtml(applicant.linkedin_url)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
+  const linkedinUrl = applicant.linkedin_url || "";
+  const linkedinLink = linkedinUrl
+    ? `<a class="drawer-link" href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
     : "<span class=\"drawer-value\">—</span>";
   const cvName = escapeHtml(applicant.cv_file_name || "CV file");
   const cvLink = applicant.cv_s3_key
@@ -543,10 +544,28 @@ function renderApplicantDrawer(applicant) {
   els.drawerBody.innerHTML = `
     <div class="drawer-section">
       <h4>Overview</h4>
-      <div class="drawer-item"><span class="drawer-label">Email</span><span class="drawer-value">${escapeHtml(applicant.email || "—")}</span></div>
-      <div class="drawer-item"><span class="drawer-label">Phone</span><span class="drawer-value">${escapeHtml(phoneLabel)}</span></div>
+      <div class="drawer-item">
+        <span class="drawer-label">Email</span>
+        <span class="drawer-value copy-value" data-copy="${escapeHtml(applicant.email || "")}">
+          ${escapeHtml(applicant.email || "—")}
+          <button class="copy-btn" type="button" aria-label="Copy email" data-copy="${escapeHtml(applicant.email || "")}">Copy</button>
+        </span>
+      </div>
+      <div class="drawer-item">
+        <span class="drawer-label">Phone</span>
+        <span class="drawer-value copy-value" data-copy="${escapeHtml(phoneLabel)}">
+          ${escapeHtml(phoneLabel)}
+          <button class="copy-btn" type="button" aria-label="Copy phone" data-copy="${escapeHtml(phoneLabel)}">Copy</button>
+        </span>
+      </div>
       <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(locationLabel)}</span></div>
-      <div class="drawer-item"><span class="drawer-label">LinkedIn</span>${linkedinLink}</div>
+      <div class="drawer-item">
+        <span class="drawer-label">LinkedIn</span>
+        <span class="drawer-value copy-value" data-copy="${escapeHtml(linkedinUrl)}">
+          ${linkedinLink}
+          <button class="copy-btn" type="button" aria-label="Copy LinkedIn" data-copy="${escapeHtml(linkedinUrl)}">Copy</button>
+        </span>
+      </div>
     </div>
     <div class="drawer-section">
       <h4>Role</h4>
@@ -682,6 +701,25 @@ async function init() {
 
   if (els.drawerClose) {
     els.drawerClose.addEventListener("click", closeApplicantDrawer);
+  }
+
+  if (els.drawerBody) {
+    els.drawerBody.addEventListener("click", async (event) => {
+      const button = event.target.closest(".copy-btn");
+      if (!button) return;
+      const value = button.dataset.copy || "";
+      if (!value || value === "—") return;
+      try {
+        await navigator.clipboard.writeText(value);
+        const original = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(() => {
+          button.textContent = original;
+        }, 1200);
+      } catch (err) {
+        console.warn("Copy failed", err);
+      }
+    });
   }
 }
 
