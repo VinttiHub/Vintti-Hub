@@ -30,6 +30,12 @@ _LINKEDIN_SCHEME_RE = re.compile(r'^https?://', flags=re.I)
 _WHITESPACE_RE = re.compile(r'\s+')
 _LINKEDIN_DOMAIN_RE = re.compile(r'linkedin\.com.*', flags=re.I)
 _BLACKLIST_COLUMN_CACHE = None
+_REJECTED_BATCH_STATUSES = {
+    'client rejected cv',
+    'client rejected after interviewing',
+}
+_REJECTION_ALERT_THRESHOLD = 5
+_REJECTION_ALERT_EMAIL = 'pgonzales@vintti.com'
 
 
 def _normalize_name(value):
@@ -150,6 +156,136 @@ def _send_rating_email(to_email, subject, html_body):
         return resp.ok
     except Exception:
         logging.exception("Send rating email failed")
+        return False
+
+
+def _normalize_batch_status(value):
+    return re.sub(r'\s+', ' ', str(value or '').strip().lower())
+
+
+def _is_rejected_batch_status(value):
+    return _normalize_batch_status(value) in _REJECTED_BATCH_STATUSES
+
+
+def _count_rejected_candidates_in_opportunity(cur, opportunity_id):
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM candidates_batches cb
+        JOIN batch b
+          ON b.batch_id = cb.batch_id
+        WHERE b.opportunity_id = %s
+          AND LOWER(TRIM(cb.status)) IN %s
+        """,
+        (opportunity_id, tuple(_REJECTED_BATCH_STATUSES)),
+    )
+    row = cur.fetchone()
+    return int(row[0] or 0) if row else 0
+
+
+def _fetch_rejection_alert_context(cur, batch_id):
+    cur.execute(
+        """
+        SELECT
+            b.opportunity_id,
+            o.opp_position_name,
+            COALESCE(a.client_name, 'Client') AS client_name,
+            o.opp_hr_lead
+        FROM batch b
+        LEFT JOIN opportunity o
+          ON o.opportunity_id = b.opportunity_id
+        LEFT JOIN account a
+          ON a.account_id = o.account_id
+        WHERE b.batch_id = %s
+        LIMIT 1
+        """,
+        (batch_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+
+    return {
+        "opportunity_id": row[0],
+        "position_name": row[1] or "Role",
+        "client_name": row[2] or "Client",
+        "hr_lead_email": (row[3] or "").strip().lower(),
+    }
+
+
+def _rejection_alert_email_html(client_name, position_name, opportunity_id, rejected_total):
+    safe_client = html.escape(client_name or "Client")
+    safe_position = html.escape(position_name or "Role")
+    safe_opp_id = html.escape(str(opportunity_id or "—"))
+    safe_total = html.escape(str(rejected_total))
+
+    return f"""
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7ff;margin:0;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:16px;box-shadow:0 20px 50px rgba(15,23,42,0.12);overflow:hidden;font-family:Arial,sans-serif;color:#0f172a;">
+            <tr>
+              <td style="padding:22px 24px;background:linear-gradient(135deg,#fff5f5,#fffaf0);border-bottom:1px solid #ffe4e6;">
+                <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#9f1239;font-weight:700;">Rejected Candidates Alert</div>
+                <div style="font-size:20px;font-weight:700;margin-top:6px;">Threshold reached</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 24px;">
+                <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 14px 0;">
+                  The opportunity has reached <strong>{safe_total} rejected candidates</strong> (Client rejected CV / Client rejected after interviewing).
+                </p>
+                <div style="padding:14px 16px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
+                  <div style="font-size:14px;color:#0f172a;line-height:1.7;">
+                    <strong>Client:</strong> {safe_client}<br/>
+                    <strong>Position:</strong> {safe_position}<br/>
+                    <strong>Opportunity ID:</strong> {safe_opp_id}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 24px 22px 24px;font-size:12px;color:#94a3b8;">
+                This message was sent automatically from Vintti Hub.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    """
+
+
+def _send_rejection_threshold_email(context, rejected_total):
+    if not context:
+        return False
+    subject = (
+        f"Alert: 5 rejected candidates reached — "
+        f"{context.get('client_name', 'Client')} | {context.get('position_name', 'Role')}"
+    )
+    body = _rejection_alert_email_html(
+        context.get("client_name"),
+        context.get("position_name"),
+        context.get("opportunity_id"),
+        rejected_total,
+    )
+    recipients = [_REJECTION_ALERT_EMAIL]
+    hr_lead_email = (context.get("hr_lead_email") or "").strip().lower()
+    if hr_lead_email and hr_lead_email not in recipients:
+        recipients.append(hr_lead_email)
+
+    payload = {"to": recipients, "subject": subject, "body": body}
+    try:
+        resp = requests.post(
+            "https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email",
+            json=payload,
+            timeout=30
+        )
+        if not resp.ok:
+            logging.error("Send rejection alert failed: %s %s", resp.status_code, resp.text)
+        return resp.ok
+    except Exception:
+        logging.exception("Send rejection alert failed")
         return False
 
 
@@ -1644,14 +1780,44 @@ def update_candidate_batch_status():
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT status
+            FROM candidates_batches
+            WHERE candidate_id = %s AND batch_id = %s
+            LIMIT 1
+            """,
+            (candidate_id, batch_id),
+        )
+        previous_row = cursor.fetchone()
+        previous_status = previous_row[0] if previous_row else None
+        previous_rejected = _is_rejected_batch_status(previous_status)
+        new_rejected = _is_rejected_batch_status(status)
+
         cursor.execute("""
             UPDATE candidates_batches
             SET status = %s
             WHERE candidate_id = %s AND batch_id = %s
         """, (status, candidate_id, batch_id))
+
+        should_send_alert = False
+        alert_context = None
+        rejected_total = 0
+        if new_rejected and not previous_rejected:
+            alert_context = _fetch_rejection_alert_context(cursor, batch_id)
+            if alert_context and alert_context.get("opportunity_id") is not None:
+                rejected_total = _count_rejected_candidates_in_opportunity(
+                    cursor,
+                    alert_context["opportunity_id"],
+                )
+                should_send_alert = rejected_total == _REJECTION_ALERT_THRESHOLD
+
         conn.commit()
         cursor.close()
         conn.close()
+
+        if should_send_alert:
+            _send_rejection_threshold_email(alert_context, rejected_total)
 
         print("✅ Status updated successfully")
         return jsonify({'success': True}), 200

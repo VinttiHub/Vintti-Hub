@@ -49,6 +49,24 @@ def _format_money(n) -> str:
         return "0"
 
 
+def _format_computer_need(value) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+
+    text = str(value).strip()
+    if not text:
+        return "—"
+
+    low = text.lower()
+    if low in {"1", "true", "t", "yes", "y", "si", "sí"}:
+        return "Yes"
+    if low in {"0", "false", "f", "no", "n"}:
+        return "No"
+    return text
+
+
 def _references_card_html(references: Optional[str]) -> str:
     """Render References / notes inside a simple card to improve readability."""
     safe_body = _format_references_block(references)
@@ -91,6 +109,7 @@ def _format_references_block(references: Optional[str]) -> str:
 def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail,
     candidate_name:str, client_name:str, opp_position_name:str,
+    computer=None,
     referal_source: Optional[str] = None,
     lead_source: Optional[str] = None
 ):
@@ -111,6 +130,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
         <li><b>Salary:</b> ${html.escape(_format_money(salary))}</li>
         <li><b>Fee:</b> ${html.escape(_format_money(fee))}</li>
         <li><b>Set-up fee:</b> ${html.escape(_format_money(setup_fee))}</li>
+        <li><b>Needs computer:</b> {html.escape(_format_computer_need(computer))}</li>
         <li><b>Client email:</b> {html.escape(client_mail or '—')}</li>
         {referral_html}
         {lead_source_html}
@@ -132,6 +152,7 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
 def _initial_email_html_recruiting(  
     candidate_id:int, start_date, salary, revenue, references, client_mail,
     candidate_name:str, client_name:str, opp_position_name:str,
+    computer=None,
     referal_source: Optional[str] = None,
     lead_source: Optional[str] = None
 ):
@@ -151,6 +172,7 @@ def _initial_email_html_recruiting(
       <p><b>Start date:</b> {html.escape(str(start_date or '—'))}<br>
          <b>Salary:</b> ${html.escape(_format_money(salary))}<br>
          <b>Revenue :</b> ${html.escape(_format_money(revenue))}<br>
+         <b>Needs computer:</b> {html.escape(_format_computer_need(computer))}<br>
          <b>Client email:</b> {html.escape(client_mail or '—')}<br>
          {referral_line}
          {lead_source_line}
@@ -231,6 +253,7 @@ def press_and_send(candidate_id):
                 candidate_name=candidate_name,
                 client_name=client_name,
                 opp_position_name=opp_position_name,
+                computer=hire.get("computer"),
                 referal_source=referal_source,
                 lead_source=lead_source
             )
@@ -246,12 +269,13 @@ def press_and_send(candidate_id):
                 candidate_name=candidate_name,
                 client_name=client_name,
                 opp_position_name=opp_position_name,
+                computer=hire.get("computer"),
                 referal_source=referal_source,
                 lead_source=lead_source
             )
 
 
-        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL]  # lista de destinatarios fija por ahora
+        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, PGONZALES_EMAIL]  # lista de destinatarios fija por ahora
 
         # Nuevo subject dinámico
         subject = f"🎉 Signed: {client_name or 'Client'} — {opp_position_name or 'Role'}"
@@ -524,6 +548,7 @@ def _fetch_hire_core(candidate_id: int, cur):
             COALESCE(ho.salary, 0)                        AS salary,
             COALESCE(ho.fee, 0)                           AS fee,       -- usado por staffing
             COALESCE(ho.revenue, 0)                       AS revenue,   -- usado por recruiting
+            ho.computer                                   AS computer,
             ho.opportunity_id                             AS opportunity_id
         FROM hire_opportunity ho
         WHERE ho.candidate_id = %s
