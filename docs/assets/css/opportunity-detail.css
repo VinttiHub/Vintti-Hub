@@ -3384,3 +3384,176 @@ input:checked + .slider::before {
   height: 40vh;    /* zona extra de drop debajo de las últimas cards */
   min-height: 120px;
 }
+
+/* ===== Turvo ===== */
+.turvo-header{
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.turvo-actions{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.turvo-refresh-btn{
+  background: #0f766e;
+  color: #ffffff;
+  border: 1px solid #0f766e;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.25);
+  cursor: pointer;
+}
+
+.turvo-refresh-btn:hover{
+  background: #115e59;
+  border-color: #115e59;
+}
+
+.turvo-refresh-label{
+  font-size: 0.85rem;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
+.turvo-table-wrap{
+  margin-top: 18px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.turvo-table{
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.turvo-table th,
+.turvo-table td{
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf2f7;
+  font-size: 0.92rem;
+}
+
+.turvo-table th{
+  background: #f8fafc;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.turvo-table td{
+  color: #1f2933;
+}
+
+.turvo-table input[type="number"]{
+  width: 120px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 0.9rem;
+}
+
+.turvo-table input[type="number"]:focus{
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+
+.turvo-empty{
+  text-align: center;
+  color: #64748b;
+  font-style: italic;
+}
+
+.turvo-empty td{
+  text-align: center;
+}
+
+/* ===== Turvo refresh popup ===== */
+.turvo-refresh-modal{
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+.turvo-refresh-modal.hidden{
+  display: none;
+}
+
+.turvo-refresh-card{
+  width: min(560px, 92vw);
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+}
+
+.turvo-refresh-card h3{
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+.turvo-refresh-subtext{
+  margin: 0 0 16px;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.turvo-game{
+  background: linear-gradient(135deg, #eef2ff, #f8fafc);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.turvo-score{
+  font-size: 0.9rem;
+  color: #1f2937;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.turvo-game-arena{
+  position: relative;
+  height: 180px;
+  border-radius: 14px;
+  background: radial-gradient(circle at 20% 20%, #e0f2fe, #fefce8);
+  border: 1px dashed #cbd5f5;
+  overflow: hidden;
+}
+
+.turvo-game-target{
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: radial-gradient(circle at 30% 30%, #38bdf8, #0ea5e9);
+  box-shadow: 0 6px 14px rgba(14, 165, 233, 0.4);
+  transition: transform 0.1s ease;
+}
+
+.turvo-game-target:active{
+  transform: scale(0.9);
+}

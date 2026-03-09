@@ -523,6 +523,204 @@ function showTinyToast(msg){
   setTimeout(()=>{ el.style.opacity=.0; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(), 220); }, 900);
 }
 
+// ===== Turvo =====
+let turvoGameInterval = null;
+let turvoGameScore = 0;
+
+function formatTurvoDate(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function setTurvoLastRefresh(value, rows) {
+  const label = document.getElementById('turvo-last-refresh');
+  if (!label) return;
+
+  let lastValue = value;
+  if (!lastValue && Array.isArray(rows) && rows.length) {
+    lastValue = rows.reduce((latest, row) => {
+      const candidate = row.last_refresh_date;
+      if (!candidate) return latest;
+      if (!latest) return candidate;
+      return new Date(candidate) > new Date(latest) ? candidate : latest;
+    }, '');
+  }
+
+  label.textContent = lastValue ? `Last refresh: ${formatTurvoDate(lastValue)}` : 'Last refresh: —';
+}
+
+function renderTurvoTable(rows) {
+  const tbody = document.getElementById('turvo-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const tr = document.createElement('tr');
+    tr.className = 'turvo-empty';
+    tr.innerHTML = '<td colspan="3">No Turvo meetings found yet.</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const aDate = new Date(a.meeting_date || 0).getTime();
+    const bDate = new Date(b.meeting_date || 0).getTime();
+    return bDate - aDate;
+  });
+
+  sorted.forEach((row) => {
+    const tr = document.createElement('tr');
+
+    const hrLeadTd = document.createElement('td');
+    hrLeadTd.textContent = row.hr_lead || '—';
+
+    const dateTd = document.createElement('td');
+    dateTd.textContent = formatTurvoDate(row.meeting_date);
+
+    const candidatesTd = document.createElement('td');
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1';
+    input.value = row.candidates != null ? row.candidates : '';
+    input.addEventListener('change', async () => {
+      const value = input.value === '' ? 0 : Number(input.value);
+      if (!Number.isFinite(value) || value < 0) {
+        showTinyToast('⚠️ enter a valid number');
+        input.value = row.candidates != null ? row.candidates : '';
+        return;
+      }
+      input.disabled = true;
+      try {
+        const res = await fetch(`${API_BASE}/turvo/${row.turvo_id}/candidates`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ candidates: value }),
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err || 'Update failed');
+        }
+        row.candidates = value;
+        showTinyToast('✅ saved');
+      } catch (err) {
+        console.error('Failed to update candidates:', err);
+        showTinyToast('⚠️ could not save');
+        input.value = row.candidates != null ? row.candidates : '';
+      } finally {
+        input.disabled = false;
+      }
+    });
+    candidatesTd.appendChild(input);
+
+    tr.appendChild(hrLeadTd);
+    tr.appendChild(dateTd);
+    tr.appendChild(candidatesTd);
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadTurvoMeetings() {
+  const opportunityId = getOpportunityId();
+  if (!opportunityId) return;
+  try {
+    const res = await fetch(`${API_BASE}/turvo?opportunity_id=${encodeURIComponent(opportunityId)}`, {
+      credentials: 'include'
+    });
+    const rows = await res.json();
+    if (!res.ok) {
+      throw new Error(rows?.error || 'Failed to load Turvo meetings');
+    }
+    renderTurvoTable(rows);
+    setTurvoLastRefresh(null, rows);
+  } catch (err) {
+    console.error('Failed to load Turvo meetings:', err);
+    renderTurvoTable([]);
+  }
+}
+
+function startTurvoGame() {
+  const arena = document.getElementById('turvo-game-arena');
+  const target = document.getElementById('turvo-game-target');
+  const scoreEl = document.getElementById('turvo-score');
+  if (!arena || !target || !scoreEl) return;
+
+  if (!target.dataset.bound) {
+    target.addEventListener('click', () => {
+      turvoGameScore += 1;
+      scoreEl.textContent = String(turvoGameScore);
+      moveTurvoTarget();
+    });
+    target.dataset.bound = 'true';
+  }
+
+  function moveTurvoTarget() {
+    const maxX = Math.max(0, arena.clientWidth - target.offsetWidth);
+    const maxY = Math.max(0, arena.clientHeight - target.offsetHeight);
+    const x = Math.random() * maxX;
+    const y = Math.random() * maxY;
+    target.style.left = `${x}px`;
+    target.style.top = `${y}px`;
+  }
+
+  moveTurvoTarget();
+  turvoGameInterval = setInterval(moveTurvoTarget, 700);
+}
+
+function openTurvoRefreshModal() {
+  const modal = document.getElementById('turvoRefreshModal');
+  if (!modal) return;
+  turvoGameScore = 0;
+  const scoreEl = document.getElementById('turvo-score');
+  if (scoreEl) scoreEl.textContent = '0';
+  modal.classList.remove('hidden');
+  clearInterval(turvoGameInterval);
+  setTimeout(startTurvoGame, 50);
+}
+
+function closeTurvoRefreshModal() {
+  const modal = document.getElementById('turvoRefreshModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  clearInterval(turvoGameInterval);
+  turvoGameInterval = null;
+}
+
+async function refreshTurvoMeetings() {
+  const opportunityId = getOpportunityId();
+  if (!opportunityId) return;
+  openTurvoRefreshModal();
+  try {
+    const res = await fetch(`${API_BASE}/turvo/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: opportunityId }),
+      credentials: 'include'
+    });
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload?.error || 'Refresh failed');
+    }
+    const rows = payload.rows || [];
+    renderTurvoTable(rows);
+    setTurvoLastRefresh(payload.last_refresh_date, rows);
+  } catch (err) {
+    console.error('Failed to refresh Turvo meetings:', err);
+    showTinyToast('⚠️ refresh failed');
+  } finally {
+    closeTurvoRefreshModal();
+  }
+}
+
 function getStoredUserEmail(){
   const stores = [window.localStorage, window.sessionStorage];
   for (const store of stores) {
@@ -1090,10 +1288,14 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
         if (tab.textContent.trim() === 'Pipeline') {
           loadPipelineCandidates();
         }
+        if (tab.textContent.trim() === 'Turvo') {
+          loadTurvoMeetings();
+        }
       });
     });
 
   activateTab(0);
+  document.getElementById('turvo-refresh-btn')?.addEventListener('click', refreshTurvoMeetings);
 
   // ✅ Card toggle
   document.querySelectorAll('.card-toggle').forEach(btn => {
@@ -1116,6 +1318,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
 
   // ✅ Cargar datos reales de la oportunidad
   loadOpportunityData();
+  loadTurvoMeetings();
   console.log('🔎 hireCandidateId after load:', window.hireCandidateId);
 
   document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {

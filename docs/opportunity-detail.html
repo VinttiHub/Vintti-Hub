@@ -46,6 +46,7 @@
         <li class="nav-item">Job Description</li>
         <li class="nav-item">Pipeline</li>
         <li class="nav-item">Candidates</li>
+        <li class="nav-item">Turvo</li>
         <div class="nav-indicator"></div>
       </ul>
     </nav>
@@ -373,6 +374,33 @@
         <button class="btn-create">Create new batch</button>
       </div>
     </section>
+
+    <!-- ========== Turvo ========== -->
+    <section id="turvo" class="detail-section hidden">
+      <div class="turvo-header">
+        <div>
+          <h2>Turvo</h2>
+          <p class="subtitle">Track Turvo meetings linked to this opportunity.</p>
+        </div>
+        <div class="turvo-actions">
+          <button id="turvo-refresh-btn" class="turvo-refresh-btn" type="button">Refresh</button>
+          <span id="turvo-last-refresh" class="turvo-refresh-label">Last refresh: —</span>
+        </div>
+      </div>
+
+      <div class="turvo-table-wrap">
+        <table class="turvo-table">
+          <thead>
+            <tr>
+              <th>HR Lead</th>
+              <th>Date of the Turvo meeting</th>
+              <th>Candidates received</th>
+            </tr>
+          </thead>
+          <tbody id="turvo-table-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <!-- ===== AI Assistant (hidden by default) ===== -->
@@ -399,6 +427,20 @@
 
       <div class="button-group">
         <button id="ai-assistant-go">Let's Go 🚀</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Turvo refresh popup ===== -->
+  <div id="turvoRefreshModal" class="turvo-refresh-modal hidden" role="dialog" aria-modal="true" aria-live="polite">
+    <div class="turvo-refresh-card" role="document">
+      <h3>Loading Turvo meetings...</h3>
+      <p class="turvo-refresh-subtext">Mini-game: catch the comet while we sync calendars.</p>
+      <div class="turvo-game">
+        <div class="turvo-score">Score: <span id="turvo-score">0</span></div>
+        <div id="turvo-game-arena" class="turvo-game-arena">
+          <button id="turvo-game-target" class="turvo-game-target" type="button" aria-label="Catch the comet"></button>
+        </div>
       </div>
     </div>
   </div>
