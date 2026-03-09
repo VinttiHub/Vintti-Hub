@@ -1733,13 +1733,18 @@ const uniqueAccounts = [...new Set(data.map(d => d.client_name).filter(Boolean))
   console.debug('No hay tabla de oportunidades en esta página; omito inicialización.');
 }
 
-const CLOSE_WIN_CELEBRATION_DURATION = 1500;
+const CLOSE_WIN_CELEBRATION_DURATION = 3200;
 let closeWinCelebrationTimer = null;
+let closeWinCelebrationFrame = null;
 
 function playCloseWinCelebration(onDone) {
   if (closeWinCelebrationTimer) {
     clearTimeout(closeWinCelebrationTimer);
     closeWinCelebrationTimer = null;
+  }
+  if (closeWinCelebrationFrame) {
+    cancelAnimationFrame(closeWinCelebrationFrame);
+    closeWinCelebrationFrame = null;
   }
 
   const existing = document.getElementById('closeWinCelebrationOverlay');
@@ -1750,17 +1755,93 @@ function playCloseWinCelebration(onDone) {
   overlay.className = 'close-win-celebration';
   overlay.setAttribute('aria-hidden', 'true');
 
-  const gif = document.createElement('img');
-  gif.src = './assets/img/applause.gif';
-  gif.alt = 'Celebration fireworks';
-  gif.className = 'close-win-celebration__gif';
-  overlay.appendChild(gif);
+  const canvas = document.createElement('canvas');
+  canvas.className = 'close-win-celebration__canvas';
+  overlay.appendChild(canvas);
 
   (document.body || document.documentElement).appendChild(overlay);
 
-  closeWinCelebrationTimer = window.setTimeout(() => {
+  const ctx = canvas.getContext('2d');
+  const colors = ['#14b8a6', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899'];
+  const pieces = [];
+  const pieceCount = 220;
+
+  const resize = () => {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  resize();
+  window.addEventListener('resize', resize);
+
+  const rand = (min, max) => Math.random() * (max - min) + min;
+  for (let i = 0; i < pieceCount; i += 1) {
+    pieces.push({
+      x: rand(0, window.innerWidth),
+      y: rand(-window.innerHeight, 0),
+      vx: rand(-2.6, 2.6),
+      vy: rand(1.5, 4.7),
+      size: rand(5, 11),
+      rot: rand(0, Math.PI * 2),
+      vr: rand(-0.2, 0.2),
+      color: colors[Math.floor(Math.random() * colors.length)],
+      tilt: rand(-0.5, 0.5),
+    });
+  }
+
+  const cleanup = () => {
+    window.removeEventListener('resize', resize);
+    if (closeWinCelebrationFrame) {
+      cancelAnimationFrame(closeWinCelebrationFrame);
+      closeWinCelebrationFrame = null;
+    }
     overlay.remove();
+  };
+
+  const animate = () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < pieces.length; i += 1) {
+      const p = pieces[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      p.vy += 0.02;
+      p.vx *= 0.998;
+
+      if (p.y > h + 20) {
+        p.y = rand(-60, -10);
+        p.x = rand(0, w);
+        p.vy = rand(1.5, 4.3);
+        p.vx = rand(-2.4, 2.4);
+      }
+      if (p.x < -20) p.x = w + 20;
+      if (p.x > w + 20) p.x = -20;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.95;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * (1 + p.tilt));
+      ctx.restore();
+    }
+
+    closeWinCelebrationFrame = requestAnimationFrame(animate);
+  };
+
+  animate();
+
+  closeWinCelebrationTimer = window.setTimeout(() => {
     closeWinCelebrationTimer = null;
+    cleanup();
     if (typeof onDone === 'function') {
       onDone();
     }
@@ -1836,7 +1917,7 @@ document.addEventListener('change', async (e) => {
       return;
     }
     if (newStage === 'Close Win') {
-      openCloseWinPopup(opportunityId, e.target, { mode: 'close-win' });
+      playCloseWinCelebration(() => openCloseWinPopup(opportunityId, e.target, { mode: 'close-win' }));
       return;
     }
     if (newStage === 'Closed Lost') {
