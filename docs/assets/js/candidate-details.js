@@ -2316,12 +2316,14 @@ const hirePerks = document.getElementById('hire-extraperks');
 const hireSalary = document.getElementById('hire-salary');
 const hireFee = document.getElementById('hire-fee');
 const hireRevenue = document.getElementById('hire-revenue');
+const hirePriceType = document.getElementById('hire-price-type');
 const hireSetupFee = document.getElementById('hire-setup-fee');
 const referencesDiv = document.getElementById('hire-references');
 
 if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
 if (hirePTO) hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
 if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
+if (hirePriceType) hirePriceType.addEventListener('change', () => updateHireField('price_type', hirePriceType.value));
 if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
 if (hireSetupFee) hireSetupFee.addEventListener('blur', () => { const v = parseFloat(hireSetupFee.value); if (!isNaN(v)) updateHireField('setup_fee', v); });
 if (referencesDiv) referencesDiv.addEventListener('blur', () => updateHireField('references_notes', referencesDiv.innerHTML));
@@ -2436,6 +2438,7 @@ if (hireRevenue){
         if (setupEl) setupEl.value = data.setup_fee || '';
         if (salaryInput) salaryInput.value = data.employee_salary || '';
         if (feeInput)    feeInput.value    = data.employee_fee    || '';
+        const priceType = document.getElementById('hire-price-type'); if (priceType) priceType.value = data.price_type || '';
         const comp = document.getElementById('hire-computer');      if (comp) comp.value = data.computer || '';
         const perks = document.getElementById('hire-extraperks');   if (perks) perks.innerHTML = data.extraperks || '';
         const ws = document.getElementById('hire-working-schedule');if (ws) ws.value = data.working_schedule || '';
