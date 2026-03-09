@@ -460,6 +460,52 @@ function computeMatchScore(profile) {
   return Math.min(10, Math.max(1, scaled));
 }
 
+function getMatchSummary(profile) {
+  const parts = [];
+  if (state.filters.country) {
+    if (isLatinAmericaFilter(state.filters.country)) {
+      parts.push(isLatinAmericaLocation(profile.country || profile.searchableText) ? "based in Latin America" : "location outside Latin America");
+    } else if (matchesTextFilter(profile.country, state.filters.country, profile.searchableText)) {
+      parts.push("location matches");
+    } else {
+      parts.push("location not mentioned");
+    }
+  }
+  if (state.filters.position) {
+    parts.push(
+      matchesTextFilter(profile.position, state.filters.position, profile.searchableText)
+        ? "position matches"
+        : "position not mentioned"
+    );
+  }
+  if (state.filters.industry) {
+    parts.push(
+      matchesTextFilter(profile.industry, state.filters.industry, profile.searchableText)
+        ? "industry matches"
+        : "industry not mentioned"
+    );
+  }
+  if (state.filters.years_experience) {
+    const yearScore = scoreYearsMatch(profile);
+    if (yearScore === 2) parts.push("years of experience match");
+    else if (yearScore === 1) parts.push("years of experience are close");
+    else parts.push("years of experience not found");
+  }
+  if (state.filters.salary) {
+    const salaryScore = scoreSalaryMatch(profile);
+    if (salaryScore === 2) parts.push("salary aligns");
+    else if (salaryScore === 1) parts.push("salary is close");
+    else parts.push("salary not found");
+  }
+  return parts.filter(Boolean);
+}
+
+function buildScoreExplanation(profile, score) {
+  const summary = getMatchSummary(profile);
+  if (!summary.length) return `${score}/10 because no filters are set.`;
+  return `${score}/10 because ${summary.slice(0, 3).join(", ")}.`;
+}
+
 function renderCandidates() {
   const scored = state.candidates
     .map((candidate) => ({
@@ -521,8 +567,10 @@ async function loadApplicants(opportunityId) {
   renderCandidates();
 }
 
-function renderApplicantDrawer(applicant) {
-  if (!applicant || !els.drawerBody || !els.drawerTitle) return;
+function renderApplicantDrawer(entry) {
+  if (!entry || !els.drawerBody || !els.drawerTitle) return;
+  const applicant = entry.pipeline;
+  const profile = entry.profile;
   const name = `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim() || applicant.email || "Applicant";
   els.drawerTitle.textContent = name;
 
@@ -540,30 +588,35 @@ function renderApplicantDrawer(applicant) {
   const cvLink = applicant.cv_s3_key
     ? `<a class="drawer-link" id="cvDownloadLink" href="#" target="_blank" rel="noopener">Download ${cvName}</a>`
     : "<span class=\"drawer-value\">—</span>";
+  const scoreText = buildScoreExplanation(profile, entry.score ?? computeMatchScore(profile));
 
   els.drawerBody.innerHTML = `
+    <div class="drawer-section">
+      <h4>Match score</h4>
+      <p class="score-note">${escapeHtml(scoreText)}</p>
+    </div>
     <div class="drawer-section">
       <h4>Overview</h4>
       <div class="drawer-item">
         <span class="drawer-label">Email</span>
         <span class="drawer-value copy-value" data-copy="${escapeHtml(applicant.email || "")}">
+          <button class="copy-btn" type="button" aria-label="Copy email" title="Copy to clipboard" data-copy="${escapeHtml(applicant.email || "")}">📋</button>
           ${escapeHtml(applicant.email || "—")}
-          <button class="copy-btn" type="button" aria-label="Copy email" data-copy="${escapeHtml(applicant.email || "")}">Copy</button>
         </span>
       </div>
       <div class="drawer-item">
         <span class="drawer-label">Phone</span>
         <span class="drawer-value copy-value" data-copy="${escapeHtml(phoneLabel)}">
+          <button class="copy-btn" type="button" aria-label="Copy phone" title="Copy to clipboard" data-copy="${escapeHtml(phoneLabel)}">📋</button>
           ${escapeHtml(phoneLabel)}
-          <button class="copy-btn" type="button" aria-label="Copy phone" data-copy="${escapeHtml(phoneLabel)}">Copy</button>
         </span>
       </div>
       <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(locationLabel)}</span></div>
       <div class="drawer-item">
         <span class="drawer-label">LinkedIn</span>
         <span class="drawer-value copy-value" data-copy="${escapeHtml(linkedinUrl)}">
+          <button class="copy-btn" type="button" aria-label="Copy LinkedIn" title="Copy to clipboard" data-copy="${escapeHtml(linkedinUrl)}">📋</button>
           ${linkedinLink}
-          <button class="copy-btn" type="button" aria-label="Copy LinkedIn" data-copy="${escapeHtml(linkedinUrl)}">Copy</button>
         </span>
       </div>
     </div>
@@ -618,7 +671,7 @@ async function loadApplicantCvLink(applicantId) {
 }
 
 function openApplicantDrawer(applicant) {
-  state.selectedApplicantId = applicant?.applicant_id || null;
+  state.selectedApplicantId = applicant?.pipeline?.applicant_id || null;
   renderApplicantDrawer(applicant);
   if (els.applicantDrawer) els.applicantDrawer.setAttribute("aria-hidden", "false");
   document.body.classList.add("drawer-open");
@@ -694,7 +747,7 @@ async function init() {
       const applicantId = Number(card.dataset.applicantId);
       const selected = state.candidates.find((entry) => entry.profile.id === applicantId);
       if (selected?.pipeline) {
-        openApplicantDrawer(selected.pipeline);
+        openApplicantDrawer({ ...selected, score: computeMatchScore(selected.profile) });
       }
     });
   }
@@ -712,7 +765,7 @@ async function init() {
       try {
         await navigator.clipboard.writeText(value);
         const original = button.textContent;
-        button.textContent = "Copied";
+        button.textContent = "✅";
         setTimeout(() => {
           button.textContent = original;
         }, 1200);
