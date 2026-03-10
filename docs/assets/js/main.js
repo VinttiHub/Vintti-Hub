@@ -3577,6 +3577,7 @@ async function sendCloseWinStageEmail(opportunityId){
 
     let candidateName = `Candidate #${candidateId}`;
     let hireStartDate = '';
+    let hirePriceType = '';
     try {
       const [candidateRes, hireRes] = await Promise.all([
         fetch(`${API_BASE}/candidates/${candidateId}`, { credentials: 'include' }),
@@ -3593,6 +3594,7 @@ async function sendCloseWinStageEmail(opportunityId){
       if (hireRes.ok) {
         const hire = await hireRes.json();
         hireStartDate = String(hire?.start_date || '').slice(0, 10);
+        hirePriceType = String(hire?.price_type || '').trim();
       } else {
         console.warn('⚠️ Close Win email: hire fetch failed', hireRes.status, candidateId, opportunityId);
       }
@@ -3602,6 +3604,12 @@ async function sendCloseWinStageEmail(opportunityId){
 
     const startDate = hireStartDate || String(opp?.opp_close_date || '').slice(0, 10) || '—';
     const clientName = await resolveAccountName(opp);
+    const priceType = (() => {
+      const raw = String(hirePriceType || '').trim().toLowerCase();
+      if (raw === 'close') return 'Close';
+      if (raw === 'transparent') return 'Transparent';
+      return hirePriceType || '—';
+    })();
 
     const esc = s => String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
     const subject = `🎉 Close Win: ${candidateName} — Start ${startDate}`;
@@ -3611,7 +3619,8 @@ async function sendCloseWinStageEmail(opportunityId){
   <p>
     <b>Client:</b> ${esc(clientName)}<br>
     <b>Candidate:</b> ${esc(candidateName)}<br>
-    <b>Start date:</b> ${esc(startDate)}
+    <b>Start date:</b> ${esc(startDate)}<br>
+    <b>Price type:</b> ${esc(priceType)}
   </p>
   <p style="margin-top:16px">— Vintti HUB</p>
 </div>`.trim();
