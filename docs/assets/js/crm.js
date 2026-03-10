@@ -369,6 +369,18 @@ function csvMoneyValue(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function csvTextValue(value, fallback = '—') {
+  const text = value === null || value === undefined ? '' : String(value).trim();
+  return text || fallback;
+}
+
+function csvNullableTextValue(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value).trim();
+  const isoDateMatch = text.match(/\d{4}-\d{2}-\d{2}/);
+  return isoDateMatch ? isoDateMatch[0] : text;
+}
+
 function buildCrmExportRecord(item = {}) {
   const accountId = Number(item.account_id);
   if (!accountId) return null;
@@ -429,47 +441,242 @@ function getOrderedCrmExportIds() {
     .filter(Boolean);
 }
 
-function downloadCrmCsv() {
+function setCrmExportButtonState(isLoading) {
+  const btn = document.getElementById('crmExportCsvBtn');
+  if (!btn) return;
+  btn.disabled = Boolean(isLoading);
+  btn.textContent = isLoading ? 'Exporting...' : 'Download CSV';
+}
+
+async function fetchCrmExportCandidates(accountId) {
+  if (!accountId) return [];
+  try {
+    const [contextRes, detailRes, buyoutsRes] = await Promise.all([
+      fetch(`${API_BASE}/public/bonus_request/context?account_id=${encodeURIComponent(accountId)}`),
+      fetch(`${API_BASE}/accounts/${accountId}/opportunities/candidates`),
+      fetch(`${API_BASE}/accounts/${accountId}/buyouts`)
+    ]);
+
+    if (!contextRes.ok) throw new Error(`Bonus context HTTP ${contextRes.status}`);
+
+    const contextData = await contextRes.json();
+    const activeCandidates = Array.isArray(contextData?.candidates) ? contextData.candidates : [];
+    const activeIds = new Set(
+      activeCandidates
+        .filter(candidate => (candidate?.status || '').toString().trim().toLowerCase() === 'active')
+        .map(candidate => Number(candidate?.candidate_id))
+        .filter(Boolean)
+    );
+
+    let detailCandidates = [];
+    if (detailRes.ok) {
+      const detailData = await detailRes.json();
+      detailCandidates = Array.isArray(detailData) ? detailData : [];
+    } else {
+      console.warn(`Could not load detailed candidate rows for CSV export on account ${accountId}: HTTP ${detailRes.status}`);
+    }
+
+    let buyouts = [];
+    if (buyoutsRes.ok) {
+      const buyoutsData = await buyoutsRes.json();
+      buyouts = Array.isArray(buyoutsData) ? buyoutsData : [];
+    } else {
+      console.warn(`Could not load buyout rows for CSV export on account ${accountId}: HTTP ${buyoutsRes.status}`);
+    }
+
+    const detailById = new Map();
+    detailCandidates.forEach(candidate => {
+      const id = Number(candidate?.candidate_id);
+      if (!id) return;
+
+      const prev = detailById.get(id);
+      if (!prev) {
+        detailById.set(id, candidate);
+        return;
+      }
+
+      const prevModel = (prev?.opp_model || '').toString().trim().toLowerCase();
+      const nextModel = (candidate?.opp_model || '').toString().trim().toLowerCase();
+      const prevActive = (prev?.status || '').toString().trim().toLowerCase() === 'active';
+      const nextActive = (candidate?.status || '').toString().trim().toLowerCase() === 'active';
+
+      const shouldReplace =
+        (nextModel === 'recruiting' && prevModel !== 'recruiting') ||
+        (nextModel === prevModel && nextActive && !prevActive);
+
+      if (shouldReplace) detailById.set(id, candidate);
+    });
+
+    const buyoutByCandidateId = new Map();
+    buyouts.forEach(buyout => {
+      const id = Number(buyout?.candidate_id);
+      if (!id) return;
+      const prev = buyoutByCandidateId.get(id);
+      const prevId = Number(prev?.buyout_id) || 0;
+      const nextId = Number(buyout?.buyout_id) || 0;
+      if (!prev || nextId > prevId) buyoutByCandidateId.set(id, buyout);
+    });
+
+    return activeCandidates.map((candidate = {}) => {
+      const id = Number(candidate.candidate_id);
+      const detail = id ? detailById.get(id) : null;
+      const buyout = id ? buyoutByCandidateId.get(id) : null;
+
+      if (buyout) {
+        const staffingEndDate = detail?.end_date || '';
+        return {
+          ...(detail || {}),
+          candidate_id: candidate.candidate_id ?? detail?.candidate_id ?? '',
+          name: candidate.full_name || buyout.candidate_name || detail?.name || '—',
+          status: 'active',
+          opp_model: 'Recruiting',
+          start_date: staffingEndDate || buyout.start_date || detail?.start_date || '',
+          end_date: staffingEndDate || buyout.end_date || detail?.end_date || '',
+          employee_salary: buyout.salary ?? detail?.employee_salary ?? '',
+          employee_revenue_recruiting: buyout.revenue ?? detail?.employee_revenue_recruiting ?? detail?.employee_revenue ?? '',
+          employee_revenue: buyout.revenue ?? detail?.employee_revenue ?? '',
+          referral_dolar: buyout.referral ?? detail?.referral_dolar ?? '',
+          referral_daterange: buyout.referral_date_range ?? detail?.referral_daterange ?? '',
+          buyout_id: buyout.buyout_id ?? ''
+        };
+      }
+
+      return {
+        ...(detail || {}),
+        candidate_id: candidate.candidate_id ?? detail?.candidate_id ?? '',
+        name: candidate.full_name || detail?.name || '—',
+        status: 'active'
+      };
+    }).filter(candidate => activeIds.has(Number(candidate.candidate_id)));
+  } catch (err) {
+    console.warn(`Could not load candidates for CSV export on account ${accountId}:`, err);
+    return [];
+  }
+}
+
+function buildCrmCandidateExportRows(accountRow, candidates = []) {
+  const candidateList = (Array.isArray(candidates) ? candidates : []).filter(isActiveHire);
+  if (!candidateList.length) {
+    return [[
+      accountRow.accountId,
+      accountRow.clientName,
+      accountRow.status,
+      accountRow.salesLead,
+      accountRow.contract,
+      accountRow.trr,
+      accountRow.tsf,
+      accountRow.tsr,
+      accountRow.priority,
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      ''
+    ]];
+  }
+
+  return candidateList.map((candidate = {}) => [
+    accountRow.accountId,
+    accountRow.clientName,
+    accountRow.status,
+    accountRow.salesLead,
+    accountRow.contract,
+    accountRow.trr,
+    accountRow.tsf,
+    accountRow.tsr,
+    accountRow.priority,
+    candidate.candidate_id ?? '',
+    csvTextValue(candidate.name),
+    csvTextValue(candidate.status ?? (candidate.end_date ? 'inactive' : 'active')),
+    csvTextValue(candidate.opp_model),
+    csvTextValue(candidate.opp_position_name),
+    csvNullableTextValue(candidate.start_date),
+    csvNullableTextValue(candidate.end_date),
+    candidate.employee_fee ?? '',
+    candidate.employee_salary ?? '',
+    candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? ''
+  ]);
+}
+
+async function downloadCrmCsv() {
   const orderedIds = getOrderedCrmExportIds();
   if (!orderedIds.length) {
     alert('No data available to export.');
     return;
   }
 
-  const headers = ['Account ID', 'Client Name', 'Status', 'Sales Lead', 'Contract', 'TRR', 'TSF', 'TSR', 'Priority'];
+  const headers = [
+    'Account ID',
+    'Client Name',
+    'Status',
+    'Sales Lead',
+    'Contract',
+    'TRR',
+    'TSF',
+    'TSR',
+    'Priority',
+    'Candidate ID',
+    'Candidate Name',
+    'Candidate Status',
+    'Opportunity Model',
+    'Position',
+    'Start Date',
+    'End Date',
+    'Employee Fee',
+    'Employee Salary',
+    'Employee Revenue'
+  ];
   const lines = [headers.map(csvSafe).join(',')];
 
-  orderedIds.forEach(id => {
-    const row = CRM_EXPORT_CACHE.get(id);
-    if (!row) return;
-    lines.push([
-      row.accountId,
-      row.clientName,
-      row.status,
-      row.salesLead,
-      row.contract,
-      row.trr,
-      row.tsf,
-      row.tsr,
-      row.priority
-    ].map(csvSafe).join(','));
-  });
+  setCrmExportButtonState(true);
+  toggleCrmLoading(true, 'Preparing CRM CSV with account candidates...');
+  updateCrmLoadingProgress(0, orderedIds.length);
 
-  if (lines.length <= 1) {
-    alert('No rows matched the current table filters.');
-    return;
+  try {
+    let doneCount = 0;
+    const tasks = orderedIds.map(id => async () => {
+      const row = CRM_EXPORT_CACHE.get(id);
+      if (!row) {
+        doneCount += 1;
+        updateCrmLoadingProgress(doneCount, orderedIds.length);
+        return;
+      }
+      const candidates = await fetchCrmExportCandidates(id);
+      const exportRows = buildCrmCandidateExportRows(row, candidates);
+      exportRows.forEach(values => {
+        lines.push(values.map(csvSafe).join(','));
+      });
+      doneCount += 1;
+      updateCrmLoadingProgress(doneCount, orderedIds.length);
+    });
+
+    await runWithConcurrency(tasks, 6);
+
+    if (lines.length <= 1) {
+      alert('No rows matched the current table filters.');
+      return;
+    }
+
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    link.href = URL.createObjectURL(blob);
+    link.download = `crm_export_${date}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  } finally {
+    toggleCrmLoading(false);
+    updateCrmLoadingProgress(0, 0);
+    setCrmExportButtonState(false);
   }
-
-  const csv = lines.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const date = new Date().toISOString().slice(0, 10);
-  link.href = URL.createObjectURL(blob);
-  link.download = `crm_export_${date}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
 }
 
 function initCrmExportButton() {
