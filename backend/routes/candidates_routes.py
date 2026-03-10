@@ -31,7 +31,6 @@ _WHITESPACE_RE = re.compile(r'\s+')
 _LINKEDIN_DOMAIN_RE = re.compile(r'linkedin\.com.*', flags=re.I)
 _BLACKLIST_COLUMN_CACHE = None
 _REJECTED_BATCH_STATUSES = {
-    'client rejected cv',
     'client rejected after interviewing',
 }
 _REJECTION_ALERT_THRESHOLD = 5
@@ -233,7 +232,7 @@ def _rejection_alert_email_html(client_name, position_name, opportunity_id, reje
             <tr>
               <td style="padding:20px 24px;">
                 <p style="font-size:14px;line-height:1.6;color:#334155;margin:0 0 14px 0;">
-                  The opportunity has reached <strong>{safe_total} rejected candidates</strong> (Client rejected CV / Client rejected after interviewing).
+                  The opportunity has reached <strong>{safe_total} candidates</strong> with status <strong>Client rejected after interviewing</strong>.
                 </p>
                 <div style="padding:14px 16px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;">
                   <div style="font-size:14px;color:#0f172a;line-height:1.7;">
