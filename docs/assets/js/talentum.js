@@ -23,6 +23,13 @@ const state = {
   },
 };
 
+const HIDDEN_HR_FILTER_EMAILS = new Set([
+  "bahia@vintti.com",
+  "sol@vintti.com",
+  "agustin@vintti.com",
+  "agustina.ferrari@vintti.com",
+].map((email) => email.toLowerCase()));
+
 const els = {
   userPill: document.getElementById("userPill"),
   opportunitiesBody: document.getElementById("opportunitiesBody"),
@@ -125,6 +132,12 @@ function displayHrLead(opp) {
   return state.hrLeadDirectory[email] || prettyNameFromEmail(opp.opp_hr_lead) || "Unassigned";
 }
 
+function isVisibleHrLeadEmail(email) {
+  const normalized = normalizeText(email);
+  if (!normalized || HIDDEN_HR_FILTER_EMAILS.has(normalized)) return false;
+  return !!state.hrLeadDirectory[normalized];
+}
+
 function parseDaysRangeValue(value) {
   const clean = String(value || "").trim();
   if (!clean) return { min: null, max: null };
@@ -189,7 +202,12 @@ function buildFilterOptions(opportunities) {
   opportunities.forEach((opp) => {
     if (opp.opp_stage) stages.add(opp.opp_stage);
     if (displaySalesLead(opp)) salesLeads.add(displaySalesLead(opp));
-    if (displayHrLead(opp)) hrLeads.add(displayHrLead(opp));
+    const hrEmail = normalizeText(opp.opp_hr_lead);
+    if (!hrEmail) {
+      hrLeads.add("Unassigned");
+    } else if (isVisibleHrLeadEmail(hrEmail)) {
+      hrLeads.add(displayHrLead(opp));
+    }
     if (opp.opp_type) types.add(opp.opp_type);
   });
 
@@ -300,7 +318,10 @@ function applyFilters(opportunities) {
 
     if (state.filters.stages.size && !state.filters.stages.has(stage)) return false;
     if (state.filters.salesLeads.size && !state.filters.salesLeads.has(sales)) return false;
-    if (state.filters.hrLeads.size && !state.filters.hrLeads.has(hr)) return false;
+    const hrFilterActive =
+      state.filters.hrLeads.size &&
+      state.filters.hrLeads.size !== state.filterOptions.hrLeads.length;
+    if (hrFilterActive && !state.filters.hrLeads.has(hr)) return false;
     if (state.filters.types.size && !state.filters.types.has(type)) return false;
 
     if (state.filters.accountText && !account.includes(state.filters.accountText)) return false;

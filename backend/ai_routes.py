@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 import os
+from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from botocore.exceptions import NoCredentialsError
 from affinda import AffindaAPI, TokenCredential
@@ -135,7 +136,7 @@ def _strip_html_text(raw: str) -> str:
     text = re.sub(r"<[^>]+>", " ", raw or "")
     return re.sub(r"\s+", " ", text).strip()
 
-def _build_opportunity_context(cursor, opportunity_id: int | None):
+def _build_opportunity_context(cursor, opportunity_id: Optional[int]):
     if not opportunity_id:
         return "", {}
     cursor.execute(
@@ -169,8 +170,8 @@ def _score_applicant_with_openai(
     extracted_pdf: str,
     applicant_location: str,
     job_description: str,
-    filters: dict | None = None,
-    opportunity_context: dict | None = None,
+    filters: Optional[Dict[str, Any]] = None,
+    opportunity_context: Optional[Dict[str, Any]] = None,
 ):
     if not extracted_pdf:
         return None, None
@@ -230,7 +231,7 @@ Extracted CV text:
         score = max(1, min(10, score))
     return score, reasons
 
-def _recalculate_applicant_scores(opportunity_id: int, filters: dict | None = None):
+def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[str, Any]] = None):
     filters = filters or {}
     conn = get_connection()
     cursor = conn.cursor()
