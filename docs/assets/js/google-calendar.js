@@ -13,6 +13,13 @@
   const formStatus = document.getElementById('formStatus');
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const refreshDefaultLabel = refreshBtn ? refreshBtn.textContent.trim() : '';
+
+  function setRefreshing(isRefreshing) {
+    if (!refreshBtn) return;
+    refreshBtn.disabled = Boolean(isRefreshing);
+    refreshBtn.textContent = isRefreshing ? 'Refreshing…' : (refreshDefaultLabel || 'Refresh');
+  }
 
   function setStatus({ connected, message }) {
     if (connected) {
@@ -45,7 +52,9 @@
     if (!email) return null;
 
     try {
-      const res = await fetch(`${API_BASE}/users?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`${API_BASE}/users?email=${encodeURIComponent(email)}`, {
+        credentials: 'include',
+      });
       if (!res.ok) return null;
       const arr = await res.json();
       const hit = Array.isArray(arr) ? arr.find(u => (u.email_vintti || '').toLowerCase() === email) : null;
@@ -105,8 +114,10 @@
     calendarDate.value = date;
 
     try {
+      setRefreshing(true);
       const res = await fetch(
         `${API_BASE}/google-calendar/events?user_id=${encodeURIComponent(userId)}&date=${encodeURIComponent(date)}&timezone=${encodeURIComponent(tz)}`,
+        { credentials: 'include' },
       );
       if (!res.ok) {
         if (res.status === 404) {
@@ -121,6 +132,8 @@
     } catch (error) {
       console.error(error);
       renderEmptyState('No pudimos cargar tus reuniones. Intenta de nuevo.');
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -130,6 +143,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, redirect_to: window.location.origin + '/calendar.html' }),
+        credentials: 'include',
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -146,6 +160,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId }),
+        credentials: 'include',
       });
       setStatus({ connected: false, message: 'Desconectado. Puedes volver a conectar cuando quieras.' });
       renderEmptyState('Conecta tu Google Calendar para ver las reuniones del día.');
@@ -161,6 +176,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload, user_id: userId, timezone: tz }),
+        credentials: 'include',
       });
       if (!res.ok) throw new Error(await res.text());
       formStatus.textContent = 'Evento creado ✅';
@@ -211,7 +227,9 @@
     });
 
     try {
-      const res = await fetch(`${API_BASE}/google-calendar/status?user_id=${encodeURIComponent(userId)}`);
+      const res = await fetch(`${API_BASE}/google-calendar/status?user_id=${encodeURIComponent(userId)}`, {
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       if (data.connected) {
