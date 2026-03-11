@@ -175,6 +175,11 @@ function computeOppDays(opp) {
   return daysSince(opp.nda_signature_or_start_date);
 }
 
+function isActiveOpportunity(opp) {
+  const stage = String(opp?.opp_stage || "").trim();
+  return stage !== "Close Win" && stage !== "Closed Lost";
+}
+
 function buildFilterOptions(opportunities) {
   const stages = new Set();
   const salesLeads = new Set();
@@ -360,18 +365,16 @@ async function loadOpportunities() {
   setOpportunityHint("Loading opportunities…");
   const opportunities = await fetchJSON(`${API_BASE}/opportunities/light`);
   const list = Array.isArray(opportunities) ? opportunities : [];
-  const email = state.currentUserEmail;
 
-  await hydrateSourcingDates(list);
-  list.forEach((opp) => {
+  const activeOpps = list.filter((opp) => isActiveOpportunity(opp));
+
+  await hydrateSourcingDates(activeOpps);
+  activeOpps.forEach((opp) => {
     opp._days_since = computeOppDays(opp);
   });
 
-  let visible = list;
-  if (state.isHrLead && email) {
-    visible = list.filter((opp) => normalizeText(opp.opp_hr_lead) === email);
-    els.hrFilterPill.textContent = "Filter: my HR lead";
-  } else {
+  const visible = activeOpps;
+  if (els.hrFilterPill) {
     els.hrFilterPill.textContent = "Filter: all HR leads";
   }
 
