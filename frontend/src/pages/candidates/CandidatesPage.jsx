@@ -53,6 +53,8 @@ const DEFAULT_FORM = {
   phoneCode: PHONE_CODE_BY_COUNTRY[DEFAULT_PHONE_COUNTRY],
   phone: '',
   linkedin: '',
+  candidate_source: '',
+  candidate_origin: '',
 };
 
 function isTrueBlacklistFlag(value) {
@@ -298,6 +300,8 @@ function CandidatesPage() {
         phone: values.phoneDigits,
         linkedin: values.linkedinSubmit,
         country: values.country || null,
+        candidate_source: values.candidate_source || null,
+        candidate_origin: values.candidate_origin || null,
         stage: 'Contactado',
         created_by: (localStorage.getItem('user_email') || '').toLowerCase(),
       });
@@ -637,6 +641,36 @@ function CandidateModal({ formState, submitting, formError, duplicateInfo, onCha
               autoComplete="url"
               required
             />
+          </label>
+
+          <label className="candidate-field">
+            <span>Source</span>
+            <select
+              id="candidateSource"
+              name="candidate_source"
+              value={formState.candidate_source}
+              onChange={onChange}
+            >
+              <option value="">Select source…</option>
+              <option value="Linkedin">Linkedin</option>
+              <option value="Other Recruitment Tool">Other Recruitment Tool</option>
+              <option value="Turbo">Turbo</option>
+              <option value="Referido">Referido</option>
+            </select>
+          </label>
+
+          <label className="candidate-field">
+            <span>Origin</span>
+            <select
+              id="candidateOrigin"
+              name="candidate_origin"
+              value={formState.candidate_origin}
+              onChange={onChange}
+            >
+              <option value="">Select origin…</option>
+              <option value="Hunteo">Hunteo</option>
+              <option value="Applicant">Applicant</option>
+            </select>
           </label>
 
           <button type="submit" id="candidateModalSubmit" className="create-btn" disabled={submitting}>

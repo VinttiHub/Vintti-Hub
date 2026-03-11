@@ -385,6 +385,8 @@ const candidateModalRefs = {
   phoneCodeSelect: null,
   phoneInput: null,
   linkedinInput: null,
+  sourceSelect: null,
+  originSelect: null,
   openExistingBtn: null
 };
 
@@ -777,6 +779,8 @@ function setupCandidateModal() {
   candidateModalRefs.phoneCodeSelect = document.getElementById('candidatePhoneCode');
   candidateModalRefs.phoneInput = document.getElementById('candidatePhone');
   candidateModalRefs.linkedinInput = document.getElementById('candidateLinkedin');
+  candidateModalRefs.sourceSelect = document.getElementById('candidateSource');
+  candidateModalRefs.originSelect = document.getElementById('candidateOrigin');
   candidateModalRefs.openExistingBtn = document.getElementById('openExistingCandidateBtn');
 
   const openBtn = document.getElementById('openCandidateModalBtn');
@@ -934,6 +938,8 @@ function gatherCandidateFormValues() {
   const rawPhone = candidateModalRefs.phoneInput?.value || '';
   const linkedinRawInput = candidateModalRefs.linkedinInput?.value || '';
   const linkedinRaw = linkedinRawInput.trim();
+  const candidateSource = candidateModalRefs.sourceSelect?.value || '';
+  const candidateOrigin = candidateModalRefs.originSelect?.value || '';
 
   const phoneDigits = normalizePhoneDigits(rawPhone, phoneCode);
   const linkedinForSubmit = formatLinkedinForSubmit(linkedinRaw);
@@ -951,7 +957,9 @@ function gatherCandidateFormValues() {
     phoneDigits,
     linkedinRaw,
     normalizedLinkedin,
-    linkedinForSubmit
+    linkedinForSubmit,
+    candidateSource,
+    candidateOrigin
   };
 }
 
@@ -1263,6 +1271,8 @@ async function submitCandidate(values) {
     phone: values.phoneDigits,
     linkedin: values.linkedinForSubmit,
     country: formatCountryForSubmit(values.country, values.usStateCode),
+    candidate_source: values.candidateSource || null,
+    candidate_origin: values.candidateOrigin || null,
     stage: 'Contactado',
     created_by: localStorage.getItem('user_email')
   };

@@ -298,6 +298,26 @@
           <input type="url" id="candidateLinkedin" name="linkedin" placeholder="https://linkedin.com/in/username *" autocomplete="url" required />
         </label>
 
+        <label class="candidate-field">
+          <span>Source</span>
+          <select id="candidateSource" name="candidate_source">
+            <option value="">Select source…</option>
+            <option value="Linkedin">Linkedin</option>
+            <option value="Other Recruitment Tool">Other Recruitment Tool</option>
+            <option value="Turbo">Turbo</option>
+            <option value="Referido">Referral</option>
+          </select>
+        </label>
+
+        <label class="candidate-field">
+          <span>Origin</span>
+          <select id="candidateOrigin" name="candidate_origin">
+            <option value="">Select origin…</option>
+            <option value="Hunteo">Hunteo</option>
+            <option value="Applicant">Applicant</option>
+          </select>
+        </label>
+
         <button type="submit" id="candidateModalSubmit" class="create-btn">Create Candidate</button>
       </form>
     </div>

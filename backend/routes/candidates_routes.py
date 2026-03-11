@@ -607,6 +607,8 @@ def create_candidate_without_opportunity():
     salary_range = data.get('salary_range')
     stage = (data.get('stage') or 'Contactado').strip() or 'Contactado'
     created_by = (data.get('created_by') or '').strip().lower() or None
+    candidate_source = (data.get('candidate_source') or '').strip() or None
+    candidate_origin = (data.get('candidate_origin') or '').strip() or None
 
     if not email or not phone_digits or not linkedin_clean:
         return jsonify({"error": "Missing required fields: email, phone and linkedin"}), 400
@@ -709,13 +711,13 @@ def create_candidate_without_opportunity():
             INSERT INTO candidates (
                 candidate_id, name, email, phone, linkedin,
                 red_flags, comments, english_level, salary_range,
-                country, timezone, stage, created_by, created_at
+                country, timezone, stage, created_by, candidate_source, candidate_origin, created_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """, (
             new_candidate_id, name_db, email, phone_digits, linkedin_clean,
             red_flags, comments, english_level, salary_range,
-            country, timezone, stage, created_by
+            country, timezone, stage, created_by, candidate_source, candidate_origin
         ))
 
         conn.commit()
@@ -1023,6 +1025,8 @@ def get_candidate_by_id(candidate_id):
                 c.phone,
                 c.email,
                 c.linkedin,
+                c.candidate_source,
+                c.candidate_origin,
                 c.english_level,
                 c.salary_range,
                 c.red_flags,
@@ -1166,6 +1170,8 @@ def update_candidate_fields(candidate_id):
         'phone',
         'email',
         'linkedin',
+        'candidate_source',
+        'candidate_origin',
         'english_level',
         'salary_range',
         'red_flags',
