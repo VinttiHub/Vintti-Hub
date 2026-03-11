@@ -1089,6 +1089,10 @@ candidates.forEach(candidate => {
   const isStarred = candidate.star === 'yes';
   const starClass = isStarred ? 'starred' : '';
   const rawBlacklist = candidate.is_blacklisted ?? candidate.blacklist;
+  const salaryValue = Number(candidate.salary_range);
+  const salaryLabel = Number.isFinite(salaryValue) && salaryValue > 0
+    ? `$${salaryValue.toLocaleString()}`
+    : '—';
 
 card.innerHTML = `
 <div class="card-header">
@@ -1109,7 +1113,7 @@ card.innerHTML = `
       </div>
     </div>
     <div class="candidate-meta">
-      <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
+      <span class="salary">${salaryLabel}</span>
       <div class="star-wrapper">
         <i class="fab fa-whatsapp wa-icon" title="WhatsApp"></i>
         <span class="delete-icon" title="Delete">🗑️</span>

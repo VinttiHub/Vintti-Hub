@@ -3731,7 +3731,8 @@ input:checked + .slider::before {
   background: #ffffff;
   box-shadow: none;
   animation: fadeSlideUp 0.22s ease forwards;
-  min-height: 72px;
+  min-height: 96px;
+  position: relative;
 }
 
 #pipeline .pipeline-card:hover {
@@ -3740,33 +3741,34 @@ input:checked + .slider::before {
 }
 
 #pipeline .pipeline-card .card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  display: block;
 }
 
 #pipeline .pipeline-card .candidate-info {
   width: 100%;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(40px, auto) 22px;
   gap: 8px;
+  padding-right: 104px;
+  padding-bottom: 22px;
+  box-sizing: border-box;
 }
 
 #pipeline .pipeline-card .candidate-topline {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
-  align-items: start;
-  gap: 8px;
+  display: block;
+  min-height: 40px;
+  width: 100%;
+  max-width: 100%;
 }
 
 #pipeline .pipeline-card .candidate-identity {
   min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: flex-start;
   gap: 7px;
-  flex: 1 1 auto;
+  max-width: 100%;
 }
 
 #pipeline .pipeline-card .country {
@@ -3790,22 +3792,25 @@ input:checked + .slider::before {
 }
 
 #pipeline .pipeline-card .candidate-name {
-  display: -webkit-box;
+  display: block;
   margin: 0;
   color: #343434;
   font-size: 0.88rem;
   font-weight: 500;
   line-height: 1.1;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  min-height: auto;
+  overflow: hidden;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
 }
 
 #pipeline .pipeline-card .candidate-meta {
   margin-top: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
+  display: block;
   align-items: center;
-  gap: 8px;
+  min-height: 22px;
 }
 
 #pipeline .pipeline-card .salary {
@@ -3819,9 +3824,21 @@ input:checked + .slider::before {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  flex: 0 0 auto;
   justify-content: flex-end;
-  width: 100%;
+}
+
+#pipeline .pipeline-card .card-header-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 84px;
+}
+
+#pipeline .pipeline-card .star-wrapper {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  width: 72px;
 }
 
 #pipeline .pipeline-card .signoff-toggle {
