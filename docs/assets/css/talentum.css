@@ -272,6 +272,35 @@ body.talentum {
   margin-bottom: 16px;
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.panel-action-btn {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.panel-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.panel-action-status {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .panel-head h3 {
   font-family: var(--display);
   font-size: 1.2rem;

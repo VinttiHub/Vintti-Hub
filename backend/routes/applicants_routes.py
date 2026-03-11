@@ -77,6 +77,122 @@ def _fetch_s3_bytes(s3_key: str) -> Optional[bytes]:
         return None
 
 
+def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None, dry_run=False):
+    filters = filters or {}
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        query = """
+            SELECT
+                applicant_id,
+                opportunity_id,
+                location,
+                cv_s3_key,
+                cv_file_name,
+                cv_content_type,
+                extracted_pdf,
+                match_score,
+                reasons
+            FROM applicants
+            WHERE (
+                extracted_pdf IS NULL OR extracted_pdf = ''
+                OR match_score IS NULL
+                OR reasons IS NULL
+            )
+        """
+        params = []
+        if opportunity_id is not None:
+            query += " AND opportunity_id = %s"
+            params.append(int(opportunity_id))
+        query += " ORDER BY updated_at DESC"
+        if limit is not None:
+            query += " LIMIT %s"
+            params.append(int(limit))
+
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        opp_cache = {}
+        updated = 0
+        extracted_count = 0
+        scored_count = 0
+
+        for (
+            applicant_id,
+            opp_id,
+            location,
+            s3_key,
+            file_name,
+            content_type,
+            extracted_pdf,
+            match_score,
+            reasons,
+        ) in rows:
+            needs_extraction = not (extracted_pdf or "").strip()
+            needs_score = match_score is None or reasons is None
+
+            if needs_extraction:
+                if not s3_key:
+                    continue
+                if not _is_pdf_upload(file_name or s3_key, content_type):
+                    continue
+                pdf_bytes = _fetch_s3_bytes(s3_key)
+                if not pdf_bytes:
+                    continue
+                extracted_pdf = _extract_pdf_text_with_openai(pdf_bytes)
+                if not extracted_pdf:
+                    continue
+                extracted_count += 1
+
+            if needs_score and extracted_pdf and opp_id:
+                if opp_id not in opp_cache:
+                    jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
+                    opp_cache[opp_id] = (jd_plain, opp_context)
+                jd_plain, opp_context = opp_cache[opp_id]
+                score, reason_text = _score_applicant_with_openai(
+                    extracted_pdf,
+                    location or "",
+                    jd_plain,
+                    filters=filters,
+                    opportunity_context=opp_context,
+                )
+                if match_score is None and score is not None:
+                    match_score = score
+                if (reasons is None or reasons == "") and reason_text:
+                    reasons = reason_text
+                if score is not None or reason_text:
+                    scored_count += 1
+
+            if dry_run:
+                continue
+
+            cur.execute(
+                """
+                UPDATE applicants
+                SET extracted_pdf = %s,
+                    match_score = %s,
+                    reasons = %s,
+                    updated_at = NOW()
+                WHERE applicant_id = %s
+                """,
+                (extracted_pdf, match_score, reasons, applicant_id),
+            )
+            updated += 1
+
+        if not dry_run:
+            conn.commit()
+
+        return {
+            "total": len(rows),
+            "updated": updated,
+            "extracted": extracted_count,
+            "scored": scored_count,
+            "dry_run": dry_run,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
 def _update_applicant_ai_fields(applicant_id, extracted_pdf, match_score, reasons):
     conn = get_connection()
     cur = conn.cursor()
@@ -503,6 +619,41 @@ def backfill_applicant_extracted_pdf():
         ), 200
     except Exception as exc:
         logging.exception("Failed to backfill applicant PDFs")
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route("/applicants/backfill_ai_fields", methods=["POST", "OPTIONS"])
+def backfill_applicant_ai_fields():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    data = request.get_json(silent=True) or {}
+    opportunity_id = data.get("opportunity_id")
+    limit = data.get("limit")
+    filters = data.get("filters") or {}
+    dry_run = bool(data.get("dry_run"))
+
+    try:
+        if opportunity_id is not None:
+            opportunity_id = int(opportunity_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid opportunity_id"}), 400
+
+    try:
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid limit"}), 400
+
+    try:
+        result = _backfill_applicant_ai_fields(
+            opportunity_id=opportunity_id,
+            limit=limit,
+            filters=filters,
+            dry_run=dry_run,
+        )
+        return jsonify(result), 200
+    except Exception as exc:
+        logging.exception("Failed to backfill applicant AI fields")
         return jsonify({"error": str(exc)}), 500
 
 

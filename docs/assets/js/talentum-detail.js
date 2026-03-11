@@ -32,6 +32,8 @@ const els = {
   filtersStatus: document.getElementById("filtersStatus"),
   candidatesGrid: document.getElementById("candidatesGrid"),
   candidatesEmpty: document.getElementById("candidatesEmpty"),
+  refreshApplicantsBtn: document.getElementById("refreshApplicantsBtn"),
+  refreshApplicantsStatus: document.getElementById("refreshApplicantsStatus"),
   applicantDrawer: document.getElementById("applicantDrawer"),
   drawerClose: document.getElementById("drawerClose"),
   drawerTitle: document.getElementById("drawerTitle"),
@@ -79,6 +81,10 @@ function setCandidateSubtitle(text) {
   if (els.candidateSubtitle) els.candidateSubtitle.textContent = text;
 }
 
+function setRefreshApplicantsStatus(text) {
+  if (els.refreshApplicantsStatus) els.refreshApplicantsStatus.textContent = text || "";
+}
+
 function setUserPill(text) {
   if (els.userPill) els.userPill.textContent = text;
 }
@@ -116,6 +122,42 @@ function appendMessage(role, text, options = {}) {
 
 function normalizeText(value) {
   return String(value || "").toLowerCase().trim();
+}
+
+function setRefreshApplicantsBusy(isBusy) {
+  if (!els.refreshApplicantsBtn) return;
+  els.refreshApplicantsBtn.disabled = Boolean(isBusy);
+  els.refreshApplicantsBtn.textContent = isBusy ? "Refreshing..." : "Refresh CVs";
+}
+
+async function backfillApplicantsAI(opportunityId) {
+  if (!opportunityId) {
+    setRefreshApplicantsStatus("Missing opportunity id.");
+    return;
+  }
+
+  setRefreshApplicantsBusy(true);
+  setRefreshApplicantsStatus("Refreshing CVs...");
+
+  try {
+    const result = await fetchJSON(`${API_BASE}/applicants/backfill_ai_fields`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        opportunity_id: opportunityId,
+        filters: state.filters,
+      }),
+    });
+    setRefreshApplicantsStatus(
+      `Updated ${result.updated || 0} · extracted ${result.extracted || 0} · scored ${result.scored || 0}`
+    );
+    await loadApplicants(opportunityId);
+  } catch (err) {
+    console.error("Applicant refresh failed", err);
+    setRefreshApplicantsStatus("Refresh failed. Try again.");
+  } finally {
+    setRefreshApplicantsBusy(false);
+  }
 }
 
 async function loadOpportunity(opportunityId) {
@@ -751,6 +793,10 @@ async function init() {
 
   if (els.chatForm) {
     els.chatForm.addEventListener("submit", handleChatSubmit);
+  }
+
+  if (els.refreshApplicantsBtn) {
+    els.refreshApplicantsBtn.addEventListener("click", () => backfillApplicantsAI(opportunityId));
   }
 
   if (els.candidatesGrid) {

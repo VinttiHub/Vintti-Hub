@@ -14,6 +14,7 @@
 
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const refreshDefaultLabel = refreshBtn ? refreshBtn.textContent.trim() : '';
+  let currentUserId = null;
 
   function setRefreshing(isRefreshing) {
     if (!refreshBtn) return;
@@ -62,6 +63,22 @@
     } catch {
       return null;
     }
+  }
+
+  async function resolveUserId() {
+    if (currentUserId) return currentUserId;
+    currentUserId = await getCurrentUserId();
+    return currentUserId;
+  }
+
+  async function ensureUserIdOrNotify() {
+    const userId = await resolveUserId();
+    if (!userId) {
+      setStatus({ connected: false, message: 'No pudimos identificar el usuario.' });
+      renderEmptyState('Inicia sesión para conectar tu calendario.');
+      return null;
+    }
+    return userId;
   }
 
   function renderEmptyState(message) {
@@ -190,41 +207,60 @@
   }
 
   async function init() {
-    const userId = await getCurrentUserId();
+    const today = new Date().toISOString().slice(0, 10);
+    calendarDate.value = calendarDate.value || today;
+    document.getElementById('eventDate').value = today;
+
+    connectBtn.addEventListener('click', async () => {
+      const userId = await ensureUserIdOrNotify();
+      if (!userId) return;
+      handleConnect(userId);
+    });
+    disconnectBtn.addEventListener('click', async () => {
+      const userId = await ensureUserIdOrNotify();
+      if (!userId) return;
+      handleDisconnect(userId);
+    });
+    refreshBtn.addEventListener('click', async () => {
+      const userId = await ensureUserIdOrNotify();
+      if (!userId) return;
+      fetchEvents(userId);
+    });
+
+    eventForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      resolveUserId().then((userId) => {
+        if (!userId) {
+          setStatus({ connected: false, message: 'No pudimos identificar el usuario.' });
+          renderEmptyState('Inicia sesión para conectar tu calendario.');
+          return;
+        }
+        const date = document.getElementById('eventDate').value;
+        const start = document.getElementById('eventStart').value;
+        const end = document.getElementById('eventEnd').value;
+        const attendees = document.getElementById('eventAttendees').value
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+
+        handleCreateEvent(userId, {
+          summary: document.getElementById('eventTitle').value.trim(),
+          start: `${date}T${start}`,
+          end: `${date}T${end}`,
+          location: document.getElementById('eventLocation').value.trim(),
+          description: document.getElementById('eventDescription').value.trim(),
+          attendees,
+          create_meet: document.getElementById('eventMeet').checked,
+        });
+      });
+    });
+
+    const userId = await resolveUserId();
     if (!userId) {
       setStatus({ connected: false, message: 'No pudimos identificar el usuario.' });
       renderEmptyState('Inicia sesión para conectar tu calendario.');
       return;
     }
-
-    const today = new Date().toISOString().slice(0, 10);
-    calendarDate.value = calendarDate.value || today;
-    document.getElementById('eventDate').value = today;
-
-    connectBtn.addEventListener('click', () => handleConnect(userId));
-    disconnectBtn.addEventListener('click', () => handleDisconnect(userId));
-    refreshBtn.addEventListener('click', () => fetchEvents(userId));
-
-    eventForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const date = document.getElementById('eventDate').value;
-      const start = document.getElementById('eventStart').value;
-      const end = document.getElementById('eventEnd').value;
-      const attendees = document.getElementById('eventAttendees').value
-        .split(',')
-        .map(item => item.trim())
-        .filter(Boolean);
-
-      handleCreateEvent(userId, {
-        summary: document.getElementById('eventTitle').value.trim(),
-        start: `${date}T${start}`,
-        end: `${date}T${end}`,
-        location: document.getElementById('eventLocation').value.trim(),
-        description: document.getElementById('eventDescription').value.trim(),
-        attendees,
-        create_meet: document.getElementById('eventMeet').checked,
-      });
-    });
 
     try {
       const res = await fetch(`${API_BASE}/google-calendar/status?user_id=${encodeURIComponent(userId)}`, {
