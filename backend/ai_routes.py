@@ -131,6 +131,150 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
 
     return extracted.strip()
 
+def _strip_html_text(raw: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", raw or "")
+    return re.sub(r"\s+", " ", text).strip()
+
+def _build_opportunity_context(cursor, opportunity_id: int | None):
+    if not opportunity_id:
+        return "", {}
+    cursor.execute(
+        """
+        SELECT
+            opp_position_name,
+            career_country,
+            years_experience,
+            hr_job_description,
+            career_description,
+            career_requirements
+        FROM opportunity
+        WHERE opportunity_id = %s
+        """,
+        (opportunity_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        return "", {}
+    position, career_country, years_experience, hr_jd, career_desc, career_reqs = row
+    raw_jd = hr_jd or career_desc or career_reqs or ""
+    jd_plain = _strip_html_text(raw_jd)
+    context = {
+        "position": position or "",
+        "career_country": career_country or "",
+        "years_experience": years_experience or "",
+    }
+    return jd_plain, context
+
+def _score_applicant_with_openai(
+    extracted_pdf: str,
+    applicant_location: str,
+    job_description: str,
+    filters: dict | None = None,
+    opportunity_context: dict | None = None,
+):
+    if not extracted_pdf:
+        return None, None
+
+    filters = filters or {}
+    opportunity_context = opportunity_context or {}
+    prompt = f"""
+You are a recruiting assistant scoring applicants for a job.
+Return STRICT JSON only: {{"score": <1-10 integer>, "reasons": "<short Spanish explanation>"}}
+
+Score MUST consider:
+- Location match between applicant and role.
+- How close the applicant's experience and education are to the job description requirements.
+- Any explicit user filters (position, salary, years_experience, industry, country) if provided.
+
+Do NOT invent facts. If key information is missing, mention it briefly in the reasons.
+Keep reasons under 25 words, in Spanish.
+
+Applicant location: {applicant_location or "Unknown"}
+Opportunity context: {json.dumps(opportunity_context, ensure_ascii=False)}
+User filters (optional): {json.dumps(filters, ensure_ascii=False)}
+
+Job description:
+{job_description[:8000]}
+
+Extracted CV text:
+{extracted_pdf[:8000]}
+"""
+
+    chat = call_openai_with_retry(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        max_tokens=250,
+    )
+
+    content = (chat.choices[0].message.content or "").strip()
+    cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r"\1", content)
+    try:
+        payload = json.loads(cleaned)
+    except Exception:
+        payload = {}
+
+    score_raw = payload.get("score")
+    try:
+        score = int(score_raw)
+    except Exception:
+        score = None
+
+    reasons = payload.get("reasons")
+    if isinstance(reasons, str):
+        reasons = reasons.strip()
+    else:
+        reasons = None
+
+    if score is not None:
+        score = max(1, min(10, score))
+    return score, reasons
+
+def _recalculate_applicant_scores(opportunity_id: int, filters: dict | None = None):
+    filters = filters or {}
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        jd_plain, opp_context = _build_opportunity_context(cursor, opportunity_id)
+        cursor.execute(
+            """
+            SELECT applicant_id, location, extracted_pdf
+            FROM applicants
+            WHERE opportunity_id = %s
+            """,
+            (opportunity_id,),
+        )
+        rows = cursor.fetchall()
+        updated = 0
+        for applicant_id, location, extracted_pdf in rows:
+            if not extracted_pdf:
+                continue
+            score, reasons = _score_applicant_with_openai(
+                extracted_pdf,
+                location or "",
+                jd_plain,
+                filters=filters,
+                opportunity_context=opp_context,
+            )
+            if score is None and not reasons:
+                continue
+            cursor.execute(
+                """
+                UPDATE applicants
+                SET match_score = %s,
+                    reasons = %s,
+                    updated_at = NOW()
+                WHERE applicant_id = %s
+                """,
+                (score, reasons, applicant_id),
+            )
+            updated += 1
+        conn.commit()
+        return updated
+    finally:
+        cursor.close()
+        conn.close()
+
 def register_ai_routes(app):
     @app.route('/ai/jd_to_career_fields', methods=['POST', 'OPTIONS'])
     def jd_to_career_fields():
@@ -337,6 +481,7 @@ JOB DESCRIPTION (verbatim):
             data = request.get_json(force=True) or {}
             message = (data.get('message') or '').strip()
             current_filters = data.get('current_filters') or {}
+            opportunity_id = data.get('opportunity_id')
 
             if not message:
                 return jsonify({"error": "message is required"}), 400
@@ -382,7 +527,18 @@ Return STRICT JSON:
             if not isinstance(response, str) or not response.strip():
                 response = "Listo, actualicé los filtros con tu mensaje."
 
-            resp = jsonify({"updated_filters": updated, "response": response.strip()})
+            rescored = None
+            if opportunity_id is not None:
+                try:
+                    rescored = _recalculate_applicant_scores(int(opportunity_id), updated)
+                except Exception:
+                    logging.exception("❌ Failed to rescore applicants from chat update")
+
+            payload = {"updated_filters": updated, "response": response.strip()}
+            if rescored is not None:
+                payload["rescored"] = rescored
+
+            resp = jsonify(payload)
             resp.headers['Access-Control-Allow-Origin'] = 'https://vinttihub.vintti.com'
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
             return resp, 200

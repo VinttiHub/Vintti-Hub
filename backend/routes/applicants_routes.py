@@ -5,6 +5,11 @@ import uuid
 from flask import Blueprint, jsonify, request
 from werkzeug.utils import secure_filename
 
+from ai_routes import (
+    _build_opportunity_context,
+    _extract_pdf_text_with_openai,
+    _score_applicant_with_openai,
+)
 from db import get_connection
 from utils import services
 
@@ -54,6 +59,42 @@ def _file_size_bytes(file_obj):
         return size
     except Exception:
         return None
+
+
+def _is_pdf_upload(filename: str, content_type: str | None) -> bool:
+    if content_type and content_type.lower() == "application/pdf":
+        return True
+    return filename.lower().endswith(".pdf")
+
+
+def _fetch_s3_bytes(s3_key: str) -> bytes | None:
+    try:
+        obj = services.s3_client.get_object(Bucket=services.S3_BUCKET, Key=s3_key)
+        return obj["Body"].read()
+    except Exception:
+        logging.exception("Failed to download applicant CV from S3")
+        return None
+
+
+def _update_applicant_ai_fields(applicant_id, extracted_pdf, match_score, reasons):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE applicants
+            SET extracted_pdf = %s,
+                match_score = %s,
+                reasons = %s,
+                updated_at = NOW()
+            WHERE applicant_id = %s
+            """,
+            (extracted_pdf, match_score, reasons, applicant_id),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
 
 
 @bp.route("/applicants/<int:applicant_id>/cv", methods=["GET", "OPTIONS"])
@@ -136,6 +177,8 @@ def get_applicants():
                 cv_file_name,
                 cv_content_type,
                 cv_size_bytes,
+                match_score,
+                reasons,
                 created_at,
                 updated_at
             FROM applicants
@@ -200,6 +243,15 @@ def create_applicant():
     s3_key = f"applicants/{uuid.uuid4()}_{safe_name}"
     content_type = cv_file.mimetype or CONTENT_TYPES.get(ext, "application/octet-stream")
     file_size = _file_size_bytes(cv_file)
+    cv_bytes = None
+    if _is_pdf_upload(filename_orig, content_type):
+        try:
+            cv_file.stream.seek(0)
+            cv_bytes = cv_file.stream.read()
+            cv_file.stream.seek(0)
+        except Exception:
+            logging.exception("Failed to read CV bytes for extraction")
+            cv_bytes = None
 
     try:
         services.s3_client.upload_fileobj(
@@ -268,9 +320,188 @@ def create_applicant():
         cur.close()
         conn.close()
 
+        if cv_bytes:
+            try:
+                extracted_pdf = _extract_pdf_text_with_openai(cv_bytes)
+                score = None
+                reasons = None
+                if opportunity_id:
+                    conn = get_connection()
+                    cur = conn.cursor()
+                    jd_plain, opp_context = _build_opportunity_context(cur, opportunity_id)
+                    cur.close()
+                    conn.close()
+                    score, reasons = _score_applicant_with_openai(
+                        extracted_pdf,
+                        _clean(data.get("location")),
+                        jd_plain,
+                        filters=None,
+                        opportunity_context=opp_context,
+                    )
+                if extracted_pdf or score is not None or reasons:
+                    _update_applicant_ai_fields(applicant_id, extracted_pdf, score, reasons)
+            except Exception:
+                logging.exception("Failed to extract/score applicant CV")
+
         return jsonify({"message": "Applicant created", "applicant_id": applicant_id}), 201
     except Exception as exc:
         logging.exception("Failed to create applicant")
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route("/applicants/recalculate_scores", methods=["POST", "OPTIONS"])
+def recalculate_applicant_scores():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    data = request.get_json(silent=True) or {}
+    opportunity_id = data.get("opportunity_id")
+    filters = data.get("filters") or {}
+
+    if opportunity_id is None:
+        return jsonify({"error": "Missing opportunity_id"}), 400
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        jd_plain, opp_context = _build_opportunity_context(cur, int(opportunity_id))
+        cur.execute(
+            """
+            SELECT applicant_id, location, extracted_pdf
+            FROM applicants
+            WHERE opportunity_id = %s
+            """,
+            (int(opportunity_id),),
+        )
+        rows = cur.fetchall()
+        updated = 0
+        for applicant_id, location, extracted_pdf in rows:
+            if not extracted_pdf:
+                continue
+            score, reasons = _score_applicant_with_openai(
+                extracted_pdf,
+                location or "",
+                jd_plain,
+                filters=filters,
+                opportunity_context=opp_context,
+            )
+            if score is None and not reasons:
+                continue
+            cur.execute(
+                """
+                UPDATE applicants
+                SET match_score = %s,
+                    reasons = %s,
+                    updated_at = NOW()
+                WHERE applicant_id = %s
+                """,
+                (score, reasons, applicant_id),
+            )
+            updated += 1
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"updated": updated}), 200
+    except Exception as exc:
+        logging.exception("Failed to recalculate applicant scores")
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route("/applicants/backfill_extracted_pdf", methods=["POST", "OPTIONS"])
+def backfill_applicant_extracted_pdf():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    data = request.get_json(silent=True) or {}
+    opportunity_id = data.get("opportunity_id")
+    filters = data.get("filters") or {}
+    limit = data.get("limit")
+    try:
+        limit = int(limit) if limit is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid limit"}), 400
+
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+
+        query = """
+            SELECT applicant_id, opportunity_id, location, cv_s3_key, cv_file_name, cv_content_type,
+                   extracted_pdf
+            FROM applicants
+            WHERE (extracted_pdf IS NULL OR extracted_pdf = '')
+        """
+        params = []
+        if opportunity_id is not None:
+            query += " AND opportunity_id = %s"
+            params.append(int(opportunity_id))
+        query += " ORDER BY updated_at DESC"
+        if limit is not None:
+            query += " LIMIT %s"
+            params.append(limit)
+
+        cur.execute(query, params)
+        rows = cur.fetchall()
+        opp_cache = {}
+        extracted_count = 0
+        scored_count = 0
+
+        for applicant_id, opp_id, location, s3_key, file_name, content_type, extracted_pdf in rows:
+            if not s3_key:
+                continue
+            if extracted_pdf:
+                continue
+            if not _is_pdf_upload(file_name or s3_key, content_type):
+                continue
+
+            pdf_bytes = _fetch_s3_bytes(s3_key)
+            if not pdf_bytes:
+                continue
+
+            extracted_pdf = _extract_pdf_text_with_openai(pdf_bytes)
+            if not extracted_pdf:
+                continue
+
+            score = None
+            reasons = None
+            if opp_id:
+                if opp_id not in opp_cache:
+                    jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
+                    opp_cache[opp_id] = (jd_plain, opp_context)
+                jd_plain, opp_context = opp_cache[opp_id]
+                score, reasons = _score_applicant_with_openai(
+                    extracted_pdf,
+                    location or "",
+                    jd_plain,
+                    filters=filters,
+                    opportunity_context=opp_context,
+                )
+            cur.execute(
+                """
+                UPDATE applicants
+                SET extracted_pdf = %s,
+                    match_score = %s,
+                    reasons = %s,
+                    updated_at = NOW()
+                WHERE applicant_id = %s
+                """,
+                (extracted_pdf, score, reasons, applicant_id),
+            )
+            extracted_count += 1
+            if score is not None or reasons:
+                scored_count += 1
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify(
+            {
+                "extracted": extracted_count,
+                "scored": scored_count,
+            }
+        ), 200
+    except Exception as exc:
+        logging.exception("Failed to backfill applicant PDFs")
         return jsonify({"error": str(exc)}), 500
 
 

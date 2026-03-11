@@ -500,7 +500,10 @@ function getMatchSummary(profile) {
   return parts.filter(Boolean);
 }
 
-function buildScoreExplanation(profile, score) {
+function buildScoreExplanation(profile, score, reasons) {
+  if (reasons) {
+    return `${score}/10. ${reasons}`;
+  }
   const summary = getMatchSummary(profile);
   if (!summary.length) return `${score}/10 because no filters are set.`;
   return `${score}/10 because ${summary.slice(0, 3).join(", ")}.`;
@@ -508,10 +511,11 @@ function buildScoreExplanation(profile, score) {
 
 function renderCandidates() {
   const scored = state.candidates
-    .map((candidate) => ({
-      ...candidate,
-      score: computeMatchScore(candidate.profile),
-    }))
+    .map((candidate) => {
+      const fallback = computeMatchScore(candidate.profile);
+      const score = Number.isFinite(candidate.score) ? candidate.score : fallback;
+      return { ...candidate, score };
+    })
     .sort((a, b) => b.score - a.score);
 
   els.candidatesGrid.innerHTML = "";
@@ -563,6 +567,8 @@ async function loadApplicants(opportunityId) {
     pipeline: applicant,
     detail: applicant,
     profile: buildApplicantProfile(applicant),
+    score: Number.isFinite(applicant.match_score) ? applicant.match_score : null,
+    reasons: applicant.reasons || "",
   }));
   renderCandidates();
 }
@@ -588,7 +594,11 @@ function renderApplicantDrawer(entry) {
   const cvLink = applicant.cv_s3_key
     ? `<a class="drawer-link" id="cvDownloadLink" href="#" target="_blank" rel="noopener">Download ${cvName}</a>`
     : "<span class=\"drawer-value\">—</span>";
-  const scoreText = buildScoreExplanation(profile, entry.score ?? computeMatchScore(profile));
+  const scoreText = buildScoreExplanation(
+    profile,
+    entry.score ?? computeMatchScore(profile),
+    entry.reasons || applicant.reasons || ""
+  );
 
   els.drawerBody.innerHTML = `
     <div class="drawer-section">
@@ -699,13 +709,17 @@ async function handleChatSubmit(event) {
     const resp = await fetchJSON(`${API_BASE}/ai/talentum_chat_update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, current_filters: state.filters }),
+      body: JSON.stringify({
+        message,
+        current_filters: state.filters,
+        opportunity_id: state.currentOpportunity?.opportunity_id,
+      }),
     });
     if (typing) typing.remove();
     if (resp.updated_filters) {
       state.filters = { ...state.filters, ...resp.updated_filters };
       renderFilters();
-      renderCandidates();
+      await loadApplicants(getOpportunityId());
     }
     appendMessage("assistant", resp.response || "Filtros actualizados.");
   } catch (err) {
@@ -747,7 +761,9 @@ async function init() {
       const applicantId = Number(card.dataset.applicantId);
       const selected = state.candidates.find((entry) => entry.profile.id === applicantId);
       if (selected?.pipeline) {
-        openApplicantDrawer({ ...selected, score: computeMatchScore(selected.profile) });
+        const fallback = computeMatchScore(selected.profile);
+        const score = Number.isFinite(selected.score) ? selected.score : fallback;
+        openApplicantDrawer({ ...selected, score });
       }
     });
   }

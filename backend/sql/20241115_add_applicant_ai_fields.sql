@@ -1,0 +1,8 @@
+BEGIN;
+
+ALTER TABLE applicants
+    ADD COLUMN IF NOT EXISTS extracted_pdf TEXT,
+    ADD COLUMN IF NOT EXISTS match_score INTEGER,
+    ADD COLUMN IF NOT EXISTS reasons TEXT;
+
+COMMIT;
