@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 import os
 import uuid
 
@@ -61,13 +62,13 @@ def _file_size_bytes(file_obj):
         return None
 
 
-def _is_pdf_upload(filename: str, content_type: str | None) -> bool:
+def _is_pdf_upload(filename: str, content_type: Optional[str]) -> bool:
     if content_type and content_type.lower() == "application/pdf":
         return True
     return filename.lower().endswith(".pdf")
 
 
-def _fetch_s3_bytes(s3_key: str) -> bytes | None:
+def _fetch_s3_bytes(s3_key: str) -> Optional[bytes]:
     try:
         obj = services.s3_client.get_object(Bucket=services.S3_BUCKET, Key=s3_key)
         return obj["Body"].read()
