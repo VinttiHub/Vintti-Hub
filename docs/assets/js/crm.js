@@ -445,11 +445,43 @@ function setCrmExportButtonState(isLoading) {
   const btn = document.getElementById('crmExportCsvBtn');
   if (!btn) return;
   btn.disabled = Boolean(isLoading);
-  btn.textContent = isLoading ? 'Exporting...' : 'Download CSV';
+  btn.textContent = isLoading ? 'Exporting...' : 'Download Excel';
 }
 
-async function fetchCrmExportCandidates(accountId) {
-  if (!accountId) return [];
+function normalizeCrmExportCandidate(detail, candidate, buyout) {
+  const staffingEndDate = detail?.end_date || '';
+  if (buyout) {
+    return {
+      ...(detail || {}),
+      candidate_id: candidate?.candidate_id ?? detail?.candidate_id ?? '',
+      name: candidate?.full_name || buyout?.candidate_name || detail?.name || '—',
+      status: 'active',
+      opp_model: 'Recruiting',
+      start_date: staffingEndDate || buyout?.start_date || detail?.start_date || '',
+      end_date: staffingEndDate || buyout?.end_date || detail?.end_date || '',
+      employee_salary: buyout?.salary ?? detail?.employee_salary ?? '',
+      employee_revenue_recruiting: buyout?.revenue ?? detail?.employee_revenue_recruiting ?? detail?.employee_revenue ?? '',
+      employee_revenue: buyout?.revenue ?? detail?.employee_revenue ?? '',
+      referral_dolar: buyout?.referral ?? detail?.referral_dolar ?? '',
+      referral_daterange: buyout?.referral_date_range ?? detail?.referral_daterange ?? '',
+      buyout_id: buyout?.buyout_id ?? '',
+      inactive_reason: detail?.inactive_reason ?? '',
+      inactive_comments: detail?.inactive_comments ?? ''
+    };
+  }
+
+  return {
+    ...(detail || {}),
+    candidate_id: candidate?.candidate_id ?? detail?.candidate_id ?? '',
+    name: candidate?.full_name || detail?.name || '—',
+    status: detail?.status || candidate?.status || 'active',
+    inactive_reason: detail?.inactive_reason ?? '',
+    inactive_comments: detail?.inactive_comments ?? ''
+  };
+}
+
+async function fetchCrmExportCandidateSheets(accountId) {
+  if (!accountId) return { active: [], inactive: [] };
   try {
     const [contextRes, detailRes, buyoutsRes] = await Promise.all([
       fetch(`${API_BASE}/public/bonus_request/context?account_id=${encodeURIComponent(accountId)}`),
@@ -517,46 +549,32 @@ async function fetchCrmExportCandidates(accountId) {
       if (!prev || nextId > prevId) buyoutByCandidateId.set(id, buyout);
     });
 
-    return activeCandidates.map((candidate = {}) => {
+    const active = activeCandidates.map((candidate = {}) => {
       const id = Number(candidate.candidate_id);
       const detail = id ? detailById.get(id) : null;
       const buyout = id ? buyoutByCandidateId.get(id) : null;
-
-      if (buyout) {
-        const staffingEndDate = detail?.end_date || '';
-        return {
-          ...(detail || {}),
-          candidate_id: candidate.candidate_id ?? detail?.candidate_id ?? '',
-          name: candidate.full_name || buyout.candidate_name || detail?.name || '—',
-          status: 'active',
-          opp_model: 'Recruiting',
-          start_date: staffingEndDate || buyout.start_date || detail?.start_date || '',
-          end_date: staffingEndDate || buyout.end_date || detail?.end_date || '',
-          employee_salary: buyout.salary ?? detail?.employee_salary ?? '',
-          employee_revenue_recruiting: buyout.revenue ?? detail?.employee_revenue_recruiting ?? detail?.employee_revenue ?? '',
-          employee_revenue: buyout.revenue ?? detail?.employee_revenue ?? '',
-          referral_dolar: buyout.referral ?? detail?.referral_dolar ?? '',
-          referral_daterange: buyout.referral_date_range ?? detail?.referral_daterange ?? '',
-          buyout_id: buyout.buyout_id ?? ''
-        };
-      }
-
-      return {
-        ...(detail || {}),
-        candidate_id: candidate.candidate_id ?? detail?.candidate_id ?? '',
-        name: candidate.full_name || detail?.name || '—',
-        status: 'active'
-      };
+      return normalizeCrmExportCandidate(detail, candidate, buyout);
     }).filter(candidate => activeIds.has(Number(candidate.candidate_id)));
+
+    const inactive = detailCandidates
+      .filter(candidate => {
+        const id = Number(candidate?.candidate_id);
+        if (!id || activeIds.has(id)) return false;
+        return (candidate?.status || '').toString().trim().toLowerCase() === 'inactive';
+      })
+      .map(candidate => normalizeCrmExportCandidate(candidate, candidate, null));
+
+    return { active, inactive };
   } catch (err) {
     console.warn(`Could not load candidates for CSV export on account ${accountId}:`, err);
-    return [];
+    return { active: [], inactive: [] };
   }
 }
 
-function buildCrmCandidateExportRows(accountRow, candidates = []) {
-  const candidateList = (Array.isArray(candidates) ? candidates : []).filter(isActiveHire);
+function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmptyAccountRow = false } = {}) {
+  const candidateList = Array.isArray(candidates) ? candidates : [];
   if (!candidateList.length) {
+    if (!includeEmptyAccountRow) return [];
     return [[
       accountRow.accountId,
       accountRow.clientName,
@@ -567,6 +585,8 @@ function buildCrmCandidateExportRows(accountRow, candidates = []) {
       accountRow.tsf,
       accountRow.tsr,
       accountRow.priority,
+      '',
+      '',
       '',
       '',
       '',
@@ -599,8 +619,25 @@ function buildCrmCandidateExportRows(accountRow, candidates = []) {
     csvNullableTextValue(candidate.end_date),
     candidate.employee_fee ?? '',
     candidate.employee_salary ?? '',
-    candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? ''
+    candidate.employee_revenue_recruiting ?? candidate.employee_revenue ?? '',
+    csvNullableTextValue(candidate.inactive_reason),
+    csvNullableTextValue(candidate.inactive_comments)
   ]);
+}
+
+function downloadCrmCsvFile({ headers = [], rows = [], filename }) {
+  const lines = [headers.map(csvSafe).join(',')];
+  rows.forEach(values => {
+    lines.push(values.map(csvSafe).join(','));
+  });
+  const blob = new Blob([`${lines.join('\n')}\n`], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
 }
 
 async function downloadCrmCsv() {
@@ -629,12 +666,15 @@ async function downloadCrmCsv() {
     'End Date',
     'Employee Fee',
     'Employee Salary',
-    'Employee Revenue'
+    'Employee Revenue',
+    'Inactive Reason',
+    'Inactive Comments'
   ];
-  const lines = [headers.map(csvSafe).join(',')];
+  const activeRows = [];
+  const inactiveRows = [];
 
   setCrmExportButtonState(true);
-  toggleCrmLoading(true, 'Preparing CRM CSV with account candidates...');
+  toggleCrmLoading(true, 'Preparing CRM active and inactive CSV files...');
   updateCrmLoadingProgress(0, orderedIds.length);
 
   try {
@@ -646,32 +686,37 @@ async function downloadCrmCsv() {
         updateCrmLoadingProgress(doneCount, orderedIds.length);
         return;
       }
-      const candidates = await fetchCrmExportCandidates(id);
-      const exportRows = buildCrmCandidateExportRows(row, candidates);
-      exportRows.forEach(values => {
-        lines.push(values.map(csvSafe).join(','));
-      });
+      const sheetData = await fetchCrmExportCandidateSheets(id);
+      buildCrmCandidateExportRows(row, sheetData.active, { includeEmptyAccountRow: true })
+        .forEach(values => activeRows.push(values));
+      buildCrmCandidateExportRows(row, sheetData.inactive, { includeEmptyAccountRow: false })
+        .forEach(values => inactiveRows.push(values));
       doneCount += 1;
       updateCrmLoadingProgress(doneCount, orderedIds.length);
     });
 
     await runWithConcurrency(tasks, 6);
 
-    if (lines.length <= 1) {
+    if (!activeRows.length && !inactiveRows.length) {
       alert('No rows matched the current table filters.');
       return;
     }
 
-    const csv = lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
     const date = new Date().toISOString().slice(0, 10);
-    link.href = URL.createObjectURL(blob);
-    link.download = `crm_export_${date}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+    downloadCrmCsvFile({
+      headers,
+      rows: activeRows,
+      filename: `crm_active_${date}.csv`
+    });
+    if (inactiveRows.length) {
+      setTimeout(() => {
+        downloadCrmCsvFile({
+          headers,
+          rows: inactiveRows,
+          filename: `crm_inactive_${date}.csv`
+        });
+      }, 150);
+    }
   } finally {
     toggleCrmLoading(false);
     updateCrmLoadingProgress(0, 0);
@@ -682,6 +727,7 @@ async function downloadCrmCsv() {
 function initCrmExportButton() {
   const btn = document.getElementById('crmExportCsvBtn');
   if (!btn) return;
+  btn.textContent = 'Download CSV';
   btn.addEventListener('click', downloadCrmCsv);
 }
 
