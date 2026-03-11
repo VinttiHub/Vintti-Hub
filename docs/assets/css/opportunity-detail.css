@@ -3557,3 +3557,344 @@ input:checked + .slider::before {
 .turvo-game-target:active{
   transform: scale(0.9);
 }
+
+/* Pipeline board refresh: visual-only update aligned to compact kanban reference */
+#pipeline.pipeline-section {
+  padding: 24px 18px;
+  min-height: auto;
+  background: transparent;
+  color: #2f2f2f;
+  font-family: "Onest", "Segoe UI", sans-serif;
+}
+
+#pipeline .pipeline-header {
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+#pipeline .pipeline-header h2 {
+  display: none;
+}
+
+#pipeline .pipeline-actions {
+  width: 100%;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#pipeline .pipeline-actions button {
+  margin-left: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #6d4aff;
+  color: #fff;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+#pipeline .pipeline-actions button:hover {
+  background: #5d3ff0;
+  transform: translateY(-1px);
+}
+
+#pipeline .interview-count {
+  margin-right: auto;
+  padding: 8px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 12px;
+  background: #fafafa;
+  color: #666;
+}
+
+#pipeline #interviewed-count-input {
+  border-radius: 10px;
+  background: #fff;
+}
+
+#pipeline .pipeline-columns {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 8px;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+}
+
+#pipeline .column {
+  min-width: 220px;
+  padding: 10px 10px 0;
+  border-right: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border-radius: 14px;
+}
+
+#pipeline .column:last-child {
+  padding-right: 10px;
+}
+
+#pipeline .column-title {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: #f3f4f6;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1f1f1f;
+  text-transform: none;
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#pipeline .column-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+#pipeline .column-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #aaaaaa;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+#pipeline .column[data-status="applicant"] .column-title {
+  background: #efe7dc;
+}
+
+#pipeline .column[data-status="contacted"] .column-title {
+  background: #f1e4e5;
+}
+
+#pipeline .column[data-status="first-interview"] .column-title {
+  background: #dce5f3;
+}
+
+#pipeline .column[data-status="no-advance"] .column-title {
+  background: #dde8dc;
+}
+
+#pipeline .column[data-status="client-process"] .column-title {
+  background: #eee1ec;
+}
+
+#pipeline .card-container {
+  flex: 1 1 auto;
+  min-height: 280px;
+  padding: 0 2px 14px 2px;
+  gap: 12px;
+  align-items: stretch;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #7b7b7b transparent;
+}
+
+#pipeline .card-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+#pipeline .card-container::-webkit-scrollbar-thumb {
+  background: #7b7b7b;
+  border-radius: 999px;
+}
+
+#pipeline .card-container::after {
+  height: 12px;
+  min-height: 12px;
+}
+
+#pipeline .pipeline-card {
+  width: 100% !important;
+  margin: 0;
+  padding: 12px 12px 9px;
+  border-radius: 14px;
+  border: 1px solid #e2e2e2;
+  background: #ffffff;
+  box-shadow: none;
+  animation: fadeSlideUp 0.22s ease forwards;
+  min-height: 72px;
+}
+
+#pipeline .pipeline-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+#pipeline .pipeline-card .card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#pipeline .pipeline-card .candidate-info {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#pipeline .pipeline-card .candidate-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  align-items: start;
+  gap: 8px;
+}
+
+#pipeline .pipeline-card .candidate-identity {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  flex: 1 1 auto;
+}
+
+#pipeline .pipeline-card .country {
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  font-size: 0.95rem;
+  line-height: 1;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#pipeline .pipeline-card .country:empty::before {
+  content: "";
+  width: 20px;
+  height: 1px;
+  display: block;
+}
+
+#pipeline .pipeline-card .candidate-name {
+  display: -webkit-box;
+  margin: 0;
+  color: #343434;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.1;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+#pipeline .pipeline-card .candidate-meta {
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  align-items: center;
+  gap: 8px;
+}
+
+#pipeline .pipeline-card .salary {
+  font-size: 0.8rem;
+  color: #8a8a8a;
+  font-weight: 500;
+}
+
+#pipeline .pipeline-card .card-header-actions,
+#pipeline .pipeline-card .star-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+#pipeline .pipeline-card .signoff-toggle {
+  position: static;
+  margin: 0;
+}
+
+#pipeline .pipeline-card .switch {
+  width: 24px;
+  height: 16px;
+}
+
+#pipeline .pipeline-card .slider {
+  background: #6d4aff;
+  border-radius: 999px;
+}
+
+#pipeline .pipeline-card .slider::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+#pipeline .pipeline-card input:not(:checked) + .slider {
+  background: #d2d2d2;
+}
+
+#pipeline .pipeline-card input:checked + .slider::before {
+  transform: translateX(8px);
+}
+
+#pipeline .pipeline-card .star-icon,
+#pipeline .pipeline-card .wa-icon,
+#pipeline .pipeline-card .association-indicator {
+  width: 16px;
+  height: 16px;
+  font-size: 0.95rem;
+  color: #a79f9f;
+}
+
+#pipeline .pipeline-card .star-icon.starred {
+  color: #f2c94c;
+}
+
+#pipeline .pipeline-card .wa-icon {
+  color: #25d366;
+}
+
+#pipeline .pipeline-card .delete-icon {
+  position: static;
+  margin: 0;
+  color: #9a9a9a;
+  font-size: 0.92rem;
+}
+
+#pipeline .pipeline-card .delete-icon:hover,
+#pipeline .pipeline-card .star-icon:hover,
+#pipeline .pipeline-card .wa-icon:hover {
+  transform: scale(1.06);
+}
+
+#pipeline .pipeline-card[data-blacklisted="true"] {
+  background: #fff4f4 !important;
+  border-color: #f0c2c2 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 1100px) {
+  #pipeline .pipeline-columns {
+    grid-template-columns: repeat(5, minmax(240px, 240px));
+  }
+}

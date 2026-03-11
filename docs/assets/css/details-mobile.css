@@ -393,6 +393,29 @@
     padding: 10px 8px;
   }
 
+  #pipeline .column-title {
+    font-size: 0.84rem;
+    gap: 6px;
+  }
+
+  #pipeline .column-name {
+    font-size: 0.84rem;
+  }
+
+  #pipeline .pipeline-card {
+    padding: 11px;
+  }
+
+  #pipeline .pipeline-card .candidate-identity {
+    gap: 6px;
+  }
+
+  #pipeline .pipeline-card .country,
+  #pipeline .pipeline-card .candidate-name,
+  #pipeline .pipeline-card .salary {
+    font-size: 0.84rem;
+  }
+
   .batch-table {
     overflow-x: auto;
   }

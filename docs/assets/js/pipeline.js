@@ -1093,22 +1093,28 @@ candidates.forEach(candidate => {
 card.innerHTML = `
 <div class="card-header">
   <div class="candidate-info">
-    <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
+    <div class="candidate-topline">
+      <div class="candidate-identity">
+        <span class="country"></span>
+        <strong class="candidate-name" title="${candidate.name}">${candidate.name}</strong>
+      </div>
+      <div class="card-header-actions">
+        <i class="fas fa-star star-icon ${starClass}" title="Star"></i>
+        <div class="signoff-toggle">
+          <label class="switch">
+            <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+    </div>
     <div class="candidate-meta">
-      <span class="country"></span>
       <span class="salary">${candidate.salary_range ? `$${Number(candidate.salary_range).toLocaleString()}` : '—'}</span>
+      <div class="star-wrapper">
+        <i class="fab fa-whatsapp wa-icon" title="WhatsApp"></i>
+        <span class="delete-icon" title="Delete">🗑️</span>
+      </div>
     </div>
-    <div class="star-wrapper">
-      <i class="fas fa-star star-icon ${starClass}" title="Star"></i>
-      <i class="fab fa-whatsapp wa-icon" title="WhatsApp"></i>
-    </div>
-  </div>
-  <span class="delete-icon" title="Delete">🗑️</span>
-  <div class="signoff-toggle">
-    <label class="switch">
-      <input type="checkbox" class="signoff-checkbox" ${signoffChecked} data-candidate-id="${candidate.candidate_id}">
-      <span class="slider round"></span>
-    </label>
   </div>
 </div>
 `;
@@ -1117,9 +1123,13 @@ if (countryEl) {
   const formattedCountry = formatCountryDisplay(candidate.country);
   const flag = getFlagEmoji(candidate.country);
   if (formattedCountry && formattedCountry !== '—') {
-    countryEl.textContent = flag ? `${flag} ${formattedCountry}` : formattedCountry;
+    countryEl.textContent = flag || '';
+    countryEl.title = formattedCountry;
+    countryEl.setAttribute('aria-label', formattedCountry);
   } else {
-    countryEl.textContent = '—';
+    countryEl.textContent = '';
+    countryEl.removeAttribute('title');
+    countryEl.removeAttribute('aria-label');
   }
 }
 decorateUsingCandidateBlacklist(card, candidate, rawBlacklist);
