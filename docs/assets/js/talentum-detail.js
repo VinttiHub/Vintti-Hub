@@ -578,9 +578,7 @@ function buildScoreExplanation(profile, score, reasons) {
   if (reasons) {
     return `${score}/10. ${reasons}`;
   }
-  const summary = getMatchSummary(profile);
-  if (!summary.length) return `${score}/10 because no filters are set.`;
-  return `${score}/10 because ${summary.slice(0, 3).join(", ")}.`;
+  return `${score}/10. No es un match adecuado para esta job description.`;
 }
 
 function renderCandidates() {
