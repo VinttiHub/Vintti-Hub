@@ -657,6 +657,117 @@ def backfill_applicant_ai_fields():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route("/applicants/<int:applicant_id>/refresh_ai_fields", methods=["POST", "OPTIONS"])
+def refresh_applicant_ai_fields(applicant_id):
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    data = request.get_json(silent=True) or {}
+    filters = data.get("filters") or {}
+
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                applicant_id,
+                opportunity_id,
+                location,
+                cv_s3_key,
+                cv_file_name,
+                cv_content_type,
+                extracted_pdf,
+                match_score,
+                reasons
+            FROM applicants
+            WHERE applicant_id = %s
+            """,
+            (applicant_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Applicant not found"}), 404
+
+        (
+            _,
+            opp_id,
+            location,
+            s3_key,
+            file_name,
+            content_type,
+            extracted_pdf,
+            match_score,
+            reasons,
+        ) = row
+
+        updated = False
+        extracted = False
+        scored = False
+
+        if not (extracted_pdf or "").strip():
+            if not s3_key:
+                return jsonify({"error": "Applicant has no CV uploaded"}), 400
+            if not _is_pdf_upload(file_name or s3_key, content_type):
+                return jsonify({"error": "Applicant CV is not a PDF"}), 400
+            pdf_bytes = _fetch_s3_bytes(s3_key)
+            if not pdf_bytes:
+                return jsonify({"error": "Unable to download applicant CV"}), 502
+            extracted_pdf = _extract_pdf_text_with_openai(pdf_bytes)
+            if not extracted_pdf:
+                return jsonify({"error": "Unable to extract CV text"}), 500
+            extracted = True
+            updated = True
+
+        if (match_score is None or reasons is None) and extracted_pdf and opp_id:
+            jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
+            score, reason_text = _score_applicant_with_openai(
+                extracted_pdf,
+                location or "",
+                jd_plain,
+                filters=filters,
+                opportunity_context=opp_context,
+            )
+            if match_score is None and score is not None:
+                match_score = score
+                updated = True
+            if (reasons is None or reasons == "") and reason_text:
+                reasons = reason_text
+                updated = True
+            if score is not None or reason_text:
+                scored = True
+
+        if updated:
+            cur.execute(
+                """
+                UPDATE applicants
+                SET extracted_pdf = %s,
+                    match_score = %s,
+                    reasons = %s,
+                    updated_at = NOW()
+                WHERE applicant_id = %s
+                """,
+                (extracted_pdf, match_score, reasons, applicant_id),
+            )
+            conn.commit()
+
+        return jsonify(
+            {
+                "updated": updated,
+                "extracted": extracted,
+                "scored": scored,
+                "match_score": match_score,
+                "reasons": reasons,
+            }
+        ), 200
+    except Exception as exc:
+        logging.exception("Failed to refresh applicant AI fields")
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 @bp.route("/linkedin_hub", methods=["GET", "OPTIONS"])
 def get_linkedin_hub_entry():
     if request.method == "OPTIONS":

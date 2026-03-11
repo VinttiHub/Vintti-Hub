@@ -130,6 +130,38 @@ function setRefreshApplicantsBusy(isBusy) {
   els.refreshApplicantsBtn.textContent = isBusy ? "Refreshing..." : "Refresh CVs";
 }
 
+async function refreshSingleApplicantAI(applicantId) {
+  if (!applicantId) return;
+  const statusEl = document.getElementById("drawerRefreshStatus");
+  const btn = document.getElementById("drawerRefreshBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Refreshing...";
+  }
+  if (statusEl) statusEl.textContent = "Refreshing CV...";
+
+  try {
+    const result = await fetchJSON(`${API_BASE}/applicants/${applicantId}/refresh_ai_fields`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filters: state.filters }),
+    });
+    const status = result.updated ? "Updated" : "No changes";
+    if (statusEl) {
+      statusEl.textContent = `${status} · score ${result.match_score ?? "—"}`;
+    }
+    await loadApplicants(getOpportunityId());
+  } catch (err) {
+    console.error("Single applicant refresh failed", err);
+    if (statusEl) statusEl.textContent = "Refresh failed. Try again.";
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Refresh CV";
+    }
+  }
+}
+
 async function backfillApplicantsAI(opportunityId) {
   if (!opportunityId) {
     setRefreshApplicantsStatus("Missing opportunity id.");
@@ -683,6 +715,12 @@ function renderApplicantDrawer(entry) {
       <h4>Files</h4>
       <div class="drawer-item"><span class="drawer-label">CV</span>${cvLink}</div>
       <div class="drawer-item"><span class="drawer-label">Size</span><span class="drawer-value">${formatBytes(applicant.cv_size_bytes)}</span></div>
+      <div class="drawer-item drawer-actions">
+        <button class="drawer-refresh-btn" id="drawerRefreshBtn" type="button" data-applicant-id="${applicant.applicant_id}">
+          Refresh CV
+        </button>
+        <span class="drawer-refresh-status" id="drawerRefreshStatus"></span>
+      </div>
     </div>
     <div class="drawer-section">
       <h4>Screening</h4>
@@ -834,6 +872,12 @@ async function init() {
       } catch (err) {
         console.warn("Copy failed", err);
       }
+    });
+    els.drawerBody.addEventListener("click", (event) => {
+      const btn = event.target.closest(".drawer-refresh-btn");
+      if (!btn) return;
+      const applicantId = Number(btn.dataset.applicantId);
+      refreshSingleApplicantAI(applicantId);
     });
   }
 }
