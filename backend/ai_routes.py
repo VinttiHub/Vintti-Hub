@@ -180,15 +180,29 @@ def _score_applicant_with_openai(
     opportunity_context = opportunity_context or {}
     prompt = f"""
 You are a recruiting assistant scoring applicants for a job.
-Return STRICT JSON only: {{"score": <1-10 integer>, "reasons": "<short Spanish explanation>"}}
+Return STRICT JSON only with this shape:
+{{
+  "score": <1-10 integer>,
+  "overall_percent": <0-100 integer>,
+  "summary": "<Spanish, 2-4 sentences, longer explanation of the match and gaps>",
+  "breakdown": [
+    {{"category": "Ubicación", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Similitud con la JD", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Posición (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Industria (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Años de experiencia (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Salario (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "País (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}}
+  ]
+}}
 
 Score MUST consider:
 - Location match between applicant and role.
 - How close the applicant's experience and education are to the job description requirements.
 - Any explicit user filters (position, salary, years_experience, industry, country) if provided.
 
-Do NOT invent facts. If key information is missing, mention it briefly in the reasons.
-Keep reasons under 25 words, in Spanish.
+If a filter is missing, still include the category with a percent and say it was not evaluated.
+Do NOT invent facts. If key information is missing, mention it briefly in the summary and details.
 
 Applicant location: {applicant_location or "Unknown"}
 Opportunity context: {json.dumps(opportunity_context, ensure_ascii=False)}
@@ -221,11 +235,52 @@ Extracted CV text:
     except Exception:
         score = None
 
-    reasons = payload.get("reasons")
-    if isinstance(reasons, str):
-        reasons = reasons.strip()
+    summary = payload.get("summary")
+    breakdown = payload.get("breakdown")
+    overall_percent = payload.get("overall_percent")
+
+    reasons = None
+    reasons_payload = {}
+    if isinstance(summary, str) and summary.strip():
+        reasons_payload["summary"] = summary.strip()
+    if isinstance(overall_percent, (int, float)):
+        reasons_payload["overall_percent"] = max(0, min(100, int(overall_percent)))
+    if isinstance(breakdown, list):
+        normalized_breakdown = []
+        for item in breakdown:
+            if not isinstance(item, dict):
+                continue
+            category = item.get("category")
+            detail = item.get("detail") or item.get("explanation")
+            percent = item.get("percent")
+            if not isinstance(category, str) or not category.strip():
+                continue
+            try:
+                percent_value = int(percent)
+            except Exception:
+                percent_value = None
+            if percent_value is not None:
+                percent_value = max(0, min(100, percent_value))
+            if not isinstance(detail, str):
+                detail = ""
+            normalized_breakdown.append(
+                {
+                    "category": category.strip(),
+                    "percent": percent_value,
+                    "detail": detail.strip(),
+                }
+            )
+        if normalized_breakdown:
+            reasons_payload["breakdown"] = normalized_breakdown
+
+    if reasons_payload:
+        if "overall_percent" not in reasons_payload and score is not None:
+            reasons_payload["overall_percent"] = max(0, min(100, int(score * 10)))
+        reasons = json.dumps(reasons_payload, ensure_ascii=False)
     else:
-        reasons = None
+        raw_reasons = payload.get("reasons")
+        if isinstance(raw_reasons, str):
+            reasons = raw_reasons.strip()
 
     if score is not None:
         score = max(1, min(10, score))

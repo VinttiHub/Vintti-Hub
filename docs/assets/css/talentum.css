@@ -677,6 +677,73 @@ body.talentum {
   color: #2b2b32;
 }
 
+.score-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.score-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #2b2b32;
+}
+
+.score-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.score-summary {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #2b2b32;
+  margin-bottom: 12px;
+}
+
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.score-row {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.score-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.score-category {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #2b2b32;
+}
+
+.score-percent {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #4c2b35;
+}
+
+.score-detail {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .screening-item {
   padding: 10px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);

@@ -574,11 +574,209 @@ function getMatchSummary(profile) {
   return parts.filter(Boolean);
 }
 
-function buildScoreExplanation(profile, score, reasons) {
-  if (reasons) {
-    return `${score}/10. ${reasons}`;
+function scoreToPercent(score) {
+  if (!Number.isFinite(score)) return null;
+  const bounded = Math.max(0, Math.min(10, score));
+  return Math.round((bounded / 10) * 100);
+}
+
+function normalizePercent(value, fallback = null) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function parseReasonsPayload(reasonsRaw) {
+  const raw = String(reasonsRaw || "").trim();
+  if (!raw) return null;
+  if (!raw.startsWith("{") && !raw.startsWith("[")) {
+    return { summary: raw, breakdown: null, overallPercent: null };
   }
-  return `${score}/10. No es un match adecuado para esta job description.`;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { summary: raw, breakdown: null, overallPercent: null };
+    }
+    const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : "";
+    const overallPercent = normalizePercent(parsed.overall_percent, null);
+    const breakdown = Array.isArray(parsed.breakdown)
+      ? parsed.breakdown
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const category = typeof item.category === "string" ? item.category.trim() : "";
+          const detail = typeof item.detail === "string" ? item.detail.trim() : "";
+          const percent = normalizePercent(item.percent, null);
+          if (!category) return null;
+          return { category, detail, percent };
+        })
+        .filter(Boolean)
+      : null;
+    return { summary, breakdown, overallPercent };
+  } catch (err) {
+    return { summary: raw, breakdown: null, overallPercent: null };
+  }
+}
+
+function mapScoreToPercent(scoreValue) {
+  if (scoreValue === 2) return 100;
+  if (scoreValue === 1) return 60;
+  if (scoreValue === 0) return 0;
+  return null;
+}
+
+function buildFilterBreakdown(label, filterValue, scoreValue, details) {
+  if (!filterValue) {
+    return {
+      category: label,
+      percent: 0,
+      detail: "Filtro no definido.",
+    };
+  }
+  if (scoreValue == null) {
+    return {
+      category: label,
+      percent: 0,
+      detail: details.missing,
+    };
+  }
+  if (scoreValue === 2) {
+    return {
+      category: label,
+      percent: 100,
+      detail: details.match,
+    };
+  }
+  if (scoreValue === 1) {
+    return {
+      category: label,
+      percent: 60,
+      detail: details.close,
+    };
+  }
+  return {
+    category: label,
+    percent: 0,
+    detail: details.miss,
+  };
+}
+
+function buildFallbackBreakdown(profile, score) {
+  const breakdown = [];
+  const overallPercent = scoreToPercent(score);
+  breakdown.push({
+    category: "Similitud con la JD",
+    percent: normalizePercent(overallPercent, 0),
+    detail: "Estimación local basada en el score general, sin análisis directo de la JD.",
+  });
+
+  const locationScore = scoreTextMatch(profile.country, state.filters.country, profile.searchableText);
+  breakdown.push(
+    buildFilterBreakdown(
+      "Ubicación",
+      state.filters.country,
+      locationScore,
+      {
+        match: "La ubicación del candidato coincide con la requerida.",
+        close: "La ubicación es cercana o parcialmente compatible.",
+        miss: "No coincide con la ubicación requerida.",
+        missing: "No se encontró ubicación suficiente para evaluar.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Posición (filtro)",
+      state.filters.position,
+      scoreTextMatch(profile.position, state.filters.position, profile.searchableText),
+      {
+        match: "La posición coincide con el filtro principal.",
+        close: "La posición es similar pero no exacta.",
+        miss: "No coincide con el filtro de posición.",
+        missing: "No se encontró posición suficiente para evaluar.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Industria (filtro)",
+      state.filters.industry,
+      scoreTextMatch(profile.industry, state.filters.industry, profile.searchableText),
+      {
+        match: "La industria coincide con la requerida.",
+        close: "La industria es parcialmente compatible.",
+        miss: "No coincide con la industria requerida.",
+        missing: "No se encontró industria suficiente para evaluar.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Años de experiencia (filtro)",
+      state.filters.years_experience,
+      scoreYearsMatch(profile),
+      {
+        match: "Cumple con los años de experiencia solicitados.",
+        close: "Está cerca del rango de experiencia requerido.",
+        miss: "No alcanza el rango de experiencia solicitado.",
+        missing: "No se encontró experiencia suficiente para evaluar.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Salario (filtro)",
+      state.filters.salary,
+      scoreSalaryMatch(profile),
+      {
+        match: "La expectativa salarial está alineada.",
+        close: "La expectativa salarial es cercana.",
+        miss: "La expectativa salarial no coincide.",
+        missing: "No se encontró información salarial.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "País (filtro)",
+      state.filters.country,
+      locationScore,
+      {
+        match: "El país coincide con el filtro definido.",
+        close: "El país es cercano o parcialmente compatible.",
+        miss: "El país no coincide con el filtro.",
+        missing: "No se encontró país suficiente para evaluar.",
+      }
+    )
+  );
+
+  return breakdown;
+}
+
+function buildDefaultSummary(profile, percent) {
+  const summaryPieces = getMatchSummary(profile);
+  if (summaryPieces.length) {
+    return `Estimación local del match (${percent || 0}%). ${summaryPieces.join(", ")}.`;
+  }
+  return `Estimación local del match (${percent || 0}%). No hay suficiente información para detallar.`;
+}
+
+function buildMatchModel(profile, score, reasonsRaw) {
+  const parsed = parseReasonsPayload(reasonsRaw);
+  const percentFallback = scoreToPercent(score) ?? 0;
+  const overallPercent = normalizePercent(parsed?.overallPercent, percentFallback);
+  const summary = parsed?.summary || buildDefaultSummary(profile, overallPercent);
+  const breakdown = parsed?.breakdown?.length
+    ? parsed.breakdown
+    : buildFallbackBreakdown(profile, score);
+  return {
+    percent: overallPercent,
+    summary,
+    breakdown,
+  };
 }
 
 function renderCandidates() {
@@ -610,9 +808,10 @@ function renderCandidates() {
       ? `<a class="candidate-link" href="${escapeHtml(candidate.profile.linkedin)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
       : `<span class="candidate-link muted">No LinkedIn</span>`;
 
+    const scorePercent = scoreToPercent(candidate.score) ?? 0;
     card.innerHTML = `
       <h4>${escapeHtml(candidate.profile.name)}</h4>
-      <div class="candidate-score">Match ${candidate.score}/10</div>
+      <div class="candidate-score">Match ${scorePercent}%</div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
@@ -666,16 +865,36 @@ function renderApplicantDrawer(entry) {
   const cvLink = applicant.cv_s3_key
     ? `<a class="drawer-link" id="cvDownloadLink" href="#" target="_blank" rel="noopener">Download ${cvName}</a>`
     : "<span class=\"drawer-value\">—</span>";
-  const scoreText = buildScoreExplanation(
+  const match = buildMatchModel(
     profile,
     entry.score ?? computeMatchScore(profile),
     entry.reasons || applicant.reasons || ""
   );
+  const breakdownHtml = match.breakdown
+    .map((item) => `
+      <div class="score-row">
+        <div class="score-row-head">
+          <span class="score-category">${escapeHtml(item.category)}</span>
+          <span class="score-percent">${escapeHtml(item.percent ?? 0)}%</span>
+        </div>
+        <p class="score-detail">${escapeHtml(item.detail || "Sin detalle adicional.")}</p>
+      </div>
+    `)
+    .join("");
 
   els.drawerBody.innerHTML = `
     <div class="drawer-section">
       <h4>Match score</h4>
-      <p class="score-note">${escapeHtml(scoreText)}</p>
+      <div class="score-header">
+        <div>
+          <div class="score-value">${escapeHtml(match.percent)}%</div>
+          <div class="score-label">Match general</div>
+        </div>
+      </div>
+      <p class="score-summary">${escapeHtml(match.summary)}</p>
+      <div class="score-breakdown">
+        ${breakdownHtml}
+      </div>
     </div>
     <div class="drawer-section">
       <h4>Overview</h4>
