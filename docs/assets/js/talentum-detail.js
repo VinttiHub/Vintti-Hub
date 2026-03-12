@@ -38,6 +38,10 @@ const els = {
   drawerClose: document.getElementById("drawerClose"),
   drawerTitle: document.getElementById("drawerTitle"),
   drawerBody: document.getElementById("drawerBody"),
+  matchDrawerBtn: document.getElementById("matchDrawerBtn"),
+  matchDrawer: document.getElementById("matchDrawer"),
+  matchDrawerClose: document.getElementById("matchDrawerClose"),
+  matchDrawerBody: document.getElementById("matchDrawerBody"),
 };
 
 function getStoredEmail() {
@@ -192,6 +196,22 @@ async function backfillApplicantsAI(opportunityId) {
   }
 }
 
+async function recalculateApplicants(opportunityId) {
+  if (!opportunityId) return;
+  try {
+    await fetchJSON(`${API_BASE}/applicants/recalculate_scores`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        opportunity_id: opportunityId,
+        filters: state.filters,
+      }),
+    });
+  } catch (err) {
+    console.warn("Failed to recalculate applicants", err);
+  }
+}
+
 async function loadOpportunity(opportunityId) {
   setChatStatus("Loading");
   setFiltersStatus("Extracting");
@@ -224,6 +244,7 @@ async function loadOpportunity(opportunityId) {
   }
 
   try {
+    await recalculateApplicants(opportunityId);
     await loadApplicants(opportunityId);
   } catch (err) {
     console.error("Failed to load candidates", err);
@@ -665,7 +686,7 @@ function buildFallbackBreakdown(profile, score) {
   breakdown.push({
     category: "Similitud con la JD",
     percent: normalizePercent(overallPercent, 0),
-    detail: "Estimación local basada en el score general, sin análisis directo de la JD.",
+    detail: "Comparación entre el CV extraído y la JD; aquí se muestra una estimación local si falta texto.",
   });
 
   const locationScore = scoreTextMatch(profile.country, state.filters.country, profile.searchableText);
@@ -769,14 +790,24 @@ function buildMatchModel(profile, score, reasonsRaw) {
   const percentFallback = scoreToPercent(score) ?? 0;
   const overallPercent = normalizePercent(parsed?.overallPercent, percentFallback);
   const summary = parsed?.summary || buildDefaultSummary(profile, overallPercent);
-  const breakdown = parsed?.breakdown?.length
+  const breakdownSource = parsed?.breakdown?.length
     ? parsed.breakdown
     : buildFallbackBreakdown(profile, score);
+  const breakdown = breakdownSource.map((item) => ({
+    ...item,
+    percent: normalizePercent(item.percent, 0),
+  }));
   return {
     percent: overallPercent,
     summary,
     breakdown,
   };
+}
+
+function getScoreTone(percent) {
+  if (percent >= 70) return "score-high";
+  if (percent >= 40) return "score-mid";
+  return "score-low";
 }
 
 function renderCandidates() {
@@ -809,9 +840,10 @@ function renderCandidates() {
       : `<span class="candidate-link muted">No LinkedIn</span>`;
 
     const scorePercent = scoreToPercent(candidate.score) ?? 0;
+    const scoreTone = getScoreTone(scorePercent);
     card.innerHTML = `
       <h4>${escapeHtml(candidate.profile.name)}</h4>
-      <div class="candidate-score">Match ${scorePercent}%</div>
+      <div class="candidate-score ${scoreTone}">Match ${scorePercent}%</div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
@@ -871,31 +903,22 @@ function renderApplicantDrawer(entry) {
     entry.reasons || applicant.reasons || ""
   );
   const breakdownHtml = match.breakdown
-    .map((item) => `
-      <div class="score-row">
-        <div class="score-row-head">
-          <span class="score-category">${escapeHtml(item.category)}</span>
-          <span class="score-percent">${escapeHtml(item.percent ?? 0)}%</span>
+    .map((item) => {
+      const percentValue = normalizePercent(item.percent, 0);
+      const tone = getScoreTone(percentValue);
+      return `
+        <div class="score-row ${tone}">
+          <div class="score-row-head">
+            <span class="score-category">${escapeHtml(item.category)}</span>
+            <span class="score-percent">${escapeHtml(percentValue)}%</span>
+          </div>
+          <p class="score-detail">${escapeHtml(item.detail || "Sin detalle adicional.")}</p>
         </div>
-        <p class="score-detail">${escapeHtml(item.detail || "Sin detalle adicional.")}</p>
-      </div>
-    `)
+      `;
+    })
     .join("");
 
   els.drawerBody.innerHTML = `
-    <div class="drawer-section">
-      <h4>Match score</h4>
-      <div class="score-header">
-        <div>
-          <div class="score-value">${escapeHtml(match.percent)}%</div>
-          <div class="score-label">Match general</div>
-        </div>
-      </div>
-      <p class="score-summary">${escapeHtml(match.summary)}</p>
-      <div class="score-breakdown">
-        ${breakdownHtml}
-      </div>
-    </div>
     <div class="drawer-section">
       <h4>Overview</h4>
       <div class="drawer-item">
@@ -959,6 +982,24 @@ function renderApplicantDrawer(entry) {
   if (applicant.cv_s3_key) {
     loadApplicantCvLink(applicant.applicant_id);
   }
+
+  if (els.matchDrawerBody) {
+    const matchTone = getScoreTone(match.percent);
+    els.matchDrawerBody.innerHTML = `
+      <div class="drawer-section">
+        <div class="score-header ${matchTone}">
+          <div>
+            <div class="score-value">${escapeHtml(match.percent)}%</div>
+            <div class="score-label">Match general</div>
+          </div>
+        </div>
+        <p class="score-summary">${escapeHtml(match.summary)}</p>
+        <div class="score-breakdown">
+          ${breakdownHtml}
+        </div>
+      </div>
+    `;
+  }
 }
 
 async function loadApplicantCvLink(applicantId) {
@@ -982,12 +1023,26 @@ function openApplicantDrawer(applicant) {
   renderApplicantDrawer(applicant);
   if (els.applicantDrawer) els.applicantDrawer.setAttribute("aria-hidden", "false");
   document.body.classList.add("drawer-open");
+  closeMatchDrawer();
 }
 
 function closeApplicantDrawer() {
   state.selectedApplicantId = null;
   if (els.applicantDrawer) els.applicantDrawer.setAttribute("aria-hidden", "true");
   document.body.classList.remove("drawer-open");
+  closeMatchDrawer();
+}
+
+function openMatchDrawer() {
+  if (!els.matchDrawer || !els.applicantDrawer) return;
+  els.matchDrawer.setAttribute("aria-hidden", "false");
+  els.applicantDrawer.classList.add("match-drawer-open");
+}
+
+function closeMatchDrawer() {
+  if (!els.matchDrawer || !els.applicantDrawer) return;
+  els.matchDrawer.setAttribute("aria-hidden", "true");
+  els.applicantDrawer.classList.remove("match-drawer-open");
 }
 
 async function handleChatSubmit(event) {
@@ -1016,6 +1071,7 @@ async function handleChatSubmit(event) {
     if (resp.updated_filters) {
       state.filters = { ...state.filters, ...resp.updated_filters };
       renderFilters();
+      await recalculateApplicants(getOpportunityId());
       await loadApplicants(getOpportunityId());
     }
     appendMessage("assistant", resp.response || "Filtros actualizados.");
@@ -1071,6 +1127,14 @@ async function init() {
 
   if (els.drawerClose) {
     els.drawerClose.addEventListener("click", closeApplicantDrawer);
+  }
+
+  if (els.matchDrawerBtn) {
+    els.matchDrawerBtn.addEventListener("click", () => openMatchDrawer());
+  }
+
+  if (els.matchDrawerClose) {
+    els.matchDrawerClose.addEventListener("click", () => closeMatchDrawer());
   }
 
   if (els.drawerBody) {

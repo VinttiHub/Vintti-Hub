@@ -73,9 +73,22 @@
         <p class="drawer-eyebrow">Applicant</p>
         <h3 id="drawerTitle">Applicant details</h3>
       </div>
-      <button class="drawer-close" id="drawerClose" type="button" aria-label="Close applicant details">✕</button>
+      <div class="drawer-header-actions">
+        <button class="drawer-action-btn" id="matchDrawerBtn" type="button">Match score</button>
+        <button class="drawer-close" id="drawerClose" type="button" aria-label="Close applicant details">✕</button>
+      </div>
     </div>
     <div class="drawer-body" id="drawerBody"></div>
+    <aside class="match-drawer" id="matchDrawer" aria-hidden="true">
+      <div class="match-drawer-header">
+        <div>
+          <p class="drawer-eyebrow">Match score</p>
+          <h3>Reasons</h3>
+        </div>
+        <button class="drawer-close" id="matchDrawerClose" type="button" aria-label="Close match score">✕</button>
+      </div>
+      <div class="match-drawer-body" id="matchDrawerBody"></div>
+    </aside>
   </aside>
 
   <script src="./assets/js/talentum-detail.js"></script>

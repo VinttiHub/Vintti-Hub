@@ -199,6 +199,7 @@ Return STRICT JSON only with this shape:
 Score MUST consider:
 - Location match between applicant and role.
 - How close the applicant's experience and education are to the job description requirements.
+- "Similitud con la JD" must compare extracted CV text (extracted_pdf) vs job description requirements.
 - Any explicit user filters (position, salary, years_experience, industry, country) if provided.
 
 If a filter is missing, still include the category with a percent and say it was not evaluated.
