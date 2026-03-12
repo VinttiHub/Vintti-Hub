@@ -184,10 +184,10 @@ Return STRICT JSON only with this shape:
 {{
   "score": <1-10 integer>,
   "overall_percent": <0-100 integer>,
-  "summary": "<Spanish, 2-4 sentences, longer explanation of the match and gaps>",
+  "summary": "<Spanish, 3-5 sentences. Explain match/gaps using the JD filters and CV evidence; mention missing info if any>",
   "breakdown": [
     {{"category": "Ubicación", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "Similitud con la JD", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Similitud con la JD", "percent": <0-100>, "detail": "<Spanish detail with 3-5 sentences comparing JD filters vs CV>"}},
     {{"category": "Posición (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
     {{"category": "Industria (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
     {{"category": "Años de experiencia (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
@@ -202,7 +202,12 @@ Score MUST consider:
 - "Similitud con la JD" must compare extracted CV text (extracted_pdf) vs job description requirements.
 - Any explicit user filters (position, salary, years_experience, industry, country) if provided.
 
-If a filter is missing, still include the category with a percent and say it was not evaluated.
+Write a specific, extended comparison using ONLY these inputs:
+- User filters (position, salary, years_experience, industry, country) extracted from the JD.
+- The job description text.
+- The extracted CV text.
+For "Similitud con la JD", explicitly reference which JD filters are present and whether the CV supports each one (e.g., "no se encontró experiencia en BDR en el CV").
+If a filter is missing in the JD or not found in the CV, state that clearly and explain how it impacts the percent.
 Do NOT invent facts. If key information is missing, mention it briefly in the summary and details.
 
 Applicant location: {applicant_location or "Unknown"}
@@ -220,7 +225,7 @@ Extracted CV text:
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=250,
+        max_tokens=450,
     )
 
     content = (chat.choices[0].message.content or "").strip()

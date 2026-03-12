@@ -91,6 +91,29 @@
     </aside>
   </aside>
 
+  <div class="loading-game" id="loadingGame" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loadingGameTitle">
+    <div class="loading-game-card">
+      <div class="loading-game-head">
+        <div>
+          <p class="loading-game-eyebrow">Talentum</p>
+          <h3 id="loadingGameTitle">Cargando applicants</h3>
+          <p class="loading-game-sub" id="loadingGameMessage">Atrapa la chispa mientras preparamos los perfiles.</p>
+        </div>
+        <div class="loading-game-score">
+          <span class="loading-game-label">Hits</span>
+          <span id="loadingGameHits">0</span>
+        </div>
+      </div>
+      <div class="loading-game-board" id="loadingGameBoard" aria-label="Mini juego de click">
+        <button class="loading-game-target" id="loadingGameTarget" type="button" aria-label="Atrapa la chispa"></button>
+      </div>
+      <div class="loading-game-footer">
+        <span>Streak: <strong id="loadingGameStreak">0</strong></span>
+        <span class="loading-game-tip">Tip: sigue el glow.</span>
+      </div>
+    </div>
+  </div>
+
   <script src="./assets/js/talentum-detail.js"></script>
 </body>
 </html>
