@@ -247,28 +247,32 @@
     padding: 18px 16px 12px;
   }
 
-  .detail-nav ul {
-    width: 100%;
-    justify-content: flex-start;
-    overflow-x: auto;
-    gap: 12px;
-    padding: 6px 10px;
-    white-space: nowrap;
-  }
-
   .detail-nav {
     width: 100%;
-    overflow: hidden;
+    overflow: visible;
   }
 
-  .detail-nav ul::-webkit-scrollbar {
+  .detail-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px;
+    white-space: normal;
+  }
+
+  .detail-tabs::-webkit-scrollbar {
     display: none;
   }
 
   .detail-nav .nav-item {
-    white-space: nowrap;
-    font-size: 14px;
-    padding-bottom: 6px;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.2;
+    padding: 10px 8px;
   }
 
   .detail-nav .nav-indicator {
@@ -357,6 +361,46 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  #job .job-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #job .job-header,
+  #job .job-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  #job .job-header-left h2 {
+    font-size: 1.7rem;
+  }
+
+  #job .job-editor-topline {
+    align-items: flex-start;
+  }
+
+  #job .job-editor-tabs {
+    width: 100%;
+    gap: 1rem;
+    overflow-x: auto;
+  }
+
+  #job .job-editor-note {
+    font-size: 0.85rem;
+  }
+
+  .toolbar button,
+  #emoji-trigger {
+    min-width: 44px;
+    padding: 9px 12px;
+  }
+
+  .job-description-editor {
+    min-height: 360px;
+    padding: 16px;
+    border-radius: 18px;
   }
 
   .pipeline-actions {
@@ -723,6 +767,10 @@
 @media (max-width: 640px) {
   .detail-title {
     font-size: 1.2rem;
+  }
+
+  .detail-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .overview-title {
