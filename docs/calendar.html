@@ -117,12 +117,43 @@
             <input type="checkbox" id="eventMeet" checked />
             Crear link de Google Meet
           </label>
+          <label class="checkbox-row">
+            <input type="checkbox" id="eventEmailInvite" checked />
+            Enviar invitación por email desde Vintti Hub
+          </label>
 
           <div class="form-actions">
             <button class="primary-btn" type="submit">Crear evento</button>
             <span class="form-status" id="formStatus"></span>
           </div>
         </form>
+      </article>
+
+      <article class="calendar-card availability-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Disponibilidad de invitados</h2>
+            <p class="card-subtitle">Mira horarios ocupados antes de agendar.</p>
+          </div>
+          <div class="card-actions">
+            <button class="ghost-btn" id="availabilityBtn" type="button">
+              <i class="fa-regular fa-calendar-check"></i>
+              Ver disponibilidad
+            </button>
+          </div>
+        </div>
+        <div class="availability-meta">
+          <span id="availabilityStatus">Ingresa emails en el evento para ver disponibilidad.</span>
+        </div>
+        <div class="availability-grid" id="availabilityGrid">
+          <div class="empty-state">
+            <img src="./assets/img/calendar.png" alt="" />
+            <p>Sin invitados para consultar.</p>
+          </div>
+        </div>
+        <p class="availability-note">
+          La disponibilidad depende de calendarios compartidos con tu cuenta de Google.
+        </p>
       </article>
     </section>
   </main>
