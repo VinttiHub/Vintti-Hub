@@ -42,6 +42,18 @@ const els = {
   matchDrawer: document.getElementById("matchDrawer"),
   matchDrawerClose: document.getElementById("matchDrawerClose"),
   matchDrawerBody: document.getElementById("matchDrawerBody"),
+  loadingGame: document.getElementById("loadingGame"),
+  loadingGameBoard: document.getElementById("loadingGameBoard"),
+  loadingGameTarget: document.getElementById("loadingGameTarget"),
+  loadingGameHits: document.getElementById("loadingGameHits"),
+  loadingGameStreak: document.getElementById("loadingGameStreak"),
+};
+
+const loadingGameState = {
+  active: false,
+  hits: 0,
+  streak: 0,
+  moveTimer: null,
 };
 
 function getStoredEmail() {
@@ -134,6 +146,72 @@ function setRefreshApplicantsBusy(isBusy) {
   els.refreshApplicantsBtn.textContent = isBusy ? "Refreshing..." : "Refresh CVs";
 }
 
+function updateLoadingGameStats() {
+  if (els.loadingGameHits) els.loadingGameHits.textContent = `${loadingGameState.hits}`;
+  if (els.loadingGameStreak) els.loadingGameStreak.textContent = `${loadingGameState.streak}`;
+}
+
+function moveLoadingGameTarget() {
+  if (!els.loadingGameBoard || !els.loadingGameTarget) return;
+  const rect = els.loadingGameBoard.getBoundingClientRect();
+  const targetSize = els.loadingGameTarget.offsetWidth || 40;
+  const maxX = Math.max(0, rect.width - targetSize);
+  const maxY = Math.max(0, rect.height - targetSize);
+  const nextX = Math.random() * maxX;
+  const nextY = Math.random() * maxY;
+  els.loadingGameTarget.style.left = `${nextX}px`;
+  els.loadingGameTarget.style.top = `${nextY}px`;
+}
+
+function startLoadingGame(options = {}) {
+  if (!els.loadingGame) return;
+  const shouldReset = options.reset !== false;
+  loadingGameState.active = true;
+  if (shouldReset) {
+    loadingGameState.hits = 0;
+    loadingGameState.streak = 0;
+  }
+  updateLoadingGameStats();
+  els.loadingGame.classList.add("is-visible");
+  els.loadingGame.setAttribute("aria-hidden", "false");
+  moveLoadingGameTarget();
+  if (loadingGameState.moveTimer) clearInterval(loadingGameState.moveTimer);
+  loadingGameState.moveTimer = setInterval(moveLoadingGameTarget, 900);
+}
+
+function stopLoadingGame() {
+  if (!els.loadingGame) return;
+  loadingGameState.active = false;
+  if (loadingGameState.moveTimer) {
+    clearInterval(loadingGameState.moveTimer);
+    loadingGameState.moveTimer = null;
+  }
+  els.loadingGame.classList.remove("is-visible");
+  els.loadingGame.setAttribute("aria-hidden", "true");
+}
+
+function initLoadingGame() {
+  if (!els.loadingGameBoard || !els.loadingGameTarget) return;
+  els.loadingGameTarget.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!loadingGameState.active) return;
+    loadingGameState.hits += 1;
+    loadingGameState.streak += 1;
+    updateLoadingGameStats();
+    moveLoadingGameTarget();
+  });
+  els.loadingGameBoard.addEventListener("click", (event) => {
+    if (!loadingGameState.active) return;
+    if (event.target !== els.loadingGameBoard) return;
+    loadingGameState.streak = 0;
+    updateLoadingGameStats();
+  });
+  window.addEventListener("resize", () => {
+    if (!loadingGameState.active) return;
+    moveLoadingGameTarget();
+  });
+}
+
 async function refreshSingleApplicantAI(applicantId) {
   if (!applicantId) return;
   const statusEl = document.getElementById("drawerRefreshStatus");
@@ -215,6 +293,7 @@ async function recalculateApplicants(opportunityId) {
 async function loadOpportunity(opportunityId) {
   setChatStatus("Loading");
   setFiltersStatus("Extracting");
+  startLoadingGame({ reset: false });
   const opportunity = await fetchJSON(`${API_BASE}/opportunities/${opportunityId}`);
   state.currentOpportunity = opportunity;
 
@@ -249,6 +328,8 @@ async function loadOpportunity(opportunityId) {
   } catch (err) {
     console.error("Failed to load candidates", err);
     setCandidateSubtitle("Unable to load applicants.");
+  } finally {
+    stopLoadingGame();
   }
 
   try {
@@ -855,25 +936,30 @@ function renderCandidates() {
 
 async function loadApplicants(opportunityId) {
   setCandidateSubtitle("Fetching applicants…");
-  const applicants = await fetchJSON(`${API_BASE}/applicants?opportunity_id=${opportunityId}`);
-  const list = Array.isArray(applicants) ? applicants : [];
+  startLoadingGame();
+  try {
+    const applicants = await fetchJSON(`${API_BASE}/applicants?opportunity_id=${opportunityId}`);
+    const list = Array.isArray(applicants) ? applicants : [];
 
-  if (!list.length) {
-    state.candidates = [];
+    if (!list.length) {
+      state.candidates = [];
+      renderCandidates();
+      setCandidateSubtitle("No applicants in pipeline.");
+      return;
+    }
+
+    setCandidateSubtitle("Scoring applicants…");
+    state.candidates = list.map((applicant) => ({
+      pipeline: applicant,
+      detail: applicant,
+      profile: buildApplicantProfile(applicant),
+      score: Number.isFinite(applicant.match_score) ? applicant.match_score : null,
+      reasons: applicant.reasons || "",
+    }));
     renderCandidates();
-    setCandidateSubtitle("No applicants in pipeline.");
-    return;
+  } finally {
+    stopLoadingGame();
   }
-
-  setCandidateSubtitle("Scoring applicants…");
-  state.candidates = list.map((applicant) => ({
-    pipeline: applicant,
-    detail: applicant,
-    profile: buildApplicantProfile(applicant),
-    score: Number.isFinite(applicant.match_score) ? applicant.match_score : null,
-    reasons: applicant.reasons || "",
-  }));
-  renderCandidates();
 }
 
 function renderApplicantDrawer(entry) {
@@ -1091,6 +1177,7 @@ async function init() {
   setUserPill(state.currentUserEmail ? state.currentUserEmail : "Guest");
   setChatStatus("Idle");
   setFiltersStatus("Idle");
+  initLoadingGame();
 
   const opportunityId = getOpportunityId();
   if (!opportunityId) {

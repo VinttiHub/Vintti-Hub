@@ -318,3 +318,82 @@ def google_calendar_events():
         )
 
     return jsonify({"date": day_start.date().isoformat(), "events": items})
+
+
+@bp.route("/google-calendar/freebusy", methods=["POST"])
+def google_calendar_freebusy():
+    payload = request.get_json(silent=True) or {}
+    user_id = payload.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    emails = payload.get("emails") or []
+    if not emails:
+        return jsonify({"error": "emails are required"}), 400
+
+    tokens = _get_tokens(int(user_id))
+    if not tokens:
+        return jsonify({"error": "Calendar not connected"}), 404
+
+    try:
+        creds, service = build_calendar_service(tokens)
+    except Exception as exc:
+        return jsonify({"error": f"Failed to build calendar service: {exc}"}), 400
+
+    if creds and creds.token != tokens.get("access_token"):
+        _upsert_tokens(
+            int(user_id),
+            {
+                "access_token": creds.token,
+                "refresh_token": creds.refresh_token,
+                "token_expiry": creds.expiry,
+                "scope": tokens.get("scope"),
+                "token_type": tokens.get("token_type"),
+            },
+        )
+
+    timezone_name = payload.get("timezone") or "UTC"
+    try:
+        tzinfo = ZoneInfo(timezone_name)
+    except Exception:
+        tzinfo = timezone.utc
+
+    date_str = payload.get("date")
+    start_raw = payload.get("time_min")
+    end_raw = payload.get("time_max")
+
+    if start_raw and end_raw:
+        try:
+            time_min = datetime.fromisoformat(start_raw).astimezone(tzinfo)
+            time_max = datetime.fromisoformat(end_raw).astimezone(tzinfo)
+        except ValueError:
+            return jsonify({"error": "time_min/time_max must be ISO format"}), 400
+    else:
+        day_start = _parse_date(date_str, tzinfo)
+        time_min = day_start
+        time_max = day_start + timedelta(days=1)
+
+    cleaned_emails = [email.strip().lower() for email in emails if email and str(email).strip()]
+    items = [{"id": email} for email in cleaned_emails]
+
+    freebusy = (
+        service.freebusy()
+        .query(
+            body={
+                "timeMin": time_min.isoformat(),
+                "timeMax": time_max.isoformat(),
+                "timeZone": timezone_name,
+                "items": items,
+            }
+        )
+        .execute()
+    )
+
+    return jsonify(
+        {
+            "time_min": time_min.isoformat(),
+            "time_max": time_max.isoformat(),
+            "timezone": timezone_name,
+            "calendars": freebusy.get("calendars", {}),
+        }
+    )

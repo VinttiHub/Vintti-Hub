@@ -228,6 +228,111 @@ body {
   color: #0b3d91;
 }
 
+.availability-card .card-header {
+  margin-bottom: 10px;
+}
+
+.availability-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #5c6b82;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.availability-grid {
+  border: 1px solid #e1e8f7;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f8faff 0%, #ffffff 40%);
+  overflow: hidden;
+  min-height: 240px;
+  overflow: auto;
+}
+
+.availability-layout {
+  display: grid;
+  grid-template-columns: 130px repeat(auto-fit, minmax(140px, 1fr));
+  min-width: 520px;
+}
+
+.availability-header {
+  display: contents;
+}
+
+.availability-header div {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e1e8f7;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5c6b82;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.availability-body {
+  display: contents;
+}
+
+.availability-time-column {
+  background: #f4f7ff;
+  border-right: 1px solid #e1e8f7;
+}
+
+.availability-time-slot {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #4b5b73;
+  border-top: 1px solid #eef3ff;
+  height: var(--slot-height, 48px);
+  box-sizing: border-box;
+}
+
+.availability-attendee-column {
+  position: relative;
+  border-right: 1px solid #eef3ff;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(231, 238, 252, 0.5) 0,
+    rgba(231, 238, 252, 0.5) 1px,
+    transparent 1px,
+    transparent var(--slot-height, 48px)
+  );
+}
+
+.availability-attendee-column:last-child {
+  border-right: none;
+}
+
+.availability-timeline {
+  position: relative;
+  height: var(--timeline-height, 480px);
+}
+
+.availability-busy {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  border-radius: 12px;
+  background: rgba(11, 61, 145, 0.18);
+  border: 1px solid rgba(11, 61, 145, 0.32);
+  color: #0b3d91;
+  font-size: 11px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+.availability-free {
+  position: absolute;
+  inset: 0;
+}
+
+.availability-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #6b7a93;
+}
+
 @media (max-width: 1100px) {
   .calendar-grid {
     grid-template-columns: 1fr;
