@@ -1272,6 +1272,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   function activateTab(index) {
     tabs.forEach((t, i) => {
       t.classList.toggle('active', i === index);
+      t.setAttribute('aria-selected', i === index ? 'true' : 'false');
       sections[i].classList.toggle('hidden', i !== index);
     });
 
@@ -1509,6 +1510,7 @@ document.getElementById('close-date-input').addEventListener('blur', async (e) =
 // CLIENT
 document.getElementById('client-name-input').addEventListener('blur', async (e) => {
   await updateAccountField('client_name', e.target.value);
+  updateJobDescriptionSummary();
 });
 
 document.getElementById('client-size-input').addEventListener('blur', async (e) => {
@@ -1534,6 +1536,7 @@ document.getElementById('client-mail-input').addEventListener('blur', async (e) 
 // DETAILS
 document.getElementById('details-opportunity-name').addEventListener('blur', async (e) => {
   await updateOpportunityField('opp_position_name', e.target.value);
+  updateJobDescriptionSummary();
 });
 document.getElementById('min-budget-input').addEventListener('blur', e =>
   updateOpportunityField('min_budget', e.target.value));
@@ -1555,11 +1558,14 @@ document.getElementById('model-select').addEventListener('change', async (e) => 
   if (other) other.value = norm;
   if (typeof __fee_apply === 'function') __fee_apply();
   await updateOpportunityField('opp_model', title);
+  updateJobDescriptionSummary();
   logOpportunityDetailTrack('opp-details-dropdown-model');
 });
 
-document.getElementById('years-experience-input').addEventListener('blur', e =>
-  updateOpportunityField('years_experience', e.target.value));
+document.getElementById('years-experience-input').addEventListener('blur', e => {
+  updateOpportunityField('years_experience', e.target.value);
+  updateJobDescriptionSummary();
+});
 
 document.getElementById('fee-input').addEventListener('blur', e =>
   updateOpportunityField('fee', e.target.value));
@@ -1569,8 +1575,10 @@ document.getElementById('recording-input').addEventListener('blur', e =>
 document.getElementById('deepdive-recording-input').addEventListener('blur', e =>
   updateOpportunityField('deepdive_recording', e.target.value));
 
-document.getElementById('timezone-input').addEventListener('blur', e =>
-  updateAccountField('timezone', e.target.value));
+document.getElementById('timezone-input').addEventListener('blur', e => {
+  updateAccountField('timezone', e.target.value);
+  updateJobDescriptionSummary();
+});
 function toNumOrNull(v){
   if (v === undefined || v === null) return null;
   const s = String(v).replace(/[, ]/g,'').trim();
@@ -1641,6 +1649,7 @@ document.getElementById('details-model').addEventListener('change', async (e) =>
   if (other) other.value = title;
   if (typeof __fee_apply === 'function') __fee_apply();
   await updateOpportunityField('opp_model', title);
+  updateJobDescriptionSummary();
   logOpportunityDetailTrack('opp-details-dropdown-model');
 });
 // AI Assistant logic
@@ -2922,6 +2931,7 @@ async function loadOpportunityData() {
     _applyFeeVisibilityFromData(data);
     // JOB DESCRIPTION
     document.getElementById('job-description-textarea').innerHTML = data.hr_job_description || '';
+    updateJobDescriptionSummary();
 
     // FIRST MEETING INFO
     document.getElementById('min-budget-input').value = data.min_budget || '';
@@ -3108,6 +3118,22 @@ async function loadOpportunityData() {
   }
 } catch (err) {
   console.error("❌ Error loading stage from opportunities/light:", err);
+}
+
+function updateJobDescriptionSummary() {
+  const title = (document.getElementById('details-opportunity-name')?.value || '').trim();
+  const client = (document.getElementById('client-name-input')?.value || '').trim();
+  const timezone = (document.getElementById('timezone-input')?.value || '').trim();
+  const years = (document.getElementById('years-experience-input')?.value || '').trim();
+  const modelRaw = (
+    document.getElementById('details-model')?.value ||
+    document.getElementById('model-select')?.value ||
+    ''
+  ).trim();
+  const model = modelRaw ? modelRaw.charAt(0).toUpperCase() + modelRaw.slice(1) : '—';
+
+  document.getElementById('job-role-title').textContent = title || 'Job Description';
+  document.getElementById('job-meta-client').textContent = client || 'Client not assigned';
 }
   await updateCareerSheetTrafficLight();
 

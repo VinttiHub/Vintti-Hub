@@ -8,8 +8,9 @@
   <script src="./assets/js/auth-guard.js"></script>
 
   <!-- ===== Fonts ===== -->
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- ===== Styles ===== -->
   <link rel="stylesheet" href="./assets/css/opportunity-detail.css" />
@@ -27,28 +28,28 @@
 
 <body>
   <!-- ===== Fixed back button (with fallback) ===== -->
-  <div id="fixedBackContainer">
+  <!-- <div id="fixedBackContainer">
     <button id="goBackButton" class="go-back-button" data-fallback="/opportunities.html">
       <span class="arrow">←</span>
       <span class="text">Go Back</span>
     </button>
-  </div>
+  </div> -->
 
   <!-- ===== Header / Tabs ===== -->
   <header class="detail-header">
     <div class="header-left">
-      <h1 class="detail-title">Opportunity Detail</h1>
+      <!-- <h1 class="detail-title">Opportunity Detail</h1> -->
     </div>
     <nav class="detail-nav" aria-label="Opportunity sections">
-      <ul>
-        <li class="nav-item active">Overview</li>
-        <li class="nav-item">Information</li>
-        <li class="nav-item">Job Description</li>
-        <li class="nav-item">Pipeline</li>
-        <li class="nav-item">Candidates</li>
-        <li class="nav-item">Turvo</li>
-        <div class="nav-indicator"></div>
-      </ul>
+      <div class="detail-tabs" role="tablist" aria-label="Opportunity sections">
+        <button type="button" class="nav-item active" aria-selected="true">Overview</button>
+        <button type="button" class="nav-item" aria-selected="false">Information</button>
+        <button type="button" class="nav-item" aria-selected="false">Job Description</button>
+        <button type="button" class="nav-item" aria-selected="false">Pipeline</button>
+        <button type="button" class="nav-item" aria-selected="false">Candidates</button>
+        <button type="button" class="nav-item" aria-selected="false">Turvo</button>
+        <div class="nav-indicator" aria-hidden="true"></div>
+      </div>
     </nav>
   </header>
 
@@ -217,8 +218,13 @@
     <section id="job" class="detail-section hidden">
       <div class="job-header">
         <div class="job-header-left">
-          <h2>Job Description</h2>
-          <p class="subtitle">Complete job description for this opportunity.</p>
+          <p class="job-kicker">
+            <span id="job-meta-client">Client not assigned</span>
+            <span class="job-kicker-sep">•</span>
+            <span id="job-meta-updated">Editing workspace</span>
+          </p>
+          <h2 id="job-role-title">Job Description</h2>
+          <p class="subtitle">Shape the description before sending or publishing it.</p>
         </div>
 
         <div class="job-header-right">
@@ -227,14 +233,14 @@
             <div class="top-actions">
               <button id="send-btn" class="header-btn">Send</button>
               <button id="publish-career-btn" class="header-btn">Publish to Career Site</button>
+            </div>
+            <!-- Row 2: Pause + Delete -->
+            <div class="bottom-actions" id="sheet-quick-actions">
               <div id="career-traffic-light" class="career-traffic-light status-off" data-tooltip="This opportunity is not published in the career site." aria-label="This opportunity is not published in the career site.">
                 <span class="light red"></span>
                 <span class="light yellow"></span>
                 <span class="light green"></span>
               </div>
-            </div>
-            <!-- Row 2: Pause + Delete -->
-            <div class="bottom-actions" id="sheet-quick-actions">
               <button id="pause-career-btn" class="header-btn ghost-btn" title="Archive on Sheet"><span class="icon">⏸️</span></button>
               <button id="delete-career-btn" class="header-btn danger-ghost-btn" title="Delete on Sheet"><span class="icon">🗑️</span></button>
             </div>
@@ -242,20 +248,23 @@
         </div>
       </div>
 
-      <!-- Job editor toolbar -->
-      <div class="toolbar" id="job-toolbar">
-        <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
-        <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
-        <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
-
-        <!-- Emoji picker trigger -->
-        <div style="position: relative; display: inline-block;">
-          <button id="emoji-trigger">😊</button>
-          <emoji-picker id="emoji-picker" style="position: absolute; top: 100%; left: 0; display: none;"></emoji-picker>
-        </div>
-      </div>
-
       <div class="job-card">
+        <div class="job-editor-topline">
+          <div class="job-editor-tabs" aria-hidden="true">
+            <span class="job-editor-tab active">Job Description</span>
+          </div>
+          <p class="job-editor-note">Format the content, keep it clear, and publish when it is ready.</p>
+        </div>
+        <div class="toolbar" id="job-toolbar">
+          <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
+          <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
+          <button onclick="document.execCommand('insertUnorderedList', false, '')">• List</button>
+
+          <div class="job-emoji-picker">
+            <button id="emoji-trigger">😊</button>
+            <emoji-picker id="emoji-picker" style="position: absolute; top: 100%; left: 0; display: none;"></emoji-picker>
+          </div>
+        </div>
         <div id="job-description-textarea" contenteditable="true" class="job-description-editor" placeholder="Write your message here..."></div>
       </div>
     </section>
