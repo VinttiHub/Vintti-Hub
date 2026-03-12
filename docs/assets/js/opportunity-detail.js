@@ -3408,12 +3408,26 @@ function createBatchBox(batch) {
 
   box.innerHTML = `
     <div class="batch-actions">
-      <h3>Batch #${batch.batch_number}</h3>
+      <div class="batch-title-wrap">
+        <h3>Batch #${batch.batch_number}</h3>
+        <span class="batch-title-caption">Candidate review list</span>
+      </div>
       <div>
-        <button class="btn-add">Add candidate</button>
-        <button class="btn-send">Send for Approval</button>
+        <button class="btn-add" type="button" title="Add Candidate" aria-label="Add Candidate" data-tooltip="Add Candidate">
+          <img src="./assets/img/add.png" alt="" />
+        </button>
+        <button class="btn-send" type="button" title="Send for Approval" aria-label="Send for Approval" data-tooltip="Send for Approval">
+          <img src="./assets/img/check.png" alt="" />
+        </button>
         <button class="btn-delete" data-batch-id="${batch.batch_id}" title="Delete Batch">🗑️</button>
       </div>
+    </div>
+    <div class="batch-candidate-head" aria-hidden="true">
+      <span class="batch-candidate-head__candidate">Candidate</span>
+      <span class="batch-candidate-head__country">Country</span>
+      <span class="batch-candidate-head__salary">Salary</span>
+      <span class="batch-candidate-head__status">Status</span>
+      <span class="batch-candidate-head__action">Action</span>
     </div>
     <div class="batch-candidates"></div>
   `;
@@ -3439,7 +3453,7 @@ function createBatchBox(batch) {
   box.querySelector('.btn-delete').addEventListener('click', async (e) => {
     const confirmed = confirm('⚠️ Are you sure you want to delete this batch?');
     if (!confirmed) return;
-    await deleteBatch(e.target.getAttribute('data-batch-id'));
+    await deleteBatch(e.currentTarget.getAttribute('data-batch-id'));
   });
 
   return box;
@@ -3452,16 +3466,22 @@ function createCandidateCard(c, batchId) {
   cardElement.setAttribute('data-candidate-id', c.candidate_id);
   const isBlacklisted = Boolean(c.is_blacklisted || c.blacklist);
 
-  cardElement.querySelectorAll('.candidate-name').forEach(el => el.textContent = c.name);
+  const candidateName = (c.name || 'Unnamed candidate').trim();
   const flag = getFlagEmoji(c.country);
   const formattedCountry = formatCountryDisplay(c.country);
-  cardElement.querySelector('.candidate-country').textContent =
+  const countryText =
     formattedCountry && formattedCountry !== '—'
       ? `${flag ? flag + ' ' : ''}${formattedCountry}`
       : '—';
-  cardElement.querySelector('.candidate-salary').textContent = c.salary_range ? `$${c.salary_range}` : '—';
-  cardElement.querySelector('.candidate-email').textContent = c.email || '';
+  const salaryText = c.salary_range ? `$${c.salary_range}` : '—';
+  const emailText = c.email || 'No email available';
+
+  cardElement.querySelector('.candidate-name').textContent = candidateName;
+  cardElement.querySelector('.candidate-country').textContent = countryText;
+  cardElement.querySelector('.candidate-salary').textContent = salaryText;
+  cardElement.querySelector('.candidate-email').textContent = emailText;
   cardElement.querySelector('.candidate-img').src = `https://randomuser.me/api/portraits/lego/${c.candidate_id % 10}.jpg`;
+  cardElement.querySelector('.candidate-img').alt = `${candidateName} avatar`;
 
   if (isBlacklisted) {
     if (typeof applyBlacklistStyles === 'function') {
@@ -3491,43 +3511,49 @@ function createCandidateCard(c, batchId) {
   if (typeof window.decorateCandidateAssociations === 'function') {
     window.decorateCandidateAssociations(cardElement, c, {
       indicatorSize: '14px',
-      fallbackTargetSelector: '.candidate-info-inline'
+      fallbackTargetSelector: '.candidate-primary'
     });
   }
 
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
   dropdown.value = c.status || "Client interviewing/testing";
   setDropdownValue(dropdown, c.status);
+  paintCandidateStatus(dropdown);
 
   dropdown.addEventListener('change', () => {
+    paintCandidateStatus(dropdown);
     updateCandidateStatus(c.candidate_id, batchId, dropdown.value);
     logOpportunityDetailTrack(`opp-details-pipeline-status-${dropdown.value || 'unknown'}`);
   });
 
   cardElement.addEventListener('click', (e) => {
-    if (e.target.classList.contains('candidate-status-dropdown') || e.target.classList.contains('delete-candidate-btn')) return;
+    if (e.target.closest('.candidate-status-dropdown') || e.target.closest('.delete-candidate-btn')) return;
     window.location.href = `/candidate-details.html?id=${c.candidate_id}`;
   });
 
-  const trash = document.createElement('button');
-  trash.innerHTML = '🗑️';
-  trash.classList.add('delete-candidate-btn');
-  trash.title = 'Remove from batch';
-  trash.style.marginLeft = 'auto';
-  trash.style.background = 'none';
-  trash.style.border = 'none';
-  trash.style.cursor = 'pointer';
-  trash.style.fontSize = '18px';
-  trash.addEventListener('click', async () => {
+  const trash = cardElement.querySelector('.delete-candidate-btn');
+  trash.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     const confirmed = confirm(`⚠️ Remove ${c.name} from this batch?`);
     if (!confirmed) return;
     await removeCandidateFromBatch(c.candidate_id, batchId);
   });
 
-  const header = cardElement.querySelector('.candidate-card-header');
-  header.insertBefore(trash, header.firstChild);
-
   return cardElement;
+}
+
+function getCandidateStatusTone(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized.includes('hired')) return 'success';
+  if (normalized.includes('rejected') || normalized.includes('abandoned')) return 'danger';
+  if (normalized.includes('interview')) return 'warning';
+  return 'info';
+}
+
+function paintCandidateStatus(dropdown) {
+  if (!dropdown) return;
+  dropdown.dataset.statusTone = getCandidateStatusTone(dropdown.value);
 }
 
 function setDropdownValue(dropdown, status) {
