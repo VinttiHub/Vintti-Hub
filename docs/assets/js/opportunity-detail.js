@@ -1478,7 +1478,6 @@ if (richCommentsEnabled && clientAboutTextarea) {
 const firstMeetingTextarea = document.getElementById('comments-firstmeeting-textarea');
 if (richCommentsEnabled && firstMeetingTextarea) {
   OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting = window.RichComments.enhance('comments-firstmeeting-textarea', {
-    placeholder: 'Summary of the first meeting...',
     onBlur: (html) => {
       updateOpportunityField('opp_comments', html);
       logOpportunityDetailTrack('opp-details-comment-firstmeeting');

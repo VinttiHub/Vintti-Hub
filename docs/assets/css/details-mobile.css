@@ -302,7 +302,8 @@
     margin-bottom: 1rem;
   }
 
-  .input-group.full {
+  .input-group.full,
+  .input-group.half-width {
     grid-column: span 1 !important;
   }
 
