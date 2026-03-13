@@ -62,8 +62,22 @@ body {
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "agenda create availability";
   gap: 24px;
+  align-items: start;
+}
+
+.agenda-card {
+  grid-area: agenda;
+}
+
+.create-card {
+  grid-area: create;
+}
+
+.availability-card {
+  grid-area: availability;
 }
 
 .calendar-card {
@@ -246,7 +260,7 @@ body {
   border-radius: 16px;
   background: linear-gradient(180deg, #f8faff 0%, #ffffff 40%);
   overflow: hidden;
-  min-height: 240px;
+  min-height: 320px;
   overflow: auto;
 }
 
@@ -333,9 +347,22 @@ body {
   color: #6b7a93;
 }
 
+@media (max-width: 1400px) {
+  .calendar-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas:
+      "agenda create"
+      "availability availability";
+  }
+}
+
 @media (max-width: 1100px) {
   .calendar-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "agenda"
+      "create"
+      "availability";
   }
 }
 

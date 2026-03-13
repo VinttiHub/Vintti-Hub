@@ -389,11 +389,47 @@ def google_calendar_freebusy():
         .execute()
     )
 
+    event_details = {}
+    for email in cleaned_emails:
+        try:
+            events = (
+                service.events()
+                .list(
+                    calendarId=email,
+                    timeMin=time_min.isoformat(),
+                    timeMax=time_max.isoformat(),
+                    singleEvents=True,
+                    orderBy="startTime",
+                    maxResults=50,
+                )
+                .execute()
+            )
+        except Exception:
+            continue
+
+        details = []
+        for event in events.get("items", []):
+            start = (event.get("start") or {}).get("dateTime") or (event.get("start") or {}).get("date")
+            end = (event.get("end") or {}).get("dateTime") or (event.get("end") or {}).get("date")
+            if not start or not end:
+                continue
+            details.append(
+                {
+                    "start": start,
+                    "end": end,
+                    "summary": event.get("summary") or "Ocupado",
+                }
+            )
+
+        if details:
+            event_details[email] = details
+
     return jsonify(
         {
             "time_min": time_min.isoformat(),
             "time_max": time_max.isoformat(),
             "timezone": timezone_name,
             "calendars": freebusy.get("calendars", {}),
+            "events": event_details,
         }
     )

@@ -245,7 +245,19 @@
     return res.json();
   }
 
-  function renderAvailability(emails, calendars) {
+  function getBusyLabel(events, slot) {
+    if (!Array.isArray(events) || !events.length) return 'Ocupado';
+    const busyStart = new Date(slot.start).getTime();
+    const busyEnd = new Date(slot.end).getTime();
+    const match = events.find(event => {
+      const start = new Date(event.start).getTime();
+      const end = new Date(event.end).getTime();
+      return start < busyEnd && end > busyStart;
+    });
+    return match?.summary || 'Ocupado';
+  }
+
+  function renderAvailability(emails, calendars, eventDetails) {
     if (!availabilityGrid) return;
     if (!emails.length) {
       renderAvailabilityEmpty('Sin invitados para consultar.');
@@ -273,6 +285,7 @@
     const attendeeColumns = emails
       .map(email => {
         const busy = calendars?.[email]?.busy || [];
+        const details = eventDetails?.[email] || [];
         const blocks = busy
           .map(slot => {
             const startDate = new Date(slot.start);
@@ -286,9 +299,10 @@
             }
             const top = (clampedStart - dayStart) * minuteHeight;
             const height = (clampedEnd - clampedStart) * minuteHeight;
+            const label = getBusyLabel(details, slot);
             return `
               <div class="availability-busy" style="top:${top}px;height:${height}px;">
-                Busy
+                ${escapeHtml(label)}
               </div>
             `;
           })
@@ -444,7 +458,7 @@
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      renderAvailability(emails, data.calendars || {});
+      renderAvailability(emails, data.calendars || {}, data.events || {});
       if (availabilityStatus) availabilityStatus.textContent = `Disponibilidad para ${emails.length} invitados el ${date}.`;
     } catch (error) {
       console.error(error);
@@ -480,6 +494,27 @@
       if (!userId) return;
       fetchAvailability(userId);
     });
+
+    const attendeeInput = document.getElementById('eventAttendees');
+    const eventDateInput = document.getElementById('eventDate');
+    let availabilityTimer = null;
+    const scheduleAvailability = () => {
+      if (availabilityTimer) window.clearTimeout(availabilityTimer);
+      availabilityTimer = window.setTimeout(async () => {
+        const emails = parseAttendees();
+        if (!emails.length) {
+          if (availabilityStatus) availabilityStatus.textContent = 'Agrega emails para consultar disponibilidad.';
+          renderAvailabilityEmpty('Sin invitados para consultar.');
+          return;
+        }
+        const userId = await ensureUserIdOrNotify();
+        if (!userId) return;
+        fetchAvailability(userId);
+      }, 450);
+    };
+
+    attendeeInput?.addEventListener('input', scheduleAvailability);
+    eventDateInput?.addEventListener('change', scheduleAvailability);
 
     if (eventForm) {
       eventForm.addEventListener('submit', (event) => {
