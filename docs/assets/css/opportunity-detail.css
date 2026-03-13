@@ -96,7 +96,6 @@ textarea,
   font-weight: 500;
   color: #5d3dbd;
   box-shadow: 0 1px 3px rgba(200, 160, 255, 0.15);
-  margin-top: 1.2rem;
   transition: all 0.2s ease-in-out;
 }
 .opportunity-id-card .label {
@@ -248,6 +247,8 @@ textarea,
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .primary-action {
@@ -335,6 +336,84 @@ textarea,
   border-radius: 1rem;
   box-shadow: 0 4px 16px rgba(224, 176, 255, 0.2); /* más suave y girly */
   border: 1px solid #f3e8ff;
+}
+
+#overview .overview-card {
+  border: 1px solid #edf0f6;
+  border-radius: 22px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+#overview .overview-grid {
+  gap: 1.5rem;
+}
+
+#overview .client-overview-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#overview .details-overview-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#overview .client-overview-grid > .input-group.half-width {
+  grid-column: span 2;
+}
+
+#overview .client-overview-grid > .client-about-group {
+  grid-column: 1 / -1;
+}
+
+#overview .overview-grid > .input-group {
+  margin-bottom: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid #eef1f7;
+  border-radius: 18px;
+  background: transparent;
+}
+
+#overview .overview-grid > .input-group label,
+#overview .comments-group label {
+  font-size: 0.8rem;
+  color: #475569;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.65rem;
+}
+
+#overview .overview-grid > .input-group input,
+#overview .overview-grid > .input-group select,
+#overview .overview-grid > .input-group textarea {
+  border-color: #dde3ec;
+  border-radius: 14px;
+  min-height: 58px;
+  box-sizing: border-box;
+}
+
+#overview .comments-group {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid #edf0f6;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+#overview .comments-group textarea {
+  min-height: 214px;
+  border-color: #d9e0ec;
+  border-radius: 18px;
+  padding: 1rem 1.05rem;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+#overview .card-toggle h3,
+#overview .card-title-row h3 {
+  font-size: 0.98rem;
+  color: #475569;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .opportunity-delete-modal {
@@ -3023,6 +3102,11 @@ input:checked + .slider::before {
   font-family: 'Quicksand', sans-serif;
 }
 
+#overview .overview-actions #stage-tag {
+  margin-left: 0;
+  margin-right: 6px;
+}
+
 /* Colores personalizados por stage */
 .stage-color-signed {
   background-color: #b7f3ef !important;
@@ -4865,4 +4949,7 @@ input:checked + .slider::before {
   #pipeline .pipeline-columns {
     grid-template-columns: repeat(5, minmax(240px, 240px));
   }
+}
+#overview .section-title .opportunity-id-card {
+  margin-top: 0;
 }
