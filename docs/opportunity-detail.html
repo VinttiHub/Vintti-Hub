@@ -586,29 +586,35 @@
   <template id="candidate-card-template">
     <div class="candidate-card">
       <div class="candidate-card-header">
-        <div class="candidate-info-inline">
-          <strong class="candidate-name">Name</strong>
-          <span class="candidate-country">🇲🇽 Mexico</span>
-          <span class="candidate-salary">$3500</span>
+        <div class="candidate-cell candidate-cell--identity">
+          <div class="candidate-avatar-wrap">
+            <img class="candidate-img" src="" alt="Candidate avatar" />
+          </div>
+          <div class="candidate-primary">
+            <strong class="candidate-name">Name</strong>
+            <span class="candidate-email">email@example.com</span>
+          </div>
         </div>
-
-        <select class="candidate-status-dropdown pipeline-only-hide">
-          <option disabled value="">Select status...</option>
-          <option value="Client rejected CV">Client rejected CV</option>
-          <option value="Client interviewing/testing">Client interviewing/testing</option>
-          <option value="Client rejected after interviewing">Client rejected after interviewing</option>
-          <option value="Candidate abandoned process">Candidate abandoned process</option>
-          <option value="Client hired">Client hired</option>
-        </select>
-      </div>
-
-      <div class="preview">
-        <img class="candidate-img" src="" />
-        <div class="info">
-          <span class="name candidate-name">Name</span>
-          <span class="email candidate-email"></span>
-          <span class="salary candidate-salary"></span>
-          <span class="country candidate-country"></span>
+        <div class="candidate-cell candidate-cell--country">
+          <span class="candidate-country">Country</span>
+        </div>
+        <div class="candidate-cell candidate-cell--salary">
+          <span class="candidate-salary">$0</span>
+        </div>
+         <div class="candidate-cell candidate-cell--status">
+          <select class="candidate-status-dropdown pipeline-only-hide">
+            <option disabled value="">Select status...</option>
+            <option value="Client rejected CV">Client rejected CV</option>
+            <option value="Client interviewing/testing">Client interviewing/testing</option>
+            <option value="Client rejected after interviewing">Client rejected after interviewing</option>
+            <option value="Candidate abandoned process">Candidate abandoned process</option>
+            <option value="Client hired">Client hired</option>
+          </select>
+        </div>
+        <div class="candidate-cell candidate-cell--actions">
+          <button class="delete-candidate-btn" type="button" title="Remove from batch" aria-label="Remove from batch">
+            <span aria-hidden="true">🗑️</span>
+          </button>
         </div>
       </div>
     </div>
