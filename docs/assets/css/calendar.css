@@ -5,8 +5,9 @@ body {
 }
 
 .main-content {
-  margin-left: 260px;
-  padding: 32px 40px 48px;
+  margin: 0;
+  width: auto;
+  padding: 32px 32px 48px 24px;
   min-height: 100vh;
 }
 
@@ -282,6 +283,9 @@ body {
   letter-spacing: 0.06em;
   color: #5c6b82;
   background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .availability-body {
@@ -328,12 +332,13 @@ body {
   left: 10px;
   right: 10px;
   border-radius: 12px;
-  background: rgba(11, 61, 145, 0.18);
-  border: 1px solid rgba(11, 61, 145, 0.32);
-  color: #0b3d91;
+  background: var(--busy-bg, rgba(11, 61, 145, 0.18));
+  border: 1px solid var(--busy-border, rgba(11, 61, 145, 0.32));
+  color: var(--busy-text, #0b3d91);
   font-size: 11px;
   padding: 6px 8px;
   box-sizing: border-box;
+  box-shadow: 0 6px 12px rgba(15, 27, 45, 0.08);
 }
 
 .availability-free {
@@ -345,6 +350,24 @@ body {
   margin: 12px 0 0;
   font-size: 12px;
   color: #6b7a93;
+}
+
+.availability-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #2b3a52;
+}
+
+.availability-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--swatch-color, #0b3d91);
+  box-shadow: 0 0 0 4px rgba(11, 61, 145, 0.12);
 }
 
 @media (max-width: 1400px) {
@@ -370,6 +393,7 @@ body {
   .main-content {
     margin-left: 0;
     padding: 24px;
+    width: 100%;
   }
 
   .calendar-page .page-header {

@@ -23,6 +23,14 @@
     dayEnd: 20 * 60,
     minuteHeight: 0.9,
   };
+  const availabilityPalette = [
+    { accent: '#0b3d91', bg: 'rgba(11, 61, 145, 0.18)', border: 'rgba(11, 61, 145, 0.32)' },
+    { accent: '#0f7a5c', bg: 'rgba(15, 122, 92, 0.18)', border: 'rgba(15, 122, 92, 0.32)' },
+    { accent: '#d16413', bg: 'rgba(209, 100, 19, 0.18)', border: 'rgba(209, 100, 19, 0.32)' },
+    { accent: '#b42318', bg: 'rgba(180, 35, 24, 0.18)', border: 'rgba(180, 35, 24, 0.32)' },
+    { accent: '#0f6da1', bg: 'rgba(15, 109, 161, 0.18)', border: 'rgba(15, 109, 161, 0.32)' },
+    { accent: '#5a6b7f', bg: 'rgba(90, 107, 127, 0.18)', border: 'rgba(90, 107, 127, 0.32)' },
+  ];
 
   function escapeHtml(value) {
     return String(value || '')
@@ -129,6 +137,11 @@
     if (!email) return 'Invitado';
     const local = email.split('@')[0] || email;
     return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function getAvailabilityLabel(email, hostEmail) {
+    if (hostEmail && email === hostEmail) return 'Tu calendario';
+    return displayNameFromEmail(email);
   }
 
   function formatEventTime(event) {
@@ -257,7 +270,7 @@
     return match?.summary || 'Ocupado';
   }
 
-  function renderAvailability(emails, calendars, eventDetails) {
+  function renderAvailability(emails, calendars, eventDetails, hostEmail) {
     if (!availabilityGrid) return;
     if (!emails.length) {
       renderAvailabilityEmpty('Sin invitados para consultar.');
@@ -275,7 +288,15 @@
     }
 
     const headerCells = emails
-      .map(email => `<div>${escapeHtml(displayNameFromEmail(email))}</div>`)
+      .map((email, index) => {
+        const palette = availabilityPalette[index % availabilityPalette.length];
+        return `
+          <div class="availability-person">
+            <span>${escapeHtml(getAvailabilityLabel(email, hostEmail))}</span>
+            <span class="availability-swatch" style="--swatch-color:${palette.accent};"></span>
+          </div>
+        `;
+      })
       .join('');
 
     const timeSlots = hours
@@ -283,9 +304,10 @@
       .join('');
 
     const attendeeColumns = emails
-      .map(email => {
+      .map((email, index) => {
         const busy = calendars?.[email]?.busy || [];
         const details = eventDetails?.[email] || [];
+        const palette = availabilityPalette[index % availabilityPalette.length];
         const blocks = busy
           .map(slot => {
             const startDate = new Date(slot.start);
@@ -301,7 +323,7 @@
             const height = (clampedEnd - clampedStart) * minuteHeight;
             const label = getBusyLabel(details, slot);
             return `
-              <div class="availability-busy" style="top:${top}px;height:${height}px;">
+              <div class="availability-busy" style="top:${top}px;height:${height}px;--busy-bg:${palette.bg};--busy-border:${palette.border};--busy-text:${palette.accent};">
                 ${escapeHtml(label)}
               </div>
             `;
@@ -434,12 +456,19 @@
   }
 
   async function fetchAvailability(userId) {
-    const emails = parseAttendees();
-    if (!emails.length) {
+    const guestEmails = parseAttendees();
+    if (!guestEmails.length) {
       if (availabilityStatus) availabilityStatus.textContent = 'Agrega emails para consultar disponibilidad.';
       renderAvailabilityEmpty('Sin invitados para consultar.');
       return;
     }
+
+    const hostEmail = getStoredEmail();
+    const emails = [];
+    if (hostEmail) emails.push(hostEmail);
+    guestEmails.forEach((email) => {
+      if (!emails.includes(email)) emails.push(email);
+    });
 
     const date = document.getElementById('eventDate')?.value || calendarDate.value || new Date().toISOString().slice(0, 10);
     if (availabilityStatus) availabilityStatus.textContent = 'Consultando disponibilidad...';
@@ -458,8 +487,12 @@
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      renderAvailability(emails, data.calendars || {}, data.events || {});
-      if (availabilityStatus) availabilityStatus.textContent = `Disponibilidad para ${emails.length} invitados el ${date}.`;
+      renderAvailability(emails, data.calendars || {}, data.events || {}, hostEmail);
+      if (availabilityStatus) {
+        const guestCount = guestEmails.length;
+        const hostLabel = hostEmail ? ' + tu calendario' : '';
+        availabilityStatus.textContent = `Disponibilidad para ${guestCount} invitados${hostLabel} el ${date}.`;
+      }
     } catch (error) {
       console.error(error);
       if (availabilityStatus) availabilityStatus.textContent = 'No pudimos consultar disponibilidad.';
