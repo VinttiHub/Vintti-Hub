@@ -523,7 +523,7 @@ function showTinyToast(msg){
   setTimeout(()=>{ el.style.opacity=.0; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(), 220); }, 900);
 }
 
-// ===== Turvo =====
+// ===== Turbo =====
 let turvoGameInterval = null;
 let turvoGameScore = 0;
 
@@ -565,7 +565,7 @@ function renderTurvoTable(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     const tr = document.createElement('tr');
     tr.className = 'turvo-empty';
-    tr.innerHTML = '<td colspan="3">No Turvo meetings found yet.</td>';
+    tr.innerHTML = '<td colspan="3">No Turbo meetings found yet.</td>';
     tbody.appendChild(tr);
     return;
   }
@@ -638,12 +638,12 @@ async function loadTurvoMeetings() {
     });
     const rows = await res.json();
     if (!res.ok) {
-      throw new Error(rows?.error || 'Failed to load Turvo meetings');
+      throw new Error(rows?.error || 'Failed to load Turbo meetings');
     }
     renderTurvoTable(rows);
     setTurvoLastRefresh(null, rows);
   } catch (err) {
-    console.error('Failed to load Turvo meetings:', err);
+    console.error('Failed to load Turbo meetings:', err);
     renderTurvoTable([]);
   }
 }
@@ -714,7 +714,7 @@ async function refreshTurvoMeetings() {
     renderTurvoTable(rows);
     setTurvoLastRefresh(payload.last_refresh_date, rows);
   } catch (err) {
-    console.error('Failed to refresh Turvo meetings:', err);
+    console.error('Failed to refresh Turbo meetings:', err);
     showTinyToast('⚠️ refresh failed');
   } finally {
     closeTurvoRefreshModal();
@@ -1289,7 +1289,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
         if (tab.textContent.trim() === 'Pipeline') {
           loadPipelineCandidates();
         }
-        if (tab.textContent.trim() === 'Turvo') {
+        if (tab.textContent.trim() === 'Turbo') {
           loadTurvoMeetings();
         }
       });
@@ -1478,7 +1478,6 @@ if (richCommentsEnabled && clientAboutTextarea) {
 const firstMeetingTextarea = document.getElementById('comments-firstmeeting-textarea');
 if (richCommentsEnabled && firstMeetingTextarea) {
   OPPORTUNITY_RICH_COMMENT_HANDLES.firstMeeting = window.RichComments.enhance('comments-firstmeeting-textarea', {
-    placeholder: 'Summary of the first meeting...',
     onBlur: (html) => {
       updateOpportunityField('opp_comments', html);
       logOpportunityDetailTrack('opp-details-comment-firstmeeting');

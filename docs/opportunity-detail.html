@@ -47,7 +47,7 @@
         <button type="button" class="nav-item" aria-selected="false">Job Description</button>
         <button type="button" class="nav-item" aria-selected="false">Pipeline</button>
         <button type="button" class="nav-item" aria-selected="false">Candidates</button>
-        <button type="button" class="nav-item" aria-selected="false">Turvo</button>
+        <button type="button" class="nav-item" aria-selected="false">Turbo</button>
         <div class="nav-indicator" aria-hidden="true"></div>
       </div>
     </nav>
@@ -59,10 +59,16 @@
     <section id="overview" class="detail-section">
       <div class="section-header">
         <div class="section-title">
-          <h2 class="overview-title">Overview</h2>
+          <div class="opportunity-id-card">
+            <span class="label">Opportunity ID</span>
+            <span id="opportunity-id-text" data-id=""></span>
+          </div>
           <p class="section-subtext"></p>
         </div>
         <div class="overview-actions">
+          <div class="opportunity-stage-card" id="stage-tag">
+            <span id="stage-text">—</span>
+          </div>
           <button id="create-applicant-link-btn" class="primary-action hidden" type="button">Create applicant link</button>
           <button id="delete-opportunity-btn" class="danger-action hidden" type="button">Delete Opportunity</button>
         </div>
@@ -70,16 +76,6 @@
 
       <!-- Summary card: stage, IDs, dates, signed, hire, comments -->
       <div class="overview-card pastel-card" style="padding-top: 2rem;">
-        <div class="stage-top">
-          <div class="opportunity-id-card">
-            <span class="label">Opportunity ID</span>
-            <span id="opportunity-id-text" data-id=""></span>
-          </div>
-          <div class="opportunity-stage-card" id="stage-tag">
-            <span id="stage-text">—</span>
-          </div>
-        </div>
-
         <div class="overview-grid">
           <div class="input-group">
             <label>Start Date</label>
@@ -117,14 +113,14 @@
           </button>
         </div>
         <div class="card-content">
-          <div class="overview-grid">
+          <div class="overview-grid client-overview-grid">
             <div class="input-group"><label>Name</label><input id="client-name-input" value="" readonly/></div>
             <div class="input-group"><label>Size</label><input type="text" id="client-size-input" value="" readonly /></div>
             <div class="input-group"><label>State</label><input id="client-state-input" value=""></div>
             <div class="input-group"><label>Linkedin</label><input id="client-linkedin-input" value=""></div>
-            <div class="input-group"><label>Website</label><input id="client-website-input" value=""></div>
-            <div class="input-group full"><label>Mail</label><input id="client-mail-input" value=""></div>
-            <div class="input-group full">
+            <div class="input-group half-width"><label>Website</label><input id="client-website-input" value=""></div>
+            <div class="input-group half-width"><label>Mail</label><input id="client-mail-input" value=""></div>
+            <div class="input-group client-about-group">
               <label>About</label>
               <textarea id="client-about-textarea" placeholder="Client background, culture, values..." class="taller-textarea"></textarea>
             </div>
@@ -139,7 +135,7 @@
           <span class="toggle-icon">▾</span>
         </button>
         <div class="card-content">
-          <div class="overview-grid">
+          <div class="overview-grid details-overview-grid">
             <div class="input-group"><label>Opportunity Name</label><input id="details-opportunity-name" value=""></div>
             <div class="input-group"><label>Account</label><input id="details-account-name" value="" readonly/></div>
             <div class="input-group"><label>Sales Lead</label><select id="details-sales-lead"><option></option></select></div>
@@ -161,12 +157,23 @@
       <div class="section-header"><p class="section-subtext"></p></div>
 
       <div class="overview-card">
-        <div class="overview-grid">
+        <div class="overview-grid information-grid">
           <!-- Budget & Salary -->
-          <div class="input-group"><label>Client Budget</label><input id="min-budget-input" /></div>
-          <div class="input-group"><label>&nbsp;</label><input id="max-budget-input" /></div>
-          <div class="input-group"><label>Candidate Salary Range</label><input id="min-salary-input" /></div>
-          <div class="input-group"><label>&nbsp;</label><input id="max-salary-input" /></div>
+          <div class="info-pair-card">
+            <label class="info-pair-title">Client Budget</label>
+            <div class="info-pair-fields">
+              <input id="min-budget-input" placeholder="Min" />
+              <input id="max-budget-input" placeholder="Max" />
+            </div>
+          </div>
+
+          <div class="info-pair-card">
+            <label class="info-pair-title">Candidate Salary Range</label>
+            <div class="info-pair-fields">
+              <input id="min-salary-input" placeholder="Min" />
+              <input id="max-salary-input" placeholder="Max" />
+            </div>
+          </div>
 
           <!-- Model (duplicate source of truth used by Fees visibility script) -->
           <div class="input-group">
@@ -192,17 +199,23 @@
           </div>
 
           <div class="input-group"><label>Time Zone</label><input id="timezone-input" /></div>
-          <div class="input-group full"><label>First Meeting Recording</label><input id="recording-input" /></div>
-          <div class="input-group full"><label>Deep Dive Recording</label><input id="deepdive-recording-input" placeholder="Deep dive recording..." /></div>
+          <div class="input-group"><label>First Meeting Recording</label><input id="recording-input" /></div>
+          <div class="input-group"><label>Deep Dive Recording</label><input id="deepdive-recording-input" /></div>
 
           <!-- Rich notes (interviewing process) -->
-          <div class="input-group full">
-            <label>First Meeting Comments</label>
-            <textarea id="comments-firstmeeting-textarea" placeholder="Summary of the first meeting..." class="taller-textarea"></textarea>
+          <div class="input-group half-width note-panel">
+            <div class="note-panel-header">
+              <label>First Meeting Comments</label>
+              <span class="note-panel-caption">Quick summary and key takeaways</span>
+            </div>
+            <textarea id="comments-firstmeeting-textarea" class="taller-textarea"></textarea>
           </div>
 
-          <div class="input-group full">
-            <label>Client Interviewing Process</label>
+          <div class="input-group half-width note-panel">
+            <div class="note-panel-header">
+              <label>Client Interviewing Process</label>
+              <span class="note-panel-caption">Outline the steps candidates will go through</span>
+            </div>
             <div class="toolbar small-toolbar" id="interviewing-toolbar">
               <button data-command="bold" onclick="toggleActiveButton('bold', this)"><b>B</b></button>
               <button data-command="italic" onclick="toggleActiveButton('italic', this)"><i>I</i></button>
@@ -384,12 +397,12 @@
       </div>
     </section>
 
-    <!-- ========== Turvo ========== -->
+    <!-- ========== Turbo ========== -->
     <section id="turvo" class="detail-section hidden">
       <div class="turvo-header">
         <div>
-          <h2>Turvo</h2>
-          <p class="subtitle">Track Turvo meetings linked to this opportunity.</p>
+          <h2>Turbo</h2>
+          <p class="subtitle">Track Turbo meetings linked to this opportunity.</p>
         </div>
         <div class="turvo-actions">
           <button id="turvo-refresh-btn" class="turvo-refresh-btn" type="button">Refresh</button>
@@ -402,7 +415,7 @@
           <thead>
             <tr>
               <th>HR Lead</th>
-              <th>Date of the Turvo meeting</th>
+              <th>Date of the Turbo meeting</th>
               <th>Candidates received</th>
             </tr>
           </thead>
@@ -440,10 +453,10 @@
     </div>
   </div>
 
-  <!-- ===== Turvo refresh popup ===== -->
+  <!-- ===== Turbo refresh popup ===== -->
   <div id="turvoRefreshModal" class="turvo-refresh-modal hidden" role="dialog" aria-modal="true" aria-live="polite">
     <div class="turvo-refresh-card" role="document">
-      <h3>Loading Turvo meetings...</h3>
+      <h3>Loading Turbo meetings...</h3>
       <p class="turvo-refresh-subtext">Mini-game: catch the comet while we sync calendars.</p>
       <div class="turvo-game">
         <div class="turvo-score">Score: <span id="turvo-score">0</span></div>
