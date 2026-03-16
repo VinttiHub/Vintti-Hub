@@ -15,7 +15,7 @@
   const availabilityBtn = document.getElementById('availabilityBtn');
   const availabilityStatus = document.getElementById('availabilityStatus');
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const tz = 'America/Argentina/Buenos_Aires';
   const refreshDefaultLabel = refreshBtn ? refreshBtn.textContent.trim() : '';
   let currentUserId = null;
   const availabilityConfig = {
@@ -144,13 +144,29 @@
     return displayNameFromEmail(email);
   }
 
+  function getProposedRange() {
+    const date = document.getElementById('eventDate')?.value || '';
+    const start = document.getElementById('eventStart')?.value || '';
+    const end = document.getElementById('eventEnd')?.value || '';
+    if (!date || !start || !end) return null;
+    const [startHour, startMin] = start.split(':').map(Number);
+    const [endHour, endMin] = end.split(':').map(Number);
+    if (Number.isNaN(startHour) || Number.isNaN(startMin) || Number.isNaN(endHour) || Number.isNaN(endMin)) {
+      return null;
+    }
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    if (endMinutes <= startMinutes) return null;
+    return { startMinutes, endMinutes };
+  }
+
   function formatEventTime(event) {
     const start = event.start?.dateTime || event.start?.date;
     const end = event.end?.dateTime || event.end?.date;
     if (!start || !end) return 'All day';
     const startDate = new Date(start);
     const endDate = new Date(end);
-    const fmt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit' });
+    const fmt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: tz });
     return `${fmt.format(startDate)} - ${fmt.format(endDate)}`;
   }
 
@@ -281,6 +297,11 @@
     const totalMinutes = dayEnd - dayStart;
     const slotHeight = 60 * minuteHeight;
     const timelineHeight = totalMinutes * minuteHeight;
+    const proposed = getProposedRange();
+    const proposedBlock = proposed ? {
+      top: Math.max(proposed.startMinutes - dayStart, 0) * minuteHeight,
+      height: Math.min(proposed.endMinutes, dayEnd) * minuteHeight - Math.max(proposed.startMinutes, dayStart) * minuteHeight,
+    } : null;
     const hours = [];
     for (let minutes = dayStart; minutes <= dayEnd; minutes += 60) {
       const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
@@ -333,6 +354,11 @@
         return `
           <div class="availability-attendee-column">
             <div class="availability-timeline" style="--timeline-height:${timelineHeight}px;">
+              ${proposedBlock && proposedBlock.height > 0 ? `
+                <div class="availability-proposed" style="top:${proposedBlock.top}px;height:${proposedBlock.height}px;">
+                  Horario propuesto
+                </div>
+              ` : ''}
               ${blocks || '<div class="availability-free"></div>'}
             </div>
           </div>
@@ -530,6 +556,8 @@
 
     const attendeeInput = document.getElementById('eventAttendees');
     const eventDateInput = document.getElementById('eventDate');
+    const eventStartInput = document.getElementById('eventStart');
+    const eventEndInput = document.getElementById('eventEnd');
     let availabilityTimer = null;
     const scheduleAvailability = () => {
       if (availabilityTimer) window.clearTimeout(availabilityTimer);
@@ -548,6 +576,8 @@
 
     attendeeInput?.addEventListener('input', scheduleAvailability);
     eventDateInput?.addEventListener('change', scheduleAvailability);
+    eventStartInput?.addEventListener('input', scheduleAvailability);
+    eventEndInput?.addEventListener('input', scheduleAvailability);
 
     if (eventForm) {
       eventForm.addEventListener('submit', (event) => {

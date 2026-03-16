@@ -339,11 +339,26 @@ body {
   padding: 6px 8px;
   box-sizing: border-box;
   box-shadow: 0 6px 12px rgba(15, 27, 45, 0.08);
+  z-index: 2;
 }
 
 .availability-free {
   position: absolute;
   inset: 0;
+}
+
+.availability-proposed {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  border-radius: 12px;
+  background: rgba(255, 198, 66, 0.2);
+  border: 1px dashed #d18b00;
+  color: #8a5a00;
+  font-size: 11px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  z-index: 1;
 }
 
 .availability-note {
