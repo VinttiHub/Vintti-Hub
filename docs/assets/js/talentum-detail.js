@@ -396,10 +396,7 @@ async function extractFiltersFromOpportunity(opportunity) {
 function renderFilters() {
   if (!els.filtersGrid) return;
   const entries = [
-    { label: "Position", value: state.filters.position },
-    { label: "Salary", value: state.filters.salary },
     { label: "Years", value: state.filters.years_experience },
-    { label: "Industry", value: state.filters.industry },
     { label: "Country", value: state.filters.country },
   ];
 
@@ -566,7 +563,8 @@ function matchesTextFilter(candidateValue, filterValue, fallbackText) {
 }
 
 function hasActiveFilters() {
-  return Object.values(state.filters || {}).some((value) => String(value || "").trim());
+  const activeKeys = ["years_experience", "country"];
+  return activeKeys.some((key) => String(state.filters?.[key] || "").trim());
 }
 
 function scoreTextMatch(candidateValue, filterValue, fallbackText) {
@@ -583,13 +581,19 @@ function scoreTextMatch(candidateValue, filterValue, fallbackText) {
   return tokens.some((token) => haystack.includes(token)) ? 1 : 0;
 }
 
+function resolveCandidateYears(profile) {
+  if (profile.years != null) return profile.years;
+  return findYearsFromText(profile.searchableText);
+}
+
 function scoreYearsMatch(profile) {
   if (!state.filters.years_experience) return null;
   const filterYears = parseNumber(state.filters.years_experience) || findYearsFromText(state.filters.years_experience);
   if (filterYears == null) return 0;
-  if (profile.years != null) {
-    if (profile.years >= filterYears) return 2;
-    if (filterYears - profile.years <= 2) return 1;
+  const candidateYears = resolveCandidateYears(profile);
+  if (candidateYears != null) {
+    if (candidateYears >= filterYears) return 2;
+    if (filterYears - candidateYears <= 2) return 1;
     return 0;
   }
   return matchesTextFilter("", state.filters.years_experience, profile.searchableText) ? 1 : 0;
@@ -621,11 +625,8 @@ function computeMatchScore(profile) {
   if (!hasActiveFilters()) return 10;
 
   const points = [];
-  points.push(scoreTextMatch(profile.position, state.filters.position, profile.searchableText));
-  points.push(scoreTextMatch(profile.industry, state.filters.industry, profile.searchableText));
   points.push(scoreTextMatch(profile.country, state.filters.country, profile.searchableText));
   points.push(scoreYearsMatch(profile));
-  points.push(scoreSalaryMatch(profile));
 
   const scored = points.filter((value) => value != null);
   const maxPoints = scored.length * 2;
@@ -647,31 +648,11 @@ function getMatchSummary(profile) {
       parts.push("location not mentioned");
     }
   }
-  if (state.filters.position) {
-    parts.push(
-      matchesTextFilter(profile.position, state.filters.position, profile.searchableText)
-        ? "position matches"
-        : "position not mentioned"
-    );
-  }
-  if (state.filters.industry) {
-    parts.push(
-      matchesTextFilter(profile.industry, state.filters.industry, profile.searchableText)
-        ? "industry matches"
-        : "industry not mentioned"
-    );
-  }
   if (state.filters.years_experience) {
     const yearScore = scoreYearsMatch(profile);
     if (yearScore === 2) parts.push("years of experience match");
     else if (yearScore === 1) parts.push("years of experience are close");
     else parts.push("years of experience not found");
-  }
-  if (state.filters.salary) {
-    const salaryScore = scoreSalaryMatch(profile);
-    if (salaryScore === 2) parts.push("salary aligns");
-    else if (salaryScore === 1) parts.push("salary is close");
-    else parts.push("salary not found");
   }
   return parts.filter(Boolean);
 }
@@ -761,13 +742,97 @@ function buildFilterBreakdown(label, filterValue, scoreValue, details) {
   };
 }
 
+function buildJdExplanation(profile, percent, includePercent = true) {
+  const roleWanted = state.filters.position || "";
+  const roleHave = profile.position || "";
+  const industryWanted = state.filters.industry || "";
+  const industryHave = profile.industry || "";
+  const countryWanted = state.filters.country || "";
+  const countryHave = profile.country || "";
+  const yearsWanted = state.filters.years_experience || "";
+  const yearsHave = resolveCandidateYears(profile);
+  const percentLabel = `${percent || 0}%`;
+
+  const roleSentence = roleWanted || roleHave
+    ? `${includePercent ? `Se le asigna este ${percentLabel} porque ` : ""}el CV menciona ${roleHave ? `experiencia en ${roleHave}` : "experiencia relevante"}${roleWanted ? ` y la posición buscada es ${roleWanted}` : ""}.`
+    : `${includePercent ? `Se le asigna este ${percentLabel} porque ` : ""}el CV contiene señales de experiencia relevante alineadas con la JD.`;
+
+  const industrySentence = industryWanted || industryHave
+    ? `En industria, ${industryHave ? `ha trabajado en ${industryHave}` : "no hay industria declarada"}${industryWanted ? ` y se busca ${industryWanted}` : ""}.`
+    : "No se declara una industria específica en el CV ni en la JD.";
+
+  const countrySentence = countryWanted || countryHave
+    ? `La ubicación ${countryHave ? `del perfil (${countryHave})` : "del perfil"}${countryWanted ? ` se compara con el país requerido (${countryWanted})` : " se compara con la JD"}.`
+    : "La ubicación no aporta evidencia clara en la comparación.";
+
+  const yearsSentence = yearsWanted
+    ? (yearsHave != null
+      ? `En años de experiencia, el perfil indica ${yearsHave} frente a ${yearsWanted} solicitados.`
+      : `La JD pide ${yearsWanted}, pero el CV no detalla años concretos.`)
+    : "La JD no define años de experiencia explícitos.";
+
+  const alignmentSentence = roleWanted || industryWanted || yearsWanted || countryWanted
+    ? "El porcentaje final refleja la suma de coincidencias directas, coincidencias parciales y señales indirectas encontradas en el texto del CV."
+    : "El porcentaje final refleja señales indirectas y coincidencias generales encontradas en el texto del CV.";
+  const nuanceSentence = "Si algún requisito no aparece textualmente, se pondera la experiencia relacionada que aparece en el historial, los títulos de roles, y los logros descritos, siempre que guarden relación con lo solicitado.";
+  const evidenceSentence = "Esta explicación se basa en la información disponible: si faltan datos concretos, se utiliza una estimación local con lo que sí está presente, por ejemplo, tareas similares, áreas cercanas o palabras clave del rol.";
+  const cautionSentence = "Cuando la evidencia es parcial, el match no se descarta por completo, sino que se ajusta proporcionalmente para reflejar cercanía sin asumir cumplimiento total.";
+  const closingSentence = "En resumen, el score intenta balancear requisitos explícitos con indicios de experiencia real, priorizando lo más relevante del perfil frente a la descripción del puesto.";
+
+  return `${roleSentence} ${industrySentence} ${yearsSentence} ${countrySentence} ${alignmentSentence} ${nuanceSentence} ${evidenceSentence} ${cautionSentence} ${closingSentence}`.trim();
+}
+
+function buildYearsBreakdown(profile) {
+  const filterValue = state.filters.years_experience;
+  if (!filterValue) {
+    return {
+      category: "Años de experiencia (filtro)",
+      percent: 0,
+      detail: "Filtro no definido.",
+    };
+  }
+
+  const filterYears = parseNumber(filterValue) || findYearsFromText(filterValue);
+  if (filterYears == null) {
+    return {
+      category: "Años de experiencia (filtro)",
+      percent: 0,
+      detail: "No se pudo interpretar el requisito de años.",
+    };
+  }
+
+  const candidateYears = resolveCandidateYears(profile);
+  if (candidateYears == null) {
+    return {
+      category: "Años de experiencia (filtro)",
+      percent: 0,
+      detail: "No se encontró experiencia suficiente para evaluar.",
+    };
+  }
+
+  const ratio = filterYears > 0 ? Math.min(candidateYears / filterYears, 1) : 0;
+  const percent = normalizePercent(Math.round(ratio * 100), 0);
+  if (candidateYears >= filterYears) {
+    return {
+      category: "Años de experiencia (filtro)",
+      percent,
+      detail: "Cumple con los años de experiencia solicitados.",
+    };
+  }
+  return {
+    category: "Años de experiencia (filtro)",
+    percent,
+    detail: `Tiene ${candidateYears} años frente a ${filterYears} solicitados, cubre aproximadamente el ${percent}% del requisito.`,
+  };
+}
+
 function buildFallbackBreakdown(profile, score) {
   const breakdown = [];
   const overallPercent = scoreToPercent(score);
   breakdown.push({
     category: "Similitud con la JD",
     percent: normalizePercent(overallPercent, 0),
-    detail: "Comparación entre el CV extraído y la JD; aquí se muestra una estimación local si falta texto.",
+    detail: buildJdExplanation(profile, overallPercent),
   });
 
   const locationScore = scoreTextMatch(profile.country, state.filters.country, profile.searchableText);
@@ -785,61 +850,7 @@ function buildFallbackBreakdown(profile, score) {
     )
   );
 
-  breakdown.push(
-    buildFilterBreakdown(
-      "Posición (filtro)",
-      state.filters.position,
-      scoreTextMatch(profile.position, state.filters.position, profile.searchableText),
-      {
-        match: "La posición coincide con el filtro principal.",
-        close: "La posición es similar pero no exacta.",
-        miss: "No coincide con el filtro de posición.",
-        missing: "No se encontró posición suficiente para evaluar.",
-      }
-    )
-  );
-
-  breakdown.push(
-    buildFilterBreakdown(
-      "Industria (filtro)",
-      state.filters.industry,
-      scoreTextMatch(profile.industry, state.filters.industry, profile.searchableText),
-      {
-        match: "La industria coincide con la requerida.",
-        close: "La industria es parcialmente compatible.",
-        miss: "No coincide con la industria requerida.",
-        missing: "No se encontró industria suficiente para evaluar.",
-      }
-    )
-  );
-
-  breakdown.push(
-    buildFilterBreakdown(
-      "Años de experiencia (filtro)",
-      state.filters.years_experience,
-      scoreYearsMatch(profile),
-      {
-        match: "Cumple con los años de experiencia solicitados.",
-        close: "Está cerca del rango de experiencia requerido.",
-        miss: "No alcanza el rango de experiencia solicitado.",
-        missing: "No se encontró experiencia suficiente para evaluar.",
-      }
-    )
-  );
-
-  breakdown.push(
-    buildFilterBreakdown(
-      "Salario (filtro)",
-      state.filters.salary,
-      scoreSalaryMatch(profile),
-      {
-        match: "La expectativa salarial está alineada.",
-        close: "La expectativa salarial es cercana.",
-        miss: "La expectativa salarial no coincide.",
-        missing: "No se encontró información salarial.",
-      }
-    )
-  );
+  breakdown.push(buildYearsBreakdown(profile));
 
   breakdown.push(
     buildFilterBreakdown(
@@ -859,11 +870,7 @@ function buildFallbackBreakdown(profile, score) {
 }
 
 function buildDefaultSummary(profile, percent) {
-  const summaryPieces = getMatchSummary(profile);
-  if (summaryPieces.length) {
-    return `Estimación local del match (${percent || 0}%). ${summaryPieces.join(", ")}.`;
-  }
-  return `Estimación local del match (${percent || 0}%). No hay suficiente información para detallar.`;
+  return buildJdExplanation(profile, percent, true);
 }
 
 function buildMatchModel(profile, score, reasonsRaw) {
