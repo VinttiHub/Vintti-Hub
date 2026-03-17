@@ -354,6 +354,94 @@ def _send_email(subject: str, html_body: str, to: List[str]):
     return r.ok
 
 
+def _is_stage_close_win(value) -> bool:
+    return str(value or "").strip().lower() == "close win"
+
+
+def _close_win_email_html(client_name: str, candidate_name: str, start_date, price_type=None, computer=None) -> str:
+    return f"""
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p>Hey team — new <b>Close Win</b> 🎉</p>
+  <p>
+    <b>Client:</b> {html.escape(str(client_name or 'Client'))}<br>
+    <b>Candidate:</b> {html.escape(str(candidate_name or 'the candidate'))}<br>
+    <b>Start date:</b> {html.escape(str(start_date or '—'))}<br>
+    <b>Price type:</b> {html.escape(_format_price_type(price_type))}<br>
+    <b>Computer:</b> {html.escape(_format_computer_need(computer))}
+  </p>
+  <p style="margin-top:16px">— Vintti HUB</p>
+</div>
+    """.strip()
+
+
+def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any]]:
+    cur.execute(
+        """
+        SELECT
+            o.opportunity_id,
+            o.opp_stage,
+            o.opp_position_name,
+            o.opp_close_date::date AS opp_close_date,
+            o.candidato_contratado AS candidate_id,
+            a.client_name,
+            c.name AS candidate_name
+        FROM opportunity o
+        LEFT JOIN account a ON a.account_id = o.account_id
+        LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+        WHERE o.opportunity_id = %s
+        LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    return cur.fetchone()
+
+
+def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
+    ctx = _fetch_close_win_context(cur, opportunity_id)
+    if not ctx:
+        return {"sent": False, "reason": "opportunity_not_found", "opportunity_id": opportunity_id}
+
+    if not _is_stage_close_win(ctx.get("opp_stage")):
+        return {"sent": False, "reason": "stage_not_close_win", "opportunity_id": opportunity_id}
+
+    candidate_id = ctx.get("candidate_id")
+    if not candidate_id:
+        return {"sent": False, "reason": "missing_candidate", "opportunity_id": opportunity_id}
+
+    hire = _fetch_hire_core(int(candidate_id), cur)
+    hire_for_opp = hire if hire and int(hire.get("opportunity_id") or 0) == int(opportunity_id) else None
+
+    start_date = (
+        (hire_for_opp or {}).get("start_date")
+        or ctx.get("opp_close_date")
+        or "—"
+    )
+    price_type = (hire_for_opp or {}).get("price_type")
+    computer = (hire_for_opp or {}).get("computer")
+
+    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, JAZ_EMAIL, PGONZALES_EMAIL])
+    ok = _send_email(
+        subject=f"🎉 Close Win: {ctx.get('candidate_name') or f'Candidate #{candidate_id}'} — Start {start_date or '—'}",
+        html_body=_close_win_email_html(
+            ctx.get("client_name"),
+            ctx.get("candidate_name") or f"Candidate #{candidate_id}",
+            start_date,
+            price_type=price_type,
+            computer=computer,
+        ),
+        to=to_list,
+    )
+    if not ok:
+        return {"sent": False, "reason": "send_failed", "opportunity_id": opportunity_id, "to": to_list}
+
+    return {
+        "sent": True,
+        "opportunity_id": opportunity_id,
+        "candidate_id": candidate_id,
+        "to": to_list,
+    }
+
+
 def _ensure_hr_lead_signed_resig_ref_table(cur):
     cur.execute(
         """
@@ -681,6 +769,20 @@ def trigger_hr_lead_signed_resig_ref_reminder():
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         result = _send_hr_lead_signed_resig_ref_email(cur, opportunity_id, force=False)
+        conn.commit()
+        return jsonify(result), 200
+
+
+@bp.route("/reminders/close_win/trigger", methods=["POST"])
+def trigger_close_win_email():
+    data = request.get_json(silent=True) or {}
+    try:
+        opportunity_id = int(data.get("opportunity_id"))
+    except Exception:
+        return jsonify({"error": "opportunity_id is required"}), 400
+
+    with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        result = _send_close_win_email(cur, opportunity_id)
         conn.commit()
         return jsonify(result), 200
 

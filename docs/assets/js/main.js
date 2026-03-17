@@ -3564,90 +3564,21 @@ async function sendNegotiatingReminder(opportunityId){
 async function sendCloseWinStageEmail(opportunityId){
   try {
     if (window._closeWinStageEmailSent.has(opportunityId)) return;
-
-    const oppRes = await fetch(`${API_BASE}/opportunities/${opportunityId}`, { credentials: 'include' });
-    if (!oppRes.ok) throw new Error(`GET opp ${opportunityId} failed ${oppRes.status}`);
-    const opp = await oppRes.json();
-
-    const candidateId = Number(opp?.candidato_contratado);
-    if (!candidateId) {
-      console.warn('⚠️ Close Win email skipped: missing candidato_contratado for opp', opportunityId);
-      return;
-    }
-
-    let candidateName = `Candidate #${candidateId}`;
-    let hireStartDate = '';
-    let hirePriceType = '';
-    let hireComputer = '';
-    try {
-      const [candidateRes, hireRes] = await Promise.all([
-        fetch(`${API_BASE}/candidates/${candidateId}`, { credentials: 'include' }),
-        fetch(`${API_BASE}/candidates/${candidateId}/hire?opportunity_id=${encodeURIComponent(opportunityId)}`, { credentials: 'include' })
-      ]);
-
-      if (candidateRes.ok) {
-        const candidate = await candidateRes.json();
-        candidateName = candidate?.name || candidateName;
-      } else {
-        console.warn('⚠️ Close Win email: candidate fetch failed', candidateRes.status, candidateId);
-      }
-
-      if (hireRes.ok) {
-        const hire = await hireRes.json();
-        hireStartDate = String(hire?.start_date || '').slice(0, 10);
-        hirePriceType = String(hire?.price_type || '').trim();
-        hireComputer = String(hire?.computer || '').trim();
-      } else {
-        console.warn('⚠️ Close Win email: hire fetch failed', hireRes.status, candidateId, opportunityId);
-      }
-    } catch (err) {
-      console.warn('⚠️ Close Win email: candidate/hire fetch error', err);
-    }
-
-    const startDate = hireStartDate || String(opp?.opp_close_date || '').slice(0, 10) || '—';
-    const clientName = await resolveAccountName(opp);
-    const priceType = (() => {
-      const raw = String(hirePriceType || '').trim().toLowerCase();
-      if (raw === 'close') return 'Close';
-      if (raw === 'transparent') return 'Transparent';
-      return hirePriceType || '—';
-    })();
-    const computer = hireComputer || '—';
-
-    const esc = s => String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-    const subject = `🎉 Close Win: ${candidateName} — Start ${startDate}`;
-    const htmlBody = `
-<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
-  <p>Hey team — new <b>Close Win</b> 🎉</p>
-  <p>
-    <b>Client:</b> ${esc(clientName)}<br>
-    <b>Candidate:</b> ${esc(candidateName)}<br>
-    <b>Start date:</b> ${esc(startDate)}<br>
-    <b>Price type:</b> ${esc(priceType)}<br>
-    <b>Computer:</b> ${esc(computer)}
-  </p>
-  <p style="margin-top:16px">— Vintti HUB</p>
-</div>`.trim();
-
-    const payload = {
-      to: ['agustin@vintti.com', 'lara@vintti.com', 'jazmin@vintti.com', 'pgonzales@vintti.com'],
-      subject,
-      body: htmlBody,
-      body_html: htmlBody,
-      content_type: 'text/html',
-      html: true
-    };
-
-    const res = await fetch(`${API_BASE}/send_email`, {
+    const res = await fetch(`${API_BASE}/reminders/close_win/trigger`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ opportunity_id: opportunityId })
     });
 
     if (!res.ok) {
       const errText = await res.text().catch(()=> '');
-      throw new Error(`send_email failed ${res.status}: ${errText}`);
+      throw new Error(`close_win trigger failed ${res.status}: ${errText}`);
+    }
+
+    const result = await res.json().catch(() => ({}));
+    if (!result?.sent) {
+      throw new Error(result?.reason || 'close_win_email_not_sent');
     }
 
     window._closeWinStageEmailSent.add(opportunityId);
