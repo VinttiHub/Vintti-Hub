@@ -968,13 +968,9 @@ function buildFilterBreakdown(label, filterValue, scoreValue, details) {
 }
 
 function buildJdExplanation(profile, percent, includePercent = true) {
-  const roleWanted = state.filters.position || "";
   const roleHave = profile.position || "";
-  const industryWanted = state.filters.industry || "";
   const industryHave = profile.industry || "";
-  const countryWanted = state.filters.country || "";
   const countryHave = profile.country || "";
-  const yearsWanted = state.filters.years_experience || "";
   const yearsHave = resolveCandidateYears(profile);
   const percentLabel = `${percent || 0}%`;
   const experienceInfo = extractExperienceFromText(profile.searchableText);
@@ -988,33 +984,17 @@ function buildJdExplanation(profile, percent, includePercent = true) {
     ? `La persona ha trabajado como ${roleHave} y esa experiencia es el eje principal del perfil.`
     : "El rol específico no está declarado de forma explícita, pero el CV sugiere experiencia relevante en funciones similares.";
 
-  const roleFitSentence = roleWanted
-    ? `La posición buscada es ${roleWanted}, por lo que se revisan tareas y responsabilidades del CV que se alineen con ese tipo de rol.`
-    : "No hay una posición objetivo definida en la JD, así que se toma la experiencia general del perfil como referencia.";
-
   const industrySentence = industryHave
     ? `En industria, se observa experiencia en ${industryHave}, lo cual aporta contexto sobre los sectores en los que se ha desempeñado.`
-    : "No se identifica una industria concreta en el CV, por lo que la evaluación se apoya más en el tipo de rol que en el sector.";
+    : "No se identifica una industria concreta en el CV, por lo que el foco queda en las funciones y responsabilidades descritas.";
 
-  const industryFitSentence = industryWanted
-    ? `La industria solicitada es ${industryWanted}, por lo que se considera si la experiencia previa está en ese mismo sector o en uno compatible.`
-    : "La JD no fija una industria específica, así que la compatibilidad se valora principalmente por responsabilidades y resultados.";
-
-  const yearsSentence = yearsWanted
-    ? (yearsHave != null
-      ? `En años de experiencia, el perfil indica ${formatExperienceDuration(yearsHave)} frente a ${yearsWanted} solicitados, lo que ayuda a dimensionar la seniority esperada.`
-      : `La JD pide ${yearsWanted}, pero el CV no detalla años concretos; se toma como referencia la trayectoria descrita.`)
-    : (yearsHave != null
-      ? `El CV sugiere alrededor de ${formatExperienceDuration(yearsHave)} de experiencia, lo que permite estimar el nivel de seniority.`
-      : "No hay una cifra clara de años de experiencia, por lo que se resume la trayectoria cualitativamente.");
+  const yearsSentence = yearsHave != null
+    ? `El CV sugiere alrededor de ${formatExperienceDuration(yearsHave)} de experiencia profesional, lo que permite estimar el nivel de seniority.`
+    : "No hay una cifra clara de años de experiencia, por lo que se resume la trayectoria cualitativamente.";
 
   const countrySentence = countryHave
-    ? `En ubicación, el perfil indica ${countryHave}, un dato útil para validar disponibilidad geográfica.`
-    : "La ubicación no está detallada en el CV, así que este punto no aporta evidencia directa.";
-
-  const countryFitSentence = countryWanted
-    ? `La JD requiere ${countryWanted}, por lo que se considera si la ubicación actual coincide o es compatible con ese requerimiento.`
-    : "La JD no exige un país específico, por lo que la ubicación solo se usa como información de contexto.";
+    ? `En ubicación, el perfil indica ${countryHave}.`
+    : "La ubicación no está detallada en el CV.";
 
   const experienceSentence = experienceInfo
     ? `Al revisar las fechas de las posiciones laborales, se estiman ${formatExperienceDuration(experienceInfo.totalMonths / 12)} de experiencia acumulada, con tramos que van aproximadamente entre ${experienceInfo.earliestYear} y ${experienceInfo.latestYear}.`
@@ -1026,9 +1006,9 @@ function buildJdExplanation(profile, percent, includePercent = true) {
     ? `En estudios, se identifica formación académica como: "${educationSnippet}".`
     : "En estudios, no se encontró una referencia académica clara en el texto disponible.";
 
-  const closingSentence = "Este resumen prioriza lo que el CV declara explícitamente y lo que se puede inferir de su trayectoria, para explicar por qué el perfil se aproxima a la posición.";
+  const closingSentence = "El resumen se basa en la información explícita del CV y en los datos que se pueden inferir de su trayectoria.";
 
-  return `${leadSentence} ${roleSentence} ${roleFitSentence} ${industrySentence} ${industryFitSentence} ${experienceSentence} ${yearsSentence} ${countrySentence} ${countryFitSentence} ${studiesSentence} ${closingSentence}`.trim();
+  return `${leadSentence} ${roleSentence} ${industrySentence} ${experienceSentence} ${yearsSentence} ${countrySentence} ${studiesSentence} ${closingSentence}`.trim();
 }
 
 function buildYearsBreakdown(profile) {
