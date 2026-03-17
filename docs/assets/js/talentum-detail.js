@@ -396,7 +396,11 @@ async function extractFiltersFromOpportunity(opportunity) {
 function renderFilters() {
   if (!els.filtersGrid) return;
   const entries = [
+    { label: "Position", value: state.filters.position },
+    { label: "Salary", value: state.filters.salary },
     { label: "Years", value: state.filters.years_experience },
+    { label: "Industry", value: state.filters.industry },
+    { label: "Country", value: state.filters.country },
   ];
 
   els.filtersGrid.innerHTML = "";
@@ -749,8 +753,7 @@ function matchesTextFilter(candidateValue, filterValue, fallbackText) {
 }
 
 function hasActiveFilters() {
-  const activeKeys = ["years_experience"];
-  return activeKeys.some((key) => String(state.filters?.[key] || "").trim());
+  return Object.values(state.filters || {}).some((value) => String(value || "").trim());
 }
 
 function scoreTextMatch(candidateValue, filterValue, fallbackText) {
@@ -815,7 +818,11 @@ function computeMatchScore(profile) {
   if (!hasActiveFilters()) return 10;
 
   const points = [];
+  points.push(scoreTextMatch(profile.position, state.filters.position, profile.searchableText));
+  points.push(scoreTextMatch(profile.industry, state.filters.industry, profile.searchableText));
+  points.push(scoreTextMatch(profile.country, state.filters.country, profile.searchableText));
   points.push(scoreYearsMatch(profile));
+  points.push(scoreSalaryMatch(profile));
 
   const scored = points.filter((value) => value != null);
   const maxPoints = scored.length * 2;
@@ -828,11 +835,40 @@ function computeMatchScore(profile) {
 
 function getMatchSummary(profile) {
   const parts = [];
+  if (state.filters.country) {
+    if (isLatinAmericaFilter(state.filters.country)) {
+      parts.push(isLatinAmericaLocation(profile.country || profile.searchableText) ? "based in Latin America" : "location outside Latin America");
+    } else if (matchesTextFilter(profile.country, state.filters.country, profile.searchableText)) {
+      parts.push("location matches");
+    } else {
+      parts.push("location not mentioned");
+    }
+  }
+  if (state.filters.position) {
+    parts.push(
+      matchesTextFilter(profile.position, state.filters.position, profile.searchableText)
+        ? "position matches"
+        : "position not mentioned"
+    );
+  }
+  if (state.filters.industry) {
+    parts.push(
+      matchesTextFilter(profile.industry, state.filters.industry, profile.searchableText)
+        ? "industry matches"
+        : "industry not mentioned"
+    );
+  }
   if (state.filters.years_experience) {
     const yearScore = scoreYearsMatch(profile);
     if (yearScore === 2) parts.push("years of experience match");
     else if (yearScore === 1) parts.push("years of experience are close");
     else parts.push("years of experience not found");
+  }
+  if (state.filters.salary) {
+    const salaryScore = scoreSalaryMatch(profile);
+    if (salaryScore === 2) parts.push("salary aligns");
+    else if (salaryScore === 1) parts.push("salary is close");
+    else parts.push("salary not found");
   }
   return parts.filter(Boolean);
 }
@@ -927,6 +963,8 @@ function buildJdExplanation(profile, percent, includePercent = true) {
   const roleHave = profile.position || "";
   const industryWanted = state.filters.industry || "";
   const industryHave = profile.industry || "";
+  const countryWanted = state.filters.country || "";
+  const countryHave = profile.country || "";
   const yearsWanted = state.filters.years_experience || "";
   const yearsHave = resolveCandidateYears(profile);
   const percentLabel = `${percent || 0}%`;
@@ -961,6 +999,14 @@ function buildJdExplanation(profile, percent, includePercent = true) {
       ? `El CV sugiere alrededor de ${formatExperienceDuration(yearsHave)} de experiencia, lo que permite estimar el nivel de seniority.`
       : "No hay una cifra clara de años de experiencia, por lo que se resume la trayectoria cualitativamente.");
 
+  const countrySentence = countryHave
+    ? `En ubicación, el perfil indica ${countryHave}, un dato útil para validar disponibilidad geográfica.`
+    : "La ubicación no está detallada en el CV, así que este punto no aporta evidencia directa.";
+
+  const countryFitSentence = countryWanted
+    ? `La JD requiere ${countryWanted}, por lo que se considera si la ubicación actual coincide o es compatible con ese requerimiento.`
+    : "La JD no exige un país específico, por lo que la ubicación solo se usa como información de contexto.";
+
   const experienceSentence = experienceInfo
     ? `Al revisar las fechas de las posiciones laborales, se estiman ${formatExperienceDuration(experienceInfo.totalMonths / 12)} de experiencia acumulada, con tramos que van aproximadamente entre ${experienceInfo.earliestYear} y ${experienceInfo.latestYear}.`
     : (yearsHave != null
@@ -973,7 +1019,7 @@ function buildJdExplanation(profile, percent, includePercent = true) {
 
   const closingSentence = "Este resumen prioriza lo que el CV declara explícitamente y lo que se puede inferir de su trayectoria, para explicar por qué el perfil se aproxima a la posición.";
 
-  return `${leadSentence} ${roleSentence} ${roleFitSentence} ${industrySentence} ${industryFitSentence} ${experienceSentence} ${yearsSentence} ${studiesSentence} ${closingSentence}`.trim();
+  return `${leadSentence} ${roleSentence} ${roleFitSentence} ${industrySentence} ${industryFitSentence} ${experienceSentence} ${yearsSentence} ${countrySentence} ${countryFitSentence} ${studiesSentence} ${closingSentence}`.trim();
 }
 
 function buildYearsBreakdown(profile) {
@@ -1029,7 +1075,78 @@ function buildFallbackBreakdown(profile, score) {
     detail: buildJdExplanation(profile, overallPercent),
   });
 
+  const locationScore = scoreTextMatch(profile.country, state.filters.country, profile.searchableText);
+  breakdown.push(
+    buildFilterBreakdown(
+      "Ubicación",
+      state.filters.country,
+      locationScore,
+      {
+        match: "La ubicación del candidato coincide con la requerida.",
+        close: "La ubicación es cercana o parcialmente compatible.",
+        miss: "No coincide con la ubicación requerida.",
+        missing: "No se encontró ubicación suficiente para evaluar.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Posición (filtro)",
+      state.filters.position,
+      scoreTextMatch(profile.position, state.filters.position, profile.searchableText),
+      {
+        match: "La posición coincide con el filtro principal.",
+        close: "La posición es similar pero no exacta.",
+        miss: "No coincide con el filtro de posición.",
+        missing: "No se encontró posición suficiente para evaluar.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Industria (filtro)",
+      state.filters.industry,
+      scoreTextMatch(profile.industry, state.filters.industry, profile.searchableText),
+      {
+        match: "La industria coincide con la requerida.",
+        close: "La industria es parcialmente compatible.",
+        miss: "No coincide con la industria requerida.",
+        missing: "No se encontró industria suficiente para evaluar.",
+      }
+    )
+  );
+
   breakdown.push(buildYearsBreakdown(profile));
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "Salario (filtro)",
+      state.filters.salary,
+      scoreSalaryMatch(profile),
+      {
+        match: "La expectativa salarial está alineada.",
+        close: "La expectativa salarial es cercana.",
+        miss: "La expectativa salarial no coincide.",
+        missing: "No se encontró información salarial.",
+      }
+    )
+  );
+
+  breakdown.push(
+    buildFilterBreakdown(
+      "País (filtro)",
+      state.filters.country,
+      locationScore,
+      {
+        match: "El país coincide con el filtro definido.",
+        close: "El país es cercano o parcialmente compatible.",
+        miss: "El país no coincide con el filtro.",
+        missing: "No se encontró país suficiente para evaluar.",
+      }
+    )
+  );
 
   return breakdown;
 }
