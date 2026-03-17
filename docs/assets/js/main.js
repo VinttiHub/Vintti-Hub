@@ -3578,6 +3578,7 @@ async function sendCloseWinStageEmail(opportunityId){
     let candidateName = `Candidate #${candidateId}`;
     let hireStartDate = '';
     let hirePriceType = '';
+    let hireComputer = '';
     try {
       const [candidateRes, hireRes] = await Promise.all([
         fetch(`${API_BASE}/candidates/${candidateId}`, { credentials: 'include' }),
@@ -3595,6 +3596,7 @@ async function sendCloseWinStageEmail(opportunityId){
         const hire = await hireRes.json();
         hireStartDate = String(hire?.start_date || '').slice(0, 10);
         hirePriceType = String(hire?.price_type || '').trim();
+        hireComputer = String(hire?.computer || '').trim();
       } else {
         console.warn('⚠️ Close Win email: hire fetch failed', hireRes.status, candidateId, opportunityId);
       }
@@ -3610,6 +3612,7 @@ async function sendCloseWinStageEmail(opportunityId){
       if (raw === 'transparent') return 'Transparent';
       return hirePriceType || '—';
     })();
+    const computer = hireComputer || '—';
 
     const esc = s => String(s || '').replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
     const subject = `🎉 Close Win: ${candidateName} — Start ${startDate}`;
@@ -3620,13 +3623,14 @@ async function sendCloseWinStageEmail(opportunityId){
     <b>Client:</b> ${esc(clientName)}<br>
     <b>Candidate:</b> ${esc(candidateName)}<br>
     <b>Start date:</b> ${esc(startDate)}<br>
-    <b>Price type:</b> ${esc(priceType)}
+    <b>Price type:</b> ${esc(priceType)}<br>
+    <b>Computer:</b> ${esc(computer)}
   </p>
   <p style="margin-top:16px">— Vintti HUB</p>
 </div>`.trim();
 
     const payload = {
-      to: ['agustin@vintti.com', 'lara@vintti.com', 'jazmin@vintti.com'],
+      to: ['agustin@vintti.com', 'lara@vintti.com', 'jazmin@vintti.com', 'pgonzales@vintti.com'],
       subject,
       body: htmlBody,
       body_html: htmlBody,
@@ -3686,10 +3690,10 @@ patchOpportunityStage = async function(opportunityId, newStage, dropdownElement)
   if (!ok) return ok;
 
   if (String(newStage) === 'Signed') {
-    triggerSignedResigRefReminder(opportunityId);
+    await triggerSignedResigRefReminder(opportunityId);
   }
   if (String(newStage) === 'Close Win') {
-    sendCloseWinStageEmail(opportunityId);
+    await sendCloseWinStageEmail(opportunityId);
   }
   return ok;
 };
