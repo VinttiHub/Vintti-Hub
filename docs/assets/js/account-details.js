@@ -169,6 +169,19 @@ function scheduleAccountDerivedRefresh() {
     .finally(() => { ACCOUNT_DERIVED_REFRESHING = false; });
 }
 
+function notifyCrmAccountUpdated(accountId, patch = {}) {
+  if (!accountId || !patch || !Object.keys(patch).length) return;
+  try {
+    localStorage.setItem('crm_account_refresh', JSON.stringify({
+      account_id: Number(accountId),
+      patch,
+      ts: Date.now()
+    }));
+  } catch (err) {
+    console.warn('⚠️ Could not notify CRM tab about account update:', err);
+  }
+}
+
 async function refreshAccountDerivedFields() {
   const base = ACCOUNT_DETAIL_RECORD;
   if (!base || !base.account_id) return;
@@ -209,6 +222,7 @@ async function refreshAccountDerivedFields() {
   if (!res.ok) throw new Error('Failed to persist derived fields');
   Object.assign(base, patch);
   updateAccountDerivedUi(patch);
+  notifyCrmAccountUpdated(base.account_id, patch);
 }
 
 function updateAccountDerivedUi(fields = {}) {
