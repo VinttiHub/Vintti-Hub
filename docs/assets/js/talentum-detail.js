@@ -488,12 +488,19 @@ const LATAM_COUNTRIES = new Set(
 );
 
 function isLatinAmericaFilter(value) {
-  const needle = normalizeText(value);
-  return needle.includes("latin america") || needle.includes("latam");
+  const needle = normalizeAscii(value).replace(/[^a-z\s]/g, " ");
+  return (
+    needle.includes("latin america") ||
+    needle.includes("latam") ||
+    needle.includes("lata") ||
+    needle.includes("latinoamerica") ||
+    needle.includes("latino america") ||
+    needle.includes("america latina")
+  );
 }
 
 function isLatinAmericaLocation(value) {
-  const needle = normalizeText(value);
+  const needle = normalizeAscii(value);
   if (!needle) return false;
   return Array.from(LATAM_COUNTRIES).some((name) => needle.includes(name));
 }
@@ -717,6 +724,7 @@ function extractEducationSnippet(text) {
 function buildApplicantProfile(applicant) {
   const fullName = `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim();
   const fallbackName = fullName || applicant.email || "Unnamed";
+  const cvText = applicant.extracted_pdf || "";
   const searchableText = [
     applicant.role_position,
     applicant.area,
@@ -726,7 +734,7 @@ function buildApplicantProfile(applicant) {
     applicant.question_1,
     applicant.question_2,
     applicant.question_3,
-    applicant.extracted_pdf,
+    cvText,
   ]
     .filter(Boolean)
     .join(" ");
@@ -740,6 +748,7 @@ function buildApplicantProfile(applicant) {
     years: null,
     salaryRange: null,
     searchableText,
+    cvText,
     linkedin: applicant.linkedin_url || "",
     core: null,
   };
