@@ -525,6 +525,192 @@ function findYearsFromText(text) {
   return Number.isFinite(num) ? num : null;
 }
 
+function normalizeAscii(value) {
+  return normalizeText(value)
+    .replace(/[áàäâ]/g, "a")
+    .replace(/[éèëê]/g, "e")
+    .replace(/[íìïî]/g, "i")
+    .replace(/[óòöô]/g, "o")
+    .replace(/[úùüû]/g, "u")
+    .replace(/ñ/g, "n");
+}
+
+const MONTH_MAP = {
+  jan: 1,
+  january: 1,
+  ene: 1,
+  enero: 1,
+  feb: 2,
+  febrero: 2,
+  february: 2,
+  mar: 3,
+  marzo: 3,
+  march: 3,
+  apr: 4,
+  abril: 4,
+  april: 4,
+  may: 5,
+  mayo: 5,
+  jun: 6,
+  junio: 6,
+  june: 6,
+  jul: 7,
+  julio: 7,
+  july: 7,
+  aug: 8,
+  ago: 8,
+  agosto: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  septiembre: 9,
+  september: 9,
+  oct: 10,
+  octubre: 10,
+  october: 10,
+  nov: 11,
+  noviembre: 11,
+  november: 11,
+  dec: 12,
+  dic: 12,
+  diciembre: 12,
+  december: 12,
+};
+
+function resolveMonth(token) {
+  const key = normalizeAscii(token || "").replace(/\./g, "");
+  return MONTH_MAP[key] || null;
+}
+
+function parsePresentToken(token) {
+  return ["present", "current", "actualidad", "hoy"].includes(normalizeAscii(token || ""));
+}
+
+function toMonthIndex(year, month) {
+  return year * 12 + (month - 1);
+}
+
+function extractDateRangesFromText(text) {
+  const clean = normalizeAscii(text);
+  if (!clean) return [];
+
+  const ranges = [];
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
+
+  const yearRange = /(\b\d{4}\b)\s*(?:-|–|—|to|a|hasta)\s*(\b\d{4}\b|present|current|actualidad|hoy)/g;
+  let match = null;
+  while ((match = yearRange.exec(clean))) {
+    const startYear = Number(match[1]);
+    const endToken = match[2];
+    const endYear = parsePresentToken(endToken) ? nowYear : Number(endToken);
+    const endMonth = parsePresentToken(endToken) ? nowMonth : 12;
+    if (!Number.isFinite(startYear) || !Number.isFinite(endYear)) continue;
+    ranges.push({ startYear, startMonth: 1, endYear, endMonth });
+  }
+
+  const monthYearRange = /(\b[a-z]{3,9}\b)\s+(\d{4})\s*(?:-|–|—|to|a|hasta)\s*(\b[a-z]{3,9}\b)?\s*(\d{4}|present|current|actualidad|hoy)/g;
+  while ((match = monthYearRange.exec(clean))) {
+    const startMonth = resolveMonth(match[1]);
+    const startYear = Number(match[2]);
+    const endMonthToken = match[3];
+    const endToken = match[4];
+    if (!startMonth || !Number.isFinite(startYear)) continue;
+    const endIsPresent = parsePresentToken(endToken);
+    const endYear = endIsPresent ? nowYear : Number(endToken);
+    if (!Number.isFinite(endYear)) continue;
+    const endMonth = endIsPresent
+      ? nowMonth
+      : (resolveMonth(endMonthToken) || 12);
+    ranges.push({ startYear, startMonth, endYear, endMonth });
+  }
+
+  const numericRange = /(\b\d{1,2})[\/\-](\d{4})\s*(?:-|–|—|to|a|hasta)\s*(\b\d{1,2})[\/\-](\d{4}|present|current|actualidad|hoy)/g;
+  while ((match = numericRange.exec(clean))) {
+    const startMonth = Number(match[1]);
+    const startYear = Number(match[2]);
+    const endMonth = Number(match[3]);
+    const endToken = match[4];
+    const endIsPresent = parsePresentToken(endToken);
+    const endYear = endIsPresent ? nowYear : Number(endToken);
+    const finalEndMonth = endIsPresent ? nowMonth : endMonth;
+    if (!Number.isFinite(startMonth) || !Number.isFinite(startYear) || !Number.isFinite(finalEndMonth) || !Number.isFinite(endYear)) {
+      continue;
+    }
+    ranges.push({ startYear, startMonth, endYear, endMonth: finalEndMonth });
+  }
+
+  return ranges;
+}
+
+function mergeMonthRanges(ranges) {
+  if (!ranges.length) return [];
+  const normalized = ranges
+    .map((range) => {
+      const startIndex = toMonthIndex(range.startYear, range.startMonth);
+      const endIndex = toMonthIndex(range.endYear, range.endMonth);
+      if (!Number.isFinite(startIndex) || !Number.isFinite(endIndex)) return null;
+      if (endIndex < startIndex) return null;
+      return { startIndex, endIndex };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startIndex - b.startIndex);
+
+  if (!normalized.length) return [];
+  const merged = [normalized[0]];
+  for (let i = 1; i < normalized.length; i += 1) {
+    const last = merged[merged.length - 1];
+    const current = normalized[i];
+    if (current.startIndex <= last.endIndex + 1) {
+      last.endIndex = Math.max(last.endIndex, current.endIndex);
+    } else {
+      merged.push({ ...current });
+    }
+  }
+  return merged;
+}
+
+function extractExperienceFromText(text) {
+  const ranges = extractDateRangesFromText(text);
+  const merged = mergeMonthRanges(ranges);
+  if (!merged.length) return null;
+  const totalMonths = merged.reduce((sum, range) => sum + (range.endIndex - range.startIndex + 1), 0);
+  const earliestIndex = merged[0].startIndex;
+  const latestIndex = merged[merged.length - 1].endIndex;
+  const earliestYear = Math.floor(earliestIndex / 12);
+  const latestYear = Math.floor(latestIndex / 12);
+  return {
+    totalMonths,
+    earliestYear,
+    latestYear,
+    rangesCount: merged.length,
+  };
+}
+
+function formatExperienceDuration(valueYears) {
+  if (!Number.isFinite(valueYears)) return "—";
+  const months = Math.round(valueYears * 12);
+  if (months < 12) return `${months} meses`;
+  const rounded = Math.round(valueYears * 10) / 10;
+  const label = `${rounded}`.replace(/\.0$/, "");
+  return `${label} años`;
+}
+
+function extractEducationSnippet(text) {
+  const raw = String(text || "");
+  if (!raw) return "";
+  const regex = /(licenciatura|ingenieria|ingeniería|maestria|maestría|mba|master|bachelor|degree|universidad|university|college|instituto|diplomatura|doctorado|phd)/i;
+  const match = raw.match(regex);
+  if (!match || match.index == null) return "";
+  const start = Math.max(0, match.index - 60);
+  const end = Math.min(raw.length, match.index + 120);
+  return raw
+    .slice(start, end)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function buildApplicantProfile(applicant) {
   const fullName = `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim();
   const fallbackName = fullName || applicant.email || "Unnamed";
@@ -537,6 +723,7 @@ function buildApplicantProfile(applicant) {
     applicant.question_1,
     applicant.question_2,
     applicant.question_3,
+    applicant.extracted_pdf,
   ]
     .filter(Boolean)
     .join(" ");
@@ -583,6 +770,10 @@ function scoreTextMatch(candidateValue, filterValue, fallbackText) {
 
 function resolveCandidateYears(profile) {
   if (profile.years != null) return profile.years;
+  const inferred = extractExperienceFromText(profile.searchableText);
+  if (inferred?.totalMonths) {
+    return inferred.totalMonths / 12;
+  }
   return findYearsFromText(profile.searchableText);
 }
 
@@ -752,34 +943,58 @@ function buildJdExplanation(profile, percent, includePercent = true) {
   const yearsWanted = state.filters.years_experience || "";
   const yearsHave = resolveCandidateYears(profile);
   const percentLabel = `${percent || 0}%`;
+  const experienceInfo = extractExperienceFromText(profile.searchableText);
+  const educationSnippet = extractEducationSnippet(profile.searchableText);
 
-  const roleSentence = roleWanted || roleHave
-    ? `${includePercent ? `Se le asigna este ${percentLabel} porque ` : ""}el CV menciona ${roleHave ? `experiencia en ${roleHave}` : "experiencia relevante"}${roleWanted ? ` y la posición buscada es ${roleWanted}` : ""}.`
-    : `${includePercent ? `Se le asigna este ${percentLabel} porque ` : ""}el CV contiene señales de experiencia relevante alineadas con la JD.`;
+  const leadSentence = includePercent
+    ? `Resumen del CV para esta comparación (${percentLabel}).`
+    : "Resumen del CV para esta comparación.";
 
-  const industrySentence = industryWanted || industryHave
-    ? `En industria, ${industryHave ? `ha trabajado en ${industryHave}` : "no hay industria declarada"}${industryWanted ? ` y se busca ${industryWanted}` : ""}.`
-    : "No se declara una industria específica en el CV ni en la JD.";
+  const roleSentence = roleHave
+    ? `La persona ha trabajado como ${roleHave} y esa experiencia es el eje principal del perfil.`
+    : "El rol específico no está declarado de forma explícita, pero el CV sugiere experiencia relevante en funciones similares.";
 
-  const countrySentence = countryWanted || countryHave
-    ? `La ubicación ${countryHave ? `del perfil (${countryHave})` : "del perfil"}${countryWanted ? ` se compara con el país requerido (${countryWanted})` : " se compara con la JD"}.`
-    : "La ubicación no aporta evidencia clara en la comparación.";
+  const roleFitSentence = roleWanted
+    ? `La posición buscada es ${roleWanted}, por lo que se revisan tareas y responsabilidades del CV que se alineen con ese tipo de rol.`
+    : "No hay una posición objetivo definida en la JD, así que se toma la experiencia general del perfil como referencia.";
+
+  const industrySentence = industryHave
+    ? `En industria, se observa experiencia en ${industryHave}, lo cual aporta contexto sobre los sectores en los que se ha desempeñado.`
+    : "No se identifica una industria concreta en el CV, por lo que la evaluación se apoya más en el tipo de rol que en el sector.";
+
+  const industryFitSentence = industryWanted
+    ? `La industria solicitada es ${industryWanted}, por lo que se considera si la experiencia previa está en ese mismo sector o en uno compatible.`
+    : "La JD no fija una industria específica, así que la compatibilidad se valora principalmente por responsabilidades y resultados.";
 
   const yearsSentence = yearsWanted
     ? (yearsHave != null
-      ? `En años de experiencia, el perfil indica ${yearsHave} frente a ${yearsWanted} solicitados.`
-      : `La JD pide ${yearsWanted}, pero el CV no detalla años concretos.`)
-    : "La JD no define años de experiencia explícitos.";
+      ? `En años de experiencia, el perfil indica ${yearsHave} frente a ${yearsWanted} solicitados, lo que ayuda a dimensionar la seniority esperada.`
+      : `La JD pide ${yearsWanted}, pero el CV no detalla años concretos; se toma como referencia la trayectoria descrita.`)
+    : (yearsHave != null
+      ? `El CV sugiere alrededor de ${yearsHave} años de experiencia, lo que permite estimar el nivel de seniority.`
+      : "No hay una cifra clara de años de experiencia, por lo que se resume la trayectoria cualitativamente.");
 
-  const alignmentSentence = roleWanted || industryWanted || yearsWanted || countryWanted
-    ? "El porcentaje final refleja la suma de coincidencias directas, coincidencias parciales y señales indirectas encontradas en el texto del CV."
-    : "El porcentaje final refleja señales indirectas y coincidencias generales encontradas en el texto del CV.";
-  const nuanceSentence = "Si algún requisito no aparece textualmente, se pondera la experiencia relacionada que aparece en el historial, los títulos de roles, y los logros descritos, siempre que guarden relación con lo solicitado.";
-  const evidenceSentence = "Esta explicación se basa en la información disponible: si faltan datos concretos, se utiliza una estimación local con lo que sí está presente, por ejemplo, tareas similares, áreas cercanas o palabras clave del rol.";
-  const cautionSentence = "Cuando la evidencia es parcial, el match no se descarta por completo, sino que se ajusta proporcionalmente para reflejar cercanía sin asumir cumplimiento total.";
-  const closingSentence = "En resumen, el score intenta balancear requisitos explícitos con indicios de experiencia real, priorizando lo más relevante del perfil frente a la descripción del puesto.";
+  const countrySentence = countryHave
+    ? `En ubicación, el perfil indica ${countryHave}, un dato útil para validar disponibilidad geográfica.`
+    : "La ubicación no está detallada en el CV, así que este punto no aporta evidencia directa.";
 
-  return `${roleSentence} ${industrySentence} ${yearsSentence} ${countrySentence} ${alignmentSentence} ${nuanceSentence} ${evidenceSentence} ${cautionSentence} ${closingSentence}`.trim();
+  const countryFitSentence = countryWanted
+    ? `La JD requiere ${countryWanted}, por lo que se considera si la ubicación actual coincide o es compatible con ese requerimiento.`
+    : "La JD no exige un país específico, por lo que la ubicación solo se usa como información de contexto.";
+
+  const experienceSentence = experienceInfo
+    ? `Al revisar las fechas de las posiciones laborales, se estiman ${formatExperienceDuration(experienceInfo.totalMonths / 12)} de experiencia acumulada, con tramos que van aproximadamente entre ${experienceInfo.earliestYear} y ${experienceInfo.latestYear}.`
+    : (yearsHave != null
+      ? `En experiencia profesional, el perfil sugiere aproximadamente ${formatExperienceDuration(yearsHave)} de trayectoria.`
+      : "En experiencia profesional, el CV describe roles y responsabilidades, pero no se detectaron rangos de fechas claros para estimar la duración total.");
+
+  const studiesSentence = educationSnippet
+    ? `En estudios, se identifica formación académica como: "${educationSnippet}".`
+    : "En estudios, no se encontró una referencia académica clara en el texto disponible.";
+
+  const closingSentence = "Este resumen prioriza lo que el CV declara explícitamente y lo que se puede inferir de su trayectoria, para explicar por qué el perfil se aproxima a la posición.";
+
+  return `${leadSentence} ${roleSentence} ${roleFitSentence} ${industrySentence} ${industryFitSentence} ${experienceSentence} ${yearsSentence} ${countrySentence} ${countryFitSentence} ${studiesSentence} ${closingSentence}`.trim();
 }
 
 function buildYearsBreakdown(profile) {
@@ -822,7 +1037,7 @@ function buildYearsBreakdown(profile) {
   return {
     category: "Años de experiencia (filtro)",
     percent,
-    detail: `Tiene ${candidateYears} años frente a ${filterYears} solicitados, cubre aproximadamente el ${percent}% del requisito.`,
+    detail: `Tiene ${formatExperienceDuration(candidateYears)} frente a ${filterYears} años solicitados, cubre aproximadamente el ${percent}% del requisito.`,
   };
 }
 
