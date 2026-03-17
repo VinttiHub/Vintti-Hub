@@ -90,11 +90,13 @@ function deriveStatusFrom(opps = [], hires = []) {
 
   const stages = (Array.isArray(opps) ? opps : []).map(o => normalizeStage(o.opp_stage || o.stage));
   const hasOpps = stages.length > 0;
+  const hasWon = stages.some(s => s === 'won');
   const hasPipeline = stages.some(s => s === 'pipeline');
   const allLost = hasOpps && stages.every(s => s === 'lost');
 
   if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
   if (allCandidatesInactive) return 'Inactive Client';
+  if (hasWon) return 'Active Client';
   if (!hasOpps && !hasCandidates) return 'Lead';
   if (allLost && !hasCandidates) return 'Lead Lost';
   if (hasPipeline) return 'Lead in Process';
@@ -1269,9 +1271,11 @@ function setCrmRefreshButtonState(btn, isLoading) {
   btn.textContent = isLoading ? 'Refreshing...' : 'Refresh';
 }
 
-async function refreshCrmDerivedFields(accountIds = null) {
+async function refreshCrmDerivedFields(accountIds = null, options = {}) {
   const btn = document.getElementById('crmRefreshBtn');
-  if (!btn || btn.disabled) return;
+  const skipButtonGuard = Boolean(options?.skipButtonGuard);
+  if (!btn) return;
+  if (!skipButtonGuard && btn.disabled) return;
 
   const fallbackRows = Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'));
   const fallbackIds = fallbackRows.map(row => Number(row.dataset.id)).filter(Boolean);
@@ -1286,6 +1290,7 @@ async function refreshCrmDerivedFields(accountIds = null) {
 
   try {
     let doneCount = 0;
+    const statusUpdates = [];
     const rowById = new Map(
       [...document.querySelectorAll('#accountTableBody tr[data-id]')].map(row => [Number(row.dataset.id), row])
     );
@@ -1313,6 +1318,11 @@ async function refreshCrmDerivedFields(accountIds = null) {
         if (derivedStatus && derivedStatus.toLowerCase() !== currentStatus) {
           patch.account_status = derivedStatus;
           patch.calculated_status = derivedStatus;
+          statusUpdates.push({
+            account_id: accountId,
+            status: derivedStatus,
+            calculated_status: derivedStatus
+          });
         }
 
         const currentContract = row ? getRowContractValue(row) : '';
@@ -1333,20 +1343,24 @@ async function refreshCrmDerivedFields(accountIds = null) {
           patch.account_manager = desiredManager;
         }
 
-        if (!Object.keys(patch).length) return;
+        if (row) {
+          updateRowStatus(row, derivedStatus || '—');
+          if ('contract' in patch) updateRowContract(row, derivedContract);
+          if (patch.account_manager) updateRowSalesLead(row, patch.account_manager, patch.account_manager);
+        }
+
+        const accountPatch = { ...patch };
+        delete accountPatch.account_status;
+        delete accountPatch.calculated_status;
+
+        if (!Object.keys(accountPatch).length) return;
 
         const res = await fetch(`${API_BASE}/accounts/${accountId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch)
+          body: JSON.stringify(accountPatch)
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        if (row) {
-          if (patch.account_status) updateRowStatus(row, derivedStatus);
-          if (patch.contract) updateRowContract(row, derivedContract);
-          if (patch.account_manager) updateRowSalesLead(row, patch.account_manager, patch.account_manager);
-        }
       } catch (err) {
         console.warn(`⚠️ Could not update derived fields for account ${accountId}:`, err);
       } finally {
@@ -1356,6 +1370,19 @@ async function refreshCrmDerivedFields(accountIds = null) {
     });
 
     await runWithConcurrency(tasks, 6);
+
+    if (statusUpdates.length) {
+      try {
+        const res = await fetch(`${API_BASE}/accounts/status/bulk_update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates: statusUpdates })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (err) {
+        console.warn('⚠️ Could not persist CRM status refresh in bulk:', err);
+      }
+    }
 
     if (accountTableInstance) {
       accountTableInstance.rows().invalidate('dom');
@@ -1954,6 +1981,9 @@ document.addEventListener('DOMContentLoaded', () => {
           accountTableInstance = this.api();
           updateCrmEmptyState(accountTableInstance);
           toggleCrmLoading(false);
+          requestAnimationFrame(() => {
+            refreshCrmDerivedFields(CRM_ALL_ACCOUNT_IDS, { skipButtonGuard: true });
+          });
         }
       });
 
@@ -1998,8 +2028,6 @@ document.addEventListener('DOMContentLoaded', () => {
           console.error('❌ Error updating priority:', error);
         }
       });
-
-      refreshCrmDerivedFields(CRM_ALL_ACCOUNT_IDS);
     } catch (err) {
       console.error('Error fetching account data:', err);
       toggleCrmLoading(false);

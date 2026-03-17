@@ -905,6 +905,25 @@ def update_opportunity_fields(opportunity_id):
                         """, ('Client hired', candidate_hired_id))
                     logging.info("🟢 candidates_batches actualizado")
 
+                incoming_stage = (data.get("opp_stage") or "").strip().lower()
+                should_mark_active_client = (
+                    candidate_hired_id is not None
+                    or incoming_stage in {"close win", "closed won", "close_won", "closed_won"}
+                )
+                if should_mark_active_client:
+                    cursor.execute("""
+                        UPDATE account a
+                           SET account_status = %s,
+                               calculated_status = %s
+                         WHERE a.account_id = (
+                             SELECT o.account_id
+                               FROM opportunity o
+                              WHERE o.opportunity_id = %s
+                              LIMIT 1
+                         )
+                    """, ('Active Client', 'Active Client', opportunity_id))
+                    logging.info("🟢 account status marcado como Active Client por Close Win (opp=%s)", opportunity_id)
+
                 if previous is not None:
                     new_hr_lead = (data.get("opp_hr_lead") or "").strip() if "opp_hr_lead" in data else None
                     old_hr_lead = (previous.get("opp_hr_lead") or "").strip()

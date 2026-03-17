@@ -110,6 +110,7 @@ function wrapContentWithBadge(content, replacementOf) {
 function deriveAccountStatusFromData(opps = [], hires = []) {
   const stages = (Array.isArray(opps) ? opps : []).map(opp => normalizeStage(opp.opp_stage || opp.stage));
   const hasOpps = stages.length > 0;
+  const hasWon = stages.some(stage => stage === 'won');
   const hasPipeline = stages.some(stage => stage === 'pipeline');
   const allLost = hasOpps && stages.every(stage => stage === 'lost');
 
@@ -121,6 +122,7 @@ function deriveAccountStatusFromData(opps = [], hires = []) {
 
   if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
   if (allCandidatesInactive) return 'Inactive Client';
+  if (hasWon) return 'Active Client';
   if (!hasOpps && !hasCandidates) return 'Lead';
   if (allLost && !hasCandidates) return 'Lead Lost';
   if (hasPipeline) return 'Lead in Process';
