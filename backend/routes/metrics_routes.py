@@ -40,7 +40,6 @@ def data_light():
               a.priority,
               a.contract,
               a.account_status,
-              a.calculated_status,
               a.account_manager,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
@@ -48,7 +47,7 @@ def data_light():
             FROM account a
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.calculated_status, a.account_manager
+            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager
             ORDER BY LOWER(a.client_name) ASC;
         """)
 
@@ -183,12 +182,6 @@ def accounts_status_summary():
                 COUNT(*)                    AS total_opps,
                 COUNT(*) FILTER (WHERE lower(opp_stage) LIKE '%%lost%%') AS lost_opps,
                 BOOL_OR(
-                  lower(COALESCE(opp_stage, '')) LIKE '%%close win%%'
-                  OR lower(COALESCE(opp_stage, '')) LIKE '%%closed won%%'
-                  OR lower(COALESCE(opp_stage, '')) LIKE '%%close_won%%'
-                  OR lower(COALESCE(opp_stage, '')) LIKE '%%closed_won%%'
-                ) AS has_won,
-                BOOL_OR(
                   lower(opp_stage) LIKE '%%sourc%%'
                   OR lower(opp_stage) LIKE '%%interview%%'
                   OR lower(opp_stage) LIKE '%%negotiat%%'
@@ -224,7 +217,6 @@ def accounts_status_summary():
               COALESCE(hi.any_active, FALSE)     AS any_active_candidate,
               COALESCE(hi.has_buyout, FALSE)     AS has_buyout,
               COALESCE(op.total_opps, 0) > 0     AS has_opps,
-              COALESCE(op.has_won, FALSE)        AS has_won,
               COALESCE(op.has_pipeline, FALSE)   AS has_pipeline,
               (COALESCE(op.total_opps,0) > 0 AND COALESCE(op.lost_opps,0) = COALESCE(op.total_opps,0)) AS all_lost
             FROM account a
@@ -238,10 +230,8 @@ def accounts_status_summary():
         cur.close()
         conn.close()
 
-        def decide(has_candidates, any_active, has_buyout, has_opps, has_won, has_pipeline, all_lost):
+        def decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost):
             if any_active or has_buyout:
-                return 'Active Client'
-            if has_won:
                 return 'Active Client'
             if has_candidates and not any_active:
                 return 'Inactive Client'
@@ -256,10 +246,10 @@ def accounts_status_summary():
             return 'Lead in Process'
 
         out = []
-        for (acc_id, has_candidates, any_active, has_buyout, has_opps, has_won, has_pipeline, all_lost) in rows:
+        for (acc_id, has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost) in rows:
             out.append({
                 "account_id": acc_id,
-                "status": decide(has_candidates, any_active, has_buyout, has_opps, has_won, has_pipeline, all_lost)
+                "status": decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost)
             })
         return jsonify(out)
     except Exception as exc:
@@ -299,36 +289,16 @@ def accounts_status_bulk_update():
 
     conn = get_connection()
     try:
-        has_account_status_updated_at = False
-        has_status_needs_refresh = False
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'account'
-                  AND column_name IN ('account_status_updated_at', 'status_needs_refresh', 'calculated_status')
-            """)
-            existing_columns = {row[0] for row in (cur.fetchall() or [])}
-            has_account_status_updated_at = 'account_status_updated_at' in existing_columns
-            has_status_needs_refresh = 'status_needs_refresh' in existing_columns
-            has_calculated_status = 'calculated_status' in existing_columns
-
         if rows_status:
             with conn:
                 with conn.cursor() as cur:
-                    cur.execute("CREATE TEMP TABLE _upd_status(account_id INT, status TEXT) ON COMMIT DROP;")
+                    execute_values(cur, "CREATE TEMP TABLE _upd_status(account_id INT, status TEXT) ON COMMIT DROP;", [])
                     execute_values(cur, "INSERT INTO _upd_status(account_id, status) VALUES %s", rows_status)
-                    extra_sets = []
-                    if has_account_status_updated_at:
-                        extra_sets.append("account_status_updated_at = NOW()")
-                    if has_status_needs_refresh:
-                        extra_sets.append("status_needs_refresh = FALSE")
-                    set_clause = ",\n                               ".join(["account_status = u.status"] + extra_sets)
                     cur.execute("""
                         UPDATE account a
-                           SET """
-                        + set_clause +
-                        """
+                           SET account_status = u.status,
+                               account_status_updated_at = NOW(),
+                               status_needs_refresh = FALSE
                           FROM _upd_status u
                          WHERE a.account_id = u.account_id;
                     """)
@@ -336,7 +306,14 @@ def accounts_status_bulk_update():
 
         if rows_calc:
             with conn.cursor() as cur:
-                if has_calculated_status:
+                cur.execute("""
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name = 'account' AND column_name = 'calculated_status'
+                    LIMIT 1
+                """)
+                has_col = cur.fetchone() is not None
+                if has_col:
                     for acc_id, status in rows_calc:
                         cur.execute(
                             "UPDATE account SET calculated_status = %s WHERE account_id = %s",
