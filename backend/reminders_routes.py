@@ -767,8 +767,10 @@ def trigger_hr_lead_signed_resig_ref_reminder():
     except Exception:
         return jsonify({"error": "opportunity_id is required"}), 400
 
+    force = _normalize_bool(data.get("force"))
+
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        result = _send_hr_lead_signed_resig_ref_email(cur, opportunity_id, force=False)
+        result = _send_hr_lead_signed_resig_ref_email(cur, opportunity_id, force=force)
         conn.commit()
         return jsonify(result), 200
 

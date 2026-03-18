@@ -3998,7 +3998,7 @@ async function triggerSignedResigRefReminder(opportunityId){
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ opportunity_id: opportunityId })
+      body: JSON.stringify({ opportunity_id: opportunityId, force: true })
     });
 
     if (!res.ok) {
