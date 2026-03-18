@@ -125,6 +125,407 @@ function getCurrentUserEmail(){
     .trim();
 }
 
+const BIRTHDAY_CELEBRATION_PREFIX = 'birthday_celebration_seen';
+let birthdayCelebrationShownInSession = false;
+const birthdayCelebrationProfilePromises = new Map();
+
+function getTodayLocalIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeBirthdayIso(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.slice(0, 10);
+}
+
+function isBirthdayToday(value) {
+  const iso = normalizeBirthdayIso(value);
+  if (!iso) return false;
+  const [, month, day] = iso.split('-');
+  const today = getTodayLocalIso();
+  return month === today.slice(5, 7) && day === today.slice(8, 10);
+}
+
+function birthdayCelebrationKey(userId) {
+  return `${BIRTHDAY_CELEBRATION_PREFIX}:${userId != null ? String(userId) : 'unknown'}`;
+}
+
+function alreadySawBirthdayCelebration(userId) {
+  return localStorage.getItem(birthdayCelebrationKey(userId)) === getTodayLocalIso();
+}
+
+function markBirthdayCelebrationSeen(userId) {
+  localStorage.setItem(birthdayCelebrationKey(userId), getTodayLocalIso());
+}
+
+async function getCurrentUserProfileForBirthday(email) {
+  const normalizedEmail = String(email || getCurrentUserEmail() || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  if (!birthdayCelebrationProfilePromises.has(normalizedEmail)) {
+    const request = fetch(`${API_BASE}/users?email=${encodeURIComponent(normalizedEmail)}`, {
+      credentials: 'include'
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const users = await res.json();
+        if (!Array.isArray(users)) return null;
+        return users.find((user) => String(user.email_vintti || '').toLowerCase() === normalizedEmail) || null;
+      })
+      .catch((error) => {
+        console.warn('Birthday celebration profile lookup failed:', error);
+        return null;
+      });
+    birthdayCelebrationProfilePromises.set(normalizedEmail, request);
+  }
+
+  return birthdayCelebrationProfilePromises.get(normalizedEmail) || null;
+}
+
+function ensureBirthdayCelebrationStyles() {
+  if (document.getElementById('birthdayCelebrationStyles')) return;
+
+  const style = document.createElement('style');
+  style.id = 'birthdayCelebrationStyles';
+  style.textContent = `
+    .birthday-celebration-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 12000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 15% 18%, rgba(220, 255, 89, 0.22), transparent 18%),
+        radial-gradient(circle at 84% 16%, rgba(255, 142, 107, 0.18), transparent 18%),
+        linear-gradient(135deg, rgba(7, 19, 60, 0.64), rgba(17, 32, 88, 0.5));
+      backdrop-filter: blur(14px);
+      animation: birthdayOverlayFadeIn .4s ease;
+    }
+    .birthday-celebration-overlay::before,
+    .birthday-celebration-overlay::after {
+      content: '';
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      filter: blur(36px);
+      opacity: .38;
+      pointer-events: none;
+    }
+    .birthday-celebration-overlay::before {
+      top: -140px;
+      left: -110px;
+      background: radial-gradient(circle, rgba(211, 255, 60, 0.95), transparent 60%);
+    }
+    .birthday-celebration-overlay::after {
+      right: -140px;
+      bottom: -180px;
+      background: radial-gradient(circle, rgba(255, 143, 109, 0.9), transparent 60%);
+    }
+    .birthday-celebration-card {
+      position: relative;
+      width: min(720px, calc(100vw - 32px));
+      overflow: hidden;
+      border-radius: 36px;
+      padding: 38px 42px 36px;
+      text-align: center;
+      background:
+        linear-gradient(160deg, rgba(255,255,255,0.98) 0%, rgba(255,249,236,0.98) 44%, rgba(255,236,229,0.98) 100%);
+      box-shadow:
+        0 32px 120px rgba(5, 12, 43, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      animation: birthdayCardPop .55s cubic-bezier(.2,.8,.2,1);
+      font-family: 'Onest', sans-serif;
+      z-index: 2;
+    }
+    .birthday-celebration-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(213, 255, 75, 0.28), transparent 18%),
+        radial-gradient(circle at 82% 16%, rgba(255, 152, 118, 0.24), transparent 18%),
+        radial-gradient(circle at 50% 118%, rgba(0, 40, 255, 0.12), transparent 32%);
+      pointer-events: none;
+    }
+    .birthday-celebration-card::after {
+      content: '';
+      position: absolute;
+      inset: 16px;
+      border-radius: 28px;
+      border: 1px solid rgba(13, 42, 109, 0.06);
+      pointer-events: none;
+    }
+    .birthday-celebration-sky {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .birthday-celebration-balloon {
+      position: absolute;
+      width: var(--balloon-size, 92px);
+      height: calc(var(--balloon-size, 92px) * 1.18);
+      border-radius: 50% 50% 46% 46%;
+      pointer-events: none;
+      background: var(--balloon-fill, linear-gradient(180deg, #5b7bff 0%, #0028ff 100%));
+      box-shadow:
+        inset -10px -16px 24px rgba(0, 0, 0, 0.08),
+        inset 10px 12px 18px rgba(255, 255, 255, 0.22),
+        0 20px 40px rgba(12, 25, 72, 0.18);
+      opacity: .96;
+      animation:
+        birthdayBalloonRise var(--rise-duration, 15s) linear infinite,
+        birthdayBalloonSway var(--sway-duration, 4.8s) ease-in-out infinite;
+      animation-delay: var(--delay, 0s), var(--delay, 0s);
+    }
+    .birthday-celebration-balloon::before {
+      content: '';
+      position: absolute;
+      top: 16%;
+      left: 18%;
+      width: 28%;
+      height: 20%;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.34);
+      transform: rotate(-24deg);
+    }
+    .birthday-celebration-balloon::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      width: 2px;
+      height: 90px;
+      background: linear-gradient(180deg, rgba(26, 42, 92, 0.28), rgba(26, 42, 92, 0.04));
+      transform: translateX(-50%);
+    }
+    .birthday-celebration-balloon.is-blue {
+      --balloon-fill: linear-gradient(180deg, #6d87ff 0%, #173eff 100%);
+    }
+    .birthday-celebration-balloon.is-lime {
+      --balloon-fill: linear-gradient(180deg, #efff9d 0%, #d8ff4d 100%);
+    }
+    .birthday-celebration-balloon.is-coral {
+      --balloon-fill: linear-gradient(180deg, #ffb194 0%, #ff7f5a 100%);
+    }
+    .birthday-celebration-balloon.is-blush {
+      --balloon-fill: linear-gradient(180deg, #ffd9e6 0%, #f4a9c1 100%);
+    }
+    .birthday-celebration-balloon.is-soft {
+      opacity: .72;
+    }
+    .birthday-celebration-topline {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .birthday-celebration-topline::before,
+    .birthday-celebration-topline::after {
+      content: '';
+      width: 72px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 40, 255, 0.22), transparent);
+    }
+    .birthday-celebration-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 9px 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.9);
+      color: #18346a;
+      font-size: .84rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      box-shadow: 0 14px 26px rgba(20, 38, 92, 0.08);
+    }
+    .birthday-celebration-title {
+      margin: 8px 0 0;
+      color: #0028ff;
+      font-size: clamp(2.4rem, 5vw, 4.6rem);
+      line-height: .92;
+      font-weight: 800;
+      letter-spacing: -.04em;
+      max-width: 560px;
+      margin-left: auto;
+      margin-right: auto;
+      text-wrap: balance;
+    }
+    .birthday-celebration-copy {
+      margin: 20px auto 0;
+      max-width: 520px;
+      color: #20304f;
+      font-size: 1.08rem;
+      line-height: 1.72;
+      text-wrap: balance;
+    }
+    .birthday-celebration-dismiss {
+      margin-top: 28px;
+      border: none;
+      border-radius: 999px;
+      padding: 15px 28px;
+      background: linear-gradient(90deg, #d8ff4d 0%, #efffa5 100%);
+      color: #102040;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 18px 36px rgba(211, 255, 60, 0.28);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .birthday-celebration-dismiss:hover {
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 22px 40px rgba(211, 255, 60, 0.34);
+    }
+    .birthday-celebration-confetti,
+    .birthday-celebration-confetti::before,
+    .birthday-celebration-confetti::after {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .birthday-celebration-confetti::before,
+    .birthday-celebration-confetti::after {
+      content: '';
+      top: auto;
+      bottom: -12%;
+      width: 240px;
+      height: 56%;
+      background-image:
+        radial-gradient(circle, #0028ff 0 3px, transparent 3.6px),
+        radial-gradient(circle, #ff8f6d 0 4px, transparent 4.6px),
+        radial-gradient(circle, #dfff65 0 4px, transparent 4.6px),
+        radial-gradient(circle, rgba(255,255,255,0.9) 0 3px, transparent 3.6px);
+      background-size: 62px 62px, 68px 68px, 58px 58px, 52px 52px;
+      opacity: .24;
+      animation: birthdayConfettiFloat 10s linear infinite;
+    }
+    .birthday-celebration-confetti::before {
+      left: -2%;
+    }
+    .birthday-celebration-confetti::after {
+      right: -2%;
+      animation-duration: 12s;
+      animation-direction: reverse;
+    }
+    .birthday-celebration-confetti.is-delayed::before,
+    .birthday-celebration-confetti.is-delayed::after {
+      animation-delay: 1.8s;
+      opacity: .18;
+    }
+    @keyframes birthdayOverlayFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes birthdayCardPop {
+      0% { opacity: 0; transform: translateY(28px) scale(.92) rotate(-1deg); }
+      70% { opacity: 1; transform: translateY(-4px) scale(1.01) rotate(.3deg); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes birthdayConfettiFloat {
+      0% { transform: translateY(18px); }
+      50% { transform: translateY(-8px); }
+      100% { transform: translateY(18px); }
+    }
+    @keyframes birthdayBalloonRise {
+      0% { transform: translate3d(0, 105vh, 0); }
+      100% { transform: translate3d(0, -130vh, 0); }
+    }
+    @keyframes birthdayBalloonSway {
+      0%, 100% { margin-left: 0; }
+      50% { margin-left: 18px; }
+    }
+    @keyframes birthdaySparkleFloat {
+      0%, 100% { transform: translateY(0) scale(1); opacity: .75; }
+      50% { transform: translateY(-8px) scale(1.2); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function showBirthdayCelebrationOverlay(displayName) {
+  ensureBirthdayCelebrationStyles();
+
+  const existing = document.getElementById('birthdayCelebrationOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'birthdayCelebrationOverlay';
+  overlay.className = 'birthday-celebration-overlay';
+  overlay.innerHTML = `
+    <div class="birthday-celebration-sky" aria-hidden="true">
+      <span class="birthday-celebration-balloon is-blue" style="left:6%; --balloon-size:90px; --delay:-1s; --rise-duration:15s; --sway-duration:4.6s;"></span>
+      <span class="birthday-celebration-balloon is-lime" style="left:14%; --balloon-size:74px; --delay:-7s; --rise-duration:18s; --sway-duration:5.2s;"></span>
+      <span class="birthday-celebration-balloon is-coral" style="left:22%; --balloon-size:106px; --delay:-3s; --rise-duration:17s; --sway-duration:4.9s;"></span>
+      <span class="birthday-celebration-balloon is-soft is-blush" style="left:31%; --balloon-size:68px; --delay:-11s; --rise-duration:20s; --sway-duration:5.8s;"></span>
+      <span class="birthday-celebration-balloon is-blue" style="left:41%; --balloon-size:82px; --delay:-5s; --rise-duration:16s; --sway-duration:4.7s;"></span>
+      <span class="birthday-celebration-balloon is-lime" style="left:53%; --balloon-size:118px; --delay:-9s; --rise-duration:19s; --sway-duration:6s;"></span>
+      <span class="birthday-celebration-balloon is-coral" style="left:64%; --balloon-size:78px; --delay:-14s; --rise-duration:18s; --sway-duration:5.1s;"></span>
+      <span class="birthday-celebration-balloon is-soft is-blue" style="left:74%; --balloon-size:66px; --delay:-2s; --rise-duration:21s; --sway-duration:6.2s;"></span>
+      <span class="birthday-celebration-balloon is-blush" style="left:84%; --balloon-size:98px; --delay:-12s; --rise-duration:17s; --sway-duration:5.4s;"></span>
+      <span class="birthday-celebration-balloon is-lime" style="left:92%; --balloon-size:72px; --delay:-6s; --rise-duration:20s; --sway-duration:6s;"></span>
+    </div>
+    <div class="birthday-celebration-card" role="dialog" aria-modal="true" aria-label="Birthday celebration">
+      <div class="birthday-celebration-confetti"></div>
+      <div class="birthday-celebration-confetti is-delayed"></div>
+      <span class="birthday-celebration-sparkle is-one"></span>
+      <span class="birthday-celebration-sparkle is-two"></span>
+      <span class="birthday-celebration-sparkle is-three"></span>
+      <div class="birthday-celebration-topline" aria-hidden="true">
+        <span class="birthday-celebration-badge">Happy Birthday</span>
+      </div>
+      <h2 class="birthday-celebration-title">${escapeHtml(displayName ? `${displayName}, this one is for you.` : 'Today is worth celebrating.')}</h2>
+      <p class="birthday-celebration-copy">Wishing you a day full of wins, good energy, sweet moments and a little extra Vintti magic.</p>
+      <button type="button" class="birthday-celebration-dismiss">Start the day</button>
+    </div>
+  `;
+
+  const dismiss = () => {
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  };
+
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) dismiss();
+  });
+  overlay.querySelector('.birthday-celebration-dismiss')?.addEventListener('click', dismiss);
+
+  document.body.appendChild(overlay);
+}
+
+async function maybeShowBirthdayCelebration({ email, fallbackName = '', delayMs = 0 } = {}) {
+  if (birthdayCelebrationShownInSession) return false;
+
+  const normalizedEmail = String(email || getCurrentUserEmail() || '').trim().toLowerCase();
+  if (!normalizedEmail) return false;
+
+  const user = await getCurrentUserProfileForBirthday(normalizedEmail);
+  if (!user?.fecha_nacimiento || !isBirthdayToday(user.fecha_nacimiento)) return false;
+
+  const userId = user.user_id ?? localStorage.getItem('user_id') ?? 'unknown';
+  if (alreadySawBirthdayCelebration(userId)) return false;
+
+  birthdayCelebrationShownInSession = true;
+  markBirthdayCelebrationSeen(userId);
+
+  const displayName = String(user.nickname || fallbackName || user.user_name || '').trim();
+  window.setTimeout(() => showBirthdayCelebrationOverlay(displayName), Math.max(0, Number(delayMs) || 0));
+  return true;
+}
+
+window.maybeShowBirthdayCelebration = maybeShowBirthdayCelebration;
+
 const _plainTextParser = document.createElement('div');
 function htmlToPlainText(value) {
   if (value === null || value === undefined) return '';
@@ -2472,6 +2873,7 @@ if (finalUid != null) {
     document.getElementById('login-container').style.display = 'none';
     document.getElementById('welcome-container').style.display = 'block';
     showWelcomeAvatar(email);
+    maybeShowBirthdayCelebration({ email, fallbackName: nickname, delayMs: 1850 }).catch(() => {});
   } catch (err) {
     console.error('Error en login:', err);
     alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
@@ -3648,4 +4050,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // redirigir al login
     window.location.href = 'index.html';
   });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const pathname = (window.location.pathname || '').toLowerCase();
+  if (pathname.endsWith('/index.html') || pathname === '/' || pathname.endsWith('/docs/')) return;
+  maybeShowBirthdayCelebration({ delayMs: 700 }).catch(() => {});
 });
