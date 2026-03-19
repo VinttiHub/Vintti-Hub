@@ -715,7 +715,11 @@ async function sendHRLeadAssignmentEmail(opportunityId, hrEmail) {
   }
 }
 
-const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+//const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+const API_BASE =
+  (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 
 // const batchCountCache = new Map();
 

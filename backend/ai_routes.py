@@ -1381,7 +1381,7 @@ Return STRICT JSON:
             cursor.close()
             conn.close()
 
-    return jsonify({"success": True, "education": education, "work_experience": work_experience, "tools": tools})
+            return jsonify({"success": True, "education": education, "work_experience": work_experience, "tools": tools})
 
         except Exception as e:
             logging.error("❌ Error en /generate_resume_fields:")
