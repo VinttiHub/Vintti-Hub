@@ -37,6 +37,14 @@ function toLocalISO(d){
   return `${y}-${m}-${day}`;
 }
 
+function isBirthdayToday(value){
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  const iso = raw.slice(0, 10);
+  if (!_ISO_ONLY.test(iso)) return false;
+  return iso.slice(5, 10) === toLocalISO(new Date()).slice(5, 10);
+}
+
 // ===== US Federal Holidays (observed) for UI =====
 // utilidades para calcular n-ésimo día de la semana y último lunes, etc.
 function nthWeekday(year, month /*1-12*/, weekday /*0=Sun..6=Sat*/, n /*1..4*/){
@@ -339,6 +347,7 @@ function renderOrgPersonCard(user, { isRoot=false, isLeader=false, isLeaf=false 
     email_vintti: user?.email_vintti,
     user_id: id
   });
+  const birthdayCardClass = isBirthdayToday(user?.fecha_nacimiento) ? " has-birthday-confetti" : "";
   const safeAvatarSrc = escapeHtml(avatarSrc || "");
   const avatarMarkup = safeAvatarSrc
     ? `
@@ -350,6 +359,7 @@ function renderOrgPersonCard(user, { isRoot=false, isLeader=false, isLeaf=false 
     : `<div class="org-avatar is-fallback"><span class="org-avatar-fallback">${initials}</span></div>`;
   const cardClasses = [
     "org-person",
+    birthdayCardClass,
     isRoot ? "is-root" : "",
     !isRoot && isLeader ? "is-leader" : "",
     !isRoot && isLeaf ? "is-leaf" : ""
@@ -1850,7 +1860,10 @@ async function api(path, opts={}){
 function setAvatar({ user_name, avatar_url, initials, email_vintti, user_id }){
   const img = $("#avatarImg");
   const ini = $("#avatarInitials");
+  const avatarWrap = $("#avatar");
   if (!img || !ini) return;
+
+  avatarWrap?.classList.toggle("has-birthday-hat", isBirthdayToday(PROFILE_CACHE?.fecha_nacimiento));
 
   const resolved = resolveInitials(user_name, initials);
   const showInitials = ()=>{

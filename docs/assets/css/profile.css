@@ -125,11 +125,49 @@ img{ max-width:100%; display:block; }
 .avatar{
   width: 132px; height: 132px; border-radius: 50%;
   background: radial-gradient(120% 120% at 20% 20%, var(--accent) 0%, var(--accent-2) 100%);
-  display:grid; place-items:center; overflow:hidden;
+  position: relative;
+  display:grid; place-items:center; overflow: visible;
   border:1px solid var(--border); box-shadow: var(--shadow);
 }
 .avatar img{ width:100%; height:100%; object-fit:cover; display:none; }
 .avatar span{ font-size: 48px; font-weight:700; color:white; letter-spacing:1px }
+
+.avatar.has-birthday-hat::before{
+  content: "";
+  position: absolute;
+  top: -25px;
+  left: 6px;
+  z-index: 3;
+  width: 0;
+  height: 0;
+  border-left: 20px solid transparent;
+  border-right: 20px solid transparent;
+  border-bottom: 44px solid #ff7f5a;
+  transform: rotate(-20deg);
+  filter: drop-shadow(0 5px 12px rgba(15,23,42,.18));
+}
+
+.avatar.has-birthday-hat::after{
+  content: "";
+  position: absolute;
+  top: -31px;
+  left: 19px;
+  z-index: 4;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #d8ff4d;
+  box-shadow:
+    -10px 10px 0 0 #ffffff,
+    10px 12px 0 0 #0028ff,
+    -2px 16px 0 -1px #ffb49b;
+}
+
+.avatar.has-birthday-hat .avatar-img,
+.avatar.has-birthday-hat #avatarInitials{
+  position: relative;
+  z-index: 2;
+}
 
 /* ---------- Panels ---------- */
 .panel{
@@ -770,6 +808,50 @@ input:focus, select:focus, textarea:focus{
 .org-person.is-root .org-person-role,
 .org-person.is-root .org-person-team{
   color: #fff;
+}
+
+.org-person.has-birthday-confetti{
+  position: relative;
+  overflow: hidden;
+}
+
+.org-person.has-birthday-confetti::before,
+.org-person.has-birthday-confetti::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.org-person.has-birthday-confetti::before{
+  background:
+    radial-gradient(circle at 12% 18%, rgba(216,255,77,.98) 0 3px, transparent 4px),
+    radial-gradient(circle at 26% 10%, rgba(255,255,255,.94) 0 3px, transparent 4px),
+    radial-gradient(circle at 84% 16%, rgba(255,127,90,.96) 0 3px, transparent 4px),
+    radial-gradient(circle at 72% 26%, rgba(0,40,255,.92) 0 3px, transparent 4px),
+    radial-gradient(circle at 18% 72%, rgba(255,127,90,.78) 0 2px, transparent 3px),
+    radial-gradient(circle at 84% 70%, rgba(216,255,77,.84) 0 2px, transparent 3px),
+    radial-gradient(circle at 8% 52%, rgba(255,255,255,.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 34% 34%, rgba(0,40,255,.82) 0 2px, transparent 3px),
+    radial-gradient(circle at 48% 12%, rgba(255,127,90,.94) 0 2px, transparent 3px),
+    radial-gradient(circle at 62% 10%, rgba(216,255,77,.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 94% 40%, rgba(255,255,255,.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 24% 54%, rgba(216,255,77,.98) 0 2px, transparent 3px),
+    radial-gradient(circle at 58% 62%, rgba(255,127,90,.82) 0 2px, transparent 3px),
+    radial-gradient(circle at 72% 54%, rgba(0,40,255,.84) 0 2px, transparent 3px),
+    radial-gradient(circle at 14% 86%, rgba(255,255,255,.8) 0 2px, transparent 3px),
+    radial-gradient(circle at 92% 82%, rgba(216,255,77,.92) 0 2px, transparent 3px),
+    radial-gradient(circle at 42% 84%, rgba(0,40,255,.78) 0 2px, transparent 3px);
+  opacity: .98;
+}
+
+.org-person.has-birthday-confetti::after{
+  background:
+    linear-gradient(135deg, transparent 0 42%, rgba(255,255,255,.16) 42% 46%, transparent 46% 100%),
+    linear-gradient(155deg, transparent 0 58%, rgba(216,255,77,.22) 58% 61%, transparent 61% 100%),
+    linear-gradient(120deg, transparent 0 28%, rgba(255,127,90,.18) 28% 31%, transparent 31% 100%),
+    linear-gradient(145deg, transparent 0 74%, rgba(0,40,255,.18) 74% 77%, transparent 77% 100%);
+  opacity: .9;
 }
 
 .org-avatar{

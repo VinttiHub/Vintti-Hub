@@ -22,6 +22,15 @@ let accountTableInstance = null;
 let crmDataTableFilterRegistered = false;
 let CRM_ALL_ACCOUNT_IDS = [];
 const CRM_EXPORT_CACHE = new Map();
+let crmRefreshInFlight = false;
+let crmAutoRefreshTimer = null;
+let crmAutoRefreshBound = false;
+let crmLastAutoRefreshAt = 0;
+let crmStorageSyncBound = false;
+let crmSilentPollingId = null;
+const CRM_STATUS_CACHE_KEY = 'crm_status_cache_v1';
+const CRM_STATUS_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
+const CRM_DEBUG_ACCOUNT_NAMES = new Set(['prueba refresh crm']);
 
 /* =========================
    1) Generic helpers
@@ -79,6 +88,66 @@ function renderAccountStatusChip(statusText) {
   if (s === 'lead')            return '<span class="chip chip--lead">Lead</span>';
   if (s === 'lead lost')       return '<span class="chip chip--lead-lost">Lead Lost</span>';
   return '<span class="chip chip--empty">No data</span>';
+}
+
+function isCrmDebugAccount(item = {}) {
+  const name = (item?.client_name || item?.account_name || '').toString().trim().toLowerCase();
+  return CRM_DEBUG_ACCOUNT_NAMES.has(name);
+}
+
+function logCrmDebug(label, payload) {
+  try {
+    const current = JSON.parse(localStorage.getItem('crm_debug_trace') || '[]');
+    current.push({ label, payload, ts: new Date().toISOString() });
+    localStorage.setItem('crm_debug_trace', JSON.stringify(current.slice(-50)));
+  } catch {}
+  console.warn(`[CRM DEBUG] ${label}`, payload);
+}
+
+function readCrmStatusCache() {
+  try {
+    const raw = localStorage.getItem(CRM_STATUS_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCrmStatusCache(cache) {
+  try {
+    localStorage.setItem(CRM_STATUS_CACHE_KEY, JSON.stringify(cache || {}));
+  } catch {}
+}
+
+function getCachedCrmStatus(accountId) {
+  const id = Number(accountId);
+  if (!id) return '';
+  const cache = readCrmStatusCache();
+  const entry = cache[id];
+  if (!entry || !entry.status || !entry.ts) return '';
+  if (Date.now() - Number(entry.ts) > CRM_STATUS_CACHE_TTL_MS) return '';
+  return String(entry.status).trim();
+}
+
+function cacheCrmStatus(accountId, statusText) {
+  const id = Number(accountId);
+  const status = (statusText || '').toString().trim();
+  if (!id || !status || status === '—') return;
+  const cache = readCrmStatusCache();
+  cache[id] = { status, ts: Date.now() };
+  writeCrmStatusCache(cache);
+}
+
+function getPreferredAccountStatus(item = {}) {
+  const cachedStatus = getCachedCrmStatus(item?.account_id);
+  return (
+    cachedStatus ||
+    item?.computed_status ||
+    item?.calculated_status ||
+    item?.account_status ||
+    '—'
+  ).toString().trim() || '—';
 }
 
 // Calculate account status from opps + hires
@@ -310,7 +379,7 @@ function decorateRowFilterMeta(row, item) {
   row.dataset.salesLeadLabel = leadMeta.label;
   row.dataset.salesLeadCode = leadMeta.code;
 
-  const statusRaw = (item?.account_status || item?.calculated_status || '').toString().trim();
+  const statusRaw = getPreferredAccountStatus(item);
   row.dataset.statusLabel = statusRaw || '—';
   row.dataset.statusCode = norm(statusRaw || '—');
   return { contractLabel, leadMeta };
@@ -384,7 +453,7 @@ function csvNullableTextValue(value) {
 function buildCrmExportRecord(item = {}) {
   const accountId = Number(item.account_id);
   if (!accountId) return null;
-  const status = (item.account_status || item.calculated_status || '—').toString().trim() || '—';
+  const status = getPreferredAccountStatus(item);
   const salesLead = (item.account_manager_name || item.account_manager || 'Unassigned').toString().trim() || 'Unassigned';
   const contract = deriveContractLabel(item.contract);
   const priority = (item.priority || '').toString().trim().toUpperCase();
@@ -822,14 +891,19 @@ async function runWithConcurrency(tasks, limit = 6) {
   await Promise.all(workers);
 }
 
+async function fetchJsonOrEmptyArray(url, label) {
+  const res = await fetch(url);
+  if (res.status === 404 || res.status === 204) return [];
+  if (!res.ok) throw new Error(`${label} HTTP ${res.status}`);
+  const payload = await res.json();
+  return Array.isArray(payload) ? payload : [];
+}
+
 async function fetchAccountOppsAndHires(accountId) {
-  const [oppsRes, hiresRes] = await Promise.all([
-    fetch(`${API_BASE}/accounts/${accountId}/opportunities`),
-    fetch(`${API_BASE}/accounts/${accountId}/opportunities/candidates`)
+  const [opps, hires] = await Promise.all([
+    fetchJsonOrEmptyArray(`${API_BASE}/accounts/${accountId}/opportunities`, 'Opps'),
+    fetchJsonOrEmptyArray(`${API_BASE}/accounts/${accountId}/opportunities/candidates`, 'Candidates')
   ]);
-  if (!oppsRes.ok) throw new Error(`Opps HTTP ${oppsRes.status}`);
-  if (!hiresRes.ok) throw new Error(`Candidates HTTP ${hiresRes.status}`);
-  const [opps, hires] = await Promise.all([oppsRes.json(), hiresRes.json()]);
   return { opps, hires };
 }
 
@@ -849,6 +923,35 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
   onProgress?.(0, ids.length);
 
   const summary = {}; // { [id]: { status: "..." } }
+  const changedStatusIds = new Set();
+
+  function paintStatusForAccount(id, status) {
+    const row = rowById.get(id);
+    if (!row) return;
+    const td = row.querySelector('td.status-td');
+    const normalizedStatus = (status || '—').toString().trim() || '—';
+    const prevStatus = (row.dataset.statusLabel || '').toString().trim();
+    if (td) {
+      td.innerHTML = renderAccountStatusChip(normalizedStatus);
+      td.dataset.order = String(statusRank(normalizedStatus));
+    }
+    row.dataset.statusLabel = normalizedStatus;
+    row.dataset.statusCode = norm(normalizedStatus);
+    updateCrmExportCache(id, { status: normalizedStatus });
+    if (normalizedStatus !== prevStatus) {
+      changedStatusIds.add(id);
+    }
+
+    const clientName = row.querySelector('td')?.textContent?.trim() || '';
+    if (CRM_DEBUG_ACCOUNT_NAMES.has(clientName.toLowerCase())) {
+      logCrmDebug('Computed status', {
+        accountId: id,
+        clientName,
+        prevStatus,
+        nextStatus: normalizedStatus
+      });
+    }
+  }
 
   function mergeSummary(resp) {
     let added = 0;
@@ -860,6 +963,7 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
         const status = it.status ?? it.calculated_status ?? it.value ?? '—';
         if (!summary[id]) added++;
         summary[id] = { status };
+        paintStatusForAccount(id, status);
       }
       return added;
     }
@@ -873,6 +977,7 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
         else status = v ?? '—';
         if (!summary[id]) added++;
         summary[id] = { status };
+        paintStatusForAccount(id, status);
       }
       return added;
     }
@@ -918,6 +1023,7 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
       try {
         const derivedStatus = await fetchAccountStatusDetails(id);
         summary[id] = { status: derivedStatus };
+        paintStatusForAccount(id, derivedStatus);
       } catch (err) {
         if (!summary[id]) summary[id] = { status: '—' };
         console.warn(`⚠️ Could not re-derive status for account ${id}:`, err);
@@ -928,51 +1034,52 @@ async function computeAndPaintAccountStatuses({ ids, rowById, onProgress }) {
     await runWithConcurrency(tasks, CONC_FALLBACK);
   }
 
-  // 3) Paint chips + sort key
-  for (const id of ids) {
-    const row = rowById.get(id);
-    if (!row) continue;
-    const td = row.querySelector('td.status-td');
-    const status = summary?.[id]?.status || '—';
-    if (td) {
-      td.innerHTML = renderAccountStatusChip(status);
-      td.dataset.order = String(statusRank(status));
-    }
-    row.dataset.statusLabel = status;
-    row.dataset.statusCode = norm(status);
-  }
-
-  // 4) Persist — try bulk first; if it fails, patch one by one
-  try {
-    const updates = ids.map(id => ({
-      account_id: id,
-      status: summary?.[id]?.status || '—'
-    }));
-    const rb = await fetch(`${API_BASE}/accounts/status/bulk_update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        updates: updates.map(u => ({
-          account_id: u.account_id,
-          status: u.status,
-          calculated_status: u.status
-        }))
-      })
-    });
-    if (!rb.ok) throw new Error('bulk endpoint not available');
-  } catch {
-    const patchTasks = ids.map(id => async () => {
+  // 4) Persist using the same account PATCH route that account-details uses.
+  if (changedStatusIds.size) {
+    const patchTasks = Array.from(changedStatusIds).map(id => async () => {
       try {
         const statusValue = summary?.[id]?.status || '—';
-        await fetch(`${API_BASE}/accounts/${id}`, {
+        const row = rowById.get(id);
+        const clientName = row?.querySelector('td')?.textContent?.trim() || '';
+        if (CRM_DEBUG_ACCOUNT_NAMES.has(clientName.toLowerCase())) {
+          logCrmDebug('Persisting status', {
+            accountId: id,
+            clientName,
+            statusValue
+          });
+        }
+        const res = await fetch(`${API_BASE}/accounts/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            account_status: statusValue,
-            calculated_status: statusValue
+            account_status: statusValue
           })
         });
-      } catch { /* noop */ }
+        if (CRM_DEBUG_ACCOUNT_NAMES.has(clientName.toLowerCase())) {
+          let responseBody = null;
+          try {
+            responseBody = await res.clone().json();
+          } catch {
+            try {
+              responseBody = await res.clone().text();
+            } catch {
+              responseBody = null;
+            }
+          }
+          logCrmDebug('Persist status response', {
+            accountId: id,
+            clientName,
+            ok: res.ok,
+            status: res.status,
+            body: responseBody
+          });
+        }
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ Could not persist CRM status for account ${id}:`, err);
+      }
     });
     await runWithConcurrency(patchTasks, 6);
   }
@@ -1146,6 +1253,7 @@ function updateRowStatus(rowEl, statusText) {
   rowEl.dataset.statusLabel = statusText;
   rowEl.dataset.statusCode = norm(statusText);
   updateCrmExportCache(accountId, { status: (statusText || '—').toString().trim() || '—' });
+  cacheCrmStatus(accountId, statusText);
 }
 
 function updateRowContract(rowEl, contractText) {
@@ -1269,9 +1377,54 @@ function setCrmRefreshButtonState(btn, isLoading) {
   btn.textContent = isLoading ? 'Refreshing...' : 'Refresh';
 }
 
-async function refreshCrmDerivedFields(accountIds = null) {
+function scheduleCrmAutoRefresh(reason = 'auto', delay = 250) {
+  if (!CRM_ALL_ACCOUNT_IDS.length) return;
+  if (crmAutoRefreshTimer) window.clearTimeout(crmAutoRefreshTimer);
+  crmAutoRefreshTimer = window.setTimeout(() => {
+    crmAutoRefreshTimer = null;
+    refreshCrmStatusesOnly(null, { silent: true });
+  }, Math.max(0, Number(delay) || 0));
+}
+
+function bindCrmAutoRefreshEvents() {
+  if (crmAutoRefreshBound) return;
+  crmAutoRefreshBound = true;
+
+  window.addEventListener('focus', () => {
+    scheduleCrmAutoRefresh('focus', 150);
+  });
+
+  window.addEventListener('pageshow', () => {
+    scheduleCrmAutoRefresh('pageshow', 150);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      scheduleCrmAutoRefresh('visibilitychange', 150);
+      startCrmSilentPolling();
+    } else {
+      stopCrmSilentPolling();
+    }
+  });
+}
+
+function startCrmSilentPolling() {
+  if (crmSilentPollingId) return;
+  crmSilentPollingId = window.setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    refreshCrmStatusesOnly(null, { silent: true });
+  }, 30000);
+}
+
+function stopCrmSilentPolling() {
+  if (!crmSilentPollingId) return;
+  window.clearInterval(crmSilentPollingId);
+  crmSilentPollingId = null;
+}
+
+async function refreshCrmDerivedFields(accountIds = null, { source = 'manual' } = {}) {
   const btn = document.getElementById('crmRefreshBtn');
-  if (!btn || btn.disabled) return;
+  if (crmRefreshInFlight) return;
 
   const fallbackRows = Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'));
   const fallbackIds = fallbackRows.map(row => Number(row.dataset.id)).filter(Boolean);
@@ -1280,12 +1433,22 @@ async function refreshCrmDerivedFields(accountIds = null) {
     : (CRM_ALL_ACCOUNT_IDS.length ? CRM_ALL_ACCOUNT_IDS.slice() : fallbackIds);
   if (!ids.length) return;
 
-  setCrmRefreshButtonState(btn, true);
-  toggleCrmLoading(true, 'Refreshing account status, contracts, and sales leads...');
-  updateCrmLoadingProgress(0, ids.length);
+  const now = Date.now();
+  if (source !== 'manual' && now - crmLastAutoRefreshAt < 1500) return;
+  crmLastAutoRefreshAt = now;
+  crmRefreshInFlight = true;
+
+  const isSilentRefresh = source !== 'manual';
+
+  if (!isSilentRefresh) {
+    setCrmRefreshButtonState(btn, true);
+    toggleCrmLoading(true, 'Refreshing account status, contracts, and sales leads...');
+    updateCrmLoadingProgress(0, ids.length);
+  }
 
   try {
     let doneCount = 0;
+    let changedRows = 0;
     const rowById = new Map(
       [...document.querySelectorAll('#accountTableBody tr[data-id]')].map(row => [Number(row.dataset.id), row])
     );
@@ -1312,7 +1475,6 @@ async function refreshCrmDerivedFields(accountIds = null) {
         const currentStatus = (row?.dataset?.statusLabel || '').toString().trim().toLowerCase();
         if (derivedStatus && derivedStatus.toLowerCase() !== currentStatus) {
           patch.account_status = derivedStatus;
-          patch.calculated_status = derivedStatus;
         }
 
         const currentContract = row ? getRowContractValue(row) : '';
@@ -1346,18 +1508,20 @@ async function refreshCrmDerivedFields(accountIds = null) {
           if (patch.account_status) updateRowStatus(row, derivedStatus);
           if (patch.contract) updateRowContract(row, derivedContract);
           if (patch.account_manager) updateRowSalesLead(row, patch.account_manager, patch.account_manager);
+          changedRows += 1;
         }
       } catch (err) {
         console.warn(`⚠️ Could not update derived fields for account ${accountId}:`, err);
       } finally {
         doneCount += 1;
-        updateCrmLoadingProgress(doneCount, ids.length);
+        if (!isSilentRefresh) updateCrmLoadingProgress(doneCount, ids.length);
       }
     });
 
     await runWithConcurrency(tasks, 6);
 
-    if (accountTableInstance) {
+    const shouldRedrawTable = changedRows > 0;
+    if (accountTableInstance && shouldRedrawTable) {
       accountTableInstance.rows().invalidate('dom');
     }
 
@@ -1369,17 +1533,22 @@ async function refreshCrmDerivedFields(accountIds = null) {
       const contractTxt = (row.dataset.contractLabel || '').toString().trim();
       if (contractTxt) contractLabels.add(contractTxt);
     });
-    populateContractFilter(Array.from(contractLabels));
-    populateStatusFilter(Array.from(statusLabels));
+    if (shouldRedrawTable) {
+      populateContractFilter(Array.from(contractLabels));
+      populateStatusFilter(Array.from(statusLabels));
+    }
 
-    if (accountTableInstance) {
-      accountTableInstance.draw();
+    if (accountTableInstance && shouldRedrawTable) {
+      accountTableInstance.draw(false);
       updateCrmEmptyState(accountTableInstance);
     }
   } finally {
-    toggleCrmLoading(false);
-    updateCrmLoadingProgress(0, 0);
-    setCrmRefreshButtonState(btn, false);
+    if (!isSilentRefresh) {
+      toggleCrmLoading(false);
+      updateCrmLoadingProgress(0, 0);
+      setCrmRefreshButtonState(btn, false);
+    }
+    crmRefreshInFlight = false;
   }
 }
 
@@ -1388,6 +1557,105 @@ function initCrmRefreshButton() {
   if (!btn) return;
   btn.style.display = 'inline-flex';
   btn.addEventListener('click', () => refreshCrmDerivedFields());
+}
+
+function applyCrmExternalAccountUpdate(accountId, patch = {}) {
+  const id = Number(accountId);
+  if (!id || !patch || typeof patch !== 'object') return;
+
+  const row = document.querySelector(`#accountTableBody tr[data-id="${id}"]`);
+  if (!row) return;
+
+  if (patch.account_status) {
+    updateRowStatus(row, patch.account_status);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'contract')) {
+    updateRowContract(row, patch.contract || '');
+  }
+  if (patch.account_manager) {
+    updateRowSalesLead(row, patch.account_manager, patch.account_manager_name || patch.account_manager);
+  }
+
+  if (accountTableInstance) {
+    accountTableInstance.rows().invalidate('dom');
+    accountTableInstance.draw(false);
+    updateCrmEmptyState(accountTableInstance);
+  }
+}
+
+function bindCrmStorageSync() {
+  if (crmStorageSyncBound) return;
+  crmStorageSyncBound = true;
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== 'crm_account_refresh' || !event.newValue) return;
+    try {
+      const payload = JSON.parse(event.newValue);
+      const accountId = Number(payload?.account_id);
+      const patch = payload?.patch;
+      if (!accountId || !patch) return;
+      applyCrmExternalAccountUpdate(accountId, patch);
+    } catch (err) {
+      console.warn('⚠️ Could not sync CRM update from another tab:', err);
+    }
+  });
+}
+
+async function refreshCrmStatusesOnly(accountIds = null, { silent = true } = {}) {
+  const fallbackRows = Array.from(document.querySelectorAll('#accountTableBody tr[data-id]'));
+  const fallbackIds = fallbackRows.map(row => Number(row.dataset.id)).filter(Boolean);
+  const ids = (Array.isArray(accountIds) && accountIds.length)
+    ? accountIds.slice()
+    : (CRM_ALL_ACCOUNT_IDS.length ? CRM_ALL_ACCOUNT_IDS.slice() : fallbackIds);
+  if (!ids.length || crmRefreshInFlight) return;
+
+  const rowById = new Map(
+    [...document.querySelectorAll('#accountTableBody tr[data-id]')].map(row => [Number(row.dataset.id), row])
+  );
+
+  crmRefreshInFlight = true;
+  if (!silent) {
+    toggleCrmLoading(true, 'Refreshing account statuses...');
+    updateCrmLoadingProgress(0, ids.length);
+  }
+
+  try {
+    let progressDone = 0;
+    const summary = await computeAndPaintAccountStatuses({
+      ids,
+      rowById,
+      onProgress: (doneOrInc, total) => {
+        if (silent) return;
+        if (typeof total === 'number' && total > 0) {
+          progressDone = Number(doneOrInc) || 0;
+        } else {
+          progressDone += Number(doneOrInc) || 0;
+        }
+        updateCrmLoadingProgress(progressDone, ids.length);
+      }
+    });
+
+    const statusLabels = new Set();
+    ids.forEach(id => {
+      const status = summary?.[id]?.status || '';
+      if (status && status !== '—') statusLabels.add(status);
+    });
+    populateStatusFilter(Array.from(statusLabels));
+
+    if (accountTableInstance) {
+      accountTableInstance.rows().invalidate('dom');
+      accountTableInstance.draw(false);
+      updateCrmEmptyState(accountTableInstance);
+    }
+  } catch (err) {
+    console.error('Error refreshing CRM statuses:', err);
+  } finally {
+    if (!silent) {
+      toggleCrmLoading(false);
+      updateCrmLoadingProgress(0, 0);
+    }
+    crmRefreshInFlight = false;
+  }
 }
 
 /* =========================
@@ -1815,8 +2083,15 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
    ========================= */
 
 document.addEventListener('DOMContentLoaded', () => {
+  logCrmDebug('crm.js boot', {
+    path: window.location.pathname,
+    href: window.location.href
+  });
   initCrmFilterControls();
   initCrmRefreshButton();
+  bindCrmAutoRefreshEvents();
+  bindCrmStorageSync();
+  startCrmSilentPolling();
   initCrmExportButton();
   loadSalesLeadFilterOptions();
   updateCrmEmptyState(null);
@@ -1826,6 +2101,18 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_BASE}/data/light`);
       const data = await res.json();
+      (Array.isArray(data) ? data : []).forEach(item => {
+        if (!isCrmDebugAccount(item)) return;
+        logCrmDebug('Initial /data/light row', {
+          accountId: item.account_id,
+          clientName: item.client_name,
+          account_status: item.account_status,
+          calculated_status: item.calculated_status,
+          computed_status: item.computed_status,
+          contract: item.contract,
+          account_manager: item.account_manager
+        });
+      });
 
       if ($.fn.DataTable.isDataTable('#accountTable')) {
         $('#accountTable').DataTable().destroy();
@@ -1858,7 +2145,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const priorityClass = priorityUpper
           ? 'priority-' + priorityUpper.toLowerCase()
           : 'priority-empty';
-        const statusTxt = item.account_status || item.calculated_status || '—';
+        const statusTxt = getPreferredAccountStatus(item);
         const statusOrder = statusRank(statusTxt);
         return `
           <tr data-id="${item.account_id}">
@@ -1904,7 +2191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = rowById.get(Number(item.account_id));
         const meta = decorateRowFilterMeta(row, item);
         if (meta?.contractLabel) contractLabels.add(meta.contractLabel);
-        const statusTxt = (item.account_status || item.calculated_status || '').toString().trim();
+        const statusTxt = getPreferredAccountStatus(item);
         if (statusTxt && statusTxt !== '—') statusLabels.add(statusTxt);
       });
       populateContractFilter(Array.from(contractLabels));
@@ -1953,7 +2240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initComplete() {
           accountTableInstance = this.api();
           updateCrmEmptyState(accountTableInstance);
-          toggleCrmLoading(false);
         }
       });
 
@@ -1999,7 +2285,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      refreshCrmDerivedFields(CRM_ALL_ACCOUNT_IDS);
+      await refreshCrmDerivedFields(CRM_ALL_ACCOUNT_IDS, { source: 'manual' });
     } catch (err) {
       console.error('Error fetching account data:', err);
       toggleCrmLoading(false);
