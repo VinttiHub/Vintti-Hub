@@ -20,6 +20,7 @@ const backBtn = document.querySelector('[data-action="back"]');
 const nextBtn = document.querySelector('[data-action="next"]');
 const customQuestions = document.getElementById("customQuestions");
 const questionsEmpty = document.getElementById("questionsEmpty");
+const successPanel = document.getElementById("applySuccess");
 let toastTimer = null;
 let currentStep = 0;
 
@@ -124,6 +125,10 @@ function validateStep(index) {
 function goToStep(nextIndex) {
   currentStep = Math.max(0, Math.min(nextIndex, steps.length - 1));
   setStatus("", "");
+  if (successPanel && !successPanel.hidden) {
+    successPanel.hidden = true;
+    successPanel.classList.remove("is-visible");
+  }
   updateSteps();
 }
 
@@ -289,6 +294,11 @@ form.addEventListener("submit", async (event) => {
     showToast("Application received. We will be in touch soon.");
     form.reset();
     cvFilename.textContent = "No file selected";
+    if (successPanel) {
+      successPanel.hidden = false;
+      successPanel.classList.add("is-visible");
+      successPanel.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   } catch (err) {
     setStatus("Unable to submit right now. Please try again.", "error");
   } finally {

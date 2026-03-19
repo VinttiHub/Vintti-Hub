@@ -398,6 +398,33 @@ body {
   color: #c0392b;
 }
 
+.apply-success {
+  border-radius: 24px;
+  padding: 26px 28px;
+  border: 1px solid #d2defa;
+  background: linear-gradient(135deg, #f5f8ff 0%, #edf2ff 50%, #f7faff 100%);
+  box-shadow: var(--soft-shadow);
+  text-align: center;
+  margin-top: 10px;
+}
+
+.apply-success.is-visible {
+  animation: stepFade 0.35s ease;
+}
+
+.apply-success-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1b2c5a;
+  margin-bottom: 6px;
+}
+
+.apply-success-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
 @keyframes applyPulse {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(11, 69, 245, 0.18);

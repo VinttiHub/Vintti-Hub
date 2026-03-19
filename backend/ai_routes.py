@@ -136,6 +136,129 @@ def _strip_html_text(raw: str) -> str:
     text = re.sub(r"<[^>]+>", " ", raw or "")
     return re.sub(r"\s+", " ", text).strip()
 
+def _clean_coresignal_html(text: str) -> str:
+    clean = re.sub(r'<[^>]+>', ' ', text or "")
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
+
+def _prune_deleted_coresignal(text: str) -> str:
+    try:
+        obj = json.loads(text)
+    except Exception:
+        return text
+
+    def prune(value):
+        if isinstance(value, dict):
+            if str(value.get('deleted', 0)) in ('1', 'true', 'True', 'TRUE', 1):
+                return None
+            out = {}
+            for key, item in value.items():
+                pruned = prune(item)
+                if pruned in (None, '', [], {}):
+                    continue
+                out[key] = pruned
+            return out
+        if isinstance(value, list):
+            out = []
+            for item in value:
+                pruned = prune(item)
+                if pruned not in (None, '', [], {}):
+                    out.append(pruned)
+            return out
+        return value
+
+    pruned = prune(obj)
+    try:
+        return json.dumps(pruned, ensure_ascii=False)
+    except Exception:
+        return text
+
+def _extract_linkedin_from_coresignal(coresignal_raw: str) -> str:
+    if not (coresignal_raw or "").strip():
+        return ""
+    raw = _clean_coresignal_html(coresignal_raw)
+    source = _prune_deleted_coresignal(raw)[:15000]
+    if not source:
+        return ""
+
+    prompt = f"""
+You are a STRICT CV/LinkedIn extractor. Input is a noisy JSON-like block (often Spanish). Your job:
+- Extract EVERY job-relevant fact that exists in the source.
+- Translate to English.
+- DO NOT invent. If something is missing, omit it.
+- Deduplicate across arrays/variants. Prefer items that include richer fields (e.g., issuer_url, company_industry).
+- Respect that any entries previously marked as deleted=1 have already been filtered out.
+
+DATE & TEXT NORMALIZATION
+- Dates: use "MMM YYYY" if month exists (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec); otherwise "YYYY".
+- Current roles end with "Present".
+- Company size: print "Company size: <range or employees_count>" only if present.
+- Industry: use company_industry if present.
+- Languages: normalize proficiency to one of:
+"Native or bilingual", "Full professional", "Professional working", "Limited working", "Elementary".
+- Remove tracking params from URLs (strip the query string).
+- No placeholders or dashes when a field is unknown: just omit that part of the line.
+
+OUTPUT FORMAT — EXACTLY this sectioned template in plain text (no markdown). Omit any entire section if empty. No extra commentary.
+
+{{FullName}}
+{{City, Country}} • LinkedIn: {{ProfileURL}}
+
+Professional Headline
+{{Headline}}
+
+Summary
+{{ShortSummary}}
+
+Experience
+{{For each role, most recent first:}}
+{{Title}} — {{Company}} {{(Industry in parentheses if available)}}
+{{If location exists, start the line with it followed by " • "}} {{Start}} – {{EndOrPresent}}
+{{If any of these exist on the same line, separate with " • " (and omit missing ones): Duration, Company size}}
+
+Education
+{{Degree/Program}} — {{Institution}}
+{{Dates line (Start–End)}}
+
+Certifications
+{{Title}} — {{Issuer}} {{• Date or Date range if any}} {{• Credential: URL if any}}
+
+Awards
+{{Title}} — {{Issuer if any}} {{• Date if any}}
+{{One short sentence if description exists}}
+
+Volunteering
+{{Role}} — {{Organization}} {{• Cause if any}}
+{{Dates line (Start–End)}}
+
+Languages
+{{Language}} — {{Proficiency}}
+
+Additional Links
+{{Profile photo (URL): <photo_url>}}
+{{Stats: <connections_count> connections • <follower_count> followers}}  {{(only if available)}}
+
+IMPORTANT
+- Plain text only. No bullets, no JSON, no markdown, no table formatting.
+- Keep spacing tidy. No empty headings. Do not output empty lines at the end.
+
+SOURCE
+---
+{source}
+---
+    """.strip()
+
+    chat = call_openai_with_retry(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are an expert resume writer and information extractor. Output plain text following the exact sectioned template, and never invent facts."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.0,
+        max_tokens=7000,
+    )
+    return (chat.choices[0].message.content or "").strip()
+
 def _build_opportunity_context(cursor, opportunity_id: Optional[int]):
     if not opportunity_id:
         return "", {}
@@ -1258,13 +1381,13 @@ Return STRICT JSON:
             cursor.close()
             conn.close()
 
-            return jsonify({"success": True, "education": education, "work_experience": work_experience, "tools": tools})
+    return jsonify({"success": True, "education": education, "work_experience": work_experience, "tools": tools})
 
         except Exception as e:
             logging.error("❌ Error en /generate_resume_fields:")
             logging.error(traceback.format_exc())
             return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
-        
+
     @app.route('/ai/coresignal_to_linkedin_scrapper', methods=['POST'])
     def coresignal_to_linkedin_scrapper():
         """
@@ -1304,137 +1427,10 @@ Return STRICT JSON:
                 cur.close(); conn.close()
                 return jsonify({"skipped": True, "reason": "linkedin_scrapper ya tiene valor"}), 200
 
-            import json, re
-
-            # --- Helpers ---
-            def _clean_html(txt: str) -> str:
-                txt = re.sub(r'<[^>]+>', ' ', txt)       # quita tags HTML
-                txt = re.sub(r'\s+', ' ', txt).strip()   # colapsa espacios
-                return txt
-
-            def _prune_deleted_and_empty(text: str) -> str:
-                """
-                Si el texto es JSON válido, elimina recursivamente items con deleted=1 y entradas vacías.
-                Devuelve JSON compacto; si no es JSON válido, retorna el texto original.
-                """
-                try:
-                    obj = json.loads(text)
-                except Exception:
-                    return text
-
-                def prune(x):
-                    if isinstance(x, dict):
-                        if str(x.get('deleted', 0)) in ('1', 'true', 'True', 'TRUE', 1):
-                            return None
-                        out = {}
-                        for k, v in x.items():
-                            pv = prune(v)
-                            if pv in (None, '', [], {}):
-                                continue
-                            out[k] = pv
-                        return out
-                    elif isinstance(x, list):
-                        out = []
-                        for item in x:
-                            pv = prune(item)
-                            if pv not in (None, '', [], {}):
-                                out.append(pv)
-                        return out
-                    else:
-                        return x
-
-                pruned = prune(obj)
-                try:
-                    return json.dumps(pruned, ensure_ascii=False)
-                except Exception:
-                    return text
-
-            # Limpieza de origen
-            raw = _clean_html(coresignal_raw)
-            source = _prune_deleted_and_empty(raw)
-            source = source[:15000]  # corte de seguridad
-
-            # ---------- PROMPT NUEVO (plantilla con secciones) ----------
-            prompt = f"""
-    You are a STRICT CV/LinkedIn extractor. Input is a noisy JSON-like block (often Spanish). Your job:
-    - Extract EVERY job-relevant fact that exists in the source.
-    - Translate to English.
-    - DO NOT invent. If something is missing, omit it.
-    - Deduplicate across arrays/variants. Prefer items that include richer fields (e.g., issuer_url, company_industry).
-    - Respect that any entries previously marked as deleted=1 have already been filtered out.
-
-    DATE & TEXT NORMALIZATION
-    - Dates: use "MMM YYYY" if month exists (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec); otherwise "YYYY".
-    - Current roles end with "Present".
-    - Company size: print "Company size: <range or employees_count>" only if present.
-    - Industry: use company_industry if present.
-    - Languages: normalize proficiency to one of:
-    "Native or bilingual", "Full professional", "Professional working", "Limited working", "Elementary".
-    - Remove tracking params from URLs (strip the query string).
-    - No placeholders or dashes when a field is unknown: just omit that part of the line.
-
-    OUTPUT FORMAT — EXACTLY this sectioned template in plain text (no markdown). Omit any entire section if empty. No extra commentary.
-
-    {{
-    FullName}}
-    {{City, Country}} • LinkedIn: {{ProfileURL}}
-
-    Professional Headline
-    {{Headline}}
-
-    Summary
-    {{ShortSummary}}
-
-    Experience
-    {{For each role, most recent first:}}
-    {{Title}} — {{Company}} {{(Industry in parentheses if available)}}
-    {{If location exists, start the line with it followed by " • "}} {{Start}} – {{EndOrPresent}}
-    {{If any of these exist on the same line, separate with " • " (and omit missing ones): Duration, Company size}}
-
-    Education
-    {{Degree/Program}} — {{Institution}}
-    {{Dates line (Start–End)}}
-
-    Certifications
-    {{Title}} — {{Issuer}} {{• Date or Date range if any}} {{• Credential: URL if any}}
-
-    Awards
-    {{Title}} — {{Issuer if any}} {{• Date if any}}
-    {{One short sentence if description exists}}
-
-    Volunteering
-    {{Role}} — {{Organization}} {{• Cause if any}}
-    {{Dates line (Start–End)}}
-
-    Languages
-    {{Language}} — {{Proficiency}}
-
-    Additional Links
-    {{Profile photo (URL): <photo_url>}}
-    {{Stats: <connections_count> connections • <follower_count> followers}}  {{(only if available)}}
-
-    IMPORTANT
-    - Plain text only. No bullets, no JSON, no markdown, no table formatting.
-    - Keep spacing tidy. No empty headings. Do not output empty lines at the end.
-
-    SOURCE
-    ---
-    {source}
-    ---
-            """.strip()
-
-            # Llamada al modelo
-            chat = call_openai_with_retry(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "You are an expert resume writer and information extractor. Output plain text following the exact sectioned template, and never invent facts."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.0,
-                max_tokens=7000
-            )
-
-            out_text = (chat.choices[0].message.content or "").strip()
+            out_text = _extract_linkedin_from_coresignal(coresignal_raw)
+            if not out_text:
+                cur.close(); conn.close()
+                return jsonify({"skipped": True, "reason": "Failed to extract linkedin_scrapper"}), 200
 
             # Guarda en candidates.linkedin_scrapper
             cur.execute("""
