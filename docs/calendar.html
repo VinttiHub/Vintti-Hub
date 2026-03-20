@@ -40,44 +40,93 @@
         <p class="page-subtitle" id="calendarStatus">Connect your Google Calendar to see today’s meetings.</p>
       </div>
       <div class="page-actions">
+        <button class="icon-btn" id="openEventModalBtn" type="button" aria-label="Crear evento">
+          <i class="fa-solid fa-plus"></i>
+        </button>
         <button class="primary-btn" id="connectBtn" type="button">Connect Google</button>
         <button class="ghost-btn" id="disconnectBtn" type="button" hidden>Disconnect</button>
       </div>
     </header>
 
     <section class="calendar-grid">
-      <article class="calendar-card agenda-card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Agenda del día</h2>
-            <span class="badge" id="connectionBadge">Not connected</span>
+      <div class="calendar-side">
+        <article class="calendar-card mini-calendar-card">
+          <div class="mini-calendar-header">
+            <div>
+              <h2 class="card-title" id="miniCalendarTitle">March, 2026</h2>
+              <p class="card-subtitle">Vista mensual rápida</p>
+            </div>
+            <div class="mini-calendar-nav">
+              <button class="icon-btn icon-btn--ghost icon-btn--sm" id="miniCalendarPrev" type="button" aria-label="Mes anterior">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <button class="icon-btn icon-btn--ghost icon-btn--sm" id="miniCalendarNext" type="button" aria-label="Mes siguiente">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
           </div>
-          <div class="card-actions">
-            <input type="date" id="calendarDate" />
-            <button class="ghost-btn" id="refreshBtn" type="button">
-              <i class="fa-solid fa-rotate"></i>
-              Refresh
-            </button>
-          </div>
-        </div>
+          <div class="mini-calendar-grid" id="miniCalendarGrid" aria-label="Calendario mensual"></div>
+        </article>
 
-        <div class="events-list" id="eventsContainer">
-          <div class="empty-state">
-            <img src="./assets/img/calendar.png" alt="" />
-            <p>Conecta tu Google Calendar para ver las reuniones del día.</p>
+        <article class="calendar-card upcoming-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Upcoming Events</h2>
+              <p class="card-subtitle" id="upcomingSubtitle">Eventos del siguiente día.</p>
+            </div>
           </div>
-        </div>
-      </article>
-
-      <article class="calendar-card create-card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Crear evento</h2>
-            <p class="card-subtitle">Agrega reuniones y genera link de Meet.</p>
+          <div class="upcoming-list" id="upcomingEventsContainer">
+            <div class="empty-state">
+              <img src="./assets/img/calendar.png" alt="" />
+              <p>No hay eventos próximos.</p>
+            </div>
           </div>
-        </div>
+        </article>
+      </div>
 
-        <form id="eventForm" class="event-form">
+      <div class="calendar-main">
+        <article class="calendar-card agenda-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Agenda del día</h2>
+              <span class="badge" id="connectionBadge">Not connected</span>
+            </div>
+            <div class="card-actions">
+              <input type="date" id="calendarDate" />
+              <button class="ghost-btn" id="refreshBtn" type="button">
+                <i class="fa-solid fa-rotate"></i>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="events-list" id="eventsContainer">
+            <div class="empty-state">
+              <img src="./assets/img/calendar.png" alt="" />
+              <p>Conecta tu Google Calendar para ver las reuniones del día.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-shell" id="eventModal" hidden>
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <section class="event-modal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
+      <header class="event-modal-header">
+        <div>
+          <span class="planner-kicker">Nuevo evento</span>
+          <h2 class="event-modal-title" id="eventModalTitle">Agenda una reunión y valida horarios al mismo tiempo.</h2>
+          <p class="card-subtitle">Invitados y disponibilidad viven aquí para que el popup sí tenga sentido.</p>
+        </div>
+        <button class="icon-btn icon-btn--ghost" id="closeEventModalBtn" type="button" aria-label="Cerrar modal">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </header>
+
+      <div class="event-modal-body">
+        <form id="eventForm" class="event-form event-form-panel">
           <label>
             Título
             <input type="text" id="eventTitle" placeholder="Reunión con cliente" required />
@@ -110,7 +159,7 @@
 
           <label>
             Descripción
-            <textarea id="eventDescription" rows="3" placeholder="Agenda, links, notas..."></textarea>
+            <textarea id="eventDescription" rows="4" placeholder="Agenda, links, notas..."></textarea>
           </label>
 
           <label class="checkbox-row">
@@ -127,36 +176,25 @@
             <span class="form-status" id="formStatus"></span>
           </div>
         </form>
-      </article>
 
-      <article class="calendar-card availability-card">
-        <div class="card-header">
-          <div>
-            <h2 class="card-title">Disponibilidad de invitados</h2>
-            <p class="card-subtitle">Mira horarios ocupados antes de agendar.</p>
+        <aside class="event-modal-sidebar">
+          <div class="availability-meta availability-meta--modal">
+            <div>
+              <h3 class="card-title">Disponibilidad en vivo</h3>
+              <p class="card-subtitle">A medida que agregues invitados, aquí verás sus bloques ocupados.</p>
+            </div>
+            <span id="modalAvailabilityStatus">Agrega invitados para consultar disponibilidad.</span>
           </div>
-          <div class="card-actions">
-            <button class="ghost-btn" id="availabilityBtn" type="button">
-              <i class="fa-regular fa-calendar-check"></i>
-              Ver disponibilidad
-            </button>
+          <div class="availability-grid availability-grid--modal" id="modalAvailabilityGrid">
+            <div class="empty-state">
+              <img src="./assets/img/calendar.png" alt="" />
+              <p>Sin invitados para consultar.</p>
+            </div>
           </div>
-        </div>
-        <div class="availability-meta">
-          <span id="availabilityStatus">Ingresa emails en el evento para ver disponibilidad.</span>
-        </div>
-        <div class="availability-grid" id="availabilityGrid">
-          <div class="empty-state">
-            <img src="./assets/img/calendar.png" alt="" />
-            <p>Sin invitados para consultar.</p>
-          </div>
-        </div>
-        <p class="availability-note">
-          La disponibilidad depende de calendarios compartidos con tu cuenta de Google.
-        </p>
-      </article>
+        </aside>
+      </div>
     </section>
-  </main>
+  </div>
 
   <script src="./assets/js/sidebar.js" defer></script>
   <script src="./assets/js/google-calendar.js" defer></script>

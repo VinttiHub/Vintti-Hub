@@ -7,21 +7,32 @@
   const calendarStatus = document.getElementById('calendarStatus');
   const connectionBadge = document.getElementById('connectionBadge');
   const eventsContainer = document.getElementById('eventsContainer');
+  const upcomingEventsContainer = document.getElementById('upcomingEventsContainer');
+  const upcomingSubtitle = document.getElementById('upcomingSubtitle');
   const calendarDate = document.getElementById('calendarDate');
   const refreshBtn = document.getElementById('refreshBtn');
+  const openEventModalBtn = document.getElementById('openEventModalBtn');
+  const eventModal = document.getElementById('eventModal');
+  const closeEventModalBtn = document.getElementById('closeEventModalBtn');
   const eventForm = document.getElementById('eventForm');
   const formStatus = document.getElementById('formStatus');
   const availabilityGrid = document.getElementById('availabilityGrid');
-  const availabilityBtn = document.getElementById('availabilityBtn');
+  const modalAvailabilityGrid = document.getElementById('modalAvailabilityGrid');
   const availabilityStatus = document.getElementById('availabilityStatus');
+  const modalAvailabilityStatus = document.getElementById('modalAvailabilityStatus');
+  const miniCalendarTitle = document.getElementById('miniCalendarTitle');
+  const miniCalendarGrid = document.getElementById('miniCalendarGrid');
+  const miniCalendarPrev = document.getElementById('miniCalendarPrev');
+  const miniCalendarNext = document.getElementById('miniCalendarNext');
 
   const tz = 'America/Argentina/Buenos_Aires';
   const refreshDefaultLabel = refreshBtn ? refreshBtn.textContent.trim() : '';
   let currentUserId = null;
+  let miniCalendarCursor = null;
   const availabilityConfig = {
     dayStart: 8 * 60,
     dayEnd: 20 * 60,
-    minuteHeight: 0.9,
+    minuteHeight: 1.12,
   };
   const availabilityPalette = [
     { accent: '#0b3d91', bg: 'rgba(11, 61, 145, 0.18)', border: 'rgba(11, 61, 145, 0.32)' },
@@ -116,13 +127,110 @@
   }
 
   function renderAvailabilityEmpty(message) {
-    if (!availabilityGrid) return;
-    availabilityGrid.innerHTML = `
+    [availabilityGrid, modalAvailabilityGrid].forEach((target) => {
+      if (!target) return;
+      target.classList.add('is-empty');
+      target.innerHTML = `
+        <div class="empty-state">
+          <img src="./assets/img/calendar.png" alt="" />
+          <p>${escapeHtml(message)}</p>
+        </div>
+      `;
+    });
+  }
+
+  function renderUpcomingEmpty(message) {
+    if (!upcomingEventsContainer) return;
+    upcomingEventsContainer.innerHTML = `
       <div class="empty-state">
         <img src="./assets/img/calendar.png" alt="" />
         <p>${escapeHtml(message)}</p>
       </div>
     `;
+  }
+
+  function setAvailabilityMessage(message) {
+    if (availabilityStatus) availabilityStatus.textContent = message;
+    if (modalAvailabilityStatus) modalAvailabilityStatus.textContent = message;
+  }
+
+  function openEventModal() {
+    if (!eventModal) return;
+    if (formStatus) formStatus.textContent = '';
+    eventModal.hidden = false;
+    document.body.classList.add('modal-open');
+    window.setTimeout(() => document.getElementById('eventTitle')?.focus(), 0);
+  }
+
+  function closeEventModal() {
+    if (!eventModal) return;
+    if (formStatus) formStatus.textContent = '';
+    eventModal.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  function getSelectedDate() {
+    return calendarDate?.value || new Date().toISOString().slice(0, 10);
+  }
+
+  function shiftIsoDate(isoDate, amount) {
+    const base = new Date(`${isoDate}T12:00:00`);
+    base.setDate(base.getDate() + amount);
+    return base.toISOString().slice(0, 10);
+  }
+
+  function formatCalendarLongDate(isoDate, locale = 'en-US') {
+    const date = new Date(`${isoDate}T12:00:00`);
+    return new Intl.DateTimeFormat(locale, {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  function renderMiniCalendar() {
+    if (!miniCalendarGrid || !miniCalendarTitle || !calendarDate) return;
+    const selected = new Date(`${getSelectedDate()}T12:00:00`);
+    const current = miniCalendarCursor || new Date(selected.getFullYear(), selected.getMonth(), 1);
+    miniCalendarCursor = new Date(current.getFullYear(), current.getMonth(), 1);
+
+    miniCalendarTitle.textContent = new Intl.DateTimeFormat('en-US', {
+      month: 'long',
+      year: 'numeric',
+    }).format(miniCalendarCursor);
+
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthStart = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), 1);
+    const monthEnd = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth() + 1, 0);
+    const firstWeekday = monthStart.getDay();
+    const daysInMonth = monthEnd.getDate();
+    const cells = [];
+
+    weekdays.forEach((day) => {
+      cells.push(`<div class="mini-calendar-weekday">${day}</div>`);
+    });
+
+    for (let i = 0; i < firstWeekday; i += 1) {
+      cells.push('<div class="mini-calendar-day is-muted" aria-hidden="true"></div>');
+    }
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const selectedIso = getSelectedDate();
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const cellDate = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth(), day);
+      const iso = cellDate.toISOString().slice(0, 10);
+      const classes = ['mini-calendar-day'];
+      if (iso === selectedIso) classes.push('is-selected');
+      if (iso === todayIso) classes.push('is-today');
+      cells.push(`
+        <button class="${classes.join(' ')}" type="button" data-calendar-day="${iso}">
+          ${day}
+        </button>
+      `);
+    }
+
+    miniCalendarGrid.innerHTML = cells.join('');
   }
 
   function parseAttendees() {
@@ -193,6 +301,27 @@
           </div>
         `;
       })
+      .join('');
+  }
+
+  function renderUpcomingEvents(events, baseDate) {
+    if (upcomingSubtitle) {
+      upcomingSubtitle.textContent = `Eventos de ${formatCalendarLongDate(baseDate)}.`;
+    }
+    if (!events.length) {
+      renderUpcomingEmpty('No hay eventos para el siguiente día.');
+      return;
+    }
+
+    upcomingEventsContainer.innerHTML = events
+      .slice(0, 4)
+      .map((event) => `
+        <article class="upcoming-item">
+          <div class="upcoming-time">${escapeHtml(formatEventTime(event))}</div>
+          <h4>${escapeHtml(event.summary || 'Sin título')}</h4>
+          <p>${escapeHtml(event.location || 'Ubicación por confirmar')}</p>
+        </article>
+      `)
       .join('');
   }
 
@@ -286,11 +415,64 @@
     return match?.summary || 'Ocupado';
   }
 
-  function renderAvailability(emails, calendars, eventDetails, hostEmail) {
-    if (!availabilityGrid) return;
+  function collectAvailabilityEntries(emails, calendars, eventDetails) {
+    const entries = [];
+    emails.forEach((email, index) => {
+      const busy = calendars?.[email]?.busy || [];
+      const details = eventDetails?.[email] || [];
+      const palette = availabilityPalette[index % availabilityPalette.length];
+      busy.forEach((slot) => {
+        const startDate = new Date(slot.start);
+        const endDate = new Date(slot.end);
+        const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+        const endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
+        entries.push({
+          email,
+          palette,
+          label: getBusyLabel(details, slot),
+          startMinutes,
+          endMinutes,
+        });
+      });
+    });
+
+    return entries
+      .filter((entry) => entry.endMinutes > entry.startMinutes)
+      .sort((a, b) => a.startMinutes - b.startMinutes || a.endMinutes - b.endMinutes);
+  }
+
+  function layoutAvailabilityEntries(entries) {
+    const active = [];
+    const positioned = [];
+    let maxColumn = 0;
+
+    entries.forEach((entry) => {
+      for (let i = active.length - 1; i >= 0; i -= 1) {
+        if (active[i].endMinutes <= entry.startMinutes) active.splice(i, 1);
+      }
+
+      let column = 0;
+      while (active.some((item) => item.column === column)) column += 1;
+      active.push({ endMinutes: entry.endMinutes, column });
+      positioned.push({ ...entry, column });
+      if (column > maxColumn) maxColumn = column;
+    });
+
+    const totalColumns = Math.max(maxColumn + 1, 1);
+    return positioned.map((entry) => ({
+      ...entry,
+      totalColumns,
+    }));
+  }
+
+  function buildAvailabilityMarkup(emails, calendars, eventDetails, hostEmail) {
     if (!emails.length) {
-      renderAvailabilityEmpty('Sin invitados para consultar.');
-      return;
+      return `
+        <div class="empty-state">
+          <img src="./assets/img/calendar.png" alt="" />
+          <p>Sin invitados para consultar.</p>
+        </div>
+      `;
     }
 
     const { dayStart, dayEnd, minuteHeight } = availabilityConfig;
@@ -302,13 +484,7 @@
       top: Math.max(proposed.startMinutes - dayStart, 0) * minuteHeight,
       height: Math.min(proposed.endMinutes, dayEnd) * minuteHeight - Math.max(proposed.startMinutes, dayStart) * minuteHeight,
     } : null;
-    const hours = [];
-    for (let minutes = dayStart; minutes <= dayEnd; minutes += 60) {
-      const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
-      hours.push(`${hour}:00`);
-    }
-
-    const headerCells = emails
+    const legendItems = emails
       .map((email, index) => {
         const palette = availabilityPalette[index % availabilityPalette.length];
         return `
@@ -319,90 +495,122 @@
         `;
       })
       .join('');
+    const hours = [];
+    for (let minutes = dayStart; minutes <= dayEnd; minutes += 60) {
+      const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
+      hours.push(`${hour}:00`);
+    }
 
     const timeSlots = hours
       .map(label => `<div class="availability-time-slot" style="--slot-height:${slotHeight}px;">${label}</div>`)
       .join('');
 
-    const attendeeColumns = emails
-      .map((email, index) => {
-        const busy = calendars?.[email]?.busy || [];
-        const details = eventDetails?.[email] || [];
-        const palette = availabilityPalette[index % availabilityPalette.length];
-        const blocks = busy
-          .map(slot => {
-            const startDate = new Date(slot.start);
-            const endDate = new Date(slot.end);
-            const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
-            const endMinutes = endDate.getHours() * 60 + endDate.getMinutes();
-            const clampedStart = Math.max(startMinutes, dayStart);
-            const clampedEnd = Math.min(endMinutes, dayEnd);
-            if (clampedEnd <= dayStart || clampedStart >= dayEnd || clampedEnd <= clampedStart) {
-              return '';
-            }
-            const top = (clampedStart - dayStart) * minuteHeight;
-            const height = (clampedEnd - clampedStart) * minuteHeight;
-            const label = getBusyLabel(details, slot);
-            return `
-              <div class="availability-busy" style="top:${top}px;height:${height}px;--busy-bg:${palette.bg};--busy-border:${palette.border};--busy-text:${palette.accent};">
-                ${escapeHtml(label)}
-              </div>
-            `;
-          })
-          .join('');
-
+    const entries = layoutAvailabilityEntries(collectAvailabilityEntries(emails, calendars, eventDetails))
+      .map((entry) => {
+        const clampedStart = Math.max(entry.startMinutes, dayStart);
+        const clampedEnd = Math.min(entry.endMinutes, dayEnd);
+        if (clampedEnd <= dayStart || clampedStart >= dayEnd || clampedEnd <= clampedStart) return '';
+        const top = (clampedStart - dayStart) * minuteHeight;
+        const height = (clampedEnd - clampedStart) * minuteHeight;
+        const duration = clampedEnd - clampedStart;
+        const width = 100 / entry.totalColumns;
+        const left = width * entry.column;
+        const compactClass = duration <= 30 ? ' is-compact' : '';
+        const tinyClass = duration <= 15 ? ' is-tiny' : '';
+        const accessibleLabel = `${getAvailabilityLabel(entry.email, hostEmail)}: ${entry.label}`;
         return `
-          <div class="availability-attendee-column">
+          <div
+            class="availability-busy availability-busy--overlay${compactClass}${tinyClass}"
+            style="top:${top}px;height:${height}px;left:calc(${left}% + 8px);width:calc(${width}% - 16px);--busy-bg:${entry.palette.bg};--busy-border:${entry.palette.border};--busy-text:${entry.palette.accent};"
+            title="${escapeHtml(accessibleLabel)}"
+          >
+            <span class="availability-busy-owner">${escapeHtml(getAvailabilityLabel(entry.email, hostEmail))}</span>
+            <span class="availability-busy-label">${escapeHtml(entry.label)}</span>
+          </div>
+        `;
+      })
+      .join('');
+
+    return `
+      <div class="availability-legend">
+        ${legendItems}
+      </div>
+      <div class="availability-layout availability-layout--overlay" style="--slot-height:${slotHeight}px;--timeline-height:${timelineHeight}px;">
+        <div class="availability-header availability-header--overlay">
+          <div>Hora</div>
+          <div>Agenda compartida</div>
+        </div>
+        <div class="availability-body">
+          <div class="availability-time-column">${timeSlots}</div>
+          <div class="availability-overlay-column">
             <div class="availability-timeline" style="--timeline-height:${timelineHeight}px;">
               ${proposedBlock && proposedBlock.height > 0 ? `
                 <div class="availability-proposed" style="top:${proposedBlock.top}px;height:${proposedBlock.height}px;">
                   Horario propuesto
                 </div>
               ` : ''}
-              ${blocks || '<div class="availability-free"></div>'}
+              ${entries || '<div class="availability-free"></div>'}
             </div>
           </div>
-        `;
-      })
-      .join('');
-
-    availabilityGrid.innerHTML = `
-      <div class="availability-layout" style="--slot-height:${slotHeight}px;--timeline-height:${timelineHeight}px;">
-        <div class="availability-header">
-          <div>Hora</div>
-          ${headerCells}
-        </div>
-        <div class="availability-body">
-          <div class="availability-time-column">${timeSlots}</div>
-          ${attendeeColumns}
         </div>
       </div>
     `;
   }
 
+  function renderAvailability(emails, calendars, eventDetails, hostEmail) {
+    const markup = buildAvailabilityMarkup(emails, calendars, eventDetails, hostEmail);
+    [availabilityGrid, modalAvailabilityGrid].forEach((target) => {
+      if (target) {
+        target.classList.remove('is-empty');
+        target.innerHTML = markup;
+      }
+    });
+  }
+
+  async function fetchDayEvents(userId, date) {
+    const res = await fetch(
+      `${API_BASE}/google-calendar/events?user_id=${encodeURIComponent(userId)}&date=${encodeURIComponent(date)}&timezone=${encodeURIComponent(tz)}`,
+      { credentials: 'include' },
+    );
+    if (!res.ok) throw res;
+    return res.json();
+  }
+
   async function fetchEvents(userId) {
-    const date = calendarDate.value || new Date().toISOString().slice(0, 10);
+    const date = getSelectedDate();
+    const nextDate = shiftIsoDate(date, 1);
     calendarDate.value = date;
+    renderMiniCalendar();
 
     try {
       setRefreshing(true);
-      const res = await fetch(
-        `${API_BASE}/google-calendar/events?user_id=${encodeURIComponent(userId)}&date=${encodeURIComponent(date)}&timezone=${encodeURIComponent(tz)}`,
-        { credentials: 'include' },
-      );
-      if (!res.ok) {
-        if (res.status === 404) {
+      const [todayRes, nextRes] = await Promise.allSettled([
+        fetchDayEvents(userId, date),
+        fetchDayEvents(userId, nextDate),
+      ]);
+
+      if (todayRes.status === 'rejected') {
+        const res = todayRes.reason;
+        if (res?.status === 404) {
           setStatus({ connected: false, message: 'Necesitas conectar tu Google Calendar.' });
           renderEmptyState('Conecta tu Google Calendar para ver las reuniones del día.');
+          renderUpcomingEmpty('Conecta tu Google Calendar para ver próximos eventos.');
           return;
         }
-        throw new Error(await res.text());
+        throw res;
       }
-      const data = await res.json();
-      renderEvents(data.events || []);
+
+      renderEvents(todayRes.value.events || []);
+
+      if (nextRes.status === 'fulfilled') {
+        renderUpcomingEvents(nextRes.value.events || [], nextDate);
+      } else {
+        renderUpcomingEmpty('No pudimos cargar los eventos del siguiente día.');
+      }
     } catch (error) {
       console.error(error);
       renderEmptyState('No pudimos cargar tus reuniones. Intenta de nuevo.');
+      renderUpcomingEmpty('No pudimos cargar los eventos del siguiente día.');
     } finally {
       setRefreshing(false);
     }
@@ -475,6 +683,9 @@
       const eventMeet = document.getElementById('eventMeet');
       if (eventMeet) eventMeet.checked = true;
       if (inviteToggle) inviteToggle.checked = true;
+      setAvailabilityMessage('Agrega invitados para consultar disponibilidad.');
+      renderAvailabilityEmpty('Sin invitados para consultar.');
+      closeEventModal();
     } catch (error) {
       console.error(error);
       if (formStatus) formStatus.textContent = 'No se pudo crear el evento.';
@@ -484,7 +695,7 @@
   async function fetchAvailability(userId) {
     const guestEmails = parseAttendees();
     if (!guestEmails.length) {
-      if (availabilityStatus) availabilityStatus.textContent = 'Agrega emails para consultar disponibilidad.';
+      setAvailabilityMessage('Agrega emails para consultar disponibilidad.');
       renderAvailabilityEmpty('Sin invitados para consultar.');
       return;
     }
@@ -497,7 +708,7 @@
     });
 
     const date = document.getElementById('eventDate')?.value || calendarDate.value || new Date().toISOString().slice(0, 10);
-    if (availabilityStatus) availabilityStatus.textContent = 'Consultando disponibilidad...';
+    setAvailabilityMessage('Consultando disponibilidad...');
 
     try {
       const res = await fetch(`${API_BASE}/google-calendar/freebusy`, {
@@ -514,14 +725,12 @@
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       renderAvailability(emails, data.calendars || {}, data.events || {}, hostEmail);
-      if (availabilityStatus) {
-        const guestCount = guestEmails.length;
-        const hostLabel = hostEmail ? ' + tu calendario' : '';
-        availabilityStatus.textContent = `Disponibilidad para ${guestCount} invitados${hostLabel} el ${date}.`;
-      }
+      const guestCount = guestEmails.length;
+      const hostLabel = hostEmail ? ' + tu calendario' : '';
+      setAvailabilityMessage(`Disponibilidad para ${guestCount} invitados${hostLabel} el ${date}.`);
     } catch (error) {
       console.error(error);
-      if (availabilityStatus) availabilityStatus.textContent = 'No pudimos consultar disponibilidad.';
+      setAvailabilityMessage('No pudimos consultar disponibilidad.');
       renderAvailabilityEmpty('No pudimos cargar la disponibilidad.');
     }
   }
@@ -529,9 +738,29 @@
   async function init() {
     const today = new Date().toISOString().slice(0, 10);
     calendarDate.value = calendarDate.value || today;
+    miniCalendarCursor = new Date(`${calendarDate.value}T12:00:00`);
     const eventDate = document.getElementById('eventDate');
     if (eventDate) eventDate.value = today;
     renderAvailabilityEmpty('Sin invitados para consultar.');
+    setAvailabilityMessage('Abre el botón + para agregar invitados y consultar disponibilidad.');
+    renderMiniCalendar();
+    renderUpcomingEmpty('Cargando eventos del siguiente día...');
+
+    [openEventModalBtn].forEach((trigger) => {
+      trigger?.addEventListener('click', openEventModal);
+    });
+    closeEventModalBtn?.addEventListener('click', closeEventModal);
+    eventModal?.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.dataset.closeModal === 'true') {
+        closeEventModal();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && eventModal && !eventModal.hidden) {
+        closeEventModal();
+      }
+    });
 
     connectBtn.addEventListener('click', async () => {
       const userId = await ensureUserIdOrNotify();
@@ -548,10 +777,27 @@
       if (!userId) return;
       fetchEvents(userId);
     });
-    availabilityBtn?.addEventListener('click', async () => {
+    miniCalendarPrev?.addEventListener('click', () => {
+      miniCalendarCursor = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth() - 1, 1);
+      renderMiniCalendar();
+    });
+    miniCalendarNext?.addEventListener('click', () => {
+      miniCalendarCursor = new Date(miniCalendarCursor.getFullYear(), miniCalendarCursor.getMonth() + 1, 1);
+      renderMiniCalendar();
+    });
+    miniCalendarGrid?.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const btn = target.closest('[data-calendar-day]');
+      if (!(btn instanceof HTMLElement)) return;
+      const nextDate = btn.dataset.calendarDay;
+      if (!nextDate || !calendarDate) return;
+      calendarDate.value = nextDate;
+      miniCalendarCursor = new Date(`${nextDate}T12:00:00`);
+      renderMiniCalendar();
       const userId = await ensureUserIdOrNotify();
       if (!userId) return;
-      fetchAvailability(userId);
+      fetchEvents(userId);
     });
 
     const attendeeInput = document.getElementById('eventAttendees');
@@ -564,7 +810,7 @@
       availabilityTimer = window.setTimeout(async () => {
         const emails = parseAttendees();
         if (!emails.length) {
-          if (availabilityStatus) availabilityStatus.textContent = 'Agrega emails para consultar disponibilidad.';
+          setAvailabilityMessage('Agrega emails para consultar disponibilidad.');
           renderAvailabilityEmpty('Sin invitados para consultar.');
           return;
         }
@@ -578,6 +824,13 @@
     eventDateInput?.addEventListener('change', scheduleAvailability);
     eventStartInput?.addEventListener('input', scheduleAvailability);
     eventEndInput?.addEventListener('input', scheduleAvailability);
+    calendarDate?.addEventListener('change', async () => {
+      miniCalendarCursor = new Date(`${getSelectedDate()}T12:00:00`);
+      renderMiniCalendar();
+      const userId = await ensureUserIdOrNotify();
+      if (!userId) return;
+      fetchEvents(userId);
+    });
 
     if (eventForm) {
       eventForm.addEventListener('submit', (event) => {
