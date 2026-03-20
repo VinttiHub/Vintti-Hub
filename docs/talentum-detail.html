@@ -25,21 +25,6 @@
     </header>
 
     <section class="talentum-main">
-      <section class="chat-panel">
-        <div class="panel-head">
-          <div>
-            <h3>AI Searcher Chat</h3>
-            <p id="chatSubtitle">Loading opportunity…</p>
-          </div>
-          <div class="chat-status" id="chatStatus">Idle</div>
-        </div>
-        <div class="chat-window" id="chatMessages" aria-live="polite"></div>
-        <form class="chat-input" id="chatForm">
-          <input id="chatInput" type="text" placeholder="Ask for a different focus…" autocomplete="off" />
-          <button type="submit">Send</button>
-        </form>
-      </section>
-
       <section class="candidates-panel">
         <div class="panel-head">
           <div>
@@ -60,9 +45,27 @@
           </div>
           <div class="filters-grid" id="filtersGrid"></div>
         </div>
+        <div class="candidates-scroll">
+          <div class="candidates-grid" id="candidatesGrid"></div>
+          <div class="empty-state" id="candidatesEmpty">Loading applicants…</div>
+        </div>
+      </section>
 
-        <div class="candidates-grid" id="candidatesGrid"></div>
-        <div class="empty-state" id="candidatesEmpty">Loading applicants…</div>
+      <section class="chat-panel" id="chatPanel" aria-hidden="true">
+        <div class="panel-head">
+          <div>
+            <h3>AI Searcher Chat</h3>
+            <p id="chatSubtitle">Loading opportunity…</p>
+          </div>
+          <div class="panel-actions">
+            <div class="chat-status" id="chatStatus">Idle</div>
+          </div>
+        </div>
+        <div class="chat-window" id="chatMessages" aria-live="polite"></div>
+        <form class="chat-input" id="chatForm">
+          <input id="chatInput" type="text" placeholder="Ask for a different focus…" autocomplete="off" />
+          <button type="submit">Send</button>
+        </form>
       </section>
     </section>
   </div>
@@ -114,6 +117,9 @@
     </div>
   </div>
 
+  <button class="chat-fab" id="chatFab" type="button" aria-label="Abrir chat">
+    Abrir chat
+  </button>
   <script src="./assets/js/talentum-detail.js"></script>
 </body>
 </html>

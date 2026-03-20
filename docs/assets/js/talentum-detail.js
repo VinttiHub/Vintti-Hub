@@ -3,6 +3,9 @@ const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
 const state = {
   currentOpportunity: null,
   currentUserEmail: "",
+  ui: {
+    chatExpanded: false,
+  },
   filters: {
     position: "",
     salary: "",
@@ -26,6 +29,8 @@ const els = {
   chatMessages: document.getElementById("chatMessages"),
   chatForm: document.getElementById("chatForm"),
   chatInput: document.getElementById("chatInput"),
+  chatPanel: document.getElementById("chatPanel"),
+  chatFab: document.getElementById("chatFab"),
   candidateSubtitle: document.getElementById("candidateSubtitle"),
   candidateCount: document.getElementById("candidateCount"),
   filtersGrid: document.getElementById("filtersGrid"),
@@ -103,6 +108,21 @@ function setRefreshApplicantsStatus(text) {
 
 function setUserPill(text) {
   if (els.userPill) els.userPill.textContent = text;
+}
+
+function setChatExpanded(isExpanded) {
+  state.ui.chatExpanded = Boolean(isExpanded);
+  document.body.classList.toggle("chat-expanded", state.ui.chatExpanded);
+  if (els.chatPanel) {
+    els.chatPanel.setAttribute("aria-hidden", state.ui.chatExpanded ? "false" : "true");
+  }
+  if (els.chatFab) {
+    els.chatFab.textContent = state.ui.chatExpanded ? "Ver candidatos" : "Abrir chat";
+    els.chatFab.setAttribute("aria-label", state.ui.chatExpanded ? "Ver candidatos" : "Abrir chat");
+  }
+  if (state.ui.chatExpanded && els.chatInput) {
+    requestAnimationFrame(() => els.chatInput.focus());
+  }
 }
 
 function escapeHtml(value) {
@@ -1453,6 +1473,7 @@ async function handleChatSubmit(event) {
 async function init() {
   state.currentUserEmail = getStoredEmail();
   setUserPill(state.currentUserEmail ? state.currentUserEmail : "Guest");
+  setChatExpanded(false);
   setChatStatus("Idle");
   setFiltersStatus("Idle");
   initLoadingGame();
@@ -1473,6 +1494,12 @@ async function init() {
 
   if (els.refreshApplicantsBtn) {
     els.refreshApplicantsBtn.addEventListener("click", () => backfillApplicantsAI(opportunityId));
+  }
+
+  if (els.chatFab) {
+    els.chatFab.addEventListener("click", () => {
+      setChatExpanded(!state.ui.chatExpanded);
+    });
   }
 
   if (els.candidatesGrid) {
