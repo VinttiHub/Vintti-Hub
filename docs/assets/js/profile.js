@@ -365,7 +365,7 @@ function renderOrgPersonCard(user, { isRoot=false, isLeader=false, isLeaf=false 
     !isRoot && isLeaf ? "is-leaf" : ""
   ].filter(Boolean).join(" ");
   return `
-    <article class="${cardClasses}" data-uid="${escapeHtml(id || "")}">
+    <article class="${cardClasses}" data-uid="${escapeHtml(id || "")}" role="button" tabindex="0" aria-label="Open profile for ${name}">
       ${avatarMarkup}
       <h3 class="org-person-name">${name}</h3>
       <div class="org-person-role">${role}</div>
@@ -963,8 +963,10 @@ function resolveProfileAvatarSource({ avatar_url, email_vintti, user_id }){
 }
 
 // —— Quick Profile helpers —— //
-function openUserQuick(){ const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
+function openUserQuick(){ closeUserPtoQuick(); const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
 function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
+function openUserPtoQuick(){ closeUserQuick(); const m = $("#userPtoModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
+function closeUserPtoQuick(){ const m = $("#userPtoModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
 
 // Avatar for quick card
 function setQuickAvatar({ user_name, avatar_url, initials, email_vintti, user_id }){
@@ -1005,6 +1007,39 @@ function setQuickAvatar({ user_name, avatar_url, initials, email_vintti, user_id
   }
 }
 
+function setPtoQuickAvatar({ user_name, avatar_url, initials, email_vintti, user_id }){
+  const img = $("#upqAvatarImg");
+  const ini = $("#upqAvatarInitials");
+  if (!img || !ini) return;
+
+  const resolved = resolveInitials(user_name, initials);
+  const showInitials = ()=>{
+    img.style.display = "none";
+    img.removeAttribute("src");
+    ini.style.display = "grid";
+    ini.textContent = resolved;
+  };
+
+  ini.textContent = resolved;
+  const finalSrc = resolveProfileAvatarSource({ avatar_url, email_vintti, user_id });
+  const trimmed = typeof finalSrc === "string" ? finalSrc.trim() : "";
+  if (trimmed){
+    img.alt = user_name || "User avatar";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.style.display = "block";
+    ini.style.display = "none";
+    img.onload = ()=>{
+      img.style.display = "block";
+      ini.style.display = "none";
+    };
+    img.onerror = showInitials;
+    if (img.src !== trimmed) img.src = trimmed;
+  } else {
+    showInitials();
+  }
+}
+
 function fmtLongDate(v){
   if (!v) return "—";
   const d = _ISO_ONLY.test(v) ? parseISODateLocal(v) : new Date(v);
@@ -1012,33 +1047,144 @@ function fmtLongDate(v){
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
 }
 
+function fmtText(v){
+  const text = String(v ?? "").trim();
+  return text || "—";
+}
+
+function buildLocation(city, country){
+  const parts = [String(city || "").trim(), String(country || "").trim()].filter(Boolean);
+  return parts.join(", ");
+}
+
+function renderHobbyChips(raw){
+  const host = $("#uqHobbies");
+  if (!host) return;
+  const items = String(raw || "")
+    .split(",")
+    .map((part)=> part.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  if (!items.length){
+    host.innerHTML = `<span class="quick-chip">No hobbies added yet</span>`;
+    return;
+  }
+
+  host.innerHTML = items.map((item)=> `<span class="quick-chip">${escapeHtml(item)}</span>`).join("");
+}
+
 // Fill modal content
 function renderUserQuick(u){
   $("#userQuickTitle").textContent = u.user_name || "Team Member";
   $("#uqName").textContent = u.user_name || "—";
-  $("#uqEmail").textContent = u.email_vintti || "—";
-  $("#uqRole").textContent = u.role || "—";
-  $("#uqTeam").textContent = u.team || "—";
-  $("#uqEmergency").textContent = u.emergency_contact || "—";
+  $("#uqEmail").textContent = fmtText(u.email_vintti);
+  $("#uqRole").textContent = fmtText(u.role);
+  $("#uqTeam").textContent = fmtText(u.team);
   $("#uqBirth").textContent = fmtLongDate(u.fecha_nacimiento);
   $("#uqStart").textContent = fmtLongDate(u.ingreso_vintti_date);
+  $("#uqCountry").textContent = fmtText(u.country);
+  $("#uqCity").textContent = fmtText(u.city);
+  $("#uqFavoriteFood").textContent = fmtText(u.favorite_food);
+  $("#uqAbout").textContent = fmtText(u.about_me);
+  $("#uqFunFact").textContent = fmtText(u.fun_fact);
 
-  // Vacation available = acumuladas + hábiles - consumidas
-  const vacTotal = _nz(u.vacaciones_acumuladas) + _nz(u.vacaciones_habiles);
-  const vacAvail = Math.max(0, vacTotal - _nz(u.vacaciones_consumidas || 0));
-  $("#uqVacTotal").textContent = String(vacAvail);
-
-  // Vintti Days: mostrar disponibles de los 2 totales
-  const vdTotal = 2;
-  const vdAvail = Math.max(0, vdTotal - _nz(u.vintti_days_consumidos));
-  $("#uqVdTotal").textContent  = String(vdAvail);
-
-  // Holidays: mostrar disponibles de los 4 totales
-  const holTotal = 4;
-  const holAvail = Math.max(0, holTotal - _nz(u.feriados_consumidos));
-  $("#uqHolTotal").textContent = String(holAvail);
+  const location = buildLocation(u.city, u.country);
+  const locationWrap = $("#uqLocationWrap");
+  if (locationWrap){
+    if (location){
+      locationWrap.hidden = false;
+      $("#uqLocation").textContent = location;
+    } else {
+      locationWrap.hidden = true;
+      $("#uqLocation").textContent = "—";
+    }
+  }
+  renderHobbyChips(u.hobbies);
 
   setQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials, email_vintti: u.email_vintti, user_id: u.user_id });
+}
+
+function renderUserPtoQuick(u){
+  $("#userPtoTitle").textContent = u.user_name || "Team Member";
+  $("#upqName").textContent = u.user_name || "—";
+  $("#upqEmail").textContent = fmtText(u.email_vintti);
+  $("#upqRole").textContent = fmtText(u.role);
+  $("#upqTeam").textContent = fmtText(u.team);
+  $("#upqEmergency").textContent = fmtText(u.emergency_contact);
+  $("#upqBirth").textContent = fmtLongDate(u.fecha_nacimiento);
+  $("#upqStart").textContent = fmtLongDate(u.ingreso_vintti_date);
+
+  const vac = calcVacation(u);
+  const vd = calcVintti(u);
+  const hol = calcHoliday(u);
+  $("#upqVacTotal").textContent = String(vac.avail);
+  $("#upqVdTotal").textContent = String(vd.avail);
+  $("#upqHolTotal").textContent = String(hol.avail);
+
+  setPtoQuickAvatar({ user_name: u.user_name, avatar_url: u.avatar_url, initials: u.initials, email_vintti: u.email_vintti, user_id: u.user_id });
+}
+
+async function openUserQuickById(uid){
+  const numericUid = Number(uid);
+  if (!numericUid) return;
+
+  renderUserQuick({
+    user_name: "Loading…",
+    email_vintti: "—",
+    role: "—",
+    team: "—",
+    emergency_contact: "—",
+    country: "",
+    city: "",
+    about_me: "",
+    hobbies: "",
+    favorite_food: "",
+    fun_fact: "",
+    fecha_nacimiento: null,
+    ingreso_vintti_date: null,
+    avatar_url: null
+  });
+  openUserQuick();
+
+  try{
+    const r = await api(`/users/${encodeURIComponent(numericUid)}`, { method:'GET' });
+    if (!r.ok) throw new Error(await r.text());
+    const u = await r.json();
+    renderUserQuick(u);
+  }catch(err){
+    console.error("quick profile load error:", err);
+    $("#userQuickTitle").textContent = "Could not load profile";
+  }
+}
+
+async function openUserPtoQuickById(uid){
+  const numericUid = Number(uid);
+  if (!numericUid) return;
+
+  renderUserPtoQuick({
+    user_name: "Loading…",
+    email_vintti: "—",
+    role: "—",
+    team: "—",
+    emergency_contact: "—",
+    fecha_nacimiento: null,
+    ingreso_vintti_date: null,
+    vacaciones_acumuladas: 0,
+    vacaciones_habiles: 0,
+    avatar_url: null
+  });
+  openUserPtoQuick();
+
+  try{
+    const r = await api(`/users/${encodeURIComponent(numericUid)}`, { method:'GET' });
+    if (!r.ok) throw new Error(await r.text());
+    const u = await r.json();
+    renderUserPtoQuick(u);
+  }catch(err){
+    console.error("pto quick profile load error:", err);
+    $("#userPtoTitle").textContent = "Could not load profile";
+  }
 }
 
 // Click on a name → fetch + open
@@ -1046,40 +1192,26 @@ document.addEventListener("click", async (e)=>{
   const t = e.target;
   if (t.matches(".name-link")){
     e.preventDefault();
-    const uid = Number(t.dataset.uid);
-    if (!uid) return;
+    await openUserPtoQuickById(t.dataset.uid);
+  }
 
-    // optimistic skeleton fill (optional)
-    renderUserQuick({
-      user_name: "Loading…",
-      email_vintti: "—",
-      role: "—",
-      team: "—",
-      emergency_contact: "—",
-      fecha_nacimiento: null,
-      ingreso_vintti_date: null,
-      vacaciones_acumuladas: 0,
-      vacaciones_habiles: 0,
-      vacaciones_consumidas: 0,
-      vintti_days_consumidos: 0,
-      feriados_consumidos: 0,
-      avatar_url: null
-    });
-    openUserQuick();
-
-    try{
-      const r = await api(`/users/${encodeURIComponent(uid)}`, { method:'GET' });
-      if (!r.ok) throw new Error(await r.text());
-      const u = await r.json();
-      renderUserQuick(u);
-    }catch(err){
-      console.error("quick profile load error:", err);
-      $("#userQuickTitle").textContent = "Could not load profile";
-    }
+  const orgCard = t.closest(".org-person[data-uid]");
+  if (orgCard){
+    e.preventDefault();
+    await openUserQuickById(orgCard.dataset.uid);
   }
 
   // close handlers reuse your generic [data-close-modal]
   if (t.matches("#userQuickModal [data-close-modal]")) { closeUserQuick(); }
+  if (t.matches("#userPtoModal [data-close-modal-pto]")) { closeUserPtoQuick(); }
+});
+
+document.addEventListener("keydown", async (e)=>{
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const orgCard = e.target.closest(".org-person[data-uid]");
+  if (!orgCard) return;
+  e.preventDefault();
+  await openUserQuickById(orgCard.dataset.uid);
 });
 
 // ✅ Keep ONE copy only
@@ -2337,6 +2469,12 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     emergency_contact: $("#emergency_contact").value.trim(),
     ingreso_vintti_date: $("#ingreso_vintti_date").value || null,
     fecha_nacimiento: $("#fecha_nacimiento").value || null,
+    country: $("#country").value.trim() || null,
+    city: $("#city").value.trim() || null,
+    about_me: $("#about_me").value.trim() || null,
+    hobbies: $("#hobbies").value.trim() || null,
+    favorite_food: $("#favorite_food").value.trim() || null,
+    fun_fact: $("#fun_fact").value.trim() || null,
     avatar_url: avatarUrlValue || null,
   };
   const toast = $("#profileToast");
@@ -2361,10 +2499,17 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       emergency_contact: payload.emergency_contact,
       ingreso_vintti_date: payload.ingreso_vintti_date,
       fecha_nacimiento: payload.fecha_nacimiento,
+      country: payload.country,
+      city: payload.city,
+      about_me: payload.about_me,
+      hobbies: payload.hobbies,
+      favorite_food: payload.favorite_food,
+      fun_fact: payload.fun_fact,
       avatar_url: payload.avatar_url,
       initials: resolveInitials(payload.user_name)
     };
     renderProfileView(PROFILE_CACHE);
+    showProfileView();
   }catch(err){
     console.error(err);
     showToast(toast, "Could not save changes.", false);
@@ -2442,6 +2587,24 @@ function renderProfileView(me){
   $("#v_emergency")?.replaceChildren(document.createTextNode(me.emergency_contact || "—"));
   $("#v_start")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.ingreso_vintti_date)));
   $("#v_birth")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.fecha_nacimiento)));
+  $("#v_country")?.replaceChildren(document.createTextNode(fmtText(me.country)));
+  $("#v_city")?.replaceChildren(document.createTextNode(fmtText(me.city)));
+  $("#v_about")?.replaceChildren(document.createTextNode(fmtText(me.about_me)));
+  $("#v_hobbies")?.replaceChildren(document.createTextNode(fmtText(me.hobbies)));
+  $("#v_favorite_food")?.replaceChildren(document.createTextNode(fmtText(me.favorite_food)));
+  $("#v_fun_fact")?.replaceChildren(document.createTextNode(fmtText(me.fun_fact)));
+
+  const locationEl = $("#v_location");
+  const location = buildLocation(me.city, me.country);
+  if (locationEl){
+    if (location){
+      locationEl.textContent = location;
+      locationEl.hidden = false;
+    } else {
+      locationEl.textContent = "—";
+      locationEl.hidden = true;
+    }
+  }
 
   // Avatar
   setAvatar({
@@ -2480,6 +2643,12 @@ async function loadMe(uid){
     emergency_contact: me.emergency_contact || "",
     ingreso_vintti_date: me.ingreso_vintti_date || null, // RAW
     fecha_nacimiento: me.fecha_nacimiento || null,       // RAW
+    country: me.country || "",
+    city: me.city || "",
+    about_me: me.about_me || "",
+    hobbies: me.hobbies || "",
+    favorite_food: me.favorite_food || "",
+    fun_fact: me.fun_fact || "",
     avatar_url: me.avatar_url || null,
     initials: resolveInitials(me.user_name, me.initials)
   };
@@ -2491,6 +2660,12 @@ async function loadMe(uid){
   $("#emergency_contact").value = PROFILE_CACHE.emergency_contact;
   $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
   $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+  $("#country").value = PROFILE_CACHE.country || "";
+  $("#city").value = PROFILE_CACHE.city || "";
+  $("#about_me").value = PROFILE_CACHE.about_me || "";
+  $("#hobbies").value = PROFILE_CACHE.hobbies || "";
+  $("#favorite_food").value = PROFILE_CACHE.favorite_food || "";
+  $("#fun_fact").value = PROFILE_CACHE.fun_fact || "";
   const avatarInput = ensureAvatarField();
   if (avatarInput) avatarInput.value = PROFILE_CACHE.avatar_url || "";
 
@@ -2517,6 +2692,12 @@ document.addEventListener("click", (e)=>{
       $("#emergency_contact").value = PROFILE_CACHE.emergency_contact || "";
       $("#ingreso_vintti_date").value = toInputDate(PROFILE_CACHE.ingreso_vintti_date);
       $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
+      $("#country").value = PROFILE_CACHE.country || "";
+      $("#city").value = PROFILE_CACHE.city || "";
+      $("#about_me").value = PROFILE_CACHE.about_me || "";
+      $("#hobbies").value = PROFILE_CACHE.hobbies || "";
+      $("#favorite_food").value = PROFILE_CACHE.favorite_food || "";
+      $("#fun_fact").value = PROFILE_CACHE.fun_fact || "";
       const avatarInput = ensureAvatarField();
       if (avatarInput) avatarInput.value = PROFILE_CACHE.avatar_url || "";
     }

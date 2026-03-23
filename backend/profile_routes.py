@@ -203,6 +203,7 @@ def get_user(user_id: int):
     SELECT
       user_id, user_name, nickname, email_vintti, role, emergency_contact,
       ingreso_vintti_date, fecha_nacimiento, avatar_url,
+      country, city, about_me, hobbies, favorite_food, fun_fact,
       team, lider,
       COALESCE(vacaciones_acumuladas, 0)    AS vacaciones_acumuladas,
       COALESCE(vacaciones_habiles, 0)       AS vacaciones_habiles,
@@ -239,6 +240,12 @@ def update_user(user_id: int):
         "emergency_contact": data.get("emergency_contact"),
         "ingreso_vintti_date": data.get("ingreso_vintti_date"),
         "fecha_nacimiento": data.get("fecha_nacimiento"),
+        "country": data.get("country"),
+        "city": data.get("city"),
+        "about_me": data.get("about_me"),
+        "hobbies": data.get("hobbies"),
+        "favorite_food": data.get("favorite_food"),
+        "fun_fact": data.get("fun_fact"),
     }
 
     avatar_specified = "avatar_url" in data
@@ -288,6 +295,7 @@ def me():
         cur.execute("""
             SELECT user_id, user_name, email_vintti, role, emergency_contact,
                 ingreso_vintti_date, fecha_nacimiento, avatar_url,
+                country, city, about_me, hobbies, favorite_food, fun_fact,
                 team
             FROM users WHERE user_id = %s
         """, (user_id,))

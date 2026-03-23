@@ -133,6 +133,14 @@
               <div id="v_email" class="value">—</div>
             </div>
             <div class="info-field">
+              <div class="label">Country</div>
+              <div id="v_country" class="value">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">City</div>
+              <div id="v_city" class="value">—</div>
+            </div>
+            <div class="info-field">
               <div class="label">Emergency Contact</div>
               <div id="v_emergency" class="value">—</div>
             </div>
@@ -143,6 +151,22 @@
             <div class="info-field">
               <div class="label">Date of Birth</div>
               <div id="v_birth" class="value">—</div>
+            </div>
+            <div class="info-field info-field--wide">
+              <div class="label">About Me</div>
+              <div id="v_about" class="value value--multiline">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">Hobbies</div>
+              <div id="v_hobbies" class="value value--multiline">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">Favorite Food</div>
+              <div id="v_favorite_food" class="value">—</div>
+            </div>
+            <div class="info-field">
+              <div class="label">Fun Fact</div>
+              <div id="v_fun_fact" class="value value--multiline">—</div>
             </div>
           </div>
         </div>
@@ -191,6 +215,37 @@
                 <span class="label">Date of Birth</span>
                 <input name="fecha_nacimiento" id="fecha_nacimiento" type="date" />
               </label>
+
+              <label class="field">
+                <span class="label">Country</span>
+                <input name="country" id="country" placeholder="Argentina" />
+              </label>
+
+              <label class="field">
+                <span class="label">City</span>
+                <input name="city" id="city" placeholder="Buenos Aires" />
+              </label>
+
+              <label class="field field--full">
+                <span class="label">About Me</span>
+                <textarea name="about_me" id="about_me" rows="4" placeholder="A short intro about who you are, what motivates you, and what you're into."></textarea>
+              </label>
+
+              <label class="field field--full">
+                <span class="label">Hobbies</span>
+                <input name="hobbies" id="hobbies" placeholder="Reading, ceramics, running, gaming" />
+              </label>
+
+              <label class="field">
+                <span class="label">Favorite Food</span>
+                <input name="favorite_food" id="favorite_food" placeholder="Sushi" />
+              </label>
+
+              <label class="field field--full">
+                <span class="label">Fun Fact</span>
+                <textarea name="fun_fact" id="fun_fact" rows="3" placeholder="Something unexpected or memorable about you."></textarea>
+              </label>
+
             </div>
 
             <div class="actions">
@@ -353,7 +408,7 @@
   <div class="org-container">
 
     <div class="org-header">
-      <h2 class="org-title">Today, we look like this</h2>
+      <h2 class="org-title">Today, we look like this, click the profile to see more details</h2>
       <p class="org-subtitle">A snapshot of our amazing Vintti Dream Team</p>
     </div>
 
@@ -538,49 +593,111 @@
   <!-- ——— Modal: Quick Profile ——— -->
 <div id="userQuickModal" class="modal" aria-hidden="true">
   <div class="modal__backdrop" data-close-modal></div>
-  <div class="modal__dialog quick-card" role="dialog" aria-modal="true" aria-labelledby="userQuickTitle">
+  <div class="modal__dialog quick-card quick-card--collage" role="dialog" aria-modal="true" aria-labelledby="userQuickTitle">
     <header class="modal__head">
       <h3 id="userQuickTitle">Team Member</h3>
       <button class="modal__close" title="Close" data-close-modal>×</button>
     </header>
 
-    <div class="quick-body">
-      <div class="quick-avatar">
-        <img id="uqAvatarImg" class="avatar-img" alt="User avatar" />
-        <span id="uqAvatarInitials" aria-hidden="true"></span>
+    <div class="quick-collage">
+      <div class="quick-panel quick-panel--hero">
+        <div class="quick-avatar quick-avatar--feature">
+          <img id="uqAvatarImg" class="avatar-img" alt="User avatar" />
+          <span id="uqAvatarInitials" aria-hidden="true"></span>
+        </div>
+
+        <div class="quick-main">
+          <div class="quick-name" id="uqName">—</div>
+          <div class="quick-meta">
+            <span id="uqRole">—</span>
+            <span class="dot">•</span>
+            <span id="uqTeam">—</span>
+          </div>
+          <div class="quick-meta quick-meta--soft">
+            <span id="uqEmail">—</span>
+          </div>
+          <div class="quick-meta quick-meta--soft" id="uqLocationWrap" hidden>
+            <span id="uqLocation">—</span>
+          </div>
+        </div>
       </div>
 
-      <div class="quick-main">
-        <div class="quick-name" id="uqName">—</div>
-        <div class="quick-meta">
-          <span id="uqEmail">—</span>
-          <span class="dot">•</span>
-          <span id="uqRole">—</span>
-          <span class="dot">•</span>
-          <span id="uqTeam">—</span>
-        </div>
+      <div class="quick-panel quick-panel--story">
+        <div class="quick-kicker">About</div>
+        <p class="quick-copy" id="uqAbout">—</p>
+      </div>
 
-        <div class="quick-grid">
-          <div class="qfield"><span class="label">Emergency</span><span id="uqEmergency">—</span></div>
+      <div class="quick-panel quick-panel--chips">
+        <div class="quick-kicker">Hobbies</div>
+        <div class="quick-chip-list" id="uqHobbies">
+          <span class="quick-chip">—</span>
+        </div>
+      </div>
+
+      <div class="quick-panel quick-panel--details">
+        <div class="quick-kicker">Details</div>
+        <div class="quick-grid quick-grid--details">
           <div class="qfield"><span class="label">Birth</span><span id="uqBirth">—</span></div>
           <div class="qfield"><span class="label">Start</span><span id="uqStart">—</span></div>
+          <div class="qfield"><span class="label">Country</span><span id="uqCountry">—</span></div>
+          <div class="qfield"><span class="label">City</span><span id="uqCity">—</span></div>
+          <div class="qfield qfield--accent"><span class="label">Favorite Food</span><span id="uqFavoriteFood">—</span></div>
+        </div>
+      </div>
+
+      <div class="quick-panel quick-panel--fact">
+        <div class="quick-kicker">Fun Fact</div>
+        <p class="quick-copy" id="uqFunFact">—</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="userPtoModal" class="modal" aria-hidden="true">
+  <div class="modal__backdrop" data-close-modal-pto></div>
+  <div class="modal__dialog pto-quick-card" role="dialog" aria-modal="true" aria-labelledby="userPtoTitle">
+    <header class="modal__head">
+      <h3 id="userPtoTitle">Team Member</h3>
+      <button class="modal__close" title="Close" data-close-modal-pto>×</button>
+    </header>
+
+    <div class="pto-quick-body">
+      <div class="pto-quick-avatar">
+        <img id="upqAvatarImg" class="avatar-img" alt="User avatar" />
+        <span id="upqAvatarInitials" aria-hidden="true"></span>
+      </div>
+
+      <div class="pto-quick-main">
+        <div class="pto-quick-name" id="upqName">—</div>
+        <div class="pto-quick-meta">
+          <span id="upqEmail">—</span>
+          <span class="dot">•</span>
+          <span id="upqRole">—</span>
+          <span class="dot">•</span>
+          <span id="upqTeam">—</span>
         </div>
 
-        <div class="quick-totals">
-          <div class="qkpi">
+        <div class="pto-quick-grid">
+          <div class="pto-field"><span class="label">Emergency</span><span id="upqEmergency">—</span></div>
+          <div class="pto-field"><span class="label">Birth</span><span id="upqBirth">—</span></div>
+          <div class="pto-field"><span class="label">Start</span><span id="upqStart">—</span></div>
+        </div>
+
+        <div class="pto-quick-totals">
+          <div class="pto-kpi">
             <span class="badge-soft badge--vac">Vacation</span>
-            <div class="value" id="uqVacTotal">0</div>
-            <div class="caption">Total</div>
+            <div class="value" id="upqVacTotal">0</div>
+            <div class="caption">Available</div>
           </div>
-          <div class="qkpi">
+          <div class="pto-kpi">
             <span class="badge-soft badge--vd">Vintti Days</span>
-            <div class="value" id="uqVdTotal">0</div>
-            <div class="caption">Total</div>
+            <div class="value" id="upqVdTotal">0</div>
+            <div class="caption">Available</div>
           </div>
-          <div class="qkpi">
+          <div class="pto-kpi">
             <span class="badge-soft badge--hol">Public Holidays</span>
-            <div class="value" id="uqHolTotal">0</div>
-            <div class="caption">Total</div>
+            <div class="value" id="upqHolTotal">0</div>
+            <div class="caption">Available</div>
           </div>
         </div>
       </div>
