@@ -20,7 +20,7 @@ function dateInputValue(v) {
 
 const API_BASE_URL =
   (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? 'http://127.0.0.1:5500'
+    ? 'http://127.0.0.1:5000'
     : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 const TRACK_PAGE = 'account details';
 
@@ -2176,6 +2176,18 @@ function openStatusInfoPopup(meta = {}) {
   const normalizedStatus = String(meta.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active';
   const candidateName = meta.name || 'Candidate';
   const clientName = meta.clientName || '';
+  const card = statusInfoOverlay.querySelector('.status-info-card');
+  const badge = statusInfoOverlay.querySelector('.status-info-badge');
+
+  if (card) {
+    card.classList.toggle('is-inactive', normalizedStatus === 'inactive');
+    card.classList.toggle('is-active', normalizedStatus !== 'inactive');
+  }
+  if (badge) {
+    badge.textContent = normalizedStatus === 'inactive' ? 'Inactive' : 'Active';
+    badge.classList.toggle('is-inactive', normalizedStatus === 'inactive');
+    badge.classList.toggle('is-active', normalizedStatus !== 'inactive');
+  }
 
   if (normalizedStatus === 'inactive') {
     statusInfoTitle.textContent = `${candidateName} is inactive`;
@@ -2223,8 +2235,12 @@ function ensureStatusInfoUi() {
   statusInfoOverlay.className = 'status-info-overlay';
   statusInfoOverlay.innerHTML = `
     <div class="status-info-card" role="dialog" aria-modal="true">
+      <div class="status-info-glow"></div>
       <button type="button" class="status-info-close" aria-label="Close dialog">×</button>
-      <div class="status-info-eyebrow">Employee status</div>
+      <div class="status-info-header">
+        <div class="status-info-eyebrow">Employee status</div>
+        <div class="status-info-badge">Status</div>
+      </div>
       <h3 class="status-info-title"></h3>
       <p class="status-info-subtitle"></p>
       <div class="status-info-rows"></div>
@@ -2272,67 +2288,167 @@ function ensureStatusInfoStyles() {
   pointer-events: auto;
 }
 .status-info-card {
-  width: min(420px, 100%);
-  background: #fff;
-  border-radius: 20px;
-  padding: 26px;
-  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.25);
+  width: min(520px, 100%);
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 36%),
+    linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 28px;
+  padding: 28px;
+  padding-top: 34px;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
   font-family: 'Onest', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   position: relative;
+  overflow: hidden;
+}
+.status-info-card.is-inactive {
+  background:
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.14), transparent 34%),
+    radial-gradient(circle at top right, rgba(251, 146, 60, 0.12), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #fff7fb 100%);
+}
+.status-info-card.is-active {
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 34%),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.12), transparent 30%),
+    linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
+}
+.status-info-glow {
+  position: absolute;
+  inset: auto -60px -90px auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.08);
+  filter: blur(10px);
+  pointer-events: none;
 }
 .status-info-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 32px;
-  height: 32px;
+  top: 20px;
+  right: 22px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: none;
-  background: rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
   cursor: pointer;
-  font-size: 20px;
+  font-size: 24px;
   line-height: 1;
+  color: #0f172a;
+}
+.status-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding-right: 92px;
+  min-height: 44px;
+  flex-wrap: wrap;
 }
 .status-info-eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: #6366f1;
-  font-weight: 600;
-  margin-bottom: 6px;
+  letter-spacing: 0.16em;
+  color: #5b6bad;
+  font-weight: 700;
+}
+.status-info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.status-info-badge.is-inactive {
+  color: #9f1239;
+  background: rgba(244, 114, 182, 0.12);
+  border-color: rgba(244, 114, 182, 0.22);
+}
+.status-info-badge.is-active {
+  color: #0f766e;
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.22);
 }
 .status-info-title {
-  margin: 0 0 4px;
-  font-size: 24px;
+  margin: 0 0 6px;
+  font-size: 26px;
+  line-height: 1.1;
   color: #0f172a;
 }
 .status-info-subtitle {
-  margin: 0 0 18px;
-  font-size: 14px;
-  color: #475569;
+  margin: 0 0 22px;
+  font-size: 15px;
+  color: #516074;
+  line-height: 1.45;
 }
 .status-info-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  gap: 14px;
 }
 .status-info-row {
-  background: #f8faff;
-  border-radius: 14px;
-  padding: 12px 14px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(6px);
+  border-radius: 20px;
+  border: 1px solid rgba(219, 227, 255, 0.9);
+  padding: 16px 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 .status-info-label {
-  font-size: 11px;
+  display: inline-block;
+  font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #94a3b8;
-  margin-bottom: 4px;
+  letter-spacing: 0.14em;
+  color: #8b9bb5;
+  margin-bottom: 8px;
+  font-weight: 700;
 }
 .status-info-value {
-  font-size: 15px;
+  display: block;
+  font-size: 18px;
+  line-height: 1.45;
   color: #0f172a;
-  font-weight: 600;
+  font-weight: 700;
   word-break: break-word;
+}
+@media (max-width: 520px) {
+  .status-info-card {
+    padding: 24px 20px 20px;
+    padding-top: 28px;
+    border-radius: 24px;
+  }
+  .status-info-title {
+    max-width: 100%;
+    font-size: 22px;
+  }
+  .status-info-header {
+    padding-right: 72px;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .status-info-close {
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+  }
+  .status-info-badge {
+    margin-left: 0;
+  }
+  .status-info-value {
+    font-size: 16px;
+  }
 }
 `;
   document.head.appendChild(style);
