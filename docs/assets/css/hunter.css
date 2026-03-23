@@ -241,7 +241,13 @@ body.hunter-body {
   justify-content: space-between;
   gap: 12px;
   align-items: start;
+  flex-wrap: wrap;
   z-index: 1;
+}
+
+.card-top > div:first-child {
+  min-width: 0;
+  flex: 1 1 180px;
 }
 
 .company-name {
@@ -249,6 +255,7 @@ body.hunter-body {
   font-size: 20px;
   margin: 0;
   color: var(--ink-900);
+  overflow-wrap: anywhere;
 }
 
 .industry-chip {
@@ -258,7 +265,13 @@ body.hunter-body {
   color: var(--sky-600);
   font-weight: 600;
   font-size: 12px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  flex: 0 1 100%;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .card-meta {
@@ -324,6 +337,10 @@ body.hunter-body {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .account-pill:hover,
@@ -574,6 +591,14 @@ body.hunter-body {
   .company-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .company-card {
+    padding: 18px;
+  }
+
+  .industry-chip {
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 700px) {
@@ -587,6 +612,72 @@ body.hunter-body {
 
   .refresh-card {
     padding: 20px;
+  }
+
+  .company-card {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .card-top {
+    gap: 10px;
+  }
+
+  .company-name {
+    font-size: 18px;
+  }
+
+  .meta-stack,
+  .meta-row,
+  .card-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .meta-stack {
+    align-items: flex-start;
+  }
+
+  .candidate-toggle,
+  .linkedin-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .candidate-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .candidate-link {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .hunter-shell {
+    padding: 20px 14px 32px;
+  }
+
+  .company-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .industry-chip {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 10.5px;
+  }
+
+  .account-list {
+    gap: 6px;
+  }
+
+  .account-pill {
+    width: 100%;
+    border-radius: 14px;
+    text-align: center;
   }
 }
 .main-content.page {
