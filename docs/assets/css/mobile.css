@@ -224,6 +224,143 @@ canvas {
     padding: 24px var(--mobile-gutter) 60px;
   }
 
+  .calendar-page {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding-left: var(--mobile-gutter) !important;
+    padding-right: var(--mobile-gutter) !important;
+    overflow-x: hidden;
+  }
+
+  .calendar-page .page-header {
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+
+  .calendar-page .page-title {
+    font-size: 2rem;
+  }
+
+  .calendar-page .page-subtitle {
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+
+  .calendar-page .page-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .calendar-page .page-actions .icon-btn,
+  .calendar-page .page-actions .primary-btn,
+  .calendar-page .page-actions .ghost-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .calendar-page .calendar-grid {
+    gap: 18px;
+  }
+
+  .calendar-page .calendar-side,
+  .calendar-page .calendar-main {
+    min-height: 0;
+    height: auto;
+  }
+
+  .calendar-page .mini-calendar-card,
+  .calendar-page .upcoming-card,
+  .calendar-page .agenda-card {
+    flex: none;
+    height: auto;
+    min-height: 0;
+  }
+
+  .calendar-page .calendar-card {
+    padding: 20px 16px;
+    border-radius: 20px;
+    box-sizing: border-box;
+  }
+
+  .calendar-page .mini-calendar-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .calendar-page .mini-calendar-header > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .calendar-page .mini-calendar-nav {
+    width: 100%;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+
+  .calendar-page .mini-calendar-grid {
+    gap: 6px;
+    margin-top: 16px;
+  }
+
+  .calendar-page .mini-calendar-weekday,
+  .calendar-page .mini-calendar-day {
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    width: 100%;
+  }
+
+  .calendar-page .mini-calendar-weekday {
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .calendar-page .mini-calendar-day {
+    font-size: 13px;
+    border-radius: 12px;
+  }
+
+  .calendar-page .card-header {
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .calendar-page .card-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .calendar-page .card-actions input[type="date"],
+  .calendar-page .card-actions .ghost-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .calendar-page .upcoming-list,
+  .calendar-page .events-list {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .calendar-page .event-item,
+  .calendar-page .upcoming-item,
+  .calendar-page .empty-state {
+    padding: 16px;
+  }
+
+  .calendar-page .event-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
   .filters-summary {
     display: flex;
   }
@@ -294,5 +431,26 @@ canvas {
 
   body.has-app-sidebar .main-content table {
     min-width: 560px;
+  }
+
+  .calendar-page .page-title {
+    font-size: 1.75rem;
+  }
+
+  .calendar-page .page-actions {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .calendar-page .page-actions .ghost-btn {
+    grid-column: 1 / -1;
+  }
+
+  .calendar-page .mini-calendar-weekday,
+  .calendar-page .mini-calendar-day {
+    font-size: 12px;
+  }
+
+  .calendar-page .calendar-card {
+    padding: 18px 14px;
   }
 }
