@@ -1425,7 +1425,9 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
             }
           }
 
-          const plainComment = htmlToPlainText(opp.comments || '');
+          const isClosedLost = String(opp.opp_stage || '').trim() === 'Closed Lost';
+          const commentField = isClosedLost ? 'motive_close_lost' : 'comments';
+          const plainComment = htmlToPlainText(opp[commentField] || '');
           const typeLabel = opp.opp_type || '';
           tr.innerHTML = `
             <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
@@ -1445,6 +1447,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
                 type="text"
                 class="comment-input"
                 data-id="${opp.opportunity_id}"
+                data-field="${commentField}"
                 id="opp-comment-${opp.opportunity_id}"
                 data-original-value="${escapeAttribute(plainComment)}"
                 value="${escapeAttribute(plainComment)}"
@@ -2452,6 +2455,7 @@ document.addEventListener('blur', async (e) => {
   if (!e.target.classList.contains('comment-input')) return;
   const input = e.target;
   const oppId = input.dataset.id;
+  const field = input.dataset.field === 'motive_close_lost' ? 'motive_close_lost' : 'comments';
   const newComment = input.value;
   const original = input.dataset.originalValue ?? '';
   if (newComment === original) return;
@@ -2460,7 +2464,7 @@ document.addEventListener('blur', async (e) => {
     const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${oppId}/fields`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comments: newComment })
+      body: JSON.stringify({ [field]: newComment })
     });
     if (!res.ok) {
       console.error('Failed to update plain comment', res.status);
