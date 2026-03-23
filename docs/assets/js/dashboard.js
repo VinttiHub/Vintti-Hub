@@ -332,10 +332,10 @@ function renderTSHistory(data){
   for (const it of data){
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${it.month}</td>
-      <td class="num">$${Number(it.tsr || 0).toLocaleString('en-US')}</td>
-      <td class="num">$${Number(it.tsf || 0).toLocaleString('en-US')}</td>
-      <td class="num">${it.active_count || 0}</td>
+      <td class="month-cell" data-label="Month">${it.month}</td>
+      <td class="num" data-label="TSR (revenue)">$${Number(it.tsr || 0).toLocaleString('en-US')}</td>
+      <td class="num" data-label="TSF (fee)">$${Number(it.tsf || 0).toLocaleString('en-US')}</td>
+      <td class="num" data-label="Active Hires">${it.active_count || 0}</td>
     `;
     tbl.appendChild(tr);
   }
@@ -643,12 +643,26 @@ function renderTable(matrix){
     const repVal = matrix[key].replacement || 0;
     const rowTotal = newVal + repVal;
 
-    tr.querySelector('[data-key="new"]').textContent = newVal;
-    tr.querySelector('[data-key="replacement"]').textContent = repVal;
-    tr.querySelector('.row-total-val').textContent = rowTotal;
+    const newCell = tr.querySelector('[data-key="new"]');
+    const replacementCell = tr.querySelector('[data-key="replacement"]');
+    const totalCell = tr.querySelector('.row-total-val');
+
+    if (newCell){
+      newCell.textContent = newVal;
+      newCell.setAttribute('data-label', 'New');
+    }
+
+    if (replacementCell){
+      replacementCell.textContent = repVal;
+      replacementCell.setAttribute('data-label', 'Replacement');
+    }
+
+    if (totalCell){
+      totalCell.textContent = rowTotal;
+      totalCell.setAttribute('data-label', 'Total');
+    }
 
     // wrap totals with a pill (idempotent)
-    const totalCell = tr.querySelector('.row-total-val');
     if (totalCell && !totalCell.querySelector('.pill')){
       totalCell.innerHTML = `<span class="pill">${totalCell.textContent}</span>`;
     }

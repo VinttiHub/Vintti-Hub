@@ -519,14 +519,103 @@ body.dialog-open{ overflow:hidden; }
   .money-grid{ grid-template-columns:1fr; }
 
   /* Table → stacked cards */
+  .table-wrap{
+    overflow-x:hidden;
+  }
+  .v-table{
+    border-spacing:0 12px;
+    table-layout:fixed;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
   .v-table thead{ display:none; }
-  .v-table, .v-table tbody, .v-table tr, .v-table th, .v-table td{ display:block; width:100%; }
-  .v-table tbody tr{ padding:10px 12px; border-radius:18px; }
+  .v-table, .v-table tr, .v-table th, .v-table td{ display:block; width:100%; }
+  .v-table tbody,
+  .v-table tfoot{
+    display:contents;
+  }
+  .v-table tbody tr{
+    padding:10px 12px;
+    border-radius:18px;
+    width:100%;
+    max-width:100%;
+    margin-inline:0;
+    box-sizing:border-box;
+    overflow:hidden;
+    clip-path: inset(0 round 18px);
+    -webkit-clip-path: inset(0 round 18px);
+  }
   .v-table tbody th.row-head{ padding:6px 2px 10px; font-size:1rem; }
   .v-table tbody td{ position:relative; padding:10px 2px 14px; margin-top:6px; background:none; text-align:left; font-weight:700; }
   .v-table tbody td::before{ content:attr(data-label); display:block; font-size:.82rem; color:var(--muted); font-weight:600; margin-bottom:4px; }
   .v-table tbody td.total-col{ border-top:1px dashed rgba(99,102,241,.18); padding-top:12px; margin-top:10px; font-weight:800; }
-  .v-table tfoot .row-total{ padding:10px 12px; }
+  .v-table tbody td.num{ text-align:left; }
+  .v-table.compact tbody tr{ padding:14px 12px; }
+  .v-table.compact tbody td.month-cell{
+    padding-top:2px;
+    padding-bottom:12px;
+    margin-top:0;
+    font-size:1rem;
+    font-weight:800;
+  }
+  .v-table.compact tbody td.month-cell::before{
+    content:none;
+  }
+  .v-table.compact tbody td:not(.month-cell){
+    border-top:1px dashed rgba(99,102,241,.14);
+    padding-top:10px;
+  }
+  .v-table tfoot .row-total{
+    padding:12px;
+    border-radius:18px;
+    margin-top:0;
+    width:100%;
+    max-width:100%;
+    box-sizing:border-box;
+    overflow:hidden;
+    clip-path: inset(0 round 18px);
+    -webkit-clip-path: inset(0 round 18px);
+  }
+  .v-table tfoot th,
+  .v-table tfoot td{
+    padding:8px 0;
+    text-align:left;
+    background:none;
+    box-shadow:none;
+  }
+  .v-table tfoot th{
+    font-size:1rem;
+    font-weight:800;
+  }
+  .v-table tfoot .row-total > th{
+    margin:0;
+  }
+  .v-table tfoot .row-total > th + th{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed rgba(99,102,241,.18);
+  }
+  .v-table tfoot th::before,
+  .v-table tfoot td::before{
+    display:block;
+    font-size:.82rem;
+    color:var(--muted);
+    font-weight:600;
+    margin-bottom:4px;
+  }
+  .v-table tfoot .pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:56px;
+  }
+  .v-table tfoot .row-total > th:first-child::before{
+    content:none;
+  }
+  #colTotalNew::before{ content:"New"; }
+  #colTotalReplacement::before{ content:"Replacement"; }
+  #grandTotal::before{ content:"Total"; }
 }
 
 
@@ -569,3 +658,212 @@ body.app-shell{
   max-width: none;    
 }
 
+@media (max-width: 900px){
+  .main-content{
+    height: auto;
+    min-height: 100vh;
+    padding: 24px 18px 40px;
+  }
+
+  .topbar{
+    position: static;
+    grid-template-columns: 1fr;
+    padding: 8px 0 0;
+    margin-bottom: 18px;
+  }
+
+  .topbar .spacer{
+    display: none;
+  }
+
+  .topbar h1{
+    justify-self: start;
+    text-align: left;
+    font-size: 2rem;
+    line-height: 1.08;
+  }
+
+  .content{
+    gap: 18px;
+  }
+
+  .card{
+    border-radius: 20px;
+  }
+
+  .card-head{
+    padding: 16px 16px 8px;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .table-wrap{
+    padding: 14px 16px 18px;
+  }
+
+  .money-head,
+  .expected-head{
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .money-visual{
+    width: auto;
+    height: auto;
+  }
+
+  .gif-circle{
+    width: 78px;
+    height: 78px;
+  }
+
+  .metrics-card .metrics-grid,
+  .metrics-grid--dual,
+  .money-grid,
+  .expected-grid,
+  .expected-grid--pretty{
+    padding: 16px;
+    gap: 12px;
+  }
+
+  #tsHistoryCard .chart-wrap{
+    padding: 10px 10px 4px;
+  }
+
+  .chart-legend{
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 4px 0 10px;
+  }
+
+  .legend-item{
+    width: 100%;
+    justify-content: center;
+  }
+
+  .metrics-dialog{
+    padding: 16px;
+  }
+
+  .metrics-dialog__panel{
+    width: min(720px, 100%);
+    border-radius: 22px;
+  }
+
+  .metrics-dialog__header{
+    padding: 18px 18px 10px;
+  }
+
+  .metrics-dialog__body{
+    padding: 16px 18px 20px;
+  }
+}
+
+@media (max-width: 720px){
+  .v-table .sticky-col{
+    position: static;
+    left: auto;
+    box-shadow: none;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .v-table tfoot th.sticky-col{
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 560px){
+  .main-content{
+    padding: 18px 14px 32px;
+  }
+
+  .topbar h1{
+    font-size: 1.7rem;
+  }
+
+  .card-head h2,
+  .card-head--center h2{
+    font-size: 1.02rem;
+    line-height: 1.22;
+  }
+
+  .muted{
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+
+  .card-head{
+    padding: 14px 14px 8px;
+  }
+
+  .table-wrap,
+  .metrics-card .metrics-grid,
+  .metrics-grid--dual,
+  .money-grid,
+  .expected-grid,
+  .expected-grid--pretty{
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .metrics-tile,
+  .money .kpi,
+  .card.expected .kpi{
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .metrics-value,
+  .money .kpi-value{
+    font-size: 1.7rem;
+  }
+
+  .kpi--rec.kpi--span2 .kpi-value{
+    font-size: clamp(24px, 9vw, 30px);
+  }
+
+  .legend-item{
+    font-size: 0.9rem;
+    padding: 8px 10px;
+  }
+
+  .chart-tooltip{
+    min-width: 160px;
+    max-width: calc(100vw - 40px);
+    font-size: 0.82rem;
+  }
+
+  .metrics-dialog{
+    padding: 10px;
+  }
+
+  .metrics-dialog__panel{
+    max-height: 92vh;
+    border-radius: 18px;
+  }
+
+  .metrics-dialog__header{
+    padding: 16px 14px 10px;
+  }
+
+  .metrics-dialog__body{
+    padding: 14px;
+  }
+
+  .metrics-summary{
+    gap: 10px;
+  }
+
+  .metrics-summary span{
+    font-size: 1.15rem;
+  }
+
+  .metrics-table th,
+  .metrics-table td{
+    padding: 9px 8px;
+    font-size: 0.85rem;
+  }
+}
