@@ -1109,7 +1109,8 @@ input:focus, select:focus, textarea:focus{
 
 .approvals-history .approvals-table{
   display:grid;
-  width:100%;
+  width:max-content;
+  min-width:100%;
   grid-template-columns:
     minmax(220px, 1.6fr)   /* Employee  */
     minmax(130px, 1fr)     /* Request   */
@@ -1402,6 +1403,31 @@ input:focus, select:focus, textarea:focus{
   padding: 10px;
   font-family: Onest, ui-sans-serif, system-ui, -apple-system, "SF Pro Text", Segoe UI, Roboto, Arial;
 
+}
+.approvals-table-wrap{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-x;
+  overscroll-behavior-x:contain;
+  padding-bottom:8px;
+}
+
+.approvals-history-table-wrap{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-x;
+  overscroll-behavior-x:contain;
+  padding-bottom:8px;
 }
 .approvals-table .th{
   font-size:10px; letter-spacing:.35px; text-transform:uppercase;
@@ -1917,7 +1943,8 @@ input:focus, select:focus, textarea:focus{
 /*----------------/*----------------Approval/*------------------------------*/
 #approvalsTable.approvals-grid{
   display:grid;
-  width:100%;
+  width:max-content;
+  min-width:100%;
   /* Employee | Request | Return | Days | Type | Status | Action */
   grid-template-columns:
     minmax(220px, 1.6fr)
@@ -2036,6 +2063,57 @@ input:focus, select:focus, textarea:focus{
   #approvalsTable.approvals-grid .cell{ font-size:13.5px; }
   .badge-soft, .col-status .status{ font-size:12px; padding:4px 8px; }
   .col-actions .btn{ font-size:12.5px; padding:5px 10px; }
+}
+
+@media (max-width:700px){
+  #panel-approvals{
+    min-width:0;
+    overflow-x:visible;
+  }
+
+  #approvalsTable.approvals-grid{
+    width:966px;
+    min-width:966px;
+    grid-template-columns:220px 132px 132px 72px 110px 110px 140px;
+  }
+
+  .approvals-table-wrap{
+    scrollbar-width:thin;
+    overflow-x:auto;
+  }
+
+  #approvalsTable.approvals-grid .hdr,
+  #approvalsTable.approvals-grid .cell{
+    min-width:0;
+  }
+
+  .approvals-history .approvals-table{
+    width:810px;
+    min-width:810px;
+    grid-template-columns:220px 130px 130px 90px 120px 120px;
+  }
+
+  .approvals-history-table-wrap{
+    scrollbar-width:thin;
+    overflow-x:auto;
+  }
+}
+
+@media (max-width:900px){
+  .approvals-history{
+    overflow-x:visible !important;
+  }
+
+  .approvals-history .approvals-table{
+    overflow:hidden !important;
+  }
+
+  .approvals-history-table-wrap{
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-x;
+  }
 }
 
 /* Pinta TODAS las celdas de la fila según el estado */

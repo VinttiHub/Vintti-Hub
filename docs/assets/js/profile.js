@@ -1357,6 +1357,8 @@ function renderApprovalsTable(items){
   const hostPending = document.getElementById("approvalsTable");
   if (!hostPending) return;
   const hostHistory = document.getElementById("approvalsHistoryTable");
+  const pendingWrap = hostPending.closest(".approvals-table-wrap");
+  const historyWrap = hostHistory?.closest(".approvals-table-wrap");
 
   hostPending.classList.add("approvals-grid");
   if (hostHistory) hostHistory.classList.add("approvals-grid");
@@ -1479,6 +1481,7 @@ function buildRow(r, withActions){
     hostPending.innerHTML = headerPending + pending.map(r => buildRow(r, true)).join("");
   }
   hydrateAvatarImages(hostPending);
+  if (pendingWrap) pendingWrap.scrollLeft = 0;
 
   // === Tabla de histórico ===
   if (hostHistory){
@@ -1492,6 +1495,7 @@ function buildRow(r, withActions){
       hostHistory.innerHTML = headerHistory + processed.map(r => buildRow(r, false)).join("");
     }
     hydrateAvatarImages(hostHistory);
+    if (historyWrap) historyWrap.scrollLeft = 0;
   }
 
   // Wire de botones solo en la tabla de pendientes
