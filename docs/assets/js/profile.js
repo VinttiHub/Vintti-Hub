@@ -126,6 +126,18 @@ function showToast(el, text, ok=true){
   setTimeout(()=> el.textContent = "", 3500);
 }
 function openTimeoffModal(){ $("#timeoffModal").classList.add("active"); $("#timeoffModal").setAttribute("open",""); }
+function ensureMobileTimeoffButton(){
+  const btn = document.getElementById("btnOpenTimeoffMobile");
+  if (!btn) return () => {};
+  btn.hidden = false;
+  btn.onclick = (e) => {
+    e.preventDefault();
+    openTimeoffModal();
+  };
+  return () => {
+    btn.hidden = false;
+  };
+}
 function closeModal(modal){
   if (!modal) return;
   modal.classList.remove("active");
@@ -150,7 +162,8 @@ function showSuccessSplash(){
 // Wire modal triggers
 document.addEventListener("click", (e)=>{
   const t = e.target;
-  if (t.matches("#btnOpenTimeoff")) { e.preventDefault(); openTimeoffModal(); }
+  const timeoffBtn = t.closest?.("#btnOpenTimeoff, #btnOpenTimeoffMobile, #btnOpenTimeoffInlineMobile");
+  if (timeoffBtn) { e.preventDefault(); openTimeoffModal(); }
   if (t.matches("[data-close-modal]")) {
     e.preventDefault();
     closeModal(t.closest(".modal"));
@@ -2058,6 +2071,7 @@ function toInputDate(v){
 
 // ===== Tabs (re-usable) =====
 function wireTabs(){
+  const syncMobileTimeoffButton = ensureMobileTimeoffButton();
   $all(".tab").forEach(btn=>{
     btn.onclick = () => {
       $all(".tab").forEach(b=> b.classList.remove("active"));
@@ -2068,8 +2082,10 @@ function wireTabs(){
         p.toggleAttribute("hidden", !isActive);
         p.classList.toggle("active", isActive);
       });
+      syncMobileTimeoffButton?.();
     };
   });
+  syncMobileTimeoffButton?.();
 }
 wireTabs();
 
@@ -2746,6 +2762,21 @@ function setupBalanceCardTables(){
   // usamos data-current-kind para saber qué tarjeta está abierta
   details.dataset.currentKind = details.dataset.currentKind || "";
 
+  const syncTableLabels = (table) => {
+    if (!table) return;
+    const headers = Array.from(table.querySelectorAll("thead th")).map((th) =>
+      (th.textContent || "").trim()
+    );
+    table.querySelectorAll("tbody tr").forEach((tr) => {
+      const cells = Array.from(tr.children).filter((node) => node.tagName === "TD");
+      cells.forEach((td, index) => {
+        const label = headers[index] || "";
+        if (label) td.setAttribute("data-label", label);
+        else td.removeAttribute("data-label");
+      });
+    });
+  };
+
   container.addEventListener("click", (ev) => {
     const row = ev.target.closest(".row");
     if (!row || !container.contains(row)) return;
@@ -2810,6 +2841,7 @@ function setupBalanceCardTables(){
         ${values.map(v => `<td>${v}</td>`).join("")}
       </tr>
     `;
+    syncTableLabels(details.querySelector(".balances-details-table"));
 
     // 🔹 rellenar historial con días aprobados de ese tipo
     if (histBody){
@@ -2841,6 +2873,7 @@ function setupBalanceCardTables(){
         }).join("");
         histBody.innerHTML = rowsHtml;
       }
+      syncTableLabels(histTable);
     }
 
     details.hidden = false;

@@ -3328,6 +3328,62 @@ input:focus, select:focus, textarea:focus{
   --category-row: rgba(56,153,67,0.08);
   --category-row-hover: rgba(56,153,67,0.16);
 }
+
+/* Match detail panel with the selected balance card */
+#balancesDetails[data-current-kind]{
+  border-color: var(--category-border) !important;
+  box-shadow: 0 10px 30px color-mix(in oklab, var(--category-color) 10%, rgba(0,0,0,0.05));
+}
+
+#balancesDetails[data-current-kind] .balances-history-title,
+#balancesDetails[data-current-kind] tbody td:last-child,
+#balancesDetails[data-current-kind] tbody td.t-right{
+  color: var(--category-color) !important;
+}
+
+#balancesDetails[data-current-kind] tbody td{
+  color: color-mix(in oklab, var(--category-color) 72%, #0f172a) !important;
+  background: transparent !important;
+}
+
+#balancesDetails[data-current-kind] thead th{
+  color: var(--category-color) !important;
+  background: color-mix(in oklab, var(--category-bg) 82%, #ffffff) !important;
+  border-bottom-color: color-mix(in oklab, var(--category-color) 26%, var(--category-border)) !important;
+}
+
+#balancesDetails[data-current-kind] .balances-details-table{
+  border-color: var(--category-border) !important;
+}
+
+#balancesDetails[data-current-kind] tbody tr:nth-child(odd) td,
+#balancesDetails[data-current-kind] tbody tr:nth-child(even) td,
+#balancesDetails[data-current-kind] tbody tr:hover td{
+  background: transparent !important;
+}
+
+#balancesDetails[data-current-kind="vacation"] .balances-history-title,
+#balancesDetails[data-current-kind="vacation"] thead th,
+#balancesDetails[data-current-kind="vacation"] tbody td:last-child,
+#balancesDetails[data-current-kind="vacation"] tbody td.t-right{
+  color: var(--vac-text) !important;
+}
+
+#balancesDetails[data-current-kind="vintti_day"]{
+  --category-bg: #eef4ff;
+  --category-color: var(--vd-text);
+  --category-border: #c9d9ff;
+  --category-row: rgba(37,99,235,0.08);
+  --category-row-hover: rgba(37,99,235,0.16);
+}
+
+#balancesDetails[data-current-kind="holiday"]{
+  --category-bg: #f4efff;
+  --category-color: var(--hol-text);
+  --category-border: #d8ccff;
+  --category-row: rgba(91,66,214,0.08);
+  --category-row-hover: rgba(91,66,214,0.16);
+}
 /* =========================================================
    My Requests — FIX REAL (Action a la derecha, Safari-proof)
    SOLO #requestsTable
@@ -3492,5 +3548,836 @@ input:focus, select:focus, textarea:focus{
   .admin-user-actions{
     width:100%;
     justify-content:flex-end;
+  }
+}
+
+/* =========================================================
+   Profile responsive overrides
+   Consolidates the profile page layout for tablet/mobile
+   ========================================================= */
+
+.view,
+.edit,
+.panel,
+.card,
+.header-card,
+.info-grid,
+.form-card .grid,
+.requests,
+.balances,
+.approvals-history,
+.teampto-table,
+.approvals-table,
+.requests-table,
+.balances-details,
+.org-image-card,
+.org-mood-card,
+.modal__dialog,
+.quick-card,
+.pto-quick-card{
+  max-width: 100%;
+}
+
+.field textarea,
+.field select{
+  width: 100%;
+}
+
+.value--multiline,
+#v_about,
+#v_hobbies,
+#v_fun_fact,
+#uqAbout,
+#uqFunFact{
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 1100px){
+  .page{
+    margin: 24px auto;
+    padding: 0 14px 40px;
+  }
+
+  .panel{
+    padding: 20px;
+  }
+
+  .view,
+  .edit{
+    margin: 20px auto;
+    padding: 0;
+  }
+
+  .card,
+  .header-card{
+    margin: 20px 0;
+  }
+
+  .card{
+    padding: 18px;
+  }
+
+  .header{
+    align-items: flex-start;
+    flex-direction: column;
+    margin-bottom: 28px;
+  }
+
+  .tabs{
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .tab{
+    flex: 1 1 220px;
+    text-align: center;
+  }
+
+  .info-grid,
+  .form-card .grid,
+  .grid,
+  .grid-compact{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .requests,
+  .balances,
+  .approvals-history,
+  .teampto-table,
+  .approvals-table,
+  .requests-table,
+  .balances-details,
+  .org-image-card,
+  .org-mood-card{
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 900px){
+  .page{
+    margin: 18px auto;
+    padding: 0 12px 96px;
+  }
+
+  .panel{
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .header-card,
+  .card-head,
+  .admin-card__head,
+  .requests-head,
+  .balances-head,
+  .teampto-head,
+  .approvals-head,
+  .admin-foot,
+  .actions{
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-right,
+  .header-right .btn,
+  .card-head .actions,
+  .form-card .actions .btn,
+  .admin-foot .btn{
+    width: 100%;
+  }
+
+  .header-left{
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .avatar{
+    width: 104px;
+    height: 104px;
+    flex: 0 0 104px;
+  }
+
+  .who{
+    min-width: 0;
+  }
+
+  .who .name{
+    font-size: 20px;
+    line-height: 1.15;
+  }
+
+  .info-grid,
+  .form-card .grid,
+  .grid,
+  .grid-compact,
+  .quick-grid--details,
+  .pto-quick-grid,
+  .pto-quick-totals{
+    grid-template-columns: 1fr;
+  }
+
+  .info-field--wide,
+  .field--full,
+  .field-span,
+  .qfield--accent{
+    grid-column: auto;
+  }
+
+  .modal__dialog,
+  .modal__dialog.quick-card,
+  .modal__dialog.pto-quick-card,
+  .modal__dialog.admin-delete{
+    width: min(100%, 92vw);
+    margin: 5vh auto;
+    padding: 14px;
+  }
+
+  .approvals-history .approvals-table,
+  .requests-table,
+  #requestsTable.requests-table,
+  .approvals-table,
+  .teampto-table{
+    min-width: 760px;
+  }
+
+  .balances-details-table{
+    min-width: 620px;
+  }
+
+  #btnOpenTimeoff{
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    width: auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px){
+  .page{
+    padding: 0 10px 104px;
+  }
+
+  .title{
+    font-size: 20px;
+  }
+
+  .tabs{
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .tab{
+    flex: 1 1 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .header-card,
+  .header-left{
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .header-left{
+    gap: 12px;
+  }
+
+  .card,
+  .header-card,
+  .admin-card,
+  .approvals-history,
+  .requests,
+  .balances{
+    padding: 14px;
+    margin: 16px 0;
+    border-radius: 16px;
+  }
+
+  .who .name,
+  .org-title,
+  .admin-card__title,
+  .approvals-history-title,
+  .balances-title,
+  .teampto-title{
+    font-size: 18px;
+  }
+
+  .modal__head{
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .btn,
+  .btn.primary,
+  .btn.fun{
+    min-height: 44px;
+  }
+
+  .quick-panel,
+  .org-image-card,
+  .org-mood-card{
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px){
+  .page{
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .panel{
+    padding: 12px;
+  }
+
+  .card,
+  .header-card,
+  .admin-card,
+  .approvals-history,
+  .requests,
+  .balances{
+    padding: 12px;
+    margin: 12px 0;
+  }
+
+  .avatar{
+    width: 88px;
+    height: 88px;
+    flex-basis: 88px;
+  }
+
+  .who .name{
+    font-size: 17px;
+  }
+
+  .muted,
+  .info-field .value,
+  .field input,
+  .field textarea,
+  .field select{
+    font-size: 14px;
+  }
+
+  .approvals-history .approvals-table,
+  .requests-table,
+  #requestsTable.requests-table,
+  .approvals-table,
+  .teampto-table{
+    min-width: 680px;
+  }
+
+  .balances-details-table{
+    min-width: 560px;
+  }
+}
+
+/* =========================================================
+   Time Off Balances final responsive/cards fix
+   ========================================================= */
+
+#balancesTable{
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  align-items: stretch !important;
+  padding: 8px 0 12px !important;
+}
+
+#balancesTable > .th{
+  display: none !important;
+}
+
+#balancesTable > .row,
+#balancesTable > .row[data-kind]{
+  display: grid !important;
+  grid-template-rows: minmax(92px, auto) minmax(190px, 1fr) !important;
+  grid-column: auto !important;
+  grid-column-start: auto !important;
+  grid-column-end: auto !important;
+  min-width: 0 !important;
+  min-height: 282px;
+  height: 100%;
+}
+
+#balancesTable > .row[data-kind]::after{
+  display: none !important;
+}
+
+#balancesTable > .row > .cell:first-child,
+#balancesTable > .row[data-kind] > .cell:first-child{
+  display: grid !important;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 18px 20px 16px !important;
+}
+
+#balancesTable > .row > .cell:last-child,
+#balancesTable > .row[data-kind] > .cell:last-child{
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 190px;
+  padding: 26px 18px 30px !important;
+}
+
+#balancesTable .metric{
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+#balancesTable .badge-soft{
+  flex: 0 0 auto;
+  justify-self: start;
+  white-space: normal;
+}
+
+#balancesTable .metric .name,
+#balancesTable .name{
+  min-width: 0;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  line-height: 1.2;
+  font-size: clamp(15px, 1.35vw, 18px);
+}
+
+#balancesTable .kpi{
+  display: block;
+  width: 100%;
+  text-align: center;
+  white-space: normal;
+  font-size: clamp(42px, 4.2vw, 56px) !important;
+  line-height: 1.02 !important;
+}
+
+#balancesTable > .row[data-kind="vacation"] .kpi{
+  color: var(--vac-text) !important;
+}
+
+#balancesTable > .row[data-kind="vintti_day"] .kpi{
+  color: var(--vd-text) !important;
+}
+
+#balancesTable > .row[data-kind="holiday"] .kpi{
+  color: var(--hol-text) !important;
+}
+
+#balancesTable > .row[data-kind="holiday"]{
+  --tone: var(--hol-text) !important;
+}
+
+#balancesTable > .row[data-kind="holiday"] > .cell:first-child{
+  background:
+    linear-gradient(
+      180deg,
+      #f3edff 0%,
+      #eef2ff 52%,
+      #f7f4ff 100%
+    ) !important;
+}
+
+#balancesTable > .row[data-kind="holiday"] > .cell:first-child::after{
+  background:
+    radial-gradient(circle, color-mix(in oklab, var(--hol-text) 24%, #d1d5db) 2px, transparent 2.6px)
+    left center/16px 10px repeat-x !important;
+  opacity: .5 !important;
+}
+
+#balancesTable > .row[data-kind="holiday"]{
+  border-color: rgba(2,6,23,.08) !important;
+}
+
+#balancesTable > .row[data-kind="holiday"] .badge--hol{
+  background: #f6f1ff !important;
+  border-color: #b8a8ff !important;
+  color: var(--hol-text) !important;
+}
+
+#balancesTable > .row:nth-child(3),
+#balancesTable > .row:nth-child(4),
+#balancesTable > .row:nth-child(5),
+#balancesTable > .row:nth-child(6),
+#balancesTable > .row:nth-child(7),
+#balancesTable > .row:nth-child(8),
+#balancesTable > .row:nth-child(9),
+#balancesTable > .row:nth-child(10),
+#balancesTable > .row:nth-child(11),
+#balancesTable > .row:nth-child(12),
+#balancesTable > .row:nth-child(13){
+  grid-column: auto !important;
+  grid-column-start: auto !important;
+  grid-column-end: auto !important;
+}
+
+#balancesTable > .row:nth-child(5) > .cell:last-child::after,
+#balancesTable > .row:nth-child(7) > .cell:last-child::after,
+#balancesTable > .row:nth-child(10) > .cell:last-child::after,
+#balancesTable > .row:nth-child(13) > .cell:last-child::after{
+  display: none !important;
+}
+
+#balancesDetails{
+  overflow: hidden;
+}
+
+#balancesDetails .balances-history{
+  overflow-x: auto;
+}
+
+@media (max-width: 1100px){
+  #balancesTable{
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #balancesTable > .row,
+  #balancesTable > .row[data-kind]{
+    min-height: 270px;
+  }
+
+  #balancesTable .metric .name,
+  #balancesTable .name{
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 900px){
+  #balancesTable{
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  #balancesTable > .row,
+  #balancesTable > .row[data-kind]{
+    grid-template-rows: minmax(88px, auto) minmax(152px, 1fr) !important;
+    min-height: 240px;
+  }
+
+  #balancesTable > .row > .cell:first-child,
+  #balancesTable > .row[data-kind] > .cell:first-child{
+    min-height: 88px;
+    padding: 16px 16px 14px !important;
+  }
+
+  #balancesTable > .row > .cell:last-child,
+  #balancesTable > .row[data-kind] > .cell:last-child{
+    min-height: 152px;
+    padding: 22px 16px 24px !important;
+  }
+
+  #balancesTable .metric .name,
+  #balancesTable .name{
+    font-size: 16px;
+  }
+
+  #balancesTable .kpi{
+    font-size: clamp(34px, 9vw, 48px) !important;
+  }
+
+  #balancesDetails{
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  #balancesDetails .balances-details-table{
+    min-width: 560px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px){
+  #balancesTable > .row,
+  #balancesTable > .row[data-kind]{
+    min-height: 228px;
+  }
+
+  #balancesTable > .row > .cell:first-child,
+  #balancesTable > .row[data-kind] > .cell:first-child{
+    justify-items: start;
+    gap: 10px;
+    padding: 14px 14px 12px !important;
+  }
+
+  #balancesTable .metric{
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+
+  #balancesTable .badge-soft{
+    white-space: normal;
+  }
+
+  #balancesTable .metric .name,
+  #balancesTable .name{
+    font-size: 15px;
+  }
+
+  #balancesTable > .row > .cell:last-child,
+  #balancesTable > .row[data-kind] > .cell:last-child{
+    min-height: 140px;
+    padding: 18px 14px 20px !important;
+  }
+
+  #balancesTable .kpi{
+    font-size: clamp(30px, 10vw, 42px) !important;
+    white-space: normal;
+  }
+
+  #balancesDetails{
+    padding: 0.85rem;
+    border-radius: 16px;
+  }
+
+  #balancesDetails thead th,
+  #balancesDetails tbody td{
+    padding: 0.7rem 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  #balancesDetails .balances-details-table{
+    min-width: 520px;
+  }
+
+  #balancesDetails{
+    overflow: visible;
+  }
+
+  #balancesDetails .balances-details-table{
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  #balancesDetails .balances-details-table thead{
+    display: none;
+  }
+
+  #balancesDetails .balances-details-table,
+  #balancesDetails .balances-details-table tbody,
+  #balancesDetails .balances-details-table tr,
+  #balancesDetails .balances-details-table td{
+    display: block;
+    width: 100%;
+  }
+
+  #balancesDetails .balances-details-table tbody{
+    display: grid;
+    gap: 10px;
+  }
+
+  #balancesDetails .balances-details-table tr{
+    border: 1px solid color-mix(in oklab, var(--category-border, rgba(0,0,0,0.08)) 80%, #ffffff);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  #balancesDetails .balances-details-table td{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    text-align: right;
+    border-bottom: 1px solid rgba(15,23,42,0.06);
+  }
+
+  #balancesDetails .balances-details-table td:last-child{
+    border-bottom: 0;
+  }
+
+  #balancesDetails .balances-details-table td::before{
+    content: attr(data-label);
+    flex: 0 0 48%;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--category-color) !important;
+  }
+
+  #balancesDetails .balances-details-table td[colspan]{
+    display: block;
+    text-align: left;
+    padding: 14px;
+  }
+
+  #balancesDetails .balances-details-table td[colspan]::before{
+    content: none;
+  }
+
+  #balancesDetails .balances-history{
+    overflow-x: visible;
+  }
+
+  #balancesDetails[data-current-kind="vacation"] > .balances-details-table tbody td:nth-child(1)::before{
+    content: "Vacaciones acumuladas";
+  }
+
+  #balancesDetails[data-current-kind="vacation"] > .balances-details-table tbody td:nth-child(2)::before{
+    content: "Vacaciones habiles";
+  }
+
+  #balancesDetails[data-current-kind="vacation"] > .balances-details-table tbody td:nth-child(3)::before{
+    content: "Vacaciones consumidas";
+  }
+
+  #balancesDetails[data-current-kind="vacation"] > .balances-details-table tbody td:nth-child(4)::before{
+    content: "Vacaciones disponibles";
+  }
+
+  #balancesDetails[data-current-kind="vintti_day"] > .balances-details-table tbody td:nth-child(1)::before{
+    content: "Vintti Days totales";
+  }
+
+  #balancesDetails[data-current-kind="vintti_day"] > .balances-details-table tbody td:nth-child(2)::before{
+    content: "Vintti Days consumidas";
+  }
+
+  #balancesDetails[data-current-kind="vintti_day"] > .balances-details-table tbody td:nth-child(3)::before{
+    content: "Vintti Days disponibles";
+  }
+
+  #balancesDetails[data-current-kind="holiday"] > .balances-details-table tbody td:nth-child(1)::before{
+    content: "Holidays totales";
+  }
+
+  #balancesDetails[data-current-kind="holiday"] > .balances-details-table tbody td:nth-child(2)::before{
+    content: "Holidays consumidos";
+  }
+
+  #balancesDetails[data-current-kind="holiday"] > .balances-details-table tbody td:nth-child(3)::before{
+    content: "Holidays disponibles";
+  }
+
+  #balancesHistoryTable tbody td:nth-child(1)::before{
+    content: "Start date";
+  }
+
+  #balancesHistoryTable tbody td:nth-child(2)::before{
+    content: "End date";
+  }
+
+  #balancesHistoryTable tbody td:nth-child(3)::before{
+    content: "Days used";
+  }
+
+  #balancesDetails[data-current-kind] .balances-details-table tbody td{
+    color: var(--category-color) !important;
+  }
+
+  #balancesDetails[data-current-kind] .balances-details-table tbody td:last-child,
+  #balancesDetails[data-current-kind] .balances-details-table tbody td.t-right{
+    color: var(--category-color) !important;
+  }
+
+  #balancesDetails[data-current-kind="vacation"] .balances-details-table tbody td,
+  #balancesDetails[data-current-kind="vacation"] .balances-details-table tbody td::before{
+    color: var(--vac-text) !important;
+  }
+
+  #balancesDetails[data-current-kind="vintti_day"] .balances-details-table tbody td,
+  #balancesDetails[data-current-kind="vintti_day"] .balances-details-table tbody td::before{
+    color: var(--vd-text) !important;
+  }
+
+  #balancesDetails[data-current-kind="holiday"] .balances-details-table tbody td,
+  #balancesDetails[data-current-kind="holiday"] .balances-details-table tbody td::before{
+    color: var(--hol-text) !important;
+  }
+
+  #balancesDetails[data-current-kind] .balances-details-table tbody td:last-child{
+    font-weight: 900 !important;
+  }
+
+  #balancesDetails[data-current-kind="vacation"] .balances-details-table tbody td:last-child{
+    color: var(--vac-text) !important;
+  }
+
+  #balancesDetails[data-current-kind="vintti_day"] .balances-details-table tbody td:last-child{
+    color: var(--vd-text) !important;
+  }
+
+  #balancesDetails[data-current-kind="holiday"] .balances-details-table tbody td:last-child{
+    color: var(--hol-text) !important;
+  }
+}
+
+/* Final override: detail body cells stay transparent */
+#balancesDetails .balances-details-table tbody td{
+  background: transparent !important;
+}
+
+#balancesDetails .balances-details-table tbody tr,
+#balancesDetails .balances-details-table tbody tr:nth-child(odd),
+#balancesDetails .balances-details-table tbody tr:nth-child(even),
+#balancesDetails .balances-details-table tbody tr:hover{
+  background: transparent !important;
+}
+
+/* Keep Take a Break visible on mobile */
+.mobile-timeoff-cta{
+  display: none !important;
+}
+
+.mobile-inline-timeoff{
+  display: none;
+}
+
+@media (max-width: 900px){
+  .timeoff-actions{
+    display: block !important;
+    position: static !important;
+    height: auto !important;
+    margin: 0 0 16px !important;
+  }
+
+  .mobile-inline-timeoff{
+    display: none !important;
+  }
+
+  #btnOpenTimeoff,
+  #btnOpenTimeoff.btn.fun,
+  #btnOpenTimeoffInlineMobile{
+    display: flex !important;
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    min-height: 52px;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 18px !important;
+    border-radius: 16px !important;
+    font-size: 15px !important;
+    background: #111111 !important;
+    color: #ffffff !important;
+    border: 1px solid #111111 !important;
+    box-shadow: 0 12px 28px rgba(15,23,42,.14) !important;
+    margin: 0 auto !important;
+  }
+
+  .mobile-timeoff-cta{
+    display: none !important;
+  }
+
+  .page{
+    padding-bottom: 96px !important;
   }
 }
