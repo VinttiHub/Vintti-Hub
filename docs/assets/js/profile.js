@@ -125,7 +125,15 @@ function showToast(el, text, ok=true){
   el.style.color = ok ? "#0f766e" : "#b91c1c";
   setTimeout(()=> el.textContent = "", 3500);
 }
-function openTimeoffModal(){ $("#timeoffModal").classList.add("active"); $("#timeoffModal").setAttribute("open",""); }
+function syncModalBodyLock(){
+  const hasOpenModal = !!document.querySelector(".modal.active, .modal[open]");
+  document.body.classList.toggle("modal-open", hasOpenModal);
+}
+function openTimeoffModal(){
+  $("#timeoffModal").classList.add("active");
+  $("#timeoffModal").setAttribute("open","");
+  syncModalBodyLock();
+}
 function ensureMobileTimeoffButton(){
   const btn = document.getElementById("btnOpenTimeoffMobile");
   if (!btn) return () => {};
@@ -142,6 +150,7 @@ function closeModal(modal){
   if (!modal) return;
   modal.classList.remove("active");
   modal.removeAttribute("open");
+  syncModalBodyLock();
   if (modal.id === "adminDeleteModal"){
     ADMIN_DELETE_TARGET = null;
     setAdminDeleteStatus("");
@@ -976,10 +985,10 @@ function resolveProfileAvatarSource({ avatar_url, email_vintti, user_id }){
 }
 
 // —— Quick Profile helpers —— //
-function openUserQuick(){ closeUserPtoQuick(); const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
-function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
-function openUserPtoQuick(){ closeUserQuick(); const m = $("#userPtoModal"); m?.classList.add("active"); m?.setAttribute("open",""); }
-function closeUserPtoQuick(){ const m = $("#userPtoModal"); m?.classList.remove("active"); m?.removeAttribute("open"); }
+function openUserQuick(){ closeUserPtoQuick(); const m = $("#userQuickModal"); m?.classList.add("active"); m?.setAttribute("open",""); syncModalBodyLock(); }
+function closeUserQuick(){ const m = $("#userQuickModal"); m?.classList.remove("active"); m?.removeAttribute("open"); syncModalBodyLock(); }
+function openUserPtoQuick(){ closeUserQuick(); const m = $("#userPtoModal"); m?.classList.add("active"); m?.setAttribute("open",""); syncModalBodyLock(); }
+function closeUserPtoQuick(){ const m = $("#userPtoModal"); m?.classList.remove("active"); m?.removeAttribute("open"); syncModalBodyLock(); }
 
 // Avatar for quick card
 function setQuickAvatar({ user_name, avatar_url, initials, email_vintti, user_id }){

@@ -49,6 +49,9 @@ body{
   color: var(--text);
   background: var(--bg);
 }
+body.modal-open{
+  overflow: hidden;
+}
 img{ max-width:100%; display:block; }
 
 /* ---------- Layout ---------- */
@@ -4337,6 +4340,19 @@ input:focus, select:focus, textarea:focus{
   display: none;
 }
 
+#userQuickModal,
+#userPtoModal{
+  overflow: hidden;
+}
+
+#userQuickModal .modal__dialog,
+#userPtoModal .modal__dialog{
+  max-height: min(88vh, 920px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 900px){
   .timeoff-actions{
     display: block !important;
@@ -4379,5 +4395,138 @@ input:focus, select:focus, textarea:focus{
 
   .page{
     padding-bottom: 96px !important;
+  }
+
+  #userQuickModal,
+  #userPtoModal{
+    padding: 12px 0;
+  }
+
+  #userQuickModal .modal__dialog,
+  #userPtoModal .modal__dialog{
+    width: min(94vw, 680px) !important;
+    max-height: calc(100vh - 24px) !important;
+    margin: 12px auto !important;
+    padding: 16px !important;
+    border-radius: 24px !important;
+  }
+
+  #userQuickModal .modal__head,
+  #userPtoModal .modal__head{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: inherit;
+    padding-bottom: 10px;
+  }
+}
+
+@media (max-width: 640px){
+  #userQuickModal .modal__dialog,
+  #userPtoModal .modal__dialog{
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    height: calc(100dvh - 16px) !important;
+    margin: 8px auto !important;
+    padding: 12px !important;
+    border-radius: 20px !important;
+  }
+
+  .quick-card--collage{
+    padding: 0 !important;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,255,255,.96)),
+      radial-gradient(circle at top center, rgba(255,212,59,.14), transparent 36%) !important;
+  }
+
+  .quick-collage{
+    gap: 14px !important;
+  }
+
+  .quick-panel{
+    padding: 14px !important;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 26px rgba(15,23,42,.08) !important;
+  }
+
+  .quick-panel--hero{
+    min-height: 0 !important;
+    grid-template-columns: 88px minmax(0, 1fr) !important;
+    gap: 12px !important;
+    align-items: center !important;
+    text-align: left !important;
+    padding: 12px !important;
+    background:
+      linear-gradient(135deg, #fff7dc 0%, #ffffff 58%, #eef4ff 100%) !important;
+  }
+
+  .quick-avatar--feature{
+    min-height: 88px !important;
+    width: 88px !important;
+    height: 88px !important;
+    max-height: none !important;
+    border-radius: 26px !important;
+    justify-self: start !important;
+  }
+
+  .quick-main{
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .quick-main::before{
+    width: 56px;
+    height: 6px;
+    margin-bottom: 0;
+  }
+
+  .quick-name{
+    font-size: 18px !important;
+    line-height: 1.15;
+    margin-top: 0;
+  }
+
+  .quick-meta{
+    flex-wrap: wrap;
+    row-gap: 6px;
+    font-size: 14px;
+    justify-content: flex-start !important;
+  }
+
+  .quick-kicker{
+    padding: 6px 10px;
+    font-size: 10px;
+    margin-bottom: 10px;
+  }
+
+  .quick-copy{
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .quick-panel--story,
+  .quick-panel--chips,
+  .quick-panel--details,
+  .quick-panel--fact{
+    padding: 14px !important;
+  }
+
+  .qfield{
+    min-height: 0;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .qfield span:last-child{
+    font-size: 14px;
+  }
+
+  .quick-chip{
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .quick-chip-list{
+    gap: 8px;
   }
 }
