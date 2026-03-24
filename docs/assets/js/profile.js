@@ -691,8 +691,11 @@ function renderTeamPtoTable(users){
   `;
 
   if (!users?.length){
-    host.innerHTML = header + `
-      <div class="cell plain" style="grid-column:1/-1;justify-content:center;">No data.</div>
+    host.innerHTML = `
+      <div class="teampto-grid">
+        ${header}
+        <div class="cell plain" style="grid-column:1/-1;justify-content:center;">No data.</div>
+      </div>
     `;
     return;
   }
@@ -774,7 +777,13 @@ function renderTeamPtoTable(users){
     </div>
   `;
 
-  host.innerHTML = header + rows + summary;
+  host.innerHTML = `
+    <div class="teampto-grid">
+      ${header}
+      ${rows}
+      ${summary}
+    </div>
+  `;
 }
 // ===== PTO Calendar (Approvals) =====
 
