@@ -955,8 +955,8 @@ function buildFilterBreakdown(label, filterValue, scoreValue, details) {
   if (!filterValue) {
     return {
       category: label,
-      percent: 0,
-      detail: "Filtro no definido.",
+      percent: null,
+      detail: "Filtro no definido para esta vacante.",
     };
   }
   if (scoreValue == null) {
@@ -1036,8 +1036,8 @@ function buildYearsBreakdown(profile) {
   if (!filterValue) {
     return {
       category: "Años de experiencia (filtro)",
-      percent: 0,
-      detail: "Filtro no definido.",
+      percent: null,
+      detail: "Filtro no definido para esta vacante.",
     };
   }
 
@@ -1172,10 +1172,12 @@ function buildMatchModel(profile, score, reasonsRaw) {
   const breakdownSource = parsed?.breakdown?.length
     ? parsed.breakdown
     : buildFallbackBreakdown(profile, score);
-  const breakdown = breakdownSource.map((item) => ({
-    ...item,
-    percent: normalizePercent(item.percent, 0),
-  }));
+  const breakdown = breakdownSource
+    .filter((item) => normalizeText(item?.category) !== "similitud con la jd")
+    .map((item) => ({
+      ...item,
+      percent: normalizePercent(item.percent, item.percent == null ? null : 0),
+    }));
   return {
     percent: overallPercent,
     summary,
@@ -1184,6 +1186,7 @@ function buildMatchModel(profile, score, reasonsRaw) {
 }
 
 function getScoreTone(percent) {
+  if (!Number.isFinite(percent)) return "score-na";
   if (percent >= 70) return "score-high";
   if (percent >= 40) return "score-mid";
   return "score-low";
@@ -1288,13 +1291,14 @@ function renderApplicantDrawer(entry) {
   );
   const breakdownHtml = match.breakdown
     .map((item) => {
-      const percentValue = normalizePercent(item.percent, 0);
+      const percentValue = normalizePercent(item.percent, null);
       const tone = getScoreTone(percentValue);
+      const percentLabel = percentValue == null ? "N/A" : `${percentValue}%`;
       return `
         <div class="score-row ${tone}">
           <div class="score-row-head">
             <span class="score-category">${escapeHtml(item.category)}</span>
-            <span class="score-percent">${escapeHtml(percentValue)}%</span>
+            <span class="score-percent">${escapeHtml(percentLabel)}</span>
           </div>
           <p class="score-detail">${escapeHtml(item.detail || "Sin detalle adicional.")}</p>
         </div>

@@ -845,6 +845,11 @@ body.chat-expanded .chat-panel {
   border-color: rgba(139, 47, 47, 0.12);
 }
 
+.score-row.score-na {
+  background: rgba(235, 238, 244, 0.92);
+  border-color: rgba(91, 104, 129, 0.14);
+}
+
 .score-row-head {
   display: flex;
   justify-content: space-between;
