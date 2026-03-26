@@ -38,6 +38,7 @@ const els = {
   candidatesGrid: document.getElementById("candidatesGrid"),
   candidatesEmpty: document.getElementById("candidatesEmpty"),
   refreshApplicantsBtn: document.getElementById("refreshApplicantsBtn"),
+  refreshMatchScoresBtn: document.getElementById("refreshMatchScoresBtn"),
   refreshApplicantsStatus: document.getElementById("refreshApplicantsStatus"),
   applicantDrawer: document.getElementById("applicantDrawer"),
   drawerClose: document.getElementById("drawerClose"),
@@ -163,7 +164,13 @@ function normalizeText(value) {
 function setRefreshApplicantsBusy(isBusy) {
   if (!els.refreshApplicantsBtn) return;
   els.refreshApplicantsBtn.disabled = Boolean(isBusy);
-  els.refreshApplicantsBtn.textContent = isBusy ? "Refreshing..." : "Refresh CVs";
+  els.refreshApplicantsBtn.textContent = isBusy ? "Refreshing CVs..." : "Refresh CVs";
+}
+
+function setRefreshMatchScoresBusy(isBusy) {
+  if (!els.refreshMatchScoresBtn) return;
+  els.refreshMatchScoresBtn.disabled = Boolean(isBusy);
+  els.refreshMatchScoresBtn.textContent = isBusy ? "Refreshing scores..." : "Refresh Match Scores";
 }
 
 function updateLoadingGameStats() {
@@ -294,6 +301,34 @@ async function backfillApplicantsAI(opportunityId) {
   }
 }
 
+async function refreshMatchScores(opportunityId) {
+  if (!opportunityId) {
+    setRefreshApplicantsStatus("Missing opportunity id.");
+    return;
+  }
+
+  setRefreshMatchScoresBusy(true);
+  setRefreshApplicantsStatus("Recalculating match scores...");
+
+  try {
+    const result = await fetchJSON(`${API_BASE}/applicants/recalculate_scores`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        opportunity_id: opportunityId,
+        filters: state.filters,
+      }),
+    });
+    setRefreshApplicantsStatus(`Updated ${result.updated || 0} applicants`);
+    await loadApplicants(opportunityId);
+  } catch (err) {
+    console.error("Match score refresh failed", err);
+    setRefreshApplicantsStatus("Score refresh failed. Try again.");
+  } finally {
+    setRefreshMatchScoresBusy(false);
+  }
+}
+
 async function recalculateApplicants(opportunityId) {
   if (!opportunityId) return;
   try {
@@ -372,6 +407,13 @@ async function loadApplicantQuestions(opportunityId) {
     question_2: data?.question_2 || "Question 2",
     question_3: data?.question_3 || "Question 3",
   };
+  if (Array.isArray(state.candidates) && state.candidates.length) {
+    state.candidates = state.candidates.map((entry) => ({
+      ...entry,
+      profile: buildApplicantProfile(entry.pipeline),
+    }));
+    renderCandidates();
+  }
 }
 
 async function extractFiltersFromOpportunity(opportunity) {
@@ -771,6 +813,11 @@ function buildApplicantProfile(applicant) {
     cvText,
     linkedin: applicant.linkedin_url || "",
     core: null,
+    screening: [
+      { question: state.applicantQuestions?.question_1 || "", answer: applicant.question_1 || "" },
+      { question: state.applicantQuestions?.question_2 || "", answer: applicant.question_2 || "" },
+      { question: state.applicantQuestions?.question_3 || "", answer: applicant.question_3 || "" },
+    ],
   };
 }
 
@@ -841,6 +888,98 @@ function scoreSalaryMatch(profile) {
     return isRangeNear(profile.salaryRange, filterRange) ? 1 : 0;
   }
   return matchesTextFilter("", state.filters.salary, profile.searchableText) ? 1 : 0;
+}
+
+function getScreeningEntries(profile) {
+  return Array.isArray(profile?.screening)
+    ? profile.screening.filter((item) => String(item?.question || "").trim())
+    : [];
+}
+
+function scoreEnglishAnswer(answer) {
+  const text = normalizeText(answer);
+  if (!text) return 0;
+  if (/(native|fluent|advanced|c1|c2)/.test(text)) return 2;
+  if (/(intermediate|b1|b2|conversational)/.test(text)) return 1;
+  return 0;
+}
+
+function scoreScreeningEntry(item, profile) {
+  const question = normalizeText(item?.question);
+  const answer = normalizeText(item?.answer);
+  if (!question) return null;
+  if (!answer) return 0;
+
+  if (/(^|\b)(no|not yet|none|never|ninguna|ninguno)\b/.test(answer)) return 0;
+
+  if (question.includes("year") || question.includes("años") || question.includes("experience")) {
+    const filterYears = parseNumber(state.filters.years_experience) || findYearsFromText(state.filters.years_experience);
+    const answerYears = parseNumber(answer) || findYearsFromText(answer);
+    if (answerYears != null && filterYears != null) {
+      if (answerYears >= filterYears) return 2;
+      if (filterYears - answerYears <= 2) return 1;
+      return 0;
+    }
+  }
+
+  if (question.includes("english") || question.includes("inglés") || question.includes("ingles")) {
+    return scoreEnglishAnswer(answer);
+  }
+
+  if (question.includes("country") || question.includes("país") || question.includes("pais") || question.includes("location")) {
+    const countryScore = scoreTextMatch(answer, state.filters.country, profile.searchableText);
+    if (countryScore != null) return countryScore;
+  }
+
+  if (/(^|\b)(yes|si|sí)\b/.test(answer)) return 1;
+  if (answer.length >= 24) return 1;
+  if (answer.length >= 8) return 1;
+  return 0;
+}
+
+function scoreScreeningMatch(profile) {
+  const entries = getScreeningEntries(profile);
+  if (!entries.length) return null;
+  const values = entries
+    .map((item) => scoreScreeningEntry(item, profile))
+    .filter((value) => value != null);
+  if (!values.length) return null;
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Math.max(0, Math.min(2, Math.round(average * 10) / 10));
+}
+
+function screeningScoreToPercent(scoreValue) {
+  if (!Number.isFinite(scoreValue)) return null;
+  return normalizePercent(Math.round((Math.max(0, Math.min(2, scoreValue)) / 2) * 100), 0);
+}
+
+function buildScreeningBreakdown(profile) {
+  const entries = getScreeningEntries(profile);
+  if (!entries.length) {
+    return {
+      category: "Screening",
+      percent: null,
+      detail: "No hay preguntas de screening definidas para esta vacante.",
+    };
+  }
+
+  const answered = entries.filter((item) => String(item?.answer || "").trim());
+  const screeningScore = scoreScreeningMatch(profile);
+  const percent = screeningScoreToPercent(screeningScore);
+
+  if (!answered.length) {
+    return {
+      category: "Screening",
+      percent: 0,
+      detail: "La vacante tiene preguntas de screening, pero el candidato no dejó respuestas suficientes.",
+    };
+  }
+
+  return {
+    category: "Screening",
+    percent,
+    detail: `Se evaluaron ${answered.length} de ${entries.length} respuestas de screening y aportan evidencia ${percent >= 70 ? "fuerte" : percent >= 40 ? "parcial" : "limitada"} para el match.`,
+  };
 }
 
 function computeMatchScore(profile) {
@@ -1157,6 +1296,8 @@ function buildFallbackBreakdown(profile, score) {
     )
   );
 
+  breakdown.push(buildScreeningBreakdown(profile));
+
   return breakdown;
 }
 
@@ -1178,6 +1319,9 @@ function buildMatchModel(profile, score, reasonsRaw) {
       ...item,
       percent: normalizePercent(item.percent, item.percent == null ? null : 0),
     }));
+  if (!breakdown.some((item) => normalizeText(item?.category) === "screening")) {
+    breakdown.push(buildScreeningBreakdown(profile));
+  }
   return {
     percent: overallPercent,
     summary,
@@ -1498,6 +1642,10 @@ async function init() {
 
   if (els.refreshApplicantsBtn) {
     els.refreshApplicantsBtn.addEventListener("click", () => backfillApplicantsAI(opportunityId));
+  }
+
+  if (els.refreshMatchScoresBtn) {
+    els.refreshMatchScoresBtn.addEventListener("click", () => refreshMatchScores(opportunityId));
   }
 
   if (els.chatFab) {

@@ -8,7 +8,9 @@ from werkzeug.utils import secure_filename
 
 from ai_routes import (
     _build_opportunity_context,
+    _build_screening_context,
     _extract_pdf_text_with_openai,
+    _get_opportunity_screening_questions,
     _score_applicant_with_openai,
 )
 from db import get_connection
@@ -77,6 +79,14 @@ def _fetch_s3_bytes(s3_key: str) -> Optional[bytes]:
         return None
 
 
+def _screening_payload(question_1=None, question_2=None, question_3=None):
+    return {
+        "question_1": _clean_optional(question_1),
+        "question_2": _clean_optional(question_2),
+        "question_3": _clean_optional(question_3),
+    }
+
+
 def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None, dry_run=False):
     filters = filters or {}
     conn = get_connection()
@@ -87,6 +97,9 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                 applicant_id,
                 opportunity_id,
                 location,
+                question_1,
+                question_2,
+                question_3,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -120,6 +133,9 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
             applicant_id,
             opp_id,
             location,
+            question_1,
+            question_2,
+            question_3,
             s3_key,
             file_name,
             content_type,
@@ -146,14 +162,19 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
             if needs_score and extracted_pdf and opp_id:
                 if opp_id not in opp_cache:
                     jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
-                    opp_cache[opp_id] = (jd_plain, opp_context)
-                jd_plain, opp_context = opp_cache[opp_id]
+                    opportunity_questions = _get_opportunity_screening_questions(cur, opp_id)
+                    opp_cache[opp_id] = (jd_plain, opp_context, opportunity_questions)
+                jd_plain, opp_context, opportunity_questions = opp_cache[opp_id]
                 score, reason_text = _score_applicant_with_openai(
                     extracted_pdf,
                     location or "",
                     jd_plain,
                     filters=filters,
                     opportunity_context=opp_context,
+                    screening_context=_build_screening_context(
+                        opportunity_questions,
+                        _screening_payload(question_1, question_2, question_3),
+                    ),
                 )
                 if match_score is None and score is not None:
                     match_score = score
@@ -446,6 +467,7 @@ def create_applicant():
                     conn = get_connection()
                     cur = conn.cursor()
                     jd_plain, opp_context = _build_opportunity_context(cur, opportunity_id)
+                    opportunity_questions = _get_opportunity_screening_questions(cur, opportunity_id)
                     cur.close()
                     conn.close()
                     score, reasons = _score_applicant_with_openai(
@@ -454,6 +476,14 @@ def create_applicant():
                         jd_plain,
                         filters=None,
                         opportunity_context=opp_context,
+                        screening_context=_build_screening_context(
+                            opportunity_questions,
+                            _screening_payload(
+                                data.get("question_1"),
+                                data.get("question_2"),
+                                data.get("question_3"),
+                            ),
+                        ),
                     )
                 if extracted_pdf or score is not None or reasons:
                     _update_applicant_ai_fields(applicant_id, extracted_pdf, score, reasons)
@@ -482,9 +512,10 @@ def recalculate_applicant_scores():
         conn = get_connection()
         cur = conn.cursor()
         jd_plain, opp_context = _build_opportunity_context(cur, int(opportunity_id))
+        opportunity_questions = _get_opportunity_screening_questions(cur, int(opportunity_id))
         cur.execute(
             """
-            SELECT applicant_id, location, extracted_pdf
+            SELECT applicant_id, location, extracted_pdf, question_1, question_2, question_3
             FROM applicants
             WHERE opportunity_id = %s
             """,
@@ -492,7 +523,7 @@ def recalculate_applicant_scores():
         )
         rows = cur.fetchall()
         updated = 0
-        for applicant_id, location, extracted_pdf in rows:
+        for applicant_id, location, extracted_pdf, question_1, question_2, question_3 in rows:
             if not extracted_pdf:
                 continue
             score, reasons = _score_applicant_with_openai(
@@ -501,6 +532,10 @@ def recalculate_applicant_scores():
                 jd_plain,
                 filters=filters,
                 opportunity_context=opp_context,
+                screening_context=_build_screening_context(
+                    opportunity_questions,
+                    _screening_payload(question_1, question_2, question_3),
+                ),
             )
             if score is None and not reasons:
                 continue
@@ -543,8 +578,8 @@ def backfill_applicant_extracted_pdf():
         cur = conn.cursor()
 
         query = """
-            SELECT applicant_id, opportunity_id, location, cv_s3_key, cv_file_name, cv_content_type,
-                   extracted_pdf
+            SELECT applicant_id, opportunity_id, location, question_1, question_2, question_3,
+                   cv_s3_key, cv_file_name, cv_content_type, extracted_pdf
             FROM applicants
             WHERE (extracted_pdf IS NULL OR extracted_pdf = '')
         """
@@ -563,7 +598,7 @@ def backfill_applicant_extracted_pdf():
         extracted_count = 0
         scored_count = 0
 
-        for applicant_id, opp_id, location, s3_key, file_name, content_type, extracted_pdf in rows:
+        for applicant_id, opp_id, location, question_1, question_2, question_3, s3_key, file_name, content_type, extracted_pdf in rows:
             if not s3_key:
                 continue
             if extracted_pdf:
@@ -584,14 +619,19 @@ def backfill_applicant_extracted_pdf():
             if opp_id:
                 if opp_id not in opp_cache:
                     jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
-                    opp_cache[opp_id] = (jd_plain, opp_context)
-                jd_plain, opp_context = opp_cache[opp_id]
+                    opportunity_questions = _get_opportunity_screening_questions(cur, opp_id)
+                    opp_cache[opp_id] = (jd_plain, opp_context, opportunity_questions)
+                jd_plain, opp_context, opportunity_questions = opp_cache[opp_id]
                 score, reasons = _score_applicant_with_openai(
                     extracted_pdf,
                     location or "",
                     jd_plain,
                     filters=filters,
                     opportunity_context=opp_context,
+                    screening_context=_build_screening_context(
+                        opportunity_questions,
+                        _screening_payload(question_1, question_2, question_3),
+                    ),
                 )
             cur.execute(
                 """
@@ -674,6 +714,9 @@ def refresh_applicant_ai_fields(applicant_id):
                 applicant_id,
                 opportunity_id,
                 location,
+                question_1,
+                question_2,
+                question_3,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -693,6 +736,9 @@ def refresh_applicant_ai_fields(applicant_id):
             _,
             opp_id,
             location,
+            question_1,
+            question_2,
+            question_3,
             s3_key,
             file_name,
             content_type,
@@ -719,19 +765,24 @@ def refresh_applicant_ai_fields(applicant_id):
             extracted = True
             updated = True
 
-        if (match_score is None or reasons is None) and extracted_pdf and opp_id:
+        if extracted_pdf and opp_id:
             jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
+            opportunity_questions = _get_opportunity_screening_questions(cur, opp_id)
             score, reason_text = _score_applicant_with_openai(
                 extracted_pdf,
                 location or "",
                 jd_plain,
                 filters=filters,
                 opportunity_context=opp_context,
+                screening_context=_build_screening_context(
+                    opportunity_questions,
+                    _screening_payload(question_1, question_2, question_3),
+                ),
             )
-            if match_score is None and score is not None:
+            if score is not None:
                 match_score = score
                 updated = True
-            if (reasons is None or reasons == "") and reason_text:
+            if reason_text and reason_text != reasons:
                 reasons = reason_text
                 updated = True
             if score is not None or reason_text:

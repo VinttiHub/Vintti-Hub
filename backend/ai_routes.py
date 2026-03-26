@@ -289,18 +289,76 @@ def _build_opportunity_context(cursor, opportunity_id: Optional[int]):
     }
     return jd_plain, context
 
+
+def _get_opportunity_screening_questions(cursor, opportunity_id: Optional[int]):
+    if not opportunity_id:
+        return ["", "", ""]
+    try:
+        cursor.execute(
+            """
+            SELECT
+                question_1,
+                question_2,
+                question_3
+            FROM linkedin_hub
+            WHERE opportunity_id = %s
+            ORDER BY linkedin_hub_id DESC
+            LIMIT 1
+            """,
+            (int(opportunity_id),),
+        )
+        row = cursor.fetchone()
+    except Exception:
+        logging.exception("Failed to fetch screening questions for opportunity_id=%s", opportunity_id)
+        return ["", "", ""]
+    if not row:
+        return ["", "", ""]
+    return [str(row[idx] or "").strip() for idx in range(3)]
+
+
+def _build_screening_context(opportunity_questions=None, applicant_screening: Optional[Dict[str, Any]] = None):
+    questions = list(opportunity_questions or ["", "", ""])
+    while len(questions) < 3:
+        questions.append("")
+    applicant_screening = applicant_screening or {}
+    answers = [
+        applicant_screening.get("question_1"),
+        applicant_screening.get("question_2"),
+        applicant_screening.get("question_3"),
+    ]
+
+    question_items = [question for question in questions if str(question or "").strip()]
+    answer_items = []
+    for question, answer in zip(questions[:3], answers):
+        question_clean = str(question or "").strip()
+        answer_clean = str(answer or "").strip()
+        if question_clean or answer_clean:
+            answer_items.append(
+                {
+                    "question": question_clean,
+                    "answer": answer_clean,
+                }
+            )
+
+    return {
+        "questions": question_items,
+        "answers": answer_items,
+    }
+
 def _score_applicant_with_openai(
     extracted_pdf: str,
     applicant_location: str,
     job_description: str,
     filters: Optional[Dict[str, Any]] = None,
     opportunity_context: Optional[Dict[str, Any]] = None,
+    screening_context: Optional[Dict[str, Any]] = None,
 ):
     if not extracted_pdf:
         return None, None
 
     filters = filters or {}
     opportunity_context = opportunity_context or {}
+    screening_context = screening_context or {}
     prompt = f"""
 You are a recruiting assistant scoring applicants for a job.
 Return STRICT JSON only with this shape:
@@ -315,7 +373,8 @@ Return STRICT JSON only with this shape:
     {{"category": "Industria (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
     {{"category": "Años de experiencia (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
     {{"category": "Salario (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "País (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}}
+    {{"category": "País (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
+    {{"category": "Screening", "percent": <0-100>, "detail": "<Spanish detail evaluating the applicant screening answers>"}}
   ]
 }}
 
@@ -324,18 +383,22 @@ Score MUST consider:
 - How close the applicant's experience and education are to the job description requirements.
 - "Similitud con la JD" must compare extracted CV text (extracted_pdf) vs job description requirements.
 - Any explicit user filters (position, salary, years_experience, industry, country) if provided.
+- Screening questions and answers if they are available.
 
 Write a specific, extended comparison using ONLY these inputs:
 - User filters (position, salary, years_experience, industry, country) extracted from the JD.
 - The job description text.
 - The extracted CV text.
+- The screening questions configured for the opportunity and the applicant responses.
 For "Similitud con la JD", explicitly reference which JD filters are present and whether the CV supports each one (e.g., "no se encontró experiencia en BDR en el CV").
 If a filter is missing in the JD or not found in the CV, state that clearly and explain how it impacts the percent.
+For "Screening", evaluate whether the applicant responses strengthen or weaken the match. If there are no screening questions or no responses, state that clearly and keep the impact limited.
 Do NOT invent facts. If key information is missing, mention it briefly in the summary and details.
 
 Applicant location: {applicant_location or "Unknown"}
 Opportunity context: {json.dumps(opportunity_context, ensure_ascii=False)}
 User filters (optional): {json.dumps(filters, ensure_ascii=False)}
+Screening context: {json.dumps(screening_context, ensure_ascii=False)}
 
 Job description:
 {job_description[:8000]}
@@ -421,9 +484,10 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
     cursor = conn.cursor()
     try:
         jd_plain, opp_context = _build_opportunity_context(cursor, opportunity_id)
+        opportunity_questions = _get_opportunity_screening_questions(cursor, opportunity_id)
         cursor.execute(
             """
-            SELECT applicant_id, location, extracted_pdf
+            SELECT applicant_id, location, extracted_pdf, question_1, question_2, question_3
             FROM applicants
             WHERE opportunity_id = %s
             """,
@@ -431,7 +495,7 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
         )
         rows = cursor.fetchall()
         updated = 0
-        for applicant_id, location, extracted_pdf in rows:
+        for applicant_id, location, extracted_pdf, question_1, question_2, question_3 in rows:
             if not extracted_pdf:
                 continue
             score, reasons = _score_applicant_with_openai(
@@ -440,6 +504,14 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
                 jd_plain,
                 filters=filters,
                 opportunity_context=opp_context,
+                screening_context=_build_screening_context(
+                    opportunity_questions,
+                    {
+                        "question_1": question_1,
+                        "question_2": question_2,
+                        "question_3": question_3,
+                    },
+                ),
             )
             if score is None and not reasons:
                 continue
