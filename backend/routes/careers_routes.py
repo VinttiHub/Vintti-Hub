@@ -585,10 +585,11 @@ def import_candidates_from_sheet():
 
             if existing_id:
                 cur.execute("""
-                    INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
-                    VALUES (%s, %s)
-                    ON CONFLICT DO NOTHING
-                """, (opp_id, existing_id))
+                    INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (opportunity_id, candidate_id)
+                    DO UPDATE SET stage_pipeline = EXCLUDED.stage_pipeline
+                """, (opp_id, existing_id, "Applicant"))
                 if cur.rowcount > 0:
                     report["linked_existing"] += 1
                     report["details"].append({"row": rec["_row_number"], "result": "linked-existing", "candidate_id": existing_id})
@@ -613,10 +614,11 @@ def import_candidates_from_sheet():
                         "Contactado"
                     ))
                     cur.execute("""
-                        INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
-                        VALUES (%s, %s)
-                        ON CONFLICT DO NOTHING
-                    """, (opp_id, new_candidate_id))
+                        INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (opportunity_id, candidate_id)
+                        DO UPDATE SET stage_pipeline = EXCLUDED.stage_pipeline
+                    """, (opp_id, new_candidate_id, "Applicant"))
                     report["created_candidates"] += 1
                     report["details"].append({"row": rec["_row_number"], "result": "created", "candidate_id": new_candidate_id})
 
