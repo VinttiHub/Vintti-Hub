@@ -134,15 +134,15 @@ canvas {
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
+    height: 100dvh;
     width: var(--mobile-sidebar-width);
     max-width: 90vw;
     transform: translateX(-110%);
     transition: transform 0.2s ease;
     z-index: 11000;
     box-shadow: 0 18px 50px rgba(15, 23, 42, 0.25);
-    overflow-y: auto;
-    padding-bottom: 16px;
+    overflow: hidden;
+    padding-bottom: 0;
     min-width: var(--mobile-sidebar-width);
   }
 
@@ -162,12 +162,32 @@ canvas {
 
   body.has-app-sidebar .profile-tile {
     display: flex !important;
+    position: absolute !important;
+    left: 16px;
+    right: 16px;
+    bottom: calc(32px + env(safe-area-inset-bottom, 0px)) !important;
+    margin: 0 !important;
+    flex: 0 0 auto;
+    z-index: 2;
   }
 
   body.has-app-sidebar .sidebar,
   body.has-app-sidebar .sidebar.collapsed {
     width: 100% !important;
     min-width: 100% !important;
+    height: 100dvh;
+    position: relative !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.has-app-sidebar .sidebar-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 144px;
   }
 
   body.has-app-sidebar .sidebar.collapsed .logo,
@@ -184,6 +204,10 @@ canvas {
 
   body.has-app-sidebar .sidebar.collapsed .profile-tile {
     justify-content: flex-start;
+  }
+
+  .todo-chat {
+    display: none !important;
   }
 
   .page-header {

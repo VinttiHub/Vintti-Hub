@@ -2503,6 +2503,16 @@ body.dark-mode .profile-tile{
   font-weight: 600;
 }
 
+/* Compacta solo esta sidebar cuando esta colapsada */
+.sidebar.collapsed .sidebar-nav{
+  gap: 2px;
+}
+
+.sidebar.collapsed .menu-item{
+  margin: 0;
+  padding: 7px 0;
+}
+
 /* ==== Profile tile pegado al borde inferior ==== */
 .profile-tile{
   margin-top: auto;             /* empuja hacia abajo */

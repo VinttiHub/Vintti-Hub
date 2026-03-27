@@ -357,6 +357,55 @@ localStorage.setItem('sidebarCollapsed', 'true');
     const body = document.body;
     if (!body) return;
 
+    const syncMobileProfileVisibility = () => {
+      const sidebar = document.querySelector('.sidebar');
+      const scroll = sidebar?.querySelector('.sidebar-scroll');
+      const tile = document.getElementById('sidebarProfile');
+      const isMobile = window.matchMedia('(max-width: 900px)').matches;
+
+      if (!sidebar || !tile) return;
+
+      tile.style.display = 'flex';
+
+      if (isMobile) {
+        sidebar.style.position = 'relative';
+        sidebar.style.overflow = 'hidden';
+        sidebar.style.paddingBottom = 'calc(12px + env(safe-area-inset-bottom, 0px))';
+
+        if (scroll) {
+          scroll.style.flex = '1 1 auto';
+          scroll.style.minHeight = '0';
+          scroll.style.overflowY = 'auto';
+          scroll.style.paddingBottom = '112px';
+        }
+
+        tile.style.position = 'absolute';
+        tile.style.left = '16px';
+        tile.style.right = '16px';
+        tile.style.bottom = 'calc(12px + env(safe-area-inset-bottom, 0px))';
+        tile.style.margin = '0';
+        tile.style.zIndex = '2';
+      } else {
+        sidebar.style.position = '';
+        sidebar.style.overflow = '';
+        sidebar.style.paddingBottom = '';
+
+        if (scroll) {
+          scroll.style.flex = '';
+          scroll.style.minHeight = '';
+          scroll.style.overflowY = '';
+          scroll.style.paddingBottom = '';
+        }
+
+        tile.style.position = '';
+        tile.style.left = '';
+        tile.style.right = '';
+        tile.style.bottom = '';
+        tile.style.margin = '';
+        tile.style.zIndex = '';
+      }
+    };
+
     body.classList.add('has-app-sidebar');
 
     if (!document.querySelector('.mobile-sidebar-toggle')) {
@@ -392,6 +441,9 @@ localStorage.setItem('sidebarCollapsed', 'true');
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') body.classList.remove('sidebar-open');
     });
+
+    syncMobileProfileVisibility();
+    window.addEventListener('resize', syncMobileProfileVisibility);
   }
 
   function ensureDesktopFiltersVisible() {
