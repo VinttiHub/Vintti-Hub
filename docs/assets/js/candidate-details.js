@@ -638,15 +638,9 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); letsGoBtn.click(); }
   });
 
-  // Parcheo de textareas → guardar en /candidates al salir
-  const linEl = document.getElementById('ai-linkedin-scrap');
-  const cvEl  = document.getElementById('ai-cv-scrap');
-  const saveScrap = (field, val) => fetch(`${API_BASE}/candidates/${candidateId}`, {
-    method:'PATCH', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ [field]: (val||'').trim() })
-  });
-  linEl?.addEventListener('blur', ()=> saveScrap('linkedin_scrapper', linEl.value));
-  cvEl?.addEventListener('blur',  ()=> saveScrap('cv_pdf_scrapper',   cvEl.value));
+  const introEl = document.getElementById('ai-intro-call-transcript');
+  const deepDiveEl = document.getElementById('ai-deep-dive-transcript');
+  const commentsEl = document.getElementById('ai-comments');
 
   // Asegurar helper
   const ensureFn = window.Resume?.ensure || (typeof ensureResumeExists==='function' ? ensureResumeExists : async()=>true);
@@ -665,33 +659,48 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
       await ensureFn();
 
       // 2) recolecta fuentes
-      let linkedin_scrapper = (linEl?.value || '').trim();
-      let cv_pdf_scrapper   = (cvEl?.value  || '').trim();
+      let linkedin_scrapper = '';
+      let cv_pdf_scrapper   = '';
+      const intro_call_transcript = (introEl?.value || '').trim();
+      const deep_dive_transcript = (deepDiveEl?.value || '').trim();
+      const notes = (commentsEl?.value || '').trim();
       let hasLinkedinUrl = false, hasAnyCvFile = false;
 
-      if (!linkedin_scrapper || !cv_pdf_scrapper) {
-        try {
-          const cand = await fetch(`${API_BASE}/candidates/${candidateId}`).then(r=>r.json());
-          if (!linkedin_scrapper) linkedin_scrapper = (cand.linkedin_scrapper || cand.coresignal_scrapper || '').trim();
-          if (!cv_pdf_scrapper)   cv_pdf_scrapper   = (cand.cv_pdf_scrapper   || cand.affinda_scrapper   || '').trim();
-          hasLinkedinUrl = !!(cand.linkedin || '').trim();
-        } catch {}
-        try {
-          const files = await fetch(`${API_BASE}/candidates/${candidateId}/cvs`).then(r=>r.json());
-          hasAnyCvFile = Array.isArray(files) && files.length>0;
-        } catch {}
-      }
+      try {
+        const cand = await fetch(`${API_BASE}/candidates/${candidateId}`).then(r=>r.json());
+        linkedin_scrapper = (cand.linkedin_scrapper || cand.coresignal_scrapper || '').trim();
+        cv_pdf_scrapper = (cand.cv_pdf_scrapper || cand.affinda_scrapper || '').trim();
+        hasLinkedinUrl = !!(cand.linkedin || '').trim();
+      } catch {}
+      try {
+        const files = await fetch(`${API_BASE}/candidates/${candidateId}/cvs`).then(r=>r.json());
+        hasAnyCvFile = Array.isArray(files) && files.length>0;
+      } catch {}
 
-      const hasAnySource = !!(linkedin_scrapper || cv_pdf_scrapper || hasLinkedinUrl || hasAnyCvFile);
+      const hasAnySource = !!(
+        linkedin_scrapper ||
+        cv_pdf_scrapper ||
+        intro_call_transcript ||
+        deep_dive_transcript ||
+        hasLinkedinUrl ||
+        hasAnyCvFile
+      );
       if (!hasAnySource) {
-        alert('Please add LinkedIn or CV info before generating.');
+        alert('Please add LinkedIn, CV, or call transcript info before generating.');
         return;
       }
 
       // 3) generar
       const resp = await fetch(`${API_BASE}/generate_resume_fields`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ candidate_id: candidateId, linkedin_scrapper, cv_pdf_scrapper })
+        body: JSON.stringify({
+          candidate_id: candidateId,
+          linkedin_scrapper,
+          cv_pdf_scrapper,
+          intro_call_transcript,
+          deep_dive_transcript,
+          notes
+        })
       });
       const out = await resp.json();
 

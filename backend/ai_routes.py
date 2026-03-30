@@ -1168,6 +1168,9 @@ Return STRICT JSON:
             candidate_id = data.get('candidate_id')
             linkedin_scrapper = data.get('linkedin_scrapper', '')[:8000]
             cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
+            intro_call_transcript = data.get('intro_call_transcript', '')[:12000]
+            deep_dive_transcript = data.get('deep_dive_transcript', '')[:12000]
+            notes = data.get('notes', '')[:4000]
 
             prompt = f"""
             You are a resume generation assistant. Based only on the following data, generate a resume in valid JSON format. Do NOT invent or assume any information.
@@ -1177,6 +1180,15 @@ Return STRICT JSON:
 
             CV PDF SCRAPER:
             {cv_pdf_scrapper}
+
+            INTRO CALL TRANSCRIPT:
+            {intro_call_transcript}
+
+            DEEP DIVE TRANSCRIPT:
+            {deep_dive_transcript}
+
+            RECRUITER NOTES / COMMENTS:
+            {notes}
 
             You must always return all 3 fields, even if any of them are empty. Return a complete valid JSON.
 
@@ -1204,9 +1216,14 @@ Return STRICT JSON:
 
             Rules:
             - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
+            - Use the 4 main sources when available: LinkedIn, CV PDF, Intro Call transcript, and Deep Dive transcript.
+            - The call transcripts may contain extra context about scope, achievements, tools, responsibilities, communication, leadership, and domain experience. Use that information when it clearly refers to the candidate's real background.
             - Use all possible details found in the source to make the descriptions **long, rich and specific**.
             - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
             - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
+            - If sources overlap, merge them carefully without duplicating the same point.
+            - Prefer the most specific version of a fact when multiple sources mention it.
+            - Ignore speculative statements, future plans, or recruiter opinions unless they describe factual past experience already stated in the source material.
             - Expand acronyms and explain concepts if mentioned.
             - translate everything to english
             Return only the full JSON object. Do not return only partial content or text outside of the JSON.

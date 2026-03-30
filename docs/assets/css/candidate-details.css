@@ -346,6 +346,8 @@ a {
   border: 2px solid #fde4e8;
   font-family: 'Onest', sans-serif;
   animation: fadeIn 0.2s ease-out;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 #ai-popup.hidden {
@@ -380,7 +382,7 @@ a {
 }
 
 #ai-popup textarea {
-  min-height: 100px;
+  min-height: 96px;
   resize: vertical;
 }
 
