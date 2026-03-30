@@ -15,7 +15,7 @@ def register_interviewing_routes(app):
         Body JSON:
           - opportunity_id (int)
           - since_interviewing (YYYY-MM-DD)
-        Inserts a new row into interviewing with incremental interviewing_id.
+        Inserts a new row into interviewing and lets the database assign interviewing_id.
         """
         data = request.get_json(silent=True) or {}
         opportunity_id = data.get("opportunity_id")
@@ -36,19 +36,16 @@ def register_interviewing_routes(app):
             conn.autocommit = False
 
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 🔒 Evita colisiones de IDs en concurrencia
-                cur.execute("LOCK TABLE interviewing IN EXCLUSIVE MODE;")
-
-                cur.execute("SELECT COALESCE(MAX(interviewing_id), 0) + 1 AS next_id FROM interviewing;")
-                next_id = int(cur.fetchone()["next_id"])
+                cur.execute("SET LOCAL lock_timeout = '5s';")
+                cur.execute("SET LOCAL statement_timeout = '10s';")
 
                 cur.execute(
                     """
-                    INSERT INTO interviewing (interviewing_id, since_interviewing, opportunity_id)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO interviewing (since_interviewing, opportunity_id)
+                    VALUES (%s, %s)
                     RETURNING interviewing_id;
                     """,
-                    (next_id, since_interviewing, int(opportunity_id))
+                    (since_interviewing, int(opportunity_id))
                 )
 
                 new_row = cur.fetchone()

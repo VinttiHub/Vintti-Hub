@@ -36,6 +36,8 @@ function openInterviewingPopup(opportunityId, dropdownElement) {
 
   // IMPORTANT: asignar onclick para no duplicar listeners
   saveBtn.onclick = async () => {
+    if (saveBtn.disabled) return;
+
     const date = (input.value || '').trim();
     if (!date) {
       alert('Please select a start date.');
@@ -43,6 +45,9 @@ function openInterviewingPopup(opportunityId, dropdownElement) {
     }
 
     try {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
       // 1) Insert en tabla interviewing
       const res = await fetch(`${API_BASE}/interviewing`, {
         method: 'POST',
@@ -70,6 +75,9 @@ function openInterviewingPopup(opportunityId, dropdownElement) {
     } catch (err) {
       console.error('❌ Interviewing save error:', err);
       alert('Network error. Please try again.');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
     }
   };
 }
