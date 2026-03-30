@@ -972,6 +972,12 @@ input:focus, select:focus, textarea:focus{
   flex-wrap: wrap;
 }
 
+.org-mood-head-copy{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .org-mood-title{
   margin: 0;
   font-size: clamp(18px, 2.2vw, 22px);
@@ -984,6 +990,31 @@ input:focus, select:focus, textarea:focus{
   font-size: 13px;
   color: #64748b;
   font-weight: 500;
+}
+
+.org-mood-recap-btn{
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #0b3d91, #295fcd);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 12px 22px rgba(11, 61, 145, 0.18);
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+.org-mood-recap-btn:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(11, 61, 145, 0.22);
+}
+
+.org-mood-recap-btn:disabled{
+  opacity: .5;
+  cursor: default;
+  box-shadow: none;
 }
 
 .org-mood-board{

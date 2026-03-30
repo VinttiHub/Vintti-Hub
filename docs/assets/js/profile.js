@@ -272,6 +272,32 @@ async function loadTeamMoods(){
   }
 }
 
+function wireMonthlyMoodRecapButton(){
+  const button = document.getElementById("viewMonthlyMoodRecapBtn");
+  if (!button) return;
+
+  button.addEventListener("click", async () => {
+    if (typeof window.maybeShowMonthlyMoodRecap !== "function"){
+      console.warn("Monthly mood recap is not available on this page.");
+      return;
+    }
+
+    const previous = button.textContent;
+    button.disabled = true;
+    button.textContent = "Opening wrapped...";
+
+    try {
+      await window.maybeShowMonthlyMoodRecap({ force: true, delayMs: 0 });
+    } catch (error) {
+      console.warn("Could not open monthly mood recap", error);
+      alert("We couldn't open your monthly wrapped right now.");
+    } finally {
+      button.disabled = false;
+      button.textContent = previous;
+    }
+  });
+}
+
 const ORG_ROOT_USER_ID = 1;
 const ORG_USER_DETAILS_CACHE = new Map();
 
@@ -2564,6 +2590,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     await loadMe(uid);
     await loadMyRequests(uid);
     await loadBalances(uid);
+    wireMonthlyMoodRecapButton();
     setupBalanceCardTables();
     loadOrgChart();
     loadTeamMoods();

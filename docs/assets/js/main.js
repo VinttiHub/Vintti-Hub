@@ -463,7 +463,7 @@ function ensureBirthdayCelebrationStyles() {
   document.head.appendChild(style);
 }
 
-function showBirthdayCelebrationOverlay(displayName) {
+function showBirthdayCelebrationOverlay(displayName, { onDismiss } = {}) {
   ensureBirthdayCelebrationStyles();
 
   const existing = document.getElementById('birthdayCelebrationOverlay');
@@ -502,6 +502,9 @@ function showBirthdayCelebrationOverlay(displayName) {
 
   const dismiss = () => {
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    if (typeof onDismiss === 'function') {
+      try { onDismiss(); } catch (error) { console.warn('Birthday dismiss callback failed:', error); }
+    }
   };
 
   overlay.addEventListener('click', (event) => {
@@ -512,7 +515,7 @@ function showBirthdayCelebrationOverlay(displayName) {
   document.body.appendChild(overlay);
 }
 
-async function maybeShowBirthdayCelebration({ email, fallbackName = '', delayMs = 0 } = {}) {
+async function maybeShowBirthdayCelebration({ email, fallbackName = '', delayMs = 0, onDismiss = null } = {}) {
   if (birthdayCelebrationShownInSession) return false;
 
   const normalizedEmail = String(email || getCurrentUserEmail() || '').trim().toLowerCase();
@@ -528,11 +531,19 @@ async function maybeShowBirthdayCelebration({ email, fallbackName = '', delayMs 
   markBirthdayCelebrationSeen(userId);
 
   const displayName = String(user.nickname || fallbackName || user.user_name || '').trim();
-  window.setTimeout(() => showBirthdayCelebrationOverlay(displayName), Math.max(0, Number(delayMs) || 0));
+  window.setTimeout(() => showBirthdayCelebrationOverlay(displayName, { onDismiss }), Math.max(0, Number(delayMs) || 0));
   return true;
 }
 
 window.maybeShowBirthdayCelebration = maybeShowBirthdayCelebration;
+
+function queueMonthlyMoodRecap({ delayMs = 0, force = false } = {}) {
+  if (typeof window.maybeShowMonthlyMoodRecap !== 'function') return Promise.resolve(false);
+  return window.maybeShowMonthlyMoodRecap({ delayMs, force }).catch((error) => {
+    console.warn('Monthly mood recap failed:', error);
+    return false;
+  });
+}
 
 const _plainTextParser = document.createElement('div');
 function htmlToPlainText(value) {
@@ -2889,7 +2900,17 @@ if (finalUid != null) {
     document.getElementById('login-container').style.display = 'none';
     document.getElementById('welcome-container').style.display = 'block';
     showWelcomeAvatar(email);
-    maybeShowBirthdayCelebration({ email, fallbackName: nickname, delayMs: 1850 }).catch(() => {});
+    maybeShowBirthdayCelebration({
+      email,
+      fallbackName: nickname,
+      delayMs: 1850,
+      onDismiss: () => queueMonthlyMoodRecap({ delayMs: 220 }),
+    })
+      .then((shown) => {
+        if (!shown) return queueMonthlyMoodRecap({ delayMs: 1850 });
+        return shown;
+      })
+      .catch(() => {});
   } catch (err) {
     console.error('Error en login:', err);
     alert('Ocurrió un error inesperado. Intenta de nuevo más tarde.');
@@ -4071,5 +4092,13 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
   const pathname = (window.location.pathname || '').toLowerCase();
   if (pathname.endsWith('/index.html') || pathname === '/' || pathname.endsWith('/docs/')) return;
-  maybeShowBirthdayCelebration({ delayMs: 700 }).catch(() => {});
+  maybeShowBirthdayCelebration({
+    delayMs: 700,
+    onDismiss: () => queueMonthlyMoodRecap({ delayMs: 200 }),
+  })
+    .then((shown) => {
+      if (!shown) return queueMonthlyMoodRecap({ delayMs: 700 });
+      return shown;
+    })
+    .catch(() => {});
 });

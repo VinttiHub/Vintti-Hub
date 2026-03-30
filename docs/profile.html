@@ -6,6 +6,7 @@
   <script src="./assets/js/auth-guard.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="./assets/css/profile.css" rel="stylesheet" />
+  <link rel="stylesheet" href="./assets/css/monthly-mood.css?v=13" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600;700;800;900&display=swap" rel="stylesheet">
@@ -427,8 +428,13 @@
 
     <section class="org-mood-card" aria-label="Team moods today">
       <header class="org-mood-head">
-        <h3 class="org-mood-title">Today's moods</h3>
-        <p class="org-mood-sub">Only moods registered today from the team.</p>
+        <div class="org-mood-head-copy">
+          <h3 class="org-mood-title">Today's moods</h3>
+          <p class="org-mood-sub">Only moods registered today from the team.</p>
+        </div>
+        <button type="button" class="org-mood-recap-btn" id="viewMonthlyMoodRecapBtn">
+          View monthly wrapped
+        </button>
       </header>
       <div id="orgMoodBoard" class="org-mood-board" aria-live="polite">
         <div class="org-mood-empty">Loading moods...</div>
@@ -740,6 +746,7 @@
 </button>
 
 <script src="./assets/js/avatar-map.js" defer></script>
+<script src="./assets/js/monthly-mood.js?v=13" defer></script>
 <script src="./assets/js/main.js" defer></script>
 <script src="./assets/js/profile.js" defer></script>
 </body>
