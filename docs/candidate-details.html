@@ -38,66 +38,110 @@
     <!-- ===== AI Popup (Fullscreen modal) ===== -->
     <!-- Kept IDs for JS to wire open/close & actions -->
     <div id="ai-popup" class="hidden" role="dialog" aria-modal="true" aria-labelledby="ai-popup-title">
-      <button id="ai-close" class="modal-close" aria-label="Close">×</button>
-      <h2 id="ai-popup-title">✨ AI Assistant</h2>
+      <div class="ai-popup-dialog">
+        <button id="ai-close" class="modal-close" aria-label="Close">×</button>
 
-      <!-- LinkedIn note (read-only) -->
-      <label>LinkedIn Data</label>
-      <div id="ai-linkedin-note" style="
-        background:#f5f7fb;
-        border:1px dashed #d5dbea;
-        color:#222;
-        padding:10px 12px;
-        border-radius:10px;
-        font-size:14px;
-      ">
-        LinkedIn? VinttiHub covered it. You do you 💅
+        <div class="ai-popup-hero">
+          <div class="ai-popup-kicker">Resume Co-Pilot</div>
+          <h2 id="ai-popup-title">✨ AI Assistant</h2>
+          <p class="ai-popup-subtitle">
+            Gather the strongest signals before generating the candidate resume.
+          </p>
+        </div>
+
+        <div class="ai-popup-content">
+          <section class="ai-popup-section">
+            <div class="ai-section-heading">
+              <div>
+                <span class="ai-section-eyebrow">Auto Sources</span>
+                <h3>What VinttiHub already has</h3>
+              </div>
+              <span class="ai-section-chip">Preloaded</span>
+            </div>
+
+            <div class="ai-source-grid">
+              <article class="ai-source-card">
+                <div class="ai-source-card-head">
+                  <div>
+                    <label for="ai-linkedin-note">LinkedIn Data</label>
+                    <p>Public profile context already captured for the candidate.</p>
+                  </div>
+                  <span class="ai-status-pill">Ready</span>
+                </div>
+                <div id="ai-linkedin-note" class="ai-note-box">
+                  LinkedIn? VinttiHub covered it. You do you 💅
+                </div>
+              </article>
+
+              <article class="ai-source-card">
+                <div class="ai-source-card-head">
+                  <div>
+                    <label for="ai-pdf-note">PDF Extract</label>
+                    <p>Resume parsing and file extraction are already part of the flow.</p>
+                  </div>
+                  <span class="ai-status-pill">Ready</span>
+                </div>
+                <div id="ai-pdf-note" class="ai-note-box">
+                  PDF? Already scanned by VinttiHub 🪄
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="ai-popup-section">
+            <div class="ai-section-heading">
+              <div>
+                <span class="ai-section-eyebrow">Optional Inputs</span>
+                <h3>Add call context</h3>
+              </div>
+              <span class="ai-section-chip ai-section-chip-soft">Recommended</span>
+            </div>
+
+            <div class="ai-form-stack">
+              <div class="ai-input-card">
+                <div class="ai-input-head">
+                  <label for="ai-intro-call-transcript">Intro Call Transcript</label>
+                  <span class="ai-input-tag">Optional</span>
+                </div>
+                <div id="ai-intro-call-note" class="ai-note-box">
+                  For now, paste the transcript here. Link support can come next.
+                </div>
+                <textarea id="ai-intro-call-transcript" placeholder="Paste intro call transcript here..."></textarea>
+              </div>
+
+              <div class="ai-input-card">
+                <div class="ai-input-head">
+                  <label for="ai-deep-dive-transcript">Deep Dive Transcript</label>
+                  <span class="ai-input-tag">Optional</span>
+                </div>
+                <div id="ai-deep-dive-note" class="ai-note-box">
+                  Use this transcript as another source so the CV captures more context from the calls.
+                </div>
+                <textarea id="ai-deep-dive-transcript" placeholder="Paste deep dive transcript here..."></textarea>
+              </div>
+            </div>
+          </section>
+
+          <section class="ai-popup-section">
+            <div class="ai-section-heading">
+              <div>
+                <span class="ai-section-eyebrow">Final Guidance</span>
+                <h3>Anything else to consider?</h3>
+              </div>
+            </div>
+
+            <div class="ai-input-card ai-input-card-full">
+              <label for="ai-comments">Do you want me to take something into account?</label>
+              <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
+            </div>
+          </section>
+        </div>
+
+        <div class="ai-popup-footer">
+          <p class="ai-footer-copy">Generate a stronger resume using VinttiHub sources plus your call notes.</p>
+          <button id="ai-lets-go">✨ Let's Go!</button>
+        </div>
       </div>
-
-      <!-- PDF note (read-only) -->
-      <label>PDF Extract</label>
-      <div id="ai-pdf-note" style="
-        background:#f5f7fb;
-        border:1px dashed #d5dbea;
-        color:#222;
-        padding:10px 12px;
-        border-radius:10px;
-        font-size:14px;
-      ">
-        PDF? Already scanned by VinttiHub 🪄
-      </div>
-
-      <label for="ai-intro-call-transcript">Intro Call Transcript</label>
-      <div id="ai-intro-call-note" style="
-        background:#f5f7fb;
-        border:1px dashed #d5dbea;
-        color:#222;
-        padding:10px 12px;
-        border-radius:10px;
-        font-size:14px;
-      ">
-        For now, paste the transcript here. Link support can come next.
-      </div>
-      <textarea id="ai-intro-call-transcript" placeholder="Paste intro call transcript here..."></textarea>
-
-      <label for="ai-deep-dive-transcript">Deep Dive Transcript</label>
-      <div id="ai-deep-dive-note" style="
-        background:#f5f7fb;
-        border:1px dashed #d5dbea;
-        color:#222;
-        padding:10px 12px;
-        border-radius:10px;
-        font-size:14px;
-      ">
-        Use this transcript as another source so the CV captures more context from the calls.
-      </div>
-      <textarea id="ai-deep-dive-transcript" placeholder="Paste deep dive transcript here..."></textarea>
-
-      <!-- Free-form comments for the AI flow -->
-      <label for="ai-comments">Do you want me to take something into account?</label>
-      <textarea id="ai-comments" placeholder="Tell me what you want me to consider..."></textarea>
-
-      <button id="ai-lets-go">✨ Let's Go!</button>
     </div>
 
     <!-- ===== Tabs (Overview / Resume / Opportunities / Hire) ===== -->
