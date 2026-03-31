@@ -64,12 +64,14 @@ def _fetch_opportunity_context(cur: RealDictCursor, opportunity_id: int) -> Opti
 
 
 def _get_next_todo_id(cur: RealDictCursor, cache: Dict[str, Any]) -> int:
-    if cache.get("next_id") is None:
-        cur.execute("SELECT COALESCE(MAX(to_do_id), 0) + 1 AS next_id FROM to_do")
-        cache["next_id"] = cur.fetchone()["next_id"]
-    next_id = cache["next_id"]
-    cache["next_id"] += 1
-    return next_id
+    cur.execute(
+        """
+        SELECT nextval(
+          COALESCE(pg_get_serial_sequence('to_do', 'to_do_id'), 'to_do_id_seq')::regclass
+        ) AS next_id
+        """
+    )
+    return int(cur.fetchone()["next_id"])
 
 
 def _get_next_order(cur: RealDictCursor, cache: Dict[str, Any], user_id: int, subtask: Optional[int]) -> int:

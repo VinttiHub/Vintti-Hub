@@ -368,6 +368,13 @@
     }
 
     checkbox.addEventListener('change', async () => {
+      if (!task.to_do_id) {
+        task.check = !checkbox.checked;
+        checkbox.checked = task.check;
+        wrapper.classList.toggle('is-done', checkbox.checked);
+        showToast('This task is missing its id. Refresh and try again.');
+        return;
+      }
       const nextValue = checkbox.checked;
       task.check = nextValue;
       wrapper.classList.toggle('is-done', nextValue);

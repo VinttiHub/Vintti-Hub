@@ -290,6 +290,12 @@
     if (metaRow.childNodes.length) textWrap.appendChild(metaRow);
 
     checkbox.addEventListener('change', async () => {
+      if (!task.to_do_id) {
+        task.check = !checkbox.checked;
+        checkbox.checked = task.check;
+        row.classList.toggle('is-done', checkbox.checked);
+        return;
+      }
       const nextValue = checkbox.checked;
       task.check = nextValue;
       row.classList.toggle('is-done', nextValue);

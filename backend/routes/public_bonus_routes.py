@@ -112,6 +112,16 @@ def _resolve_bonus_email_recipients(cur) -> List[str]:
 
     return recipients
 
+
+def _get_next_todo_id(cur) -> int:
+    cur.execute("""
+      SELECT nextval(
+        COALESCE(pg_get_serial_sequence('to_do', 'to_do_id'), 'to_do_id_seq')::regclass
+      ) AS next_id
+    """)
+    row = cur.fetchone() or {}
+    return int(row.get("next_id") or 1)
+
 @bp.route("/submit", methods=["POST", "OPTIONS"])
 def submit_bonus_request():
     if request.method == "OPTIONS":
@@ -299,11 +309,12 @@ def submit_bonus_request():
 
                 row_order = cur.fetchone()
                 next_order = row_order["next_order"] if row_order and row_order.get("next_order") else 1
+                next_todo_id = _get_next_todo_id(cur)
 
                 cur.execute("""
-            INSERT INTO to_do (user_id, description, due_date, "check", orden, subtask)
-            VALUES (%s, %s, %s, false, %s, NULL)
-            """, (owner_user_id, todo_desc, payout_date, next_order))
+            INSERT INTO to_do (to_do_id, user_id, description, due_date, "check", orden, subtask)
+            VALUES (%s, %s, %s, %s, false, %s, NULL)
+            """, (next_todo_id, owner_user_id, todo_desc, payout_date, next_order))
 
         conn.commit()
 

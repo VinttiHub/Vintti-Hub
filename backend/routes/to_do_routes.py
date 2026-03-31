@@ -27,6 +27,56 @@ def _extract_bonus_request_id(description: Optional[str]) -> Optional[int]:
         return None
 
 
+def _next_todo_id(cur) -> int:
+    cur.execute(
+        """
+        SELECT nextval(
+          COALESCE(pg_get_serial_sequence('to_do', 'to_do_id'), 'to_do_id_seq')::regclass
+        ) AS next_id
+        """
+    )
+    row = cur.fetchone() or {}
+    return int(row['next_id'])
+
+
+def _repair_invalid_todo_ids(cur) -> int:
+    """
+    Ensure every to_do row has a unique non-null to_do_id.
+    If duplicates exist, we keep the first row for that id and reassign the rest.
+    We use ctid only inside the current transaction as a stable row locator.
+    """
+    cur.execute(
+        """
+        WITH ranked AS (
+          SELECT
+            ctid::text AS row_ctid,
+            to_do_id,
+            ROW_NUMBER() OVER (
+              PARTITION BY to_do_id
+              ORDER BY user_id ASC, orden NULLS LAST, due_date NULLS LAST, description ASC, ctid ASC
+            ) AS duplicate_rank
+          FROM to_do
+        )
+        SELECT row_ctid
+        FROM ranked
+        WHERE to_do_id IS NULL OR duplicate_rank > 1
+        ORDER BY row_ctid
+        FOR UPDATE
+        """
+    )
+    rows_to_fix = cur.fetchall() or []
+    for row in rows_to_fix:
+        cur.execute(
+            """
+            UPDATE to_do
+            SET to_do_id = %s
+            WHERE ctid = %s::tid
+            """,
+            (_next_todo_id(cur), row['row_ctid']),
+        )
+    return len(rows_to_fix)
+
+
 def _todo_reminder_email_html(user_name: str, groups: Dict[str, List[Dict]]) -> str:
     safe_name = html.escape(user_name or 'there')
     detail_url = 'https://vinttihub.vintti.com/to-do-details.html'
@@ -101,6 +151,9 @@ def to_do_collection():
         try:
             conn = get_connection()
             cur = conn.cursor(cursor_factory=RealDictCursor)
+            repaired = _repair_invalid_todo_ids(cur)
+            if repaired:
+                conn.commit()
             cur.execute(
                 """
                 SELECT to_do_id, user_id, description, due_date::text AS due_date, "check", orden, subtask
@@ -130,8 +183,7 @@ def to_do_collection():
     try:
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT COALESCE(MAX(to_do_id), 0) + 1 AS next_id FROM to_do")
-        next_id = cur.fetchone()['next_id']
+        next_id = _next_todo_id(cur)
 
         if orden is None:
             cur.execute(
@@ -194,6 +246,9 @@ def to_do_item(to_do_id: int):
     try:
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        repaired = _repair_invalid_todo_ids(cur)
+        if repaired:
+            conn.commit()
         checked = bool(check_value)
         cur.execute(
             """
@@ -210,39 +265,52 @@ def to_do_item(to_do_id: int):
             conn.close()
             return jsonify({"error": "to_do item not found"}), 404
 
-        # Si es una tarea auto-generada desde bonus request y la marcan como hecha,
-        # reflejamos el cambio en el CRM (pending -> approved).
-        if checked:
-            bonus_request_id = _extract_bonus_request_id(row.get('description'))
-            if bonus_request_id:
-                savepoint_created = False
-                try:
-                    # Aisla errores del sync para no romper el check del ToDo.
-                    cur.execute("SAVEPOINT todo_bonus_sync")
-                    savepoint_created = True
-                    cur.execute(
-                        """
-                        UPDATE bonus_requests
-                        SET status = 'approved',
-                            updated_at = NOW()
-                        WHERE bonus_request_id = %s
-                          AND status = 'pending'
-                        """,
-                        (bonus_request_id,),
-                    )
-                except Exception:
-                    if savepoint_created:
-                        try:
-                            cur.execute("ROLLBACK TO SAVEPOINT todo_bonus_sync")
-                        except Exception:
-                            logging.exception('Failed to rollback savepoint todo_bonus_sync')
-                    logging.exception('Failed to sync bonus_request status from ToDo check (bonus_request_id=%s)', bonus_request_id)
-                finally:
-                    if savepoint_created:
-                        try:
-                            cur.execute("RELEASE SAVEPOINT todo_bonus_sync")
-                        except Exception:
-                            pass
+        # Si es una tarea auto-generada desde bonus request, todas las tareas
+        # espejo de ese bonus deben mantenerse sincronizadas entre si.
+        bonus_request_id = _extract_bonus_request_id(row.get('description'))
+        if bonus_request_id:
+            savepoint_created = False
+            try:
+                # Aisla errores del sync para no romper el check del ToDo.
+                cur.execute("SAVEPOINT todo_bonus_sync")
+                savepoint_created = True
+                auto_marker = f"[AUTO:bonus_request:{bonus_request_id}"
+                cur.execute(
+                    """
+                    UPDATE to_do
+                    SET "check" = %s
+                    WHERE description LIKE %s
+                    """,
+                    (checked, f"{auto_marker}%"),
+                )
+                target_status = 'approved' if checked else 'pending'
+                cur.execute(
+                    """
+                    UPDATE bonus_requests
+                    SET status = %s,
+                        updated_at = NOW()
+                    WHERE bonus_request_id = %s
+                    """,
+                    (target_status, bonus_request_id),
+                )
+            except Exception:
+                if savepoint_created:
+                    try:
+                        cur.execute("ROLLBACK TO SAVEPOINT todo_bonus_sync")
+                    except Exception:
+                        logging.exception('Failed to rollback savepoint todo_bonus_sync')
+                logging.exception(
+                    'Failed to sync bonus_request status from ToDo check '
+                    '(bonus_request_id=%s, checked=%s)',
+                    bonus_request_id,
+                    checked,
+                )
+            finally:
+                if savepoint_created:
+                    try:
+                        cur.execute("RELEASE SAVEPOINT todo_bonus_sync")
+                    except Exception:
+                        pass
         conn.commit()
         cur.close()
         conn.close()
@@ -263,6 +331,9 @@ def to_do_team():
     try:
         conn = get_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        repaired = _repair_invalid_todo_ids(cur)
+        if repaired:
+            conn.commit()
 
         cur.execute("SELECT COUNT(*) AS cnt FROM users WHERE lider = %s", (leader_id,))
         if cur.fetchone()['cnt'] == 0:

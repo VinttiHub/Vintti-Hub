@@ -2710,6 +2710,16 @@ function notifyTodoSync(reason = "updated") {
   }
 }
 
+window.addEventListener("storage", (event) => {
+  if (event.key === TODO_SYNC_KEY) {
+    loadBonusRequests().catch(err => console.error("bonus reload after storage sync failed:", err));
+  }
+});
+
+window.addEventListener("todo:changed", () => {
+  loadBonusRequests().catch(err => console.error("bonus reload after todo change failed:", err));
+});
+
 // async function upsertTodoTask({ sourceKey, description, due_date, forceUserId = null }) {
 //   const userId = forceUserId ?? (Number(localStorage.getItem("user_id")) || null);
 //   if (!userId) return;
