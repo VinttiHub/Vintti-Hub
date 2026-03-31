@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 import re
 
 from flask import Blueprint, jsonify, request
@@ -11,6 +12,7 @@ from utils.google_calendar import build_calendar_service
 
 
 bp = Blueprint("turvo", __name__)
+logger = logging.getLogger(__name__)
 
 RECRUITER_EMAILS = [
     "paz@vintti.com",
@@ -20,6 +22,9 @@ RECRUITER_EMAILS = [
     "julieta@vintti.com",
     "pilar.fernandez@vintti.com",
 ]
+
+INITIAL_SYNC_LOOKBACK_DAYS = 90
+REFRESH_OVERLAP_MINUTES = 5
 
 
 def _normalize_dt(value: datetime | None) -> datetime | None:
@@ -48,13 +53,35 @@ def _parse_event_start(event: dict) -> datetime | None:
 def _extract_opportunity_id(summary: str | None) -> int | None:
     if not summary:
         return None
-    match = re.search(r"\bid\s*[:#-]?\s*(\d+)\b", summary, re.IGNORECASE)
-    if not match:
-        return None
-    try:
-        return int(match.group(1))
-    except ValueError:
-        return None
+    patterns = (
+        r"\bid\s*[:#-]?\s*(\d+)\b",
+        r"\bopportunity\s*[:#-]?\s*(\d+)\b",
+        r"\bopp\s*[:#-]?\s*(\d+)\b",
+        r"\bjob\s*[:#-]?\s*(\d+)\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, summary, re.IGNORECASE)
+        if not match:
+            continue
+        try:
+            return int(match.group(1))
+        except ValueError:
+            continue
+    return None
+
+
+def _event_matches_opportunity(event: dict, opp_id: int) -> bool:
+    for field in ("summary", "description"):
+        raw_value = event.get(field)
+        if not raw_value:
+            continue
+        extracted = _extract_opportunity_id(str(raw_value))
+        if extracted == opp_id:
+            return True
+        # Fallback: accept the exact opportunity id as a standalone token.
+        if re.search(rf"(?<!\d){opp_id}(?!\d)", str(raw_value)):
+            return True
+    return False
 
 
 def _get_tokens(conn, user_id: int) -> dict | None:
@@ -191,7 +218,10 @@ def refresh_turvo_meetings():
                 (opp_id,),
             )
             last_meeting = _normalize_dt(cur.fetchone()[0])
-            start = last_meeting if last_meeting else now - timedelta(days=2)
+            if last_meeting:
+                start = last_meeting - timedelta(minutes=REFRESH_OVERLAP_MINUTES)
+            else:
+                start = now - timedelta(days=INITIAL_SYNC_LOOKBACK_DAYS)
             cur.execute(
                 "UPDATE turvo SET last_refresh_date = %s WHERE opportunity_id = %s",
                 (now, opp_id),
@@ -213,15 +243,27 @@ def refresh_turvo_meetings():
             cur.execute("SELECT COALESCE(MAX(turvo_id), 0) FROM turvo")
             next_id = int(cur.fetchone()[0] or 0)
 
+        stats = {
+            "recruiters_found": len(recruiters),
+            "recruiters_with_tokens": 0,
+            "events_scanned": 0,
+            "events_matched": 0,
+            "inserted": 0,
+            "duplicates": 0,
+        }
+
         for recruiter in recruiters:
             user_id = recruiter["user_id"]
             email = recruiter["email"]
             tokens = _get_tokens(conn, user_id)
             if not tokens:
+                logger.info("Turvo refresh skipping recruiter without tokens: opp_id=%s email=%s", opp_id, email)
                 continue
+            stats["recruiters_with_tokens"] += 1
             try:
                 creds, service = build_calendar_service(tokens)
             except Exception:
+                logger.exception("Turvo refresh failed to build calendar service: opp_id=%s email=%s", opp_id, email)
                 continue
 
             if creds and creds.token != tokens.get("access_token"):
@@ -238,12 +280,14 @@ def refresh_turvo_meetings():
                 )
 
             events = _fetch_events(service, start, now)
+            stats["events_scanned"] += len(events)
             for event in events:
                 summary = (event.get("summary") or "").strip()
                 if not summary:
                     continue
-                if _extract_opportunity_id(summary) != opp_id:
+                if not _event_matches_opportunity(event, opp_id):
                     continue
+                stats["events_matched"] += 1
                 meeting_date = _parse_event_start(event)
                 if not meeting_date:
                     continue
@@ -261,6 +305,7 @@ def refresh_turvo_meetings():
                         (opp_id, summary, email, meeting_date),
                     )
                     if cur.fetchone():
+                        stats["duplicates"] += 1
                         continue
                     next_id += 1
                     cur.execute(
@@ -278,6 +323,7 @@ def refresh_turvo_meetings():
                         """,
                         (next_id, opp_id, summary, email, meeting_date, 0, now),
                     )
+                    stats["inserted"] += 1
 
         conn.commit()
 
@@ -299,7 +345,15 @@ def refresh_turvo_meetings():
             )
             rows = cur.fetchall() or []
 
-        return jsonify({"rows": _serialize_rows(rows), "last_refresh_date": now.isoformat()})
+        return jsonify(
+            {
+                "rows": _serialize_rows(rows),
+                "last_refresh_date": now.isoformat(),
+                "stats": stats,
+                "window_start": start.isoformat(),
+                "window_end": now.isoformat(),
+            }
+        )
     finally:
         conn.close()
 
