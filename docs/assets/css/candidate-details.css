@@ -505,6 +505,12 @@ a {
   font-weight: 700;
 }
 
+#ai-popup .ai-secondary-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
 #ai-popup .ai-source-card-head p {
   margin: 6px 0 0;
   color: #64748b;
@@ -562,6 +568,7 @@ a {
 }
 
 #ai-popup input[type="text"]:focus,
+#ai-popup input[type="url"]:focus,
 #ai-popup textarea:focus {
   border-color: rgba(168, 85, 247, 0.46);
   outline: none;
@@ -571,6 +578,7 @@ a {
 }
 
 #ai-popup input[type="text"],
+#ai-popup input[type="url"],
 #ai-popup input[type="file"],
 #ai-popup textarea {
   width: 100%;

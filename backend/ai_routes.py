@@ -26,6 +26,7 @@ import re
 from flask import jsonify, request
 from openai import OpenAI
 from PyPDF2 import PdfReader 
+from urllib.parse import parse_qs, urlparse
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -459,6 +460,156 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
     finally:
         cursor.close()
         conn.close()
+
+def _extract_grain_recording_id(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+
+    if re.fullmatch(r"[A-Za-z0-9_-]{8,}", raw):
+        return raw
+
+    try:
+        parsed = urlparse(raw)
+    except Exception:
+        return ""
+
+    path_parts = [part for part in parsed.path.split("/") if part]
+    query = parse_qs(parsed.query or "")
+
+    for key in ("recording_id", "recordingId", "id"):
+        values = query.get(key) or []
+        for item in values:
+            candidate = (item or "").strip()
+            if re.fullmatch(r"[A-Za-z0-9_-]{8,}", candidate):
+                return candidate
+
+    preferred_markers = {"recordings", "recording", "r"}
+    for index, part in enumerate(path_parts[:-1]):
+        if part.lower() in preferred_markers:
+            candidate = path_parts[index + 1].strip()
+            if re.fullmatch(r"[A-Za-z0-9_-]{8,}", candidate):
+                return candidate
+
+    if len(path_parts) >= 3 and path_parts[0].lower() == "share" and path_parts[1].lower() == "recording":
+        candidate = path_parts[2].strip()
+        if re.fullmatch(r"[A-Za-z0-9_-]{8,}", candidate):
+            return candidate
+
+    for part in reversed(path_parts):
+        candidate = part.strip()
+        if re.fullmatch(r"[A-Za-z0-9_-]{8,}", candidate):
+            return candidate
+
+    return ""
+
+def _extract_grain_transcript_text(value: Any) -> str:
+    lines = []
+
+    def walk(node: Any):
+        if node is None:
+            return
+        if isinstance(node, str):
+            text = re.sub(r"\s+", " ", node).strip()
+            if text:
+                lines.append(text)
+            return
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        speaker = (
+            node.get("speaker_name")
+            or node.get("speaker")
+            or node.get("participant_name")
+            or node.get("name")
+        )
+        text_fields = [
+            node.get("text"),
+            node.get("transcript"),
+            node.get("utterance"),
+            node.get("content"),
+        ]
+        joined = " ".join(
+            re.sub(r"\s+", " ", str(item)).strip()
+            for item in text_fields
+            if isinstance(item, str) and item.strip()
+        ).strip()
+        if joined:
+            if speaker:
+                lines.append(f"{speaker}: {joined}")
+            else:
+                lines.append(joined)
+            return
+
+        for key in (
+            "utterances",
+            "segments",
+            "entries",
+            "items",
+            "paragraphs",
+            "transcript",
+            "results",
+            "data",
+            "words",
+            "children",
+        ):
+            if key in node:
+                walk(node[key])
+
+    walk(value)
+
+    deduped = []
+    seen = set()
+    for line in lines:
+        normalized = line.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(line)
+
+    return "\n".join(deduped).strip()
+
+def _fetch_grain_transcript_from_link(link_or_id: str) -> str:
+    recording_id = _extract_grain_recording_id(link_or_id)
+    if not recording_id:
+        raise ValueError("Invalid Grain recording link.")
+
+    token = (os.getenv("GRAIN_API_TOKEN") or "").strip()
+    if not token:
+        raise RuntimeError("Grain integration is not configured. Missing GRAIN_API_TOKEN.")
+
+    response = requests.get(
+        f"https://api.grain.com/_/workspace-api/recordings/{recording_id}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        params={
+            "transcript_format": "json",
+        },
+        timeout=30,
+    )
+    if not response.ok:
+        logging.error("Grain error body for recording_id=%s: %s", recording_id, response.text)
+        raise RuntimeError(f"Failed to fetch Grain recording ({response.status_code}): {response.text}")
+
+    payload = response.json()
+    transcript = (
+        _extract_grain_transcript_text(payload.get("transcript_json"))
+        or _extract_grain_transcript_text(payload.get("transcript"))
+    )
+    if not transcript:
+        raise RuntimeError("The Grain recording did not return transcript content.")
+
+    if (os.getenv("GRAIN_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        logging.info("Grain transcript fetched for recording_id=%s", recording_id)
+        logging.info("Grain transcript preview (%s chars): %s", len(transcript), transcript[:1500])
+
+    return transcript
 
 def register_ai_routes(app):
     @app.route('/ai/jd_to_career_fields', methods=['POST', 'OPTIONS'])
@@ -1168,9 +1319,40 @@ Return STRICT JSON:
             candidate_id = data.get('candidate_id')
             linkedin_scrapper = data.get('linkedin_scrapper', '')[:8000]
             cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
-            intro_call_transcript = data.get('intro_call_transcript', '')[:12000]
-            deep_dive_transcript = data.get('deep_dive_transcript', '')[:12000]
+            intro_call_link = data.get('intro_call_link', '')
+            deep_dive_link = data.get('deep_dive_link', '')
+            first_interview_link = data.get('first_interview_link', '')
+            intro_call_transcript = data.get('intro_call_transcript', '')
+            deep_dive_transcript = data.get('deep_dive_transcript', '')
+            first_interview_transcript = data.get('first_interview_transcript', '')
             notes = data.get('notes', '')[:4000]
+
+            if intro_call_link:
+                logging.info("generate_resume_fields: fetching Intro Call transcript from Grain link")
+                intro_call_transcript = _fetch_grain_transcript_from_link(intro_call_link)
+            if deep_dive_link:
+                logging.info("generate_resume_fields: fetching Deep Dive transcript from Grain link")
+                deep_dive_transcript = _fetch_grain_transcript_from_link(deep_dive_link)
+            if first_interview_link:
+                logging.info("generate_resume_fields: fetching First Interview transcript from Grain link")
+                first_interview_transcript = _fetch_grain_transcript_from_link(first_interview_link)
+
+            intro_call_transcript = intro_call_transcript[:12000]
+            deep_dive_transcript = deep_dive_transcript[:12000]
+            first_interview_transcript = first_interview_transcript[:12000]
+
+            logging.info(
+                "generate_resume_fields sources: linkedin=%s cv=%s intro_link=%s intro_chars=%s deep_link=%s deep_chars=%s first_link=%s first_chars=%s notes=%s",
+                bool(linkedin_scrapper.strip()),
+                bool(cv_pdf_scrapper.strip()),
+                bool((intro_call_link or "").strip()),
+                len(intro_call_transcript or ""),
+                bool((deep_dive_link or "").strip()),
+                len(deep_dive_transcript or ""),
+                bool((first_interview_link or "").strip()),
+                len(first_interview_transcript or ""),
+                len(notes or ""),
+            )
 
             prompt = f"""
             You are a resume generation assistant. Based only on the following data, generate a resume in valid JSON format. Do NOT invent or assume any information.
@@ -1186,6 +1368,9 @@ Return STRICT JSON:
 
             DEEP DIVE TRANSCRIPT:
             {deep_dive_transcript}
+
+            FIRST INTERVIEW TRANSCRIPT:
+            {first_interview_transcript}
 
             RECRUITER NOTES / COMMENTS:
             {notes}
@@ -1216,8 +1401,8 @@ Return STRICT JSON:
 
             Rules:
             - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
-            - Use the 4 main sources when available: LinkedIn, CV PDF, Intro Call transcript, and Deep Dive transcript.
-            - The call transcripts may contain extra context about scope, achievements, tools, responsibilities, communication, leadership, and domain experience. Use that information when it clearly refers to the candidate's real background.
+            - Use the available sources when present: LinkedIn, CV PDF, Intro Call transcript, Deep Dive transcript, and First Interview transcript.
+            - The call transcripts may contain extra context about scope, achievements, tools, responsibilities, communication, leadership, domain experience, and interview examples. Use that information when it clearly refers to the candidate's real background.
             - Use all possible details found in the source to make the descriptions **long, rich and specific**.
             - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
             - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.

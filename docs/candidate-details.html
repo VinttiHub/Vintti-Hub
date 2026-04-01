@@ -100,24 +100,41 @@
             <div class="ai-form-stack">
               <div class="ai-input-card">
                 <div class="ai-input-head">
-                  <label for="ai-intro-call-transcript">Intro Call Transcript</label>
+                  <label for="ai-intro-call-link">Intro Call</label>
                   <span class="ai-input-tag">Optional</span>
                 </div>
                 <div id="ai-intro-call-note" class="ai-note-box">
-                  For now, paste the transcript here. Link support can come next.
+                  Paste a Grain recording link to fetch the transcript automatically, or paste the transcript manually below.
                 </div>
+                <input id="ai-intro-call-link" type="url" placeholder="Paste Grain recording link here..." />
+                <label for="ai-intro-call-transcript" class="ai-secondary-label">Intro Call Transcript</label>
                 <textarea id="ai-intro-call-transcript" placeholder="Paste intro call transcript here..."></textarea>
               </div>
 
               <div class="ai-input-card">
                 <div class="ai-input-head">
-                  <label for="ai-deep-dive-transcript">Deep Dive Transcript</label>
+                  <label for="ai-deep-dive-link">Deep Dive</label>
                   <span class="ai-input-tag">Optional</span>
                 </div>
                 <div id="ai-deep-dive-note" class="ai-note-box">
-                  Use this transcript as another source so the CV captures more context from the calls.
+                  Add another Grain link if you want more context, or paste the transcript manually below.
                 </div>
+                <input id="ai-deep-dive-link" type="url" placeholder="Paste Grain recording link here..." />
+                <label for="ai-deep-dive-transcript" class="ai-secondary-label">Deep Dive Transcript</label>
                 <textarea id="ai-deep-dive-transcript" placeholder="Paste deep dive transcript here..."></textarea>
+              </div>
+
+              <div class="ai-input-card">
+                <div class="ai-input-head">
+                  <label for="ai-first-interview-link">First Interview</label>
+                  <span class="ai-input-tag">Optional</span>
+                </div>
+                <div id="ai-first-interview-note" class="ai-note-box">
+                  Add the Grain link for the first interview, or paste the transcript manually below.
+                </div>
+                <input id="ai-first-interview-link" type="url" placeholder="Paste Grain recording link here..." />
+                <label for="ai-first-interview-transcript" class="ai-secondary-label">First Interview Transcript</label>
+                <textarea id="ai-first-interview-transcript" placeholder="Paste first interview transcript here..."></textarea>
               </div>
             </div>
           </section>

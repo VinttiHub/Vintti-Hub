@@ -582,7 +582,10 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
   // --- LET'S GO (AI Assistant) ---
 // --- Sustituye COMPLETO el bloque (function wireAiLetsGo(){...}) por:
 (function wireAiGenerate(){
-  const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API_BASE =
+  (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
   const letsGoBtn =
     document.getElementById('ai-lets-go') ||
     document.getElementById('ai-submit') ||
@@ -638,8 +641,12 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); letsGoBtn.click(); }
   });
 
+  const introLinkEl = document.getElementById('ai-intro-call-link');
   const introEl = document.getElementById('ai-intro-call-transcript');
+  const deepDiveLinkEl = document.getElementById('ai-deep-dive-link');
   const deepDiveEl = document.getElementById('ai-deep-dive-transcript');
+  const firstInterviewLinkEl = document.getElementById('ai-first-interview-link');
+  const firstInterviewEl = document.getElementById('ai-first-interview-transcript');
   const commentsEl = document.getElementById('ai-comments');
 
   // Asegurar helper
@@ -661,8 +668,12 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
       // 2) recolecta fuentes
       let linkedin_scrapper = '';
       let cv_pdf_scrapper   = '';
+      const intro_call_link = (introLinkEl?.value || '').trim();
       const intro_call_transcript = (introEl?.value || '').trim();
+      const deep_dive_link = (deepDiveLinkEl?.value || '').trim();
       const deep_dive_transcript = (deepDiveEl?.value || '').trim();
+      const first_interview_link = (firstInterviewLinkEl?.value || '').trim();
+      const first_interview_transcript = (firstInterviewEl?.value || '').trim();
       const notes = (commentsEl?.value || '').trim();
       let hasLinkedinUrl = false, hasAnyCvFile = false;
 
@@ -680,8 +691,12 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
       const hasAnySource = !!(
         linkedin_scrapper ||
         cv_pdf_scrapper ||
+        intro_call_link ||
         intro_call_transcript ||
+        deep_dive_link ||
         deep_dive_transcript ||
+        first_interview_link ||
+        first_interview_transcript ||
         hasLinkedinUrl ||
         hasAnyCvFile
       );
@@ -697,11 +712,19 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
           candidate_id: candidateId,
           linkedin_scrapper,
           cv_pdf_scrapper,
+          intro_call_link,
           intro_call_transcript,
+          deep_dive_link,
           deep_dive_transcript,
+          first_interview_link,
+          first_interview_transcript,
           notes
         })
       });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(errText || 'Failed to generate resume');
+      }
       const out = await resp.json();
 
       // 4) pintar + guardar con la API del resume
@@ -715,7 +738,7 @@ setActiveTab(document.querySelector('.tab.active')?.dataset.tab || 'overview');
 
     } catch (err) {
       console.error('❌ AI generate failed', err);
-      alert('Something went wrong while generating the resume.');
+      alert(err?.message || 'Something went wrong while generating the resume.');
     } finally {
       stopResumeLoader();
       letsGoBtn.disabled = false;
