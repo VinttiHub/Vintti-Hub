@@ -98,6 +98,20 @@ def _get_tokens(conn, user_id: int) -> dict | None:
         return dict(row) if row else None
 
 
+def _get_opportunity_hr_lead(conn, opportunity_id: int) -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT LOWER(COALESCE(opp_hr_lead, ''))
+            FROM opportunity
+            WHERE opportunity_id = %s
+            """,
+            (opportunity_id,),
+        )
+        row = cur.fetchone()
+    return (row[0] or "").strip().lower() if row else ""
+
+
 def _upsert_tokens(conn, user_id: int, payload: dict) -> None:
     with conn.cursor() as cur:
         cur.execute(
@@ -155,6 +169,17 @@ def _fetch_events(service, start: datetime, end: datetime) -> list[dict]:
     return events
 
 
+def _extract_event_owner_email(event: dict, recruiter_emails: set[str]) -> str:
+    candidates = [
+        ((event.get("organizer") or {}).get("email") or "").strip().lower(),
+        ((event.get("creator") or {}).get("email") or "").strip().lower(),
+    ]
+    for email in candidates:
+        if email and email in recruiter_emails:
+            return email
+    return ""
+
+
 def _serialize_rows(rows: list[dict]) -> list[dict]:
     serialized = []
     for row in rows:
@@ -178,6 +203,28 @@ def list_turvo_meetings():
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
+                WITH ranked AS (
+                    SELECT t.turvo_id,
+                           t.opportunity_id,
+                           t.meeting_name,
+                           t.hr_lead,
+                           t.meeting_date,
+                           t.candidates,
+                           t.last_refresh_date,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY t.opportunity_id, t.meeting_name, t.meeting_date
+                               ORDER BY
+                                   CASE
+                                       WHEN LOWER(t.hr_lead) = LOWER(COALESCE(o.opp_hr_lead, '')) THEN 0
+                                       ELSE 1
+                                   END,
+                                   t.turvo_id DESC
+                           ) AS rn
+                    FROM turvo t
+                    LEFT JOIN opportunity o
+                      ON o.opportunity_id = t.opportunity_id
+                    WHERE t.opportunity_id = %s
+                )
                 SELECT turvo_id,
                        opportunity_id,
                        meeting_name,
@@ -185,8 +232,8 @@ def list_turvo_meetings():
                        meeting_date,
                        candidates,
                        last_refresh_date
-                FROM turvo
-                WHERE opportunity_id = %s
+                FROM ranked
+                WHERE rn = 1
                 ORDER BY meeting_date DESC, turvo_id DESC
                 """,
                 (opportunity_id,),
@@ -212,6 +259,8 @@ def refresh_turvo_meetings():
     now = datetime.now(timezone.utc)
     conn = get_connection()
     try:
+        opportunity_hr_lead = _get_opportunity_hr_lead(conn, opp_id)
+
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT MAX(meeting_date) FROM turvo WHERE opportunity_id = %s",
@@ -238,6 +287,7 @@ def refresh_turvo_meetings():
                 ([email.lower() for email in RECRUITER_EMAILS],),
             )
             recruiters = cur.fetchall() or []
+        recruiter_email_set = {str(item["email"]).strip().lower() for item in recruiters if item.get("email")}
 
         with conn.cursor() as cur:
             cur.execute("SELECT COALESCE(MAX(turvo_id), 0) FROM turvo")
@@ -250,6 +300,8 @@ def refresh_turvo_meetings():
             "events_matched": 0,
             "inserted": 0,
             "duplicates": 0,
+            "reassigned": 0,
+            "deleted_duplicates": 0,
         }
 
         for recruiter in recruiters:
@@ -291,21 +343,47 @@ def refresh_turvo_meetings():
                 meeting_date = _parse_event_start(event)
                 if not meeting_date:
                     continue
+                event_owner_email = _extract_event_owner_email(event, recruiter_email_set)
+                canonical_hr_lead = opportunity_hr_lead or event_owner_email or email
 
                 with conn.cursor() as cur:
                     cur.execute(
                         """
-                        SELECT 1
+                        DELETE FROM turvo
+                        WHERE opportunity_id = %s
+                          AND meeting_name = %s
+                          AND meeting_date = %s
+                          AND hr_lead <> %s
+                        """,
+                        (opp_id, summary, meeting_date, canonical_hr_lead),
+                    )
+                    stats["deleted_duplicates"] += cur.rowcount or 0
+
+                    cur.execute(
+                        """
+                        SELECT turvo_id, hr_lead
                         FROM turvo
                         WHERE opportunity_id = %s
                           AND meeting_name = %s
-                          AND hr_lead = %s
                           AND meeting_date = %s
                         """,
-                        (opp_id, summary, email, meeting_date),
+                        (opp_id, summary, meeting_date),
                     )
-                    if cur.fetchone():
+                    existing = cur.fetchone()
+                    if existing and existing[1] == canonical_hr_lead:
                         stats["duplicates"] += 1
+                        continue
+                    if existing:
+                        cur.execute(
+                            """
+                            UPDATE turvo
+                            SET hr_lead = %s,
+                                last_refresh_date = %s
+                            WHERE turvo_id = %s
+                            """,
+                            (canonical_hr_lead, now, existing[0]),
+                        )
+                        stats["reassigned"] += 1
                         continue
                     next_id += 1
                     cur.execute(
@@ -321,7 +399,7 @@ def refresh_turvo_meetings():
                         )
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                         """,
-                        (next_id, opp_id, summary, email, meeting_date, 0, now),
+                        (next_id, opp_id, summary, canonical_hr_lead, meeting_date, 0, now),
                     )
                     stats["inserted"] += 1
 
@@ -330,6 +408,28 @@ def refresh_turvo_meetings():
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
+                WITH ranked AS (
+                    SELECT t.turvo_id,
+                           t.opportunity_id,
+                           t.meeting_name,
+                           t.hr_lead,
+                           t.meeting_date,
+                           t.candidates,
+                           t.last_refresh_date,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY t.opportunity_id, t.meeting_name, t.meeting_date
+                               ORDER BY
+                                   CASE
+                                       WHEN LOWER(t.hr_lead) = LOWER(COALESCE(o.opp_hr_lead, '')) THEN 0
+                                       ELSE 1
+                                   END,
+                                   t.turvo_id DESC
+                           ) AS rn
+                    FROM turvo t
+                    LEFT JOIN opportunity o
+                      ON o.opportunity_id = t.opportunity_id
+                    WHERE t.opportunity_id = %s
+                )
                 SELECT turvo_id,
                        opportunity_id,
                        meeting_name,
@@ -337,8 +437,8 @@ def refresh_turvo_meetings():
                        meeting_date,
                        candidates,
                        last_refresh_date
-                FROM turvo
-                WHERE opportunity_id = %s
+                FROM ranked
+                WHERE rn = 1
                 ORDER BY meeting_date DESC, turvo_id DESC
                 """,
                 (opp_id,),
