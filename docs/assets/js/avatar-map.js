@@ -37,7 +37,8 @@
     'pilaraiassa@vintti.com':      'piliaissa.png',
     'valeria@vintti.com':          'valeria.png',
     'ana@vintti.com':              'ana.png',
-    'lucia@vintti.com':            'lufrey.png'
+    'lucia@vintti.com':            'lufrey.png',
+    'justo@vintti.com':            'justo.png'
   };
   const AVATAR_BY_USER_ID = {
     // '123': 'avatar.png',
