@@ -427,28 +427,88 @@
 
   <!-- ===== AI Assistant (hidden by default) ===== -->
   <div id="ai-assistant-btn" style="display: none;">✨ AI Assistant ✨</div>
-  <div id="ai-assistant-popup" class="ai-popup hidden">
-    <div class="ai-popup-content">
-      <span id="ai-assistant-close" class="ai-close-x">×</span>
-      <h2>AI Assistant</h2>
+  <div id="ai-assistant-popup" class="ai-popup hidden" role="dialog" aria-modal="true" aria-labelledby="ai-assistant-title">
+    <div class="ai-popup-dialog">
+      <button id="ai-assistant-close" class="modal-close" aria-label="Close">×</button>
 
-      <label>Intro Call</label>
-      <textarea placeholder="00:00 Speaker: Text here..."></textarea>
-
-      <label>Deep Dive Call</label>
-      <input type="text" placeholder="2nd_Call_Transcript" />
-
-      <label>Notes / Emails</label>
-      <textarea placeholder="Your notes here..."></textarea>
-
-      <label>Files</label>
-      <div class="file-upload" onclick="document.getElementById('ai-file-input').click()">
-        <input type="file" id="ai-file-input" />
-        <div class="upload-icon">📁</div>
+      <div class="ai-popup-hero">
+        <div class="ai-popup-kicker">Job Description Co-Pilot</div>
+        <h2 id="ai-assistant-title">✨ AI Assistant</h2>
+        <p class="ai-popup-subtitle">
+          Turn call context into a cleaner, stronger job description using Grain links, transcripts, and recruiter notes.
+        </p>
       </div>
 
-      <div class="button-group">
-        <button id="ai-assistant-go">Let's Go 🚀</button>
+      <div class="ai-popup-content">
+        <section class="ai-popup-section">
+          <div class="ai-section-heading">
+            <div>
+              <span class="ai-section-eyebrow">Optional Inputs</span>
+              <h3>Add hiring context</h3>
+            </div>
+            <span class="ai-section-chip ai-section-chip-soft">Recommended</span>
+          </div>
+
+          <div class="ai-form-stack">
+            <div class="ai-input-card">
+              <div class="ai-input-head">
+                <label for="ai-intro-link">Intro Call</label>
+                <span class="ai-input-tag">Optional</span>
+              </div>
+              <div class="ai-note-box">
+                Paste a Grain recording link to fetch the transcript automatically, or paste the transcript manually below.
+              </div>
+              <input id="ai-intro-link" type="url" placeholder="Paste Grain recording link here..." />
+              <label for="ai-intro-transcript" class="ai-secondary-label">Intro Call Transcript</label>
+              <textarea id="ai-intro-transcript" placeholder="Paste intro call transcript here..."></textarea>
+            </div>
+
+            <div class="ai-input-card">
+              <div class="ai-input-head">
+                <label for="ai-deep-dive-link">Deep Dive</label>
+                <span class="ai-input-tag">Optional</span>
+              </div>
+              <div class="ai-note-box">
+                Add another Grain link if you want more context, or paste the transcript manually below.
+              </div>
+              <input id="ai-deep-dive-link" type="url" placeholder="Paste Grain recording link here..." />
+              <label for="ai-deep-dive-transcript" class="ai-secondary-label">Deep Dive Transcript</label>
+              <textarea id="ai-deep-dive-transcript" placeholder="Paste deep dive transcript here..."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <section class="ai-popup-section">
+          <div class="ai-section-heading">
+            <div>
+              <span class="ai-section-eyebrow">Final Guidance</span>
+              <h3>Anything else to consider?</h3>
+            </div>
+          </div>
+
+          <div class="ai-form-stack">
+            <div class="ai-input-card ai-input-card-full">
+              <label for="ai-notes">Notes / Emails</label>
+              <textarea id="ai-notes" placeholder="Tell me what should be reflected in the job description..."></textarea>
+            </div>
+
+            <div class="ai-input-card ai-input-card-full">
+              <label for="ai-file-input">Files</label>
+              <div class="ai-note-box">
+                Upload documents or notes you want to keep attached to this workflow.
+              </div>
+              <div class="file-upload" onclick="document.getElementById('ai-file-input').click()">
+                <input type="file" id="ai-file-input" />
+                <div class="upload-icon">📁</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="ai-popup-footer">
+        <p class="ai-footer-copy">Generate a stronger job description using call context and recruiter notes.</p>
+        <button id="ai-assistant-go">✨ Let's Go!</button>
       </div>
     </div>
   </div>

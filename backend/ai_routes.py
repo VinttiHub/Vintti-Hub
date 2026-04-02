@@ -1217,11 +1217,29 @@ Return STRICT JSON:
                 logging.warning("❗ No se recibió JSON o está vacío")
                 raise ValueError("No JSON payload received")
 
+            intro_link = data.get('intro_link', '')
+            deep_dive_link = data.get('deep_dive_link', '')
             intro = data.get('intro', '')
             deep_dive = data.get('deepDive', '')
             notes = data.get('notes', '')
 
+            if intro_link:
+                logging.info("generate_jd: fetching Intro Call transcript from Grain link")
+                intro = _fetch_grain_transcript_from_link(intro_link)
+            if deep_dive_link:
+                logging.info("generate_jd: fetching Deep Dive transcript from Grain link")
+                deep_dive = _fetch_grain_transcript_from_link(deep_dive_link)
+
+            intro = (intro or '')[:12000]
+            deep_dive = (deep_dive or '')[:12000]
+            notes = (notes or '')[:4000]
+
+            if not intro.strip() and not deep_dive.strip() and not notes.strip():
+                raise ValueError("No usable source material was provided. Add notes or a valid Grain link with transcript.")
+
             logging.info("📥 Datos recibidos:")
+            logging.info(f"   - Intro link: {intro_link[:100] + '...' if intro_link else 'VACÍO'}")
+            logging.info(f"   - DeepDive link: {deep_dive_link[:100] + '...' if deep_dive_link else 'VACÍO'}")
             logging.info(f"   - Intro: {intro[:100] + '...' if intro else 'VACÍO'}")
             logging.info(f"   - DeepDive: {deep_dive[:100] + '...' if deep_dive else 'VACÍO'}")
             logging.info(f"   - Notes: {notes[:100] + '...' if notes else 'VACÍO'}")

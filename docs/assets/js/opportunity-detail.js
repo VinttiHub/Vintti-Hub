@@ -1652,6 +1652,11 @@ document.getElementById('details-model').addEventListener('change', async (e) =>
   logOpportunityDetailTrack('opp-details-dropdown-model');
 });
 // AI Assistant logic
+const AI_API_BASE =
+  (location.hostname === '127.0.0.1' || location.hostname === 'localhost')
+    ? 'http://127.0.0.1:5000'
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+
 const aiBtn = document.getElementById('ai-assistant-btn');
 const aiPopup = document.getElementById('ai-assistant-popup');
 const aiClose = document.getElementById('ai-assistant-close');
@@ -1697,14 +1702,49 @@ aiClose.addEventListener('click', () => {
   aiPopup.classList.add('hidden');
 });
 
+async function requestJobDescription(payload, attempt = 1) {
+  try {
+    const res = await fetch(`${AI_API_BASE}/ai/generate_jd`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(errText || 'Error generating job description');
+    }
+
+    return await res.json();
+  } catch (err) {
+    const msg = String(err?.message || '').toLowerCase();
+    const isTransientNetworkError =
+      err instanceof TypeError ||
+      msg.includes('load failed') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('networkerror') ||
+      msg.includes('timed out');
+
+    if (attempt < 2 && isTransientNetworkError) {
+      console.warn(`⚠️ AI Assistant transient error on attempt ${attempt}, retrying once...`, err);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      return requestJobDescription(payload, attempt + 1);
+    }
+
+    throw err;
+  }
+}
+
 aiGo.addEventListener('click', async () => {
-  const intro = document.querySelector('#ai-assistant-popup textarea[placeholder="00:00 Speaker: Text here..."]').value;
-  const deepDive = document.querySelector('#ai-assistant-popup input[placeholder="2nd_Call_Transcript"]').value;
-  const notes = document.querySelector('#ai-assistant-popup textarea[placeholder="Your notes here..."]').value;
+  const introLink = (document.getElementById('ai-intro-link')?.value || '').trim();
+  const intro = (document.getElementById('ai-intro-transcript')?.value || '').trim();
+  const deepDiveLink = (document.getElementById('ai-deep-dive-link')?.value || '').trim();
+  const deepDive = (document.getElementById('ai-deep-dive-transcript')?.value || '').trim();
+  const notes = (document.getElementById('ai-notes')?.value || '').trim();
 
-  console.log("📤 Enviando a AI Assistant:", { intro, deepDive, notes });
+  console.log("📤 Enviando a AI Assistant:", { introLink, intro, deepDiveLink, deepDive, notes });
 
-  if (!intro && !deepDive && !notes) {
+  if (!introLink && !intro && !deepDiveLink && !deepDive && !notes) {
     alert("❌ Please fill at least one field");
     return;
   }
@@ -1713,13 +1753,13 @@ aiGo.addEventListener('click', async () => {
   aiGo.disabled = true;
 
   try {
-    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/ai/generate_jd', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intro, deepDive, notes })
+    const data = await requestJobDescription({
+      intro_link: introLink,
+      intro,
+      deep_dive_link: deepDiveLink,
+      deepDive,
+      notes
     });
-
-    const data = await res.json();
     console.log("📥 Respuesta de AI Assistant:", data);
 
     if (data.job_description) {
@@ -1735,11 +1775,11 @@ aiGo.addEventListener('click', async () => {
 
       alert("✅ Job description generated!");
     } else {
-      alert("⚠️ Unexpected response from AI");
+      alert(data?.error || "⚠️ Unexpected response from AI");
     }
   } catch (err) {
     console.error("❌ AI Assistant error:", err);
-    alert("❌ Error generating job description");
+    alert(err?.message || "❌ Error generating job description");
   } finally {
     aiGo.textContent = "Let's Go 🚀";
     aiGo.disabled = false;
