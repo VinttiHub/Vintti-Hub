@@ -20,6 +20,20 @@
     { emoji: '🌺', message: 'November vibes 🌺 Almost summer ✨' },
     { emoji: '🎄', message: 'December moments 🎄 Sunshine and celebrations ☀️' },
   ];
+  const HOME_MONTHLY_MESSAGES = [
+    'Happy January, new year and new energy ahead ✨',
+    'Happy Valentine’s Month, Sending you lots of love 💗',
+    'Hello March, fresh starts and blooming ideas 🌸',
+    'Welcome April, bright days and good vibes ahead 🌼',
+    'Happy May, keep growing and shining every day 🌿',
+    'Hello June, halfway through the year and still glowing ☀️',
+    'Welcome July, bold energy and summer momentum 🚀',
+    'Happy August, fresh focus and strong goals ahead 🌻',
+    'Hello September, new season, new opportunities 🍂',
+    'Welcome October, cozy days and big wins ahead 🎃',
+    'Happy November, grateful hearts and steady growth 🍁',
+    'Welcome December, celebration season is here 🎄'
+  ];
 
   const MOOD_OPTIONS = [
     { key: 'energetic', emoji: '🔋', label: 'Energetic', tone: 'On fire' },
@@ -179,6 +193,13 @@
     const dataUri = buildWatermarkDataUri(emoji);
     main.classList.add('monthly-mood-surface');
     main.style.setProperty('--monthly-watermark', `url("${dataUri}")`);
+  }
+
+  function updateHomeMonthlyMessage() {
+    const messageEl = document.getElementById('home-monthly-message');
+    if (!messageEl) return;
+    const currentMonth = new Date().getMonth();
+    messageEl.textContent = HOME_MONTHLY_MESSAGES[currentMonth] || HOME_MONTHLY_MESSAGES[0];
   }
 
   function clearWatermark(main) {
@@ -649,6 +670,7 @@
   }
 
   function init() {
+    updateHomeMonthlyMessage();
     installRouteWatcher();
     insertBannerIfNeeded();
   }
