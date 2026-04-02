@@ -719,7 +719,7 @@ def refresh_applicant_ai_fields(applicant_id):
             extracted = True
             updated = True
 
-        if (match_score is None or reasons is None) and extracted_pdf and opp_id:
+        if extracted_pdf and opp_id:
             jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
             score, reason_text = _score_applicant_with_openai(
                 extracted_pdf,
@@ -728,10 +728,10 @@ def refresh_applicant_ai_fields(applicant_id):
                 filters=filters,
                 opportunity_context=opp_context,
             )
-            if match_score is None and score is not None:
+            if score is not None and score != match_score:
                 match_score = score
                 updated = True
-            if (reasons is None or reasons == "") and reason_text:
+            if reason_text and reason_text != (reasons or ""):
                 reasons = reason_text
                 updated = True
             if score is not None or reason_text:

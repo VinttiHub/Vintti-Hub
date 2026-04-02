@@ -27,6 +27,7 @@ from flask import jsonify, request
 from openai import OpenAI
 from PyPDF2 import PdfReader 
 from urllib.parse import parse_qs, urlparse
+from utils.applicant_matching import score_candidate_against_job
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -34,23 +35,135 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 from openai import OpenAI
 from PyPDF2 import PdfReader  # fallback local
 
+
+def _normalize_filter_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _extract_inline_filter(message: str, labels) -> str:
+    if isinstance(labels, str):
+        labels = [labels]
+    pattern = r"(?:^|[\n,;])\s*(?:" + "|".join(re.escape(label) for label in labels) + r")\s*:\s*([^\n,;]+)"
+    match = re.search(pattern, message, flags=re.I)
+    return _normalize_filter_text(match.group(1)) if match else ""
+
+
+def _parse_filters_without_ai(message: str, current_filters: Optional[Dict[str, Any]] = None):
+    current_filters = dict(current_filters or {})
+    normalized_current = {
+        "position": _normalize_filter_text(current_filters.get("position")),
+        "salary": _normalize_filter_text(current_filters.get("salary")),
+        "years_experience": _normalize_filter_text(current_filters.get("years_experience")),
+        "industry": _normalize_filter_text(current_filters.get("industry")),
+        "country": _normalize_filter_text(current_filters.get("country")),
+    }
+    updated = dict(normalized_current)
+    raw = _normalize_filter_text(message)
+    if not raw:
+        return updated, "", False
+
+    lower = raw.lower()
+    changed = []
+
+    direct_map = {
+        "position": ["position", "role", "title", "puesto", "posicion", "posición"],
+        "salary": ["salary", "compensation", "salario"],
+        "years_experience": ["years", "experience", "años", "anos", "years_experience"],
+        "industry": ["industry", "industria"],
+        "country": ["country", "location", "pais", "país", "ubicacion", "ubicación"],
+    }
+
+    for field, labels in direct_map.items():
+        value = _extract_inline_filter(raw, labels)
+        if value:
+            updated[field] = value
+            changed.append(field)
+
+    clear_targets = {
+        "position": ["remove position", "clear position", "sin posicion", "sin posición", "remove role"],
+        "salary": ["remove salary", "clear salary", "sin salario"],
+        "years_experience": ["remove years", "clear years", "sin anos", "sin años", "remove experience"],
+        "industry": ["remove industry", "clear industry", "sin industria"],
+        "country": ["remove country", "clear country", "sin pais", "sin país", "remove location"],
+    }
+    for field, phrases in clear_targets.items():
+        if any(phrase in lower for phrase in phrases):
+            updated[field] = ""
+            changed.append(field)
+
+    year_match = re.search(r"(\d+(?:\s*-\s*\d+)?\+?)\s*(?:years?|anos?|años?)", lower, flags=re.I)
+    if year_match and not updated["years_experience"]:
+        updated["years_experience"] = _normalize_filter_text(year_match.group(0))
+        changed.append("years_experience")
+
+    if "latam" in lower and not updated["country"]:
+        updated["country"] = "LATAM"
+        changed.append("country")
+
+    countries = ["mexico", "brazil", "argentina", "colombia", "peru", "chile", "uruguay", "ecuador", "united states", "canada"]
+    if not updated["country"]:
+        for country in countries:
+            if country in lower:
+                updated["country"] = country.title() if country != "united states" else "United States"
+                changed.append("country")
+                break
+
+    industries = ["saas", "fintech", "healthcare", "ecommerce", "staffing", "recruiting", "logistics", "education"]
+    if not updated["industry"]:
+        for industry in industries:
+            if industry in lower:
+                updated["industry"] = industry.upper() if industry == "saas" else industry.title()
+                changed.append("industry")
+                break
+
+    known_roles = [
+        "account executive", "business development representative", "bdr", "sdr",
+        "recruiter", "backend engineer", "frontend engineer", "fullstack engineer",
+        "software engineer", "data analyst", "project manager",
+    ]
+    if not updated["position"]:
+        for role in known_roles:
+            if role in lower:
+                updated["position"] = role.title()
+                changed.append("position")
+                break
+
+    changed = list(dict.fromkeys(changed))
+    if changed:
+        labels = ", ".join(changed)
+        return updated, f"Listo, actualicé: {labels}.", False
+
+    mentions_filter_words = any(word in lower for word in ["position", "role", "title", "country", "location", "industry", "salary", "years", "experience", "filtro", "filter"])
+    if not mentions_filter_words:
+        return updated, "No vi cambios concretos en filtros, así que mantuve los actuales.", False
+
+    return updated, "", True
+
 def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> str:
     """
-    Sube el PDF a OpenAI Files (purpose=assistants) y lo pasa al modelo como input_file.
-    Devuelve texto plano en inglés, limpio.
-    Si el modelo no lo procesa, hace fallback local con PyPDF2 y limpia con el modelo.
+    Intenta extraer texto localmente primero para evitar costo.
+    Solo usa OpenAI como fallback cuando el PDF no trae texto suficiente.
     """
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    local_text = ""
+    try:
+        with io.BytesIO(pdf_bytes) as bio:
+            reader = PdfReader(bio)
+            raw = []
+            for page in reader.pages:
+                raw.append(page.extract_text() or "")
+            local_text = re.sub(r"\s+", " ", "\n".join(raw)).strip()
+    except Exception as e:
+        logging.error(f"❌ Local PDF read failed: {e}")
 
-    # --- 1) Subir PDF con purpose correcto ---
+    if len(local_text) >= 300:
+        return local_text
+
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     try:
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
             tmp.write(pdf_bytes)
             tmp.flush()
-            up = client.files.create(
-                file=open(tmp.name, "rb"),
-                purpose="assistants"    # <-- importante (antes usabas "user_data")
-            )
+            up = client.files.create(file=open(tmp.name, "rb"), purpose="assistants")
     except Exception as e:
         logging.error(f"❌ Upload to OpenAI Files failed: {e}")
         up = None
@@ -97,39 +210,8 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
 
     # A veces el modelo puede responder “I can't view…” si no recibió bien el file
     if not extracted or "can't view or extract" in extracted.lower():
-        logging.warning("⚠️ Model did not read the PDF properly. Falling back to local text extraction (PyPDF2).")
-        try:
-            # --- 3) Fallback local: extraer texto crudo con PyPDF2 ---
-            with io.BytesIO(pdf_bytes) as bio:
-                reader = PdfReader(bio)
-                raw = []
-                for page in reader.pages:
-                    raw.append(page.extract_text() or "")
-                local_text = "\n".join(raw).strip()
-        except Exception as e:
-            logging.error(f"❌ Local PDF read failed: {e}")
-            local_text = ""
-
-        # Si logramos algo local, pedimos al modelo que lo limpie/normalice a texto CV útil
-        if local_text:
-            try:
-                clean_prompt = (
-                    "Clean and normalize the following raw PDF text into CV-relevant plain English text only. "
-                    "Remove duplicated headers/footers and layout noise. "
-                    "No markdown, no JSON, no bullet symbols, just readable plain text.\n\n"
-                    f"{local_text[:15000]}"
-                )
-                # Puedes usar el mismo cliente legacy de chat completions si prefieres:
-                cleaned = openai.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": clean_prompt}],
-                    temperature=0.0,
-                    max_tokens=2000
-                )
-                extracted = (cleaned.choices[0].message.content or "").strip()
-            except Exception as e:
-                logging.error(f"❌ Cleaning fallback failed: {e}")
-                extracted = local_text  # último recurso: texto crudo
+        logging.warning("⚠️ Model did not read the PDF properly. Returning best local extraction.")
+        extracted = local_text
 
     return extracted.strip()
 
@@ -297,124 +379,13 @@ def _score_applicant_with_openai(
     filters: Optional[Dict[str, Any]] = None,
     opportunity_context: Optional[Dict[str, Any]] = None,
 ):
-    if not extracted_pdf:
-        return None, None
-
-    filters = filters or {}
-    opportunity_context = opportunity_context or {}
-    prompt = f"""
-You are a recruiting assistant scoring applicants for a job.
-Return STRICT JSON only with this shape:
-{{
-  "score": <1-10 integer>,
-  "overall_percent": <0-100 integer>,
-  "summary": "<Spanish, 3-5 sentences. Explain match/gaps using the JD filters and CV evidence; mention missing info if any>",
-  "breakdown": [
-    {{"category": "Ubicación", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "Similitud con la JD", "percent": <0-100>, "detail": "<Spanish detail with 3-5 sentences comparing JD filters vs CV>"}},
-    {{"category": "Posición (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "Industria (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "Años de experiencia (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "Salario (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}},
-    {{"category": "País (filtro)", "percent": <0-100>, "detail": "<Spanish detail>"}}
-  ]
-}}
-
-Score MUST consider:
-- Location match between applicant and role.
-- How close the applicant's experience and education are to the job description requirements.
-- "Similitud con la JD" must compare extracted CV text (extracted_pdf) vs job description requirements.
-- Any explicit user filters (position, salary, years_experience, industry, country) if provided.
-
-Write a specific, extended comparison using ONLY these inputs:
-- User filters (position, salary, years_experience, industry, country) extracted from the JD.
-- The job description text.
-- The extracted CV text.
-For "Similitud con la JD", explicitly reference which JD filters are present and whether the CV supports each one (e.g., "no se encontró experiencia en BDR en el CV").
-If a filter is missing in the JD or not found in the CV, state that clearly and explain how it impacts the percent.
-Do NOT invent facts. If key information is missing, mention it briefly in the summary and details.
-
-Applicant location: {applicant_location or "Unknown"}
-Opportunity context: {json.dumps(opportunity_context, ensure_ascii=False)}
-User filters (optional): {json.dumps(filters, ensure_ascii=False)}
-
-Job description:
-{job_description[:8000]}
-
-Extracted CV text:
-{extracted_pdf[:8000]}
-"""
-
-    chat = call_openai_with_retry(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-        max_tokens=450,
+    return score_candidate_against_job(
+        extracted_pdf,
+        applicant_location,
+        job_description,
+        filters=filters,
+        opportunity_context=opportunity_context,
     )
-
-    content = (chat.choices[0].message.content or "").strip()
-    cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r"\1", content)
-    try:
-        payload = json.loads(cleaned)
-    except Exception:
-        payload = {}
-
-    score_raw = payload.get("score")
-    try:
-        score = int(score_raw)
-    except Exception:
-        score = None
-
-    summary = payload.get("summary")
-    breakdown = payload.get("breakdown")
-    overall_percent = payload.get("overall_percent")
-
-    reasons = None
-    reasons_payload = {}
-    if isinstance(summary, str) and summary.strip():
-        reasons_payload["summary"] = summary.strip()
-    if isinstance(overall_percent, (int, float)):
-        reasons_payload["overall_percent"] = max(0, min(100, int(overall_percent)))
-    if isinstance(breakdown, list):
-        normalized_breakdown = []
-        for item in breakdown:
-            if not isinstance(item, dict):
-                continue
-            category = item.get("category")
-            detail = item.get("detail") or item.get("explanation")
-            percent = item.get("percent")
-            if not isinstance(category, str) or not category.strip():
-                continue
-            try:
-                percent_value = int(percent)
-            except Exception:
-                percent_value = None
-            if percent_value is not None:
-                percent_value = max(0, min(100, percent_value))
-            if not isinstance(detail, str):
-                detail = ""
-            normalized_breakdown.append(
-                {
-                    "category": category.strip(),
-                    "percent": percent_value,
-                    "detail": detail.strip(),
-                }
-            )
-        if normalized_breakdown:
-            reasons_payload["breakdown"] = normalized_breakdown
-
-    if reasons_payload:
-        if "overall_percent" not in reasons_payload and score is not None:
-            reasons_payload["overall_percent"] = max(0, min(100, int(score * 10)))
-        reasons = json.dumps(reasons_payload, ensure_ascii=False)
-    else:
-        raw_reasons = payload.get("reasons")
-        if isinstance(raw_reasons, str):
-            reasons = raw_reasons.strip()
-
-    if score is not None:
-        score = max(1, min(10, score))
-    return score, reasons
 
 def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[str, Any]] = None):
     filters = filters or {}
@@ -822,7 +793,10 @@ JOB DESCRIPTION (verbatim):
             if not message:
                 return jsonify({"error": "message is required"}), 400
 
-            prompt = f"""
+            updated, response, needs_ai = _parse_filters_without_ai(message, current_filters)
+
+            if needs_ai:
+                prompt = f"""
 You are a recruiting assistant updating filters.
 Current filters (JSON):
 {json.dumps(current_filters, ensure_ascii=False)}
@@ -841,25 +815,30 @@ Return STRICT JSON:
 {{"updated_filters": {{...}}, "response": "<short Spanish summary of changes>" }}
 """
 
-            chat = call_openai_with_retry(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-                max_tokens=350
-            )
+                chat = call_openai_with_retry(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=350
+                )
 
-            content = (chat.choices[0].message.content or "").strip()
-            cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
-            try:
-                payload = json.loads(cleaned)
-            except Exception:
-                payload = {}
+                content = (chat.choices[0].message.content or "").strip()
+                cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content)
+                try:
+                    payload = json.loads(cleaned)
+                except Exception:
+                    payload = {}
 
-            updated = payload.get("updated_filters")
+                maybe_updated = payload.get("updated_filters")
+                if isinstance(maybe_updated, dict):
+                    updated = maybe_updated
+
+                maybe_response = payload.get("response")
+                if isinstance(maybe_response, str) and maybe_response.strip():
+                    response = maybe_response.strip()
+
             if not isinstance(updated, dict):
                 updated = current_filters
-
-            response = payload.get("response")
             if not isinstance(response, str) or not response.strip():
                 response = "Listo, actualicé los filtros con tu mensaje."
 

@@ -163,7 +163,7 @@ function normalizeText(value) {
 function setRefreshApplicantsBusy(isBusy) {
   if (!els.refreshApplicantsBtn) return;
   els.refreshApplicantsBtn.disabled = Boolean(isBusy);
-  els.refreshApplicantsBtn.textContent = isBusy ? "Refreshing..." : "Refresh CVs";
+  els.refreshApplicantsBtn.textContent = isBusy ? "Syncing..." : "Sync applicants";
 }
 
 function updateLoadingGameStats() {
@@ -271,7 +271,7 @@ async function backfillApplicantsAI(opportunityId) {
   }
 
   setRefreshApplicantsBusy(true);
-  setRefreshApplicantsStatus("Refreshing CVs...");
+  setRefreshApplicantsStatus("Syncing applicants...");
 
   try {
     const result = await fetchJSON(`${API_BASE}/applicants/backfill_ai_fields`, {
@@ -1459,7 +1459,6 @@ async function handleChatSubmit(event) {
     if (resp.updated_filters) {
       state.filters = { ...state.filters, ...resp.updated_filters };
       renderFilters();
-      await recalculateApplicants(getOpportunityId());
       await loadApplicants(getOpportunityId());
     }
     appendMessage("assistant", resp.response || "Filtros actualizados.");
