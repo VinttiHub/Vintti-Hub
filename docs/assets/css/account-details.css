@@ -1465,9 +1465,46 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   color: #6b7280;
 }
 
-.credit-loop-table td,
-.credit-loop-table th {
-  vertical-align: top;
+.credit-loop-list {
+  display: grid;
+  gap: 18px;
+}
+
+.credit-loop-item {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+  border: 1px solid #e7ebf1;
+  border-radius: 24px;
+  padding: 22px 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.credit-loop-item-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(100px, 0.7fr)) minmax(220px, 1.1fr) minmax(220px, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.credit-loop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.credit-loop-field-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a8599;
+  font-weight: 700;
+}
+
+.credit-loop-field-value {
+  font-size: 16px;
+  line-height: 1.35;
+  color: #1f2937;
+  font-weight: 600;
 }
 
 .credit-status {
@@ -1504,8 +1541,8 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 .credit-loop-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 200px;
+  gap: 10px;
+  width: 100%;
 }
 
 .credit-loop-actions select,
@@ -1515,25 +1552,77 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   width: 100%;
 }
 
-.credit-loop-actions textarea {
-  min-height: 72px;
+.credit-loop-notes {
+  min-height: 96px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 16px;
+  padding: 14px 16px;
   font-family: 'Onest', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.45;
   resize: vertical;
+  width: 100%;
+  display: block;
+  background: #fff;
+  color: #1f2937;
+  box-sizing: border-box;
+}
+
+.credit-loop-notes::placeholder {
+  color: #9ca3af;
+}
+
+.credit-loop-notes:focus,
+.credit-loop-actions select:focus {
+  outline: none;
+  border-color: #c7c7ff;
+  box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.12);
 }
 
 .credit-loop-opportunity {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  align-items: flex-start;
+}
+
+.credit-loop-opportunity strong {
+  font-size: 16px;
+  color: #1f2937;
+}
+
+.credit-loop-opportunity small {
+  font-size: 13px;
+}
+
+.credit-loop-action-btn {
+  align-self: stretch;
+  min-height: 46px;
+  border-radius: 14px;
+}
+
+.credit-loop-actions .select-chip {
+  min-height: 46px;
+  border-radius: 14px;
+}
+
+.credit-loop-used-on {
+  color: #4b5563;
+  font-weight: 500;
 }
 
 .credit-loop-opportunity small,
 .subtle {
   color: #6b7280;
+}
+
+.credit-loop-empty {
+  padding: 32px 24px;
+  text-align: center;
+  color: #6b7280;
+  border: 1px dashed #d9deea;
+  border-radius: 20px;
+  background: #fafbff;
 }
 
 @media (max-width: 900px) {
@@ -1543,5 +1632,9 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 
   .credit-loop-header {
     flex-direction: column;
+  }
+
+  .credit-loop-item-grid {
+    grid-template-columns: 1fr;
   }
 }

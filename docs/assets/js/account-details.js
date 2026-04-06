@@ -12,9 +12,10 @@ function dateInputValue(v) {
   // último intento: parse
   const d = new Date(s);
   if (isNaN(d)) return '';
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
+  // Usa UTC para no restar un día cuando Flask serializa fechas como GMT.
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -348,17 +349,41 @@ document.body.style.backgroundColor = 'var(--bg)';
     });
   }
 
-  const creditLoopTbody = document.getElementById('creditLoopTbody');
-  if (creditLoopTbody) {
-    creditLoopTbody.addEventListener('click', async (event) => {
+  const creditLoopList = document.getElementById('creditLoopList');
+  if (creditLoopList) {
+    creditLoopList.addEventListener('focusout', async (event) => {
+      const textarea = event.target.closest('.credit-loop-notes');
+      if (!textarea) return;
+
+      const creditId = Number(textarea.getAttribute('data-credit-id'));
+      const nextValue = textarea.value.trim();
+      const lastSaved = textarea.getAttribute('data-last-saved') || '';
+      if (!creditId || nextValue === lastSaved) return;
+
+      textarea.disabled = true;
+      try {
+        await updateCreditLoopItem(id, creditId, {
+          action: 'notes',
+          notes: nextValue
+        });
+        textarea.setAttribute('data-last-saved', nextValue);
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to save note');
+      } finally {
+        textarea.disabled = false;
+      }
+    });
+
+    creditLoopList.addEventListener('click', async (event) => {
       const button = event.target.closest('.credit-loop-action-btn');
       if (!button) return;
 
-      const row = button.closest('tr');
+      const card = button.closest('.credit-loop-item');
       const creditId = Number(button.getAttribute('data-credit-id'));
       const action = button.getAttribute('data-action');
-      const notes = row?.querySelector('.credit-loop-notes')?.value?.trim() || '';
-      const selectedOpportunity = row?.querySelector('.credit-loop-use-select')?.value || '';
+      const notes = card?.querySelector('.credit-loop-notes')?.value?.trim() || '';
+      const selectedOpportunity = card?.querySelector('.credit-loop-use-select')?.value || '';
 
       if (action === 'use' && !selectedOpportunity) {
         alert('Select the opportunity where this credit was used.');
@@ -620,9 +645,9 @@ function fillOpportunitiesTable(opportunities) {
 }
 
 async function loadCreditLoop(accountId) {
-  const tbody = document.getElementById('creditLoopTbody');
-  if (tbody) {
-    tbody.innerHTML = `<tr><td colspan="7">Loading…</td></tr>`;
+  const list = document.getElementById('creditLoopList');
+  if (list) {
+    list.innerHTML = `<div class="credit-loop-empty">Loading…</div>`;
   }
 
   try {
@@ -636,8 +661,8 @@ async function loadCreditLoop(accountId) {
     fillCreditLoopTable(ACCOUNT_DETAIL_CREDIT_LOOP);
   } catch (err) {
     console.error('Error loading Credit Loop:', err);
-    if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="7">Failed to load Credit Loop</td></tr>`;
+    if (list) {
+      list.innerHTML = `<div class="credit-loop-empty">Failed to load Credit Loop</div>`;
     }
   }
 }
@@ -671,15 +696,15 @@ function buildCreditLoopOpportunityOptions(currentOppId = null) {
 }
 
 function fillCreditLoopTable(items = []) {
-  const tbody = document.getElementById('creditLoopTbody');
-  if (!tbody) return;
+  const list = document.getElementById('creditLoopList');
+  if (!list) return;
 
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No credits yet. Credits will appear here once an opportunity reaches Close Win.</td></tr>`;
+    list.innerHTML = `<div class="credit-loop-empty">No credits yet. Credits will appear here once an opportunity reaches Close Win.</div>`;
     return;
   }
 
-  tbody.innerHTML = items.map((item) => {
+  list.innerHTML = items.map((item) => {
     const status = String(item.status || 'available').toLowerCase();
     const sourceLabel = item.source_opportunity_name || item.source_position_name || `Opportunity #${item.source_opportunity_id}`;
     const usedLabel = item.used_by_opportunity_name || (item.used_by_opportunity_id ? `Opportunity #${item.used_by_opportunity_id}` : '—');
@@ -690,34 +715,58 @@ function fillCreditLoopTable(items = []) {
           <select class="select-chip credit-loop-use-select">
             ${buildCreditLoopOpportunityOptions(item.source_opportunity_id)}
           </select>
-          <textarea class="credit-loop-notes" placeholder="Optional note">${escapeHtml(notes)}</textarea>
           <button class="tab-btn credit-loop-action-btn" data-credit-id="${item.credit_id}" data-action="use" type="button">Use credit</button>
         </div>
       `
       : (status === 'used' || status === 'reversed')
         ? `
           <div class="credit-loop-actions">
-            <textarea class="credit-loop-notes" placeholder="Optional note">${escapeHtml(notes)}</textarea>
             <button class="tab-btn credit-loop-action-btn" data-credit-id="${item.credit_id}" data-action="restore" type="button">Restore credit</button>
           </div>
         `
         : `<span class="placeholder">No actions available</span>`;
 
     return `
-      <tr>
-        <td>
-          <div class="credit-loop-opportunity">
-            <strong>${escapeHtml(sourceLabel)}</strong>
-            <small>Opp ID ${escapeHtml(item.source_opportunity_id)}</small>
+      <article class="credit-loop-item">
+        <div class="credit-loop-item-grid">
+          <div class="credit-loop-field credit-loop-field-source">
+            <span class="credit-loop-field-label">Source Opportunity</span>
+            <div class="credit-loop-opportunity">
+              <strong>${escapeHtml(sourceLabel)}</strong>
+              <small>Opp ID ${escapeHtml(item.source_opportunity_id)}</small>
+            </div>
           </div>
-        </td>
-        <td>${escapeHtml(formatDateLabel(item.earned_date))}</td>
-        <td>${escapeHtml(formatDateLabel(item.expires_at))}</td>
-        <td>${renderCreditStatus(status)}</td>
-        <td>${escapeHtml(usedLabel)}</td>
-        <td>${escapeHtml(notes || '—')}</td>
-        <td>${actions}</td>
-      </tr>
+          <div class="credit-loop-field">
+            <span class="credit-loop-field-label">Earned</span>
+            <div class="credit-loop-field-value">${escapeHtml(formatDateLabel(item.earned_date))}</div>
+          </div>
+          <div class="credit-loop-field">
+            <span class="credit-loop-field-label">Expires</span>
+            <div class="credit-loop-field-value">${escapeHtml(formatDateLabel(item.expires_at))}</div>
+          </div>
+          <div class="credit-loop-field">
+            <span class="credit-loop-field-label">Status</span>
+            <div class="credit-loop-field-value">${renderCreditStatus(status)}</div>
+          </div>
+          <div class="credit-loop-field">
+            <span class="credit-loop-field-label">Used On</span>
+            <div class="credit-loop-field-value credit-loop-used-on">${escapeHtml(usedLabel)}</div>
+          </div>
+          <div class="credit-loop-field credit-loop-field-notes">
+            <span class="credit-loop-field-label">Notes</span>
+            <textarea
+              class="credit-loop-notes"
+              data-credit-id="${item.credit_id}"
+              data-last-saved="${escapeAttribute(notes)}"
+              placeholder="Optional note"
+            >${escapeHtml(notes)}</textarea>
+          </div>
+          <div class="credit-loop-field credit-loop-field-action">
+            <span class="credit-loop-field-label">Action</span>
+            ${actions}
+          </div>
+        </div>
+      </article>
     `;
   }).join('');
 }

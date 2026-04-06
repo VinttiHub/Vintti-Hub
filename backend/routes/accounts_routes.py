@@ -652,12 +652,13 @@ def update_opportunity_stage(opportunity_id):
                     (new_stage, opportunity_id),
                 )
 
-                if (previous_stage or "").strip() != (new_stage or "").strip():
+                stage_changed = (previous_stage or "").strip() != (new_stage or "").strip()
+                if stage_changed:
                     create_stage_todos(cursor, opportunity_id, new_stage)
 
-                    if str(new_stage or "").strip().lower() == "close win" and account_id:
-                        credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)
-                        credit_created = create_credit_for_close_win(cursor, opportunity_id)
+                if str(new_stage or "").strip().lower() == "close win" and account_id:
+                    credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)
+                    credit_created = create_credit_for_close_win(cursor, opportunity_id)
 
         return jsonify({
             'success': True,

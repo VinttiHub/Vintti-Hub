@@ -244,22 +244,9 @@
           </div>
         </div>
 
-        <table class="styled-table credit-loop-table" role="table" aria-label="Credit Loop credits">
-          <thead>
-            <tr>
-              <th scope="col">Source Opportunity</th>
-              <th scope="col">Earned</th>
-              <th scope="col">Expires</th>
-              <th scope="col">Status</th>
-              <th scope="col">Used On</th>
-              <th scope="col">Notes</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody id="creditLoopTbody">
-            <tr><td colspan="7">Loading…</td></tr>
-          </tbody>
-        </table>
+        <div id="creditLoopList" class="credit-loop-list" aria-live="polite">
+          <div class="credit-loop-empty">Loading…</div>
+        </div>
       </div>
     </section>
 

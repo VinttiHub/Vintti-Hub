@@ -341,6 +341,19 @@ def update_credit_status(
         raise ValueError("Credit not found")
 
     normalized_action = str(action or "").strip().lower()
+    if normalized_action == "notes":
+        cur.execute(
+            """
+            UPDATE account_credit_loop
+               SET notes = %s,
+                   updated_at = now()
+             WHERE credit_id = %s
+             RETURNING *
+            """,
+            (notes, credit_id),
+        )
+        return cur.fetchone() or {}
+
     if normalized_action == "use":
         if current.get("status") != "available":
             raise ValueError("Only available credits can be marked as used")
