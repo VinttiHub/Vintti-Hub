@@ -453,10 +453,14 @@ def run_due_credit_loop_reminders(cur, *, today: Optional[date] = None) -> List[
         summary = get_available_credit_summary(cur, account_id, today=today)
         available_credits = summary["available_credits"]
         months_left = payload["months_left"] or 0
-        credit_lines = "".join(
-            f"<li>{html.escape(str(item.get('source_position_name') or f'Opportunity #{item.get('credit_id')}'))} — expires {html.escape(str(item.get('expires_at') or '—'))}</li>"
-            for item in payload["credits"]
-        )
+        credit_line_parts = []
+        for item in payload["credits"]:
+            source_label = item.get("source_position_name") or f"Opportunity #{item.get('credit_id')}"
+            expires_label = item.get("expires_at") or "—"
+            credit_line_parts.append(
+                f"<li>{html.escape(str(source_label))} - expires {html.escape(str(expires_label))}</li>"
+            )
+        credit_lines = "".join(credit_line_parts)
         subject = (
             f"Credit Loop reminder: {payload['client_name']} has {available_credits} credit"
             f"{'s' if available_credits != 1 else ''} left"
