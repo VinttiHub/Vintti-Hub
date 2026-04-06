@@ -28,6 +28,7 @@ let buyoutReloadTimer = null;
 let ACCOUNT_DETAIL_RECORD = null;
 let ACCOUNT_DETAIL_OPPORTUNITIES = [];
 let ACCOUNT_DETAIL_CANDIDATES = [];
+let ACCOUNT_DETAIL_CREDIT_LOOP = [];
 let ACCOUNT_OPPS_READY = false;
 let ACCOUNT_CANDIDATES_READY = false;
 let ACCOUNT_DERIVED_REFRESHING = false;
@@ -91,6 +92,21 @@ function hasBuyout(hire = {}) {
 
 function escapeAttribute(value) {
   return String(value).replace(/"/g, '&quot;');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateLabel(value) {
+  if (!value) return '—';
+  const ymd = dateInputValue(value);
+  return ymd || String(value);
 }
 
 function renderReplacementBadge(replacementOf) {
@@ -265,6 +281,12 @@ document.body.style.backgroundColor = 'var(--bg)';
       if (target === 'invoice') {
         loadBonusRequests().catch(console.error);
       }
+      if (target === 'credit-loop') {
+        const accountId = getIdFromURL();
+        if (accountId) {
+          loadCreditLoop(accountId).catch(console.error);
+        }
+      }
     });
   });
 
@@ -319,17 +341,60 @@ document.body.style.backgroundColor = 'var(--bg)';
   }
   if (!id) return;
 
+  const reloadCreditLoopBtn = document.getElementById('reloadCreditLoopBtn');
+  if (reloadCreditLoopBtn) {
+    reloadCreditLoopBtn.addEventListener('click', () => {
+      loadCreditLoop(id).catch(console.error);
+    });
+  }
+
+  const creditLoopTbody = document.getElementById('creditLoopTbody');
+  if (creditLoopTbody) {
+    creditLoopTbody.addEventListener('click', async (event) => {
+      const button = event.target.closest('.credit-loop-action-btn');
+      if (!button) return;
+
+      const row = button.closest('tr');
+      const creditId = Number(button.getAttribute('data-credit-id'));
+      const action = button.getAttribute('data-action');
+      const notes = row?.querySelector('.credit-loop-notes')?.value?.trim() || '';
+      const selectedOpportunity = row?.querySelector('.credit-loop-use-select')?.value || '';
+
+      if (action === 'use' && !selectedOpportunity) {
+        alert('Select the opportunity where this credit was used.');
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        await updateCreditLoopItem(id, creditId, {
+          action,
+          notes,
+          used_by_opportunity_id: selectedOpportunity ? Number(selectedOpportunity) : null
+        });
+        await loadCreditLoop(id);
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Failed to update credit');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/accounts/${id}`)
     .then(res => res.json())
     .then(data => {
       ACCOUNT_DETAIL_RECORD = data || null;
       ACCOUNT_DETAIL_OPPORTUNITIES = [];
       ACCOUNT_DETAIL_CANDIDATES = [];
+      ACCOUNT_DETAIL_CREDIT_LOOP = [];
       ACCOUNT_OPPS_READY = false;
       ACCOUNT_CANDIDATES_READY = false;
       fillAccountDetails(data);
       loadAssociatedOpportunities(id);
       loadCandidates(id);
+      loadCreditLoop(id);
       loadAccountPdfs(id); // ⬅️ NUEVO: pinta la grilla de PDFs
     })
     .catch(err => {
@@ -421,6 +486,9 @@ function loadAssociatedOpportunities(accountId) {
       scheduleAccountDerivedRefresh();
       console.log("Oportunidades asociadas:", data);
       fillOpportunitiesTable(data);
+      if (ACCOUNT_DETAIL_CREDIT_LOOP.length) {
+        fillCreditLoopTable(ACCOUNT_DETAIL_CREDIT_LOOP);
+      }
     })
     .catch(err => {
       console.error("Error cargando oportunidades asociadas:", err);
@@ -549,6 +617,123 @@ function fillOpportunitiesTable(opportunities) {
 
     tbody.appendChild(row);
   });
+}
+
+async function loadCreditLoop(accountId) {
+  const tbody = document.getElementById('creditLoopTbody');
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="7">Loading…</td></tr>`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/accounts/${accountId}/credit-loop`, { credentials: 'include' });
+    if (!res.ok) {
+      throw new Error(`Failed to load Credit Loop: ${res.status}`);
+    }
+    const payload = await res.json();
+    ACCOUNT_DETAIL_CREDIT_LOOP = Array.isArray(payload?.items) ? payload.items : [];
+    fillCreditLoopSummary(payload?.summary || {});
+    fillCreditLoopTable(ACCOUNT_DETAIL_CREDIT_LOOP);
+  } catch (err) {
+    console.error('Error loading Credit Loop:', err);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="7">Failed to load Credit Loop</td></tr>`;
+    }
+  }
+}
+
+function fillCreditLoopSummary(summary = {}) {
+  const availableEl = document.getElementById('creditLoopAvailable');
+  const expirationEl = document.getElementById('creditLoopNextExpiration');
+  const monthsLeftEl = document.getElementById('creditLoopMonthsLeft');
+  if (availableEl) availableEl.textContent = summary.available_credits ?? 0;
+  if (expirationEl) expirationEl.textContent = summary.next_expiration ? formatDateLabel(summary.next_expiration) : '—';
+  if (monthsLeftEl) {
+    const months = summary.months_left;
+    monthsLeftEl.textContent = Number.isFinite(months) ? `${months}` : '—';
+  }
+}
+
+function renderCreditStatus(status) {
+  const normalized = String(status || 'available').trim().toLowerCase();
+  return `<span class="credit-status ${escapeHtml(normalized)}">${escapeHtml(normalized)}</span>`;
+}
+
+function buildCreditLoopOpportunityOptions(currentOppId = null) {
+  const rows = Array.isArray(ACCOUNT_DETAIL_OPPORTUNITIES) ? ACCOUNT_DETAIL_OPPORTUNITIES : [];
+  const options = rows
+    .filter((opp) => Number(opp.opportunity_id) !== Number(currentOppId))
+    .map((opp) => {
+      const label = `${opp.opp_position_name || `Opportunity #${opp.opportunity_id}`} (${opp.opp_stage || '—'})`;
+      return `<option value="${escapeAttribute(opp.opportunity_id)}">${escapeHtml(label)}</option>`;
+    });
+  return [`<option value="">Select opportunity</option>`, ...options].join('');
+}
+
+function fillCreditLoopTable(items = []) {
+  const tbody = document.getElementById('creditLoopTbody');
+  if (!tbody) return;
+
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="7">No credits yet. Credits will appear here once an opportunity reaches Close Win.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = items.map((item) => {
+    const status = String(item.status || 'available').toLowerCase();
+    const sourceLabel = item.source_opportunity_name || item.source_position_name || `Opportunity #${item.source_opportunity_id}`;
+    const usedLabel = item.used_by_opportunity_name || (item.used_by_opportunity_id ? `Opportunity #${item.used_by_opportunity_id}` : '—');
+    const notes = item.notes || '';
+    const actions = status === 'available'
+      ? `
+        <div class="credit-loop-actions">
+          <select class="select-chip credit-loop-use-select">
+            ${buildCreditLoopOpportunityOptions(item.source_opportunity_id)}
+          </select>
+          <textarea class="credit-loop-notes" placeholder="Optional note">${escapeHtml(notes)}</textarea>
+          <button class="tab-btn credit-loop-action-btn" data-credit-id="${item.credit_id}" data-action="use" type="button">Use credit</button>
+        </div>
+      `
+      : (status === 'used' || status === 'reversed')
+        ? `
+          <div class="credit-loop-actions">
+            <textarea class="credit-loop-notes" placeholder="Optional note">${escapeHtml(notes)}</textarea>
+            <button class="tab-btn credit-loop-action-btn" data-credit-id="${item.credit_id}" data-action="restore" type="button">Restore credit</button>
+          </div>
+        `
+        : `<span class="placeholder">No actions available</span>`;
+
+    return `
+      <tr>
+        <td>
+          <div class="credit-loop-opportunity">
+            <strong>${escapeHtml(sourceLabel)}</strong>
+            <small>Opp ID ${escapeHtml(item.source_opportunity_id)}</small>
+          </div>
+        </td>
+        <td>${escapeHtml(formatDateLabel(item.earned_date))}</td>
+        <td>${escapeHtml(formatDateLabel(item.expires_at))}</td>
+        <td>${renderCreditStatus(status)}</td>
+        <td>${escapeHtml(usedLabel)}</td>
+        <td>${escapeHtml(notes || '—')}</td>
+        <td>${actions}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function updateCreditLoopItem(accountId, creditId, body) {
+  const res = await fetch(`${API_BASE_URL}/accounts/${accountId}/credit-loop/${creditId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'include'
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || 'Failed to update credit');
+  }
+  return payload;
 }
 
 async function loadCandidates(accountId) {

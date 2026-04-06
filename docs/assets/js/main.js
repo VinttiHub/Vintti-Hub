@@ -4027,6 +4027,24 @@ async function sendCloseWinStageEmail(opportunityId){
   }
 }
 
+async function syncCloseWinCreditLoop(opportunityId){
+  try {
+    const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/credit-loop/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`credit_loop sync failed ${res.status}: ${errText}`);
+    }
+    return await res.json().catch(() => ({}));
+  } catch (e) {
+    console.error('❌ Failed to sync Close Win Credit Loop:', e);
+    return null;
+  }
+}
+
 async function triggerSignedResigRefReminder(opportunityId){
   try {
     if (window._signedResigRefReminderTriggered.has(opportunityId)) return;
@@ -4063,6 +4081,7 @@ patchOpportunityStage = async function(opportunityId, newStage, dropdownElement)
     await triggerSignedResigRefReminder(opportunityId);
   }
   if (String(newStage) === 'Close Win') {
+    await syncCloseWinCreditLoop(opportunityId);
     await sendCloseWinStageEmail(opportunityId);
   }
   return ok;

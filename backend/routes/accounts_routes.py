@@ -10,6 +10,12 @@ from psycopg2.extras import RealDictCursor, execute_values
 
 from db import get_connection
 from utils import services
+from utils.credit_loop import (
+    create_credit_for_close_win,
+    list_account_credits,
+    maybe_send_credit_available_email,
+    update_credit_status,
+)
 from utils.hr_lead_todo import create_assignment_todo, create_replacement_todo, create_stage_todos
 from utils.storage_utils import (
     get_account_pdf_keys,
@@ -619,11 +625,13 @@ def update_opportunity_stage(opportunity_id):
 
     try:
         conn = get_connection()
+        credit_notice = None
+        credit_created = None
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(
                     """
-                    SELECT opp_stage
+                    SELECT opp_stage, account_id
                     FROM opportunity
                     WHERE opportunity_id = %s
                     """,
@@ -633,6 +641,7 @@ def update_opportunity_stage(opportunity_id):
                 if not row:
                     return jsonify({"error": "Opportunity not found"}), 404
                 previous_stage = row.get("opp_stage")
+                account_id = row.get("account_id")
 
                 cursor.execute(
                     """
@@ -646,7 +655,15 @@ def update_opportunity_stage(opportunity_id):
                 if (previous_stage or "").strip() != (new_stage or "").strip():
                     create_stage_todos(cursor, opportunity_id, new_stage)
 
-        return jsonify({'success': True}), 200
+                    if str(new_stage or "").strip().lower() == "close win" and account_id:
+                        credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)
+                        credit_created = create_credit_for_close_win(cursor, opportunity_id)
+
+        return jsonify({
+            'success': True,
+            'credit_loop_notice': credit_notice,
+            'credit_loop_created': credit_created,
+        }), 200
 
     except Exception as e:
         print("Error updating stage:", e)
@@ -1244,6 +1261,69 @@ def list_account_buyouts(account_id):
         cursor.close()
         conn.close()
         return jsonify(rows)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/accounts/<int:account_id>/credit-loop', methods=['GET'])
+def get_account_credit_loop(account_id):
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                payload = list_account_credits(cursor, account_id)
+        return jsonify(payload), 200
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/accounts/<int:account_id>/credit-loop/<int:credit_id>', methods=['PATCH'])
+def patch_account_credit_loop(account_id, credit_id):
+    data = request.get_json(silent=True) or {}
+    action = data.get('action')
+    notes = data.get('notes')
+    used_by_opportunity_id = data.get('used_by_opportunity_id')
+
+    try:
+        if used_by_opportunity_id not in (None, ''):
+            used_by_opportunity_id = int(used_by_opportunity_id)
+        else:
+            used_by_opportunity_id = None
+    except (TypeError, ValueError):
+        return jsonify({"error": "used_by_opportunity_id must be an integer"}), 400
+
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                updated = update_credit_status(
+                    cursor,
+                    account_id,
+                    credit_id,
+                    action=action,
+                    used_by_opportunity_id=used_by_opportunity_id,
+                    notes=notes,
+                )
+        return jsonify(updated), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/opportunities/<int:opportunity_id>/credit-loop/sync', methods=['POST'])
+def sync_opportunity_credit_loop(opportunity_id):
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)
+                credit_created = create_credit_for_close_win(cursor, opportunity_id)
+        return jsonify({
+            "success": True,
+            "credit_loop_notice": credit_notice,
+            "credit_loop_created": credit_created,
+        }), 200
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 

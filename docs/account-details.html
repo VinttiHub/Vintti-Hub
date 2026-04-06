@@ -35,6 +35,7 @@
     <div class="tab-selector" role="tablist" aria-label="Account sections">
       <button class="tab-btn active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview">Overview</button>
       <button class="tab-btn" data-tab="employees" role="tab" aria-selected="false" aria-controls="employees">Employees</button>
+      <button class="tab-btn" data-tab="credit-loop" role="tab" aria-selected="false" aria-controls="credit-loop">Credit Loop</button>
       <button class="tab-btn" data-tab="invoice" role="tab" aria-selected="false" aria-controls="invoice">Invoice</button>    
     <button class="tab-btn" id="requestBonusBtn" type="button">Request bonus</button>
     </div>
@@ -212,6 +213,52 @@
             </tr>
           </thead>
           <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tab-content" id="credit-loop" role="tabpanel" hidden>
+      <div class="card credit-loop-card">
+        <div class="credit-loop-header">
+          <div>
+            <h2>Credit Loop</h2>
+            <p class="subtle">
+              Credits are generated automatically when an opportunity moves to Close Win. Each credit lasts 6 months.
+            </p>
+          </div>
+          <button id="reloadCreditLoopBtn" type="button" class="btn btn-ghost">Reload</button>
+        </div>
+
+        <div class="credit-loop-summary" id="creditLoopSummary">
+          <div class="credit-loop-stat">
+            <span class="credit-loop-stat-label">Available credits</span>
+            <strong id="creditLoopAvailable">0</strong>
+          </div>
+          <div class="credit-loop-stat">
+            <span class="credit-loop-stat-label">Next expiration</span>
+            <strong id="creditLoopNextExpiration">—</strong>
+          </div>
+          <div class="credit-loop-stat">
+            <span class="credit-loop-stat-label">Estimated months left</span>
+            <strong id="creditLoopMonthsLeft">—</strong>
+          </div>
+        </div>
+
+        <table class="styled-table credit-loop-table" role="table" aria-label="Credit Loop credits">
+          <thead>
+            <tr>
+              <th scope="col">Source Opportunity</th>
+              <th scope="col">Earned</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Status</th>
+              <th scope="col">Used On</th>
+              <th scope="col">Notes</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody id="creditLoopTbody">
+            <tr><td colspan="7">Loading…</td></tr>
+          </tbody>
         </table>
       </div>
     </section>

@@ -1425,3 +1425,123 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   background: #e5e7eb;
   color: #374151;
 }
+
+.credit-loop-card {
+  background: white;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+.credit-loop-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.credit-loop-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.credit-loop-stat {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%);
+  border: 1px solid #e7ebf1;
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.credit-loop-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.credit-loop-table td,
+.credit-loop-table th {
+  vertical-align: top;
+}
+
+.credit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.credit-status.available {
+  background: #e8f7ed;
+  color: #166534;
+}
+
+.credit-status.used {
+  background: #e8efff;
+  color: #1d4ed8;
+}
+
+.credit-status.expired {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.credit-status.reversed {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.credit-loop-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.credit-loop-actions select,
+.credit-loop-actions input,
+.credit-loop-actions textarea,
+.credit-loop-actions button {
+  width: 100%;
+}
+
+.credit-loop-actions textarea {
+  min-height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: 'Onest', sans-serif;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.credit-loop-opportunity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.credit-loop-opportunity small,
+.subtle {
+  color: #6b7280;
+}
+
+@media (max-width: 900px) {
+  .credit-loop-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .credit-loop-header {
+    flex-direction: column;
+  }
+}

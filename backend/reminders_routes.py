@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify
 from psycopg2.extras import RealDictCursor
 from db import get_connection   # ya lo tienes
+from utils.credit_loop import run_due_credit_loop_reminders
 from utils.hr_lead_todo import run_scheduled_todos
 import requests
 import html
@@ -926,12 +927,22 @@ def send_due_reminders():
                     cur.execute(f"UPDATE hire_reminders SET {col} = now() WHERE reminder_id = %s", (rid,))
 
         hr_lead_signed_resig_ref_sent = _run_due_hr_lead_signed_resig_ref_reminders(cur)
+        credit_loop_sent = run_due_credit_loop_reminders(cur)
 
         conn.commit()
         return jsonify({
             "sent": sent,
-            "hr_lead_signed_resig_ref_sent": hr_lead_signed_resig_ref_sent
+            "hr_lead_signed_resig_ref_sent": hr_lead_signed_resig_ref_sent,
+            "credit_loop_sent": credit_loop_sent,
         })
+
+
+@bp.route("/reminders/credit_loop/due", methods=["POST"])
+def send_due_credit_loop_reminders():
+    with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        sent = run_due_credit_loop_reminders(cur)
+        conn.commit()
+        return jsonify({"sent": sent}), 200
 
 
 @bp.route("/reminders/hr_lead_todos/run", methods=["POST"])
