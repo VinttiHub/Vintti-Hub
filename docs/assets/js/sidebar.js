@@ -105,16 +105,17 @@
     setDisplay('candidateSearchLink', new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
       'pilar@vintti.com','pilar.fernandez@vintti.com','angie@vintti.com','agostina@vintti.com',
-      'julieta@vintti.com','paz@vintti.com'
+      'julieta@vintti.com','paz@vintti.com', 'pgonzales@vintti.com'
     ]).has(email));
 
     setDisplay('salesLink', new Set([
-      'agustin@vintti.com','angie@vintti.com','lara@vintti.com','bahia@vintti.com','mariano@vintti.com'
+      'agustin@vintti.com','angie@vintti.com','lara@vintti.com','bahia@vintti.com','mariano@vintti.com', 'pgonzales@vintti.com'
     ]).has(email));
 
     const dashOk = new Set([
       'agustin@vintti.com','angie@vintti.com','lara@vintti.com','bahia@vintti.com',
-      'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com'
+      'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com','lucia@vintti.com',
+      'pgonzales@vintti.com'
     ]).has(email);
     setDisplay('dashboardLink', dashOk);
     setDisplay('managementMetricsLink', dashOk);
@@ -122,18 +123,18 @@
     setDisplay('recruiterPowerLink', new Set([
       'angie@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
       'constanza@vintti.com','pilar@vintti.com','pilar.fernandez@vintti.com','julieta@vintti.com','paz@vintti.com',
-      'valentina@vintti.com'
+      'valentina@vintti.com', 'pgonzales@vintti.com'
     ]).has(email));
 
     setDisplay('equipmentsLink', new Set([
-      'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
+      'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com', 'pgonzales@vintti.com'
     ]).has(email));
 
     // Summary link
     const summaryLink = document.getElementById('summaryLink');
     const allowedEmails = new Set([
       'agustin@vintti.com','bahia@vintti.com','angie@vintti.com','lara@vintti.com',
-      'agostina@vintti.com','mariano@vintti.com','jazmin@vintti.com'
+      'agostina@vintti.com','mariano@vintti.com','jazmin@vintti.com', 'pgonzales@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
   }
