@@ -491,13 +491,37 @@ function countryCodeToFlag(code) {
   return String.fromCodePoint(first, second);
 }
 
+function normalizeCountryLookup(value) {
+  return normalizeAscii(value)
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function hasExactCountryTerm(haystack, term) {
+  if (!haystack || !term) return false;
+  const normalizedTerm = normalizeCountryLookup(term);
+  if (!normalizedTerm) return false;
+  const pattern = new RegExp(`(^|\\s)${escapeRegex(normalizedTerm)}(?=\\s|$)`, "i");
+  return pattern.test(haystack);
+}
+
 function resolveCountryInfo(location) {
-  const needle = normalizeText(location);
+  const needle = normalizeCountryLookup(location);
   if (!needle) return null;
+
   for (const entry of COUNTRY_DIRECTORY) {
-    if (needle.includes(entry.name)) return entry;
-    if ((entry.aliases || []).some((alias) => needle.includes(alias))) return entry;
+    if (hasExactCountryTerm(needle, entry.name)) return entry;
   }
+
+  for (const entry of COUNTRY_DIRECTORY) {
+    if ((entry.aliases || []).some((alias) => hasExactCountryTerm(needle, alias))) return entry;
+  }
+
   return null;
 }
 
@@ -530,7 +554,13 @@ function formatPhoneNumber(phone, countryInfo) {
   const cleaned = String(phone).trim();
   if (!cleaned) return "—";
   if (cleaned.startsWith("+")) return cleaned;
-  if (countryInfo?.dial) return `${countryInfo.dial} ${cleaned}`;
+  if (cleaned.startsWith("00")) return `+${cleaned.slice(2)}`;
+  const digits = cleaned.replace(/\D/g, "");
+  const dialDigits = String(countryInfo?.dial || "").replace(/\D/g, "");
+  if (dialDigits) {
+    if (digits.startsWith(dialDigits)) return `+${digits}`;
+    return `${countryInfo.dial} ${digits || cleaned}`;
+  }
   return cleaned;
 }
 
