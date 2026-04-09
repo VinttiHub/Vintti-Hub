@@ -2069,6 +2069,8 @@ def get_interviewed_count(opportunity_id):
                   AND (
                         cb.status IS NULL
                         OR LOWER(TRIM(cb.status)) = 'client interviewing/testing'
+                        OR LOWER(TRIM(cb.status)) = 'client rejected after interviewing'
+                        OR LOWER(TRIM(cb.status)) = 'client rejected after interview'
                         OR LOWER(TRIM(cb.status)) = 'null'
                       )
             """,
