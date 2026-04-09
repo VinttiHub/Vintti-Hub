@@ -1721,9 +1721,17 @@ async function kickoffConditionResolve(tableInstance) {
       const hire  = await fetchHireDates(id);
       const start = hire?.start_date || hire?.[0]?.start_date || null;
       const end   = hire?.end_date   || hire?.[0]?.end_date   || null;
+      const apiStatus = (hire?.status || hire?.[0]?.status || '').toString().toLowerCase();
+      const hasBuyout = Boolean(
+        hire?.buyout_dolar ||
+        hire?.buyout_daterange ||
+        hire?.[0]?.buyout_dolar ||
+        hire?.[0]?.buyout_daterange
+      );
 
-      const condition = !start ? 'unhired' : (end ? 'inactive' : 'active');
+      const condition = apiStatus || (hasBuyout ? 'active' : (!start ? 'unhired' : (end ? 'inactive' : 'active')));
       renderCondition(cell, condition);
+      tr.dataset.status = condition;
 
       // sincroniza DataTables si está disponible
       if (tableInstance) {

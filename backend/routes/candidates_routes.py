@@ -1365,6 +1365,24 @@ def handle_candidate_hire_data(candidate_id):
                     referral_daterange,
                     buyout_dolar,
                     buyout_daterange,
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM buyouts b
+                            WHERE b.candidate_id = hire_opportunity.candidate_id
+                              AND b.end_date IS NULL
+                        ) THEN 'active'
+                        WHEN (
+                            buyout_dolar IS NOT NULL
+                            AND NULLIF(TRIM(CAST(buyout_dolar AS TEXT)), '') IS NOT NULL
+                        ) THEN 'active'
+                        WHEN (
+                            buyout_daterange IS NOT NULL
+                            AND NULLIF(TRIM(CAST(buyout_daterange AS TEXT)), '') IS NOT NULL
+                        ) THEN 'active'
+                        WHEN end_date IS NULL THEN 'active'
+                        ELSE 'unhired'
+                    END AS effective_status,
                     carga_active,
                     carga_inactive
                 FROM hire_opportunity
@@ -1394,6 +1412,7 @@ def handle_candidate_hire_data(candidate_id):
                     'referral_daterange': None,
                     'buyout_dolar': None,
                     'buyout_daterange': None,
+                    'status': 'unhired',
                     'carga_inactive': None
                 })
 
@@ -1417,6 +1436,7 @@ def handle_candidate_hire_data(candidate_id):
                 'referral_daterange': row['referral_daterange'],
                 'buyout_dolar': row['buyout_dolar'],
                 'buyout_daterange': row['buyout_daterange'],
+                'status': row['effective_status'],
                 'carga_active': row['carga_active'],
                 'carga_inactive': row['carga_inactive']
             })
@@ -1864,7 +1884,8 @@ def get_candidates_light_fast():
     Devuelve candidatos + status (unhired/active) y opp_model del hire ACTIVO.
     Regla:
       - Hay hire_opportunity con end_date IS NULL => status='active' y opp_model viene de opportunity.
-      - No hay hire activo (o solo cerrados)     => status='unhired' y opp_model=NULL.
+      - Hay buyout abierto / marcado            => status='active'.
+      - No hay hire/buyout activo               => status='unhired' y opp_model=NULL.
     """
     try:
         conn = get_connection()
@@ -1880,6 +1901,25 @@ def get_candidates_light_fast():
               ORDER BY h.candidate_id,
                        (h.end_date IS NULL) DESC,
                        h.start_date DESC NULLS LAST
+            ),
+            buyout_hire AS (
+              SELECT DISTINCT ON (h.candidate_id)
+                     h.candidate_id,
+                     h.opportunity_id
+              FROM hire_opportunity h
+              WHERE
+                (h.buyout_dolar IS NOT NULL AND NULLIF(TRIM(CAST(h.buyout_dolar AS TEXT)), '') IS NOT NULL)
+                OR (h.buyout_daterange IS NOT NULL AND NULLIF(TRIM(CAST(h.buyout_daterange AS TEXT)), '') IS NOT NULL)
+              ORDER BY h.candidate_id,
+                       h.start_date DESC NULLS LAST,
+                       h.end_date DESC NULLS LAST
+            ),
+            active_buyout AS (
+              SELECT DISTINCT ON (b.candidate_id)
+                     b.candidate_id
+              FROM buyouts b
+              WHERE b.end_date IS NULL OR NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NULL
+              ORDER BY b.candidate_id, b.start_date DESC NULLS LAST, b.buyout_id DESC
             )
             SELECT
               c.candidate_id,
@@ -1889,18 +1929,27 @@ def get_candidates_light_fast():
               c.linkedin,
               (r.candidate_id IS NOT NULL) AS has_resume,
               CASE
+                WHEN a.candidate_id IS NOT NULL AND a.end_date IS NULL THEN 'active'
+                WHEN ab.candidate_id IS NOT NULL THEN 'active'
+                WHEN bh.candidate_id IS NOT NULL THEN 'active'
                 WHEN a.candidate_id IS NULL THEN 'unhired'
-                WHEN a.end_date IS NULL      THEN 'active'
                 ELSE 'unhired'
               END AS status,
               CASE
-                WHEN a.end_date IS NULL THEN o.opp_model
+                WHEN a.candidate_id IS NOT NULL AND a.end_date IS NULL THEN o.opp_model
+                WHEN (
+                  ab.candidate_id IS NOT NULL
+                  OR bh.candidate_id IS NOT NULL
+                ) THEN bo.opp_model
                 ELSE NULL
               END AS opp_model,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
             FROM candidates c
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
             LEFT JOIN opportunity o      ON o.opportunity_id = a.opportunity_id
+            LEFT JOIN buyout_hire bh      ON bh.candidate_id = c.candidate_id
+            LEFT JOIN opportunity bo      ON bo.opportunity_id = bh.opportunity_id
+            LEFT JOIN active_buyout ab    ON ab.candidate_id = c.candidate_id
             LEFT JOIN resume r            ON r.candidate_id = c.candidate_id
                                          AND r.about IS NOT NULL
             LEFT JOIN LATERAL (
