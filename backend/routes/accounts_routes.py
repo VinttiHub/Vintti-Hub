@@ -709,13 +709,19 @@ def get_candidates_by_opportunity(opportunity_id):
                 c.country,
                 c.employee_salary,
                 c.salary_range,
-                COALESCE(c.blacklist, FALSE) AS is_blacklisted,
+                COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted,
                 oc.stage_batch,
                 oc.stage_pipeline AS stage,
                 oc.sign_off,
                 oc.star
             FROM candidates c
             INNER JOIN opportunity_candidates oc ON c.candidate_id = oc.candidate_id
+            LEFT JOIN LATERAL (
+                SELECT TRUE AS is_blacklisted
+                FROM blacklist b
+                WHERE b.candidate_id = c.candidate_id
+                LIMIT 1
+            ) bl ON TRUE
             WHERE oc.opportunity_id = %s
         """, (opportunity_id,))
 
@@ -1189,7 +1195,7 @@ def get_candidates_by_account_opportunities(account_id):
             c.candidate_id,
             c.name,
             c.stage,
-            COALESCE(c.blacklist, FALSE) AS is_blacklisted,
+            COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted,
             o.opportunity_id,
             o.opp_model,
             o.opp_position_name,
@@ -1212,6 +1218,12 @@ def get_candidates_by_account_opportunities(account_id):
             FROM opportunity o
             LEFT JOIN candidates c
                 ON o.candidato_contratado = c.candidate_id
+            LEFT JOIN LATERAL (
+                SELECT TRUE AS is_blacklisted
+                FROM blacklist b
+                WHERE b.candidate_id = c.candidate_id
+                LIMIT 1
+            ) bl ON TRUE
             LEFT JOIN hire_opportunity h
                 ON h.opportunity_id = o.opportunity_id
             AND h.candidate_id   = c.candidate_id
