@@ -1940,7 +1940,7 @@ def get_candidates_light_fast():
                 WHEN (
                   ab.candidate_id IS NOT NULL
                   OR bh.candidate_id IS NOT NULL
-                ) THEN bo.opp_model
+                ) THEN 'Recruiting'
                 ELSE NULL
               END AS opp_model,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
