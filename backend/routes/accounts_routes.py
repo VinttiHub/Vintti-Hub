@@ -11,9 +11,12 @@ from psycopg2.extras import RealDictCursor, execute_values
 from db import get_connection
 from utils import services
 from utils.credit_loop import (
+    backfill_all_credits,
     create_credit_for_close_win,
+    get_available_credit_summary,
     list_account_credits,
     maybe_send_credit_available_email,
+    maybe_send_credit_available_email_for_new_opportunity,
     update_credit_status,
 )
 from utils.hr_lead_todo import create_assignment_todo, create_replacement_todo, create_stage_todos
@@ -532,14 +535,86 @@ def create_opportunity():
             opp_type, 'Deep Dive', replacement_of, replacement_end_date
         ))
 
+        credit_loop_notice = maybe_send_credit_available_email_for_new_opportunity(
+            cursor,
+            account_id=account_id,
+            opportunity_id=new_opportunity_id,
+            opp_model=opp_model,
+            opp_position_name=position_name,
+            client_name=client_name,
+        )
+
         conn.commit()
         cursor.close(); conn.close()
-        return jsonify({'message': 'Opportunity created successfully'}), 201
+        return jsonify({
+            'message': 'Opportunity created successfully',
+            'credit_loop_notice': credit_loop_notice,
+        }), 201
 
     except Exception as e:
         import traceback
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/credit-loop/opportunity-preview', methods=['POST'])
+def credit_loop_opportunity_preview():
+    data = request.get_json(silent=True) or {}
+    client_name = (data.get('client_name') or '').strip()
+    opp_model = (data.get('opp_model') or '').strip()
+    if not client_name or not opp_model:
+        return jsonify({
+            "eligible": False,
+            "available_credits": 0,
+            "available_credit_amount_total": 0,
+        }), 200
+
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    """
+                    SELECT account_id
+                    FROM account
+                    WHERE LOWER(TRIM(client_name)) = LOWER(TRIM(%s))
+                    LIMIT 1
+                    """,
+                    (client_name,),
+                )
+                account_row = cursor.fetchone()
+                if not account_row:
+                    return jsonify({
+                        "eligible": False,
+                        "available_credits": 0,
+                        "available_credit_amount_total": 0,
+                    }), 200
+
+                summary = get_available_credit_summary(
+                    cursor,
+                    int(account_row["account_id"]),
+                    source_model=opp_model,
+                )
+                return jsonify({
+                    "eligible": (summary.get("available_credits") or 0) > 0,
+                    "available_credits": summary.get("available_credits") or 0,
+                    "available_credit_amount_total": summary.get("available_credit_amount_total") or 0,
+                    "model": opp_model,
+                }), 200
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@bp.route('/credit-loop/backfill', methods=['POST'])
+def backfill_credit_loop():
+    try:
+        conn = get_connection()
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                updated = backfill_all_credits(cursor)
+        return jsonify({"success": True, "updated": updated}), 200
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 @bp.route('/accounts', methods=['GET', 'POST'])
 def accounts():

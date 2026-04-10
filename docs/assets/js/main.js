@@ -2930,11 +2930,56 @@ window.getReplacementCandidateId = function () {
 // --- Create Opportunity form (drop-in fix de scope) ---
 const createOpportunityForm = document.getElementById('createOpportunityForm');
 const createButton = createOpportunityForm?.querySelector('.create-btn');
+const creditLoopPreviewBanner = document.getElementById('creditLoopPreviewBanner');
 
 // helper seguro para leer el end date del replacement
 const getReplacementEndDateEl = () => document.getElementById('replacementEndDate');
 
 if (createOpportunityForm && createButton) {
+  let creditLoopPreviewToken = 0;
+
+  const renderCreditLoopPreview = (payload = null) => {
+    if (!creditLoopPreviewBanner) return;
+    const credits = Number(payload?.available_credits || 0);
+    if (!payload?.eligible || credits <= 0) {
+      creditLoopPreviewBanner.hidden = true;
+      creditLoopPreviewBanner.textContent = '';
+      return;
+    }
+    creditLoopPreviewBanner.textContent = `This account has ${credits} Credit Loop credit available for this model.`;
+    creditLoopPreviewBanner.hidden = false;
+  };
+
+  const refreshCreditLoopPreview = async () => {
+    const clientName = createOpportunityForm.client_name.value.trim();
+    const oppModel = createOpportunityForm.opp_model.value;
+    const token = ++creditLoopPreviewToken;
+
+    if (!clientName || !oppModel) {
+      renderCreditLoopPreview(null);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/credit-loop/opportunity-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_name: clientName, opp_model: oppModel }),
+        credentials: 'include',
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (token !== creditLoopPreviewToken) return;
+      if (!res.ok) {
+        renderCreditLoopPreview(null);
+        return;
+      }
+      renderCreditLoopPreview(payload);
+    } catch (err) {
+      if (token !== creditLoopPreviewToken) return;
+      renderCreditLoopPreview(null);
+    }
+  };
+
   // Habilitar/deshabilitar botón según campos
   createOpportunityForm.addEventListener('input', () => {
     const clientName   = createOpportunityForm.client_name.value.trim();
@@ -2951,7 +2996,11 @@ if (createOpportunityForm && createButton) {
                       (!needsReplacement || (hasRepCandidate && hasRepEndDate));
 
     createButton.disabled = !allFilled;
+    refreshCreditLoopPreview();
   });
+
+  createOpportunityForm.client_name?.addEventListener('change', refreshCreditLoopPreview);
+  createOpportunityForm.opp_model?.addEventListener('change', refreshCreditLoopPreview);
 
   // Submit
   createOpportunityForm.addEventListener('submit', async (e) => {

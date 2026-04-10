@@ -1443,7 +1443,7 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 
 .credit-loop-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -1480,8 +1480,8 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 
 .credit-loop-item-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(100px, 0.7fr)) minmax(220px, 1.1fr) minmax(220px, 1.1fr);
-  gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px 24px;
   align-items: start;
 }
 
@@ -1490,6 +1490,10 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+
+.credit-loop-field-source {
+  grid-column: span 4;
 }
 
 .credit-loop-field-label {
@@ -1553,7 +1557,8 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 }
 
 .credit-loop-notes {
-  min-height: 96px;
+  min-height: 64px;
+  max-height: 96px;
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 14px 16px;
@@ -1597,7 +1602,7 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 
 .credit-loop-action-btn {
   align-self: stretch;
-  min-height: 46px;
+  min-height: 42px;
   border-radius: 14px;
 }
 
@@ -1608,6 +1613,11 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 
 .credit-loop-used-on {
   color: #4b5563;
+  font-weight: 500;
+}
+
+.credit-loop-calc {
+  color: #475569;
   font-weight: 500;
 }
 
@@ -1627,7 +1637,7 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
 
 @media (max-width: 900px) {
   .credit-loop-summary {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .credit-loop-header {
@@ -1635,6 +1645,29 @@ td:has(.currency-wrap), td:has(.range-chip), td:has(.select-chip) {
   }
 
   .credit-loop-item-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .credit-loop-field-source {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .credit-loop-summary {
     grid-template-columns: 1fr;
+  }
+
+  .credit-loop-item {
+    padding: 20px 18px;
+  }
+
+  .credit-loop-item-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .credit-loop-field-source {
+    grid-column: span 1;
   }
 }

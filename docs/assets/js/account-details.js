@@ -110,6 +110,12 @@ function formatDateLabel(value) {
   return ymd || String(value);
 }
 
+function formatMoneyLabel(value) {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num)) return '$0';
+  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function renderReplacementBadge(replacementOf) {
   if (replacementOf === null || replacementOf === undefined) return '';
   const idLabel = typeof replacementOf === 'number' ? replacementOf : String(replacementOf).trim();
@@ -669,9 +675,11 @@ async function loadCreditLoop(accountId) {
 
 function fillCreditLoopSummary(summary = {}) {
   const availableEl = document.getElementById('creditLoopAvailable');
+  const availableValueEl = document.getElementById('creditLoopAvailableValue');
   const expirationEl = document.getElementById('creditLoopNextExpiration');
   const monthsLeftEl = document.getElementById('creditLoopMonthsLeft');
   if (availableEl) availableEl.textContent = summary.available_credits ?? 0;
+  if (availableValueEl) availableValueEl.textContent = formatMoneyLabel(summary.available_credit_amount_total);
   if (expirationEl) expirationEl.textContent = summary.next_expiration ? formatDateLabel(summary.next_expiration) : '—';
   if (monthsLeftEl) {
     const months = summary.months_left;
@@ -684,12 +692,33 @@ function renderCreditStatus(status) {
   return `<span class="credit-status ${escapeHtml(normalized)}">${escapeHtml(normalized)}</span>`;
 }
 
-function buildCreditLoopOpportunityOptions(currentOppId = null) {
+function buildCreditLoopOpportunityOptions(currentOppId = null, sourceEarnedDate = null, sourceModel = null) {
   const rows = Array.isArray(ACCOUNT_DETAIL_OPPORTUNITIES) ? ACCOUNT_DETAIL_OPPORTUNITIES : [];
+  const normalizedSourceModel = String(sourceModel || '').trim().toLowerCase();
   const options = rows
-    .filter((opp) => Number(opp.opportunity_id) !== Number(currentOppId))
+    .filter((opp) => {
+      if (Number(opp.opportunity_id) === Number(currentOppId)) return false;
+      if (String(opp.opp_stage || '').trim().toLowerCase() !== 'close win') return false;
+      if (normalizedSourceModel) {
+        const oppModel = String(opp.opp_model || '').trim().toLowerCase();
+        if (oppModel !== normalizedSourceModel) return false;
+      }
+
+      const sourceDate = dateInputValue(sourceEarnedDate);
+      const oppCloseDate = dateInputValue(opp.opp_close_date);
+
+      if (sourceDate && oppCloseDate) {
+        if (oppCloseDate <= sourceDate) return false;
+      } else if (Number(opp.opportunity_id) <= Number(currentOppId)) {
+        // fallback si alguna opp no trae close_date
+        return false;
+      }
+
+      return true;
+    })
     .map((opp) => {
-      const label = `${opp.opp_position_name || `Opportunity #${opp.opportunity_id}`} (${opp.opp_stage || '—'})`;
+      const closeDateLabel = dateInputValue(opp.opp_close_date) || 'No close date';
+      const label = `${opp.opp_position_name || `Opportunity #${opp.opportunity_id}`} (${closeDateLabel}) · Opp ID ${opp.opportunity_id}`;
       return `<option value="${escapeAttribute(opp.opportunity_id)}">${escapeHtml(label)}</option>`;
     });
   return [`<option value="">Select opportunity</option>`, ...options].join('');
@@ -706,14 +735,22 @@ function fillCreditLoopTable(items = []) {
 
   list.innerHTML = items.map((item) => {
     const status = String(item.status || 'available').toLowerCase();
+    const model = String(item.source_model || '').toLowerCase();
+    const modelLabel = model ? model.charAt(0).toUpperCase() + model.slice(1) : 'Unknown model';
     const sourceLabel = item.source_opportunity_name || item.source_position_name || `Opportunity #${item.source_opportunity_id}`;
     const usedLabel = item.used_by_opportunity_name || (item.used_by_opportunity_id ? `Opportunity #${item.used_by_opportunity_id}` : '—');
     const notes = item.notes || '';
+    const baseLabel = model === 'staffing'
+      ? `Fee ${formatMoneyLabel(item.source_fee)}`
+      : model === 'recruiting'
+        ? `Revenue ${formatMoneyLabel(item.source_revenue)}`
+        : 'Base not available';
+    const rateLabel = item.credit_rate ? `${Number(item.credit_rate) * 100}%` : '—';
     const actions = status === 'available'
       ? `
         <div class="credit-loop-actions">
           <select class="select-chip credit-loop-use-select">
-            ${buildCreditLoopOpportunityOptions(item.source_opportunity_id)}
+            ${buildCreditLoopOpportunityOptions(item.source_opportunity_id, item.earned_date, item.source_model)}
           </select>
           <button class="tab-btn credit-loop-action-btn" data-credit-id="${item.credit_id}" data-action="use" type="button">Use credit</button>
         </div>
@@ -733,7 +770,7 @@ function fillCreditLoopTable(items = []) {
             <span class="credit-loop-field-label">Source Opportunity</span>
             <div class="credit-loop-opportunity">
               <strong>${escapeHtml(sourceLabel)}</strong>
-              <small>Opp ID ${escapeHtml(item.source_opportunity_id)}</small>
+              <small>${escapeHtml(modelLabel)} · Opp ID ${escapeHtml(item.source_opportunity_id)}</small>
             </div>
           </div>
           <div class="credit-loop-field">
@@ -743,6 +780,14 @@ function fillCreditLoopTable(items = []) {
           <div class="credit-loop-field">
             <span class="credit-loop-field-label">Expires</span>
             <div class="credit-loop-field-value">${escapeHtml(formatDateLabel(item.expires_at))}</div>
+          </div>
+          <div class="credit-loop-field">
+            <span class="credit-loop-field-label">Credit value</span>
+            <div class="credit-loop-field-value">${formatMoneyLabel(item.credit_amount)}</div>
+          </div>
+          <div class="credit-loop-field">
+            <span class="credit-loop-field-label">Calculation</span>
+            <div class="credit-loop-field-value credit-loop-calc">${escapeHtml(baseLabel)} · ${escapeHtml(rateLabel)}</div>
           </div>
           <div class="credit-loop-field">
             <span class="credit-loop-field-label">Status</span>

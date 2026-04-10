@@ -2746,6 +2746,19 @@ body.dark-mode .profile-tile{
   box-sizing: border-box;
 }
 
+.credit-loop-preview-banner {
+  margin: 4px 0 2px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid #d9d2ff;
+  background: linear-gradient(180deg, #f7f4ff 0%, #fff 100%);
+  color: #4c3d91;
+  font-family: 'Onest', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(108, 99, 255, 0.08);
+}
+
 /* Tu wrapper del datalist/search: que ocupe TODO el ancho */
 #popup .popup-form .input-with-button{
   width: 100% !important;     /* pisa el 92% */
