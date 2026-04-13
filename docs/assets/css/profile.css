@@ -2938,7 +2938,8 @@ input:focus, select:focus, textarea:focus{
   border:1px solid var(--stroke);
   border-radius: var(--radius);
   background:#fff;
-  overflow:auto;
+  overflow-x:auto;
+  overflow-y:auto;
   max-height:64vh;
   box-shadow: 0 10px 30px rgba(17,24,39,.06);
   scrollbar-gutter: stable;
@@ -3102,7 +3103,7 @@ input:focus, select:focus, textarea:focus{
 
 #panel-teampto #teamPtoTable{
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: auto;
 }
 
 #panel-teampto #teamPtoTable .teampto-grid{
