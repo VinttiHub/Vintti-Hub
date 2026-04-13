@@ -145,8 +145,10 @@ function equipmentEmoji(name){
   return EQUIP_EMOJI[String(name).toLowerCase()] || '📦';
 }
 // === Helpers para crear salary_update desde inputs ==========================
-async function fetchHire(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com'){
-  const r = await fetch(`${apiBase}/candidates/${candidateId}/hire`);
+async function fetchHire(candidateId, apiBase='https://7m6mw95m8y.us-east-2.awsapprunner.com', opportunityId=null){
+  const url = new URL(`${apiBase}/candidates/${candidateId}/hire`);
+  if (opportunityId) url.searchParams.set('opportunity_id', opportunityId);
+  const r = await fetch(url.toString());
   if (!r.ok) throw new Error(`GET hire failed ${r.status}`);
   return r.json();
 }
@@ -2142,9 +2144,6 @@ if (successDiv) {
     if (!d.is_hired) {
       if (hireTab) hireTab.style.display = 'none';
       if (hireContent) hireContent.style.display = 'none';
-    } else {
-      // si está contratado, sincroniza desde Salary Updates
-      syncHireFromLatestSalaryUpdate(candidateId);
     }
   });
 
@@ -2460,8 +2459,19 @@ if (hireRevenue){
 
   function loadHireData() {
     const revenueInput = document.getElementById('hire-revenue');
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire`)
+    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire_opportunity`)
       .then(res => res.json())
+      .then(async (oppData) => {
+        window.__currentOppId = Number(oppData?.opportunity_id) || window.__currentOppId;
+        const model = oppData?.opp_model;
+        if (model) {
+          const pill = document.getElementById('opp-model-pill');
+          if (pill) pill.textContent = `Model: ${model}`;
+          adaptHireFieldsByModel(model);
+        }
+
+        return fetchHire(candidateId, 'https://7m6mw95m8y.us-east-2.awsapprunner.com', window.__currentOppId);
+      })
       .then(data => {
         const salaryInput = document.getElementById('hire-salary');
         const feeInput = document.getElementById('hire-fee');
@@ -2503,18 +2513,6 @@ if (hireRevenue){
         }
 
         loadSalaryUpdates();
-      });
-
-    fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/hire_opportunity`)
-      .then(res => res.json())
-      .then(data => {
-        window.__currentOppId = Number(data?.opportunity_id) || window.__currentOppId;
-        const model = data.opp_model;
-        if (model) {
-          const pill = document.getElementById('opp-model-pill');
-          if (pill) pill.textContent = `Model: ${model}`;
-          adaptHireFieldsByModel(model);
-        }
       });
   }
   window.loadHireData = loadHireData;

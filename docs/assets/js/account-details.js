@@ -698,7 +698,7 @@ function buildCreditLoopOpportunityOptions(currentOppId = null, sourceEarnedDate
   const options = rows
     .filter((opp) => {
       if (Number(opp.opportunity_id) === Number(currentOppId)) return false;
-      if (String(opp.opp_stage || '').trim().toLowerCase() !== 'close win') return false;
+      if (String(opp.opp_stage || '').trim().toLowerCase() !== 'signed') return false;
       if (normalizedSourceModel) {
         const oppModel = String(opp.opp_model || '').trim().toLowerCase();
         if (oppModel !== normalizedSourceModel) return false;

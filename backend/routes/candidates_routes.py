@@ -1089,6 +1089,7 @@ def get_hire_opportunity(candidate_id):
             FROM hire_opportunity h
             JOIN opportunity o ON o.opportunity_id = h.opportunity_id
             WHERE h.candidate_id = %s
+            ORDER BY h.start_date DESC NULLS LAST, h.hire_opp_id DESC
             LIMIT 1;
         """, (candidate_id,))
 
@@ -1327,12 +1328,16 @@ def handle_candidate_hire_data(candidate_id):
                 """, (opp_id_param,))
                 opp = cur.fetchone()
             else:
-                # fallback: the latest opp where this candidate is the hired one
+                # fallback: the latest hire_opportunity row for this candidate
                 cur.execute("""
-                    SELECT opportunity_id, opp_model, account_id
-                    FROM opportunity
-                    WHERE candidato_contratado = %s
-                    ORDER BY COALESCE(opp_close_date, '1900-01-01') DESC, opportunity_id DESC
+                    SELECT
+                        o.opportunity_id,
+                        o.opp_model,
+                        o.account_id
+                    FROM hire_opportunity h
+                    JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+                    WHERE h.candidate_id = %s
+                    ORDER BY h.start_date DESC NULLS LAST, h.hire_opp_id DESC
                     LIMIT 1
                 """, (candidate_id,))
                 opp = cur.fetchone()

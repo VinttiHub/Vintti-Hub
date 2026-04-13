@@ -129,7 +129,8 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     price_type=None,
     computer=None,
     referal_source: Optional[str] = None,
-    lead_source: Optional[str] = None
+    lead_source: Optional[str] = None,
+    credit_loop=None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_value = html.escape(referal_source) if referal_source else "—"
@@ -137,6 +138,25 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     lead_value = html.escape(lead_source) if lead_source else "—"
     lead_source_html = f'<li><b>Lead source:</b> {lead_value}</li>'
     notes_card = _references_card_html(references)
+    credit_loop = credit_loop or {}
+    credit_applied = bool(credit_loop.get("applied_discount_amount"))
+    fee_html = (
+        f"""
+        <li><b>Fee:</b> ${html.escape(_format_money(fee))}</li>
+        """
+        if not credit_applied else
+        ""
+    )
+    credit_loop_html = (
+        f"""
+        <li><b>Credit Loop applied:</b> Yes</li>
+        <li><b>Previous fee:</b> ${html.escape(_format_money(credit_loop.get('applied_original_value')))}</li>
+        <li><b>Credit Loop discount:</b> ${html.escape(_format_money(credit_loop.get('applied_discount_amount')))}</li>
+        <li><b>New fee:</b> ${html.escape(_format_money(credit_loop.get('applied_adjusted_value')))}</li>
+        """
+        if credit_applied else
+        "<li><b>Credit Loop applied:</b> No</li>"
+    )
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Signed</b> 🎉</p>
@@ -146,7 +166,8 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
       <ul>
         <li><b>Start date:</b> {html.escape(str(start_date or '—'))}</li>
         <li><b>Salary:</b> ${html.escape(_format_money(salary))}</li>
-        <li><b>Fee:</b> ${html.escape(_format_money(fee))}</li>
+        {fee_html}
+        {credit_loop_html}
         <li><b>Set-up fee:</b> ${html.escape(_format_money(setup_fee))}</li>
         <li><b>Price type:</b> {html.escape(_format_price_type(price_type))}</li>
         <li><b>Needs computer:</b> {html.escape(_format_computer_need(computer))}</li>
@@ -174,7 +195,8 @@ def _initial_email_html_recruiting(
     price_type=None,
     computer=None,
     referal_source: Optional[str] = None,
-    lead_source: Optional[str] = None
+    lead_source: Optional[str] = None,
+    credit_loop=None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_value = html.escape(referal_source) if referal_source else "—"
@@ -182,6 +204,18 @@ def _initial_email_html_recruiting(
     referral_line = f"<b>Referral source:</b> {referral_value}<br>"
     lead_source_line = f"<b>Lead source:</b> {lead_value}<br>"
     notes_card = _references_card_html(references)
+    credit_loop = credit_loop or {}
+    credit_applied = bool(credit_loop.get("applied_discount_amount"))
+    credit_loop_lines = (
+        f"""
+         <b>Credit Loop applied:</b> Yes<br>
+         <b>Previous revenue:</b> ${html.escape(_format_money(credit_loop.get('applied_original_value')))}<br>
+         <b>Credit Loop discount:</b> ${html.escape(_format_money(credit_loop.get('applied_discount_amount')))}<br>
+         <b>New revenue:</b> ${html.escape(_format_money(credit_loop.get('applied_adjusted_value')))}<br>
+        """
+        if credit_applied else
+        "<b>Credit Loop applied:</b> No<br>"
+    )
     return f"""
     <div style="font-family:Inter,Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6">
       <p>Hey team — new <b>Signed</b> 🎉</p>
@@ -192,6 +226,7 @@ def _initial_email_html_recruiting(
       <p><b>Start date:</b> {html.escape(str(start_date or '—'))}<br>
          <b>Salary:</b> ${html.escape(_format_money(salary))}<br>
          <b>Revenue :</b> ${html.escape(_format_money(revenue))}<br>
+         {credit_loop_lines}
          <b>Price type:</b> {html.escape(_format_price_type(price_type))}<br>
          <b>Needs computer:</b> {html.escape(_format_computer_need(computer))}<br>
          <b>Client email:</b> {html.escape(client_mail or '—')}<br>
@@ -250,6 +285,7 @@ def press_and_send(candidate_id):
 
         opportunity_id = hire["opportunity_id"]
         ctx = _fetch_email_context(candidate_id, opportunity_id, cur)
+        credit_loop = _fetch_credit_loop_application(opportunity_id, cur)
         candidate_name    = ctx.get("candidate_name") or ""
         client_name       = ctx.get("client_name") or ""
         opp_position_name = ctx.get("opp_position_name") or ""
@@ -277,7 +313,8 @@ def press_and_send(candidate_id):
                 price_type=hire.get("price_type"),
                 computer=hire.get("computer"),
                 referal_source=referal_source,
-                lead_source=lead_source
+                lead_source=lead_source,
+                credit_loop=credit_loop
             )
         else:
             html_body = _initial_email_html_staffing(
@@ -294,7 +331,8 @@ def press_and_send(candidate_id):
                 price_type=hire.get("price_type"),
                 computer=hire.get("computer"),
                 referal_source=referal_source,
-                lead_source=lead_source
+                lead_source=lead_source,
+                credit_loop=credit_loop
             )
 
 
@@ -705,6 +743,25 @@ def _fetch_email_context(candidate_id:int, opportunity_id:int, cur):
        WHERE o.opportunity_id = %s
        LIMIT 1
     """, (candidate_id, opportunity_id))
+    return cur.fetchone() or {}
+
+
+def _fetch_credit_loop_application(opportunity_id: int, cur):
+    cur.execute(
+        """
+        SELECT
+            applied_target_field,
+            applied_original_value,
+            applied_adjusted_value,
+            applied_discount_amount
+        FROM account_credit_loop
+        WHERE used_by_opportunity_id = %s
+          AND status = 'used'
+        ORDER BY used_at DESC NULLS LAST, credit_id DESC
+        LIMIT 1
+        """,
+        (opportunity_id,),
+    )
     return cur.fetchone() or {}
 
 def _initial_email_html(candidate_id:int, start_date, salary, fee, setup_fee, references, client_mail,

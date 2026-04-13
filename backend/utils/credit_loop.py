@@ -93,6 +93,13 @@ def ensure_credit_loop_table(cur) -> None:
             status TEXT NOT NULL DEFAULT 'available'
                 CHECK (status IN ('available', 'used', 'expired', 'reversed')),
             used_by_opportunity_id BIGINT,
+            applied_target_candidate_id BIGINT,
+            applied_target_field TEXT,
+            applied_original_value NUMERIC(12,2),
+            applied_adjusted_value NUMERIC(12,2),
+            applied_discount_amount NUMERIC(12,2),
+            applied_original_revenue NUMERIC(12,2),
+            applied_adjusted_revenue NUMERIC(12,2),
             used_at TIMESTAMPTZ,
             notes TEXT,
             last_reminder_month4_at TIMESTAMPTZ,
@@ -121,6 +128,13 @@ def ensure_credit_loop_table(cur) -> None:
         "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS source_revenue NUMERIC(12,2)",
         "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS credit_rate NUMERIC(6,4)",
         "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS credit_amount NUMERIC(12,2)",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_target_candidate_id BIGINT",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_target_field TEXT",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_original_value NUMERIC(12,2)",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_adjusted_value NUMERIC(12,2)",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_discount_amount NUMERIC(12,2)",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_original_revenue NUMERIC(12,2)",
+        "ALTER TABLE account_credit_loop ADD COLUMN IF NOT EXISTS applied_adjusted_revenue NUMERIC(12,2)",
     ):
         cur.execute(statement)
 
@@ -568,6 +582,13 @@ def list_account_credits(cur, account_id: int) -> Dict[str, Any]:
             acl.expires_at,
             acl.status,
             acl.used_by_opportunity_id,
+            acl.applied_target_candidate_id,
+            acl.applied_target_field,
+            acl.applied_original_value,
+            acl.applied_adjusted_value,
+            acl.applied_discount_amount,
+            acl.applied_original_revenue,
+            acl.applied_adjusted_revenue,
             acl.used_at,
             acl.notes,
             acl.last_reminder_month4_at,
@@ -586,6 +607,57 @@ def list_account_credits(cur, account_id: int) -> Dict[str, Any]:
     today = date.today()
     normalized_rows = []
     for row in rows:
+        if (
+            str(row.get("status") or "").strip().lower() == "used"
+            and row.get("used_by_opportunity_id")
+            and row.get("applied_target_candidate_id")
+            and str(row.get("applied_target_field") or "").strip().lower() in {"fee", "revenue"}
+            and row.get("applied_adjusted_value") is not None
+        ):
+            applied_field = str(row.get("applied_target_field")).strip().lower()
+            if applied_field == "fee":
+                cur.execute(
+                    """
+                    SELECT salary
+                    FROM hire_opportunity
+                    WHERE candidate_id = %s AND opportunity_id = %s
+                    LIMIT 1
+                    """,
+                    (
+                        row.get("applied_target_candidate_id"),
+                        row.get("used_by_opportunity_id"),
+                    ),
+                )
+                hire_row = _row_to_dict(cur, cur.fetchone())
+                current_salary = _safe_money(hire_row.get("salary"))
+                cur.execute(
+                    """
+                    UPDATE hire_opportunity
+                       SET fee = %s,
+                           revenue = %s
+                     WHERE candidate_id = %s AND opportunity_id = %s
+                    """,
+                    (
+                        row.get("applied_adjusted_value"),
+                        round(current_salary + _safe_money(row.get("applied_adjusted_value")), 2),
+                        row.get("applied_target_candidate_id"),
+                        row.get("used_by_opportunity_id"),
+                    ),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE hire_opportunity
+                       SET revenue = %s
+                     WHERE candidate_id = %s AND opportunity_id = %s
+                    """,
+                    (
+                        row.get("applied_adjusted_value"),
+                        row.get("applied_target_candidate_id"),
+                        row.get("used_by_opportunity_id"),
+                    ),
+                )
+
         expires_at = row.get("expires_at")
         days_left = (expires_at - today).days if expires_at else None
         normalized_rows.append(
@@ -615,7 +687,21 @@ def update_credit_status(
     expire_due_credits(cur)
     cur.execute(
         """
-        SELECT credit_id, account_id, status
+        SELECT
+            credit_id,
+            account_id,
+            status,
+            source_model,
+            credit_amount,
+            used_by_opportunity_id,
+            applied_target_candidate_id,
+            applied_target_field,
+            applied_original_value,
+            applied_adjusted_value,
+            applied_discount_amount
+            ,
+            applied_original_revenue,
+            applied_adjusted_revenue
         FROM account_credit_loop
         WHERE credit_id = %s AND account_id = %s
         LIMIT 1
@@ -640,32 +726,179 @@ def update_credit_status(
         )
         return _row_to_dict(cur, cur.fetchone())
 
+    def _fetch_target_hire(opportunity_id: int, preferred_candidate_id: Optional[int] = None) -> Dict[str, Any]:
+        cur.execute(
+            """
+            SELECT opportunity_id, candidato_contratado AS candidate_id, opp_model
+            FROM opportunity
+            WHERE opportunity_id = %s
+            LIMIT 1
+            """,
+            (opportunity_id,),
+        )
+        opp_row = _row_to_dict(cur, cur.fetchone())
+        if not opp_row:
+            raise ValueError("Selected opportunity not found")
+
+        candidate_id = preferred_candidate_id or opp_row.get("candidate_id")
+        if not candidate_id:
+            raise ValueError("Selected opportunity does not have a hired candidate yet")
+
+        cur.execute(
+            """
+            SELECT hire_opp_id, candidate_id, opportunity_id, salary, fee, revenue
+            FROM hire_opportunity
+            WHERE candidate_id = %s AND opportunity_id = %s
+            LIMIT 1
+            """,
+            (candidate_id, opportunity_id),
+        )
+        hire_row = _row_to_dict(cur, cur.fetchone())
+        if not hire_row:
+            raise ValueError("Selected opportunity does not have a hire record yet")
+
+        return {
+            "candidate_id": candidate_id,
+            "opp_model": opp_row.get("opp_model"),
+            "hire": hire_row,
+        }
+
     if normalized_action == "use":
         if current.get("status") != "available":
             raise ValueError("Only available credits can be marked as used")
+        if not used_by_opportunity_id:
+            raise ValueError("A target opportunity is required to use this credit")
+
+        target = _fetch_target_hire(used_by_opportunity_id)
+        source_model = _normalize_model(current.get("source_model"))
+        target_model = _normalize_model(target.get("opp_model"))
+        if source_model and target_model and source_model != target_model:
+            raise ValueError("Credit model must match the selected opportunity model")
+
+        target_field = "fee" if source_model == "staffing" else "revenue" if source_model == "recruiting" else None
+        if not target_field:
+            raise ValueError("Credit source model is not supported")
+
+        original_value = _safe_money(target["hire"].get(target_field))
+        discount_amount = _safe_money(current.get("credit_amount"))
+        adjusted_value = round(max(original_value - discount_amount, 0), 2)
+        staffing_salary = _safe_money(target["hire"].get("salary")) if source_model == "staffing" else None
+        staffing_revenue_original = _safe_money(target["hire"].get("revenue")) if source_model == "staffing" else None
+        staffing_revenue_adjusted = None
+        if source_model == "staffing":
+            staffing_revenue_adjusted = round(staffing_salary + adjusted_value, 2)
+
+        if source_model == "staffing":
+            cur.execute(
+                """
+                UPDATE hire_opportunity
+                   SET fee = %s,
+                       revenue = %s
+                 WHERE candidate_id = %s AND opportunity_id = %s
+                """,
+                (
+                    adjusted_value,
+                    staffing_revenue_adjusted,
+                    target["candidate_id"],
+                    used_by_opportunity_id,
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE hire_opportunity
+                   SET revenue = %s
+                 WHERE candidate_id = %s AND opportunity_id = %s
+                """,
+                (adjusted_value, target["candidate_id"], used_by_opportunity_id),
+            )
         cur.execute(
             """
             UPDATE account_credit_loop
                SET status = 'used',
                    used_by_opportunity_id = %s,
+                   applied_target_candidate_id = %s,
+                   applied_target_field = %s,
+                   applied_original_value = %s,
+                   applied_adjusted_value = %s,
+                   applied_discount_amount = %s,
+                   applied_original_revenue = %s,
+                   applied_adjusted_revenue = %s,
                    used_at = now(),
                    notes = %s,
                    updated_at = now()
              WHERE credit_id = %s
              RETURNING *
             """,
-            (used_by_opportunity_id, notes, credit_id),
+            (
+                used_by_opportunity_id,
+                target["candidate_id"],
+                target_field,
+                original_value,
+                adjusted_value,
+                discount_amount,
+                staffing_revenue_original,
+                staffing_revenue_adjusted,
+                notes,
+                credit_id,
+            ),
         )
         return _row_to_dict(cur, cur.fetchone())
 
     if normalized_action == "restore":
         if current.get("status") not in {"used", "reversed"}:
             raise ValueError("Only used or reversed credits can be restored")
+        restore_opp_id = current.get("used_by_opportunity_id")
+        restore_candidate_id = current.get("applied_target_candidate_id")
+        restore_field = str(current.get("applied_target_field") or "").strip().lower()
+        restore_value = current.get("applied_original_value")
+        restore_revenue = current.get("applied_original_revenue")
+
+        if restore_opp_id and restore_candidate_id and restore_field in {"fee", "revenue"} and restore_value is not None:
+            if restore_field == "fee":
+                cur.execute(
+                    """
+                    SELECT salary
+                    FROM hire_opportunity
+                    WHERE candidate_id = %s AND opportunity_id = %s
+                    LIMIT 1
+                    """,
+                    (restore_candidate_id, restore_opp_id),
+                )
+                hire_row = _row_to_dict(cur, cur.fetchone())
+                current_salary = _safe_money(hire_row.get("salary"))
+                restored_revenue = round(current_salary + _safe_money(restore_value), 2)
+                cur.execute(
+                    """
+                    UPDATE hire_opportunity
+                       SET fee = %s,
+                           revenue = %s
+                     WHERE candidate_id = %s AND opportunity_id = %s
+                    """,
+                    (_safe_money(restore_value), restored_revenue, restore_candidate_id, restore_opp_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE hire_opportunity
+                       SET revenue = %s
+                     WHERE candidate_id = %s AND opportunity_id = %s
+                    """,
+                    (restore_value, restore_candidate_id, restore_opp_id),
+                )
+
         cur.execute(
             """
             UPDATE account_credit_loop
                SET status = 'available',
                    used_by_opportunity_id = NULL,
+                   applied_target_candidate_id = NULL,
+                   applied_target_field = NULL,
+                   applied_original_value = NULL,
+                   applied_adjusted_value = NULL,
+                   applied_discount_amount = NULL,
+                   applied_original_revenue = NULL,
+                   applied_adjusted_revenue = NULL,
                    used_at = NULL,
                    notes = %s,
                    updated_at = now()
