@@ -3243,13 +3243,13 @@ function colorizeSourcingCell(cell, days) {
   let label = String(n);
 
   // 🎨 Lógica de colores:
-  // 1–2 días  → verde
-  // 3–5 días  → amarillo
-  // 6+ días   → rojo + ⚠️
-  if (n >= 6) {
+  // 0–1 días  → verde
+  // 2–3 días  → amarillo
+  // 4+ días   → rojo + ⚠️
+  if (n >= 4) {
     cell.classList.add('red-cell');
     label = `${n} ⚠️`;
-  } else if (n >= 3) {
+  } else if (n >= 2) {
     cell.classList.add('yellow-cell');
     label = `${n} ⏳`;
   } else if (n >= 0) {
