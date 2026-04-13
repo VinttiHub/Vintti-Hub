@@ -514,16 +514,16 @@ def create_opportunity():
 
     try:
         conn = get_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute("SELECT account_id FROM account WHERE client_name = %s LIMIT 1", (client_name,))
         account_row = cursor.fetchone()
         if not account_row:
             return jsonify({'error': f'No account found for client_name: {client_name}'}), 400
-        account_id = account_row[0]
+        account_id = account_row["account_id"]
 
-        cursor.execute("SELECT COALESCE(MAX(opportunity_id), 0) + 1 FROM opportunity")
-        new_opportunity_id = cursor.fetchone()[0]
+        cursor.execute("SELECT COALESCE(MAX(opportunity_id), 0) + 1 AS next_opportunity_id FROM opportunity")
+        new_opportunity_id = cursor.fetchone()["next_opportunity_id"]
 
         cursor.execute("""
             INSERT INTO opportunity (

@@ -15,6 +15,24 @@ TEAM_EMAILS = [
 ]
 
 
+def _row_to_dict(cur, row: Any) -> Dict[str, Any]:
+    if not row:
+        return {}
+    if isinstance(row, dict):
+        return row
+    columns = [desc[0] for desc in (cur.description or [])]
+    if columns and isinstance(row, (tuple, list)):
+        return dict(zip(columns, row))
+    try:
+        return dict(row)
+    except Exception:
+        return {}
+
+
+def _rows_to_dicts(cur, rows: List[Any]) -> List[Dict[str, Any]]:
+    return [_row_to_dict(cur, row) for row in (rows or [])]
+
+
 def _dedupe_emails(values: List[str]) -> List[str]:
     out: List[str] = []
     seen = set()
@@ -158,7 +176,8 @@ def _fetch_credit_context(cur, opportunity_id: int) -> Optional[Dict[str, Any]]:
         """,
         (opportunity_id,),
     )
-    return cur.fetchone()
+    row = cur.fetchone()
+    return _row_to_dict(cur, row) if row else None
 
 
 def _normalize_model(value: Any) -> str:
@@ -251,7 +270,7 @@ def backfill_credit_payload(cur, row: Dict[str, Any]) -> Dict[str, Any]:
             row["credit_id"],
         ),
     )
-    refreshed = cur.fetchone() or {}
+    refreshed = _row_to_dict(cur, cur.fetchone())
     if refreshed:
         row.update(refreshed)
     else:
@@ -276,7 +295,7 @@ def backfill_account_credits(cur, account_id: int) -> None:
         """,
         (account_id,),
     )
-    rows = cur.fetchall() or []
+    rows = _rows_to_dicts(cur, cur.fetchall() or [])
     for row in rows:
         backfill_credit_payload(cur, row)
 
@@ -297,7 +316,7 @@ def backfill_all_credits(cur) -> int:
         ORDER BY credit_id ASC
         """
     )
-    rows = cur.fetchall() or []
+    rows = _rows_to_dicts(cur, cur.fetchall() or [])
     updated = 0
     for row in rows:
         before = dict(row)
@@ -350,7 +369,7 @@ def get_available_credit_summary(
         """,
         tuple(params),
     )
-    row = cur.fetchone() or {}
+    row = _row_to_dict(cur, cur.fetchone())
     next_expiration = row.get("next_expiration")
     days_left = None
     months_left = None
@@ -468,7 +487,7 @@ def create_credit_for_close_win(cur, opportunity_id: int) -> Dict[str, Any]:
             expires_at,
         ),
     )
-    row = cur.fetchone() or {}
+    row = _row_to_dict(cur, cur.fetchone())
     return {
         "created": True,
         "credit_id": row.get("credit_id"),
@@ -563,7 +582,7 @@ def list_account_credits(cur, account_id: int) -> Dict[str, Any]:
         """,
         (account_id,),
     )
-    rows = cur.fetchall() or []
+    rows = _rows_to_dicts(cur, cur.fetchall() or [])
     today = date.today()
     normalized_rows = []
     for row in rows:
@@ -603,7 +622,7 @@ def update_credit_status(
         """,
         (credit_id, account_id),
     )
-    current = cur.fetchone()
+    current = _row_to_dict(cur, cur.fetchone())
     if not current:
         raise ValueError("Credit not found")
 
@@ -619,7 +638,7 @@ def update_credit_status(
             """,
             (notes, credit_id),
         )
-        return cur.fetchone() or {}
+        return _row_to_dict(cur, cur.fetchone())
 
     if normalized_action == "use":
         if current.get("status") != "available":
@@ -637,7 +656,7 @@ def update_credit_status(
             """,
             (used_by_opportunity_id, notes, credit_id),
         )
-        return cur.fetchone() or {}
+        return _row_to_dict(cur, cur.fetchone())
 
     if normalized_action == "restore":
         if current.get("status") not in {"used", "reversed"}:
@@ -655,7 +674,7 @@ def update_credit_status(
             """,
             (notes, credit_id),
         )
-        return cur.fetchone() or {}
+        return _row_to_dict(cur, cur.fetchone())
 
     if normalized_action == "reverse":
         if current.get("status") == "used":
@@ -673,7 +692,7 @@ def update_credit_status(
             """,
             (notes, credit_id),
         )
-        return cur.fetchone() or {}
+        return _row_to_dict(cur, cur.fetchone())
 
     raise ValueError("Unsupported credit action")
 
@@ -699,7 +718,7 @@ def run_due_credit_loop_reminders(cur, *, today: Optional[date] = None) -> List[
         ORDER BY acl.account_id, acl.earned_date ASC
         """
     )
-    rows = cur.fetchall() or []
+    rows = _rows_to_dicts(cur, cur.fetchall() or [])
 
     grouped: Dict[tuple, Dict[str, Any]] = defaultdict(lambda: {"credits": [], "months_left": None, "account_id": None, "client_name": ""})
 
