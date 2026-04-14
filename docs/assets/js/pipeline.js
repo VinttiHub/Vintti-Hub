@@ -150,8 +150,28 @@ const BLACKLIST_CACHE = Object.create(null);
 const CANDIDATE_ASSOCIATION_CACHE = Object.create(null);
 const onlyDigits = s => String(s||'').replace(/\D/g, '');
 const BLACKLIST_TOOLTIP_TEXT = 'Black list';
+const PIPELINE_DELETE_WHITELIST = new Set([
+  'agostina@vintti.com',
+  'agustin@vintti.com',
+  'lara@vintti.com'
+]);
 let blacklistTooltipEl = null;
 let blacklistTooltipHideQueued = false;
+
+function getPipelineUserEmail() {
+  return (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+    .toLowerCase()
+    .trim();
+}
+
+function canCurrentUserDeletePipelineCandidate() {
+  return PIPELINE_DELETE_WHITELIST.has(getPipelineUserEmail());
+}
+
+function canDeletePipelineCandidateForStage(stageValue) {
+  const normalizedStage = String(stageValue || '').trim();
+  return normalizedStage === 'Applicant' || canCurrentUserDeletePipelineCandidate();
+}
 
 function ensureBlacklistTooltipElement() {
   if (blacklistTooltipEl) return blacklistTooltipEl;
@@ -1059,6 +1079,7 @@ document.getElementById('candidate-country').addEventListener('change', (e) => {
 function loadPipelineCandidates() {
   // Leer el opportunity_id que ya está en la página
   const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
+  const canDeletePipelineCandidates = canCurrentUserDeletePipelineCandidate();
   if (opportunityId === '—' || opportunityId === '') {
     console.error('Opportunity ID not found');
     return;
@@ -1093,6 +1114,8 @@ candidates.forEach(candidate => {
   const salaryLabel = Number.isFinite(salaryValue) && salaryValue > 0
     ? `$${salaryValue.toLocaleString()}`
     : '—';
+  const stageVal = (candidate.stage_pipeline || candidate.stage || '').trim();
+  const canDeleteThisCandidate = canDeletePipelineCandidateForStage(stageVal);
 
 card.innerHTML = `
 <div class="card-header">
@@ -1116,7 +1139,7 @@ card.innerHTML = `
       <span class="salary">${salaryLabel}</span>
       <div class="star-wrapper">
         <i class="fab fa-whatsapp wa-icon" title="WhatsApp"></i>
-        <span class="delete-icon" title="Delete">🗑️</span>
+        ${canDeleteThisCandidate ? '<span class="delete-icon" title="Delete">🗑️</span>' : ''}
       </div>
     </div>
   </div>
@@ -1173,38 +1196,38 @@ decorateCandidateAssociations(card, candidate);
   }
 }
 
+  const deleteIcon = card.querySelector(".delete-icon");
+  if (deleteIcon) {
+    deleteIcon.addEventListener("click", async (e) => {
+      e.stopPropagation(); // evitar que redireccione
 
+      if (!canDeletePipelineCandidateForStage(stageVal)) {
+        return;
+      }
 
-  card.querySelector(".delete-icon").addEventListener("click", async (e) => {
+      const candidateId = card.getAttribute("data-candidate-id");
+      const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
 
-  e.stopPropagation(); // evitar que redireccione
+      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`);
+      const linkedOpportunities = await res.json();
 
-  const candidateId = card.getAttribute("data-candidate-id");
-  const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
-  if (columnId) {
-    container.appendChild(card);
-    counters[columnId]++;
-  }
+      let message = "Are you sure you want to delete this candidate from the pipeline?";
+      if (linkedOpportunities.length === 1 && linkedOpportunities[0].opportunity_id == opportunityId) {
+        message += "\n⚠️ This candidate is only linked to this opportunity. Deleting will remove them from the database.";
+      }
 
-  const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`);
-  const linkedOpportunities = await res.json();
-
-  let message = "Are you sure you want to delete this candidate from the pipeline?";
-  if (linkedOpportunities.length === 1 && linkedOpportunities[0].opportunity_id == opportunityId) {
-    message += "\n⚠️ This candidate is only linked to this opportunity. Deleting will remove them from the database.";
-  }
-
-  if (confirm(message)) {
-    const deleteRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}`, {
-      method: 'DELETE'
+      if (confirm(message)) {
+        const deleteRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}`, {
+          method: 'DELETE'
+        });
+        if (deleteRes.ok) {
+          loadPipelineCandidates();
+        } else {
+          alert("Error deleting candidate.");
+        }
+      }
     });
-    if (deleteRes.ok) {
-      loadPipelineCandidates();
-    } else {
-      alert("Error deleting candidate.");
-    }
   }
-});
 card.querySelector(".star-icon").addEventListener("click", async (e) => {
   e.stopPropagation();
   const starIcon = e.target;
@@ -1262,8 +1285,6 @@ card.querySelector(".star-icon").addEventListener("click", async (e) => {
 
 
 // Mapeo del stage → columna id
-const stageVal = (candidate.stage_pipeline || candidate.stage || '').trim();
-
 let columnId = '';
 switch (stageVal) {
   case 'Applicant':
