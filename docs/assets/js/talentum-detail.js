@@ -1,4 +1,5 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
+const CONTACTED_STORAGE_KEY = "talentum_contacted_applicants";
 
 const state = {
   currentOpportunity: null,
@@ -87,6 +88,39 @@ async function fetchJSON(url, options = {}) {
     throw new Error(`${res.status}: ${text}`);
   }
   return res.json();
+}
+
+function readContactedMap() {
+  try {
+    const raw = localStorage.getItem(CONTACTED_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    console.warn("Failed to read contacted applicants from storage", err);
+    return {};
+  }
+}
+
+function writeContactedMap(map) {
+  try {
+    localStorage.setItem(CONTACTED_STORAGE_KEY, JSON.stringify(map || {}));
+  } catch (err) {
+    console.warn("Failed to persist contacted applicants", err);
+  }
+}
+
+function isApplicantContacted(applicantId) {
+  if (!Number.isFinite(Number(applicantId))) return false;
+  const map = readContactedMap();
+  return Boolean(map[String(applicantId)]);
+}
+
+function setApplicantContacted(applicantId, contacted) {
+  const normalizedId = Number(applicantId);
+  if (!Number.isFinite(normalizedId)) return;
+  const map = readContactedMap();
+  map[String(normalizedId)] = Boolean(contacted);
+  writeContactedMap(map);
 }
 
 
@@ -1242,6 +1276,7 @@ function renderCandidates() {
     const card = document.createElement("div");
     card.className = "candidate-card";
     card.dataset.applicantId = candidate.profile.id;
+    const contacted = isApplicantContacted(candidate.profile.id);
     const tags = [candidate.profile.position, candidate.profile.industry, candidate.profile.country]
       .filter(Boolean)
       .slice(0, 3)
@@ -1254,6 +1289,17 @@ function renderCandidates() {
     const scorePercent = scoreToPercent(candidate.score) ?? 0;
     const scoreTone = getScoreTone(scorePercent);
     card.innerHTML = `
+      <div class="candidate-card-top">
+        <label class="candidate-contact-toggle ${contacted ? "is-contacted" : ""}">
+          <input
+            class="candidate-contact-checkbox"
+            type="checkbox"
+            data-applicant-id="${escapeHtml(candidate.profile.id)}"
+            ${contacted ? "checked" : ""}
+          />
+          <span>${contacted ? "Contacted" : "Not contacted"}</span>
+        </label>
+      </div>
       <h4>${escapeHtml(candidate.profile.name)}</h4>
       <div class="candidate-score ${scoreTone}">Match ${scorePercent}%</div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
@@ -1307,6 +1353,7 @@ function renderApplicantDrawer(entry) {
     : (applicant.location || "—");
   const phoneLabel = formatPhoneNumber(applicant.phone, countryInfo);
   const linkedinUrl = applicant.linkedin_url || "";
+  const contacted = isApplicantContacted(applicant.applicant_id);
   const linkedinLink = linkedinUrl
     ? `<a class="drawer-link" href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
     : "<span class=\"drawer-value\">—</span>";
@@ -1354,6 +1401,18 @@ function renderApplicantDrawer(entry) {
         </span>
       </div>
       <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(locationLabel)}</span></div>
+      <div class="drawer-item drawer-item-contacted">
+        <span class="drawer-label">Contacted</span>
+        <label class="candidate-contact-toggle ${contacted ? "is-contacted" : ""}">
+          <input
+            class="candidate-contact-checkbox"
+            type="checkbox"
+            data-applicant-id="${applicant.applicant_id}"
+            ${contacted ? "checked" : ""}
+          />
+          <span>${contacted ? "Yes" : "No"}</span>
+        </label>
+      </div>
       <div class="drawer-item">
         <span class="drawer-label">LinkedIn</span>
         <span class="drawer-value copy-value" data-copy="${escapeHtml(linkedinUrl)}">
@@ -1538,6 +1597,7 @@ async function init() {
   if (els.candidatesGrid) {
     els.candidatesGrid.addEventListener("click", (event) => {
       if (event.target.closest("a")) return;
+      if (event.target.closest(".candidate-contact-toggle")) return;
       const card = event.target.closest(".candidate-card");
       if (!card) return;
       const applicantId = Number(card.dataset.applicantId);
@@ -1546,6 +1606,20 @@ async function init() {
         const fallback = computeMatchScore(selected.profile);
         const score = Number.isFinite(selected.score) ? selected.score : fallback;
         openApplicantDrawer({ ...selected, score });
+      }
+    });
+    els.candidatesGrid.addEventListener("change", (event) => {
+      const checkbox = event.target.closest(".candidate-contact-checkbox");
+      if (!checkbox) return;
+      setApplicantContacted(Number(checkbox.dataset.applicantId), checkbox.checked);
+      renderCandidates();
+      const selected = state.candidates.find(
+        (entry) => entry.profile.id === state.selectedApplicantId
+      );
+      if (selected?.pipeline) {
+        const fallback = computeMatchScore(selected.profile);
+        const score = Number.isFinite(selected.score) ? selected.score : fallback;
+        renderApplicantDrawer({ ...selected, score });
       }
     });
   }
@@ -1563,6 +1637,20 @@ async function init() {
   }
 
   if (els.drawerBody) {
+    els.drawerBody.addEventListener("change", (event) => {
+      const checkbox = event.target.closest(".candidate-contact-checkbox");
+      if (!checkbox) return;
+      setApplicantContacted(Number(checkbox.dataset.applicantId), checkbox.checked);
+      renderCandidates();
+      const selected = state.candidates.find(
+        (entry) => entry.profile.id === state.selectedApplicantId
+      );
+      if (selected?.pipeline) {
+        const fallback = computeMatchScore(selected.profile);
+        const score = Number.isFinite(selected.score) ? selected.score : fallback;
+        renderApplicantDrawer({ ...selected, score });
+      }
+    });
     els.drawerBody.addEventListener("click", async (event) => {
       const button = event.target.closest(".copy-btn");
       if (!button) return;

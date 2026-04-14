@@ -526,9 +526,41 @@ body.chat-expanded .chat-panel {
   cursor: pointer;
 }
 
+.candidate-card-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .candidate-card h4 {
   font-size: 1rem;
   font-weight: 600;
+}
+
+.candidate-contact-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(246, 224, 181, 0.32);
+  color: #7a5322;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.candidate-contact-toggle.is-contacted {
+  background: rgba(200, 235, 210, 0.8);
+  color: #2d6a4f;
+}
+
+.candidate-contact-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #2d6a4f;
+  cursor: pointer;
 }
 
 .candidate-score {
@@ -711,6 +743,10 @@ body.chat-expanded .chat-panel {
 
 .drawer-item:last-child {
   border-bottom: none;
+}
+
+.drawer-item-contacted {
+  align-items: center;
 }
 
 .drawer-label {
