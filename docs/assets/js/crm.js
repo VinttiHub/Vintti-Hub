@@ -462,6 +462,8 @@ function buildCrmExportRecord(item = {}) {
     clientName: (item.client_name || '—').toString().trim() || '—',
     status,
     salesLead,
+    leadSource: csvTextValue(item.where_come_from),
+    referralSource: csvTextValue(item.referal_source),
     contract,
     trr: csvMoneyValue(item.trr),
     tsf: csvMoneyValue(item.tsf),
@@ -486,6 +488,8 @@ function updateCrmExportCache(accountId, patch = {}) {
     clientName: '—',
     status: '—',
     salesLead: 'Unassigned',
+    leadSource: '—',
+    referralSource: '—',
     contract: 'No Contract',
     trr: 0,
     tsf: 0,
@@ -493,6 +497,33 @@ function updateCrmExportCache(accountId, patch = {}) {
     priority: ''
   };
   CRM_EXPORT_CACHE.set(id, { ...current, ...patch });
+}
+
+async function hydrateCrmExportAccountRow(accountId, row = null) {
+  const id = Number(accountId);
+  if (!id) return row;
+
+  const currentRow = row || CRM_EXPORT_CACHE.get(id);
+  const currentLeadSource = (currentRow?.leadSource || '').toString().trim();
+  const currentReferralSource = (currentRow?.referralSource || '').toString().trim();
+  const hasLeadSource = currentLeadSource && currentLeadSource !== '—';
+  const hasReferralSource = currentReferralSource && currentReferralSource !== '—';
+  if (currentRow && hasLeadSource && hasReferralSource) return currentRow;
+
+  try {
+    const res = await fetch(`${API_BASE}/accounts/${encodeURIComponent(id)}`);
+    if (!res.ok) throw new Error(`Account HTTP ${res.status}`);
+    const account = await res.json();
+    const patch = {
+      leadSource: csvTextValue(account?.where_come_from),
+      referralSource: csvTextValue(account?.referal_source)
+    };
+    updateCrmExportCache(id, patch);
+    return { ...(currentRow || {}), ...patch };
+  } catch (err) {
+    console.warn(`Could not hydrate account sources for CSV export on account ${id}:`, err);
+    return currentRow;
+  }
 }
 
 function getOrderedCrmExportIds() {
@@ -649,6 +680,8 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
       accountRow.clientName,
       accountRow.status,
       accountRow.salesLead,
+      accountRow.leadSource,
+      accountRow.referralSource,
       accountRow.contract,
       accountRow.trr,
       accountRow.tsf,
@@ -674,6 +707,8 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
     accountRow.clientName,
     accountRow.status,
     accountRow.salesLead,
+    accountRow.leadSource,
+    accountRow.referralSource,
     accountRow.contract,
     accountRow.trr,
     accountRow.tsf,
@@ -721,6 +756,8 @@ async function downloadCrmCsv() {
     'Client Name',
     'Status',
     'Sales Lead',
+    'lead_source',
+    'referal_source',
     'Contract',
     'TRR',
     'TSF',
@@ -749,12 +786,13 @@ async function downloadCrmCsv() {
   try {
     let doneCount = 0;
     const tasks = orderedIds.map(id => async () => {
-      const row = CRM_EXPORT_CACHE.get(id);
+      let row = CRM_EXPORT_CACHE.get(id);
       if (!row) {
         doneCount += 1;
         updateCrmLoadingProgress(doneCount, orderedIds.length);
         return;
       }
+      row = await hydrateCrmExportAccountRow(id, row);
       const sheetData = await fetchCrmExportCandidateSheets(id);
       buildCrmCandidateExportRows(row, sheetData.active, { includeEmptyAccountRow: true })
         .forEach(values => activeRows.push(values));

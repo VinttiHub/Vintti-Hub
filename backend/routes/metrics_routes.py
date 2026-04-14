@@ -41,13 +41,15 @@ def data_light():
               a.contract,
               a.account_status,
               a.account_manager,
+              a.where_come_from,
+              a.referal_source,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary, 0) + COALESCE(h.fee, 0) END), 0) AS tsr
             FROM account a
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager
+            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager, a.where_come_from, a.referal_source
             ORDER BY LOWER(a.client_name) ASC;
         """)
 
