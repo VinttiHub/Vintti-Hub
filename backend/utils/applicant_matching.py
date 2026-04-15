@@ -44,6 +44,49 @@ _INDUSTRY_KEYWORDS = {
     "outsourcing", "logistics", "retail", "manufacturing", "software", "agency", "startup",
 }
 
+_LATAM_COUNTRIES = {
+    "argentina", "bolivia", "brazil", "brasil", "chile", "colombia", "costa rica",
+    "dominican republic", "dominicana", "ecuador", "el salvador", "guatemala", "honduras",
+    "mexico", "mexico city", "nicaragua", "panama", "panamá", "paraguay", "peru", "perú",
+    "puerto rico", "uruguay", "venezuela", "latin america", "latam", "latinoamerica",
+    "latino america", "america latina",
+}
+
+_ROLE_FAMILIES = {
+    "recruiting": {
+        "recruiter", "recruiting", "talent acquisition", "talent-acquisition", "talent acquisition specialist",
+        "talent partner", "talent sourcer", "sourcer", "headhunter", "human resources recruiter", "technical recruiter",
+        "it recruiter", "hr recruiter", "reclutador", "reclutamiento", "seleccion", "selección",
+    },
+    "finance_control": {
+        "controller", "financial controller", "finance controller", "controllership", "controladoria", "contralor",
+        "accountant", "accounting", "finance", "finanzas", "fp&a", "cfo", "contador", "bookkeeper", "audit", "auditor",
+    },
+    "sales": {
+        "account executive", "sales", "sales executive", "business development", "bdr", "sdr", "account manager",
+    },
+    "marketing": {
+        "marketing", "growth marketing", "performance marketing", "brand manager",
+    },
+    "operations": {
+        "operations", "operator", "project manager", "program manager", "ops", "chief of staff",
+    },
+    "engineering": {
+        "software engineer", "developer", "backend engineer", "frontend engineer", "fullstack engineer",
+        "devops", "qa", "data engineer",
+    },
+}
+
+_INDUSTRY_FAMILIES = {
+    "staffing": {"staffing", "recruiting", "recruitment", "talent acquisition", "headhunting"},
+    "finance": {"finance", "finanzas", "accounting", "fp&a", "audit", "banking", "financial"},
+    "software": {"saas", "software", "startup", "tech", "technology"},
+    "healthcare": {"healthcare", "health", "medical", "biotech"},
+    "education": {"education", "edtech", "academic"},
+    "ecommerce": {"ecommerce", "retail", "marketplace"},
+    "logistics": {"logistics", "supply chain", "transportation"},
+}
+
 
 def normalize_ascii(value: Any) -> str:
     text = str(value or "").strip().lower()
@@ -63,6 +106,81 @@ def tokenize(value: Any) -> List[str]:
         return []
     tokens = re.findall(r"[a-z0-9][a-z0-9.+#/-]{1,}", text)
     return [token for token in tokens if token not in _STOPWORDS and len(token) > 1]
+
+
+def _meaningful_tokens(value: Any) -> List[str]:
+    return [token for token in tokenize(value) if len(token) > 2]
+
+
+def _normalize_text_chunks(*values: Any) -> str:
+    return " ".join(part for part in (normalize_ascii(value) for value in values) if part).strip()
+
+
+def _contains_phrase(haystack: str, phrase: str) -> bool:
+    needle = normalize_ascii(phrase)
+    if not haystack or not needle:
+        return False
+    return needle in haystack
+
+
+def _detect_families(text: Any, families: Dict[str, Set[str]]) -> Set[str]:
+    haystack = normalize_ascii(text)
+    detected: Set[str] = set()
+    if not haystack:
+        return detected
+    for family, phrases in families.items():
+        if any(_contains_phrase(haystack, phrase) for phrase in phrases):
+            detected.add(family)
+    return detected
+
+
+def _match_family_strength(candidate_families: Set[str], target_families: Set[str]) -> Optional[int]:
+    if not target_families:
+        return None
+    if not candidate_families:
+        return 0
+    return 2 if candidate_families.intersection(target_families) else 0
+
+
+def _match_text_strength(candidate_value: Any, target_value: Any, fallback_text: Any = "") -> Optional[int]:
+    target = normalize_ascii(target_value)
+    if not target:
+        return None
+
+    combined = _normalize_text_chunks(candidate_value, fallback_text)
+    if not combined:
+        return 0
+    if target in combined:
+        return 2
+
+    target_tokens = _meaningful_tokens(target)
+    if not target_tokens:
+        return 0
+
+    combined_tokens = set(_meaningful_tokens(combined))
+    overlap = combined_tokens.intersection(target_tokens)
+    if not overlap:
+        return 0
+
+    token_ratio = len(overlap) / len(set(target_tokens))
+    if len(target_tokens) == 1:
+        return 1
+    return 1 if token_ratio >= 0.6 else 0
+
+
+def match_location_strength(candidate_value: Any, target_value: Any, fallback_text: Any = "") -> Optional[int]:
+    target = normalize_ascii(target_value)
+    if not target:
+        return None
+
+    combined = _normalize_text_chunks(candidate_value, fallback_text)
+    if not combined:
+        return 0
+
+    if target in {"latam", "latin america", "latinoamerica", "latino america", "america latina"}:
+        return 2 if any(country in combined for country in _LATAM_COUNTRIES) else 0
+
+    return 2 if target in combined else 0
 
 
 def keyword_set(*chunks: Any) -> Set[str]:
@@ -193,20 +311,7 @@ def overlap_ratio(left: Set[str], right: Set[str]) -> float:
 
 
 def match_strength(candidate_value: Any, target_value: Any, fallback_text: Any = "") -> Optional[int]:
-    target = normalize_ascii(target_value)
-    if not target:
-        return None
-
-    haystack = normalize_ascii(candidate_value)
-    combined = " ".join(part for part in [haystack, normalize_ascii(fallback_text)] if part).strip()
-    if not combined:
-        return 0
-    if target in combined:
-        return 2
-    tokens = [token for token in re.split(r"[\s,;/|-]+", target) if token]
-    if not tokens:
-        return 0
-    return 1 if any(token in combined for token in tokens) else 0
+    return _match_text_strength(candidate_value, target_value, fallback_text)
 
 
 def match_years(candidate_years: Optional[float], target_years: Optional[float]) -> Optional[int]:
@@ -227,13 +332,17 @@ def build_candidate_profile(extracted_pdf: str, applicant_location: str = "") ->
     token_set = keyword_set(text)
     role = next((token for token in keywords if token in _ROLE_KEYWORDS), "")
     industry = next((token for token in keywords if token in _INDUSTRY_KEYWORDS), "")
+    role_families = _detect_families(text, _ROLE_FAMILIES)
+    industry_families = _detect_families(text, _INDUSTRY_FAMILIES)
     years = estimate_years_experience(text)
     return {
         "text": text[:12000],
         "keywords": keywords,
         "token_set": token_set,
         "role_hint": role,
+        "role_families": role_families,
         "industry_hint": industry,
+        "industry_families": industry_families,
         "location": compact_whitespace(applicant_location),
         "years_experience": years,
     }
@@ -254,14 +363,18 @@ def build_job_profile(
     years = parse_number(filters.get("years_experience") or opportunity_context.get("years_experience"))
     industry = compact_whitespace(filters.get("industry") or "")
     salary = compact_whitespace(filters.get("salary") or "")
+    role_families = _detect_families(" ".join([position, text]), _ROLE_FAMILIES)
+    industry_families = _detect_families(" ".join([industry, text]), _INDUSTRY_FAMILIES)
 
     return {
         "text": text[:8000],
         "keywords": keywords,
         "token_set": keyword_set(text, position, country, industry),
         "position": position,
+        "role_families": role_families,
         "country": country,
         "industry": industry,
+        "industry_families": industry_families,
         "salary": salary,
         "years_experience": years,
     }
@@ -306,17 +419,25 @@ def score_candidate_against_job(
     job = build_job_profile(job_description, filters=filters, opportunity_context=opportunity_context)
 
     jd_overlap = overlap_ratio(candidate["token_set"], job["token_set"])
-    jd_percent = max(15, min(100, int(round(jd_overlap * 100)))) if job["token_set"] else 50
+    jd_percent = min(100, int(round(jd_overlap * 100))) if job["token_set"] else 35
 
-    position_strength = match_strength(candidate["role_hint"], job["position"], candidate["text"])
-    industry_strength = match_strength(candidate["industry_hint"], job["industry"], candidate["text"])
-    location_strength = match_strength(candidate["location"], job["country"], candidate["text"])
+    family_position_strength = _match_family_strength(candidate["role_families"], job["role_families"])
+    text_position_strength = match_strength(candidate["role_hint"], job["position"], candidate["text"])
+    position_strength = family_position_strength if family_position_strength is not None else text_position_strength
+    if family_position_strength == 0 and text_position_strength == 1:
+        position_strength = 0
+
+    family_industry_strength = _match_family_strength(candidate["industry_families"], job["industry_families"])
+    text_industry_strength = match_strength(candidate["industry_hint"], job["industry"], candidate["text"])
+    industry_strength = family_industry_strength if family_industry_strength is not None else text_industry_strength
+
+    location_strength = match_location_strength(candidate["location"], job["country"], candidate["text"])
     years_strength = match_years(candidate["years_experience"], job["years_experience"])
 
     weights = [
-        ("jd", jd_percent, 0.45),
-        ("position", _strength_to_percent(position_strength), 0.2),
-        ("industry", _strength_to_percent(industry_strength), 0.1),
+        ("jd", jd_percent, 0.3),
+        ("position", _strength_to_percent(position_strength), 0.3),
+        ("industry", _strength_to_percent(industry_strength), 0.15),
         ("location", _strength_to_percent(location_strength), 0.15),
         ("years", _strength_to_percent(years_strength), 0.1),
     ]
@@ -329,6 +450,10 @@ def score_candidate_against_job(
         weighted_total += percent * weight
         used_weight += weight
     overall_percent = int(round(weighted_total / used_weight)) if used_weight else jd_percent
+    if job["position"] and position_strength == 0:
+        overall_percent = min(overall_percent, 35)
+    if job["country"] and location_strength == 0:
+        overall_percent = min(overall_percent, 45)
     score = max(1, min(10, int(round(overall_percent / 10))))
 
     keyword_overlap = sorted(candidate["token_set"].intersection(job["token_set"]))

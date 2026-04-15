@@ -926,6 +926,10 @@ function computeMatchScore(profile) {
   return Math.min(10, Math.max(1, scaled));
 }
 
+function getDisplayScore(score) {
+  return Number.isFinite(score) ? score : null;
+}
+
 function getMatchSummary(profile) {
   const parts = [];
   if (state.filters.country) {
@@ -1230,12 +1234,16 @@ function buildDefaultSummary(profile, percent) {
 
 function buildMatchModel(profile, score, reasonsRaw) {
   const parsed = parseReasonsPayload(reasonsRaw);
-  const percentFallback = scoreToPercent(score) ?? 0;
+  const percentFallback = scoreToPercent(score);
   const overallPercent = normalizePercent(parsed?.overallPercent, percentFallback);
-  const summary = parsed?.summary || buildDefaultSummary(profile, overallPercent);
+  const summary = parsed?.summary || (
+    Number.isFinite(overallPercent)
+      ? buildDefaultSummary(profile, overallPercent)
+      : "Este applicant todavía no tiene un score validado. Refresca el CV para evaluarlo con los filtros actuales."
+  );
   const breakdownSource = parsed?.breakdown?.length
     ? parsed.breakdown
-    : buildFallbackBreakdown(profile, score);
+    : (Number.isFinite(score) ? buildFallbackBreakdown(profile, score) : []);
   const breakdown = breakdownSource
     .filter((item) => normalizeText(item?.category) !== "similitud con la jd")
     .map((item) => ({
@@ -1259,11 +1267,15 @@ function getScoreTone(percent) {
 function renderCandidates() {
   const scored = state.candidates
     .map((candidate) => {
-      const fallback = computeMatchScore(candidate.profile);
-      const score = Number.isFinite(candidate.score) ? candidate.score : fallback;
+      const score = getDisplayScore(candidate.score);
       return { ...candidate, score };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      if (Number.isFinite(a.score) && Number.isFinite(b.score)) return b.score - a.score;
+      if (Number.isFinite(a.score)) return -1;
+      if (Number.isFinite(b.score)) return 1;
+      return 0;
+    });
 
   els.candidatesGrid.innerHTML = "";
   els.candidatesEmpty.style.display = scored.length ? "none" : "block";
@@ -1286,8 +1298,9 @@ function renderCandidates() {
       ? `<a class="candidate-link" href="${escapeHtml(candidate.profile.linkedin)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
       : `<span class="candidate-link muted">No LinkedIn</span>`;
 
-    const scorePercent = scoreToPercent(candidate.score) ?? 0;
+    const scorePercent = scoreToPercent(candidate.score);
     const scoreTone = getScoreTone(scorePercent);
+    const scoreLabel = Number.isFinite(scorePercent) ? `Match ${scorePercent}%` : "Score pending";
     card.innerHTML = `
       <div class="candidate-card-top">
         <label class="candidate-contact-toggle ${contacted ? "is-contacted" : ""}">
@@ -1301,7 +1314,7 @@ function renderCandidates() {
         </label>
       </div>
       <h4>${escapeHtml(candidate.profile.name)}</h4>
-      <div class="candidate-score ${scoreTone}">Match ${scorePercent}%</div>
+      <div class="candidate-score ${scoreTone}">${scoreLabel}</div>
       <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
       <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
       <div class="candidate-tags">${tags}</div>
@@ -1363,7 +1376,7 @@ function renderApplicantDrawer(entry) {
     : "<span class=\"drawer-value\">—</span>";
   const match = buildMatchModel(
     profile,
-    entry.score ?? computeMatchScore(profile),
+    entry.score,
     entry.reasons || applicant.reasons || ""
   );
   const breakdownHtml = match.breakdown
@@ -1466,7 +1479,7 @@ function renderApplicantDrawer(entry) {
       <div class="drawer-section">
         <div class="score-header ${matchTone}">
           <div>
-            <div class="score-value">${escapeHtml(match.percent)}%</div>
+            <div class="score-value">${Number.isFinite(match.percent) ? escapeHtml(match.percent) + "%" : "—"}</div>
             <div class="score-label">Match general</div>
           </div>
         </div>
