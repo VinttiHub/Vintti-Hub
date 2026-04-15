@@ -644,7 +644,11 @@ async function loadOrgChart(){
   }
 }
 // ===== Team PTO (helpers) =====
-const TEAM_ALLOWED = new Set([8,2,1,6]); // who can see the tab
+const TEAM_GLOBAL_EMAILS = new Set([
+  "agustin@vintti.com",
+  "jazmin@vintti.com",
+  "lara@vintti.com"
+]);
 const ADMIN_ALLOWED_EMAILS = new Set([
   "agustin@vintti.com",
   "lara@vintti.com",
@@ -663,6 +667,39 @@ let ADMIN_USERS_CACHE = [];
 let ADMIN_DELETE_TARGET = null;
 let ADMIN_DELETE_STATUS_TIMER = null;
 const _nz = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+function currentProfileEmail(){
+  return normalizeEmail(PROFILE_CACHE?.email_vintti || document.getElementById("email_vintti")?.value || "");
+}
+
+function canViewWholeCompanyPto(){
+  return TEAM_GLOBAL_EMAILS.has(currentProfileEmail());
+}
+
+function collectDirectReportIds(users, leaderId){
+  const rootId = Number(leaderId);
+  if (!Number.isFinite(rootId) || rootId <= 0) return new Set();
+
+  const directReports = new Set();
+  (Array.isArray(users) ? users : []).forEach((user)=>{
+    const childId = Number(user?.user_id);
+    const parentId = toLeaderId(user?.lider);
+    if (!Number.isFinite(childId) || childId <= 0) return;
+    if (parentId === rootId) directReports.add(childId);
+  });
+  return directReports;
+}
+
+function filterTeamPtoUsers(allUsers){
+  const rows = Array.isArray(allUsers) ? allUsers : [];
+  if (canViewWholeCompanyPto()) return rows;
+
+  const visibleIds = collectDirectReportIds(rows, CURRENT_USER_ID);
+  if (!visibleIds.size) return [];
+
+  return rows.filter((user)=> visibleIds.has(Number(user?.user_id)));
+}
 
 function calcVacation(user){
   const acc  = _nz(user.vacaciones_acumuladas);
@@ -1281,8 +1318,9 @@ async function loadTeamPto(){
     const r = await api(`/users`, { method: 'GET' });
     if (!r.ok) throw new Error(await r.text());
     const arr = await r.json();
+    const filtered = filterTeamPtoUsers(arr);
     // include vacation, vintti days AND holidays
-    const slim = arr.map(u => ({
+    const slim = filtered.map(u => ({
       user_id: u.user_id,
       user_name: u.user_name,
       email_vintti: u.email_vintti,
@@ -2595,14 +2633,16 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     loadOrgChart();
     loadTeamMoods();
 
-    // Existing: enable Team PTO for certain user_ids
-    if (TEAM_ALLOWED.has(Number(uid))) {
+    const hasGlobalTeamPtoAccess = canViewWholeCompanyPto();
+
+    // Try to enable Approvals tab only if user is truly leader (API decides)
+    const isLeader = await loadLeaderApprovals(); // preloads too
+
+    if (hasGlobalTeamPtoAccess || isLeader) {
       enableTeamTab();
       loadTeamPto();
     }
 
-    // NEW: Try to enable Approvals tab only if user is truly leader (API decides)
-    const isLeader = await loadLeaderApprovals(); // preloads too
     if (isLeader) {
       enableApprovalsTab();
       // re-load once tab exists (optional; we already preloaded)
