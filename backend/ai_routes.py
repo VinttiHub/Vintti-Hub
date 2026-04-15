@@ -378,6 +378,7 @@ def _score_applicant_with_openai(
     job_description: str,
     filters: Optional[Dict[str, Any]] = None,
     opportunity_context: Optional[Dict[str, Any]] = None,
+    candidate_context: Optional[Dict[str, Any]] = None,
 ):
     return score_candidate_against_job(
         extracted_pdf,
@@ -385,6 +386,7 @@ def _score_applicant_with_openai(
         job_description,
         filters=filters,
         opportunity_context=opportunity_context,
+        candidate_context=candidate_context,
     )
 
 def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[str, Any]] = None):
@@ -395,7 +397,7 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
         jd_plain, opp_context = _build_opportunity_context(cursor, opportunity_id)
         cursor.execute(
             """
-            SELECT applicant_id, location, extracted_pdf
+            SELECT applicant_id, location, extracted_pdf, role_position, area
             FROM applicants
             WHERE opportunity_id = %s
             """,
@@ -403,7 +405,7 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
         )
         rows = cursor.fetchall()
         updated = 0
-        for applicant_id, location, extracted_pdf in rows:
+        for applicant_id, location, extracted_pdf, role_position, area in rows:
             if not extracted_pdf:
                 continue
             score, reasons = _score_applicant_with_openai(
@@ -412,6 +414,7 @@ def _recalculate_applicant_scores(opportunity_id: int, filters: Optional[Dict[st
                 jd_plain,
                 filters=filters,
                 opportunity_context=opp_context,
+                candidate_context={"role_position": role_position or "", "area": area or ""},
             )
             if score is None and not reasons:
                 continue

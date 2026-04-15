@@ -199,6 +199,13 @@ def extract_keywords(text: Any, limit: int = 24) -> List[str]:
     return [token for token, _count in ranked[:limit]]
 
 
+def _candidate_role_signal_text(text: Any, keywords: Optional[Sequence[str]] = None) -> str:
+    clean = compact_whitespace(text)
+    opening = clean[:1800]
+    keyword_blob = " ".join(keywords or [])
+    return compact_whitespace(f"{opening} {keyword_blob}")
+
+
 def parse_number(value: Any) -> Optional[float]:
     if value is None:
         return None
@@ -327,22 +334,37 @@ def match_years(candidate_years: Optional[float], target_years: Optional[float])
     return 0
 
 
-def build_candidate_profile(extracted_pdf: str, applicant_location: str = "") -> Dict[str, Any]:
+def build_candidate_profile(
+    extracted_pdf: str,
+    applicant_location: str = "",
+    candidate_context: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    candidate_context = candidate_context or {}
     text = compact_whitespace(extracted_pdf)
+    explicit_role = compact_whitespace(candidate_context.get("role_position") or "")
+    explicit_area = compact_whitespace(candidate_context.get("area") or "")
     keywords = extract_keywords(text, limit=30)
     token_set = keyword_set(text)
-    role = next((token for token in keywords if token in _ROLE_KEYWORDS), "")
-    industry = next((token for token in keywords if token in _INDUSTRY_KEYWORDS), "")
-    role_families = _detect_families(text, _ROLE_FAMILIES)
-    industry_families = _detect_families(text, _INDUSTRY_FAMILIES)
+    role = explicit_role or next((token for token in keywords if token in _ROLE_KEYWORDS), "")
+    industry = explicit_area or next((token for token in keywords if token in _INDUSTRY_KEYWORDS), "")
+    role_signal_text = _candidate_role_signal_text(f"{explicit_role} {text}", keywords)
+    explicit_role_families = _detect_families(explicit_role, _ROLE_FAMILIES)
+    role_families = explicit_role_families or _detect_families(role_signal_text, _ROLE_FAMILIES)
+    explicit_industry_families = _detect_families(explicit_area, _INDUSTRY_FAMILIES)
+    industry_families = explicit_industry_families or _detect_families(f"{explicit_area} {text}", _INDUSTRY_FAMILIES)
     years = estimate_years_experience(text)
     return {
         "text": text[:12000],
         "keywords": keywords,
         "token_set": token_set,
+        "explicit_role": explicit_role,
         "role_hint": role,
+        "role_signal_text": role_signal_text,
+        "explicit_role_families": explicit_role_families,
         "role_families": role_families,
+        "explicit_area": explicit_area,
         "industry_hint": industry,
+        "explicit_industry_families": explicit_industry_families,
         "industry_families": industry_families,
         "location": compact_whitespace(applicant_location),
         "years_experience": years,
@@ -412,24 +434,35 @@ def score_candidate_against_job(
     job_description: str,
     filters: Optional[Dict[str, Any]] = None,
     opportunity_context: Optional[Dict[str, Any]] = None,
+    candidate_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[int], Optional[str]]:
     if not compact_whitespace(extracted_pdf):
         return None, None
 
-    candidate = build_candidate_profile(extracted_pdf, applicant_location)
+    candidate = build_candidate_profile(extracted_pdf, applicant_location, candidate_context=candidate_context)
     job = build_job_profile(job_description, filters=filters, opportunity_context=opportunity_context)
 
     jd_overlap = overlap_ratio(candidate["token_set"], job["token_set"])
     jd_percent = min(100, int(round(jd_overlap * 100))) if job["token_set"] else 35
 
-    family_position_strength = _match_family_strength(candidate["role_families"], job["role_families"])
-    text_position_strength = match_strength(candidate["role_hint"], job["position"], candidate["text"])
+    candidate_role_families = candidate["explicit_role_families"] or candidate["role_families"]
+    family_position_strength = _match_family_strength(candidate_role_families, job["role_families"])
+    text_position_strength = match_strength(
+        candidate["explicit_role"] or candidate["role_hint"],
+        job["position"],
+        candidate["role_signal_text"],
+    )
     position_strength = family_position_strength if family_position_strength is not None else text_position_strength
     if family_position_strength == 0 and text_position_strength == 1:
         position_strength = 0
 
-    family_industry_strength = _match_family_strength(candidate["industry_families"], job["industry_families"])
-    text_industry_strength = match_strength(candidate["industry_hint"], job["industry"], candidate["text"])
+    candidate_industry_families = candidate["explicit_industry_families"] or candidate["industry_families"]
+    family_industry_strength = _match_family_strength(candidate_industry_families, job["industry_families"])
+    text_industry_strength = match_strength(
+        candidate["explicit_area"] or candidate["industry_hint"],
+        job["industry"],
+        candidate["text"],
+    )
     industry_strength = family_industry_strength if family_industry_strength is not None else text_industry_strength
 
     location_strength = match_location_strength(candidate["location"], job["country"], candidate["text"])
@@ -452,7 +485,8 @@ def score_candidate_against_job(
         used_weight += weight
     overall_percent = int(round(weighted_total / used_weight)) if used_weight else jd_percent
     if job["position"] and position_strength == 0:
-        overall_percent = min(overall_percent, 35)
+        hard_role_conflict = bool(candidate_role_families and job["role_families"] and not candidate_role_families.intersection(job["role_families"]))
+        overall_percent = min(overall_percent, 25 if hard_role_conflict else 35)
     if job["country"] and location_strength == 0:
         overall_percent = min(overall_percent, 45)
     score = max(1, min(10, int(round(overall_percent / 10))))

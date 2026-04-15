@@ -87,6 +87,8 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                 applicant_id,
                 opportunity_id,
                 location,
+                role_position,
+                area,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -120,6 +122,8 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
             applicant_id,
             opp_id,
             location,
+            role_position,
+            area,
             s3_key,
             file_name,
             content_type,
@@ -154,6 +158,7 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                     jd_plain,
                     filters=filters,
                     opportunity_context=opp_context,
+                    candidate_context={"role_position": role_position or "", "area": area or ""},
                 )
                 if match_score is None and score is not None:
                     match_score = score
@@ -454,6 +459,10 @@ def create_applicant():
                         jd_plain,
                         filters=None,
                         opportunity_context=opp_context,
+                        candidate_context={
+                            "role_position": _clean(data.get("role_position")),
+                            "area": _clean(data.get("area")),
+                        },
                     )
                 if extracted_pdf or score is not None or reasons:
                     _update_applicant_ai_fields(applicant_id, extracted_pdf, score, reasons)
@@ -484,7 +493,7 @@ def recalculate_applicant_scores():
         jd_plain, opp_context = _build_opportunity_context(cur, int(opportunity_id))
         cur.execute(
             """
-            SELECT applicant_id, location, extracted_pdf
+            SELECT applicant_id, location, extracted_pdf, role_position, area
             FROM applicants
             WHERE opportunity_id = %s
             """,
@@ -492,7 +501,7 @@ def recalculate_applicant_scores():
         )
         rows = cur.fetchall()
         updated = 0
-        for applicant_id, location, extracted_pdf in rows:
+        for applicant_id, location, extracted_pdf, role_position, area in rows:
             if not extracted_pdf:
                 continue
             score, reasons = _score_applicant_with_openai(
@@ -501,6 +510,7 @@ def recalculate_applicant_scores():
                 jd_plain,
                 filters=filters,
                 opportunity_context=opp_context,
+                candidate_context={"role_position": role_position or "", "area": area or ""},
             )
             if score is None and not reasons:
                 continue
@@ -543,7 +553,7 @@ def backfill_applicant_extracted_pdf():
         cur = conn.cursor()
 
         query = """
-            SELECT applicant_id, opportunity_id, location, cv_s3_key, cv_file_name, cv_content_type,
+            SELECT applicant_id, opportunity_id, location, role_position, area, cv_s3_key, cv_file_name, cv_content_type,
                    extracted_pdf
             FROM applicants
             WHERE (extracted_pdf IS NULL OR extracted_pdf = '')
@@ -563,7 +573,7 @@ def backfill_applicant_extracted_pdf():
         extracted_count = 0
         scored_count = 0
 
-        for applicant_id, opp_id, location, s3_key, file_name, content_type, extracted_pdf in rows:
+        for applicant_id, opp_id, location, role_position, area, s3_key, file_name, content_type, extracted_pdf in rows:
             if not s3_key:
                 continue
             if extracted_pdf:
@@ -592,6 +602,7 @@ def backfill_applicant_extracted_pdf():
                     jd_plain,
                     filters=filters,
                     opportunity_context=opp_context,
+                    candidate_context={"role_position": role_position or "", "area": area or ""},
                 )
             cur.execute(
                 """
@@ -674,6 +685,8 @@ def refresh_applicant_ai_fields(applicant_id):
                 applicant_id,
                 opportunity_id,
                 location,
+                role_position,
+                area,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -693,6 +706,8 @@ def refresh_applicant_ai_fields(applicant_id):
             _,
             opp_id,
             location,
+            role_position,
+            area,
             s3_key,
             file_name,
             content_type,
@@ -727,6 +742,7 @@ def refresh_applicant_ai_fields(applicant_id):
                 jd_plain,
                 filters=filters,
                 opportunity_context=opp_context,
+                candidate_context={"role_position": role_position or "", "area": area or ""},
             )
             if score is not None and score != match_score:
                 match_score = score

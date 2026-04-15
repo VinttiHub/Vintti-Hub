@@ -32,6 +32,8 @@ def backfill(applicant_limit=None, opportunity_id=None, dry_run=False):
                 applicant_id,
                 opportunity_id,
                 location,
+                role_position,
+                area,
                 cv_s3_key,
                 cv_file_name,
                 cv_content_type,
@@ -65,6 +67,8 @@ def backfill(applicant_limit=None, opportunity_id=None, dry_run=False):
             applicant_id,
             opp_id,
             location,
+            role_position,
+            area,
             s3_key,
             file_name,
             content_type,
@@ -99,6 +103,7 @@ def backfill(applicant_limit=None, opportunity_id=None, dry_run=False):
                     jd_plain,
                     filters=None,
                     opportunity_context=opp_context,
+                    candidate_context={"role_position": role_position or "", "area": area or ""},
                 )
                 if score is not None:
                     match_score = score
