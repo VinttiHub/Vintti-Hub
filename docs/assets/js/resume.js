@@ -34,10 +34,157 @@ async function ensureResumeExists() {
   let savePending = false;
   let hydrated = false;
 
+  async function getTrackUserId() {
+    const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '')
+      .toLowerCase()
+      .trim();
+    const cachedUid = localStorage.getItem('user_id');
+    const cachedOwner = localStorage.getItem('user_id_owner_email');
+
+    if (cachedOwner && email && cachedOwner !== email) {
+      localStorage.removeItem('user_id');
+    }
+    if (cachedUid) return Number(cachedUid);
+    if (!email) return null;
+
+    try {
+      const fast = await fetch(`${API_BASE}/users?email=${encodeURIComponent(email)}`, { credentials: 'include' });
+      if (fast.ok) {
+        const arr = await fast.json();
+        const hit = Array.isArray(arr) ? arr.find(u => String(u.email_vintti || '').toLowerCase() === email) : null;
+        if (hit?.user_id != null) {
+          localStorage.setItem('user_id', String(hit.user_id));
+          localStorage.setItem('user_id_owner_email', email);
+          return Number(hit.user_id);
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  async function logCandidateTrack(buttonId, page = 'candidate details') {
+    if (!buttonId) return;
+    try {
+      const userId = await getTrackUserId();
+      if (userId == null) return;
+      await fetch(`${API_BASE}/tracks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, button: String(buttonId), page: String(page) }),
+        credentials: 'include'
+      });
+    } catch (err) {
+      console.debug('Candidate track log failed:', err);
+    }
+  }
+
   // ---------- Utils ----------
   const debounce = (fn, wait=400) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait); }; };
 
   function deepEqual(a,b){ try { return JSON.stringify(a)===JSON.stringify(b); } catch { return a===b; } }
+
+  function hasMeaningfulResumeContent(data){
+    if (!data) return false;
+    return Boolean(
+      normalizeText(data.about || '') ||
+      normalizeText(data.video_link || '') ||
+      (Array.isArray(data.education) && data.education.length) ||
+      (Array.isArray(data.work_experience) && data.work_experience.length) ||
+      (Array.isArray(data.tools) && data.tools.length) ||
+      (Array.isArray(data.languages) && data.languages.length)
+    );
+  }
+
+  function toolLabel(entry){
+    const name = normalizeText(entry?.tool || '');
+    const level = normalizeText(entry?.level || '');
+    return [name || '(sin tool)', level].filter(Boolean).join(' - ');
+  }
+
+  function languageLabel(entry){
+    const name = normalizeText(entry?.language || '');
+    const level = normalizeText(entry?.level || '');
+    return [name || '(sin language)', level].filter(Boolean).join(' - ');
+  }
+
+  function entrySignature(kind, entry){
+    if (!entry || typeof entry !== 'object') return '';
+    if (kind === 'work') {
+      return JSON.stringify([
+        normalizeText(entry.title || ''),
+        normalizeText(entry.company || ''),
+        normalizeText(entry.start_date || ''),
+        normalizeText(entry.end_date || ''),
+        !!entry.current
+      ]);
+    }
+    if (kind === 'education') {
+      return JSON.stringify([
+        normalizeText(entry.institution || ''),
+        normalizeText(entry.title || ''),
+        normalizeText(entry.country || ''),
+        normalizeText(entry.start_date || ''),
+        normalizeText(entry.end_date || ''),
+        !!entry.current
+      ]);
+    }
+    if (kind === 'tools') {
+      return JSON.stringify([
+        normalizeText(entry.tool || ''),
+        normalizeText(entry.level || '')
+      ]);
+    }
+    if (kind === 'languages') {
+      return JSON.stringify([
+        normalizeText(entry.language || ''),
+        normalizeText(entry.level || '')
+      ]);
+    }
+    return '';
+  }
+
+  function findRemovedEntries(prevList = [], currList = [], kind){
+    if (!Array.isArray(prevList) || !Array.isArray(currList) || prevList.length <= currList.length) return [];
+    const counts = new Map();
+    currList.forEach((entry) => {
+      const key = entrySignature(kind, entry);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+
+    const removed = [];
+    prevList.forEach((entry) => {
+      const key = entrySignature(kind, entry);
+      const left = counts.get(key) || 0;
+      if (left > 0) {
+        counts.set(key, left - 1);
+      } else {
+        removed.push(entry);
+      }
+    });
+    return removed;
+  }
+
+  function collectResumeTrackEvents(prev, current){
+    const events = [];
+    if (!hasMeaningfulResumeContent(prev) && hasMeaningfulResumeContent(current)) {
+      events.push(`candidate-resume-created-${candidateId}`);
+    }
+
+    findRemovedEntries(prev?.work_experience || [], current?.work_experience || [], 'work')
+      .forEach((entry) => events.push(`candidate-work-deleted-${candidateId}-${_summarizeEntry('work', entry)}`));
+
+    findRemovedEntries(prev?.education || [], current?.education || [], 'education')
+      .forEach((entry) => events.push(`candidate-education-deleted-${candidateId}-${_summarizeEntry('edu', entry)}`));
+
+    findRemovedEntries(prev?.tools || [], current?.tools || [], 'tools')
+      .forEach((entry) => events.push(`candidate-tool-deleted-${candidateId}-${toolLabel(entry)}`));
+
+    findRemovedEntries(prev?.languages || [], current?.languages || [], 'languages')
+      .forEach((entry) => events.push(`candidate-language-deleted-${candidateId}-${languageLabel(entry)}`));
+
+    return [...new Set(events.map((item) => String(item).replace(/\s+/g, ' ').trim()).filter(Boolean))];
+  }
 
   function normalizeText(s){
     return (s ?? '').replace(/\u00A0/g,' ').replace(/\s+/g,' ').trim();
@@ -889,6 +1036,7 @@ async function saveNow(options = {}){
   const scopedFields = Array.isArray(onlyFields) && onlyFields.length ? new Set(onlyFields) : null;
 
   const current = readResumeFromDOM();
+  const trackEvents = collectResumeTrackEvents(snapshot, current);
 
   // arma patch solo con cambios
   const patch = {};
@@ -1007,6 +1155,10 @@ async function saveNow(options = {}){
       }
     }
     snapshot = merged;
+
+    if (lastRes?.ok && trackEvents.length) {
+      await Promise.all(trackEvents.map((eventId) => logCandidateTrack(eventId)));
+    }
 
   } catch(e){
     console.error('❌ PATCH /resumes failed', e);
