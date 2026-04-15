@@ -120,7 +120,8 @@ def _contains_phrase(haystack: str, phrase: str) -> bool:
     needle = normalize_ascii(phrase)
     if not haystack or not needle:
         return False
-    return needle in haystack
+    pattern = r"(?<![a-z0-9])" + re.escape(needle).replace(r"\ ", r"\s+") + r"(?![a-z0-9])"
+    return re.search(pattern, haystack) is not None
 
 
 def _detect_families(text: Any, families: Dict[str, Set[str]]) -> Set[str]:
@@ -363,8 +364,8 @@ def build_job_profile(
     years = parse_number(filters.get("years_experience") or opportunity_context.get("years_experience"))
     industry = compact_whitespace(filters.get("industry") or "")
     salary = compact_whitespace(filters.get("salary") or "")
-    role_families = _detect_families(" ".join([position, text]), _ROLE_FAMILIES)
-    industry_families = _detect_families(" ".join([industry, text]), _INDUSTRY_FAMILIES)
+    role_families = _detect_families(position, _ROLE_FAMILIES)
+    industry_families = _detect_families(industry, _INDUSTRY_FAMILIES)
 
     return {
         "text": text[:8000],
