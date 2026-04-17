@@ -647,13 +647,13 @@ def accounts():
                     website, linkedin, comments, mail,
                     where_come_from, referal_source,
                     industry, outsource, pain_points, position, type,
-                    name, surname
+                    name, surname, account_manager
                 ) VALUES (
                     %s, %s, %s, %s,
                     %s, %s, %s, %s,
                     %s, %s,
                     %s, %s, %s, %s, %s,
-                    %s, %s
+                    %s, %s, %s
                 )
             """
 
@@ -676,7 +676,8 @@ def accounts():
                 data.get("position"),         # position
                 data.get("type"),             # type
                 data.get("contact_name"),     # name (en la tabla)
-                data.get("contact_surname")   # surname (en la tabla)
+                data.get("contact_surname"),  # surname (en la tabla)
+                data.get("account_manager")   # sales lead / account manager
             ))
 
             conn.commit()

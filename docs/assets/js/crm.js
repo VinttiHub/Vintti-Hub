@@ -12,7 +12,8 @@ const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 // Emails allowed for extra UI (priority col, summary link, etc.)
 const allowedEmails = [
   'agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com',
-  'lara@vintti.com','agostina@vintti.com', 'mariano@vintti.com'
+  'lara@vintti.com','agostina@vintti.com', 'mariano@vintti.com',
+  'pgonzales@vintti.com'
 ];
 
 const CRM_UNASSIGNED_SALES_LEAD_VALUE = '__unassigned__';
@@ -836,6 +837,45 @@ function initCrmExportButton() {
   if (!btn) return;
   btn.textContent = 'Download CSV';
   btn.addEventListener('click', downloadCrmCsv);
+}
+
+function initHubSpotSyncButton() {
+  const btn = document.getElementById('crmHubSpotSyncBtn');
+  if (!btn) return;
+  const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase().trim();
+  if (!allowedEmails.includes(currentUserEmail)) {
+    btn.style.display = 'none';
+    return;
+  }
+  const originalText = btn.textContent || 'Sync HubSpot';
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+
+    try {
+      const response = await fetch(`${API_BASE}/hubspot/sync/mariano-sql-contacts`, {
+        method: 'POST'
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || `HubSpot sync failed (${response.status})`);
+      }
+
+      const created = Number(payload.created || 0);
+      const linked = Number(payload.linked || payload.updated || 0);
+      const errors = Array.isArray(payload.errors) ? payload.errors.length : 0;
+      alert(`HubSpot sync complete. Created: ${created}. Linked existing: ${linked}. Errors: ${errors}.`);
+      window.location.reload();
+    } catch (err) {
+      console.error('HubSpot sync failed:', err);
+      alert(`HubSpot sync failed: ${err.message || err}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
 }
 
 /* =========================
@@ -2131,6 +2171,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindCrmStorageSync();
   startCrmSilentPolling();
   initCrmExportButton();
+  initHubSpotSyncButton();
   loadSalesLeadFilterOptions();
   updateCrmEmptyState(null);
   toggleCrmLoading(true, 'Loading CRM accounts…');

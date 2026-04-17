@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask, request
@@ -33,13 +34,14 @@ from routes.moods_routes import bp as moods_bp
 from routes.to_do_routes import bp as to_do_bp
 from routes.public_bonus_routes import bp as public_bonus_bp
 from routes.google_calendar_routes import bp as google_calendar_bp
+from routes.hubspot_routes import bp as hubspot_bp
 from routes.turvo_routes import bp as turvo_bp
 
 
 
 
 def create_app() -> Flask:
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parent / ".env")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     init_services()
 
@@ -79,6 +81,7 @@ def create_app() -> Flask:
     app.register_blueprint(profile_users_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(google_calendar_bp)
+    app.register_blueprint(hubspot_bp)
     app.register_blueprint(turvo_bp)
     app.register_blueprint(bp_candidate_search, url_prefix="")
     app.register_blueprint(hunter_bp)
