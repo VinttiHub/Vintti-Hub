@@ -162,22 +162,26 @@ class HubSpotClient:
             },
         )
 
-    def get_company(self, company_id):
+    def get_company(self, company_id, extra_properties=None):
+        properties = [
+            "name",
+            "domain",
+            "website",
+            "industry",
+            "state",
+            "city",
+            "country",
+            "numberofemployees",
+            "description",
+        ]
+        for prop in extra_properties or []:
+            if prop and prop not in properties:
+                properties.append(prop)
         return self._request(
             "GET",
             f"/crm/v3/objects/companies/{company_id}",
             params={
-                "properties": ",".join([
-                    "name",
-                    "domain",
-                    "website",
-                    "industry",
-                    "state",
-                    "city",
-                    "country",
-                    "numberofemployees",
-                    "description",
-                ]),
+                "properties": ",".join(properties),
                 "archived": "false",
             },
         )
