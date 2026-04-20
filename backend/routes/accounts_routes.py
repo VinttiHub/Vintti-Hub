@@ -104,6 +104,106 @@ def fetch_data_from_table(table_name):
     except Exception as exc:
         return {"error": str(exc)}
 
+
+def _normalize_account_lookup(value):
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def _account_name_candidates(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    candidates = [raw]
+    for separator in (" - ", " – ", " — "):
+        if separator in raw:
+            before = raw.split(separator, 1)[0].strip()
+            if before:
+                candidates.append(before)
+    seen = set()
+    unique = []
+    for candidate in candidates:
+        key = _normalize_account_lookup(candidate)
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(candidate)
+    return unique
+
+
+def _find_account_duplicates(cursor, *, name=None, mail=None):
+    matches = []
+    seen = set()
+
+    def add_rows(rows, match_type):
+        for row in rows or []:
+            account_id = row["account_id"] if isinstance(row, dict) else row[0]
+            if account_id in seen:
+                continue
+            seen.add(account_id)
+            if isinstance(row, dict):
+                matches.append({
+                    "account_id": row.get("account_id"),
+                    "client_name": row.get("client_name"),
+                    "mail": row.get("mail"),
+                    "account_manager": row.get("account_manager"),
+                    "match_type": match_type,
+                })
+            else:
+                matches.append({
+                    "account_id": row[0],
+                    "client_name": row[1],
+                    "mail": row[2],
+                    "account_manager": row[3],
+                    "match_type": match_type,
+                })
+
+    email = str(mail or "").strip().lower()
+    if email:
+        cursor.execute(
+            """
+            SELECT account_id, client_name, mail, account_manager
+            FROM account
+            WHERE LOWER(TRIM(mail)) = LOWER(TRIM(%s))
+            LIMIT 5
+            """,
+            (email,),
+        )
+        add_rows(cursor.fetchall(), "email")
+
+    for candidate in _account_name_candidates(name):
+        cursor.execute(
+            """
+            SELECT account_id, client_name, mail, account_manager
+            FROM account
+            WHERE LOWER(TRIM(client_name)) = LOWER(TRIM(%s))
+            LIMIT 5
+            """,
+            (candidate,),
+        )
+        add_rows(cursor.fetchall(), "client_name")
+
+    return matches
+
+
+@bp.route('/accounts/duplicate-check', methods=['GET', 'POST'])
+def check_account_duplicates():
+    data = request.get_json(silent=True) or {}
+    name = request.args.get("name") or data.get("name") or data.get("client_name")
+    mail = request.args.get("mail") or data.get("mail")
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        matches = _find_account_duplicates(cursor, name=name, mail=mail)
+        cursor.close()
+        conn.close()
+        return jsonify({
+            "duplicate": bool(matches),
+            "matches": matches,
+        })
+    except Exception as exc:
+        logging.exception("❌ duplicate account check failed")
+        return jsonify({"error": str(exc)}), 500
+
 @bp.route('/opportunities')
 def get_opportunities():
     try:
@@ -630,7 +730,21 @@ def accounts():
             print("🟢 Datos recibidos en POST /accounts:", data)
 
             conn = get_connection()
-            cursor = conn.cursor()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            duplicate_matches = _find_account_duplicates(
+                cursor,
+                name=data.get("name"),
+                mail=data.get("mail"),
+            )
+            if duplicate_matches:
+                cursor.close()
+                conn.close()
+                return jsonify({
+                    "error": "duplicate_account",
+                    "message": "This account may already exist.",
+                    "matches": duplicate_matches,
+                }), 409
 
             # 👉 Normalizar boolean de outsource (yes/no -> True/False/None)
             raw_outsource = str(data.get("outsource") or "").strip().lower()

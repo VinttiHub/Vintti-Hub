@@ -878,6 +878,32 @@ function initHubSpotSyncButton() {
   });
 }
 
+function formatDuplicateAccountMessage(payload = {}) {
+  const matches = Array.isArray(payload.matches) ? payload.matches : [];
+  if (!matches.length) return 'This account may already exist.';
+  const lines = matches.slice(0, 3).map(match => {
+    const name = match.client_name || 'Unnamed account';
+    const email = match.mail ? ` · ${match.mail}` : '';
+    const id = match.account_id ? `#${match.account_id}` : '';
+    const type = match.match_type ? ` (${match.match_type})` : '';
+    return `${name}${id ? ` ${id}` : ''}${email}${type}`;
+  });
+  return `This account may already exist:\n\n${lines.join('\n')}`;
+}
+
+async function checkManualAccountDuplicate(data = {}) {
+  const response = await fetch(`${API_BASE}/accounts/duplicate-check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: data.name || '',
+      mail: data.mail || ''
+    })
+  });
+  if (!response.ok) return { duplicate: false, matches: [] };
+  return response.json();
+}
+
 /* =========================
    2) Mini progress toast
    ========================= */
@@ -2418,6 +2444,12 @@ document.addEventListener('DOMContentLoaded', () => {
       delete data.referral_source_mode;
 
       try {
+        const duplicatePayload = await checkManualAccountDuplicate(data);
+        if (duplicatePayload.duplicate) {
+          alert(formatDuplicateAccountMessage(duplicatePayload));
+          return;
+        }
+
         const response = await fetch(`${API_BASE}/accounts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2430,7 +2462,17 @@ document.addEventListener('DOMContentLoaded', () => {
           location.reload();
         } else {
           const errorText = await response.text();
-          alert('Error: ' + errorText);
+          let errorPayload = null;
+          try {
+            errorPayload = errorText ? JSON.parse(errorText) : null;
+          } catch {
+            errorPayload = null;
+          }
+          if (response.status === 409 && errorPayload?.error === 'duplicate_account') {
+            alert(formatDuplicateAccountMessage(errorPayload));
+          } else {
+            alert('Error: ' + (errorPayload?.message || errorText || 'Failed to create account'));
+          }
         }
       } catch (err) {
         console.error("❌ Error sending request:", err);
