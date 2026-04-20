@@ -1353,6 +1353,14 @@ def handle_candidate_hire_data(candidate_id):
             cur.execute("""
                 SELECT
                     references_notes,
+                    reference_1_name,
+                    reference_1_phone,
+                    reference_1_email,
+                    reference_1_linkedin,
+                    reference_2_name,
+                    reference_2_phone,
+                    reference_2_email,
+                    reference_2_linkedin,
                     salary,
                     fee,
                     setup_fee,
@@ -1398,7 +1406,16 @@ def handle_candidate_hire_data(candidate_id):
             if not row:
                 # return an empty shell so the UI can render cleanly
                 return jsonify({
+                    'opportunity_id': opportunity_id,
                     'references_notes': None,
+                    'reference_1_name': None,
+                    'reference_1_phone': None,
+                    'reference_1_email': None,
+                    'reference_1_linkedin': None,
+                    'reference_2_name': None,
+                    'reference_2_phone': None,
+                    'reference_2_email': None,
+                    'reference_2_linkedin': None,
                     'employee_salary': None,
                     'employee_fee': None,
                     'computer': None,
@@ -1422,7 +1439,16 @@ def handle_candidate_hire_data(candidate_id):
                 })
 
             return jsonify({
+                'opportunity_id': opportunity_id,
                 'references_notes': row['references_notes'],
+                'reference_1_name': row['reference_1_name'],
+                'reference_1_phone': row['reference_1_phone'],
+                'reference_1_email': row['reference_1_email'],
+                'reference_1_linkedin': row['reference_1_linkedin'],
+                'reference_2_name': row['reference_2_name'],
+                'reference_2_phone': row['reference_2_phone'],
+                'reference_2_email': row['reference_2_email'],
+                'reference_2_linkedin': row['reference_2_linkedin'],
                 'employee_salary': row['salary'],
                 'employee_fee': row['fee'],
                 'computer': row['computer'],
@@ -1502,6 +1528,14 @@ def handle_candidate_hire_data(candidate_id):
         # mapping of incoming JSON → columns
         mapping = {
             'references_notes': 'references_notes',
+            'reference_1_name': 'reference_1_name',
+            'reference_1_phone': 'reference_1_phone',
+            'reference_1_email': 'reference_1_email',
+            'reference_1_linkedin': 'reference_1_linkedin',
+            'reference_2_name': 'reference_2_name',
+            'reference_2_phone': 'reference_2_phone',
+            'reference_2_email': 'reference_2_email',
+            'reference_2_linkedin': 'reference_2_linkedin',
             'employee_salary': 'salary',
             'employee_fee': 'fee',
             'setup_fee': 'setup_fee',
@@ -1521,6 +1555,10 @@ def handle_candidate_hire_data(candidate_id):
             'buyout_dolar': 'buyout_dolar',
             'buyout_daterange': 'buyout_daterange'
         }
+        ignored_fields = sorted(
+            key for key in data.keys()
+            if key not in mapping and key != 'opportunity_id'
+        )
 
         set_cols, set_vals = [], []
 
@@ -1649,7 +1687,12 @@ def handle_candidate_hire_data(candidate_id):
         """, (candidate_id, opportunity_id))
 
         conn.commit()
-        return jsonify({'success': True, 'created': created, 'updated': updated})
+        return jsonify({
+            'success': True,
+            'created': created,
+            'updated': updated,
+            'ignored_fields': ignored_fields
+        })
 
     except Exception as e:
         conn.rollback()

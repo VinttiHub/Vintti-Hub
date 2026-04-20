@@ -84,14 +84,72 @@ def _format_price_type(value) -> str:
     return text
 
 
-def _references_card_html(references: Optional[str]) -> str:
+def _has_reference_details(reference_details: Optional[Dict[str, Any]]) -> bool:
+    if not reference_details:
+        return False
+    return any(str(reference_details.get(key) or "").strip() for key in (
+        "reference_1_name", "reference_1_phone", "reference_1_email", "reference_1_linkedin",
+        "reference_2_name", "reference_2_phone", "reference_2_email", "reference_2_linkedin",
+    ))
+
+
+def _reference_linkedin_html(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "—"
+    safe_text = html.escape(text)
+    if re.match(r"^https?://", text, flags=re.IGNORECASE):
+        return f'<a href="{safe_text}" target="_blank" rel="noopener noreferrer">{safe_text}</a>'
+    return safe_text
+
+
+def _reference_details_html(reference_details: Optional[Dict[str, Any]]) -> str:
+    if not _has_reference_details(reference_details):
+        return ""
+
+    cards = []
+    for idx in (1, 2):
+        prefix = f"reference_{idx}"
+        values = {
+            "Name": str(reference_details.get(f"{prefix}_name") or "").strip(),
+            "Phone": str(reference_details.get(f"{prefix}_phone") or "").strip(),
+            "Email": str(reference_details.get(f"{prefix}_email") or "").strip(),
+            "LinkedIn": str(reference_details.get(f"{prefix}_linkedin") or "").strip(),
+        }
+        if not any(values.values()):
+            continue
+        cards.append(f"""
+          <div style="margin:10px 0">
+            <div style="font-weight:600">Reference {idx}</div>
+            <ul style="margin:6px 0 0 18px;padding:0">
+              <li><b>Name:</b> {html.escape(values["Name"]) if values["Name"] else "—"}</li>
+              <li><b>Phone:</b> {html.escape(values["Phone"]) if values["Phone"] else "—"}</li>
+              <li><b>Email:</b> {html.escape(values["Email"]) if values["Email"] else "—"}</li>
+              <li><b>LinkedIn:</b> {_reference_linkedin_html(values["LinkedIn"])}</li>
+            </ul>
+          </div>
+        """)
+    return "".join(cards)
+
+
+def _references_card_html(references: Optional[str], reference_details: Optional[Dict[str, Any]] = None) -> str:
     """Render References / notes inside a simple card to improve readability."""
     safe_body = _format_references_block(references)
+    details_html = _reference_details_html(reference_details)
+    notes_html = ""
+    if safe_body != "—":
+        notes_html = f"""
+          <div style="margin-top:12px">
+            <div style="font-weight:600">Notes</div>
+            <div style="margin-top:6px">{safe_body}</div>
+          </div>
+        """
+    body = details_html + notes_html if details_html or notes_html else "—"
 
     return f"""
       <div style="margin:16px 0;padding:12px 16px;border:1px solid #dfe5f2;border-radius:10px;background:#f6f8fc">
-        <div style="font-weight:600;margin-bottom:6px">References / notes</div>
-        <div style="white-space:normal">{safe_body}</div>
+        <div style="font-weight:600;margin-bottom:6px">References</div>
+        <div style="white-space:normal">{body}</div>
       </div>
     """
 
@@ -130,14 +188,15 @@ def _initial_email_html_staffing(  # NEW (misma copia que tu plantilla actual)
     computer=None,
     referal_source: Optional[str] = None,
     lead_source: Optional[str] = None,
-    credit_loop=None
+    credit_loop=None,
+    reference_details: Optional[Dict[str, Any]] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_value = html.escape(referal_source) if referal_source else "—"
     referral_html = f'<li><b>Referral source:</b> {referral_value}</li>'
     lead_value = html.escape(lead_source) if lead_source else "—"
     lead_source_html = f'<li><b>Lead source:</b> {lead_value}</li>'
-    notes_card = _references_card_html(references)
+    notes_card = _references_card_html(references, reference_details)
     credit_loop = credit_loop or {}
     credit_applied = bool(credit_loop.get("applied_discount_amount"))
     fee_html = (
@@ -196,14 +255,15 @@ def _initial_email_html_recruiting(
     computer=None,
     referal_source: Optional[str] = None,
     lead_source: Optional[str] = None,
-    credit_loop=None
+    credit_loop=None,
+    reference_details: Optional[Dict[str, Any]] = None
 ):
     link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id))
     referral_value = html.escape(referal_source) if referal_source else "—"
     lead_value = html.escape(lead_source) if lead_source else "—"
     referral_line = f"<b>Referral source:</b> {referral_value}<br>"
     lead_source_line = f"<b>Lead source:</b> {lead_value}<br>"
-    notes_card = _references_card_html(references)
+    notes_card = _references_card_html(references, reference_details)
     credit_loop = credit_loop or {}
     credit_applied = bool(credit_loop.get("applied_discount_amount"))
     credit_loop_lines = (
@@ -314,7 +374,8 @@ def press_and_send(candidate_id):
                 computer=hire.get("computer"),
                 referal_source=referal_source,
                 lead_source=lead_source,
-                credit_loop=credit_loop
+                credit_loop=credit_loop,
+                reference_details=hire
             )
         else:
             html_body = _initial_email_html_staffing(
@@ -332,7 +393,8 @@ def press_and_send(candidate_id):
                 computer=hire.get("computer"),
                 referal_source=referal_source,
                 lead_source=lead_source,
-                credit_loop=credit_loop
+                credit_loop=credit_loop,
+                reference_details=hire
             )
 
 
@@ -687,12 +749,20 @@ def _fetch_hire_core(candidate_id: int, cur):
     """
     Devuelve los datos del hire más reciente para el candidato desde hire_opportunity.
     Campos esperados por el correo:
-      start_date, references_notes, setup_fee, salary, fee, revenue, price_type, computer, opportunity_id
+      start_date, references_notes, reference fields, setup_fee, salary, fee, revenue, price_type, computer, opportunity_id
     """
     cur.execute("""
         SELECT
             ho.start_date::date                           AS start_date,
             COALESCE(ho.references_notes, '')             AS references_notes,
+            COALESCE(ho.reference_1_name, '')             AS reference_1_name,
+            COALESCE(ho.reference_1_phone, '')            AS reference_1_phone,
+            COALESCE(ho.reference_1_email, '')            AS reference_1_email,
+            COALESCE(ho.reference_1_linkedin, '')         AS reference_1_linkedin,
+            COALESCE(ho.reference_2_name, '')             AS reference_2_name,
+            COALESCE(ho.reference_2_phone, '')            AS reference_2_phone,
+            COALESCE(ho.reference_2_email, '')            AS reference_2_email,
+            COALESCE(ho.reference_2_linkedin, '')         AS reference_2_linkedin,
             COALESCE(ho.setup_fee, 0)                     AS setup_fee,
             COALESCE(ho.salary, 0)                        AS salary,
             COALESCE(ho.fee, 0)                           AS fee,       -- usado por staffing

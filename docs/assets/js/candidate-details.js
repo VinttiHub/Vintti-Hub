@@ -1439,6 +1439,16 @@ async function patchHireFields(fields = {}) {
   if (!candidateId) return;
   const entries = Object.entries(fields || {}).filter(([, value]) => value !== undefined);
   if (!entries.length) return;
+  const referenceFieldNames = new Set([
+    'reference_1_name',
+    'reference_1_phone',
+    'reference_1_email',
+    'reference_1_linkedin',
+    'reference_2_name',
+    'reference_2_phone',
+    'reference_2_email',
+    'reference_2_linkedin',
+  ]);
 
   const oppId = await ensureCurrentOppId(candidateId);  // 🔑
   const payload = entries.reduce(
@@ -1459,6 +1469,16 @@ async function patchHireFields(fields = {}) {
     const t = await r.text().catch(() => '');
     console.error('PATCH /hire failed', r.status, t);
     alert('We couldn’t save this field. Please try again.');
+    return;
+  }
+  const result = await r.json().catch(() => ({}));
+  if (entries.every(([key]) => referenceFieldNames.has(key))) {
+    if (result && result.updated === false) {
+      if (!window.__hireReferenceSaveWarningShown) {
+        window.__hireReferenceSaveWarningShown = true;
+        console.warn('PATCH /hire did not update reference fields. The deployed backend may need the reference-field changes and DB migration.', { payload, result });
+      }
+    }
     return;
   }
   if (typeof window.loadHireData === 'function') window.loadHireData();
@@ -2350,6 +2370,16 @@ const hireRevenue = document.getElementById('hire-revenue');
 const hirePriceType = document.getElementById('hire-price-type');
 const hireSetupFee = document.getElementById('hire-setup-fee');
 const referencesDiv = document.getElementById('hire-references');
+const hireReferenceFields = [
+  ['hire-reference-1-name', 'reference_1_name'],
+  ['hire-reference-1-phone', 'reference_1_phone'],
+  ['hire-reference-1-email', 'reference_1_email'],
+  ['hire-reference-1-linkedin', 'reference_1_linkedin'],
+  ['hire-reference-2-name', 'reference_2_name'],
+  ['hire-reference-2-phone', 'reference_2_phone'],
+  ['hire-reference-2-email', 'reference_2_email'],
+  ['hire-reference-2-linkedin', 'reference_2_linkedin'],
+];
 
 if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
 if (hirePTO) hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
@@ -2358,6 +2388,10 @@ if (hirePriceType) hirePriceType.addEventListener('change', () => updateHireFiel
 if (hirePerks) hirePerks.addEventListener('blur', () => updateHireField('extraperks', hirePerks.innerHTML));
 if (hireSetupFee) hireSetupFee.addEventListener('blur', () => { const v = parseFloat(hireSetupFee.value); if (!isNaN(v)) updateHireField('setup_fee', v); });
 if (referencesDiv) referencesDiv.addEventListener('blur', () => updateHireField('references_notes', referencesDiv.innerHTML));
+hireReferenceFields.forEach(([id, field]) => {
+  const input = document.getElementById(id);
+  if (input) input.addEventListener('blur', () => updateHireField(field, input.value));
+});
 
 /**
  * NUEVO COMPORTAMIENTO:
@@ -2486,6 +2520,10 @@ if (hireRevenue){
         const ws = document.getElementById('hire-working-schedule');if (ws) ws.value = data.working_schedule || '';
         const pto = document.getElementById('hire-pto');            if (pto) pto.value = data.pto || '';
         const ref = document.getElementById('hire-references');     if (ref) ref.innerHTML = data.references_notes || '';
+        hireReferenceFields.forEach(([id, field]) => {
+          const input = document.getElementById(id);
+          if (input && input !== document.activeElement) input.value = data[field] || '';
+        });
 
         // fechas (YYYY-MM-DD)
         const startInp = document.getElementById('hire-start-date');
