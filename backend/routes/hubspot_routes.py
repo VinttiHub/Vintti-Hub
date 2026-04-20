@@ -96,6 +96,7 @@ HUBSPOT_ACCOUNT_FIELD_ALIASES = {
     "where_come_from": ["Origin", "Lead Source", "Lead source"],
     "linkedin": ["URL de LinkedIn", "LinkedIn URL", "Linkedin URL"],
     "model": ["Model"],
+    "pain_points": ["Pain Point (Deal)", "Pain Point", "Pain Points"],
 }
 
 
@@ -123,6 +124,7 @@ def _resolve_account_property_maps(client):
     return {
         "contacts": _resolve_property_map_for_object(client, "contacts"),
         "companies": _resolve_property_map_for_object(client, "companies"),
+        "deals": _resolve_property_map_for_object(client, "deals"),
     }
 
 
@@ -140,13 +142,16 @@ def _record_prop(record, prop_name):
     return ((record or {}).get("properties") or {}).get(prop_name) or ""
 
 
-def _first_mapped_value(property_maps, field, contact=None, company=None):
+def _first_mapped_value(property_maps, field, contact=None, company=None, deal=None):
     contact_value = _record_prop(contact, property_maps.get("contacts", {}).get(field))
     if contact_value not in (None, ""):
         return contact_value
     company_value = _record_prop(company, property_maps.get("companies", {}).get(field))
     if company_value not in (None, ""):
         return company_value
+    deal_value = _record_prop(deal, property_maps.get("deals", {}).get(field))
+    if deal_value not in (None, ""):
+        return deal_value
     return ""
 
 
@@ -172,6 +177,7 @@ def _preview_account_fields(payload):
         "state",
         "outsource",
         "size",
+        "pain_points",
         "position",
         "about",
         "account_manager",
@@ -182,7 +188,18 @@ def _preview_account_fields(payload):
     return {key: payload.get(key) for key in keys}
 
 
-def _apply_account_field_overrides(payload, contact=None, company=None, property_maps=None):
+def _normalize_outsource_value(value):
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return None
+    if raw in ("yes", "true", "1", "si", "sí", "y", "outsourced", "outsourced before"):
+        return "yes"
+    if raw in ("no", "false", "0", "n", "not outsourced", "never"):
+        return "no"
+    return raw
+
+
+def _apply_account_field_overrides(payload, contact=None, company=None, deal=None, property_maps=None):
     property_maps = property_maps or {}
     field_to_payload = {
         "client_name": "name",
@@ -193,17 +210,19 @@ def _apply_account_field_overrides(payload, contact=None, company=None, property
         "size": "size",
         "where_come_from": "where_come_from",
         "linkedin": "linkedin",
+        "pain_points": "pain_points",
     }
     for field, payload_key in field_to_payload.items():
-        value = _first_mapped_value(property_maps, field, contact=contact, company=company)
+        value = _first_mapped_value(property_maps, field, contact=contact, company=company, deal=deal)
         if value not in (None, ""):
             payload[payload_key] = value
+    payload["outsource"] = _normalize_outsource_value(payload.get("outsource"))
 
-    exact_size = _first_mapped_value(property_maps, "exact_size", contact=contact, company=company)
+    exact_size = _first_mapped_value(property_maps, "exact_size", contact=contact, company=company, deal=deal)
     if exact_size and not payload.get("size"):
         payload["size"] = str(exact_size)
 
-    model = _first_mapped_value(property_maps, "model", contact=contact, company=company)
+    model = _first_mapped_value(property_maps, "model", contact=contact, company=company, deal=deal)
     _append_comment_line(payload, "HubSpot model", model)
     return payload
 
@@ -575,6 +594,7 @@ def preview_mariano_sql_contacts():
         property_maps = _resolve_account_property_maps(client)
         contact_extra_properties = [lead_life_property] + _mapped_property_names(property_maps, "contacts")
         company_extra_properties = _mapped_property_names(property_maps, "companies")
+        deal_extra_properties = _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
         contacts = client.search_contacts(
             [
@@ -600,7 +620,7 @@ def preview_mariano_sql_contacts():
                         company_ids = association_ids(contact, "companies")
                         deal_ids = association_ids(contact, "deals")
                         company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
-                        deal = client.get_deal_with_associations(deal_ids[0]) if deal_ids else {}
+                        deal = client.get_deal_with_associations(deal_ids[0], extra_properties=deal_extra_properties) if deal_ids else {}
                         payload = build_account_payload(
                             deal,
                             company=company,
@@ -611,6 +631,7 @@ def preview_mariano_sql_contacts():
                             payload,
                             contact=contact,
                             company=company,
+                            deal=deal,
                             property_maps=property_maps,
                         )
                         existing = _preview_existing_account(cursor, payload)
@@ -682,6 +703,7 @@ def sync_mariano_sql_contacts():
         property_maps = _resolve_account_property_maps(client)
         contact_extra_properties = [lead_life_property] + _mapped_property_names(property_maps, "contacts")
         company_extra_properties = _mapped_property_names(property_maps, "companies")
+        deal_extra_properties = _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
         contacts = client.search_contacts(
             [
@@ -709,7 +731,7 @@ def sync_mariano_sql_contacts():
                             company_ids = association_ids(contact, "companies")
                             deal_ids = association_ids(contact, "deals")
                             company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
-                            deal = client.get_deal_with_associations(deal_ids[0]) if deal_ids else {}
+                            deal = client.get_deal_with_associations(deal_ids[0], extra_properties=deal_extra_properties) if deal_ids else {}
                             payload = build_account_payload(
                                 deal,
                                 company=company,
@@ -720,6 +742,7 @@ def sync_mariano_sql_contacts():
                                 payload,
                                 contact=contact,
                                 company=company,
+                                deal=deal,
                                 property_maps=property_maps,
                             )
                             existing = _preview_existing_account(cursor, payload)
