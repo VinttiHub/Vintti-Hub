@@ -132,9 +132,23 @@ def _reference_details_html(reference_details: Optional[Dict[str, Any]]) -> str:
     return "".join(cards)
 
 
+def _strip_structured_reference_notes(references: Optional[str]) -> Optional[str]:
+    if not references:
+        return references
+    return re.sub(
+        r'<div\b[^>]*data-structured-references=["\']true["\'][^>]*>.*?</div>',
+        '',
+        str(references),
+        flags=re.IGNORECASE | re.DOTALL,
+    ).strip()
+
+
 def _references_card_html(references: Optional[str], reference_details: Optional[Dict[str, Any]] = None) -> str:
     """Render References / notes inside a simple card to improve readability."""
-    safe_body = _format_references_block(references)
+    has_reference_details = _has_reference_details(reference_details)
+    safe_body = _format_references_block(
+        _strip_structured_reference_notes(references) if has_reference_details else references
+    )
     details_html = _reference_details_html(reference_details)
     notes_html = ""
     if safe_body != "—":

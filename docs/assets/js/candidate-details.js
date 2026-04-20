@@ -1435,7 +1435,7 @@ function updateLinkedInUI(raw) {
   }
 
   // --- Patch helpers (Hire) ---
-async function patchHireFields(fields = {}) {
+async function patchHireFields(fields = {}, options = {}) {
   if (!candidateId) return;
   const entries = Object.entries(fields || {}).filter(([, value]) => value !== undefined);
   if (!entries.length) return;
@@ -1481,12 +1481,13 @@ async function patchHireFields(fields = {}) {
     }
     return;
   }
+  if (options.skipReload) return;
   if (typeof window.loadHireData === 'function') window.loadHireData();
 }
 
 window.patchHireFields = patchHireFields;
-window.updateHireField = function(field, value) {
-  return patchHireFields({ [field]: value });
+window.updateHireField = function(field, value, options = {}) {
+  return patchHireFields({ [field]: value }, options);
 };
 
 async function captureInactiveMetadataFromModal({ candidateName, clientName, roleName } = {}) {
@@ -2381,6 +2382,74 @@ const hireReferenceFields = [
   ['hire-reference-2-linkedin', 'reference_2_linkedin'],
 ];
 
+function escapeReferenceHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
+function stripStructuredReferencesHtml(html = '') {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html || '';
+  wrapper.querySelectorAll('[data-structured-references="true"]').forEach((node) => node.remove());
+  return wrapper.innerHTML.trim();
+}
+
+function buildStructuredReferencesHtml() {
+  const values = Object.fromEntries(hireReferenceFields.map(([id, field]) => [
+    field,
+    document.getElementById(id)?.value?.trim() || ''
+  ]));
+  const hasAnyValue = Object.values(values).some(Boolean);
+  if (!hasAnyValue) return '';
+
+  const linesFor = (idx) => {
+    const prefix = `reference_${idx}`;
+    const fields = [
+      ['Name', `${prefix}_name`],
+      ['Phone', `${prefix}_phone`],
+      ['Email', `${prefix}_email`],
+      ['LinkedIn', `${prefix}_linkedin`],
+    ];
+    if (!fields.some(([, field]) => values[field])) return '';
+    return `
+      <p>
+        <strong>Reference ${idx}</strong><br>
+        ${fields.map(([label, field]) => (
+          `<span data-reference-field="${field}"><strong>${label}:</strong> ${escapeReferenceHtml(values[field] || '-')}</span>`
+        )).join('<br>')}
+      </p>
+    `;
+  };
+
+  return `<div data-structured-references="true">${linesFor(1)}${linesFor(2)}</div>`;
+}
+
+function mergeStructuredReferencesIntoNotes() {
+  if (!referencesDiv) return '';
+  const manualNotes = stripStructuredReferencesHtml(referencesDiv.innerHTML);
+  const structuredReferences = buildStructuredReferencesHtml();
+  const merged = [structuredReferences, manualNotes].filter(Boolean).join('<br>');
+  referencesDiv.innerHTML = merged;
+  return merged;
+}
+
+function parseStructuredReferencesFromNotes(html = '') {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html || '';
+  const values = {};
+  wrapper.querySelectorAll('[data-reference-field]').forEach((node) => {
+    const field = node.getAttribute('data-reference-field');
+    const raw = (node.textContent || '').replace(/^[^:]+:\s*/, '').trim();
+    values[field] = raw === '-' ? '' : raw;
+  });
+  return values;
+}
+
 if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
 if (hirePTO) hirePTO.addEventListener('blur', () => updateHireField('pto', hirePTO.value));
 if (hireComputer) hireComputer.addEventListener('change', () => updateHireField('computer', hireComputer.value));
@@ -2390,7 +2459,12 @@ if (hireSetupFee) hireSetupFee.addEventListener('blur', () => { const v = parseF
 if (referencesDiv) referencesDiv.addEventListener('blur', () => updateHireField('references_notes', referencesDiv.innerHTML));
 hireReferenceFields.forEach(([id, field]) => {
   const input = document.getElementById(id);
-  if (input) input.addEventListener('blur', () => updateHireField(field, input.value));
+  if (input) {
+    input.addEventListener('blur', () => patchHireFields({
+      [field]: input.value,
+      references_notes: mergeStructuredReferencesIntoNotes()
+    }, { skipReload: true }));
+  }
 });
 
 /**
@@ -2520,9 +2594,10 @@ if (hireRevenue){
         const ws = document.getElementById('hire-working-schedule');if (ws) ws.value = data.working_schedule || '';
         const pto = document.getElementById('hire-pto');            if (pto) pto.value = data.pto || '';
         const ref = document.getElementById('hire-references');     if (ref) ref.innerHTML = data.references_notes || '';
+        const fallbackReferenceValues = parseStructuredReferencesFromNotes(data.references_notes || '');
         hireReferenceFields.forEach(([id, field]) => {
           const input = document.getElementById(id);
-          if (input && input !== document.activeElement) input.value = data[field] || '';
+          if (input && input !== document.activeElement) input.value = data[field] || fallbackReferenceValues[field] || '';
         });
 
         // fechas (YYYY-MM-DD)
