@@ -155,6 +155,88 @@ def expire_due_credits(cur, *, today: Optional[date] = None) -> int:
     return cur.rowcount or 0
 
 
+def remove_unused_credits_for_inactive_source_hires(
+    cur,
+    *,
+    account_id: Optional[int] = None,
+    opportunity_id: Optional[int] = None,
+    candidate_id: Optional[int] = None,
+) -> int:
+    """Delete unused credits whose source hire is now inactive."""
+    ensure_credit_loop_table(cur)
+
+    params: List[Any] = []
+    credit_filters: List[str] = ["acl.status IN ('available', 'expired', 'reversed')"]
+    hire_filters: List[str] = [
+        "h.opportunity_id = acl.source_opportunity_id",
+        "(acl.source_candidate_id IS NULL OR h.candidate_id = acl.source_candidate_id)",
+        """
+        (
+            LOWER(TRIM(COALESCE(h.status, ''))) = 'inactive'
+            OR (
+                h.end_date IS NOT NULL
+                AND LOWER(TRIM(COALESCE(h.status, ''))) <> 'active'
+            )
+        )
+        """,
+    ]
+
+    if account_id is not None:
+        credit_filters.append("acl.account_id = %s")
+        params.append(account_id)
+    if opportunity_id is not None:
+        credit_filters.append("acl.source_opportunity_id = %s")
+        params.append(opportunity_id)
+    if candidate_id is not None:
+        hire_filters.append("h.candidate_id = %s")
+        params.append(candidate_id)
+
+    cur.execute(
+        f"""
+        DELETE FROM account_credit_loop acl
+         WHERE {" AND ".join(credit_filters)}
+           AND EXISTS (
+                SELECT 1
+                  FROM hire_opportunity h
+                 WHERE {" AND ".join(hire_filters)}
+           )
+        """,
+        tuple(params),
+    )
+    return cur.rowcount or 0
+
+
+def source_hire_is_inactive(
+    cur,
+    opportunity_id: int,
+    candidate_id: Optional[int] = None,
+) -> bool:
+    params: List[Any] = [opportunity_id]
+    candidate_filter = ""
+    if candidate_id is not None:
+        candidate_filter = "AND h.candidate_id = %s"
+        params.append(candidate_id)
+
+    cur.execute(
+        f"""
+        SELECT 1
+          FROM hire_opportunity h
+         WHERE h.opportunity_id = %s
+           {candidate_filter}
+           AND (
+                LOWER(TRIM(COALESCE(h.status, ''))) = 'inactive'
+                OR (
+                    h.end_date IS NOT NULL
+                    AND LOWER(TRIM(COALESCE(h.status, ''))) <> 'active'
+                )
+           )
+         LIMIT 1
+        """,
+        tuple(params),
+    )
+    return cur.fetchone() is not None
+
+
 def _fetch_credit_context(cur, opportunity_id: int) -> Optional[Dict[str, Any]]:
     cur.execute(
         """
@@ -451,6 +533,10 @@ def create_credit_for_close_win(cur, opportunity_id: int) -> Dict[str, Any]:
     if not is_close_win(ctx.get("opp_stage")):
         return {"created": False, "reason": "stage_not_close_win", "opportunity_id": opportunity_id}
 
+    if source_hire_is_inactive(cur, opportunity_id, ctx.get("candidate_id")):
+        removed = remove_unused_credits_for_inactive_source_hires(cur, opportunity_id=opportunity_id)
+        return {"created": False, "reason": "source_hire_inactive", "opportunity_id": opportunity_id, "removed": removed}
+
     earned_date = ctx.get("opp_close_date") or date.today()
     expires_at = add_months(earned_date, 6)
     credit_payload = _compute_credit_payload(ctx)
@@ -565,6 +651,7 @@ def list_account_credits(cur, account_id: int) -> Dict[str, Any]:
     ensure_credit_loop_table(cur)
     expire_due_credits(cur)
     backfill_account_credits(cur, account_id)
+    remove_unused_credits_for_inactive_source_hires(cur, account_id=account_id)
     cur.execute(
         """
         SELECT

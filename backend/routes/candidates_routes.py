@@ -22,6 +22,7 @@ from utils.storage_utils import (
     set_candidate_tests_documents,
     set_cv_keys,
 )
+from utils.credit_loop import remove_unused_credits_for_inactive_source_hires
 from utils.types import to_bool
 
 bp = Blueprint('candidates', __name__)
@@ -1686,12 +1687,19 @@ def handle_candidate_hire_data(candidate_id):
              WHERE candidate_id = %s AND opportunity_id = %s
         """, (candidate_id, opportunity_id))
 
+        credit_loop_removed = remove_unused_credits_for_inactive_source_hires(
+            cur,
+            opportunity_id=opportunity_id,
+            candidate_id=candidate_id,
+        )
+
         conn.commit()
         return jsonify({
             'success': True,
             'created': created,
             'updated': updated,
-            'ignored_fields': ignored_fields
+            'ignored_fields': ignored_fields,
+            'credit_loop_removed': credit_loop_removed
         })
 
     except Exception as e:
