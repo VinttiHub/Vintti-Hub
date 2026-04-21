@@ -988,6 +988,7 @@ function prettyNameFromEmail(email, fallback = 'Assign HR Lead') {
 function displayNameForHR(email){
   const key = String(email||'').toLowerCase();
   if (!key) return 'Assign HR Lead';
+  if (HIDDEN_HR_FILTER_EMAILS.has(key)) return 'Assign HR Lead';
   const directoryName = (window.userDirectoryByEmail || {})[key];
   if (directoryName) return directoryName;
   const u = (window.allowedHRUsers||[]).find(x => String(x.email_vintti||'').toLowerCase() === key);
@@ -1020,7 +1021,9 @@ const HIDDEN_HR_FILTER_EMAILS = new Set([
   'bahia@vintti.com',
   'sol@vintti.com',
   'agustin@vintti.com',
+  'agustina.barbero@vintti.com',
   'agustina.ferrari@vintti.com',
+  'pilar.fernandez@vintti.com',
 ].map((email) => email.toLowerCase()));
 
 const SALES_ALLOWED_EMAILS = new Set([
@@ -2024,7 +2027,6 @@ function nameToEmail(label, isHR){
   if (isHR) {
     // ➕ primero casos específicos
     if (lower.includes('paz'))                                    return 'paz@vintti.com';
-    if (lower.includes('pilar') && lower.includes('fernandez')) return 'pilar.fernandez@vintti.com';
     if (lower.includes('pilar'))                                 return 'pilar@vintti.com';
 
     if (lower.includes('jazmin'))                                 return 'jazmin@vintti.com';
@@ -2545,7 +2547,6 @@ if (candidateSearchLink) {
     'lara@vintti.com',
     'constanza@vintti.com',
     'pilar@vintti.com',
-    'pilar.fernandez@vintti.com',
     'angie@vintti.com',
     'agostina@vintti.com',
     'julieta@vintti.com',
@@ -3742,7 +3743,6 @@ async function patchOppFields(oppId, payload) {
     'lara@vintti.com',
     'constanza@vintti.com',
     'pilar@vintti.com',
-    'pilar.fernandez@vintti.com',
     'julieta@vintti.com',
     'paz@vintti.com',
     'valentina@vintti.com'
@@ -3765,8 +3765,7 @@ window.addEventListener('pageshow', () => {
 const HR_INITIALS_BY_EMAIL = {
   'agostina@vintti.com':                'AC',
   'jazmin@vintti.com':                  'JP',
-  'pilar@vintti.com':                   'PL', 
-  'pilar.fernandez@vintti.com':         'PF', 
+  'pilar@vintti.com':                   'PL',
   'josefina@vintti.com':                'JP',
   'constanza@vintti.com':               'CL',
   'julieta@vintti.com':                 'JG',
@@ -3782,10 +3781,9 @@ function initialsForHRLead(emailOrName) {
   if (HR_INITIALS_BY_EMAIL[s]) return HR_INITIALS_BY_EMAIL[s];
 
   // Distinción por nombre
-  if (s.includes('pilar') && s.includes('fernandez')) return 'PF'; // nueva
   if (s.includes('pilar') && s.includes('flores'))     return 'PL'; // si la Pilar anterior es López
   // fallback histórico (si solo dice "Pilar", asumimos la de siempre)
-  if (s === 'pilar' || (s.includes('pilar') && !s.includes('fernandez'))) return 'PL';
+  if (s === 'pilar' || s.includes('pilar')) return 'PL';
 
   if (s.includes('agostina') && s.includes('ferrari'))  return 'AF';
   if (s.includes('agostina')) return 'AC';

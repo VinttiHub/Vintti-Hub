@@ -2081,7 +2081,6 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'lara@vintti.com',
     'constanza@vintti.com',
     'pilar@vintti.com',
-    'pilar.fernandez@vintti.com',
     'julieta@vintti.com',
     'paz@vintti.com',
     'valentina@vintti.com'
@@ -2122,7 +2121,6 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'lara@vintti.com',
     'constanza@vintti.com',
     'pilar@vintti.com',
-    'pilar.fernandez@vintti.com',
     'angie@vintti.com',
     'agostina@vintti.com',
     'julieta@vintti.com',

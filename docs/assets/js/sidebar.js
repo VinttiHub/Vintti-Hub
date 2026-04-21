@@ -104,7 +104,7 @@
 
     setDisplay('candidateSearchLink', new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
-      'pilar@vintti.com','pilar.fernandez@vintti.com','angie@vintti.com','agostina@vintti.com',
+      'pilar@vintti.com','angie@vintti.com','agostina@vintti.com',
       'julieta@vintti.com','paz@vintti.com', 'pgonzales@vintti.com'
     ]).has(email));
 
@@ -122,7 +122,7 @@
 
     setDisplay('recruiterPowerLink', new Set([
       'angie@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
-      'constanza@vintti.com','pilar@vintti.com','pilar.fernandez@vintti.com','julieta@vintti.com','paz@vintti.com',
+      'constanza@vintti.com','pilar@vintti.com','julieta@vintti.com','paz@vintti.com',
       'valentina@vintti.com', 'pgonzales@vintti.com'
     ]).has(email));
 

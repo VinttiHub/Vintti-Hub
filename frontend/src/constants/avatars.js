@@ -6,7 +6,6 @@ export const AVATAR_BY_EMAIL = {
   'lara@vintti.com': 'lara.png',
   'jazmin@vintti.com': 'jaz.png',
   'pilar@vintti.com': 'pilar.png',
-  'pilar.fernandez@vintti.com': 'pilar_fer.png',
   'agustin@vintti.com': 'agus.png',
   'agustina@vintti.com': 'agustina_valentini.png',
   'josefina@vintti.com': 'josefina.png',

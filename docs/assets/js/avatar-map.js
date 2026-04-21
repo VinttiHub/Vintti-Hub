@@ -11,7 +11,6 @@
     'lara@vintti.com':             'lara.png',
     'jazmin@vintti.com':           'jaz.png',
     'pilar@vintti.com':            'pilar.png',
-    'pilar.fernandez@vintti.com':  'pilar_fer.png',
     'agustin@vintti.com':          'agus.png',
     'agustina@vintti.com':         'agusvalentini.png',
     'josefina@vintti.com':         'josefina.png',

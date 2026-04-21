@@ -5,6 +5,11 @@ from db import get_connection
 
 bp = Blueprint('users_basic', __name__)
 
+HIDDEN_USER_EMAILS = {
+    'agustina.barbero@vintti.com',
+    'pilar.fernandez@vintti.com',
+}
+
 
 @bp.route('/users')
 def users_list_or_by_email():
@@ -116,9 +121,10 @@ def _list_users_by_role(role_type: str):
                 LEFT JOIN admin_user_access aua ON aua.user_id = u.user_id
                 WHERE ur.role_type = %s
                   AND COALESCE(aua.is_active, TRUE)
+                  AND COALESCE(LOWER(TRIM(u.email_vintti)), '') <> ALL(%s)
                 ORDER BY LOWER(u.user_name), LOWER(u.email_vintti)
                 """,
-                (role_type,),
+                (role_type, list(HIDDEN_USER_EMAILS)),
             )
             rows = cur.fetchall()
         conn.close()

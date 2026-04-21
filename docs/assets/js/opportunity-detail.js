@@ -412,7 +412,10 @@ const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
   'constanza@vintti.com',
   'valentina@vintti.com',
   'pilar@vintti.com',
-  'julieta@vintti.com',
+  'julieta@vintti.com'
+]);
+const HIDDEN_HR_EMAILS = new Set([
+  'agustina.barbero@vintti.com',
   'pilar.fernandez@vintti.com'
 ]);
 const CAND_CACHE_TTL = 5 * 60 * 1000; // 5 min
@@ -746,7 +749,7 @@ async function getRecruiterEmailSet() {
           const role = String(item?.role || '').toLowerCase().trim();
           if (!role.includes('recruiter')) return;
           const email = (item?.email_vintti || '').toLowerCase().trim();
-          if (email) emails.add(email);
+          if (email && !HIDDEN_HR_EMAILS.has(email)) emails.add(email);
         });
       }
       __recruiterEmails = emails;
@@ -3070,7 +3073,7 @@ async function loadOpportunityData() {
                   || email;
                 return { email, name };
               })
-              .filter(person => person.email && !seen.has(person.email) && seen.add(person.email))
+              .filter(person => person.email && !HIDDEN_HR_EMAILS.has(person.email) && !seen.has(person.email) && seen.add(person.email))
               .sort((a, b) => a.name.localeCompare(b.name));
           };
 
@@ -3089,7 +3092,7 @@ async function loadOpportunityData() {
               hrLeadSelect.appendChild(opt);
             });
             const hrLeadValue = String(data.opp_hr_lead || data.hr_lead || '').trim().toLowerCase();
-            hrLeadSelect.value = hrLeadValue;
+            hrLeadSelect.value = HIDDEN_HR_EMAILS.has(hrLeadValue) ? '' : hrLeadValue;
           }
 
           if (salesLeadSelect) {

@@ -20,7 +20,6 @@ RECRUITER_EMAILS = [
     "valentina@vintti.com",
     "pilar@vintti.com",
     "julieta@vintti.com",
-    "pilar.fernandez@vintti.com",
 ]
 
 INITIAL_SYNC_LOOKBACK_DAYS = 90

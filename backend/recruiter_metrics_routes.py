@@ -9,6 +9,10 @@ from db import get_connection
 
 logger = logging.getLogger(__name__)
 BOGOTA_TZ = timezone(timedelta(hours=-5))
+HIDDEN_RECRUITER_EMAILS = {
+    "agustina.barbero@vintti.com",
+    "pilar.fernandez@vintti.com",
+}
 
 
 def _default_rolling_30d():
@@ -935,6 +939,8 @@ def register_recruiter_metrics_routes(app):
             hire_pct = (hired_candidates / sent_candidates) if sent_candidates else None
 
             email = r["opp_hr_lead"]
+            if (email or "").strip().lower() in HIDDEN_RECRUITER_EMAILS:
+                continue
             name = r.get("user_name") or email
 
             metrics.append(

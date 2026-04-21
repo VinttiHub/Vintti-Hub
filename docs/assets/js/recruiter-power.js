@@ -8,13 +8,19 @@ const EXCLUDED_EMAILS = new Set([
   "agustina.ferrari@vintti.com",
   "agustina.barbero@vintti.com",
   "jazmin@vintti.com",
+  "pilar.fernandez@vintti.com",
 ]);
+
+function isExcludedRecruiter(row = {}) {
+  const email = String(row.email || row.hr_lead_email || row.hr_lead || "").trim().toLowerCase();
+  const name = String(row.name || row.hr_lead_name || row.hr_lead || "").trim().toLowerCase();
+  return EXCLUDED_EMAILS.has(email) || (name.includes("pilar") && name.includes("fernandez"));
+}
 
 // 🔸 Personas que sólo deben ver SU propia opción
 const RESTRICTED_EMAILS = new Set([
   "constanza@vintti.com",
   "pilar@vintti.com",
-  "pilar.fernandez@vintti.com",
   "agostina@vintti.com",
   "julieta@vintti.com",
   "paz@vintti.com",
@@ -234,7 +240,7 @@ async function loadRecruiterDirectory() {
       .sort((a, b) => a.name.localeCompare(b.name));
     metricsState.recruiterDirectory = directory;
     metricsState.recruiterLookup = directory.reduce((acc, person) => {
-      if (!EXCLUDED_EMAILS.has(person.email)) {
+      if (!isExcludedRecruiter(person)) {
         acc[person.email] = person.name;
       }
       return acc;
@@ -2078,12 +2084,14 @@ async function fetchMetrics(rangeStartYMD = null, rangeEndYMD = null) {
 
     for (const row of data.metrics || []) {
       const email = (row.hr_lead_email || row.hr_lead || "").toLowerCase();
-      if (!email || EXCLUDED_EMAILS.has(email)) continue;
+      if (!email || isExcludedRecruiter(row)) continue;
       byLead[email] = row;
       addEmail(email);
     }
 
-    (metricsState.recruiterDirectory || []).forEach((person) => addEmail(person.email));
+    (metricsState.recruiterDirectory || [])
+      .filter((person) => !isExcludedRecruiter(person))
+      .forEach((person) => addEmail(person.email));
 
     metricsState.byLead = byLead;
     metricsState.orderedLeadEmails = orderedEmails;
