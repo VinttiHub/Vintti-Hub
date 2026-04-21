@@ -626,6 +626,27 @@ function downloadTextFile(filename, content, mimeType = 'text/plain;charset=utf-
   URL.revokeObjectURL(url);
 }
 
+async function fetchOpportunityBatchSourcingDates() {
+  const res = await fetch(`${API_BASE}/opportunities/batch-sourcing-dates`, {
+    credentials: 'include'
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`batch-sourcing-dates failed ${res.status}: ${text}`);
+  }
+
+  const rows = await res.json();
+  const grouped = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const key = String(row?.opportunity_id || '');
+    if (!key) return;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+  return grouped;
+}
+
 function hydrateClosedLostMotives(opportunities) {
   if (!Array.isArray(opportunities) || opportunities.length === 0) return;
   const pendingIds = opportunities
@@ -1721,78 +1742,99 @@ if (dateFromFilter || dateToFilter) {
 
 const downloadCsvBtn = document.getElementById('downloadCsvBtn');
 if (downloadCsvBtn) {
-  downloadCsvBtn.addEventListener('click', () => {
+  downloadCsvBtn.addEventListener('click', async () => {
     try {
-    const filteredNodes = table.rows({ search: 'applied', order: 'applied' }).nodes().toArray();
-    if (!filteredNodes.length) {
-      alert('No rows available to export with the current filters.');
-      return;
-    }
+      downloadCsvBtn.disabled = true;
+      downloadCsvBtn.textContent = 'Preparing CSV...';
 
-    const opportunitiesById = new Map(
-      (Array.isArray(data) ? data : []).map((opp) => [String(opp.opportunity_id), opp])
-    );
+      const filteredNodes = table.rows({ search: 'applied', order: 'applied' }).nodes().toArray();
+      if (!filteredNodes.length) {
+        alert('No rows available to export with the current filters.');
+        return;
+      }
 
-    const headers = [
-      'opportunity_id',
-      'stage_visible',
-      'account_visible',
-      'position_visible',
-      'type_visible',
-      'model_visible',
-      'sales_lead_visible',
-      'hr_lead_visible',
-      'comment_visible',
-      'days_visible',
-      'days_since_batch_visible',
-      'candidates_count_visible',
-      'interviewed_count_visible',
-      'motive_close_lost',
-      'raw_expected_fee',
-      'raw_expected_revenue',
-      'raw_latest_sourcing_date',
-      'raw_nda_signature_or_start_date',
-      'raw_opp_close_date',
-    ];
+      const opportunitiesById = new Map(
+        (Array.isArray(data) ? data : []).map((opp) => [String(opp.opportunity_id), opp])
+      );
 
-    const lines = [headers.map(csvEscape).join(',')];
+      const batchSourcingByOpp = await fetchOpportunityBatchSourcingDates();
 
-    filteredNodes.forEach((row) => {
-      const stageSelect = row.querySelector('.stage-dropdown');
-      const opportunityId = String(stageSelect?.dataset?.id || '');
-      const opp = opportunitiesById.get(opportunityId) || {};
+      const headers = [
+        'opportunity_id',
+        'stage_visible',
+        'account_visible',
+        'position_visible',
+        'type_visible',
+        'model_visible',
+        'sales_lead_visible',
+        'hr_lead_visible',
+        'comment_visible',
+        'days_visible',
+        'days_since_batch_visible',
+        'candidates_count_visible',
+        'interviewed_count_visible',
+        'motive_close_lost',
+        'matching_sourcing_date',
+        'batch_presentation_date',
+        'days_from_sourcing_to_batch',
+        'batch_number',
+        'raw_expected_fee',
+        'raw_expected_revenue',
+        'raw_latest_sourcing_date',
+        'raw_nda_signature_or_start_date',
+        'raw_opp_close_date',
+      ];
 
-      const values = {
-        opportunity_id: opportunityId,
-        stage_visible: stageSelect?.selectedOptions?.[0]?.textContent?.trim() || '',
-        account_visible: row.children?.[1]?.textContent?.trim() || '',
-        position_visible: row.children?.[2]?.textContent?.trim() || '',
-        type_visible: row.querySelector('[data-type-value]')?.getAttribute('data-type-value') || '',
-        model_visible: row.children?.[4]?.textContent?.trim() || '',
-        sales_lead_visible: row.querySelector('.sales-lead-cell .sr-only')?.textContent?.trim() || row.children?.[5]?.textContent?.trim() || '',
-        hr_lead_visible: row.querySelector('.hr-lead-dropdown')?.selectedOptions?.[0]?.textContent?.trim() || row.children?.[6]?.textContent?.trim() || '',
-        comment_visible: row.querySelector('.comment-input')?.value?.trim() || '',
-        days_visible: row.children?.[8]?.textContent?.trim() || '',
-        days_since_batch_visible: row.children?.[9]?.textContent?.trim() || '',
-        candidates_count_visible: row.children?.[10]?.textContent?.trim() || '',
-        interviewed_count_visible: row.children?.[11]?.textContent?.trim() || '',
-        motive_close_lost: opp?.motive_close_lost || opp?.details_close_lost || '',
-        raw_expected_fee: opp?.expected_fee ?? '',
-        raw_expected_revenue: opp?.expected_revenue ?? '',
-        raw_latest_sourcing_date: opp?.latest_sourcing_date ?? '',
-        raw_nda_signature_or_start_date: opp?.nda_signature_or_start_date ?? '',
-        raw_opp_close_date: opp?.opp_close_date ?? '',
-      };
+      const lines = [headers.map(csvEscape).join(',')];
 
-      const line = headers.map((header) => csvEscape(values[header])).join(',');
-      lines.push(line);
-    });
+      filteredNodes.forEach((row) => {
+        const stageSelect = row.querySelector('.stage-dropdown');
+        const opportunityId = String(stageSelect?.dataset?.id || '');
+        const opp = opportunitiesById.get(opportunityId) || {};
+        const batchSourcingRows = batchSourcingByOpp.get(opportunityId) || [];
 
-    const today = toIsoDate(new Date()) || 'today';
-    downloadTextFile(`opportunities_${today}.csv`, `${lines.join('\n')}\n`, 'text/csv;charset=utf-8;');
+        const batchRows = batchSourcingRows.length ? batchSourcingRows : [{}];
+
+        batchRows.forEach((batchRow) => {
+          const values = {
+            opportunity_id: opportunityId,
+            stage_visible: stageSelect?.selectedOptions?.[0]?.textContent?.trim() || '',
+            account_visible: row.children?.[1]?.textContent?.trim() || '',
+            position_visible: row.children?.[2]?.textContent?.trim() || '',
+            type_visible: row.querySelector('[data-type-value]')?.getAttribute('data-type-value') || '',
+            model_visible: row.children?.[4]?.textContent?.trim() || '',
+            sales_lead_visible: row.querySelector('.sales-lead-cell .sr-only')?.textContent?.trim() || row.children?.[5]?.textContent?.trim() || '',
+            hr_lead_visible: row.querySelector('.hr-lead-dropdown')?.selectedOptions?.[0]?.textContent?.trim() || row.children?.[6]?.textContent?.trim() || '',
+            comment_visible: row.querySelector('.comment-input')?.value?.trim() || '',
+            days_visible: row.children?.[8]?.textContent?.trim() || '',
+            days_since_batch_visible: row.children?.[9]?.textContent?.trim() || '',
+            candidates_count_visible: row.children?.[10]?.textContent?.trim() || '',
+            interviewed_count_visible: row.children?.[11]?.textContent?.trim() || '',
+            motive_close_lost: opp?.motive_close_lost || opp?.details_close_lost || '',
+            matching_sourcing_date: batchRow?.matching_sourcing_date ?? '',
+            batch_presentation_date: batchRow?.batch_presentation_date ?? '',
+            days_from_sourcing_to_batch: batchRow?.days_from_sourcing_to_batch ?? '',
+            batch_number: batchRow?.batch_number ?? '',
+            raw_expected_fee: opp?.expected_fee ?? '',
+            raw_expected_revenue: opp?.expected_revenue ?? '',
+            raw_latest_sourcing_date: toIsoDate(opp?.latest_sourcing_date),
+            raw_nda_signature_or_start_date: toIsoDate(opp?.nda_signature_or_start_date),
+            raw_opp_close_date: toIsoDate(opp?.opp_close_date),
+          };
+
+          const line = headers.map((header) => csvEscape(values[header])).join(',');
+          lines.push(line);
+        });
+      });
+
+      const today = toIsoDate(new Date()) || 'today';
+      downloadTextFile(`opportunities_${today}.csv`, `${lines.join('\n')}\n`, 'text/csv;charset=utf-8;');
     } catch (err) {
       console.error('CSV export failed:', err);
       alert('Could not export CSV. Please try again.');
+    } finally {
+      downloadCsvBtn.disabled = false;
+      downloadCsvBtn.textContent = 'Download CSV';
     }
   });
 }

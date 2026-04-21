@@ -106,6 +106,91 @@ def get_opportunities_light():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route('/opportunities/batch-sourcing-dates', methods=['GET'])
+def get_opportunity_batch_sourcing_dates():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            WITH candidate_sources AS (
+              SELECT
+                b.batch_id,
+                'sourcing' AS source_type,
+                s.sourcing_id,
+                s.since_sourcing::date AS source_date,
+                1 AS priority
+              FROM batch b
+              JOIN sourcing s
+                ON s.opportunity_id = b.opportunity_id
+               AND s.since_sourcing::date <= b.presentation_date::date
+
+              UNION ALL
+
+              SELECT
+                b.batch_id,
+                'nda_signature_or_start_date' AS source_type,
+                NULL::int AS sourcing_id,
+                o.nda_signature_or_start_date::date AS source_date,
+                2 AS priority
+              FROM batch b
+              JOIN opportunity o
+                ON o.opportunity_id = b.opportunity_id
+              WHERE o.nda_signature_or_start_date IS NOT NULL
+                AND o.nda_signature_or_start_date::date <= b.presentation_date::date
+            ),
+            matched AS (
+              SELECT DISTINCT ON (batch_id)
+                batch_id,
+                source_type,
+                sourcing_id,
+                source_date
+              FROM candidate_sources
+              ORDER BY
+                batch_id,
+                priority,
+                source_date DESC,
+                sourcing_id DESC NULLS LAST
+            )
+            SELECT
+              o.opportunity_id,
+              o.opp_position_name,
+              a.client_name,
+              b.batch_id,
+              b.batch_number,
+              matched.source_type,
+              matched.sourcing_id,
+              to_char(matched.source_date, 'YYYY-MM-DD') AS matching_sourcing_date,
+              to_char(b.presentation_date::date, 'YYYY-MM-DD') AS batch_presentation_date,
+              CASE
+                WHEN matched.source_date IS NULL OR b.presentation_date IS NULL THEN NULL
+                ELSE b.presentation_date::date - matched.source_date
+              END AS days_from_sourcing_to_batch
+            FROM opportunity o
+            LEFT JOIN account a
+              ON a.account_id = o.account_id
+            LEFT JOIN batch b
+              ON b.opportunity_id = o.opportunity_id
+            LEFT JOIN matched
+              ON matched.batch_id = b.batch_id
+            ORDER BY
+              o.opportunity_id,
+              b.presentation_date::date,
+              b.batch_number,
+              b.batch_id
+            """
+        )
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        data = [dict(zip(columns, row)) for row in rows]
+        cursor.close()
+        conn.close()
+        return jsonify(data)
+    except Exception as exc:
+        logging.exception("Failed to fetch opportunity batch sourcing dates")
+        return jsonify({"error": str(exc)}), 500
+
+
 @bp.route('/data')
 def get_accounts():
     try:
