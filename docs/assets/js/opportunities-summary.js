@@ -26,7 +26,11 @@ function recruiterLabel(email) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const stages = ["Negotiating", "Interviewing", "Sourcing", "Deep Dive", "NDA Sent"];
+  const stages = ["Negotiating", "Interviewing", "Sourcing", "Deep Dive", "NDA Sent", "Signed"];
+  const normalizeStage = (stage) => {
+    const normalized = String(stage || "").trim().toLowerCase();
+    return stages.find((item) => item.toLowerCase() === normalized) || "";
+  };
   const tbody = document.querySelector("#summaryTable tbody");
   tbody.innerHTML = "";
 
@@ -44,14 +48,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!recruiterDirectory.length) {
     const tr = document.createElement("tr");
     tr.innerHTML =
-      '<td colspan="7" style="text-align:center;">No recruiters available. Create one from the Admin panel.</td>';
+      '<td colspan="8" style="text-align:center;">No recruiters available. Create one from the Admin panel.</td>';
     tbody.appendChild(tr);
   }
 
   // ——— Etiquetar headers por stage para estilos por-columna
 (function colorizeStageHeaders() {
   const emojiMap = {
-    'Negotiating':'🤝', 'Interviewing':'🎤', 'Sourcing':'🧭', 'Deep Dive':'🔎', 'NDA Sent':'📝'
+    'Negotiating':'🤝', 'Interviewing':'🎤', 'Sourcing':'🧭', 'Deep Dive':'🔎', 'NDA Sent':'📝', 'Signed':'✅'
   };
   const toSlug = (s) => s.toLowerCase().replace(/[^a-z]+/g, "-").replace(/(^-+|-+$)/g, "");
   document.querySelectorAll("#summaryTable thead th").forEach((th) => {
@@ -78,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       opportunities.forEach((opp) => {
         const hrLead = String(opp.opp_hr_lead || "").trim().toLowerCase();
-        const stage = String(opp.opp_stage || "").trim();
+        const stage = normalizeStage(opp.opp_stage);
         if (summaryCounts[hrLead] && stages.includes(stage)) {
           summaryCounts[hrLead][stage]++;
         }
@@ -171,10 +175,11 @@ function stageBadge(stage){
     'Interviewing': 'int',
     'Sourcing': 'src',
     'Deep Dive': 'dd',
-    'NDA Sent': 'nda'
+    'NDA Sent': 'nda',
+    'Signed': 'sgn'
   };
   const emoji = {
-    'Negotiating':'🤝', 'Interviewing':'🎤', 'Sourcing':'🧭', 'Deep Dive':'🔎', 'NDA Sent':'📝'
+    'Negotiating':'🤝', 'Interviewing':'🎤', 'Sourcing':'🧭', 'Deep Dive':'🔎', 'NDA Sent':'📝', 'Signed':'✅'
   }[stage] || '';
   const k = keyMap[stage] || 'int';
   return `<span class="dd-badge dd-badge-${k}">${emoji} ${stage}</span>`;
@@ -234,7 +239,7 @@ table.addEventListener("click", async (evt) => {
   const isNumber = !isNaN(parseInt(cell.textContent, 10));
 
   // Evitar clic en la columna Total (última)
-  const isLastCol = cell.cellIndex === (stages.length /*5*/ + 1);
+  const isLastCol = cell.cellIndex === (stages.length + 1);
   if (isFirstCol || isLastCol || !isNumber) return;
 
   // Solo números, no la primera columna
@@ -273,7 +278,7 @@ const priorityMap = {};
   // Filtro por HR Lead + Stage
 const filteredOpps = (oppsCache || []).filter((o) =>
   String(o?.opp_hr_lead || '').trim().toLowerCase() === hrEmail &&
-  String(o?.opp_stage   || '').trim() === stage
+  normalizeStage(o?.opp_stage) === stage
 );
 
 
@@ -331,9 +336,9 @@ function updateColumnTotals(stages, table) {
   const rows = Array.from(table.querySelectorAll('tbody tr'));
   const colTotals = new Array(stages.length).fill(0);
 
-  // Recorremos filas y sumamos cada columna de stage (td 2..6)
+  // Recorremos filas y sumamos cada columna de stage
   rows.forEach(row => {
-    // td[0] = HR Lead, luego vienen las 5 de stage y la última es Total de fila
+    // td[0] = HR Lead, luego vienen las columnas de stage y la última es Total de fila
     stages.forEach((_, idx) => {
       const td = row.children[idx + 1]; // +1 por la 1ª columna (HR Lead)
       const val = Number(td?.textContent || 0);

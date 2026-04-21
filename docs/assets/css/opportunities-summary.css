@@ -6,6 +6,7 @@
   --src-bg: #e6fff5;  --src-text:#0a6847;  --src-veil: rgba(230,255,245,.45);
   --dd-bg:  #f3e6ff;  --dd-text:#6b2fb8;  --dd-veil:  rgba(243,230,255,.45);
   --nda-bg: #fff4e6;  --nda-text:#9a4f00;  --nda-veil: rgba(255,244,230,.45);
+  --sgn-bg: #e8fbf8;  --sgn-text:#08756f;  --sgn-veil: rgba(232,251,248,.45);
 
   /* Glass tech */
   --glass-bg1: rgba(255,255,255,.65);
@@ -168,12 +169,21 @@
   content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
   background: var(--nda-veil); filter: blur(10px); border-radius: 999px;
 }
+/* Signed */
+#summaryTable thead th.stage-title-signed{
+  color: var(--sgn-text);
+  background: linear-gradient(135deg, var(--sgn-bg), #ffffff);
+}
+#summaryTable thead th.stage-title-signed::after{
+  content:""; position:absolute; left:10%; right:10%; bottom:-10px; height:10px;
+  background: var(--sgn-veil); filter: blur(10px); border-radius: 999px;
+}
 
 /* Ajustes de head row */
 #summaryTable thead tr { background: transparent !important; }
 
 /* ===== Hover de columna con velo del color del stage ===== */
-/* Mapeamos el índice de columna (2..6) a un velo distinto */
+/* Mapeamos el índice de columna (2..7) a un velo distinto */
 #summaryTable[data-hover-col="2"] th:nth-child(2),
 #summaryTable[data-hover-col="2"] td:nth-child(2){
   box-shadow: inset 0 0 0 100vmax var(--neg-veil);
@@ -193,6 +203,10 @@
 #summaryTable[data-hover-col="6"] th:nth-child(6),
 #summaryTable[data-hover-col="6"] td:nth-child(6){
   box-shadow: inset 0 0 0 100vmax var(--nda-veil);
+}
+#summaryTable[data-hover-col="7"] th:nth-child(7),
+#summaryTable[data-hover-col="7"] td:nth-child(7){
+  box-shadow: inset 0 0 0 100vmax var(--sgn-veil);
 }
 
 /* Animación de entrada sutil */
@@ -331,6 +345,7 @@
 .dd-badge-src{ color:var(--src-text);  background:var(--src-bg); }
 .dd-badge-dd { color:var(--dd-text);   background:var(--dd-bg); }
 .dd-badge-nda{ color:var(--nda-text);  background:var(--nda-bg); }
+.dd-badge-sgn{ color:var(--sgn-text);  background:var(--sgn-bg); }
 
 /* Marca la celda activa */
 #summaryTable td.is-selected{
@@ -362,6 +377,7 @@
 #summaryTable thead th.stage-title-sourcing::before    { content:"🧭 "; }
 #summaryTable thead th.stage-title-deep-dive::before   { content:"🔎 "; }
 #summaryTable thead th.stage-title-nda-sent::before    { content:"📝 "; }
+#summaryTable thead th.stage-title-signed::before      { content:"✅ "; }
 /* Header: aseguramos que se vea el texto y el emoji insertados por JS */
 #summaryTable thead th .stage-emoji{ margin-right:.4rem; }
 #summaryTable thead th .stage-label{ font-weight:800; }
@@ -375,6 +391,7 @@
 #summaryTable[data-hover-col="4"] th:nth-child(4){ box-shadow: inset 0 0 0 100vmax var(--src-veil); }
 #summaryTable[data-hover-col="5"] th:nth-child(5){ box-shadow: inset 0 0 0 100vmax var(--dd-veil); }
 #summaryTable[data-hover-col="6"] th:nth-child(6){ box-shadow: inset 0 0 0 100vmax var(--nda-veil); }
+#summaryTable[data-hover-col="7"] th:nth-child(7){ box-shadow: inset 0 0 0 100vmax var(--sgn-veil); }
 
 /* Chips de desglose A/B/C: neutros (sin color) */
 .priority-breakdown{ display:flex; gap:6px; margin-top:6px; justify-content:center; font-size:12px; font-weight:700; }
@@ -422,6 +439,7 @@
 #summaryTable td.is-selected-src{ box-shadow: inset 0 0 0 999px var(--src-veil); color: var(--src-text); }
 #summaryTable td.is-selected-dd { box-shadow: inset 0 0 0 999px var(--dd-veil);  color: var(--dd-text); }
 #summaryTable td.is-selected-nda{ box-shadow: inset 0 0 0 999px var(--nda-veil); color: var(--nda-text); }
+#summaryTable td.is-selected-sgn{ box-shadow: inset 0 0 0 999px var(--sgn-veil); color: var(--sgn-text); }
 /* Solo el header en negrilla; filas normales */
 .dd-table thead th{ font-weight: 800; }
 .dd-table tbody td,
@@ -521,8 +539,8 @@
 }
 
 /* Asegura que TOTAL nunca reciba velo/hover de colores */
-#summaryTable[data-hover-col="7"] th:nth-child(7),
-#summaryTable[data-hover-col="7"] td:nth-child(7){
+#summaryTable[data-hover-col="8"] th:nth-child(8),
+#summaryTable[data-hover-col="8"] td:nth-child(8){
   box-shadow: none !important;
 }
 /* == Overrides: zebra azul claro en drilldown == */
