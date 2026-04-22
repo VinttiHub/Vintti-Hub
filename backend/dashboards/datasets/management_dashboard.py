@@ -4,36 +4,42 @@ from __future__ import annotations
 def query(_filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
     sql = """
         WITH recruiting_revenue AS (
-          SELECT COALESCE(SUM(h.revenue), 0)::bigint AS total
+          SELECT COALESCE(SUM(h.revenue::numeric), 0)::bigint AS total
           FROM hire_opportunity h
           JOIN opportunity o ON o.opportunity_id = h.opportunity_id
           WHERE lower(o.opp_model) LIKE 'recruiting%%'
-            AND h.start_date >= (CURRENT_DATE - INTERVAL '30 days')
+            AND NULLIF(h.start_date, '')::date >= (CURRENT_DATE - INTERVAL '30 days')
         ),
         active_staffing AS (
           SELECT COUNT(DISTINCT h.candidate_id) AS c
           FROM hire_opportunity h
           JOIN opportunity o ON o.opportunity_id = h.opportunity_id
-          WHERE h.end_date IS NULL
+          WHERE (h.end_date IS NULL OR h.end_date = '')
             AND lower(o.opp_model) LIKE 'staffing%%'
         ),
         active_recruiting AS (
           SELECT COUNT(DISTINCT h.candidate_id) AS c
           FROM hire_opportunity h
           JOIN opportunity o ON o.opportunity_id = h.opportunity_id
-          WHERE h.end_date IS NULL
+          WHERE (h.end_date IS NULL OR h.end_date = '')
             AND lower(o.opp_model) LIKE 'recruiting%%'
         ),
         ltv AS (
           SELECT COALESCE(AVG(months_active), 0)::numeric(10,2) AS months
           FROM (
             SELECT h.candidate_id,
-                   EXTRACT(YEAR FROM age(COALESCE(h.end_date::timestamp, NOW()), h.start_date::timestamp)) * 12
-                 + EXTRACT(MONTH FROM age(COALESCE(h.end_date::timestamp, NOW()), h.start_date::timestamp)) AS months_active
+                   EXTRACT(YEAR FROM age(
+                       COALESCE(NULLIF(h.end_date, '')::timestamp, NOW()),
+                       NULLIF(h.start_date, '')::timestamp
+                   )) * 12
+                 + EXTRACT(MONTH FROM age(
+                       COALESCE(NULLIF(h.end_date, '')::timestamp, NOW()),
+                       NULLIF(h.start_date, '')::timestamp
+                   )) AS months_active
             FROM hire_opportunity h
             JOIN opportunity o ON o.opportunity_id = h.opportunity_id
             WHERE lower(o.opp_model) LIKE 'staffing%%'
-              AND h.start_date IS NOT NULL
+              AND NULLIF(h.start_date, '') IS NOT NULL
           ) sub
         )
         SELECT

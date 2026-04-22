@@ -38,14 +38,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
         ),
         staffing AS (
           SELECT
-            COALESCE(h.salary, 0)::numeric AS salary,
-            COALESCE(h.fee, 0)::numeric AS fee,
-            h.start_date::date AS start_date,
-            h.end_date::date AS end_date
+            COALESCE(h.salary::numeric, 0) AS salary,
+            COALESCE(h.fee::numeric, 0) AS fee,
+            NULLIF(h.start_date, '')::date AS start_date,
+            NULLIF(h.end_date, '')::date AS end_date
           FROM hire_opportunity h
           JOIN opportunity o ON o.opportunity_id = h.opportunity_id
           WHERE lower(o.opp_model) LIKE 'staffing%%'
-            AND h.start_date IS NOT NULL
+            AND NULLIF(h.start_date, '') IS NOT NULL
         ),
         eom AS (
           SELECT
