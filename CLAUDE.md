@@ -68,3 +68,5 @@ Third-party clients and helpers are grouped under `backend/utils/` and `backend/
 - The two `requirements.txt` files are not redundant: root is a fully pinned list (used where reproducible installs matter), `backend/requirements.txt` is a loose list suitable for local dev. Update both when adding a backend dep.
 - `backend/.env` is gitignored and must exist for `init_services()` to populate clients. Missing env vars silently leave clients as `None` rather than raising — expect `AttributeError` on first use if you forgot to set one.
 - The repo root also contains `icons/` and `docs/assets/` which are static assets served by GitHub Pages, not part of any build step.
+
+- Don´t work on the frontend file, everything that is related to React, Do not touch the files 

@@ -36,6 +36,7 @@ from routes.public_bonus_routes import bp as public_bonus_bp
 from routes.google_calendar_routes import bp as google_calendar_bp
 from routes.hubspot_routes import bp as hubspot_bp
 from routes.turvo_routes import bp as turvo_bp
+from routes.dashboards_routes import bp as dashboards_bp
 
 
 
@@ -86,6 +87,7 @@ def create_app() -> Flask:
     app.register_blueprint(bp_candidate_search, url_prefix="")
     app.register_blueprint(hunter_bp)
     app.register_blueprint(public_bonus_bp)
+    app.register_blueprint(dashboards_bp)
 
     @app.after_request
     def apply_cors_headers(response):
