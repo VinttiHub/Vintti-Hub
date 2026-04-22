@@ -99,7 +99,7 @@ def create_app() -> Flask:
             response.headers['Access-Control-Allow-Credentials'] = 'true'
 
         response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,OPTIONS,PATCH,DELETE'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-User-Email,X-User-Id'
         return response
 
     return app
