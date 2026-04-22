@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 _DEFAULT_EDITOR_EMAIL = "pgonzales@vintti.com"
