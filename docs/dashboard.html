@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vintti HUB · Dashboard</title>
+  <script src="./assets/js/auth-guard.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./assets/css/sidebar.css" />
+  <link rel="stylesheet" href="./assets/css/dashboards.css?v=1">
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
+
+  <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+</head>
+<body>
+  <div id="sidebarMount"></div>
+
+  <main class="main-content">
+    <div class="dash-shell">
+      <header class="dash-header">
+        <div>
+          <h1 id="dashTitle">Dashboard</h1>
+          <div class="dash-subtitle" id="dashSubtitle">—</div>
+        </div>
+      </header>
+
+      <nav class="dash-tabs" id="dashTabs" role="tablist"></nav>
+
+      <div id="dashFilterBar"></div>
+
+      <div class="dash-grid" id="dashGrid"></div>
+    </div>
+  </main>
+
+  <script src="./assets/js/sidebar.js" defer></script>
+  <script src="./assets/js/dashboards/toolkit.js" defer></script>
+  <script src="./assets/js/dashboards/main-dashboard.js" defer></script>
+</body>
+</html>

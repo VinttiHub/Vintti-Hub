@@ -1,0 +1,200 @@
+:root {
+  --dash-pad: 18px;
+  --dash-radius: 18px;
+  --dash-border: rgba(15,23,42,.08);
+  --dash-shadow: 0 6px 18px rgba(15,23,42,.06);
+  --dash-bg: #f6f7fb;
+}
+
+body { background: var(--dash-bg); }
+
+.dash-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 24px 64px;
+}
+
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.dash-header h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0;
+  background: linear-gradient(120deg, #0b2f6a, #0a84ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.dash-header .dash-subtitle {
+  color: #64748b;
+  font-size: .9rem;
+}
+
+.dash-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  padding: 10px 0;
+  background: var(--dash-bg);
+  border-bottom: 1px solid var(--dash-border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.dash-tab {
+  border: 1px solid rgba(15,23,42,.12);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: .9rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s ease;
+}
+.dash-tab:hover { border-color: rgba(10,132,255,.4); }
+.dash-tab.is-active {
+  background: linear-gradient(120deg, #0b2f6a, #0a84ff);
+  color: #fff;
+  border-color: transparent;
+}
+
+.dash-filter-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  background: rgba(246,247,251,.85);
+  backdrop-filter: blur(10px);
+  padding: 12px 0;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-bottom: 1px solid var(--dash-border);
+}
+.dash-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid rgba(15,23,42,.1);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: .85rem;
+}
+.dash-filter label {
+  color: #64748b;
+  font-weight: 600;
+  font-size: .75rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.dash-filter input[type="date"],
+.dash-filter input[type="month"],
+.dash-filter select {
+  border: none;
+  background: transparent;
+  font-size: .85rem;
+  color: #0f172a;
+  font-family: inherit;
+  outline: none;
+}
+.dash-filter-reset {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid rgba(15,23,42,.15);
+  color: #64748b;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: .8rem;
+  font-weight: 600;
+}
+.dash-filter-reset:hover { color: #0f172a; border-color: rgba(15,23,42,.3); }
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+}
+.dash-panel { display: none; }
+.dash-panel.is-active { display: contents; }
+
+.dash-card {
+  grid-column: span 12;
+  background: #fff;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius);
+  padding: var(--dash-pad);
+  box-shadow: var(--dash-shadow);
+  min-height: 120px;
+  position: relative;
+}
+.dash-card h3 {
+  font-size: .9rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 12px;
+  letter-spacing: -.01em;
+}
+
+.dash-card--kpi .dash-kpi-value {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+}
+.dash-card--kpi .dash-kpi-label {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.dash-chart-body {
+  position: relative;
+  min-height: 280px;
+  width: 100%;
+}
+.dash-chart-body > div { width: 100%; height: 100%; }
+
+.dash-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  color: #94a3b8;
+  font-size: .9rem;
+  font-style: italic;
+}
+
+.dash-card--loading .dash-kpi-value,
+.dash-card--loading h3 {
+  background: linear-gradient(90deg, #eef2f7 25%, #f5f7fa 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: dashShimmer 1.2s infinite linear;
+  color: transparent;
+  border-radius: 6px;
+}
+@keyframes dashShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Responsive: grid-column span rules are also set inline via `w` from position_json;
+   on narrow screens everything collapses to 12 cols via media query. */
+@media (max-width: 820px) {
+  .dash-card { grid-column: span 12 !important; }
+  .dash-filter-bar { top: 48px; }
+}
