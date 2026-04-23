@@ -164,7 +164,7 @@ body { background: var(--dash-bg); }
 
 .dash-chart-body {
   position: relative;
-  min-height: 280px;
+  height: 280px;
   width: 100%;
 }
 .dash-chart-body > div { width: 100%; height: 100%; }
