@@ -6,6 +6,7 @@ const state = {
   currentUserEmail: "",
   ui: {
     chatExpanded: false,
+    genderFilter: "all",
   },
   filters: {
     position: "",
@@ -38,6 +39,7 @@ const els = {
   filtersStatus: document.getElementById("filtersStatus"),
   candidatesGrid: document.getElementById("candidatesGrid"),
   candidatesEmpty: document.getElementById("candidatesEmpty"),
+  candidateGenderFilter: document.getElementById("candidateGenderFilter"),
   refreshApplicantsBtn: document.getElementById("refreshApplicantsBtn"),
   refreshApplicantsStatus: document.getElementById("refreshApplicantsStatus"),
   applicantDrawer: document.getElementById("applicantDrawer"),
@@ -629,6 +631,143 @@ function normalizeAscii(value) {
     .replace(/ñ/g, "n");
 }
 
+function normalizeGenderValue(value) {
+  const normalized = normalizeAscii(value);
+  if (!normalized) return "";
+  if (["male", "man", "hombre", "masculino", "m"].includes(normalized)) return "male";
+  if (["female", "woman", "mujer", "femenino", "f"].includes(normalized)) return "female";
+  return "";
+}
+
+const COMMON_FEMALE_NAMES = new Set([
+  "abby", "adriana", "agustina", "alejandra", "alexandra", "alexa", "alicia", "allison",
+  "amanda", "ana", "anabel", "andrea", "angela", "angie", "anna", "ashley", "barbara",
+  "beatriz", "brenda", "camila", "carla", "carolina", "cassandra", "catalina", "cecilia",
+  "clara", "claudia", "cristina", "daniela", "diana", "emilia", "erika", "estefania",
+  "evelin", "evelyn", "fabiana", "fernanda", "flor", "gabriela", "gisela", "gloria",
+  "helen", "ingrid", "isabel", "isabella", "ivonne", "jennifer", "jessica", "jimena",
+  "joana", "johana", "julia", "juliana", "karen", "karina", "karen", "kate", "katherine",
+  "kathleen", "laura", "leslie", "liliana", "lina", "lorena", "lucia", "luisa", "luz",
+  "madison", "mafer", "margarita", "maria", "mariana", "maribel", "mariela", "maritza",
+  "melanie", "melissa", "micaela", "monica", "natalia", "nicole", "noelia", "paola",
+  "patricia", "paula", "paulina", "rebecca", "rosa", "sabrina", "samantha", "sara",
+  "sarah", "shirley", "silvia", "sofia", "stephanie", "susana", "tatiana", "tiffany",
+  "valentina", "valeria", "vanessa", "veronica", "victoria", "ximena", "yessica", "yuliana"
+]);
+
+const COMMON_MALE_NAMES = new Set([
+  "aaron", "adrian", "agustin", "alan", "alberto", "alejandro", "alex", "alonso",
+  "andres", "anthony", "antonio", "benjamin", "brayan", "bryan", "camilo", "carlos",
+  "christian", "cristian", "daniel", "danny", "david", "diego", "edgar", "eduardo",
+  "emmanuel", "enzo", "esteban", "fabian", "felipe", "fernando", "francisco", "gabriel",
+  "gary", "gerardo", "gerson", "giovanni", "gustavo", "harold", "hector", "henry",
+  "hugo", "ian", "isaac", "ivan", "javier", "jean", "jesus", "john", "jonathan",
+  "jorge", "jose", "juan", "julian", "kevin", "leo", "leonardo", "luis", "manuel",
+  "marco", "marcos", "martin", "mateo", "mauricio", "max", "miguel", "nelson", "nicolas",
+  "oscar", "pablo", "paul", "pedro", "rafael", "raul", "ricardo", "roberto", "rodrigo",
+  "samuel", "santiago", "sebastian", "sergio", "tomas", "victor", "walter", "william"
+]);
+
+function inferGenderFromName(name) {
+  const normalized = normalizeAscii(name)
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return "";
+
+  const [firstToken] = normalized.split(" ").filter(Boolean);
+  if (!firstToken) return "";
+
+  if (COMMON_FEMALE_NAMES.has(firstToken)) return "female";
+  if (COMMON_MALE_NAMES.has(firstToken)) return "male";
+
+  if (firstToken.endsWith("ette") || firstToken.endsWith("elly") || firstToken.endsWith("lly")) return "female";
+  if (firstToken.endsWith("son") || firstToken.endsWith("ton")) return "male";
+  if (firstToken.endsWith("a")) return "female";
+  if (firstToken.endsWith("o")) return "male";
+  if (firstToken.endsWith("el") || firstToken.endsWith("er") || firstToken.endsWith("an")) return "male";
+  if (firstToken.endsWith("is") || firstToken.endsWith("ys") || firstToken.endsWith("lin")) return "female";
+
+  return "";
+}
+
+function inferGenderFromText(text) {
+  const normalized = normalizeAscii(text);
+  if (!normalized) return "";
+
+  const femalePattern = /\b(she|her|hers|woman|female|ms|mrs)\b/i;
+  const malePattern = /\b(he|him|his|man|male|mr)\b/i;
+  const femaleMatch = femalePattern.test(normalized);
+  const maleMatch = malePattern.test(normalized);
+
+  if (femaleMatch && !maleMatch) return "female";
+  if (maleMatch && !femaleMatch) return "male";
+  return "";
+}
+
+function resolveApplicantGender(applicant) {
+  const explicitGender = normalizeGenderValue(
+    applicant.gender ||
+    applicant.sexo ||
+    applicant.sex ||
+    applicant.preferred_gender ||
+    applicant.pronouns
+  );
+  if (explicitGender) return explicitGender;
+
+  const nameGender = inferGenderFromName(
+    applicant.first_name ||
+    applicant.name ||
+    `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim()
+  );
+  if (nameGender) return nameGender;
+
+  const textGender = inferGenderFromText([
+    applicant.first_name,
+    applicant.last_name,
+    applicant.linkedin_url,
+    applicant.extracted_pdf,
+  ].filter(Boolean).join(" "));
+  if (textGender) return textGender;
+
+  return "female";
+}
+
+function matchesGenderFilter(candidate) {
+  const activeFilter = state.ui.genderFilter || "all";
+  if (activeFilter === "all") return true;
+  return (candidate.profile.gender || "unknown") === activeFilter;
+}
+
+function getGenderCounts() {
+  return state.candidates.reduce((acc, candidate) => {
+    const gender = candidate?.profile?.gender || "female";
+    acc.all += 1;
+    if (gender === "male") acc.male += 1;
+    else acc.female += 1;
+    return acc;
+  }, { all: 0, male: 0, female: 0 });
+}
+
+function syncGenderFilterButtons() {
+  if (!els.candidateGenderFilter) return;
+  const counts = getGenderCounts();
+  const buttons = els.candidateGenderFilter.querySelectorAll("[data-gender-filter]");
+  buttons.forEach((button) => {
+    const filterKey = button.dataset.genderFilter || "all";
+    const isActive = filterKey === state.ui.genderFilter;
+    const baseLabel = (
+      filterKey === "all" ? "Todos" :
+      filterKey === "male" ? "Hombre" :
+      "Mujer"
+    );
+    const count = Number.isFinite(counts[filterKey]) ? counts[filterKey] : 0;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.textContent = `${baseLabel} (${count})`;
+  });
+}
+
 const MONTH_MAP = {
   jan: 1,
   january: 1,
@@ -826,6 +965,7 @@ function buildApplicantProfile(applicant) {
   return {
     id: applicant.applicant_id,
     name: fallbackName,
+    gender: resolveApplicantGender(applicant),
     country: applicant.location || "",
     position: applicant.role_position || "",
     industry: applicant.area || "",
@@ -1270,6 +1410,7 @@ function renderCandidates() {
       const score = getDisplayScore(candidate.score);
       return { ...candidate, score };
     })
+    .filter((candidate) => matchesGenderFilter(candidate))
     .sort((a, b) => {
       if (Number.isFinite(a.score) && Number.isFinite(b.score)) return b.score - a.score;
       if (Number.isFinite(a.score)) return -1;
@@ -1277,11 +1418,13 @@ function renderCandidates() {
       return 0;
     });
 
+  syncGenderFilterButtons();
+
   els.candidatesGrid.innerHTML = "";
   els.candidatesEmpty.style.display = scored.length ? "none" : "block";
   els.candidatesEmpty.textContent = scored.length
     ? ""
-    : "No applicants yet.";
+    : (state.candidates.length ? "No hay candidatos para ese filtro." : "No applicants yet.");
   els.candidateCount.textContent = `${scored.length} applicants`;
 
   scored.forEach((candidate) => {
@@ -1599,6 +1742,17 @@ async function init() {
 
   if (els.refreshApplicantsBtn) {
     els.refreshApplicantsBtn.addEventListener("click", () => backfillApplicantsAI(opportunityId));
+  }
+
+  if (els.candidateGenderFilter) {
+    els.candidateGenderFilter.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-gender-filter]");
+      if (!button) return;
+      state.ui.genderFilter = button.dataset.genderFilter || "all";
+      syncGenderFilterButtons();
+      renderCandidates();
+    });
+    syncGenderFilterButtons();
   }
 
   if (els.chatFab) {

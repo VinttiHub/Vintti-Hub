@@ -45,6 +45,14 @@
           </div>
           <div class="filters-grid" id="filtersGrid"></div>
         </div>
+        <div class="candidate-gender-filter" aria-label="Filter candidates by gender">
+          <span class="candidate-gender-filter__label">Gender</span>
+          <div class="candidate-gender-filter__controls" id="candidateGenderFilter">
+            <button class="candidate-gender-filter__btn is-active" type="button" data-gender-filter="all">Todos</button>
+            <button class="candidate-gender-filter__btn" type="button" data-gender-filter="male">Hombre</button>
+            <button class="candidate-gender-filter__btn" type="button" data-gender-filter="female">Mujer</button>
+          </div>
+        </div>
         <div class="candidates-scroll">
           <div class="candidates-grid" id="candidatesGrid"></div>
           <div class="empty-state" id="candidatesEmpty">Loading applicants…</div>

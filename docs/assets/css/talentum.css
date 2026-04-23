@@ -453,6 +453,56 @@ body.chat-expanded .chat-panel {
   margin-bottom: 4px;
 }
 
+.candidate-gender-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.candidate-gender-filter__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.candidate-gender-filter__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.candidate-gender-filter__btn {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.candidate-gender-filter__btn:hover {
+  transform: translateY(-1px);
+}
+
+.candidate-gender-filter__btn.is-active {
+  background: var(--accent-strong);
+  color: #fff;
+  border-color: transparent;
+}
+
 .drawer-actions {
   display: flex;
   align-items: center;
