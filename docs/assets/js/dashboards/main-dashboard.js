@@ -11,6 +11,7 @@
     pageId: SLUG,
     defaults: { tab: 'growth' },
   });
+  VD.pageState = state;
 
   let dashboard = null;
   let charts = [];

@@ -9,6 +9,7 @@ from . import (
     batch_sourcing,
     mrr_history,
     active_headcount_history,
+    active_headcount_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -18,6 +19,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     batch_sourcing.DATASET["key"]: batch_sourcing.DATASET,
     mrr_history.DATASET["key"]: mrr_history.DATASET,
     active_headcount_history.DATASET["key"]: active_headcount_history.DATASET,
+    active_headcount_detail.DATASET["key"]: active_headcount_detail.DATASET,
 }
 
 

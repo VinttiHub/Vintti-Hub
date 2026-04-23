@@ -140,6 +140,20 @@ MAIN_CHARTS = [
         "position": {"x": 8, "y": 7, "w": 4, "h": 5},
         "sort_order": 80,
     },
+    {
+        "chart_key": "gr_table_active_headcount_detail",
+        "tab_key": "growth",
+        "title": "Candidatos activos (detalle por mes)",
+        "type": "table",
+        "dataset_key": "active_headcount_detail",
+        "config": {
+            "mapping": {
+                "columns": ["month", "client_name", "candidate_name", "start_date"],
+            },
+        },
+        "position": {"x": 0, "y": 12, "w": 12, "h": 6},
+        "sort_order": 90,
+    },
 
     # Account Management
     {

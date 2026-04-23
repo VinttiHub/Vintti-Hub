@@ -280,6 +280,15 @@
     const instance = window.echarts.init(holder);
     instance.setOption(option);
     new ResizeObserver(() => instance.resize()).observe(holder);
+
+    if (mapping.drillKey && window.VinttiDashboards && window.VinttiDashboards.pageState) {
+      holder.style.cursor = 'pointer';
+      instance.on('click', (params) => {
+        if (params && params.name != null) {
+          window.VinttiDashboards.pageState.set(mapping.drillKey, params.name);
+        }
+      });
+    }
     return instance;
   }
 
