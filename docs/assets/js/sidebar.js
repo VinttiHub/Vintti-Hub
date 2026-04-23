@@ -118,6 +118,7 @@
       'pgonzales@vintti.com'
     ]).has(email);
     setDisplay('dashboardLink', dashOk);
+    setDisplay('customDashboardLink', dashOk);
     setDisplay('managementMetricsLink', dashOk);
 
     setDisplay('recruiterPowerLink', new Set([
