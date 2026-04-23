@@ -114,6 +114,32 @@ MAIN_CHARTS = [
         "position": {"x": 8, "y": 2, "w": 4, "h": 5},
         "sort_order": 60,
     },
+    {
+        "chart_key": "gr_line_mrr",
+        "tab_key": "growth",
+        "title": "MRR",
+        "type": "line",
+        "dataset_key": "mrr_history",
+        "config": {
+            "filters": {"metric": "Revenue"},
+            "mapping": {"x": "mes", "y": ["mrr_total"], "formatter": "currency"},
+        },
+        "position": {"x": 0, "y": 7, "w": 8, "h": 5},
+        "sort_order": 70,
+    },
+    {
+        "chart_key": "gr_line_mrr_growth",
+        "tab_key": "growth",
+        "title": "MRR Growth %",
+        "type": "line",
+        "dataset_key": "mrr_history",
+        "config": {
+            "filters": {"metric": "Revenue"},
+            "mapping": {"x": "mes", "y": ["growth_pct"], "formatter": "percent"},
+        },
+        "position": {"x": 8, "y": 7, "w": 4, "h": 5},
+        "sort_order": 80,
+    },
 
     # Account Management
     {
