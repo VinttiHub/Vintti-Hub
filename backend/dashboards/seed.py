@@ -109,7 +109,7 @@ MAIN_CHARTS = [
         "tab_key": "growth",
         "title": "Active Headcount por mes",
         "type": "bar",
-        "dataset_key": "ts_history",
+        "dataset_key": "active_headcount_history",
         "config": {"mapping": {"x": "month", "y": ["active_count"], "formatter": "number"}},
         "position": {"x": 8, "y": 2, "w": 4, "h": 5},
         "sort_order": 60,

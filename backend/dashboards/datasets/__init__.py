@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from . import ts_history, management_dashboard, opportunities, batch_sourcing, mrr_history
+from . import (
+    ts_history,
+    management_dashboard,
+    opportunities,
+    batch_sourcing,
+    mrr_history,
+    active_headcount_history,
+)
 
 _REGISTRY: dict[str, dict[str, Any]] = {
     ts_history.DATASET["key"]: ts_history.DATASET,
@@ -10,6 +17,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     opportunities.DATASET["key"]: opportunities.DATASET,
     batch_sourcing.DATASET["key"]: batch_sourcing.DATASET,
     mrr_history.DATASET["key"]: mrr_history.DATASET,
+    active_headcount_history.DATASET["key"]: active_headcount_history.DATASET,
 }
 
 
