@@ -131,30 +131,27 @@ def public_candidate_references_context():
         if not hire:
             return jsonify({'error': 'candidate not found'}), 404
 
-        if hire.get('opportunity_id'):
-            cur.execute(
-                """
-                SELECT
-                    reference_1_name,
-                    reference_1_phone,
-                    reference_1_email,
-                    reference_1_linkedin,
-                    reference_1_position,
-                    reference_2_name,
-                    reference_2_phone,
-                    reference_2_email,
-                    reference_2_linkedin,
-                    reference_2_position
-                FROM hire_opportunity
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
-                LIMIT 1
-                """,
-                (candidate_id, hire['opportunity_id']),
-            )
-            refs = cur.fetchone() or {}
-        else:
-            refs = {}
+        cur.execute(
+            """
+            SELECT
+                references_notes,
+                reference_1_name,
+                reference_1_phone,
+                reference_1_email,
+                reference_1_linkedin,
+                reference_1_position,
+                reference_2_name,
+                reference_2_phone,
+                reference_2_email,
+                reference_2_linkedin,
+                reference_2_position
+            FROM candidates
+            WHERE candidate_id = %s
+            LIMIT 1
+            """,
+            (candidate_id,),
+        )
+        refs = cur.fetchone() or {}
 
         return jsonify({
             'candidate_id': hire['candidate_id'],
@@ -214,27 +211,15 @@ def submit_candidate_references():
         hire = _resolve_candidate_hire(cur, candidate_id, opportunity_id)
         if not hire:
             return jsonify({'error': 'candidate not found'}), 404
-        if not hire.get('opportunity_id'):
-            return jsonify({'error': 'No hired opportunity found for this candidate'}), 404
-
-        cur.execute(
-            """
-            INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
-            """,
-            (candidate_id, hire['opportunity_id'], hire.get('account_id')),
-        )
 
         cur.execute(
             """
             SELECT references_notes
-            FROM hire_opportunity
+            FROM candidates
             WHERE candidate_id = %s
-              AND opportunity_id = %s
             LIMIT 1
             """,
-            (candidate_id, hire['opportunity_id']),
+            (candidate_id,),
         )
         existing = cur.fetchone() or {}
         manual_notes = _strip_structured_references_html(existing.get('references_notes') or '')
@@ -243,7 +228,7 @@ def submit_candidate_references():
 
         cur.execute(
             """
-            UPDATE hire_opportunity
+            UPDATE candidates
             SET
                 reference_1_name = %s,
                 reference_1_position = %s,
@@ -257,7 +242,6 @@ def submit_candidate_references():
                 reference_2_linkedin = %s,
                 references_notes = %s
             WHERE candidate_id = %s
-              AND opportunity_id = %s
             """,
             (
                 cleaned['reference_1_name'],
@@ -272,9 +256,52 @@ def submit_candidate_references():
                 cleaned['reference_2_linkedin'],
                 merged_notes,
                 candidate_id,
-                hire['opportunity_id'],
             ),
         )
+
+        if hire.get('opportunity_id'):
+            cur.execute(
+                """
+                INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
+                """,
+                (candidate_id, hire['opportunity_id'], hire.get('account_id')),
+            )
+            cur.execute(
+                """
+                UPDATE hire_opportunity
+                SET
+                    reference_1_name = %s,
+                    reference_1_position = %s,
+                    reference_1_phone = %s,
+                    reference_1_email = %s,
+                    reference_1_linkedin = %s,
+                    reference_2_name = %s,
+                    reference_2_position = %s,
+                    reference_2_phone = %s,
+                    reference_2_email = %s,
+                    reference_2_linkedin = %s,
+                    references_notes = %s
+                WHERE candidate_id = %s
+                  AND opportunity_id = %s
+                """,
+                (
+                    cleaned['reference_1_name'],
+                    cleaned['reference_1_position'],
+                    cleaned['reference_1_phone'],
+                    cleaned['reference_1_email'],
+                    cleaned['reference_1_linkedin'],
+                    cleaned['reference_2_name'],
+                    cleaned['reference_2_position'],
+                    cleaned['reference_2_phone'],
+                    cleaned['reference_2_email'],
+                    cleaned['reference_2_linkedin'],
+                    merged_notes,
+                    candidate_id,
+                    hire['opportunity_id'],
+                ),
+            )
 
         conn.commit()
         return jsonify({

@@ -36,6 +36,19 @@ _REJECTED_BATCH_STATUSES = {
 }
 _REJECTION_ALERT_THRESHOLD = 5
 _REJECTION_ALERT_EMAIL = 'pgonzales@vintti.com'
+_REFERENCE_CANDIDATE_FIELDS = [
+    'references_notes',
+    'reference_1_name',
+    'reference_1_position',
+    'reference_1_phone',
+    'reference_1_email',
+    'reference_1_linkedin',
+    'reference_2_name',
+    'reference_2_position',
+    'reference_2_phone',
+    'reference_2_email',
+    'reference_2_linkedin',
+]
 
 
 def _normalize_name(value):
@@ -495,6 +508,27 @@ def _bulk_update_candidate_blacklist(cursor, candidate_ids, flag=True):
         params
     )
     return cursor.rowcount
+
+
+def _sync_candidate_reference_fields_to_hire(cursor, candidate_id, fields):
+    sync_fields = {
+        field: fields[field]
+        for field in _REFERENCE_CANDIDATE_FIELDS
+        if field in fields
+    }
+    if not sync_fields:
+        return
+
+    set_cols = [f"{field} = %s" for field in sync_fields.keys()]
+    values = list(sync_fields.values()) + [candidate_id]
+    cursor.execute(
+        f"""
+        UPDATE hire_opportunity
+        SET {', '.join(set_cols)}
+        WHERE candidate_id = %s
+        """,
+        values,
+    )
 
 @bp.route('/candidates/light')
 def get_candidates_light():
@@ -1048,6 +1082,17 @@ def get_candidate_by_id(candidate_id):
                 c.address,
                 c.dni,
                 c.compu_propia,
+                c.references_notes,
+                c.reference_1_name,
+                c.reference_1_position,
+                c.reference_1_phone,
+                c.reference_1_email,
+                c.reference_1_linkedin,
+                c.reference_2_name,
+                c.reference_2_position,
+                c.reference_2_phone,
+                c.reference_2_email,
+                c.reference_2_linkedin,
                 bl.blacklist_id,
                 COALESCE(bl.blacklist_id IS NOT NULL, FALSE) AS is_blacklisted
             FROM candidates c
@@ -1190,7 +1235,18 @@ def update_candidate_fields(candidate_id):
         'other_process',
         'vacations',
         'usa_nationality',
-        'compu_propia'
+        'compu_propia',
+        'references_notes',
+        'reference_1_name',
+        'reference_1_position',
+        'reference_1_phone',
+        'reference_1_email',
+        'reference_1_linkedin',
+        'reference_2_name',
+        'reference_2_position',
+        'reference_2_phone',
+        'reference_2_email',
+        'reference_2_linkedin',
     ]
 
     updates = []
@@ -1222,6 +1278,7 @@ def update_candidate_fields(candidate_id):
             SET {', '.join(updates)}
             WHERE candidate_id = %s
         """, values)
+        _sync_candidate_reference_fields_to_hire(cursor, candidate_id, data)
         conn.commit()
         cursor.close()
         conn.close()
@@ -1317,6 +1374,25 @@ def handle_candidate_hire_data(candidate_id):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cur.execute("""
+            SELECT
+                references_notes,
+                reference_1_name,
+                reference_1_phone,
+                reference_1_email,
+                reference_1_linkedin,
+                reference_1_position,
+                reference_2_name,
+                reference_2_phone,
+                reference_2_email,
+                reference_2_linkedin,
+                reference_2_position
+            FROM candidates
+            WHERE candidate_id = %s
+            LIMIT 1
+        """, (candidate_id,))
+        candidate_reference_row = cur.fetchone() or {}
+
         if request.method == 'GET':
             # 1) pick the opportunity
             opp_id_param = request.args.get('opportunity_id', type=int)
@@ -1342,6 +1418,15 @@ def handle_candidate_hire_data(candidate_id):
                     LIMIT 1
                 """, (candidate_id,))
                 opp = cur.fetchone()
+                if not opp:
+                    cur.execute("""
+                        SELECT opportunity_id, opp_model, account_id
+                        FROM opportunity
+                        WHERE candidato_contratado = %s
+                        ORDER BY opportunity_id DESC
+                        LIMIT 1
+                    """, (candidate_id,))
+                    opp = cur.fetchone()
 
             if not opp:
                 return jsonify({'error': 'No hired opportunity found for this candidate'}), 404
@@ -1410,17 +1495,17 @@ def handle_candidate_hire_data(candidate_id):
                 # return an empty shell so the UI can render cleanly
                 return jsonify({
                     'opportunity_id': opportunity_id,
-                    'references_notes': None,
-                    'reference_1_name': None,
-                    'reference_1_phone': None,
-                    'reference_1_email': None,
-                    'reference_1_linkedin': None,
-                    'reference_1_position': None,
-                    'reference_2_name': None,
-                    'reference_2_phone': None,
-                    'reference_2_email': None,
-                    'reference_2_linkedin': None,
-                    'reference_2_position': None,
+                    'references_notes': candidate_reference_row.get('references_notes'),
+                    'reference_1_name': candidate_reference_row.get('reference_1_name'),
+                    'reference_1_phone': candidate_reference_row.get('reference_1_phone'),
+                    'reference_1_email': candidate_reference_row.get('reference_1_email'),
+                    'reference_1_linkedin': candidate_reference_row.get('reference_1_linkedin'),
+                    'reference_1_position': candidate_reference_row.get('reference_1_position'),
+                    'reference_2_name': candidate_reference_row.get('reference_2_name'),
+                    'reference_2_phone': candidate_reference_row.get('reference_2_phone'),
+                    'reference_2_email': candidate_reference_row.get('reference_2_email'),
+                    'reference_2_linkedin': candidate_reference_row.get('reference_2_linkedin'),
+                    'reference_2_position': candidate_reference_row.get('reference_2_position'),
                     'employee_salary': None,
                     'employee_fee': None,
                     'computer': None,
@@ -1445,17 +1530,17 @@ def handle_candidate_hire_data(candidate_id):
 
             return jsonify({
                 'opportunity_id': opportunity_id,
-                'references_notes': row['references_notes'],
-                'reference_1_name': row['reference_1_name'],
-                'reference_1_phone': row['reference_1_phone'],
-                'reference_1_email': row['reference_1_email'],
-                'reference_1_linkedin': row['reference_1_linkedin'],
-                'reference_1_position': row['reference_1_position'],
-                'reference_2_name': row['reference_2_name'],
-                'reference_2_phone': row['reference_2_phone'],
-                'reference_2_email': row['reference_2_email'],
-                'reference_2_linkedin': row['reference_2_linkedin'],
-                'reference_2_position': row['reference_2_position'],
+                'references_notes': row['references_notes'] or candidate_reference_row.get('references_notes'),
+                'reference_1_name': row['reference_1_name'] or candidate_reference_row.get('reference_1_name'),
+                'reference_1_phone': row['reference_1_phone'] or candidate_reference_row.get('reference_1_phone'),
+                'reference_1_email': row['reference_1_email'] or candidate_reference_row.get('reference_1_email'),
+                'reference_1_linkedin': row['reference_1_linkedin'] or candidate_reference_row.get('reference_1_linkedin'),
+                'reference_1_position': row['reference_1_position'] or candidate_reference_row.get('reference_1_position'),
+                'reference_2_name': row['reference_2_name'] or candidate_reference_row.get('reference_2_name'),
+                'reference_2_phone': row['reference_2_phone'] or candidate_reference_row.get('reference_2_phone'),
+                'reference_2_email': row['reference_2_email'] or candidate_reference_row.get('reference_2_email'),
+                'reference_2_linkedin': row['reference_2_linkedin'] or candidate_reference_row.get('reference_2_linkedin'),
+                'reference_2_position': row['reference_2_position'] or candidate_reference_row.get('reference_2_position'),
                 'employee_salary': row['salary'],
                 'employee_fee': row['fee'],
                 'computer': row['computer'],
@@ -1617,6 +1702,20 @@ def handle_candidate_hire_data(candidate_id):
                 WHERE candidate_id = %s AND opportunity_id = %s
             """, set_vals)
             updated = True
+
+        candidate_reference_updates = {
+            field: data[field]
+            for field in _REFERENCE_CANDIDATE_FIELDS
+            if field in data
+        }
+        if candidate_reference_updates:
+            candidate_set_cols = [f"{field} = %s" for field in candidate_reference_updates.keys()]
+            candidate_vals = list(candidate_reference_updates.values()) + [candidate_id]
+            cur.execute(f"""
+                UPDATE candidates
+                SET {', '.join(candidate_set_cols)}
+                WHERE candidate_id = %s
+            """, candidate_vals)
 
         # if row didn’t exist before, mark created
         cur.execute("""

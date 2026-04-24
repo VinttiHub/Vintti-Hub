@@ -1648,6 +1648,16 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
     .then(r => r.json())
     .then(data => {
       candidateOverviewData = data;
+      window.__referenceFeedbackSubmittedRefs = parseSubmittedReferenceFeedbackFromNotes(data.references_notes || '');
+      hireReferenceFields.forEach(([id, field]) => {
+        const input = document.getElementById(id);
+        if (input && input !== document.activeElement) input.value = data[field] || '';
+      });
+      const candidateReferenceOverviewValues = extractReferenceOverviewValues(data);
+      renderReferenceOverview(candidateReferenceOverviewValues);
+      if (!hasAnyReferenceOverviewValue(candidateReferenceOverviewValues)) {
+        loadCandidateReferenceOverviewFallback().catch(console.error);
+      }
       const isBlacklisted = Boolean(data && data.is_blacklisted);
       if (typeof window.__applyBlacklistState === 'function') {
         window.__applyBlacklistState({
@@ -2513,6 +2523,52 @@ function parseSubmittedReferenceFeedbackFromNotes(html = '') {
   return submitted;
 }
 
+function extractReferenceOverviewValues(source = {}) {
+  return {
+    reference_1_name: source.reference_1_name || '',
+    reference_1_position: source.reference_1_position || '',
+    reference_1_phone: source.reference_1_phone || '',
+    reference_1_email: source.reference_1_email || '',
+    reference_1_linkedin: source.reference_1_linkedin || '',
+    reference_2_name: source.reference_2_name || '',
+    reference_2_position: source.reference_2_position || '',
+    reference_2_phone: source.reference_2_phone || '',
+    reference_2_email: source.reference_2_email || '',
+    reference_2_linkedin: source.reference_2_linkedin || '',
+  };
+}
+
+function hasAnyReferenceOverviewValue(values = {}) {
+  return Object.values(values || {}).some((value) => String(value || '').trim());
+}
+
+async function loadCandidateReferenceOverviewFallback() {
+  try {
+    const url = new URL('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/candidate_references/context');
+    url.searchParams.set('candidate_id', candidateId);
+    if (window.__currentOppId) url.searchParams.set('opportunity_id', window.__currentOppId);
+    const res = await fetch(url.toString());
+    if (!res.ok) return;
+    const data = await res.json();
+    const refs = extractReferenceOverviewValues(data?.references || {});
+    if (!hasAnyReferenceOverviewValue(refs)) return;
+
+    hireReferenceFields.forEach(([id, field]) => {
+      const input = document.getElementById(id);
+      if (input && input !== document.activeElement && !String(input.value || '').trim()) {
+        input.value = refs[field] || '';
+      }
+    });
+
+    renderReferenceOverview({
+      ...(window.__currentReferenceOverviewValues || {}),
+      ...refs,
+    });
+  } catch (err) {
+    console.warn('Unable to load candidate reference overview fallback', err);
+  }
+}
+
 function getCandidateDisplayName() {
   const current = (document.getElementById('field-name')?.textContent || '').trim();
   return current && current !== '—' ? current : 'the candidate';
@@ -2897,21 +2953,22 @@ if (hireRevenue){
         const ref = document.getElementById('hire-references');     if (ref) ref.innerHTML = data.references_notes || '';
         window.__referenceFeedbackSubmittedRefs = parseSubmittedReferenceFeedbackFromNotes(data.references_notes || '');
         const fallbackReferenceValues = parseStructuredReferencesFromNotes(data.references_notes || '');
+        const existingOverviewValues = window.__currentReferenceOverviewValues || {};
         hireReferenceFields.forEach(([id, field]) => {
           const input = document.getElementById(id);
-          if (input && input !== document.activeElement) input.value = data[field] || fallbackReferenceValues[field] || '';
+          if (input && input !== document.activeElement) input.value = data[field] || fallbackReferenceValues[field] || existingOverviewValues[field] || '';
         });
         renderReferenceOverview({
-          reference_1_name: data.reference_1_name || fallbackReferenceValues.reference_1_name || '',
-          reference_1_position: data.reference_1_position || fallbackReferenceValues.reference_1_position || '',
-          reference_1_phone: data.reference_1_phone || fallbackReferenceValues.reference_1_phone || '',
-          reference_1_email: data.reference_1_email || fallbackReferenceValues.reference_1_email || '',
-          reference_1_linkedin: data.reference_1_linkedin || fallbackReferenceValues.reference_1_linkedin || '',
-          reference_2_name: data.reference_2_name || fallbackReferenceValues.reference_2_name || '',
-          reference_2_position: data.reference_2_position || fallbackReferenceValues.reference_2_position || '',
-          reference_2_phone: data.reference_2_phone || fallbackReferenceValues.reference_2_phone || '',
-          reference_2_email: data.reference_2_email || fallbackReferenceValues.reference_2_email || '',
-          reference_2_linkedin: data.reference_2_linkedin || fallbackReferenceValues.reference_2_linkedin || '',
+          reference_1_name: data.reference_1_name || fallbackReferenceValues.reference_1_name || existingOverviewValues.reference_1_name || '',
+          reference_1_position: data.reference_1_position || fallbackReferenceValues.reference_1_position || existingOverviewValues.reference_1_position || '',
+          reference_1_phone: data.reference_1_phone || fallbackReferenceValues.reference_1_phone || existingOverviewValues.reference_1_phone || '',
+          reference_1_email: data.reference_1_email || fallbackReferenceValues.reference_1_email || existingOverviewValues.reference_1_email || '',
+          reference_1_linkedin: data.reference_1_linkedin || fallbackReferenceValues.reference_1_linkedin || existingOverviewValues.reference_1_linkedin || '',
+          reference_2_name: data.reference_2_name || fallbackReferenceValues.reference_2_name || existingOverviewValues.reference_2_name || '',
+          reference_2_position: data.reference_2_position || fallbackReferenceValues.reference_2_position || existingOverviewValues.reference_2_position || '',
+          reference_2_phone: data.reference_2_phone || fallbackReferenceValues.reference_2_phone || existingOverviewValues.reference_2_phone || '',
+          reference_2_email: data.reference_2_email || fallbackReferenceValues.reference_2_email || existingOverviewValues.reference_2_email || '',
+          reference_2_linkedin: data.reference_2_linkedin || fallbackReferenceValues.reference_2_linkedin || existingOverviewValues.reference_2_linkedin || '',
         });
         loadReferenceFeedbackRequests(window.__currentOppId);
 

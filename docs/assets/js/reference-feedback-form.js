@@ -144,28 +144,25 @@ const API_BASE =
         return;
       }
     } else {
-      if (!context.candidate_id || !context.opportunity_id) {
-        alert('Missing candidate or opportunity data in this form.');
+      if (!context.candidate_id) {
+        alert('Missing candidate data in this form.');
         return;
       }
 
-      const hireUrl = new URL(`${API_BASE}/candidates/${encodeURIComponent(context.candidate_id)}/hire`);
-      hireUrl.searchParams.set('opportunity_id', context.opportunity_id);
-      const hireRes = await fetch(hireUrl.toString());
-      if (!hireRes.ok) {
-        const txt = await hireRes.text().catch(() => '');
-        alert(`Unable to load current hire notes.\n${txt}`);
+      const candidateRes = await fetch(`${API_BASE}/candidates/${encodeURIComponent(context.candidate_id)}`);
+      if (!candidateRes.ok) {
+        const txt = await candidateRes.text().catch(() => '');
+        alert(`Unable to load current candidate notes.\n${txt}`);
         return;
       }
 
-      const hireData = await hireRes.json();
-      const mergedNotes = mergeFeedbackIntoNotes(hireData.references_notes || '', context, answers);
+      const candidateData = await candidateRes.json();
+      const mergedNotes = mergeFeedbackIntoNotes(candidateData.references_notes || '', context, answers);
 
-      res = await fetch(`${API_BASE}/candidates/${encodeURIComponent(context.candidate_id)}/hire`, {
+      res = await fetch(`${API_BASE}/candidates/${encodeURIComponent(context.candidate_id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          opportunity_id: context.opportunity_id,
           references_notes: mergedNotes,
         }),
       });
