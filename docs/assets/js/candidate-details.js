@@ -1655,6 +1655,7 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
       });
       const candidateReferenceOverviewValues = extractReferenceOverviewValues(data);
       renderReferenceOverview(candidateReferenceOverviewValues);
+      loadReferenceFeedbackRequests(window.__currentOppId).catch(console.error);
       if (!hasAnyReferenceOverviewValue(candidateReferenceOverviewValues)) {
         loadCandidateReferenceOverviewFallback().catch(console.error);
       }
@@ -2779,12 +2780,13 @@ async function generateReferenceFeedbackForm() {
   }
 }
 
-function openReferenceFeedbackResponses(referenceNumber) {
+async function openReferenceFeedbackResponses(referenceNumber) {
   const modal = document.getElementById('reference-feedback-response-modal');
   const content = document.getElementById('reference-feedback-response-content');
   const subtitle = document.getElementById('reference-feedback-response-subtitle');
   if (!modal || !content) return;
 
+  await loadReferenceFeedbackRequests(window.__currentOppId).catch(console.error);
   const requestInfo = window.__referenceFeedbackRequests?.[String(referenceNumber)];
   if (!requestInfo || !requestInfo.submitted_at) {
     alert('No submitted responses found for this reference yet.');
@@ -3073,7 +3075,7 @@ if (hireRevenue){
     const viewBtn = event.target.closest('[data-reference-feedback-view]');
     if (viewBtn) {
       event.preventDefault();
-      openReferenceFeedbackResponses(Number(viewBtn.getAttribute('data-reference-feedback-view')));
+      openReferenceFeedbackResponses(Number(viewBtn.getAttribute('data-reference-feedback-view'))).catch(console.error);
       return;
     }
 

@@ -9,10 +9,7 @@ from db import get_connection
 
 
 bp = Blueprint('public_reference_feedback', __name__, url_prefix='/public/reference_feedback')
-_REFERENCE_FEEDBACK_NOTES_RE = re.compile(
-    r'<div[^>]*data-reference-feedback-notes="true"[^>]*>.*?</div>',
-    flags=re.I | re.S,
-)
+_DIV_TAG_RE = re.compile(r'</?div\b[^>]*>', flags=re.I)
 
 
 def _clean_text(value):
@@ -63,8 +60,40 @@ def _escape_html(value):
     )
 
 
+def _strip_tagged_div(html, marker):
+    content = html or ''
+    marker = (marker or '').lower()
+    while True:
+        match = None
+        for tag_match in _DIV_TAG_RE.finditer(content):
+            tag_text = tag_match.group(0).lower()
+            if tag_text.startswith('<div') and marker in tag_text:
+                match = tag_match
+                break
+        if not match:
+            return content.strip()
+
+        depth = 1
+        end_index = None
+        for tag_match in _DIV_TAG_RE.finditer(content, match.end()):
+            tag_text = tag_match.group(0).lower()
+            if tag_text.startswith('</div'):
+                depth -= 1
+                if depth == 0:
+                    end_index = tag_match.end()
+                    break
+            else:
+                depth += 1
+
+        if end_index is None:
+            content = content[:match.start()]
+            continue
+
+        content = (content[:match.start()] + content[end_index:]).strip()
+
+
 def _strip_feedback_notes(html):
-    return _REFERENCE_FEEDBACK_NOTES_RE.sub('', html or '').strip()
+    return _strip_tagged_div(html, 'data-reference-feedback-notes="true"')
 
 
 def _build_feedback_notes_html(rows):

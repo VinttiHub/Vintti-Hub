@@ -1620,7 +1620,7 @@ def handle_candidate_hire_data(candidate_id):
         candidate_seed_updates = {
             field: candidate_reference_row.get(field)
             for field in _REFERENCE_CANDIDATE_FIELDS
-            if field in candidate_reference_row
+            if field in candidate_reference_row and field != 'references_notes'
         }
         if candidate_seed_updates:
             seed_cols = [f"{field} = %s" for field in candidate_seed_updates.keys()]
