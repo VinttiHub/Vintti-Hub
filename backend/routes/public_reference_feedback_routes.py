@@ -74,6 +74,10 @@ def _build_feedback_notes_html(rows):
         answers = row.get('answers') or []
         if not questions or not answers:
             continue
+        reference_name = _escape_html(row.get('reference_name')) if row.get('reference_name') else ''
+        reference_title = f'Reference {row["reference_number"]}'
+        if reference_name:
+            reference_title = f'{reference_title} - {reference_name}'
         qa_lines = []
         for index, question in enumerate(questions):
             answer = answers[index] if index < len(answers) else ''
@@ -89,9 +93,7 @@ def _build_feedback_notes_html(rows):
             (
                 f'<section data-reference-feedback-section="{row["reference_number"]}">'
                 f'<p>----------------------------------------</p>'
-                f'<p><strong>Reference {row["reference_number"]}'
-                f'{f" - {_escape_html(row.get("reference_name"))}" if row.get("reference_name") else ""}'
-                f'</strong></p>'
+                f'<p><strong>{reference_title}</strong></p>'
                 f'{"<br>".join(qa_lines)}'
                 f'</section>'
             )
