@@ -34,6 +34,7 @@ from routes.moods_routes import bp as moods_bp
 from routes.to_do_routes import bp as to_do_bp
 from routes.public_bonus_routes import bp as public_bonus_bp
 from routes.public_candidate_references_routes import bp as public_candidate_references_bp
+from routes.public_reference_feedback_routes import bp as public_reference_feedback_bp
 from routes.google_calendar_routes import bp as google_calendar_bp
 from routes.hubspot_routes import bp as hubspot_bp
 from routes.turvo_routes import bp as turvo_bp
@@ -89,6 +90,7 @@ def create_app() -> Flask:
     app.register_blueprint(hunter_bp)
     app.register_blueprint(public_bonus_bp)
     app.register_blueprint(public_candidate_references_bp)
+    app.register_blueprint(public_reference_feedback_bp)
     app.register_blueprint(dashboards_bp)
 
     @app.after_request
