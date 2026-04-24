@@ -521,6 +521,27 @@
             </div>
           </div>
 
+          <div class="field doc-card" id="reference-request-card">
+            <label class="doc-card-label">
+              <span>Reference request</span>
+              <a id="reference-request-link" class="pill pill-link" href="#" target="_blank" rel="noopener noreferrer">Open form →</a>
+            </label>
+            <div class="reference-request-copy">
+              Share this form with the candidate so they can submit two professional references linked to this profile.
+            </div>
+            <div id="overview-reference-status" class="reference-status-badge">Waiting for references</div>
+            <div class="reference-overview-list">
+              <article class="reference-overview-item">
+                <h4>Reference 1</h4>
+                <div id="overview-reference-1" class="reference-overview-body">No information yet.</div>
+              </article>
+              <article class="reference-overview-item">
+                <h4>Reference 2</h4>
+                <div id="overview-reference-2" class="reference-overview-body">No information yet.</div>
+              </article>
+            </div>
+          </div>
+
           <!-- Toast contenedor (si no tienes ya uno global) -->
           <div id="cuteToast" class="cute-toast" role="status" aria-live="polite"></div>
 
@@ -815,6 +836,11 @@
         </div>
 
         <div class="field">
+          <label for="hire-reference-1-position">Reference 1 Position</label>
+          <input type="text" id="hire-reference-1-position" />
+        </div>
+
+        <div class="field">
           <label for="hire-reference-1-phone">Reference 1 Phone</label>
           <input type="tel" id="hire-reference-1-phone" />
         </div>
@@ -832,6 +858,11 @@
         <div class="field">
           <label for="hire-reference-2-name">Reference 2 Name</label>
           <input type="text" id="hire-reference-2-name" />
+        </div>
+
+        <div class="field">
+          <label for="hire-reference-2-position">Reference 2 Position</label>
+          <input type="text" id="hire-reference-2-position" />
         </div>
 
         <div class="field">

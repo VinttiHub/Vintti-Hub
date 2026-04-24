@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Candidate References • Vintti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./assets/css/reference-request.css" />
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4" />
+</head>
+<body>
+  <main class="page">
+    <section class="shell">
+      <header class="hero">
+        <div class="brand">
+          <img class="logo" src="./assets/img/vintti_logo.png" alt="Vintti logo" width="96" height="54" />
+          <div>
+            <h1>Candidate references</h1>
+            <p>Please complete the information for two professional references for this candidate.</p>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="meta-card">
+            <span class="meta-label">Estimated time</span>
+            <strong>3–4 min</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Candidate</span>
+            <strong id="candidateLabel">Loading...</strong>
+          </div>
+        </div>
+      </header>
+
+      <form class="form" id="referenceRequestForm">
+        <section class="card">
+          <div class="card-head">
+            <h2>1) Reference 1</h2>
+            <p>Share the contact details of the first professional reference.</p>
+          </div>
+          <div class="grid">
+            <label class="field">
+              <span>Full name</span>
+              <input name="reference_1_name" type="text" placeholder="e.g., Ana Perez" required />
+            </label>
+            <label class="field">
+              <span>Position</span>
+              <input name="reference_1_position" type="text" placeholder="e.g., Engineering Manager" required />
+            </label>
+            <label class="field">
+              <span>Cell phone</span>
+              <input name="reference_1_phone" type="tel" placeholder="e.g., +1 555 555 5555" required />
+            </label>
+            <label class="field">
+              <span>Email</span>
+              <input name="reference_1_email" type="email" placeholder="e.g., ana@company.com" required />
+            </label>
+            <label class="field field-full">
+              <span>LinkedIn</span>
+              <input name="reference_1_linkedin" type="url" placeholder="https://linkedin.com/in/..." required />
+            </label>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>2) Reference 2</h2>
+            <p>Share the contact details of the second professional reference.</p>
+          </div>
+          <div class="grid">
+            <label class="field">
+              <span>Full name</span>
+              <input name="reference_2_name" type="text" placeholder="e.g., Carlos Gomez" required />
+            </label>
+            <label class="field">
+              <span>Position</span>
+              <input name="reference_2_position" type="text" placeholder="e.g., Product Director" required />
+            </label>
+            <label class="field">
+              <span>Cell phone</span>
+              <input name="reference_2_phone" type="tel" placeholder="e.g., +52 55 5555 5555" required />
+            </label>
+            <label class="field">
+              <span>Email</span>
+              <input name="reference_2_email" type="email" placeholder="e.g., carlos@company.com" required />
+            </label>
+            <label class="field field-full">
+              <span>LinkedIn</span>
+              <input name="reference_2_linkedin" type="url" placeholder="https://linkedin.com/in/..." required />
+            </label>
+          </div>
+        </section>
+
+        <section class="card review">
+          <div class="card-head">
+            <h2>Summary</h2>
+            <p>Please review before submitting.</p>
+          </div>
+
+          <div class="review-grid">
+            <div class="review-item">
+              <span class="k">Candidate</span>
+              <strong class="v" data-review="candidate_name">—</strong>
+            </div>
+            <div class="review-item">
+              <span class="k">Reference 1</span>
+              <strong class="v" data-review="reference_1_name">—</strong>
+            </div>
+            <div class="review-item">
+              <span class="k">Reference 2</span>
+              <strong class="v" data-review="reference_2_name">—</strong>
+            </div>
+          </div>
+
+          <label class="checkbox">
+            <input type="checkbox" name="confirm" required />
+            <span>I confirm the information above is accurate.</span>
+          </label>
+        </section>
+
+        <footer class="actions">
+          <button type="button" class="btn ghost" id="btnClear">Clear</button>
+          <button type="submit" class="btn primary">Submit references</button>
+        </footer>
+      </form>
+    </section>
+  </main>
+
+  <script src="./assets/js/reference-request.js"></script>
+</body>
+</html>

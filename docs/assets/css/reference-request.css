@@ -1,0 +1,11 @@
+@import url('./bonus-form.css');
+
+.review-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+}

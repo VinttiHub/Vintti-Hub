@@ -1441,10 +1441,12 @@ async function patchHireFields(fields = {}, options = {}) {
   if (!entries.length) return;
   const referenceFieldNames = new Set([
     'reference_1_name',
+    'reference_1_position',
     'reference_1_phone',
     'reference_1_email',
     'reference_1_linkedin',
     'reference_2_name',
+    'reference_2_position',
     'reference_2_phone',
     'reference_2_email',
     'reference_2_linkedin',
@@ -2165,7 +2167,9 @@ if (successDiv) {
     if (!d.is_hired) {
       if (hireTab) hireTab.style.display = 'none';
       if (hireContent) hireContent.style.display = 'none';
+      return;
     }
+    loadHireData();
   });
 
 
@@ -2373,10 +2377,12 @@ const hireSetupFee = document.getElementById('hire-setup-fee');
 const referencesDiv = document.getElementById('hire-references');
 const hireReferenceFields = [
   ['hire-reference-1-name', 'reference_1_name'],
+  ['hire-reference-1-position', 'reference_1_position'],
   ['hire-reference-1-phone', 'reference_1_phone'],
   ['hire-reference-1-email', 'reference_1_email'],
   ['hire-reference-1-linkedin', 'reference_1_linkedin'],
   ['hire-reference-2-name', 'reference_2_name'],
+  ['hire-reference-2-position', 'reference_2_position'],
   ['hire-reference-2-phone', 'reference_2_phone'],
   ['hire-reference-2-email', 'reference_2_email'],
   ['hire-reference-2-linkedin', 'reference_2_linkedin'],
@@ -2411,6 +2417,7 @@ function buildStructuredReferencesHtml() {
     const prefix = `reference_${idx}`;
     const fields = [
       ['Name', `${prefix}_name`],
+      ['Position', `${prefix}_position`],
       ['Phone', `${prefix}_phone`],
       ['Email', `${prefix}_email`],
       ['LinkedIn', `${prefix}_linkedin`],
@@ -2448,6 +2455,57 @@ function parseStructuredReferencesFromNotes(html = '') {
     values[field] = raw === '-' ? '' : raw;
   });
   return values;
+}
+
+function normalizeReferenceLink(value) {
+  const clean = String(value || '').trim();
+  if (!clean) return '';
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return `https://${clean.replace(/^\/+/, '')}`;
+}
+
+function buildReferenceOverviewMarkup(idx, values = {}) {
+  const body = document.getElementById(`overview-reference-${idx}`);
+  if (!body) return;
+
+  const prefix = `reference_${idx}_`;
+  const name = values[`${prefix}name`] || '';
+  const position = values[`${prefix}position`] || '';
+  const phone = values[`${prefix}phone`] || '';
+  const email = values[`${prefix}email`] || '';
+  const linkedin = values[`${prefix}linkedin`] || '';
+  const hasAny = [name, position, phone, email, linkedin].some(Boolean);
+
+  body.classList.toggle('is-empty', !hasAny);
+  if (!hasAny) {
+    body.textContent = 'No information yet.';
+    return;
+  }
+
+  const lines = [];
+  if (name) lines.push(`<div><strong>Name:</strong> ${escapeReferenceHtml(name)}</div>`);
+  if (position) lines.push(`<div><strong>Position:</strong> ${escapeReferenceHtml(position)}</div>`);
+  if (phone) lines.push(`<div><strong>Phone:</strong> ${escapeReferenceHtml(phone)}</div>`);
+  if (email) lines.push(`<div><strong>Email:</strong> <a href="mailto:${escapeReferenceHtml(email)}">${escapeReferenceHtml(email)}</a></div>`);
+  if (linkedin) {
+    const href = normalizeReferenceLink(linkedin);
+    lines.push(`<div><strong>LinkedIn:</strong> <a href="${escapeReferenceHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeReferenceHtml(linkedin)}</a></div>`);
+  }
+  body.innerHTML = lines.join('');
+}
+
+function renderReferenceOverview(values = {}) {
+  buildReferenceOverviewMarkup(1, values);
+  buildReferenceOverviewMarkup(2, values);
+
+  const statusEl = document.getElementById('overview-reference-status');
+  if (!statusEl) return;
+
+  const isComplete = [1, 2].every((idx) => (
+    ['name', 'position', 'phone', 'email', 'linkedin'].every((field) => values[`reference_${idx}_${field}`])
+  ));
+  statusEl.textContent = isComplete ? 'References received' : 'Waiting for references';
+  statusEl.classList.toggle('is-complete', isComplete);
 }
 
 if (hireWorkingSchedule) hireWorkingSchedule.addEventListener('blur', () => updateHireField('working_schedule', hireWorkingSchedule.value));
@@ -2571,6 +2629,12 @@ if (hireRevenue){
       .then(res => res.json())
       .then(async (oppData) => {
         window.__currentOppId = Number(oppData?.opportunity_id) || window.__currentOppId;
+        if (referenceRequestLink) {
+          const refUrl = new URL('reference-request.html', window.location.href);
+          refUrl.searchParams.set('candidate_id', candidateId);
+          if (window.__currentOppId) refUrl.searchParams.set('opportunity_id', window.__currentOppId);
+          referenceRequestLink.href = refUrl.toString();
+        }
         const model = oppData?.opp_model;
         if (model) {
           const pill = document.getElementById('opp-model-pill');
@@ -2598,6 +2662,18 @@ if (hireRevenue){
         hireReferenceFields.forEach(([id, field]) => {
           const input = document.getElementById(id);
           if (input && input !== document.activeElement) input.value = data[field] || fallbackReferenceValues[field] || '';
+        });
+        renderReferenceOverview({
+          reference_1_name: data.reference_1_name || fallbackReferenceValues.reference_1_name || '',
+          reference_1_position: data.reference_1_position || fallbackReferenceValues.reference_1_position || '',
+          reference_1_phone: data.reference_1_phone || fallbackReferenceValues.reference_1_phone || '',
+          reference_1_email: data.reference_1_email || fallbackReferenceValues.reference_1_email || '',
+          reference_1_linkedin: data.reference_1_linkedin || fallbackReferenceValues.reference_1_linkedin || '',
+          reference_2_name: data.reference_2_name || fallbackReferenceValues.reference_2_name || '',
+          reference_2_position: data.reference_2_position || fallbackReferenceValues.reference_2_position || '',
+          reference_2_phone: data.reference_2_phone || fallbackReferenceValues.reference_2_phone || '',
+          reference_2_email: data.reference_2_email || fallbackReferenceValues.reference_2_email || '',
+          reference_2_linkedin: data.reference_2_linkedin || fallbackReferenceValues.reference_2_linkedin || '',
         });
 
         // fechas (YYYY-MM-DD)
@@ -2630,9 +2706,13 @@ if (hireRevenue){
   }
   window.loadHireData = loadHireData;
 
-  // Cargar si estás en Hire
+  const referenceRequestLink = document.getElementById('reference-request-link');
+  if (referenceRequestLink) {
+    referenceRequestLink.href = `reference-request.html?candidate_id=${encodeURIComponent(candidateId)}`;
+  }
+
+  // Cargar salary updates si estás en Hire
   if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {
-    loadHireData();
     loadSalaryUpdates();
   }
 
