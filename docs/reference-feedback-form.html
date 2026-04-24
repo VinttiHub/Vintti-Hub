@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Reference Feedback • Vintti</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./assets/css/reference-feedback-form.css" />
+  <link rel="stylesheet" href="./assets/css/mobile.css?v=4" />
+</head>
+<body>
+  <main class="page">
+    <section class="shell">
+      <header class="hero">
+        <div class="brand">
+          <img class="logo" src="./assets/img/vintti_logo.png" alt="Vintti logo" width="96" height="54" />
+          <div>
+            <h1>Reference feedback</h1>
+            <p>Please answer the following questions about the candidate based on your experience working together.</p>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="meta-card">
+            <span class="meta-label">Estimated time</span>
+            <strong>4–6 min</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Candidate</span>
+            <strong id="feedbackCandidateLabel">Loading...</strong>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Reference</span>
+            <strong id="feedbackReferenceLabel">Loading...</strong>
+          </div>
+        </div>
+      </header>
+
+      <form class="form" id="referenceFeedbackForm">
+        <section class="card">
+          <div class="card-head">
+            <h2>Questions</h2>
+            <p>Your answers will help us complete the candidate's reference check.</p>
+          </div>
+          <div id="referenceFeedbackQuestions" class="feedback-questions"></div>
+        </section>
+
+        <section class="card review">
+          <div class="card-head">
+            <h2>Before sending</h2>
+            <p>Please confirm that your answers reflect your honest experience working with the candidate.</p>
+          </div>
+          <label class="checkbox">
+            <input type="checkbox" name="confirm" required />
+            <span>I confirm the information above is accurate.</span>
+          </label>
+        </section>
+
+        <footer class="actions">
+          <button type="submit" class="btn primary">Submit feedback</button>
+        </footer>
+      </form>
+    </section>
+  </main>
+
+  <script src="./assets/js/reference-feedback-form.js"></script>
+</body>
+</html>

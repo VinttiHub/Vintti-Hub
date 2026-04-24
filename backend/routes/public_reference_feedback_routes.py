@@ -76,20 +76,21 @@ def _build_feedback_notes_html(rows):
             continue
         qa_lines = []
         for index, question in enumerate(questions):
-          answer = answers[index] if index < len(answers) else ''
-          qa_lines.append(
-              (
-                  f'<div data-reference-feedback-item="{row["reference_number"]}-{index + 1}">'
-                  f'<strong>Q:</strong> {_escape_html(question)}<br>'
-                  f'<strong>A:</strong> {_escape_html(answer)}'
-                  f'</div>'
-              )
-          )
+            answer = answers[index] if index < len(answers) else ''
+            qa_lines.append(
+                (
+                    f'<div data-reference-feedback-item="{row["reference_number"]}-{index + 1}">'
+                    f'<strong>Question -</strong> {_escape_html(question)}<br>'
+                    f'<strong>Feedback -</strong> {_escape_html(answer)}'
+                    f'</div>'
+                )
+            )
         sections.append(
             (
                 f'<section data-reference-feedback-section="{row["reference_number"]}">'
-                f'<p><strong>Reference {row["reference_number"]} Feedback'
-                f'{f" — {_escape_html(row.get("reference_name"))}" if row.get("reference_name") else ""}'
+                f'<p>----------------------------------------</p>'
+                f'<p><strong>Reference {row["reference_number"]}'
+                f'{f" - {_escape_html(row.get("reference_name"))}" if row.get("reference_name") else ""}'
                 f'</strong></p>'
                 f'{"<br>".join(qa_lines)}'
                 f'</section>'

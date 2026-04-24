@@ -2464,6 +2464,240 @@ function normalizeReferenceLink(value) {
   return `https://${clean.replace(/^\/+/, '')}`;
 }
 
+window.__referenceFeedbackRequests = {};
+window.__currentReferenceOverviewValues = {};
+window.__referenceFeedbackDraft = null;
+window.__referenceFeedbackSubmittedRefs = new Set();
+
+function referenceFeedbackStorageKey(opportunityId = null) {
+  return `reference_feedback_requests:${candidateId}:${opportunityId || 'latest'}`;
+}
+
+function encodeReferenceFeedbackPayload(payload) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+
+function decodeReferenceFeedbackPayload(value) {
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(value))));
+  } catch {
+    return null;
+  }
+}
+
+function getStoredReferenceFeedbackRequests(opportunityId = null) {
+  try {
+    const raw = localStorage.getItem(referenceFeedbackStorageKey(opportunityId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function setStoredReferenceFeedbackRequests(requests, opportunityId = null) {
+  try {
+    localStorage.setItem(referenceFeedbackStorageKey(opportunityId), JSON.stringify(requests || {}));
+  } catch {}
+}
+
+function parseSubmittedReferenceFeedbackFromNotes(html = '') {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html || '';
+  const submitted = new Set();
+  wrapper.querySelectorAll('[data-reference-feedback-section]').forEach((node) => {
+    const refNum = Number(node.getAttribute('data-reference-feedback-section'));
+    if (Number.isFinite(refNum)) submitted.add(refNum);
+  });
+  return submitted;
+}
+
+function getCandidateDisplayName() {
+  const current = (document.getElementById('field-name')?.textContent || '').trim();
+  return current && current !== '—' ? current : 'the candidate';
+}
+
+function getReferenceValuesFromForm(idx) {
+  const prefix = `hire-reference-${idx}`;
+  return {
+    reference_number: idx,
+    reference_name: document.getElementById(`${prefix}-name`)?.value?.trim() || '',
+    reference_position: document.getElementById(`${prefix}-position`)?.value?.trim() || '',
+    reference_phone: document.getElementById(`${prefix}-phone`)?.value?.trim() || '',
+    reference_email: document.getElementById(`${prefix}-email`)?.value?.trim() || '',
+    reference_linkedin: document.getElementById(`${prefix}-linkedin`)?.value?.trim() || '',
+  };
+}
+
+function getDefaultReferenceQuestions(candidateName) {
+  const label = candidateName || 'the candidate';
+  return [
+    `What was your working relationship with ${label}? Could you please tell me ${label}'s weaknesses and strengths?`,
+    `How would you describe ${label}'s overall performance?`,
+    `Why did ${label} leave the company (or why did you stop working together)?`,
+    `Would you rehire or work with ${label} again? Why or why not?`,
+    `Are there any areas where you feel ${label} might need additional support or development?`,
+    `Is there anything else you'd like to share about ${label}'s work style or personality?`,
+  ];
+}
+
+async function loadReferenceFeedbackRequests(opportunityId = null) {
+  window.__referenceFeedbackRequests = getStoredReferenceFeedbackRequests(opportunityId);
+  renderReferenceOverview(window.__currentReferenceOverviewValues || {});
+  return window.__referenceFeedbackRequests;
+}
+
+function renderReferenceFeedbackActions(idx, hasReference = false) {
+  const host = document.getElementById(`overview-reference-${idx}-actions`);
+  if (!host) return;
+
+  const requestInfo = window.__referenceFeedbackRequests?.[String(idx)] || null;
+  const submitted = window.__referenceFeedbackSubmittedRefs?.has(idx);
+  if (!hasReference) {
+    host.innerHTML = '<span class="reference-overview-chip">Complete reference info to create the form</span>';
+    return;
+  }
+
+  const statusText = submitted
+    ? 'Response received'
+    : requestInfo
+    ? 'Form ready to share'
+    : 'No feedback form yet';
+  const statusClass = submitted ? 'reference-overview-chip is-complete' : 'reference-overview-chip';
+  const buttonLabel = requestInfo ? 'Edit / share feedback form' : 'Create feedback form';
+
+  host.innerHTML = `
+    <span class="${statusClass}">${statusText}</span>
+    <button type="button" class="reference-overview-action-btn" data-reference-feedback-builder="${idx}">
+      ${buttonLabel}
+    </button>
+  `;
+}
+
+function renderReferenceFeedbackQuestionPreview() {
+  const preview = document.getElementById('reference-feedback-question-preview');
+  if (!preview) return;
+  const draft = window.__referenceFeedbackDraft;
+  const questions = Array.isArray(draft?.questions) ? draft.questions : [];
+  preview.innerHTML = questions.map((question, index) => `
+    <div class="reference-feedback-question-item">
+      <div class="reference-feedback-question-number">${index + 1}</div>
+      <div class="reference-feedback-question-content">
+        <div class="reference-feedback-question-kicker">Question ${index + 1}</div>
+        <div class="reference-feedback-question-text">${escapeReferenceHtml(question)}</div>
+      </div>
+      <button type="button" title="Remove question" data-remove-reference-question="${index}">×</button>
+    </div>
+  `).join('');
+}
+
+function setReferenceFeedbackLink(url = '') {
+  const input = document.getElementById('reference-feedback-link');
+  if (input) input.value = url || '';
+}
+
+function openReferenceFeedbackBuilder(referenceNumber) {
+  const modal = document.getElementById('reference-feedback-builder');
+  if (!modal) return;
+
+  const reference = getReferenceValuesFromForm(referenceNumber);
+  if (!reference.reference_name) {
+    alert(`Please complete Reference ${referenceNumber} first.`);
+    return;
+  }
+
+  const candidateName = getCandidateDisplayName();
+  const existing = window.__referenceFeedbackRequests?.[String(referenceNumber)] || null;
+  window.__referenceFeedbackDraft = {
+    referenceNumber,
+    reference,
+    candidateName,
+    questions: existing?.questions?.length ? [...existing.questions] : getDefaultReferenceQuestions(candidateName),
+    publicUrl: existing?.public_url || '',
+    submittedAt: existing?.submitted_at || null,
+  };
+
+  const target = document.getElementById('reference-feedback-builder-target');
+  if (target) target.textContent = `Reference ${referenceNumber} • ${reference.reference_name}`;
+
+  const status = document.getElementById('reference-feedback-builder-status');
+  if (status) status.textContent = window.__referenceFeedbackSubmittedRefs?.has(referenceNumber)
+    ? 'Response received'
+    : (existing ? 'Form ready to share' : 'Draft');
+
+  setReferenceFeedbackLink(existing?.public_url || '');
+  if (referenceFeedbackQuestionInput) referenceFeedbackQuestionInput.value = '';
+  renderReferenceFeedbackQuestionPreview();
+  modal.classList.remove('hidden');
+}
+
+async function generateReferenceFeedbackForm() {
+  const draft = window.__referenceFeedbackDraft;
+  if (!draft) return;
+
+  const generateButton = document.getElementById('reference-feedback-generate');
+  const status = document.getElementById('reference-feedback-builder-status');
+
+  if (generateButton) {
+    generateButton.disabled = true;
+    generateButton.textContent = 'Generating...';
+  }
+  if (status) status.textContent = 'Generating link';
+
+  try {
+    let opportunityId = window.__currentOppId || null;
+    if (!opportunityId) {
+      try {
+        opportunityId = await ensureCurrentOppId(candidateId);
+        window.__currentOppId = opportunityId;
+      } catch (err) {
+        console.warn('Failed to resolve opportunity_id for feedback form', err);
+      }
+    }
+
+    const payload = {
+      candidate_id: Number(candidateId),
+      opportunity_id: opportunityId,
+      reference_number: draft.referenceNumber,
+      reference_name: draft.reference.reference_name,
+      reference_position: draft.reference.reference_position,
+      reference_email: draft.reference.reference_email,
+      reference_phone: draft.reference.reference_phone,
+      reference_linkedin: draft.reference.reference_linkedin,
+      candidate_name: draft.candidateName,
+      questions: draft.questions,
+    };
+
+    const url = new URL('reference-feedback-form.html', window.location.href);
+    url.searchParams.set('data', encodeReferenceFeedbackPayload(payload));
+    draft.publicUrl = url.toString();
+    draft.submittedAt = null;
+    window.__referenceFeedbackRequests[String(draft.referenceNumber)] = {
+      reference_number: draft.referenceNumber,
+      public_url: draft.publicUrl,
+      candidate_id: payload.candidate_id,
+      opportunity_id: payload.opportunity_id,
+      questions: [...payload.questions],
+      submitted_at: null,
+    };
+    setStoredReferenceFeedbackRequests(window.__referenceFeedbackRequests, opportunityId);
+    setReferenceFeedbackLink(draft.publicUrl);
+    if (status) status.textContent = 'Form ready to share';
+    showCuteToast('Feedback form link generated successfully.');
+    renderReferenceOverview(window.__currentReferenceOverviewValues || {});
+  } catch (err) {
+    console.error('generateReferenceFeedbackForm failed', err);
+    if (status) status.textContent = 'Draft';
+    alert('We could not generate the feedback form link. Please try again.');
+  } finally {
+    if (generateButton) {
+      generateButton.disabled = false;
+      generateButton.textContent = draft.publicUrl ? 'Regenerate form' : 'Generate form';
+    }
+  }
+}
+
 function buildReferenceOverviewMarkup(idx, values = {}) {
   const body = document.getElementById(`overview-reference-${idx}`);
   if (!body) return;
@@ -2479,6 +2713,7 @@ function buildReferenceOverviewMarkup(idx, values = {}) {
   body.classList.toggle('is-empty', !hasAny);
   if (!hasAny) {
     body.textContent = 'No information yet.';
+    renderReferenceFeedbackActions(idx, false);
     return;
   }
 
@@ -2492,9 +2727,11 @@ function buildReferenceOverviewMarkup(idx, values = {}) {
     lines.push(`<div><strong>LinkedIn:</strong> <a href="${escapeReferenceHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeReferenceHtml(linkedin)}</a></div>`);
   }
   body.innerHTML = lines.join('');
+  renderReferenceFeedbackActions(idx, hasAny);
 }
 
 function renderReferenceOverview(values = {}) {
+  window.__currentReferenceOverviewValues = values;
   buildReferenceOverviewMarkup(1, values);
   buildReferenceOverviewMarkup(2, values);
 
@@ -2658,6 +2895,7 @@ if (hireRevenue){
         const ws = document.getElementById('hire-working-schedule');if (ws) ws.value = data.working_schedule || '';
         const pto = document.getElementById('hire-pto');            if (pto) pto.value = data.pto || '';
         const ref = document.getElementById('hire-references');     if (ref) ref.innerHTML = data.references_notes || '';
+        window.__referenceFeedbackSubmittedRefs = parseSubmittedReferenceFeedbackFromNotes(data.references_notes || '');
         const fallbackReferenceValues = parseStructuredReferencesFromNotes(data.references_notes || '');
         hireReferenceFields.forEach(([id, field]) => {
           const input = document.getElementById(id);
@@ -2675,6 +2913,7 @@ if (hireRevenue){
           reference_2_email: data.reference_2_email || fallbackReferenceValues.reference_2_email || '',
           reference_2_linkedin: data.reference_2_linkedin || fallbackReferenceValues.reference_2_linkedin || '',
         });
+        loadReferenceFeedbackRequests(window.__currentOppId);
 
         // fechas (YYYY-MM-DD)
         const startInp = document.getElementById('hire-start-date');
@@ -2710,6 +2949,76 @@ if (hireRevenue){
   if (referenceRequestLink) {
     referenceRequestLink.href = `reference-request.html?candidate_id=${encodeURIComponent(candidateId)}`;
   }
+
+  const referenceFeedbackBuilder = document.getElementById('reference-feedback-builder');
+  const referenceFeedbackQuestionInput = document.getElementById('reference-feedback-question-input');
+  document.addEventListener('click', async (event) => {
+    const builderBtn = event.target.closest('[data-reference-feedback-builder]');
+    if (builderBtn) {
+      event.preventDefault();
+      openReferenceFeedbackBuilder(Number(builderBtn.getAttribute('data-reference-feedback-builder')));
+      return;
+    }
+
+    const removeBtn = event.target.closest('[data-remove-reference-question]');
+    if (removeBtn && window.__referenceFeedbackDraft) {
+      const index = Number(removeBtn.getAttribute('data-remove-reference-question'));
+      if (Number.isFinite(index)) {
+        window.__referenceFeedbackDraft.questions.splice(index, 1);
+        renderReferenceFeedbackQuestionPreview();
+      }
+    }
+  });
+
+  document.getElementById('reference-feedback-add-question')?.addEventListener('click', () => {
+    const question = referenceFeedbackQuestionInput?.value?.trim();
+    if (!question || !window.__referenceFeedbackDraft) return;
+    window.__referenceFeedbackDraft.questions.push(question);
+    if (referenceFeedbackQuestionInput) referenceFeedbackQuestionInput.value = '';
+    renderReferenceFeedbackQuestionPreview();
+  });
+
+  referenceFeedbackQuestionInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      document.getElementById('reference-feedback-add-question')?.click();
+    }
+  });
+
+  document.getElementById('reference-feedback-generate')?.addEventListener('click', () => {
+    const questions = window.__referenceFeedbackDraft?.questions || [];
+    if (!questions.length) {
+      alert('Please keep at least one question in the form.');
+      return;
+    }
+    generateReferenceFeedbackForm().catch(console.error);
+  });
+
+  document.getElementById('reference-feedback-copy-link')?.addEventListener('click', async () => {
+    const link = document.getElementById('reference-feedback-link')?.value?.trim();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      showCuteToast('Feedback form link copied to clipboard.');
+    } catch (err) {
+      console.warn('Clipboard write failed', err);
+    }
+  });
+
+  document.getElementById('reference-feedback-open-link')?.addEventListener('click', () => {
+    const link = document.getElementById('reference-feedback-link')?.value?.trim();
+    if (!link) return;
+    window.open(link, '_blank', 'noopener,noreferrer');
+  });
+
+  referenceFeedbackBuilder?.querySelector('.close-star-popup')?.addEventListener('click', () => {
+    referenceFeedbackBuilder.classList.add('hidden');
+  });
+  referenceFeedbackBuilder?.addEventListener('click', (event) => {
+    if (event.target === referenceFeedbackBuilder) {
+      referenceFeedbackBuilder.classList.add('hidden');
+    }
+  });
 
   // Cargar salary updates si estás en Hire
   if (document.querySelector('.tab.active')?.dataset.tab === 'hire') {

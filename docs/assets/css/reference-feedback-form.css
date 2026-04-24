@@ -1,0 +1,25 @@
+@import url('./bonus-form.css');
+
+.feedback-questions {
+  display: grid;
+  gap: 14px;
+  padding: 14px 18px 18px;
+}
+
+.feedback-question {
+  display: grid;
+  gap: 8px;
+}
+
+.feedback-question label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.feedback-question textarea {
+  min-height: 120px;
+}

@@ -534,10 +534,12 @@
               <article class="reference-overview-item">
                 <h4>Reference 1</h4>
                 <div id="overview-reference-1" class="reference-overview-body">No information yet.</div>
+                <div id="overview-reference-1-actions" class="reference-overview-actions"></div>
               </article>
               <article class="reference-overview-item">
                 <h4>Reference 2</h4>
                 <div id="overview-reference-2" class="reference-overview-body">No information yet.</div>
+                <div id="overview-reference-2-actions" class="reference-overview-actions"></div>
               </article>
             </div>
           </div>
@@ -962,6 +964,76 @@
     <p class="reminder">Remember: I already have this candidate's info from LinkedIn and the PDF.</p>
     <textarea placeholder="What would you like to improve in this section?"></textarea>
     <button class="generate-btn">Generate</button>
+  </div>
+
+  <div id="reference-feedback-builder" class="hidden" role="dialog" aria-modal="true" aria-labelledby="reference-feedback-builder-title">
+    <div class="reference-feedback-dialog">
+      <button class="close-star-popup modal-close" aria-label="Close">×</button>
+
+      <div class="reference-feedback-hero">
+        <div class="reference-feedback-kicker">Reference Check</div>
+        <h3 id="reference-feedback-builder-title">Reference feedback form</h3>
+        <p class="reference-feedback-subtitle">Shape the question set before sharing it with the reference. Use the preview below to keep it sharp, short, and relevant.</p>
+
+        <div class="reference-feedback-builder-meta">
+          <span id="reference-feedback-builder-target">Reference</span>
+          <span id="reference-feedback-builder-status" class="reference-feedback-inline-status">Draft</span>
+        </div>
+      </div>
+
+      <div class="reference-feedback-content">
+        <section class="reference-feedback-section">
+          <div class="reference-feedback-section-head">
+            <div>
+              <span class="reference-feedback-eyebrow">Questions</span>
+              <h4>Preview</h4>
+            </div>
+            <span class="reference-feedback-soft-chip">Editable</span>
+          </div>
+          <div class="reference-feedback-preview-card">
+            <div id="reference-feedback-question-preview" class="reference-feedback-question-preview"></div>
+          </div>
+        </section>
+
+        <section class="reference-feedback-section">
+          <div class="reference-feedback-section-head">
+            <div>
+              <span class="reference-feedback-eyebrow">Custom Prompt</span>
+              <h4>Add another question</h4>
+            </div>
+          </div>
+          <div class="reference-feedback-input-card">
+            <label for="reference-feedback-question-input">Optional extra question</label>
+            <div class="reference-feedback-add-row">
+              <input type="text" id="reference-feedback-question-input" placeholder="Write an extra question..." />
+              <button type="button" id="reference-feedback-add-question" class="btn-soft btn-sm">Add question</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="reference-feedback-section">
+          <div class="reference-feedback-section-head">
+            <div>
+              <span class="reference-feedback-eyebrow">Share</span>
+              <h4>Generated link</h4>
+            </div>
+          </div>
+          <div class="reference-feedback-input-card">
+            <label for="reference-feedback-link">Shareable link</label>
+            <input type="text" id="reference-feedback-link" readonly placeholder="Generate the form to get the link." />
+            <div class="reference-feedback-link-actions">
+              <button type="button" id="reference-feedback-copy-link" class="btn-soft btn-sm">Copy link</button>
+              <button type="button" id="reference-feedback-open-link" class="btn-soft btn-sm">Open form</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="reference-feedback-footer">
+        <p class="reference-feedback-footer-copy">This creates a shareable form for the selected reference and saves the responses back into the candidate's hire notes.</p>
+        <button type="button" id="reference-feedback-generate" class="generate-btn">Generate form</button>
+      </div>
+    </div>
   </div>
 
   <!-- ===================== Loaders ===================== -->
