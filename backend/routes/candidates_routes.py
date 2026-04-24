@@ -1617,6 +1617,20 @@ def handle_candidate_hire_data(candidate_id):
             ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
         """, (candidate_id, opportunity_id, account_id))
 
+        candidate_seed_updates = {
+            field: candidate_reference_row.get(field)
+            for field in _REFERENCE_CANDIDATE_FIELDS
+            if field in candidate_reference_row
+        }
+        if candidate_seed_updates:
+            seed_cols = [f"{field} = %s" for field in candidate_seed_updates.keys()]
+            seed_vals = list(candidate_seed_updates.values()) + [candidate_id, opportunity_id]
+            cur.execute(f"""
+                UPDATE hire_opportunity
+                SET {', '.join(seed_cols)}
+                WHERE candidate_id = %s AND opportunity_id = %s
+            """, seed_vals)
+
         # mapping of incoming JSON → columns
         mapping = {
             'references_notes': 'references_notes',

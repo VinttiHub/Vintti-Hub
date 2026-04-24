@@ -2599,7 +2599,25 @@ function getDefaultReferenceQuestions(candidateName) {
 }
 
 async function loadReferenceFeedbackRequests(opportunityId = null) {
-  window.__referenceFeedbackRequests = getStoredReferenceFeedbackRequests(opportunityId);
+  try {
+    const url = new URL('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/reference_feedback/candidate');
+    url.searchParams.set('candidate_id', candidateId);
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`Failed to load reference feedback requests (${res.status})`);
+    const data = await res.json();
+    const requestMap = {};
+    const submittedRefs = new Set();
+    (data?.items || []).forEach((item) => {
+      requestMap[String(item.reference_number)] = item;
+      if (item?.submitted_at) submittedRefs.add(Number(item.reference_number));
+    });
+    window.__referenceFeedbackRequests = requestMap;
+    window.__referenceFeedbackSubmittedRefs = submittedRefs;
+    setStoredReferenceFeedbackRequests(requestMap, opportunityId);
+  } catch (err) {
+    console.warn('Failed to load reference feedback requests from backend', err);
+    window.__referenceFeedbackRequests = getStoredReferenceFeedbackRequests(opportunityId);
+  }
   renderReferenceOverview(window.__currentReferenceOverviewValues || {});
   return window.__referenceFeedbackRequests;
 }
@@ -2609,7 +2627,7 @@ function renderReferenceFeedbackActions(idx, hasReference = false) {
   if (!host) return;
 
   const requestInfo = window.__referenceFeedbackRequests?.[String(idx)] || null;
-  const submitted = window.__referenceFeedbackSubmittedRefs?.has(idx);
+  const submitted = window.__referenceFeedbackSubmittedRefs?.has(idx) || Boolean(requestInfo?.submitted_at);
   if (!hasReference) {
     host.innerHTML = '<span class="reference-overview-chip">Complete reference info to create the form</span>';
     return;
@@ -2622,9 +2640,13 @@ function renderReferenceFeedbackActions(idx, hasReference = false) {
     : 'No feedback form yet';
   const statusClass = submitted ? 'reference-overview-chip is-complete' : 'reference-overview-chip';
   const buttonLabel = requestInfo ? 'Edit / share feedback form' : 'Create feedback form';
+  const viewButton = submitted && requestInfo
+    ? `<button type="button" class="reference-overview-action-btn is-secondary" data-reference-feedback-view="${idx}">View responses</button>`
+    : '';
 
   host.innerHTML = `
     <span class="${statusClass}">${statusText}</span>
+    ${viewButton}
     <button type="button" class="reference-overview-action-btn" data-reference-feedback-builder="${idx}">
       ${buttonLabel}
     </button>
@@ -2715,6 +2737,7 @@ async function generateReferenceFeedbackForm() {
     const payload = {
       candidate_id: Number(candidateId),
       opportunity_id: opportunityId,
+      api_base: 'https://7m6mw95m8y.us-east-2.awsapprunner.com',
       reference_number: draft.referenceNumber,
       reference_name: draft.reference.reference_name,
       reference_position: draft.reference.reference_position,
@@ -2734,7 +2757,9 @@ async function generateReferenceFeedbackForm() {
       public_url: draft.publicUrl,
       candidate_id: payload.candidate_id,
       opportunity_id: payload.opportunity_id,
+      reference_name: payload.reference_name,
       questions: [...payload.questions],
+      answers: [],
       submitted_at: null,
     };
     setStoredReferenceFeedbackRequests(window.__referenceFeedbackRequests, opportunityId);
@@ -2752,6 +2777,34 @@ async function generateReferenceFeedbackForm() {
       generateButton.textContent = draft.publicUrl ? 'Regenerate form' : 'Generate form';
     }
   }
+}
+
+function openReferenceFeedbackResponses(referenceNumber) {
+  const modal = document.getElementById('reference-feedback-response-modal');
+  const content = document.getElementById('reference-feedback-response-content');
+  const subtitle = document.getElementById('reference-feedback-response-subtitle');
+  if (!modal || !content) return;
+
+  const requestInfo = window.__referenceFeedbackRequests?.[String(referenceNumber)];
+  if (!requestInfo || !requestInfo.submitted_at) {
+    alert('No submitted responses found for this reference yet.');
+    return;
+  }
+
+  const title = `Reference ${referenceNumber}${requestInfo.reference_name ? ` - ${requestInfo.reference_name}` : ''}`;
+  if (subtitle) subtitle.textContent = `${title} • Submitted feedback`;
+
+  const questions = Array.isArray(requestInfo.questions) ? requestInfo.questions : [];
+  const answers = Array.isArray(requestInfo.answers) ? requestInfo.answers : [];
+  content.innerHTML = questions.map((question, index) => `
+    <article class="reference-feedback-response-item">
+      <div class="reference-feedback-response-label">Question ${index + 1}</div>
+      <div class="reference-feedback-response-question">${escapeReferenceHtml(question)}</div>
+      <div class="reference-feedback-response-answer">${escapeReferenceHtml(answers[index] || '—')}</div>
+    </article>
+  `).join('');
+
+  modal.classList.remove('hidden');
 }
 
 function buildReferenceOverviewMarkup(idx, values = {}) {
@@ -3017,6 +3070,13 @@ if (hireRevenue){
       return;
     }
 
+    const viewBtn = event.target.closest('[data-reference-feedback-view]');
+    if (viewBtn) {
+      event.preventDefault();
+      openReferenceFeedbackResponses(Number(viewBtn.getAttribute('data-reference-feedback-view')));
+      return;
+    }
+
     const removeBtn = event.target.closest('[data-remove-reference-question]');
     if (removeBtn && window.__referenceFeedbackDraft) {
       const index = Number(removeBtn.getAttribute('data-remove-reference-question'));
@@ -3074,6 +3134,16 @@ if (hireRevenue){
   referenceFeedbackBuilder?.addEventListener('click', (event) => {
     if (event.target === referenceFeedbackBuilder) {
       referenceFeedbackBuilder.classList.add('hidden');
+    }
+  });
+
+  const referenceFeedbackResponseModal = document.getElementById('reference-feedback-response-modal');
+  referenceFeedbackResponseModal?.querySelector('.reference-feedback-response-close')?.addEventListener('click', () => {
+    referenceFeedbackResponseModal.classList.add('hidden');
+  });
+  referenceFeedbackResponseModal?.addEventListener('click', (event) => {
+    if (event.target === referenceFeedbackResponseModal) {
+      referenceFeedbackResponseModal.classList.add('hidden');
     }
   });
 

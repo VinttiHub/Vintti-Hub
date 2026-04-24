@@ -21,6 +21,10 @@ const API_BASE =
     return qs('data');
   }
 
+  function getApiBase(context = null) {
+    return context?.api_base || API_BASE;
+  }
+
   function escapeHtml(value) {
     return String(value || '')
       .replace(/&/g, '&amp;')
@@ -114,7 +118,7 @@ const API_BASE =
       return null;
     }
 
-    const res = await fetch(`${API_BASE}/public/reference_feedback/context?t=${encodeURIComponent(token)}`);
+    const res = await fetch(`${getApiBase()}/public/reference_feedback/context?t=${encodeURIComponent(token)}`);
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
       alert(`Unable to load the feedback form.\n${txt}`);
@@ -133,7 +137,7 @@ const API_BASE =
     const answers = Array.from(questionsHost.querySelectorAll('textarea')).map((textarea) => textarea.value.trim());
     let res;
     if (token) {
-      res = await fetch(`${API_BASE}/public/reference_feedback/submit?t=${encodeURIComponent(token)}`, {
+      res = await fetch(`${getApiBase(context)}/public/reference_feedback/submit?t=${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers }),
@@ -149,7 +153,8 @@ const API_BASE =
         return;
       }
 
-      const candidateRes = await fetch(`${API_BASE}/candidates/${encodeURIComponent(context.candidate_id)}`);
+      const apiBase = getApiBase(context);
+      const candidateRes = await fetch(`${apiBase}/candidates/${encodeURIComponent(context.candidate_id)}`);
       if (!candidateRes.ok) {
         const txt = await candidateRes.text().catch(() => '');
         alert(`Unable to load current candidate notes.\n${txt}`);
@@ -159,7 +164,7 @@ const API_BASE =
       const candidateData = await candidateRes.json();
       const mergedNotes = mergeFeedbackIntoNotes(candidateData.references_notes || '', context, answers);
 
-      res = await fetch(`${API_BASE}/candidates/${encodeURIComponent(context.candidate_id)}`, {
+      res = await fetch(`${apiBase}/candidates/${encodeURIComponent(context.candidate_id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,6 +174,29 @@ const API_BASE =
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
         alert(`Unable to save feedback.\n${txt}`);
+        return;
+      }
+
+      const persistRes = await fetch(`${apiBase}/public/reference_feedback/direct_submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          candidate_id: context.candidate_id,
+          opportunity_id: context.opportunity_id || null,
+          reference_number: context.reference_number,
+          reference_name: context.reference_name || '',
+          reference_position: context.reference_position || '',
+          reference_email: context.reference_email || '',
+          reference_phone: context.reference_phone || '',
+          reference_linkedin: context.reference_linkedin || '',
+          candidate_name: context.candidate_name || '',
+          questions: context.questions || [],
+          answers,
+        }),
+      });
+      if (!persistRes.ok) {
+        const txt = await persistRes.text().catch(() => '');
+        alert(`Feedback was saved to the candidate notes, but the structured record could not be stored.\n${txt}`);
         return;
       }
     }

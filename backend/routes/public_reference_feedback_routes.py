@@ -103,6 +103,67 @@ def _build_feedback_notes_html(rows):
     return f'<div data-reference-feedback-notes="true">{"<br>".join(sections)}</div>'
 
 
+def _merge_feedback_into_notes(existing_notes, feedback_rows):
+    base_notes = _strip_feedback_notes(existing_notes or '')
+    feedback_html = _build_feedback_notes_html(feedback_rows)
+    return '<br>'.join(part for part in [base_notes, feedback_html] if part)
+
+
+def _sync_feedback_notes_to_candidate_and_hire(cur, candidate_id, opportunity_id=None):
+    cur.execute(
+        """
+        SELECT references_notes
+        FROM candidates
+        WHERE candidate_id = %s
+        LIMIT 1
+        """,
+        (candidate_id,),
+    )
+    candidate_row = cur.fetchone() or {}
+
+    cur.execute(
+        """
+        SELECT reference_number, reference_name, questions, answers
+        FROM reference_feedback_requests
+        WHERE candidate_id = %s
+          AND submitted_at IS NOT NULL
+        ORDER BY reference_number ASC, updated_at ASC
+        """,
+        (candidate_id,),
+    )
+    feedback_rows = cur.fetchall()
+    merged_notes = _merge_feedback_into_notes(candidate_row.get('references_notes') or '', feedback_rows)
+
+    cur.execute(
+        """
+        UPDATE candidates
+        SET references_notes = %s
+        WHERE candidate_id = %s
+        """,
+        (merged_notes, candidate_id),
+    )
+
+    if opportunity_id:
+        cur.execute(
+            """
+            UPDATE hire_opportunity
+            SET references_notes = %s
+            WHERE candidate_id = %s
+              AND opportunity_id = %s
+            """,
+            (merged_notes, candidate_id, opportunity_id),
+        )
+    else:
+        cur.execute(
+            """
+            UPDATE hire_opportunity
+            SET references_notes = %s
+            WHERE candidate_id = %s
+            """,
+            (merged_notes, candidate_id),
+        )
+
+
 @bp.route('/request', methods=['POST', 'OPTIONS'])
 def upsert_reference_feedback_request():
     if request.method == 'OPTIONS':
@@ -135,95 +196,132 @@ def upsert_reference_feedback_request():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        public_token = uuid.uuid4()
-        cur.execute(
-            """
-            INSERT INTO reference_feedback_requests (
-                public_token,
-                candidate_id,
-                opportunity_id,
-                reference_number,
-                reference_name,
-                reference_position,
-                reference_email,
-                reference_phone,
-                reference_linkedin,
-                candidate_name,
-                questions,
-                answers,
-                submitted_at,
-                updated_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, '[]'::jsonb, NULL, NOW())
-            ON CONFLICT (candidate_id, opportunity_id, reference_number)
-            DO UPDATE SET
-                public_token = EXCLUDED.public_token,
-                reference_name = EXCLUDED.reference_name,
-                reference_position = EXCLUDED.reference_position,
-                reference_email = EXCLUDED.reference_email,
-                reference_phone = EXCLUDED.reference_phone,
-                reference_linkedin = EXCLUDED.reference_linkedin,
-                candidate_name = EXCLUDED.candidate_name,
-                questions = EXCLUDED.questions,
-                answers = '[]'::jsonb,
-                submitted_at = NULL,
-                updated_at = NOW()
-            RETURNING *
-            """,
-            (
-                public_token,
-                candidate_id,
-                opportunity_id,
-                reference_number,
-                _clean_text(data.get('reference_name')),
-                _clean_text(data.get('reference_position')),
-                _clean_text(data.get('reference_email')),
-                _clean_text(data.get('reference_phone')),
-                _clean_text(data.get('reference_linkedin')),
-                _clean_text(data.get('candidate_name')),
-                Json(questions),
-            ),
+        public_token = str(uuid.uuid4())
+        params = (
+            public_token,
+            candidate_id,
+            opportunity_id,
+            reference_number,
+            _clean_text(data.get('reference_name')),
+            _clean_text(data.get('reference_position')),
+            _clean_text(data.get('reference_email')),
+            _clean_text(data.get('reference_phone')),
+            _clean_text(data.get('reference_linkedin')),
+            _clean_text(data.get('candidate_name')),
+            Json(questions),
         )
-        row = cur.fetchone()
-
-        if row.get('opportunity_id'):
+        if opportunity_id is None:
             cur.execute(
                 """
-                SELECT references_notes
-                FROM hire_opportunity
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
+                WITH existing AS (
+                    SELECT request_id
+                    FROM reference_feedback_requests
+                    WHERE candidate_id = %s
+                      AND opportunity_id IS NULL
+                      AND reference_number = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                ),
+                updated AS (
+                    UPDATE reference_feedback_requests
+                    SET public_token = %s,
+                        reference_name = %s,
+                        reference_position = %s,
+                        reference_email = %s,
+                        reference_phone = %s,
+                        reference_linkedin = %s,
+                        candidate_name = %s,
+                        questions = %s,
+                        answers = '[]'::jsonb,
+                        submitted_at = NULL,
+                        updated_at = NOW()
+                    WHERE request_id IN (SELECT request_id FROM existing)
+                    RETURNING *
+                ),
+                inserted AS (
+                    INSERT INTO reference_feedback_requests (
+                        public_token,
+                        candidate_id,
+                        opportunity_id,
+                        reference_number,
+                        reference_name,
+                        reference_position,
+                        reference_email,
+                        reference_phone,
+                        reference_linkedin,
+                        candidate_name,
+                        questions,
+                        answers,
+                        submitted_at,
+                        updated_at
+                    )
+                    SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, '[]'::jsonb, NULL, NOW()
+                    WHERE NOT EXISTS (SELECT 1 FROM existing)
+                    RETURNING *
+                )
+                SELECT * FROM updated
+                UNION ALL
+                SELECT * FROM inserted
                 LIMIT 1
                 """,
-                (row['candidate_id'], row['opportunity_id']),
+                (
+                    candidate_id,
+                    reference_number,
+                    public_token,
+                    params[4],
+                    params[5],
+                    params[6],
+                    params[7],
+                    params[8],
+                    params[9],
+                    params[10],
+                    *params,
+                ),
             )
-            hire_row = cur.fetchone() or {}
-            base_notes = _strip_feedback_notes(hire_row.get('references_notes') or '')
-
+        else:
             cur.execute(
                 """
-                SELECT reference_number, reference_name, questions, answers
-                FROM reference_feedback_requests
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
-                  AND submitted_at IS NOT NULL
-                ORDER BY reference_number ASC, updated_at ASC
+                INSERT INTO reference_feedback_requests (
+                    public_token,
+                    candidate_id,
+                    opportunity_id,
+                    reference_number,
+                    reference_name,
+                    reference_position,
+                    reference_email,
+                    reference_phone,
+                    reference_linkedin,
+                    candidate_name,
+                    questions,
+                    answers,
+                    submitted_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, '[]'::jsonb, NULL, NOW())
+                ON CONFLICT (candidate_id, opportunity_id, reference_number)
+                DO UPDATE SET
+                    public_token = EXCLUDED.public_token,
+                    reference_name = EXCLUDED.reference_name,
+                    reference_position = EXCLUDED.reference_position,
+                    reference_email = EXCLUDED.reference_email,
+                    reference_phone = EXCLUDED.reference_phone,
+                    reference_linkedin = EXCLUDED.reference_linkedin,
+                    candidate_name = EXCLUDED.candidate_name,
+                    questions = EXCLUDED.questions,
+                    answers = '[]'::jsonb,
+                    submitted_at = NULL,
+                    updated_at = NOW()
+                RETURNING *
                 """,
-                (row['candidate_id'], row['opportunity_id']),
+                params,
             )
-            feedback_rows = cur.fetchall()
-            feedback_html = _build_feedback_notes_html(feedback_rows)
-            merged_notes = '<br>'.join(part for part in [base_notes, feedback_html] if part)
+        row = cur.fetchone()
 
-            cur.execute(
-                """
-                UPDATE hire_opportunity
-                SET references_notes = %s
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
-                """,
-                (merged_notes, row['candidate_id'], row['opportunity_id']),
-            )
+        _sync_feedback_notes_to_candidate_and_hire(
+            cur,
+            candidate_id=row['candidate_id'],
+            opportunity_id=row.get('opportunity_id'),
+        )
 
         conn.commit()
 
@@ -353,47 +451,188 @@ def submit_reference_feedback():
         )
         updated = cur.fetchone()
 
-        if updated.get('opportunity_id'):
-            cur.execute(
-                """
-                SELECT references_notes
-                FROM hire_opportunity
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
-                LIMIT 1
-                """,
-                (updated['candidate_id'], updated['opportunity_id']),
-            )
-            hire_row = cur.fetchone() or {}
-            base_notes = _strip_feedback_notes(hire_row.get('references_notes') or '')
-
-            cur.execute(
-                """
-                SELECT reference_number, reference_name, questions, answers
-                FROM reference_feedback_requests
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
-                  AND submitted_at IS NOT NULL
-                ORDER BY reference_number ASC, updated_at ASC
-                """,
-                (updated['candidate_id'], updated['opportunity_id']),
-            )
-            feedback_rows = cur.fetchall()
-            feedback_html = _build_feedback_notes_html(feedback_rows)
-            merged_notes = '<br>'.join(part for part in [base_notes, feedback_html] if part)
-
-            cur.execute(
-                """
-                UPDATE hire_opportunity
-                SET references_notes = %s
-                WHERE candidate_id = %s
-                  AND opportunity_id = %s
-                """,
-                (merged_notes, updated['candidate_id'], updated['opportunity_id']),
-            )
+        _sync_feedback_notes_to_candidate_and_hire(
+            cur,
+            candidate_id=updated['candidate_id'],
+            opportunity_id=updated.get('opportunity_id'),
+        )
 
         conn.commit()
         return jsonify(_serialize_row(updated))
+    except Exception as exc:
+        conn.rollback()
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@bp.route('/direct_submit', methods=['POST', 'OPTIONS'])
+def direct_submit_reference_feedback():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        candidate_id = int(data.get('candidate_id'))
+        reference_number = int(data.get('reference_number'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'candidate_id and reference_number must be valid integers'}), 400
+
+    opportunity_raw = data.get('opportunity_id')
+    if opportunity_raw in (None, ''):
+        opportunity_id = None
+    else:
+        try:
+            opportunity_id = int(opportunity_raw)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'opportunity_id must be a valid integer'}), 400
+
+    questions = _clean_list(data.get('questions'))
+    answers = _clean_list(data.get('answers'))
+    if not questions:
+        return jsonify({'error': 'At least one question is required'}), 400
+    if len(questions) != len(answers):
+        return jsonify({'error': 'answers count must match questions count'}), 400
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        public_token = str(uuid.uuid4())
+        submitted_at = datetime.utcnow()
+        params = (
+            public_token,
+            candidate_id,
+            opportunity_id,
+            reference_number,
+            _clean_text(data.get('reference_name')),
+            _clean_text(data.get('reference_position')),
+            _clean_text(data.get('reference_email')),
+            _clean_text(data.get('reference_phone')),
+            _clean_text(data.get('reference_linkedin')),
+            _clean_text(data.get('candidate_name')),
+            Json(questions),
+            Json(answers),
+            submitted_at,
+        )
+
+        if opportunity_id is None:
+            cur.execute(
+                """
+                WITH existing AS (
+                    SELECT request_id
+                    FROM reference_feedback_requests
+                    WHERE candidate_id = %s
+                      AND opportunity_id IS NULL
+                      AND reference_number = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                ),
+                updated AS (
+                    UPDATE reference_feedback_requests
+                    SET public_token = %s,
+                        reference_name = %s,
+                        reference_position = %s,
+                        reference_email = %s,
+                        reference_phone = %s,
+                        reference_linkedin = %s,
+                        candidate_name = %s,
+                        questions = %s,
+                        answers = %s,
+                        submitted_at = %s,
+                        updated_at = NOW()
+                    WHERE request_id IN (SELECT request_id FROM existing)
+                    RETURNING *
+                ),
+                inserted AS (
+                    INSERT INTO reference_feedback_requests (
+                        public_token,
+                        candidate_id,
+                        opportunity_id,
+                        reference_number,
+                        reference_name,
+                        reference_position,
+                        reference_email,
+                        reference_phone,
+                        reference_linkedin,
+                        candidate_name,
+                        questions,
+                        answers,
+                        submitted_at,
+                        updated_at
+                    )
+                    SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                    WHERE NOT EXISTS (SELECT 1 FROM existing)
+                    RETURNING *
+                )
+                SELECT * FROM updated
+                UNION ALL
+                SELECT * FROM inserted
+                LIMIT 1
+                """,
+                (
+                    candidate_id,
+                    reference_number,
+                    public_token,
+                    params[4],
+                    params[5],
+                    params[6],
+                    params[7],
+                    params[8],
+                    params[9],
+                    params[10],
+                    params[11],
+                    params[12],
+                    *params,
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO reference_feedback_requests (
+                    public_token,
+                    candidate_id,
+                    opportunity_id,
+                    reference_number,
+                    reference_name,
+                    reference_position,
+                    reference_email,
+                    reference_phone,
+                    reference_linkedin,
+                    candidate_name,
+                    questions,
+                    answers,
+                    submitted_at,
+                    updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (candidate_id, opportunity_id, reference_number)
+                DO UPDATE SET
+                    public_token = EXCLUDED.public_token,
+                    reference_name = EXCLUDED.reference_name,
+                    reference_position = EXCLUDED.reference_position,
+                    reference_email = EXCLUDED.reference_email,
+                    reference_phone = EXCLUDED.reference_phone,
+                    reference_linkedin = EXCLUDED.reference_linkedin,
+                    candidate_name = EXCLUDED.candidate_name,
+                    questions = EXCLUDED.questions,
+                    answers = EXCLUDED.answers,
+                    submitted_at = EXCLUDED.submitted_at,
+                    updated_at = NOW()
+                RETURNING *
+                """,
+                params,
+            )
+
+        row = cur.fetchone()
+        _sync_feedback_notes_to_candidate_and_hire(
+            cur,
+            candidate_id=row['candidate_id'],
+            opportunity_id=row.get('opportunity_id'),
+        )
+        conn.commit()
+        return jsonify(_serialize_row(row))
     except Exception as exc:
         conn.rollback()
         return jsonify({'error': str(exc)}), 500

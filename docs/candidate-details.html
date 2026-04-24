@@ -1030,9 +1030,21 @@
       </div>
 
       <div class="reference-feedback-footer">
-        <p class="reference-feedback-footer-copy">This creates a shareable form for the selected reference and saves the responses back into the candidate's hire notes.</p>
+        <p class="reference-feedback-footer-copy">This creates a shareable form for the selected reference and stores the responses on the candidate profile, keeping hire notes in sync when a hire exists.</p>
         <button type="button" id="reference-feedback-generate" class="generate-btn">Generate form</button>
       </div>
+    </div>
+  </div>
+
+  <div id="reference-feedback-response-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="reference-feedback-response-title">
+    <div class="reference-feedback-response-dialog">
+      <button class="reference-feedback-response-close modal-close" aria-label="Close">×</button>
+      <div class="reference-feedback-response-hero">
+        <div class="reference-feedback-kicker">Reference Check</div>
+        <h3 id="reference-feedback-response-title">Reference responses</h3>
+        <p id="reference-feedback-response-subtitle" class="reference-feedback-subtitle">Review the submitted answers for this reference.</p>
+      </div>
+      <div id="reference-feedback-response-content" class="reference-feedback-response-content"></div>
     </div>
   </div>
 
