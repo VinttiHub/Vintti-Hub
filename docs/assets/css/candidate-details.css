@@ -2736,6 +2736,12 @@ html body .month-year .btn-clear:active{
   color: #45556f;
 }
 
+.reference-overview-action-btn.is-danger {
+  background: rgba(255, 244, 244, 0.98);
+  border-color: rgba(248, 113, 113, 0.28);
+  color: #b42318;
+}
+
 .reference-overview-chip {
   display: inline-flex;
   align-items: center;

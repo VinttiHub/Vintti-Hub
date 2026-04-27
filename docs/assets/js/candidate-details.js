@@ -2479,6 +2479,11 @@ window.__referenceFeedbackRequests = {};
 window.__currentReferenceOverviewValues = {};
 window.__referenceFeedbackDraft = null;
 window.__referenceFeedbackSubmittedRefs = new Set();
+const REFERENCE_DELETE_ALLOWED_EMAILS = new Set([
+  'agostina@vintti.com',
+  'lara@vintti.com',
+  'pgonzales@vintti.com',
+]);
 
 function referenceFeedbackStorageKey(opportunityId = null) {
   return `reference_feedback_requests:${candidateId}:${opportunityId || 'latest'}`;
@@ -2644,6 +2649,10 @@ function renderReferenceFeedbackActions(idx, hasReference = false) {
   const viewButton = submitted && requestInfo
     ? `<button type="button" class="reference-overview-action-btn is-secondary" data-reference-feedback-view="${idx}">View responses</button>`
     : '';
+  const currentUserEmail = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase().trim();
+  const deleteButton = REFERENCE_DELETE_ALLOWED_EMAILS.has(currentUserEmail)
+    ? `<button type="button" class="reference-overview-action-btn is-danger" data-reference-delete="${idx}">Delete reference</button>`
+    : '';
 
   host.innerHTML = `
     <span class="${statusClass}">${statusText}</span>
@@ -2651,7 +2660,51 @@ function renderReferenceFeedbackActions(idx, hasReference = false) {
     <button type="button" class="reference-overview-action-btn" data-reference-feedback-builder="${idx}">
       ${buttonLabel}
     </button>
+    ${deleteButton}
   `;
+}
+
+async function deleteReference(referenceNumber) {
+  const referenceName = window.__currentReferenceOverviewValues?.[`reference_${referenceNumber}_name`] || `Reference ${referenceNumber}`;
+  if (!window.confirm(`Delete ${referenceName} and its feedback?`)) return;
+
+  const response = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/candidate_references/delete_reference', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      candidate_id: Number(candidateId),
+      opportunity_id: window.__currentOppId || null,
+      reference_number: referenceNumber,
+    }),
+  });
+  if (!response.ok) {
+    const txt = await response.text().catch(() => '');
+    alert(`We could not delete this reference.\n${txt}`);
+    return;
+  }
+
+  delete window.__referenceFeedbackRequests[String(referenceNumber)];
+  window.__referenceFeedbackSubmittedRefs.delete(referenceNumber);
+  setStoredReferenceFeedbackRequests(window.__referenceFeedbackRequests, window.__currentOppId);
+
+  const emptyValues = { ...(window.__currentReferenceOverviewValues || {}) };
+  ['name', 'position', 'phone', 'email', 'linkedin'].forEach((field) => {
+    emptyValues[`reference_${referenceNumber}_${field}`] = '';
+  });
+  window.__currentReferenceOverviewValues = emptyValues;
+
+  hireReferenceFields.forEach(([id, field]) => {
+    if (field.startsWith(`reference_${referenceNumber}_`)) {
+      const input = document.getElementById(id);
+      if (input) input.value = '';
+    }
+  });
+
+  renderReferenceOverview(window.__currentReferenceOverviewValues || {});
+  if (typeof loadHireData === 'function') {
+    loadHireData();
+  }
+  showCuteToast(`Reference ${referenceNumber} deleted.`);
 }
 
 function renderReferenceFeedbackQuestionPreview() {
@@ -3076,6 +3129,13 @@ if (hireRevenue){
     if (viewBtn) {
       event.preventDefault();
       openReferenceFeedbackResponses(Number(viewBtn.getAttribute('data-reference-feedback-view'))).catch(console.error);
+      return;
+    }
+
+    const deleteBtn = event.target.closest('[data-reference-delete]');
+    if (deleteBtn) {
+      event.preventDefault();
+      deleteReference(Number(deleteBtn.getAttribute('data-reference-delete'))).catch(console.error);
       return;
     }
 

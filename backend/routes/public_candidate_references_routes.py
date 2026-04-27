@@ -13,6 +13,8 @@ _STRUCTURED_REFS_RE = re.compile(
     r'<div[^>]*data-structured-references="true"[^>]*>.*?</div>',
     flags=re.I | re.S,
 )
+_DIV_TAG_RE = re.compile(r'</?div\b[^>]*>', flags=re.I)
+_SECTION_TAG_RE = re.compile(r'</?section\b[^>]*>', flags=re.I)
 
 
 def _escape_html(value):
@@ -28,6 +30,83 @@ def _escape_html(value):
 
 def _strip_structured_references_html(html):
     return _STRUCTURED_REFS_RE.sub('', html or '').strip()
+
+
+def _strip_tagged_block(html, tag_pattern, marker):
+    content = html or ''
+    marker = (marker or '').lower()
+    while True:
+        match = None
+        for tag_match in tag_pattern.finditer(content):
+            tag_text = tag_match.group(0).lower()
+            if tag_text.startswith(f'<{tag_pattern.pattern[3:-8]}'):
+                pass
+            if marker in tag_text:
+                match = tag_match
+                break
+        if not match:
+            return content.strip()
+
+        open_tag_prefix = match.group(0).lower().split()[0].replace('<', '')
+        close_prefix = f'</{open_tag_prefix[0:open_tag_prefix.find(">")] if ">" in open_tag_prefix else open_tag_prefix}'
+        depth = 1
+        end_index = None
+        for tag_match in tag_pattern.finditer(content, match.end()):
+            tag_text = tag_match.group(0).lower()
+            if tag_text.startswith(close_prefix):
+                depth -= 1
+                if depth == 0:
+                    end_index = tag_match.end()
+                    break
+            else:
+                depth += 1
+
+        if end_index is None:
+            content = content[:match.start()]
+            continue
+
+        content = (content[:match.start()] + content[end_index:]).strip()
+
+
+def _strip_feedback_notes_html(html):
+    return _strip_tagged_block(html, _DIV_TAG_RE, 'data-reference-feedback-notes="true"')
+
+
+def _build_feedback_notes_html(rows):
+    sections = []
+    for row in rows or []:
+        questions = row.get('questions') or []
+        answers = row.get('answers') or []
+        if not questions or not answers:
+            continue
+        reference_name = _escape_html(row.get('reference_name')) if row.get('reference_name') else ''
+        title = f'Reference {row["reference_number"]}'
+        if reference_name:
+            title = f'{title} - {reference_name}'
+        qa_lines = []
+        for index, question in enumerate(questions):
+            answer = answers[index] if index < len(answers) else ''
+            qa_lines.append(
+                f'<div data-reference-feedback-item="{row["reference_number"]}-{index + 1}">'
+                f'<strong>Question -</strong> {_escape_html(question)}<br>'
+                f'<strong>Feedback -</strong> {_escape_html(answer)}'
+                f'</div>'
+            )
+        sections.append(
+            f'<section data-reference-feedback-section="{row["reference_number"]}">'
+            f'<p>----------------------------------------</p>'
+            f'<p><strong>{title}</strong></p>'
+            f'{"<br>".join(qa_lines)}'
+            f'</section>'
+        )
+    if not sections:
+        return ''
+    return f'<div data-reference-feedback-notes="true">{"<br>".join(sections)}</div>'
+
+
+def _merge_notes_html(existing_notes, structured_html, feedback_html):
+    base_notes = _strip_feedback_notes_html(_strip_structured_references_html(existing_notes or ''))
+    return '<br>'.join(part for part in [structured_html, base_notes, feedback_html] if part)
 
 
 def _build_structured_references_html(data):
@@ -501,6 +580,134 @@ def submit_candidate_references():
             'candidate_id': candidate_id,
             'opportunity_id': hire['opportunity_id'],
         })
+    except Exception as exc:
+        conn.rollback()
+        return jsonify({'error': str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@bp.route('/delete_reference', methods=['POST', 'OPTIONS'])
+def delete_candidate_reference():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+
+    data = request.get_json(silent=True) or {}
+    try:
+        candidate_id = int(data.get('candidate_id'))
+        reference_number = int(data.get('reference_number'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'candidate_id and reference_number must be valid integers'}), 400
+
+    opportunity_id = data.get('opportunity_id')
+    if opportunity_id not in (None, ''):
+        try:
+            opportunity_id = int(opportunity_id)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'opportunity_id must be a valid integer'}), 400
+    else:
+        opportunity_id = None
+
+    if reference_number not in (1, 2):
+        return jsonify({'error': 'reference_number must be 1 or 2'}), 400
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        hire = _resolve_candidate_hire(cur, candidate_id, opportunity_id)
+        if not hire:
+            return jsonify({'error': 'candidate not found'}), 404
+
+        cur.execute(
+            """
+            SELECT
+                references_notes,
+                reference_1_name,
+                reference_1_position,
+                reference_1_phone,
+                reference_1_email,
+                reference_1_linkedin,
+                reference_2_name,
+                reference_2_position,
+                reference_2_phone,
+                reference_2_email,
+                reference_2_linkedin
+            FROM candidates
+            WHERE candidate_id = %s
+            LIMIT 1
+            """,
+            (candidate_id,),
+        )
+        existing = cur.fetchone() or {}
+
+        for field in (
+            f'reference_{reference_number}_name',
+            f'reference_{reference_number}_position',
+            f'reference_{reference_number}_phone',
+            f'reference_{reference_number}_email',
+            f'reference_{reference_number}_linkedin',
+        ):
+            existing[field] = ''
+
+        cur.execute(
+            """
+            DELETE FROM reference_feedback_requests
+            WHERE candidate_id = %s
+              AND reference_number = %s
+            """,
+            (candidate_id, reference_number),
+        )
+
+        cur.execute(
+            """
+            SELECT reference_number, reference_name, questions, answers
+            FROM reference_feedback_requests
+            WHERE candidate_id = %s
+              AND submitted_at IS NOT NULL
+            ORDER BY reference_number ASC, updated_at ASC
+            """,
+            (candidate_id,),
+        )
+        feedback_rows = cur.fetchall()
+        structured_html = _build_structured_references_html(existing)
+        feedback_html = _build_feedback_notes_html(feedback_rows)
+        merged_notes = _merge_notes_html(existing.get('references_notes') or '', structured_html, feedback_html)
+
+        cur.execute(
+            f"""
+            UPDATE candidates
+            SET
+                reference_{reference_number}_name = NULL,
+                reference_{reference_number}_position = NULL,
+                reference_{reference_number}_phone = NULL,
+                reference_{reference_number}_email = NULL,
+                reference_{reference_number}_linkedin = NULL,
+                references_notes = %s
+            WHERE candidate_id = %s
+            """,
+            (merged_notes, candidate_id),
+        )
+
+        if hire.get('opportunity_id'):
+            cur.execute(
+                f"""
+                UPDATE hire_opportunity
+                SET
+                    reference_{reference_number}_name = NULL,
+                    reference_{reference_number}_position = NULL,
+                    reference_{reference_number}_phone = NULL,
+                    reference_{reference_number}_email = NULL,
+                    reference_{reference_number}_linkedin = NULL,
+                    references_notes = %s
+                WHERE candidate_id = %s
+                  AND opportunity_id = %s
+                """,
+                (merged_notes, candidate_id, hire['opportunity_id']),
+            )
+
+        conn.commit()
+        return jsonify({'ok': True, 'candidate_id': candidate_id, 'reference_number': reference_number})
     except Exception as exc:
         conn.rollback()
         return jsonify({'error': str(exc)}), 500
