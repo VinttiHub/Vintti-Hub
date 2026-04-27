@@ -6,6 +6,69 @@ const API_BASE =
 (() => {
   const form = document.getElementById('referenceRequestForm');
   const candidateLabel = document.getElementById('candidateLabel');
+  const referenceCard1 = document.getElementById('referenceCard1');
+  const referenceCard2 = document.getElementById('referenceCard2');
+  const addAnotherWrap = document.getElementById('referenceAddAnotherWrap');
+  const addAnotherButton = document.getElementById('btnAddReference');
+
+  function getReferenceFieldNames(idx) {
+    return [
+      `reference_${idx}_name`,
+      `reference_${idx}_position`,
+      `reference_${idx}_phone`,
+      `reference_${idx}_email`,
+      `reference_${idx}_linkedin`,
+    ];
+  }
+
+  function setReferenceRequired(idx, required) {
+    getReferenceFieldNames(idx).forEach((field) => {
+      if (form.elements[field]) form.elements[field].required = required;
+    });
+  }
+
+  function isReferenceComplete(refs = {}, idx) {
+    return getReferenceFieldNames(idx).every((field) => String(refs[field] || '').trim());
+  }
+
+  function toggleReference2(isVisible) {
+    if (referenceCard2) referenceCard2.hidden = !isVisible;
+    setReferenceRequired(2, isVisible);
+    if (addAnotherWrap) {
+      addAnotherWrap.hidden = isVisible;
+      addAnotherWrap.style.display = isVisible ? 'none' : '';
+    }
+  }
+
+  function applyReferenceLayout(context = {}) {
+    const refs = context.references || {};
+    const ref1Complete = isReferenceComplete(refs, 1);
+    const ref2Complete = isReferenceComplete(refs, 2);
+    const nextSlot = Number(context.next_reference_slot) || (ref1Complete ? 2 : 1);
+
+    setReferenceRequired(1, !ref1Complete || nextSlot === 1);
+
+    if (!ref1Complete && !ref2Complete) {
+      if (referenceCard1) referenceCard1.hidden = false;
+      toggleReference2(false);
+      return;
+    }
+
+    if (ref1Complete && !ref2Complete) {
+      if (referenceCard1) referenceCard1.hidden = true;
+      toggleReference2(true);
+      return;
+    }
+
+    if (!ref1Complete && ref2Complete) {
+      if (referenceCard1) referenceCard1.hidden = false;
+      toggleReference2(false);
+      return;
+    }
+
+    if (referenceCard1) referenceCard1.hidden = false;
+    toggleReference2(true);
+  }
 
   function qs(name) {
     return new URLSearchParams(window.location.search).get(name);
@@ -56,6 +119,7 @@ const API_BASE =
       if (form.elements[key] && value) form.elements[key].value = value;
     });
 
+    applyReferenceLayout(ctx);
     updateReview({ candidate_name: ctx.candidate_name || '' });
     return ctx;
   }
@@ -84,7 +148,8 @@ const API_BASE =
     }
 
     form.reset();
-    updateReview({ candidate_name: context.candidate_name || candidateLabel.textContent || '' });
+    currentContext = await loadContext();
+    updateReview({ candidate_name: currentContext?.candidate_name || context.candidate_name || candidateLabel.textContent || '' });
     const successBox = document.querySelector('.success-box');
     if (successBox) {
       successBox.classList.remove('hidden');
@@ -107,6 +172,13 @@ const API_BASE =
   document.getElementById('btnClear')?.addEventListener('click', async () => {
     form.reset();
     currentContext = await loadContext();
+  });
+
+  addAnotherButton?.addEventListener('click', () => {
+    toggleReference2(true);
+    const ref2Name = form.elements.reference_2_name;
+    if (ref2Name) ref2Name.focus();
+    updateReview(currentContext || {});
   });
 
   loadContext()

@@ -32,7 +32,7 @@
       </header>
 
       <form class="form" id="referenceRequestForm">
-        <section class="card">
+        <section class="card" id="referenceCard1">
           <div class="card-head">
             <h2>1) Reference 1</h2>
             <p>Share the contact details of the first professional reference.</p>
@@ -61,7 +61,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="referenceCard2" hidden>
           <div class="card-head">
             <h2>2) Reference 2</h2>
             <p>Share the contact details of the second professional reference.</p>
@@ -89,6 +89,10 @@
             </label>
           </div>
         </section>
+
+        <div class="actions" id="referenceAddAnotherWrap">
+          <button type="button" class="btn ghost" id="btnAddReference">Add another reference</button>
+        </div>
 
         <section class="card review">
           <div class="card-head">
