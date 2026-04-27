@@ -17,6 +17,7 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 JAZ_EMAIL  = "jazmin@vintti.com"
 LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
+# LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 ANGIE_EMAIL = "angie@vintti.com"
 PGONZALES_EMAIL = "pgonzales@vintti.com"
 
@@ -412,7 +413,9 @@ def press_and_send(candidate_id):
             )
 
 
-        to_list = [JAZ_EMAIL, LAR_EMAIL, AGUS_EMAIL, PGONZALES_EMAIL]  # lista de destinatarios fija por ahora
+        to_list = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL]  # hire reminders activos
+        # Lucia desactivada para hire reminders.
+        # to_list = [JAZ_EMAIL, LAR_EMAIL, LUCIA_EMAIL, PGONZALES_EMAIL]
 
         # Nuevo subject dinámico
         subject = f"🎉 Signed: {client_name or 'Client'} — {opp_position_name or 'Role'}"
@@ -1027,7 +1030,7 @@ def send_due_reminders():
         cur.execute("""
           SELECT *
             FROM hire_reminders
-           WHERE (NOT jaz OR NOT lar OR NOT agus)
+           WHERE (NOT jaz OR NOT lar)
         """)
         rows = cur.fetchall() or []
 
@@ -1047,7 +1050,8 @@ def send_due_reminders():
             plan = []
             if not r["jaz"] and _should_send(now, press, r["last_jaz_sent_at"]): plan.append(("jaz", JAZ_EMAIL))
             if not r["lar"] and _should_send(now, press, r["last_lar_sent_at"]): plan.append(("lar", LAR_EMAIL))
-            if not r["agus"] and _should_send(now, press, r["last_agus_sent_at"]): plan.append(("agus", AGUS_EMAIL))
+            # Lucia desactivada para hire reminders.
+            # if not r["agus"] and _should_send(now, press, r["last_agus_sent_at"]): plan.append(("agus", LUCIA_EMAIL))
             
             if not plan:
                 continue
