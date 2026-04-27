@@ -621,7 +621,8 @@ def management_dashboard_metrics():
             WITH hire_rows AS (
               SELECT
                 ho.account_id,
-                LOWER(o.opp_model) AS model,
+                LOWER(TRIM(o.opp_model)) AS model,
+                LOWER(TRIM(COALESCE(ho.status, ''))) AS status,
                 CASE
                   WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
                   WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
@@ -641,6 +642,7 @@ def management_dashboard_metrics():
               SELECT
                 b.account_id,
                 'recruiting' AS model,
+                '' AS status,
                 CASE
                   WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
                     THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
@@ -664,16 +666,24 @@ def management_dashboard_metrics():
               a.client_name,
               r.model,
               COUNT(*) FILTER (
-                WHERE r.start_d IS NOT NULL
-                  AND r.start_d <= %s
-                  AND (r.end_d IS NULL OR r.end_d >= %s)
+                WHERE (
+                  (
+                    r.start_d IS NOT NULL
+                    AND r.start_d <= %s
+                    AND (r.end_d IS NULL OR r.end_d >= %s)
+                  )
+                  OR (
+                    r.status = 'active'
+                    AND (r.end_d IS NULL OR r.end_d >= %s)
+                  )
+                )
               ) AS active_now
             FROM all_rows r
             LEFT JOIN account a ON a.account_id = r.account_id
             WHERE r.model IN ('staffing', 'recruiting')
             GROUP BY r.account_id, a.client_name, r.model
             """,
-            (today, today),
+            (today, today, today),
         )
         active_rows = cur.fetchall()
 
