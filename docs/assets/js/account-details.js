@@ -1326,19 +1326,20 @@ if (endInputS) {
     const prevValue = endInputS.dataset.previousEndDate || '';
     const shouldNotify = !prevValue && !!newValue;
     const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
+    let inactiveModalResult = null;
     const persistEndDate = () =>
       updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
 
     try {
       if (shouldNotify) {
-        const modalResult = await captureInactiveMetadataFromAccount({
+        inactiveModalResult = await captureInactiveMetadataFromAccount({
           candidateId,
           candidateName: candidate.name,
           clientName: accountName,
           roleName: candidate.opp_position_name,
           opportunityId: oppId
         });
-        if (!modalResult) {
+        if (!inactiveModalResult) {
           endInputS.value = prevValue;
           endInputS.dataset.previousEndDate = prevValue;
           return;
@@ -1356,6 +1357,15 @@ if (endInputS) {
           roleName: candidate.opp_position_name,
           endDate: newValue,
           opportunityId: oppId
+        });
+        await notifyChurnEmail({
+          candidateId,
+          candidateName: candidate.name,
+          clientName: accountName,
+          roleName: candidate.opp_position_name,
+          endDate: newValue,
+          opportunityId: oppId,
+          inactiveInfo: inactiveModalResult
         });
       }
 
@@ -1790,19 +1800,20 @@ function createRecruitingRow(candidate, options = {}) {
       const prevValue = endInput.dataset.previousEndDate || '';
       const shouldNotify = !prevValue && !!newValue;
       const accountName = getCurrentAccountName() || candidate.client_name || candidate.account_name || '';
+      let inactiveModalResult = null;
       const persistEndDate = () =>
         updateCandidateField(candidateId, 'end_date', patchValue, oppId) || Promise.resolve();
 
       try {
         if (shouldNotify) {
-          const modalResult = await captureInactiveMetadataFromAccount({
+          inactiveModalResult = await captureInactiveMetadataFromAccount({
             candidateId,
             candidateName: candidate.name,
             clientName: accountName,
             roleName: candidate.opp_position_name,
             opportunityId: oppId
           });
-          if (!modalResult) {
+          if (!inactiveModalResult) {
             endInput.value = prevValue;
             endInput.dataset.previousEndDate = prevValue;
             return;
@@ -1820,6 +1831,15 @@ function createRecruitingRow(candidate, options = {}) {
             roleName: candidate.opp_position_name,
             endDate: newValue,
             opportunityId: oppId
+          });
+          await notifyChurnEmail({
+            candidateId,
+            candidateName: candidate.name,
+            clientName: accountName,
+            roleName: candidate.opp_position_name,
+            endDate: newValue,
+            opportunityId: oppId,
+            inactiveInfo: inactiveModalResult
           });
         }
 
@@ -2047,6 +2067,12 @@ function numberOrNull(value) {
 }
 
 const INACTIVE_EMAIL_TO = ['angie@vintti.com', 'lara@vintti.com'];
+const CHURN_EMAIL_TO = [
+  'agustin@vintti.com',
+  'lara@vintti.com',
+  'agostina@vintti.com',
+  'pgonzales@vintti.com'
+];
 const SEND_EMAIL_ENDPOINT = 'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email';
 
 function getCurrentAccountName() {
@@ -2119,6 +2145,88 @@ function notifyCandidateInactiveEmail({
     console.log(`📨 Notified Lara about inactive candidate ${candidateId}`);
   })
   .catch(err => console.error('❌ Failed to notify Lara about inactive candidate', err));
+}
+
+function escapeEmailHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function notifyChurnEmail({
+  candidateId,
+  candidateName,
+  clientName,
+  roleName,
+  endDate,
+  opportunityId,
+  inactiveInfo
+}) {
+  if (!endDate || !inactiveInfo?.reason) return Promise.resolve();
+
+  const displayName = (candidateName || '').trim() || `Candidate #${candidateId}`;
+  const subject = `Churn alert – ${displayName}`;
+  const comments = inactiveInfo.comments || '';
+
+  const detailRows = [
+    { label: 'Employee', value: displayName },
+    { label: 'End date', value: endDate },
+    { label: 'Client', value: clientName },
+    { label: 'Role', value: roleName },
+    { label: 'Reason', value: inactiveInfo.reason },
+    { label: 'Comments', value: comments },
+    { label: 'Vintti process error', value: inactiveInfo.vinttiError ? 'Yes' : 'No' },
+    { label: 'Opportunity ID', value: opportunityId }
+  ].filter(item => item.value !== null && item.value !== undefined && item.value !== '');
+
+  const detailHtml = detailRows.map(item => `
+    <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;font-weight:600;color:#111927;width:180px;">
+        ${escapeEmailHtml(item.label)}
+      </td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;color:#243B53;">
+        ${escapeEmailHtml(item.value)}
+      </td>
+    </tr>
+  `).join('');
+
+  const htmlBody = `
+    <div style="font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#243B53;">
+      <p style="margin:0 0 18px;font-size:16px;">Hi team,</p>
+      <p style="margin:0 0 18px;">
+        A churn was just logged for <strong>${escapeEmailHtml(displayName)}</strong>.
+      </p>
+      <table style="border-collapse:collapse;width:100%;max-width:680px;background:#f8fafc;border-radius:14px;overflow:hidden;margin:0 0 20px;">
+        <tbody>${detailHtml}</tbody>
+      </table>
+      <p style="margin:0;font-size:14px;color:#52606d;">
+        Thanks,<br/>
+        <strong>Vintti Hub</strong>
+      </p>
+    </div>
+  `.trim();
+
+  return fetch(SEND_EMAIL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: CHURN_EMAIL_TO,
+      subject,
+      body: htmlBody
+    })
+  })
+  .then(res => {
+    if (!res.ok) {
+      return res.text().then(text => {
+        throw new Error(`send_email failed ${res.status}: ${text}`);
+      });
+    }
+    console.log(`📨 Churn email sent for candidate ${candidateId}`);
+  })
+  .catch(err => console.error('❌ Failed to send churn email', err));
 }
 
 function explainFetchError(err) {
