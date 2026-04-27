@@ -1,82 +1,136 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 
-_ALLOWED_MODELS = {"Staffing", "Recruiting"}
-
-
-def _parse_ym(value: str | None) -> datetime | None:
+def _parse_ym(value: str | None) -> date | None:
     if not value:
         return None
     parts = str(value).split("-")
     if len(parts) < 2:
         return None
     try:
-        return datetime(int(parts[0]), int(parts[1]), 1)
+        return date(int(parts[0]), int(parts[1]), 1)
     except (ValueError, TypeError):
         return None
 
 
-def _resolve_model(filters: dict) -> str:
-    raw = (filters.get("model") or filters.get("opp_model") or "").strip()
-    if not raw:
-        return "Staffing"
-    norm = raw.capitalize()
-    return norm if norm in _ALLOWED_MODELS else "Staffing"
+def _resolve_segment(filters: dict) -> str:
+    raw = (
+        filters.get("segmento")
+        or filters.get("model")
+        or filters.get("opp_model")
+        or ""
+    ).strip().lower()
+    if raw in {"staffing", "staff"}:
+        return "staffing"
+    if raw in {"recruiting", "recru"}:
+        return "recruiting"
+    return "total"
 
 
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
+def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     target = (
         _parse_ym(filters.get("fecha"))
         or _parse_ym(filters.get("mes"))
         or _parse_ym(filters.get("month"))
-        or datetime.utcnow().replace(day=1)
+        or datetime.utcnow().date().replace(day=1)
     )
-
-    model = _resolve_model(filters)
+    segment = _resolve_segment(filters)
 
     sql = """
         WITH target AS (
           SELECT
-            date_trunc('month', %s::date)::date AS month_start,
-            (date_trunc('month', %s::date) + INTERVAL '1 month - 1 day')::date AS month_end
+            DATE_TRUNC('month', %(target)s::date)::date AS mes_ini,
+            (DATE_TRUNC('month', %(target)s::date)
+              + INTERVAL '1 month - 1 day')::date AS mes_fin
         ),
-        hires AS (
+        hire_rows AS (
           SELECT
+            ('hire_' || ho.hire_opp_id::text) AS row_id,
+            'hire'::text AS source,
+            LOWER(TRIM(o.opp_model)) AS model,
+            ho.account_id,
+            ho.candidate_id,
             a.client_name,
             c.name AS candidate_name,
+            LOWER(TRIM(COALESCE(ho.status, ''))) AS status,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              ELSE NULLIF(ho.start_date::text, '')::date
+              WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
+              ELSE NULL
             END AS start_d,
             CASE
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-              WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
-              ELSE ho.end_date::date
+              WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL THEN NULL
+              ELSE NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
             END AS end_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           JOIN account a     ON a.account_id = ho.account_id
-          JOIN candidates c  ON c.candidate_id = ho.candidate_id
-          WHERE o.opp_model = %s
-            AND ho.account_id IS NOT NULL
-            AND ho.candidate_id IS NOT NULL
+          LEFT JOIN candidates c ON c.candidate_id = ho.candidate_id
+          WHERE ho.account_id IS NOT NULL
+            AND LOWER(TRIM(o.opp_model)) IN ('staffing', 'recruiting')
+        ),
+        buyout_rows AS (
+          SELECT
+            ('buyout_' || b.buyout_id::text) AS row_id,
+            'buyout'::text AS source,
+            'recruiting'::text AS model,
+            b.account_id,
+            NULL::integer AS candidate_id,
+            a.client_name,
+            NULL::text AS candidate_name,
+            ''::text AS status,
+            CASE
+              WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS start_d,
+            CASE
+              WHEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS end_d
+          FROM buyouts b
+          JOIN account a ON a.account_id = b.account_id
+          WHERE b.account_id IS NOT NULL
+        ),
+        all_rows AS (
+          SELECT * FROM hire_rows
+          UNION ALL
+          SELECT * FROM buyout_rows
         )
         SELECT
-          to_char(t.month_start, 'YYYY-MM') AS month,
-          h.client_name,
-          h.candidate_name,
-          h.start_d AS start_date
+          to_char(t.mes_ini, 'YYYY-MM') AS month,
+          INITCAP(r.model) AS model,
+          r.client_name,
+          COALESCE(
+            r.candidate_name,
+            CASE WHEN r.source = 'buyout' THEN '(buyout)' ELSE NULL END
+          ) AS candidate_name,
+          r.start_d AS start_date,
+          r.end_d  AS end_date
         FROM target t
-        JOIN hires h
-          ON h.start_d IS NOT NULL
-         AND h.start_d <= t.month_end
-         AND COALESCE(h.end_d, DATE '9999-12-31') >= t.month_end
-        ORDER BY h.client_name, h.candidate_name;
+        JOIN all_rows r
+          ON (
+            (
+              r.start_d IS NOT NULL
+              AND r.start_d <= t.mes_fin
+              AND COALESCE(r.end_d, DATE '9999-12-31') >= t.mes_fin
+            )
+            OR (
+              t.mes_ini = DATE_TRUNC('month', CURRENT_DATE)
+              AND r.status = 'active'
+              AND (r.end_d IS NULL OR r.end_d >= CURRENT_DATE)
+            )
+          )
+         AND (%(segment)s = 'total' OR r.model = %(segment)s)
+        ORDER BY r.model, r.client_name, r.candidate_name NULLS LAST;
     """
-    target_date = target.date()
-    return sql, (target_date, target_date, model)
+
+    return sql, {"target": target, "segment": segment}
 
 
 DATASET = {
@@ -84,11 +138,13 @@ DATASET = {
     "label": "Active Headcount — Detail by Month",
     "dimensions": [
         {"key": "month", "label": "Month", "type": "date"},
+        {"key": "model", "label": "Model", "type": "string"},
         {"key": "client_name", "label": "Client", "type": "string"},
         {"key": "candidate_name", "label": "Candidate", "type": "string"},
         {"key": "start_date", "label": "Start Date", "type": "date"},
+        {"key": "end_date", "label": "End Date", "type": "date"},
     ],
     "measures": [],
-    "default_filters": {"model": "Staffing"},
+    "default_filters": {"model": ""},
     "query": query,
 }

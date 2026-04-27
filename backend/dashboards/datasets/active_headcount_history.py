@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 
 _ALLOWED_SEGMENTS = {"staffing", "recruiting", "total"}
@@ -34,7 +34,7 @@ def _resolve_segment(filters: dict) -> str:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     today = datetime.utcnow().date()
-    last_full_month_start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+    current_month_start = today.replace(day=1)
 
     desde = (
         _parse_ym(filters.get("desde"))
@@ -44,7 +44,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     hasta = (
         _parse_ym(filters.get("hasta"))
         or _parse_ym(filters.get("to"))
-        or last_full_month_start
+        or current_month_start
     )
     if hasta < desde:
         hasta = desde
