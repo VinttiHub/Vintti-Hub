@@ -17,6 +17,7 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 JAZ_EMAIL  = "jazmin@vintti.com"
 LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
+AGOSTINA_EMAIL = "agostina@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 ANGIE_EMAIL = "angie@vintti.com"
 PGONZALES_EMAIL = "pgonzales@vintti.com"
@@ -476,6 +477,10 @@ def _is_stage_close_win(value) -> bool:
     return str(value or "").strip().lower() == "close win"
 
 
+def _is_stage_closed_lost(value) -> bool:
+    return str(value or "").strip().lower() in {"closed lost", "close lost"}
+
+
 def _close_win_email_html(client_name: str, candidate_name: str, start_date, price_type=None, computer=None) -> str:
     return f"""
 <div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
@@ -486,6 +491,23 @@ def _close_win_email_html(client_name: str, candidate_name: str, start_date, pri
     <b>Start date:</b> {html.escape(str(start_date or '—'))}<br>
     <b>Price type:</b> {html.escape(_format_price_type(price_type))}<br>
     <b>Computer:</b> {html.escape(_format_computer_need(computer))}
+  </p>
+  <p style="margin-top:16px">— Vintti HUB</p>
+</div>
+    """.strip()
+
+
+def _closed_lost_email_html(ctx: Dict[str, Any]) -> str:
+    return f"""
+<div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
+  <p>Hey team — opportunity marked as <b>Closed Lost</b>.</p>
+  <p>
+    <b>Client:</b> {html.escape(str(ctx.get("client_name") or "Client"))}<br>
+    <b>Role:</b> {html.escape(str(ctx.get("opp_position_name") or "—"))}<br>
+    <b>Model:</b> {html.escape(str(ctx.get("opp_model") or "—"))}<br>
+    <b>Close date:</b> {html.escape(str(ctx.get("opp_close_date") or "—"))}<br>
+    <b>Reason:</b> {html.escape(str(ctx.get("motive_close_lost") or "—"))}<br>
+    <b>Details:</b> {html.escape(str(ctx.get("details_close_lost") or "—"))}
   </p>
   <p style="margin-top:16px">— Vintti HUB</p>
 </div>
@@ -506,6 +528,28 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
         FROM opportunity o
         LEFT JOIN account a ON a.account_id = o.account_id
         LEFT JOIN candidates c ON c.candidate_id = o.candidato_contratado
+        WHERE o.opportunity_id = %s
+        LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    return cur.fetchone()
+
+
+def _fetch_closed_lost_context(cur, opportunity_id: int) -> Optional[Dict[str, Any]]:
+    cur.execute(
+        """
+        SELECT
+            o.opportunity_id,
+            o.opp_stage,
+            o.opp_position_name,
+            o.opp_model,
+            o.opp_close_date::date AS opp_close_date,
+            o.motive_close_lost,
+            o.details_close_lost,
+            a.client_name
+        FROM opportunity o
+        LEFT JOIN account a ON a.account_id = o.account_id
         WHERE o.opportunity_id = %s
         LIMIT 1
         """,
@@ -556,6 +600,30 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
         "sent": True,
         "opportunity_id": opportunity_id,
         "candidate_id": candidate_id,
+        "to": to_list,
+    }
+
+
+def _send_closed_lost_email(cur, opportunity_id: int) -> Dict[str, Any]:
+    ctx = _fetch_closed_lost_context(cur, opportunity_id)
+    if not ctx:
+        return {"sent": False, "reason": "opportunity_not_found", "opportunity_id": opportunity_id}
+
+    if not _is_stage_closed_lost(ctx.get("opp_stage")):
+        return {"sent": False, "reason": "stage_not_closed_lost", "opportunity_id": opportunity_id}
+
+    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL, PGONZALES_EMAIL])
+    ok = _send_email(
+        subject=f"Closed Lost: {ctx.get('client_name') or 'Client'} — {ctx.get('opp_position_name') or 'Opportunity'}",
+        html_body=_closed_lost_email_html(ctx),
+        to=to_list,
+    )
+    if not ok:
+        return {"sent": False, "reason": "send_failed", "opportunity_id": opportunity_id, "to": to_list}
+
+    return {
+        "sent": True,
+        "opportunity_id": opportunity_id,
         "to": to_list,
     }
 
@@ -930,6 +998,20 @@ def trigger_close_win_email():
 
     with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
         result = _send_close_win_email(cur, opportunity_id)
+        conn.commit()
+        return jsonify(result), 200
+
+
+@bp.route("/reminders/closed_lost/trigger", methods=["POST"])
+def trigger_closed_lost_email():
+    data = request.get_json(silent=True) or {}
+    try:
+        opportunity_id = int(data.get("opportunity_id"))
+    except Exception:
+        return jsonify({"error": "opportunity_id is required"}), 400
+
+    with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        result = _send_closed_lost_email(cur, opportunity_id)
         conn.commit()
         return jsonify(result), 200
 

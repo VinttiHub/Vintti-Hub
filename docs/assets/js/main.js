@@ -4005,6 +4005,7 @@ window.getCurrentUserId    = getCurrentUserId;
 // --- evita duplicados por cambios rápidos / re-renders ---
 window._negotiatingEmailSent = window._negotiatingEmailSent || new Set();
 window._closeWinStageEmailSent = window._closeWinStageEmailSent || new Set();
+window._closedLostStageEmailSent = window._closedLostStageEmailSent || new Set();
 window._signedResigRefReminderTriggered = window._signedResigRefReminderTriggered || new Set();
 
 /**
@@ -4116,6 +4117,33 @@ async function sendCloseWinStageEmail(opportunityId){
   }
 }
 
+async function sendClosedLostStageEmail(opportunityId){
+  try {
+    if (window._closedLostStageEmailSent.has(opportunityId)) return;
+    const res = await fetch(`${API_BASE}/reminders/closed_lost/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ opportunity_id: opportunityId })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(()=> '');
+      throw new Error(`closed_lost trigger failed ${res.status}: ${errText}`);
+    }
+
+    const result = await res.json().catch(() => ({}));
+    if (!result?.sent) {
+      throw new Error(result?.reason || 'closed_lost_email_not_sent');
+    }
+
+    window._closedLostStageEmailSent.add(opportunityId);
+    console.info('✅ Closed Lost stage email sent for opp', opportunityId);
+  } catch (e) {
+    console.error('❌ Failed to send Closed Lost stage email:', e);
+  }
+}
+
 async function syncCloseWinCreditLoop(opportunityId){
   try {
     const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/credit-loop/sync`, {
@@ -4172,6 +4200,9 @@ patchOpportunityStage = async function(opportunityId, newStage, dropdownElement)
   if (String(newStage) === 'Close Win') {
     await syncCloseWinCreditLoop(opportunityId);
     await sendCloseWinStageEmail(opportunityId);
+  }
+  if (String(newStage) === 'Closed Lost') {
+    await sendClosedLostStageEmail(opportunityId);
   }
   return ok;
 };
