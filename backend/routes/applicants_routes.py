@@ -1,4 +1,6 @@
+import json
 import logging
+import re
 from typing import Optional
 import os
 import uuid
@@ -10,9 +12,11 @@ from ai_routes import (
     _build_opportunity_context,
     _extract_pdf_text_with_openai,
     _score_applicant_with_openai,
+    call_openai_with_retry,
 )
 from db import get_connection
 from utils import services
+from psycopg2.extras import Json as PgJson
 
 bp = Blueprint("applicants", __name__)
 
@@ -94,12 +98,14 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                 cv_content_type,
                 extracted_pdf,
                 match_score,
-                reasons
+                reasons,
+                parsed_cv
             FROM applicants
             WHERE (
                 extracted_pdf IS NULL OR extracted_pdf = ''
                 OR match_score IS NULL
                 OR reasons IS NULL
+                OR parsed_cv IS NULL
             )
         """
         params = []
@@ -117,6 +123,7 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
         updated = 0
         extracted_count = 0
         scored_count = 0
+        parsed_count = 0
 
         for (
             applicant_id,
@@ -130,9 +137,11 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
             extracted_pdf,
             match_score,
             reasons,
+            parsed_cv,
         ) in rows:
             needs_extraction = not (extracted_pdf or "").strip()
             needs_score = match_score is None or reasons is None
+            needs_parse = parsed_cv is None
 
             if needs_extraction:
                 if not s3_key:
@@ -146,6 +155,9 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                 if not extracted_pdf:
                     continue
                 extracted_count += 1
+                # Once we re-extract the CV text, parsed_cv must be regenerated.
+                needs_parse = True
+                parsed_cv = None
 
             if needs_score and extracted_pdf and opp_id:
                 if opp_id not in opp_cache:
@@ -167,6 +179,12 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                 if score is not None or reason_text:
                     scored_count += 1
 
+            if needs_parse and extracted_pdf:
+                new_parsed = _parse_cv_with_openai(extracted_pdf)
+                if new_parsed is not None:
+                    parsed_cv = new_parsed
+                    parsed_count += 1
+
             if dry_run:
                 continue
 
@@ -176,10 +194,17 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
                 SET extracted_pdf = %s,
                     match_score = %s,
                     reasons = %s,
+                    parsed_cv = %s,
                     updated_at = NOW()
                 WHERE applicant_id = %s
                 """,
-                (extracted_pdf, match_score, reasons, applicant_id),
+                (
+                    extracted_pdf,
+                    match_score,
+                    reasons,
+                    PgJson(parsed_cv) if parsed_cv is not None else None,
+                    applicant_id,
+                ),
             )
             updated += 1
 
@@ -191,6 +216,7 @@ def _backfill_applicant_ai_fields(opportunity_id=None, limit=None, filters=None,
             "updated": updated,
             "extracted": extracted_count,
             "scored": scored_count,
+            "parsed": parsed_count,
             "dry_run": dry_run,
         }
     finally:
@@ -212,6 +238,111 @@ def _update_applicant_ai_fields(applicant_id, extracted_pdf, match_score, reason
             WHERE applicant_id = %s
             """,
             (extracted_pdf, match_score, reasons, applicant_id),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+_CV_PARSE_PROMPT = (
+    "You parse CV text into a strict JSON object. Read the CV and produce ONLY a JSON object "
+    "with this exact shape:\n"
+    "{\n"
+    '  "experience": [{"title": str|null, "company": str|null, "start": str|null, "end": str|null}],\n'
+    '  "education":  [{"degree": str|null, "institution": str|null, "start": str|null, "end": str|null}]\n'
+    "}\n"
+    "Rules:\n"
+    "- Sort each list most-recent first.\n"
+    "- Use 'Present' (or 'Actualidad' for Spanish CVs) when the role/study is ongoing.\n"
+    "- Dates may be 'YYYY' or 'MMM YYYY' (e.g. 'Jan 2023', 'Mar 2018'). Do not invent dates.\n"
+    "- Include at most 6 entries per list (most recent).\n"
+    "- If a value is not present in the CV, use null. Never fabricate.\n"
+    "- Do NOT include any text outside the JSON object — no markdown fences, no commentary."
+)
+
+
+def _parse_cv_with_openai(extracted_pdf: Optional[str]) -> Optional[dict]:
+    """Use OpenAI to turn the raw CV text into structured experience/education lists.
+
+    Returns a dict on success or None on failure / when there isn't enough text.
+    The shape matches the JSONB stored on applicants.parsed_cv.
+    """
+    text = (extracted_pdf or "").strip()
+    if len(text) < 80:
+        return None
+
+    # Cap input to keep the prompt cheap; CVs over ~12K chars are unusual.
+    snippet = text[:12000]
+    try:
+        response = call_openai_with_retry(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a precise CV parser. Output strictly valid JSON only."},
+                {"role": "user", "content": f"{_CV_PARSE_PROMPT}\n\nCV TEXT:\n{snippet}"},
+            ],
+            temperature=0,
+            max_tokens=900,
+        )
+    except Exception:
+        logging.exception("OpenAI CV parse call failed")
+        return None
+
+    try:
+        raw = (response.choices[0].message.content or "").strip()
+    except Exception:
+        logging.exception("Unexpected OpenAI response shape")
+        return None
+
+    # Strip optional markdown fences ```json ... ``` defensively.
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```\s*$", "", raw).strip()
+    if not raw:
+        return None
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        logging.warning("CV parse returned non-JSON: %s", raw[:200])
+        return None
+
+    if not isinstance(parsed, dict):
+        return None
+
+    def _normalize_list(items, allowed_keys):
+        if not isinstance(items, list):
+            return []
+        cleaned = []
+        for item in items[:8]:
+            if not isinstance(item, dict):
+                continue
+            entry = {key: (item.get(key) or None) for key in allowed_keys}
+            # Drop completely empty entries.
+            if any(entry.values()):
+                cleaned.append(entry)
+        return cleaned
+
+    experience = _normalize_list(parsed.get("experience"), ("title", "company", "start", "end"))
+    education = _normalize_list(parsed.get("education"), ("degree", "institution", "start", "end"))
+    if not experience and not education:
+        return None
+    return {"experience": experience, "education": education}
+
+
+def _update_applicant_parsed_cv(applicant_id: int, parsed_cv: Optional[dict]) -> None:
+    if parsed_cv is None:
+        return
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE applicants
+            SET parsed_cv = %s,
+                updated_at = NOW()
+            WHERE applicant_id = %s
+            """,
+            (PgJson(parsed_cv), applicant_id),
         )
         conn.commit()
     finally:
@@ -302,6 +433,7 @@ def get_applicants():
                 match_score,
                 reasons,
                 extracted_pdf,
+                parsed_cv,
                 created_at,
                 updated_at
             FROM applicants
@@ -467,6 +599,10 @@ def create_applicant():
                     )
                 if extracted_pdf or score is not None or reasons:
                     _update_applicant_ai_fields(applicant_id, extracted_pdf, score, reasons)
+                if extracted_pdf:
+                    parsed_cv = _parse_cv_with_openai(extracted_pdf)
+                    if parsed_cv is not None:
+                        _update_applicant_parsed_cv(applicant_id, parsed_cv)
             except Exception:
                 logging.exception("Failed to extract/score applicant CV")
 
@@ -605,16 +741,24 @@ def backfill_applicant_extracted_pdf():
                     opportunity_context=opp_context,
                     candidate_context={"role_position": role_position or "", "area": area or ""},
                 )
+            parsed_cv = _parse_cv_with_openai(extracted_pdf)
             cur.execute(
                 """
                 UPDATE applicants
                 SET extracted_pdf = %s,
                     match_score = %s,
                     reasons = %s,
+                    parsed_cv = %s,
                     updated_at = NOW()
                 WHERE applicant_id = %s
                 """,
-                (extracted_pdf, score, reasons, applicant_id),
+                (
+                    extracted_pdf,
+                    score,
+                    reasons,
+                    PgJson(parsed_cv) if parsed_cv is not None else None,
+                    applicant_id,
+                ),
             )
             extracted_count += 1
             if score is not None or reasons:
@@ -693,7 +837,8 @@ def refresh_applicant_ai_fields(applicant_id):
                 cv_content_type,
                 extracted_pdf,
                 match_score,
-                reasons
+                reasons,
+                parsed_cv
             FROM applicants
             WHERE applicant_id = %s
             """,
@@ -715,11 +860,13 @@ def refresh_applicant_ai_fields(applicant_id):
             extracted_pdf,
             match_score,
             reasons,
+            parsed_cv,
         ) = row
 
         updated = False
         extracted = False
         scored = False
+        parsed_changed = False
 
         if not (extracted_pdf or "").strip():
             if not s3_key:
@@ -734,6 +881,7 @@ def refresh_applicant_ai_fields(applicant_id):
                 return jsonify({"error": "Unable to extract CV text"}), 500
             extracted = True
             updated = True
+            parsed_cv = None  # CV text changed, re-parse
 
         if extracted_pdf and opp_id:
             jd_plain, opp_context = _build_opportunity_context(cur, opp_id)
@@ -754,6 +902,15 @@ def refresh_applicant_ai_fields(applicant_id):
             if score is not None or reason_text:
                 scored = True
 
+        # Always (re)parse on a manual refresh — if a user clicks Refresh,
+        # they expect the structured experience/education to update too.
+        if extracted_pdf:
+            new_parsed = _parse_cv_with_openai(extracted_pdf)
+            if new_parsed is not None and new_parsed != parsed_cv:
+                parsed_cv = new_parsed
+                parsed_changed = True
+                updated = True
+
         if updated:
             cur.execute(
                 """
@@ -761,10 +918,17 @@ def refresh_applicant_ai_fields(applicant_id):
                 SET extracted_pdf = %s,
                     match_score = %s,
                     reasons = %s,
+                    parsed_cv = %s,
                     updated_at = NOW()
                 WHERE applicant_id = %s
                 """,
-                (extracted_pdf, match_score, reasons, applicant_id),
+                (
+                    extracted_pdf,
+                    match_score,
+                    reasons,
+                    PgJson(parsed_cv) if parsed_cv is not None else None,
+                    applicant_id,
+                ),
             )
             conn.commit()
 
@@ -773,8 +937,10 @@ def refresh_applicant_ai_fields(applicant_id):
                 "updated": updated,
                 "extracted": extracted,
                 "scored": scored,
+                "parsed": parsed_changed,
                 "match_score": match_score,
                 "reasons": reasons,
+                "parsed_cv": parsed_cv,
             }
         ), 200
     except Exception as exc:

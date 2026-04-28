@@ -936,17 +936,70 @@ function formatExperienceDuration(valueYears) {
 }
 
 function extractEducationSnippet(text) {
-  const raw = String(text || "");
-  if (!raw) return "";
-  const regex = /(licenciatura|ingenieria|ingeniería|maestria|maestría|mba|master|bachelor|degree|universidad|university|college|instituto|diplomatura|doctorado|phd)/i;
-  const match = raw.match(regex);
-  if (!match || match.index == null) return "";
-  const start = Math.max(0, match.index - 60);
-  const end = Math.min(raw.length, match.index + 120);
-  return raw
-    .slice(start, end)
-    .replace(/\s+/g, " ")
-    .trim();
+  const entries = extractEducationEntries(text, 1);
+  if (!entries.length) return "";
+  const entry = entries[0];
+  return entry.dates ? `${entry.title} · ${entry.dates}` : entry.title;
+}
+
+function extractEducationEntries(text, limit = 2) {
+  const section = findCvSection(text, "education");
+  if (!section) return [];
+
+  const yearTerm = "(?:Present|Current|Presente|Actualidad|Hoy|Actual|\\d{4})";
+  const yearRe = new RegExp(`(\\d{4}\\s*(?:[-–—]\\s*${yearTerm})?)`, "i");
+  const yearReGlobal = new RegExp(`\\d{4}\\s*(?:[-–—]\\s*${yearTerm})?`, "gi");
+
+  let chunks = section
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (chunks.length <= 1) {
+    // No newlines — split using year markers as boundaries.
+    const segs = [];
+    let last = 0;
+    let m;
+    while ((m = yearReGlobal.exec(section))) {
+      const piece = section.slice(last, m.index + m[0].length).trim();
+      if (piece) segs.push(piece);
+      last = m.index + m[0].length;
+    }
+    const tail = section.slice(last).trim();
+    if (tail.length > 6) segs.push(tail);
+    if (segs.length) chunks = segs;
+  }
+
+  const cleanTitle = (value) =>
+    String(value || "")
+      .replace(/[••·]+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/^[\s,;:\-–—]+/, "")
+      .replace(/[\s,;:\-–—]+$/, "")
+      .trim();
+
+  const entries = chunks
+    .map((line) => {
+      const m = line.match(yearRe);
+      const dates = m ? m[0].replace(/\s+/g, " ").trim() : "";
+      const title = cleanTitle(m ? line.replace(m[0], "") : line);
+      return { title, dates };
+    })
+    .filter((entry) => entry.title.length > 4)
+    .map((entry) => ({
+      title: entry.title.length > 130 ? `${entry.title.slice(0, 127).trim()}…` : entry.title,
+      dates: entry.dates,
+    }));
+
+  const seen = new Set();
+  const unique = entries.filter((entry) => {
+    const key = entry.title.toLowerCase().slice(0, 60);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return unique.slice(0, limit);
 }
 
 function buildApplicantProfile(applicant) {
@@ -967,6 +1020,17 @@ function buildApplicantProfile(applicant) {
     .filter(Boolean)
     .join(" ");
 
+  // parsed_cv may arrive as a JSON string or as an already-parsed object
+  // depending on the psycopg2 / Flask version on the backend.
+  let parsedCv = applicant.parsed_cv ?? null;
+  if (typeof parsedCv === "string") {
+    try {
+      parsedCv = JSON.parse(parsedCv);
+    } catch (err) {
+      parsedCv = null;
+    }
+  }
+
   return {
     id: applicant.applicant_id,
     name: fallbackName,
@@ -978,6 +1042,7 @@ function buildApplicantProfile(applicant) {
     salaryRange: null,
     searchableText,
     cvText,
+    parsedCv,
     linkedin: applicant.linkedin_url || "",
     core: null,
   };
@@ -1432,8 +1497,134 @@ function buildExperienceLine(cvText) {
   return yearsLabel;
 }
 
+const CV_SECTION_HEADINGS = {
+  experience: [
+    "PROFESSIONAL EXPERIENCE",
+    "WORK EXPERIENCE",
+    "EMPLOYMENT HISTORY",
+    "WORK HISTORY",
+    "EXPERIENCIA PROFESIONAL",
+    "EXPERIENCIA LABORAL",
+    "TRAYECTORIA PROFESIONAL",
+    "EXPERIENCIA",
+    "EXPERIENCE",
+  ],
+  education: [
+    "ACADEMIC BACKGROUND",
+    "FORMACION ACADEMICA",
+    "FORMACIÓN ACADÉMICA",
+    "ESTUDIOS ACADEMICOS",
+    "ESTUDIOS ACADÉMICOS",
+    "EDUCACION",
+    "EDUCACIÓN",
+    "EDUCATION",
+    "ESTUDIOS",
+  ],
+  other: [
+    "SKILLS",
+    "HABILIDADES",
+    "COMPETENCIAS",
+    "LANGUAGES",
+    "IDIOMAS",
+    "CERTIFICATIONS",
+    "CERTIFICACIONES",
+    "CERTIFICATES",
+    "REFERENCES",
+    "REFERENCIAS",
+    "SUMMARY",
+    "RESUMEN",
+    "PERFIL",
+    "PROFILE",
+    "PROJECTS",
+    "PROYECTOS",
+    "ACHIEVEMENTS",
+    "LOGROS",
+    "AWARDS",
+    "TECHNOLOGIES",
+    "TECNOLOGIAS",
+    "TECNOLOGÍAS",
+    "TOOLS",
+    "HERRAMIENTAS",
+    "INTERESTS",
+    "INTERESES",
+    "VOLUNTEER",
+    "VOLUNTARIADO",
+    "PUBLICATIONS",
+    "PUBLICACIONES",
+    "COURSES",
+    "CURSOS",
+    "CONTACT",
+    "CONTACTO",
+    "OBJECTIVE",
+    "OBJETIVO",
+    "ABOUT ME",
+    "ACERCA DE",
+    "STRENGTHS",
+    "FORTALEZAS",
+    "EXTRA-CURRICULAR",
+    "EXTRACURRICULAR",
+    "AREAS OF EXPERTISE",
+    "PERSONAL DETAILS",
+    "DATOS PERSONALES",
+    "INFORMACION PERSONAL",
+    "INFORMACIÓN PERSONAL",
+  ],
+};
+
+function _escapeRegexLiteral(value) {
+  return String(value).replace(/[\\.*+?^${}()|[\]]/g, "\\$&");
+}
+
+function findCvSection(rawText, kind) {
+  const text = String(rawText || "");
+  if (!text) return "";
+  const primary = CV_SECTION_HEADINGS[kind] || [];
+  if (!primary.length) return "";
+  const headingPattern = primary.map(_escapeRegexLiteral).join("|");
+  const headingRe = new RegExp(`\\b(${headingPattern})\\b`, "gi");
+
+  const matches = [];
+  let m;
+  while ((m = headingRe.exec(text))) {
+    const captured = m[1];
+    const before = text[m.index - 1] || "\n";
+    const after = text[m.index + captured.length] || "\n";
+    matches.push({
+      index: m.index,
+      end: m.index + captured.length,
+      isUpper: captured === captured.toUpperCase(),
+      isLineStart: before === "\n" || before === "\r" || before === "",
+      isLineEnd: after === "\n" || after === "\r" || after === ":" || /\s/.test(after),
+      raw: captured,
+    });
+  }
+  if (!matches.length) return "";
+
+  // Prefer matches that are uppercase AND at line start; fall back gracefully.
+  matches.sort((a, b) => {
+    const score = (x) => (x.isUpper ? 4 : 0) + (x.isLineStart ? 2 : 0) + (x.isLineEnd ? 1 : 0);
+    const diff = score(b) - score(a);
+    if (diff !== 0) return diff;
+    return a.index - b.index;
+  });
+  const chosen = matches[0];
+
+  const allHeadings = [
+    ...CV_SECTION_HEADINGS.experience,
+    ...CV_SECTION_HEADINGS.education,
+    ...CV_SECTION_HEADINGS.other,
+  ];
+  const stopHeadings = allHeadings.filter((h) => !primary.includes(h));
+  const stopPattern = stopHeadings.map(_escapeRegexLiteral).join("|");
+  const stopRe = new RegExp(`\\b(?:${stopPattern})\\b`, "gi");
+  stopRe.lastIndex = chosen.end;
+  const stopMatch = stopRe.exec(text);
+  const end = stopMatch ? stopMatch.index : text.length;
+  return text.slice(chosen.end, end).replace(/^[:\s\-–—]+/, "").trim();
+}
+
 function extractRecentJobs(text, limit = 2) {
-  const raw = String(text || "");
+  const raw = findCvSection(text, "experience");
   if (!raw) return [];
 
   const monthName =
@@ -1521,19 +1712,56 @@ function buildCandidateRowEl(candidate) {
   const locationLabel = [flag, profile.country].filter(Boolean).join(" ").trim() || "Location unknown";
 
   const cvText = profile.cvText || "";
-  const experienceLabel = buildExperienceLine(cvText);
-  const recentJobs = extractRecentJobs(cvText, 2);
-  const experienceItemsHtml = recentJobs
-    .map(
-      (job) => `
-        <li class="candidate-row__exp-item">
-          <span class="candidate-row__exp-title">${escapeHtml(job.title)}</span>
-          <span class="candidate-row__exp-dates">${escapeHtml(job.dates)}</span>
-        </li>
-      `
-    )
-    .join("");
-  const educationSnippet = extractEducationSnippet(cvText);
+  const parsedCv = profile.parsedCv || null;
+
+  const formatDateRange = (start, end) => {
+    const s = (start || "").toString().trim();
+    const e = (end || "").toString().trim();
+    if (s && e) return `${s} – ${e}`;
+    return s || e || "";
+  };
+
+  const aiExperience = Array.isArray(parsedCv?.experience)
+    ? parsedCv.experience
+        .map((entry) => {
+          const titlePart = [entry.title, entry.company].filter(Boolean).join(" · ");
+          if (!titlePart) return null;
+          return { title: titlePart, dates: formatDateRange(entry.start, entry.end) };
+        })
+        .filter(Boolean)
+    : null;
+
+  const aiEducation = Array.isArray(parsedCv?.education)
+    ? parsedCv.education
+        .map((entry) => {
+          const titlePart = [entry.degree, entry.institution].filter(Boolean).join(" · ");
+          if (!titlePart) return null;
+          return { title: titlePart, dates: formatDateRange(entry.start, entry.end) };
+        })
+        .filter(Boolean)
+    : null;
+
+  const recentJobs = aiExperience && aiExperience.length
+    ? aiExperience.slice(0, 2)
+    : extractRecentJobs(cvText, 2);
+  const educationEntries = aiEducation && aiEducation.length
+    ? aiEducation.slice(0, 2)
+    : extractEducationEntries(cvText, 2);
+
+  const renderEntryList = (entries) =>
+    entries
+      .map(
+        (entry) => `
+          <li class="candidate-row__exp-item">
+            <span class="candidate-row__exp-title">${escapeHtml(entry.title)}</span>
+            ${entry.dates ? `<span class="candidate-row__exp-dates">${escapeHtml(entry.dates)}</span>` : ""}
+          </li>
+        `
+      )
+      .join("");
+
+  const experienceItemsHtml = renderEntryList(recentJobs);
+  const educationItemsHtml = renderEntryList(educationEntries);
 
   const fallbackScore = computeMatchScore(profile);
   const effectiveScore = Number.isFinite(candidate.score) ? candidate.score : fallbackScore;
@@ -1643,15 +1871,19 @@ function buildCandidateRowEl(candidate) {
       <div class="candidate-row__field">
         <span class="candidate-row__field-label">Experience</span>
         <div class="candidate-row__field-value">
-          ${experienceItemsHtml ? `<ul class="candidate-row__exp-list">${experienceItemsHtml}</ul>` : ""}
-          <span class="candidate-row__exp-summary">${escapeHtml(experienceLabel)}</span>
+          ${experienceItemsHtml
+            ? `<ul class="candidate-row__exp-list">${experienceItemsHtml}</ul>`
+            : `<span class="candidate-row__exp-summary">—</span>`}
         </div>
       </div>
-      ${educationSnippet ? `
       <div class="candidate-row__field">
         <span class="candidate-row__field-label">Education</span>
-        <span class="candidate-row__field-value">${escapeHtml(educationSnippet)}</span>
-      </div>` : ""}
+        <div class="candidate-row__field-value">
+          ${educationItemsHtml
+            ? `<ul class="candidate-row__exp-list">${educationItemsHtml}</ul>`
+            : `<span class="candidate-row__exp-summary">—</span>`}
+        </div>
+      </div>
       ${skillChipsHtml ? `
       <div class="candidate-row__field">
         <span class="candidate-row__field-label">Skills match</span>
