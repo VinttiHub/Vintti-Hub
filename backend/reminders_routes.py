@@ -18,6 +18,7 @@ JAZ_EMAIL  = "jazmin@vintti.com"
 LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
 AGOSTINA_EMAIL = "agostina@vintti.com"
+BAHIA_EMAIL = "bahia@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 ANGIE_EMAIL = "angie@vintti.com"
 PGONZALES_EMAIL = "pgonzales@vintti.com"
@@ -544,6 +545,7 @@ def _fetch_closed_lost_context(cur, opportunity_id: int) -> Optional[Dict[str, A
             o.opp_stage,
             o.opp_position_name,
             o.opp_model,
+            o.opp_sales_lead,
             o.opp_close_date::date AS opp_close_date,
             o.motive_close_lost,
             o.details_close_lost,
@@ -612,7 +614,14 @@ def _send_closed_lost_email(cur, opportunity_id: int) -> Dict[str, Any]:
     if not _is_stage_closed_lost(ctx.get("opp_stage")):
         return {"sent": False, "reason": "stage_not_closed_lost", "opportunity_id": opportunity_id}
 
-    to_list = _dedupe_emails([AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL, PGONZALES_EMAIL])
+    recipients = [AGUS_EMAIL, LAR_EMAIL, AGOSTINA_EMAIL, PGONZALES_EMAIL]
+    if (
+        str(ctx.get("motive_close_lost") or "").strip().lower() == "vinttis fault"
+        and str(ctx.get("opp_sales_lead") or "").strip().lower() == "mariano@vintti.com"
+    ):
+        recipients.append(BAHIA_EMAIL)
+
+    to_list = _dedupe_emails(recipients)
     ok = _send_email(
         subject=f"Closed Lost: {ctx.get('client_name') or 'Client'} — {ctx.get('opp_position_name') or 'Opportunity'}",
         html_body=_closed_lost_email_html(ctx),
