@@ -1620,10 +1620,6 @@ function buildCandidateRowEl(candidate) {
         <div class="candidate-row__field-value"><div class="candidate-row__chips">${skillChipsHtml}</div></div>
       </div>` : ""}
       <div class="candidate-row__field">
-        <span class="candidate-row__field-label">Match note</span>
-        <span class="candidate-row__field-value">${escapeHtml(matchModel.summary)}</span>
-      </div>
-      <div class="candidate-row__field">
         <span class="candidate-row__field-label">Contact</span>
         <span class="candidate-row__field-value">${contactBits}</span>
       </div>

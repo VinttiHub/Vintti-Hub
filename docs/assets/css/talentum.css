@@ -11,8 +11,8 @@
   --shadow: 0 22px 60px rgba(31, 31, 36, 0.12);
   --glass: rgba(255, 255, 255, 0.72);
   --radius: 22px;
-  --mono: "Manrope", sans-serif;
-  --display: "Playfair Display", serif;
+  --mono: "Onest", sans-serif;
+  --display: "Onest", sans-serif;
 }
 
 * {
@@ -516,8 +516,7 @@ body.chat-expanded .chat-panel {
 .paginator {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  gap: 8px;
   margin-bottom: 18px;
   padding: 10px 14px;
   border-radius: 16px;
@@ -528,9 +527,18 @@ body.chat-expanded .chat-panel {
 .paginator__center {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
   flex: 1;
+  order: 1;
+}
+
+#prevCandidateBtn {
+  order: 2;
+}
+
+#nextCandidateBtn {
+  order: 3;
 }
 
 .paginator__counter {
