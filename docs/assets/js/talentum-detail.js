@@ -935,73 +935,6 @@ function formatExperienceDuration(valueYears) {
   return `${label} años`;
 }
 
-function extractEducationSnippet(text) {
-  const entries = extractEducationEntries(text, 1);
-  if (!entries.length) return "";
-  const entry = entries[0];
-  return entry.dates ? `${entry.title} · ${entry.dates}` : entry.title;
-}
-
-function extractEducationEntries(text, limit = 2) {
-  const section = findCvSection(text, "education");
-  if (!section) return [];
-
-  const yearTerm = "(?:Present|Current|Presente|Actualidad|Hoy|Actual|\\d{4})";
-  const yearRe = new RegExp(`(\\d{4}\\s*(?:[-–—]\\s*${yearTerm})?)`, "i");
-  const yearReGlobal = new RegExp(`\\d{4}\\s*(?:[-–—]\\s*${yearTerm})?`, "gi");
-
-  let chunks = section
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  if (chunks.length <= 1) {
-    // No newlines — split using year markers as boundaries.
-    const segs = [];
-    let last = 0;
-    let m;
-    while ((m = yearReGlobal.exec(section))) {
-      const piece = section.slice(last, m.index + m[0].length).trim();
-      if (piece) segs.push(piece);
-      last = m.index + m[0].length;
-    }
-    const tail = section.slice(last).trim();
-    if (tail.length > 6) segs.push(tail);
-    if (segs.length) chunks = segs;
-  }
-
-  const cleanTitle = (value) =>
-    String(value || "")
-      .replace(/[••·]+/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/^[\s,;:\-–—]+/, "")
-      .replace(/[\s,;:\-–—]+$/, "")
-      .trim();
-
-  const entries = chunks
-    .map((line) => {
-      const m = line.match(yearRe);
-      const dates = m ? m[0].replace(/\s+/g, " ").trim() : "";
-      const title = cleanTitle(m ? line.replace(m[0], "") : line);
-      return { title, dates };
-    })
-    .filter((entry) => entry.title.length > 4)
-    .map((entry) => ({
-      title: entry.title.length > 130 ? `${entry.title.slice(0, 127).trim()}…` : entry.title,
-      dates: entry.dates,
-    }));
-
-  const seen = new Set();
-  const unique = entries.filter((entry) => {
-    const key = entry.title.toLowerCase().slice(0, 60);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  return unique.slice(0, limit);
-}
-
 function buildApplicantProfile(applicant) {
   const fullName = `${applicant.first_name || ""} ${applicant.last_name || ""}`.trim();
   const fallbackName = fullName || applicant.email || "Unnamed";
@@ -1020,17 +953,6 @@ function buildApplicantProfile(applicant) {
     .filter(Boolean)
     .join(" ");
 
-  // parsed_cv may arrive as a JSON string or as an already-parsed object
-  // depending on the psycopg2 / Flask version on the backend.
-  let parsedCv = applicant.parsed_cv ?? null;
-  if (typeof parsedCv === "string") {
-    try {
-      parsedCv = JSON.parse(parsedCv);
-    } catch (err) {
-      parsedCv = null;
-    }
-  }
-
   return {
     id: applicant.applicant_id,
     name: fallbackName,
@@ -1042,7 +964,6 @@ function buildApplicantProfile(applicant) {
     salaryRange: null,
     searchableText,
     cvText,
-    parsedCv,
     linkedin: applicant.linkedin_url || "",
     core: null,
   };
@@ -1272,7 +1193,7 @@ function buildJdExplanation(profile, percent, includePercent = true) {
   const yearsHave = resolveCandidateYears(profile);
   const percentLabel = `${percent || 0}%`;
   const experienceInfo = extractExperienceFromText(profile.searchableText);
-  const educationSnippet = extractEducationSnippet(profile.searchableText);
+  const educationSnippet = "";
 
   const leadSentence = includePercent
     ? `Resumen del CV para esta comparación (${percentLabel}).`
@@ -1485,221 +1406,6 @@ function buildInitials(name) {
   );
 }
 
-function buildExperienceLine(cvText) {
-  const exp = extractExperienceFromText(cvText);
-  if (!exp || !exp.totalMonths) return "—";
-  const yearsLabel = formatExperienceDuration(exp.totalMonths / 12);
-  const currentYear = new Date().getFullYear();
-  if (exp.earliestYear && exp.latestYear) {
-    const endLabel = exp.latestYear >= currentYear ? "Present" : exp.latestYear;
-    return `${yearsLabel} · ${exp.earliestYear} – ${endLabel}`;
-  }
-  return yearsLabel;
-}
-
-const CV_SECTION_HEADINGS = {
-  experience: [
-    "PROFESSIONAL EXPERIENCE",
-    "WORK EXPERIENCE",
-    "EMPLOYMENT HISTORY",
-    "WORK HISTORY",
-    "EXPERIENCIA PROFESIONAL",
-    "EXPERIENCIA LABORAL",
-    "TRAYECTORIA PROFESIONAL",
-    "EXPERIENCIA",
-    "EXPERIENCE",
-  ],
-  education: [
-    "ACADEMIC BACKGROUND",
-    "FORMACION ACADEMICA",
-    "FORMACIÓN ACADÉMICA",
-    "ESTUDIOS ACADEMICOS",
-    "ESTUDIOS ACADÉMICOS",
-    "EDUCACION",
-    "EDUCACIÓN",
-    "EDUCATION",
-    "ESTUDIOS",
-  ],
-  other: [
-    "SKILLS",
-    "HABILIDADES",
-    "COMPETENCIAS",
-    "LANGUAGES",
-    "IDIOMAS",
-    "CERTIFICATIONS",
-    "CERTIFICACIONES",
-    "CERTIFICATES",
-    "REFERENCES",
-    "REFERENCIAS",
-    "SUMMARY",
-    "RESUMEN",
-    "PERFIL",
-    "PROFILE",
-    "PROJECTS",
-    "PROYECTOS",
-    "ACHIEVEMENTS",
-    "LOGROS",
-    "AWARDS",
-    "TECHNOLOGIES",
-    "TECNOLOGIAS",
-    "TECNOLOGÍAS",
-    "TOOLS",
-    "HERRAMIENTAS",
-    "INTERESTS",
-    "INTERESES",
-    "VOLUNTEER",
-    "VOLUNTARIADO",
-    "PUBLICATIONS",
-    "PUBLICACIONES",
-    "COURSES",
-    "CURSOS",
-    "CONTACT",
-    "CONTACTO",
-    "OBJECTIVE",
-    "OBJETIVO",
-    "ABOUT ME",
-    "ACERCA DE",
-    "STRENGTHS",
-    "FORTALEZAS",
-    "EXTRA-CURRICULAR",
-    "EXTRACURRICULAR",
-    "AREAS OF EXPERTISE",
-    "PERSONAL DETAILS",
-    "DATOS PERSONALES",
-    "INFORMACION PERSONAL",
-    "INFORMACIÓN PERSONAL",
-  ],
-};
-
-function _escapeRegexLiteral(value) {
-  return String(value).replace(/[\\.*+?^${}()|[\]]/g, "\\$&");
-}
-
-function findCvSection(rawText, kind) {
-  const text = String(rawText || "");
-  if (!text) return "";
-  const primary = CV_SECTION_HEADINGS[kind] || [];
-  if (!primary.length) return "";
-  const headingPattern = primary.map(_escapeRegexLiteral).join("|");
-  const headingRe = new RegExp(`\\b(${headingPattern})\\b`, "gi");
-
-  const matches = [];
-  let m;
-  while ((m = headingRe.exec(text))) {
-    const captured = m[1];
-    const before = text[m.index - 1] || "\n";
-    const after = text[m.index + captured.length] || "\n";
-    matches.push({
-      index: m.index,
-      end: m.index + captured.length,
-      isUpper: captured === captured.toUpperCase(),
-      isLineStart: before === "\n" || before === "\r" || before === "",
-      isLineEnd: after === "\n" || after === "\r" || after === ":" || /\s/.test(after),
-      raw: captured,
-    });
-  }
-  if (!matches.length) return "";
-
-  // Prefer matches that are uppercase AND at line start; fall back gracefully.
-  matches.sort((a, b) => {
-    const score = (x) => (x.isUpper ? 4 : 0) + (x.isLineStart ? 2 : 0) + (x.isLineEnd ? 1 : 0);
-    const diff = score(b) - score(a);
-    if (diff !== 0) return diff;
-    return a.index - b.index;
-  });
-  const chosen = matches[0];
-
-  const allHeadings = [
-    ...CV_SECTION_HEADINGS.experience,
-    ...CV_SECTION_HEADINGS.education,
-    ...CV_SECTION_HEADINGS.other,
-  ];
-  const stopHeadings = allHeadings.filter((h) => !primary.includes(h));
-  const stopPattern = stopHeadings.map(_escapeRegexLiteral).join("|");
-  const stopRe = new RegExp(`\\b(?:${stopPattern})\\b`, "gi");
-  stopRe.lastIndex = chosen.end;
-  const stopMatch = stopRe.exec(text);
-  const end = stopMatch ? stopMatch.index : text.length;
-  return text.slice(chosen.end, end).replace(/^[:\s\-–—]+/, "").trim();
-}
-
-function extractRecentJobs(text, limit = 2) {
-  const raw = findCvSection(text, "experience");
-  if (!raw) return [];
-
-  const monthName =
-    "(?:Ene|Enero|Feb|Febrero|Mar|Marzo|Abr|Abril|May|Mayo|Jun|Junio|Jul|Julio|Ago|Agosto|Sep|Sept|Septiembre|Set|Setiembre|Oct|Octubre|Nov|Noviembre|Dic|Diciembre|Jan|January|February|March|April|June|July|August|September|October|November|December)";
-  const present = "(?:Present|Current|Presente|Actualidad|Actual|Hoy|Now)";
-  const datePart = `(?:${monthName}\\.?\\s+\\d{4}|\\d{1,2}[\\/\\-]\\d{4}|\\d{4})`;
-  const endPart = `(?:${monthName}\\.?\\s+\\d{4}|\\d{1,2}[\\/\\-]\\d{4}|\\d{4}|${present})`;
-  const rangePattern = `(${datePart}\\s*(?:[-–—]|to|a|hasta)\\s*${endPart})`;
-  const lineRe = new RegExp(rangePattern, "i");
-
-  const cleanTitle = (value) => {
-    if (!value) return "";
-    return value
-      .replace(/[••·]+/g, " · ")
-      .replace(/^[\s·,;:\-–—]+/, "")
-      .replace(/[\s·,;:\-–—]+$/, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  };
-
-  const computeEndYear = (dates) => {
-    if (new RegExp(present, "i").test(dates)) return new Date().getFullYear() + 1;
-    const all = String(dates).match(/\d{4}/g) || [];
-    return all.length ? Number(all[all.length - 1]) : 0;
-  };
-
-  const pushJob = (acc, title, dates) => {
-    const cleaned = cleanTitle(title);
-    if (!cleaned || cleaned.length < 3) return;
-    const dt = String(dates).replace(/\s+/g, " ").trim();
-    acc.push({
-      title: cleaned.length > 120 ? `${cleaned.slice(0, 117).trim()}…` : cleaned,
-      dates: dt,
-      endYear: computeEndYear(dt),
-    });
-  };
-
-  const jobs = [];
-
-  // Pass 1: line-based — works when the PDF extractor preserves newlines.
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  lines.forEach((line, idx) => {
-    const m = line.match(lineRe);
-    if (!m) return;
-    let title = line.replace(m[0], " ").trim();
-    if (cleanTitle(title).length < 4 && idx > 0) {
-      title = lines[idx - 1];
-    }
-    pushJob(jobs, title, m[1]);
-  });
-
-  // Pass 2: fallback — scan the whole blob and grab preceding chunk if pass 1 was empty.
-  if (!jobs.length) {
-    const globalRe = new RegExp(rangePattern, "gi");
-    let m;
-    while ((m = globalRe.exec(raw))) {
-      const before = raw.slice(Math.max(0, m.index - 220), m.index);
-      const segments = before.split(/\n|\t|[·•]|\.\s|;\s/);
-      const title = segments[segments.length - 1] || "";
-      pushJob(jobs, title, m[1]);
-    }
-  }
-
-  const seen = new Set();
-  const unique = jobs.filter((job) => {
-    const key = `${job.title.toLowerCase()}|${job.dates.toLowerCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  unique.sort((a, b) => b.endYear - a.endYear);
-  return unique.slice(0, limit);
-}
-
 function buildCandidateRowEl(candidate) {
   const questions = state.applicantQuestions || {};
   const applicant = candidate.pipeline || {};
@@ -1711,57 +1417,6 @@ function buildCandidateRowEl(candidate) {
   const flag = countryInfo?.code ? countryCodeToFlag(countryInfo.code) : "";
   const locationLabel = [flag, profile.country].filter(Boolean).join(" ").trim() || "Location unknown";
 
-  const cvText = profile.cvText || "";
-  const parsedCv = profile.parsedCv || null;
-
-  const formatDateRange = (start, end) => {
-    const s = (start || "").toString().trim();
-    const e = (end || "").toString().trim();
-    if (s && e) return `${s} – ${e}`;
-    return s || e || "";
-  };
-
-  const aiExperience = Array.isArray(parsedCv?.experience)
-    ? parsedCv.experience
-        .map((entry) => {
-          const titlePart = [entry.title, entry.company].filter(Boolean).join(" · ");
-          if (!titlePart) return null;
-          return { title: titlePart, dates: formatDateRange(entry.start, entry.end) };
-        })
-        .filter(Boolean)
-    : null;
-
-  const aiEducation = Array.isArray(parsedCv?.education)
-    ? parsedCv.education
-        .map((entry) => {
-          const titlePart = [entry.degree, entry.institution].filter(Boolean).join(" · ");
-          if (!titlePart) return null;
-          return { title: titlePart, dates: formatDateRange(entry.start, entry.end) };
-        })
-        .filter(Boolean)
-    : null;
-
-  const recentJobs = aiExperience && aiExperience.length
-    ? aiExperience.slice(0, 2)
-    : extractRecentJobs(cvText, 2);
-  const educationEntries = aiEducation && aiEducation.length
-    ? aiEducation.slice(0, 2)
-    : extractEducationEntries(cvText, 2);
-
-  const renderEntryList = (entries) =>
-    entries
-      .map(
-        (entry) => `
-          <li class="candidate-row__exp-item">
-            <span class="candidate-row__exp-title">${escapeHtml(entry.title)}</span>
-            ${entry.dates ? `<span class="candidate-row__exp-dates">${escapeHtml(entry.dates)}</span>` : ""}
-          </li>
-        `
-      )
-      .join("");
-
-  const experienceItemsHtml = renderEntryList(recentJobs);
-  const educationItemsHtml = renderEntryList(educationEntries);
 
   const fallbackScore = computeMatchScore(profile);
   const effectiveScore = Number.isFinite(candidate.score) ? candidate.score : fallbackScore;
@@ -1867,22 +1522,6 @@ function buildCandidateRowEl(candidate) {
         <span class="dot">·</span>
         <span>${escapeHtml(locationLabel)}</span>
         ${profile.industry ? `<span class="dot">·</span><span>${escapeHtml(profile.industry)}</span>` : ""}
-      </div>
-      <div class="candidate-row__field">
-        <span class="candidate-row__field-label">Experience</span>
-        <div class="candidate-row__field-value">
-          ${experienceItemsHtml
-            ? `<ul class="candidate-row__exp-list">${experienceItemsHtml}</ul>`
-            : `<span class="candidate-row__exp-summary">—</span>`}
-        </div>
-      </div>
-      <div class="candidate-row__field">
-        <span class="candidate-row__field-label">Education</span>
-        <div class="candidate-row__field-value">
-          ${educationItemsHtml
-            ? `<ul class="candidate-row__exp-list">${educationItemsHtml}</ul>`
-            : `<span class="candidate-row__exp-summary">—</span>`}
-        </div>
       </div>
       ${skillChipsHtml ? `
       <div class="candidate-row__field">
