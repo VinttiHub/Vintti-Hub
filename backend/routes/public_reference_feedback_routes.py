@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 import re
+import requests
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import Json, RealDictCursor
@@ -136,6 +137,165 @@ def _merge_feedback_into_notes(existing_notes, feedback_rows):
     base_notes = _strip_feedback_notes(existing_notes or '')
     feedback_html = _build_feedback_notes_html(feedback_rows)
     return '<br>'.join(part for part in [base_notes, feedback_html] if part)
+
+
+def _send_email(subject, html_body, recipients):
+    clean_recipients = []
+    seen = set()
+    for value in recipients or []:
+        email = str(value or '').strip().lower()
+        if not email or email in seen:
+            continue
+        seen.add(email)
+        clean_recipients.append(email)
+    if not clean_recipients:
+        return False
+    payload = {'to': clean_recipients, 'subject': subject, 'body': html_body}
+    try:
+        resp = requests.post(
+            'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email',
+            json=payload,
+            timeout=30,
+        )
+        return resp.ok
+    except Exception:
+        return False
+
+
+def _fetch_reference_feedback_email_context(cur, candidate_id, opportunity_id=None):
+    if opportunity_id:
+        cur.execute(
+            """
+            SELECT
+                c.name AS candidate_name,
+                o.opportunity_id,
+                o.opp_position_name,
+                o.opp_hr_lead,
+                COALESCE(a.client_name, 'Client') AS account_name
+            FROM candidates c
+            LEFT JOIN opportunity o ON o.opportunity_id = %s
+            LEFT JOIN account a ON a.account_id = o.account_id
+            WHERE c.candidate_id = %s
+            LIMIT 1
+            """,
+            (opportunity_id, candidate_id),
+        )
+        row = cur.fetchone()
+        if row:
+            return row
+
+    cur.execute(
+        """
+        SELECT
+            c.name AS candidate_name,
+            o.opportunity_id,
+            o.opp_position_name,
+            o.opp_hr_lead,
+            COALESCE(a.client_name, 'Client') AS account_name
+        FROM candidates c
+        LEFT JOIN hire_opportunity ho ON ho.candidate_id = c.candidate_id
+        LEFT JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+        LEFT JOIN account a ON a.account_id = o.account_id
+        WHERE c.candidate_id = %s
+        ORDER BY ho.start_date DESC NULLS LAST, ho.hire_opp_id DESC
+        LIMIT 1
+        """,
+        (candidate_id,),
+    )
+    return cur.fetchone()
+
+
+def _render_feedback_reference_card(row):
+    questions = row.get('questions') or []
+    answers = row.get('answers') or []
+    qa_items = []
+    for index, question in enumerate(questions):
+        answer = answers[index] if index < len(answers) else ''
+        qa_items.append(
+            f"""
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e4ebfb;">
+              <div style="font-weight:700;color:#50607f;margin-bottom:4px;">Question {index + 1}</div>
+              <div style="margin-bottom:8px;">{_escape_html(question)}</div>
+              <div style="font-weight:700;color:#50607f;margin-bottom:4px;">Feedback</div>
+              <div>{_escape_html(answer) or '—'}</div>
+            </div>
+            """
+        )
+    return f"""
+    <div style="margin:16px 0;padding:18px;border:1px solid #dbe6ff;border-radius:18px;background:#f8fbff;">
+      <div style="font-weight:800;font-size:18px;margin-bottom:12px;">Reference {row.get('reference_number') or '—'}</div>
+      <div><b>Name:</b> {_escape_html(row.get('reference_name') or '—')}</div>
+      <div><b>Position:</b> {_escape_html(row.get('reference_position') or '—')}</div>
+      <div><b>Phone:</b> {_escape_html(row.get('reference_phone') or '—')}</div>
+      <div><b>Email:</b> {_escape_html(row.get('reference_email') or '—')}</div>
+      <div><b>LinkedIn:</b> {_escape_html(row.get('reference_linkedin') or '—')}</div>
+      {''.join(qa_items)}
+    </div>
+    """
+
+
+def _reference_feedback_email_html(ctx, feedback_rows):
+    sections = ''.join(_render_feedback_reference_card(row) for row in feedback_rows or [])
+    return f"""
+    <div style="font-family:Arial,sans-serif;color:#172036;line-height:1.5;">
+      <h2 style="margin:0 0 12px;">Reference feedback received</h2>
+      <p style="margin:0 0 10px;"><b>Candidate:</b> {_escape_html(ctx.get('candidate_name') or 'Candidate')}</p>
+      <p style="margin:0 0 10px;"><b>Opportunity:</b> {_escape_html(ctx.get('opp_position_name') or '—')}</p>
+      <p style="margin:0 0 10px;"><b>Account:</b> {_escape_html(ctx.get('account_name') or '—')}</p>
+      {sections}
+    </div>
+    """
+
+
+def _send_reference_feedback_notifications(cur, candidate_id, opportunity_id, submitted_reference_number):
+    ctx = _fetch_reference_feedback_email_context(cur, candidate_id, opportunity_id)
+    if not ctx:
+        return
+
+    hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
+    recipients = ['pgonzales@vintti.com']
+    if hr_lead:
+        recipients.insert(0, hr_lead)
+
+    cur.execute(
+        """
+        SELECT
+            reference_number,
+            reference_name,
+            reference_position,
+            reference_email,
+            reference_phone,
+            reference_linkedin,
+            questions,
+            answers,
+            submitted_at,
+            updated_at
+        FROM reference_feedback_requests
+        WHERE candidate_id = %s
+          AND submitted_at IS NOT NULL
+        ORDER BY reference_number ASC, updated_at DESC
+        """,
+        (candidate_id,),
+    )
+    submitted_rows = cur.fetchall() or []
+    latest_by_reference = {}
+    for row in submitted_rows:
+        latest_by_reference.setdefault(row['reference_number'], row)
+
+    if submitted_reference_number not in latest_by_reference:
+        return
+
+    candidate_name = ctx.get('candidate_name') or 'Candidate'
+    opportunity_name = ctx.get('opp_position_name') or 'Opportunity'
+
+    if len(latest_by_reference) >= 2:
+        subject = f"Reference feedback completed for {candidate_name} • {opportunity_name}"
+        rows_for_email = [latest_by_reference[idx] for idx in (1, 2) if idx in latest_by_reference]
+    else:
+        subject = f"Reference {submitted_reference_number} feedback completed for {candidate_name} • {opportunity_name}"
+        rows_for_email = [latest_by_reference[submitted_reference_number]]
+
+    _send_email(subject, _reference_feedback_email_html(ctx, rows_for_email), recipients)
 
 
 def _sync_feedback_notes_to_candidate_and_hire(cur, candidate_id, opportunity_id=None):
@@ -485,6 +645,12 @@ def submit_reference_feedback():
             candidate_id=updated['candidate_id'],
             opportunity_id=updated.get('opportunity_id'),
         )
+        _send_reference_feedback_notifications(
+            cur,
+            candidate_id=updated['candidate_id'],
+            opportunity_id=updated.get('opportunity_id'),
+            submitted_reference_number=updated['reference_number'],
+        )
 
         conn.commit()
         return jsonify(_serialize_row(updated))
@@ -659,6 +825,12 @@ def direct_submit_reference_feedback():
             cur,
             candidate_id=row['candidate_id'],
             opportunity_id=row.get('opportunity_id'),
+        )
+        _send_reference_feedback_notifications(
+            cur,
+            candidate_id=row['candidate_id'],
+            opportunity_id=row.get('opportunity_id'),
+            submitted_reference_number=row['reference_number'],
         )
         conn.commit()
         return jsonify(_serialize_row(row))
