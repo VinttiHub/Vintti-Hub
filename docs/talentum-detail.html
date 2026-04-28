@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="./assets/css/talentum.css" />
+  <link rel="stylesheet" href="./assets/css/talentum.css?v=5" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
   <link rel="stylesheet" href="./assets/css/details-mobile.css?v=6">
 </head>
@@ -25,6 +25,25 @@
     </header>
 
     <section class="talentum-main">
+      <aside class="filters-sidebar" id="filtersSidebar" aria-label="Filters">
+        <div class="filters-sidebar__head">
+          <h4>Active filters</h4>
+          <span class="filters-status" id="filtersStatus">Idle</span>
+        </div>
+        <div class="filters-grid filters-grid--stacked" id="filtersGrid"></div>
+
+        <div class="filters-sidebar__divider"></div>
+
+        <div class="filters-sidebar__section">
+          <span class="filters-sidebar__label">Gender</span>
+          <div class="candidate-gender-filter__controls candidate-gender-filter__controls--stacked" id="candidateGenderFilter">
+            <button class="candidate-gender-filter__btn is-active" type="button" data-gender-filter="all">Todos</button>
+            <button class="candidate-gender-filter__btn" type="button" data-gender-filter="male">Hombre</button>
+            <button class="candidate-gender-filter__btn" type="button" data-gender-filter="female">Mujer</button>
+          </div>
+        </div>
+      </aside>
+
       <section class="candidates-panel">
         <div class="panel-head">
           <div>
@@ -38,22 +57,16 @@
           </div>
         </div>
 
-        <div class="filters-card">
-          <div class="filters-title">
-            <span>Active filters</span>
-            <span class="filters-status" id="filtersStatus">Idle</span>
+        <div class="paginator" id="paginator" aria-label="Candidate navigation">
+          <button class="paginator__btn paginator__btn--icon" id="prevCandidateBtn" type="button" aria-label="Previous candidate">←</button>
+          <div class="paginator__center">
+            <span class="paginator__counter" id="paginatorCounter">– / –</span>
+            <span class="paginator__hint">Use ← → to navigate</span>
           </div>
-          <div class="filters-grid" id="filtersGrid"></div>
+          <button class="paginator__btn paginator__btn--icon" id="nextCandidateBtn" type="button" aria-label="Next candidate">→</button>
         </div>
-        <div class="candidate-gender-filter" aria-label="Filter candidates by gender">
-          <span class="candidate-gender-filter__label">Gender</span>
-          <div class="candidate-gender-filter__controls" id="candidateGenderFilter">
-            <button class="candidate-gender-filter__btn is-active" type="button" data-gender-filter="all">Todos</button>
-            <button class="candidate-gender-filter__btn" type="button" data-gender-filter="male">Hombre</button>
-            <button class="candidate-gender-filter__btn" type="button" data-gender-filter="female">Mujer</button>
-          </div>
-        </div>
-        <div class="candidates-scroll">
+
+        <div class="candidates-stage">
           <div class="candidates-grid" id="candidatesGrid"></div>
           <div class="empty-state" id="candidatesEmpty">Loading applicants…</div>
         </div>
@@ -128,6 +141,6 @@
   <button class="chat-fab" id="chatFab" type="button" aria-label="Abrir chat">
     Abrir chat
   </button>
-  <script src="./assets/js/talentum-detail.js"></script>
+  <script src="./assets/js/talentum-detail.js?v=4"></script>
 </body>
 </html>

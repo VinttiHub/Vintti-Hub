@@ -301,6 +301,7 @@ def get_applicants():
                 cv_size_bytes,
                 match_score,
                 reasons,
+                extracted_pdf,
                 created_at,
                 updated_at
             FROM applicants

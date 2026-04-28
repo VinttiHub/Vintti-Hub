@@ -22,6 +22,7 @@ const state = {
     question_3: "Question 3",
   },
   selectedApplicantId: null,
+  paginationIndex: 0,
 };
 
 const els = {
@@ -55,6 +56,10 @@ const els = {
   loadingGameTarget: document.getElementById("loadingGameTarget"),
   loadingGameHits: document.getElementById("loadingGameHits"),
   loadingGameStreak: document.getElementById("loadingGameStreak"),
+  prevCandidateBtn: document.getElementById("prevCandidateBtn"),
+  nextCandidateBtn: document.getElementById("nextCandidateBtn"),
+  paginatorCounter: document.getElementById("paginatorCounter"),
+  paginator: document.getElementById("paginator"),
 };
 
 const loadingGameState = {
@@ -1404,8 +1409,292 @@ function getScoreTone(percent) {
   return "score-low";
 }
 
-function renderCandidates() {
-  const scored = state.candidates
+function buildInitials(name) {
+  return (
+    String(name || "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase() || "")
+      .join("") || "?"
+  );
+}
+
+function buildExperienceLine(cvText) {
+  const exp = extractExperienceFromText(cvText);
+  if (!exp || !exp.totalMonths) return "—";
+  const yearsLabel = formatExperienceDuration(exp.totalMonths / 12);
+  const currentYear = new Date().getFullYear();
+  if (exp.earliestYear && exp.latestYear) {
+    const endLabel = exp.latestYear >= currentYear ? "Present" : exp.latestYear;
+    return `${yearsLabel} · ${exp.earliestYear} – ${endLabel}`;
+  }
+  return yearsLabel;
+}
+
+function extractRecentJobs(text, limit = 2) {
+  const raw = String(text || "");
+  if (!raw) return [];
+
+  const monthName =
+    "(?:Ene|Enero|Feb|Febrero|Mar|Marzo|Abr|Abril|May|Mayo|Jun|Junio|Jul|Julio|Ago|Agosto|Sep|Sept|Septiembre|Set|Setiembre|Oct|Octubre|Nov|Noviembre|Dic|Diciembre|Jan|January|February|March|April|June|July|August|September|October|November|December)";
+  const present = "(?:Present|Current|Presente|Actualidad|Actual|Hoy|Now)";
+  const datePart = `(?:${monthName}\\.?\\s+\\d{4}|\\d{1,2}[\\/\\-]\\d{4}|\\d{4})`;
+  const endPart = `(?:${monthName}\\.?\\s+\\d{4}|\\d{1,2}[\\/\\-]\\d{4}|\\d{4}|${present})`;
+  const rangePattern = `(${datePart}\\s*(?:[-–—]|to|a|hasta)\\s*${endPart})`;
+  const lineRe = new RegExp(rangePattern, "i");
+
+  const cleanTitle = (value) => {
+    if (!value) return "";
+    return value
+      .replace(/[••·]+/g, " · ")
+      .replace(/^[\s·,;:\-–—]+/, "")
+      .replace(/[\s·,;:\-–—]+$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const computeEndYear = (dates) => {
+    if (new RegExp(present, "i").test(dates)) return new Date().getFullYear() + 1;
+    const all = String(dates).match(/\d{4}/g) || [];
+    return all.length ? Number(all[all.length - 1]) : 0;
+  };
+
+  const pushJob = (acc, title, dates) => {
+    const cleaned = cleanTitle(title);
+    if (!cleaned || cleaned.length < 3) return;
+    const dt = String(dates).replace(/\s+/g, " ").trim();
+    acc.push({
+      title: cleaned.length > 120 ? `${cleaned.slice(0, 117).trim()}…` : cleaned,
+      dates: dt,
+      endYear: computeEndYear(dt),
+    });
+  };
+
+  const jobs = [];
+
+  // Pass 1: line-based — works when the PDF extractor preserves newlines.
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  lines.forEach((line, idx) => {
+    const m = line.match(lineRe);
+    if (!m) return;
+    let title = line.replace(m[0], " ").trim();
+    if (cleanTitle(title).length < 4 && idx > 0) {
+      title = lines[idx - 1];
+    }
+    pushJob(jobs, title, m[1]);
+  });
+
+  // Pass 2: fallback — scan the whole blob and grab preceding chunk if pass 1 was empty.
+  if (!jobs.length) {
+    const globalRe = new RegExp(rangePattern, "gi");
+    let m;
+    while ((m = globalRe.exec(raw))) {
+      const before = raw.slice(Math.max(0, m.index - 220), m.index);
+      const segments = before.split(/\n|\t|[·•]|\.\s|;\s/);
+      const title = segments[segments.length - 1] || "";
+      pushJob(jobs, title, m[1]);
+    }
+  }
+
+  const seen = new Set();
+  const unique = jobs.filter((job) => {
+    const key = `${job.title.toLowerCase()}|${job.dates.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  unique.sort((a, b) => b.endYear - a.endYear);
+  return unique.slice(0, limit);
+}
+
+function buildCandidateRowEl(candidate) {
+  const questions = state.applicantQuestions || {};
+  const applicant = candidate.pipeline || {};
+  const profile = candidate.profile;
+  const contacted = isApplicantContacted(profile.id);
+  const initials = buildInitials(profile.name);
+
+  const countryInfo = resolveCountryInfo(profile.country);
+  const flag = countryInfo?.code ? countryCodeToFlag(countryInfo.code) : "";
+  const locationLabel = [flag, profile.country].filter(Boolean).join(" ").trim() || "Location unknown";
+
+  const cvText = profile.cvText || "";
+  const experienceLabel = buildExperienceLine(cvText);
+  const recentJobs = extractRecentJobs(cvText, 2);
+  const experienceItemsHtml = recentJobs
+    .map(
+      (job) => `
+        <li class="candidate-row__exp-item">
+          <span class="candidate-row__exp-title">${escapeHtml(job.title)}</span>
+          <span class="candidate-row__exp-dates">${escapeHtml(job.dates)}</span>
+        </li>
+      `
+    )
+    .join("");
+  const educationSnippet = extractEducationSnippet(cvText);
+
+  const fallbackScore = computeMatchScore(profile);
+  const effectiveScore = Number.isFinite(candidate.score) ? candidate.score : fallbackScore;
+  const matchModel = buildMatchModel(profile, effectiveScore, candidate.reasons || applicant.reasons || "");
+  const scorePercent = matchModel.percent;
+  const scoreTone = getScoreTone(scorePercent);
+  const scoreText = Number.isFinite(scorePercent) ? `${scorePercent}%` : "—";
+
+  const skillTags = [profile.position, profile.industry, profile.country]
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((tag) => `<span class="candidate-row__chip">${escapeHtml(tag)}</span>`)
+    .join("");
+  const englishLevel = applicant.english_level
+    ? `<span class="candidate-row__chip candidate-row__chip--muted">${escapeHtml(`English: ${applicant.english_level}`)}</span>`
+    : "";
+  const skillChipsHtml = skillTags + englishLevel;
+
+  const phoneLabel = applicant.phone ? formatPhoneNumber(applicant.phone, countryInfo) : "";
+  const contactBits = [
+    applicant.email ? escapeHtml(applicant.email) : null,
+    phoneLabel ? escapeHtml(phoneLabel) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ") || "—";
+
+  const screeningPairs = [
+    { q: questions.question_1, a: applicant.question_1 },
+    { q: questions.question_2, a: applicant.question_2 },
+    { q: questions.question_3, a: applicant.question_3 },
+  ].filter((pair) => pair.a && String(pair.a).trim());
+  const screeningHtml = screeningPairs.length
+    ? `
+      <div class="candidate-row__field">
+        <span class="candidate-row__field-label">Screening</span>
+        <div class="candidate-row__field-value">
+          <div class="candidate-row__qa">
+            ${screeningPairs
+              .map(
+                (pair, idx) => `
+                  <div class="candidate-row__qa-item">
+                    <p class="candidate-row__qa-q">${escapeHtml(pair.q || `Question ${idx + 1}`)}</p>
+                    <p class="candidate-row__qa-a">${escapeHtml(pair.a)}</p>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+    `
+    : "";
+
+  const linkedinAction = profile.linkedin
+    ? `<a class="candidate-row__action-btn" href="${escapeHtml(profile.linkedin)}" target="_blank" rel="noopener" data-stop="true">LinkedIn ↗</a>`
+    : `<span class="candidate-row__action-btn candidate-row__action-btn--muted">No LinkedIn</span>`;
+  const cvAction = applicant.cv_s3_key
+    ? `<button class="candidate-row__action-btn" data-action="download-cv" data-applicant-id="${applicant.applicant_id}" type="button">CV</button>`
+    : "";
+  const referralRow = applicant.referral_source
+    ? `<div class="candidate-row__field"><span class="candidate-row__field-label">Source</span><span class="candidate-row__field-value">${escapeHtml(applicant.referral_source)}</span></div>`
+    : "";
+
+  const breakdownRowsHtml = (matchModel.breakdown || [])
+    .map((item) => {
+      const percentValue = normalizePercent(item.percent, null);
+      const tone = getScoreTone(percentValue);
+      const percentLabel = percentValue == null ? "N/A" : `${percentValue}%`;
+      return `
+        <div class="candidate-row__breakdown-row ${tone}">
+          <div class="candidate-row__breakdown-head">
+            <span>${escapeHtml(item.category)}</span>
+            <span>${escapeHtml(percentLabel)}</span>
+          </div>
+          <p class="candidate-row__breakdown-detail">${escapeHtml(item.detail || "Sin detalle adicional.")}</p>
+        </div>
+      `;
+    })
+    .join("");
+  const breakdownHtml = breakdownRowsHtml
+    ? `
+      <div class="candidate-row__breakdown" hidden>
+        <div class="candidate-row__breakdown-summary">${escapeHtml(matchModel.summary || "")}</div>
+        <div class="candidate-row__breakdown-list">${breakdownRowsHtml}</div>
+      </div>
+    `
+    : "";
+
+  const row = document.createElement("article");
+  row.className = "candidate-row";
+  row.dataset.applicantId = profile.id;
+  row.innerHTML = `
+    <div class="candidate-row__avatar">
+      <div class="candidate-row__avatar-circle">${escapeHtml(initials)}</div>
+    </div>
+    <div class="candidate-row__main">
+      <div class="candidate-row__heading">
+        <span class="candidate-row__name">${escapeHtml(profile.name)}</span>
+        <span class="candidate-row__status ${contacted ? "is-contacted" : ""}">${contacted ? "Contacted" : "New applicant"}</span>
+      </div>
+      <div class="candidate-row__subline">
+        <span>${escapeHtml(profile.position || "Role unknown")}</span>
+        <span class="dot">·</span>
+        <span>${escapeHtml(locationLabel)}</span>
+        ${profile.industry ? `<span class="dot">·</span><span>${escapeHtml(profile.industry)}</span>` : ""}
+      </div>
+      <div class="candidate-row__field">
+        <span class="candidate-row__field-label">Experience</span>
+        <div class="candidate-row__field-value">
+          ${experienceItemsHtml ? `<ul class="candidate-row__exp-list">${experienceItemsHtml}</ul>` : ""}
+          <span class="candidate-row__exp-summary">${escapeHtml(experienceLabel)}</span>
+        </div>
+      </div>
+      ${educationSnippet ? `
+      <div class="candidate-row__field">
+        <span class="candidate-row__field-label">Education</span>
+        <span class="candidate-row__field-value">${escapeHtml(educationSnippet)}</span>
+      </div>` : ""}
+      ${skillChipsHtml ? `
+      <div class="candidate-row__field">
+        <span class="candidate-row__field-label">Skills match</span>
+        <div class="candidate-row__field-value"><div class="candidate-row__chips">${skillChipsHtml}</div></div>
+      </div>` : ""}
+      <div class="candidate-row__field">
+        <span class="candidate-row__field-label">Match note</span>
+        <span class="candidate-row__field-value">${escapeHtml(matchModel.summary)}</span>
+      </div>
+      <div class="candidate-row__field">
+        <span class="candidate-row__field-label">Contact</span>
+        <span class="candidate-row__field-value">${contactBits}</span>
+      </div>
+      ${screeningHtml}
+      ${referralRow}
+      ${breakdownHtml}
+    </div>
+    <div class="candidate-row__side">
+      <div class="candidate-row__score-card ${scoreTone}" data-action="toggle-breakdown" role="button" tabindex="0" aria-expanded="false" aria-label="Toggle match score breakdown">
+        <div class="candidate-row__score-value">${escapeHtml(scoreText)}</div>
+        <div class="candidate-row__score-label">Match score</div>
+        <span class="candidate-row__score-link" data-toggle-label>View reasons →</span>
+      </div>
+      <label class="candidate-contact-toggle candidate-row__contact-toggle ${contacted ? "is-contacted" : ""}" data-stop="true">
+        <input
+          class="candidate-contact-checkbox"
+          type="checkbox"
+          data-applicant-id="${profile.id}"
+          ${contacted ? "checked" : ""}
+        />
+        <span>${contacted ? "Contacted" : "Not contacted"}</span>
+      </label>
+      <div class="candidate-row__actions">
+        ${linkedinAction}
+        ${cvAction}
+      </div>
+    </div>
+  `;
+  return row;
+}
+
+function getOrderedCandidates() {
+  return state.candidates
     .map((candidate) => {
       const score = getDisplayScore(candidate.score);
       return { ...candidate, score };
@@ -1417,54 +1706,56 @@ function renderCandidates() {
       if (Number.isFinite(b.score)) return 1;
       return 0;
     });
+}
+
+function updatePaginatorUI(total) {
+  if (!els.paginator || !els.paginatorCounter) return;
+  if (!total) {
+    els.paginatorCounter.textContent = "– / –";
+    if (els.prevCandidateBtn) els.prevCandidateBtn.disabled = true;
+    if (els.nextCandidateBtn) els.nextCandidateBtn.disabled = true;
+    els.paginator.style.visibility = "hidden";
+    return;
+  }
+  els.paginator.style.visibility = "visible";
+  els.paginatorCounter.textContent = `${state.paginationIndex + 1} / ${total}`;
+  if (els.prevCandidateBtn) els.prevCandidateBtn.disabled = state.paginationIndex <= 0;
+  if (els.nextCandidateBtn) els.nextCandidateBtn.disabled = state.paginationIndex >= total - 1;
+}
+
+function renderCandidates() {
+  const ordered = getOrderedCandidates();
 
   syncGenderFilterButtons();
 
+  if (state.paginationIndex >= ordered.length) state.paginationIndex = Math.max(0, ordered.length - 1);
+  if (state.paginationIndex < 0) state.paginationIndex = 0;
+
   els.candidatesGrid.innerHTML = "";
-  els.candidatesEmpty.style.display = scored.length ? "none" : "block";
-  els.candidatesEmpty.textContent = scored.length
+  els.candidatesEmpty.style.display = ordered.length ? "none" : "block";
+  els.candidatesEmpty.textContent = ordered.length
     ? ""
     : (state.candidates.length ? "No hay candidatos para ese filtro." : "No applicants yet.");
-  els.candidateCount.textContent = `${scored.length} applicants`;
+  els.candidateCount.textContent = `${ordered.length} applicants`;
 
-  scored.forEach((candidate) => {
-    const card = document.createElement("div");
-    card.className = "candidate-card";
-    card.dataset.applicantId = candidate.profile.id;
-    const contacted = isApplicantContacted(candidate.profile.id);
-    const tags = [candidate.profile.position, candidate.profile.industry, candidate.profile.country]
-      .filter(Boolean)
-      .slice(0, 3)
-      .map((tag) => `<span class="candidate-tag">${escapeHtml(tag)}</span>`)
-      .join("");
-    const profileLink = candidate.profile.linkedin
-      ? `<a class="candidate-link" href="${escapeHtml(candidate.profile.linkedin)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
-      : `<span class="candidate-link muted">No LinkedIn</span>`;
+  if (ordered.length) {
+    const candidate = ordered[state.paginationIndex];
+    els.candidatesGrid.appendChild(buildCandidateRowEl(candidate));
+  }
 
-    const scorePercent = scoreToPercent(candidate.score);
-    const scoreTone = getScoreTone(scorePercent);
-    const scoreLabel = Number.isFinite(scorePercent) ? `Match ${scorePercent}%` : "Score pending";
-    card.innerHTML = `
-      <div class="candidate-card-top">
-        <label class="candidate-contact-toggle ${contacted ? "is-contacted" : ""}">
-          <input
-            class="candidate-contact-checkbox"
-            type="checkbox"
-            data-applicant-id="${escapeHtml(candidate.profile.id)}"
-            ${contacted ? "checked" : ""}
-          />
-          <span>${contacted ? "Contacted" : "Not contacted"}</span>
-        </label>
-      </div>
-      <h4>${escapeHtml(candidate.profile.name)}</h4>
-      <div class="candidate-score ${scoreTone}">${scoreLabel}</div>
-      <p class="candidate-meta">${escapeHtml(candidate.profile.position || "Role unknown")}</p>
-      <p class="candidate-meta">${escapeHtml(candidate.profile.country || "Location unknown")}</p>
-      <div class="candidate-tags">${tags}</div>
-      ${profileLink}
-    `;
-    els.candidatesGrid.appendChild(card);
-  });
+  updatePaginatorUI(ordered.length);
+}
+
+function changeCandidatePage(delta) {
+  const ordered = getOrderedCandidates();
+  if (!ordered.length) return;
+  const next = Math.min(ordered.length - 1, Math.max(0, state.paginationIndex + delta));
+  if (next === state.paginationIndex) return;
+  state.paginationIndex = next;
+  renderCandidates();
+  if (els.candidatesGrid) {
+    els.candidatesGrid.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 }
 
 async function loadApplicants(opportunityId) {
@@ -1489,6 +1780,7 @@ async function loadApplicants(opportunityId) {
       score: Number.isFinite(applicant.match_score) ? applicant.match_score : null,
       reasons: applicant.reasons || "",
     }));
+    state.paginationIndex = 0;
     renderCandidates();
   } finally {
     stopLoadingGame();
@@ -1703,6 +1995,7 @@ async function handleChatSubmit(event) {
     if (typing) typing.remove();
     if (resp.updated_filters) {
       state.filters = { ...state.filters, ...resp.updated_filters };
+      state.paginationIndex = 0;
       renderFilters();
       await loadApplicants(getOpportunityId());
     }
@@ -1749,11 +2042,31 @@ async function init() {
       const button = event.target.closest("[data-gender-filter]");
       if (!button) return;
       state.ui.genderFilter = button.dataset.genderFilter || "all";
+      state.paginationIndex = 0;
       syncGenderFilterButtons();
       renderCandidates();
     });
     syncGenderFilterButtons();
   }
+
+  if (els.prevCandidateBtn) {
+    els.prevCandidateBtn.addEventListener("click", () => changeCandidatePage(-1));
+  }
+  if (els.nextCandidateBtn) {
+    els.nextCandidateBtn.addEventListener("click", () => changeCandidatePage(1));
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
+    if (event.target && event.target.isContentEditable) return;
+    if (document.body.classList.contains("drawer-open")) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      changeCandidatePage(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      changeCandidatePage(1);
+    }
+  });
 
   if (els.chatFab) {
     els.chatFab.addEventListener("click", () => {
@@ -1762,32 +2075,80 @@ async function init() {
   }
 
   if (els.candidatesGrid) {
-    els.candidatesGrid.addEventListener("click", (event) => {
-      if (event.target.closest("a")) return;
+    const toggleBreakdown = (trigger) => {
+      const row = trigger.closest(".candidate-row");
+      if (!row) return;
+      const panel = row.querySelector(".candidate-row__breakdown");
+      if (!panel) return;
+      const expanded = !panel.hasAttribute("hidden");
+      if (expanded) {
+        panel.setAttribute("hidden", "");
+      } else {
+        panel.removeAttribute("hidden");
+      }
+      const card = trigger.closest('[data-action="toggle-breakdown"]') || trigger;
+      card.setAttribute("aria-expanded", expanded ? "false" : "true");
+      const label = card.querySelector("[data-toggle-label]");
+      if (label) label.textContent = expanded ? "View reasons →" : "Hide reasons ↑";
+    };
+
+    els.candidatesGrid.addEventListener("click", async (event) => {
+      if (event.target.closest("[data-stop]")) return;
       if (event.target.closest(".candidate-contact-toggle")) return;
-      const card = event.target.closest(".candidate-card");
-      if (!card) return;
-      const applicantId = Number(card.dataset.applicantId);
-      const selected = state.candidates.find((entry) => entry.profile.id === applicantId);
-      if (selected?.pipeline) {
-        const fallback = computeMatchScore(selected.profile);
-        const score = Number.isFinite(selected.score) ? selected.score : fallback;
-        openApplicantDrawer({ ...selected, score });
+
+      const cvBtn = event.target.closest('[data-action="download-cv"]');
+      if (cvBtn) {
+        event.preventDefault();
+        // Open the popup synchronously inside the click handler so the
+        // browser preserves the user-gesture and doesn't block it.
+        const popup = window.open("", "_blank");
+        const applicantId = Number(cvBtn.dataset.applicantId);
+        const original = cvBtn.textContent;
+        cvBtn.disabled = true;
+        cvBtn.textContent = "Loading…";
+        try {
+          const data = await fetchJSON(`${API_BASE}/applicants/${applicantId}/cv`);
+          if (data?.url) {
+            if (popup && !popup.closed) {
+              popup.location.href = data.url;
+            } else {
+              window.location.href = data.url;
+            }
+          } else if (popup && !popup.closed) {
+            popup.close();
+          }
+        } catch (err) {
+          console.warn("CV download failed", err);
+          if (popup && !popup.closed) popup.close();
+          cvBtn.textContent = "Unavailable";
+          setTimeout(() => { cvBtn.textContent = original; cvBtn.disabled = false; }, 1500);
+          return;
+        }
+        cvBtn.textContent = original;
+        cvBtn.disabled = false;
+        return;
+      }
+
+      const breakdownTrigger = event.target.closest('[data-action="toggle-breakdown"]');
+      if (breakdownTrigger) {
+        toggleBreakdown(breakdownTrigger);
+        return;
       }
     });
+
+    els.candidatesGrid.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const trigger = event.target.closest('[data-action="toggle-breakdown"]');
+      if (!trigger) return;
+      event.preventDefault();
+      toggleBreakdown(trigger);
+    });
+
     els.candidatesGrid.addEventListener("change", (event) => {
       const checkbox = event.target.closest(".candidate-contact-checkbox");
       if (!checkbox) return;
       setApplicantContacted(Number(checkbox.dataset.applicantId), checkbox.checked);
       renderCandidates();
-      const selected = state.candidates.find(
-        (entry) => entry.profile.id === state.selectedApplicantId
-      );
-      if (selected?.pipeline) {
-        const fallback = computeMatchScore(selected.profile);
-        const score = Number.isFinite(selected.score) ? selected.score : fallback;
-        renderApplicantDrawer({ ...selected, score });
-      }
     });
   }
 
