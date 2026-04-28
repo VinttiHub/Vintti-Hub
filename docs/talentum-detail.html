@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="./assets/css/talentum.css?v=6" />
+  <link rel="stylesheet" href="./assets/css/talentum.css?v=7" />
   <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
   <link rel="stylesheet" href="./assets/css/details-mobile.css?v=6">
 </head>
@@ -40,6 +40,33 @@
             <button class="candidate-gender-filter__btn is-active" type="button" data-gender-filter="all">Todos</button>
             <button class="candidate-gender-filter__btn" type="button" data-gender-filter="male">Hombre</button>
             <button class="candidate-gender-filter__btn" type="button" data-gender-filter="female">Mujer</button>
+          </div>
+        </div>
+
+        <div class="filters-sidebar__section">
+          <span class="filters-sidebar__label">Reviewed</span>
+          <div class="candidate-gender-filter__controls candidate-gender-filter__controls--stacked" data-flag-filter-section="reviewed">
+            <button class="candidate-gender-filter__btn is-active" type="button" data-flag-filter-value="all">Todos</button>
+            <button class="candidate-gender-filter__btn" type="button" data-flag-filter-value="yes">Revisados</button>
+            <button class="candidate-gender-filter__btn" type="button" data-flag-filter-value="no">No revisados</button>
+          </div>
+        </div>
+
+        <div class="filters-sidebar__section">
+          <span class="filters-sidebar__label">Contacted</span>
+          <div class="candidate-gender-filter__controls candidate-gender-filter__controls--stacked" data-flag-filter-section="contacted">
+            <button class="candidate-gender-filter__btn is-active" type="button" data-flag-filter-value="all">Todos</button>
+            <button class="candidate-gender-filter__btn" type="button" data-flag-filter-value="yes">Contactados</button>
+            <button class="candidate-gender-filter__btn" type="button" data-flag-filter-value="no">No contactados</button>
+          </div>
+        </div>
+
+        <div class="filters-sidebar__section">
+          <span class="filters-sidebar__label">Rejected</span>
+          <div class="candidate-gender-filter__controls candidate-gender-filter__controls--stacked" data-flag-filter-section="rejected">
+            <button class="candidate-gender-filter__btn is-active" type="button" data-flag-filter-value="all">Todos</button>
+            <button class="candidate-gender-filter__btn" type="button" data-flag-filter-value="yes">Rechazados</button>
+            <button class="candidate-gender-filter__btn" type="button" data-flag-filter-value="no">No rechazados</button>
           </div>
         </div>
       </aside>
@@ -141,6 +168,6 @@
   <button class="chat-fab" id="chatFab" type="button" aria-label="Abrir chat">
     Abrir chat
   </button>
-  <script src="./assets/js/talentum-detail.js?v=7"></script>
+  <script src="./assets/js/talentum-detail.js?v=11"></script>
 </body>
 </html>

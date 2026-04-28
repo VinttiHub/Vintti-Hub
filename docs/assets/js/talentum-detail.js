@@ -1,5 +1,15 @@
 const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
-const CONTACTED_STORAGE_KEY = "talentum_contacted_applicants";
+const FLAG_STORAGE_KEYS = {
+  reviewed: "talentum_reviewed_applicants",
+  contacted: "talentum_contacted_applicants",
+  rejected: "talentum_rejected_applicants",
+};
+const FLAG_LABELS = {
+  reviewed: { on: "Reviewed", off: "Not reviewed" },
+  contacted: { on: "Contacted", off: "Not contacted" },
+  rejected: { on: "Rejected", off: "Not rejected" },
+};
+const FLAG_ORDER = ["reviewed", "contacted", "rejected"];
 
 const state = {
   currentOpportunity: null,
@@ -7,6 +17,11 @@ const state = {
   ui: {
     chatExpanded: false,
     genderFilter: "all",
+    flagFilters: {
+      reviewed: "all",
+      contacted: "all",
+      rejected: "all",
+    },
   },
   filters: {
     position: "",
@@ -41,6 +56,7 @@ const els = {
   candidatesGrid: document.getElementById("candidatesGrid"),
   candidatesEmpty: document.getElementById("candidatesEmpty"),
   candidateGenderFilter: document.getElementById("candidateGenderFilter"),
+  flagFilterSections: document.querySelectorAll("[data-flag-filter-section]"),
   refreshApplicantsBtn: document.getElementById("refreshApplicantsBtn"),
   refreshApplicantsStatus: document.getElementById("refreshApplicantsStatus"),
   applicantDrawer: document.getElementById("applicantDrawer"),
@@ -97,37 +113,63 @@ async function fetchJSON(url, options = {}) {
   return res.json();
 }
 
-function readContactedMap() {
+function readFlagMap(flag) {
+  const key = FLAG_STORAGE_KEYS[flag];
+  if (!key) return {};
   try {
-    const raw = localStorage.getItem(CONTACTED_STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch (err) {
-    console.warn("Failed to read contacted applicants from storage", err);
+    console.warn(`Failed to read ${flag} applicants from storage`, err);
     return {};
   }
 }
 
-function writeContactedMap(map) {
+function writeFlagMap(flag, map) {
+  const key = FLAG_STORAGE_KEYS[flag];
+  if (!key) return;
   try {
-    localStorage.setItem(CONTACTED_STORAGE_KEY, JSON.stringify(map || {}));
+    localStorage.setItem(key, JSON.stringify(map || {}));
   } catch (err) {
-    console.warn("Failed to persist contacted applicants", err);
+    console.warn(`Failed to persist ${flag} applicants`, err);
   }
 }
 
-function isApplicantContacted(applicantId) {
+function isApplicantFlagged(flag, applicantId) {
   if (!Number.isFinite(Number(applicantId))) return false;
-  const map = readContactedMap();
+  const map = readFlagMap(flag);
   return Boolean(map[String(applicantId)]);
 }
 
-function setApplicantContacted(applicantId, contacted) {
+function setApplicantFlag(flag, applicantId, value) {
   const normalizedId = Number(applicantId);
   if (!Number.isFinite(normalizedId)) return;
-  const map = readContactedMap();
-  map[String(normalizedId)] = Boolean(contacted);
-  writeContactedMap(map);
+  const map = readFlagMap(flag);
+  map[String(normalizedId)] = Boolean(value);
+  writeFlagMap(flag, map);
+}
+
+function buildFlagTogglesHtml(applicantId, options = {}) {
+  const layout = options.layout || "stacked";
+  const togglesHtml = FLAG_ORDER.map((flag) => {
+    const active = isApplicantFlagged(flag, applicantId);
+    const labels = FLAG_LABELS[flag];
+    const label = active ? labels.on : labels.off;
+    return `
+      <label class="candidate-flag-toggle candidate-flag-toggle--${flag} ${active ? "is-active" : ""}" data-stop="true">
+        <input
+          class="candidate-flag-checkbox"
+          type="checkbox"
+          data-applicant-id="${applicantId}"
+          data-flag="${flag}"
+          ${active ? "checked" : ""}
+        />
+        <span>${label}</span>
+      </label>
+    `;
+  }).join("");
+  return `<div class="candidate-flag-toggles candidate-flag-toggles--${layout}">${togglesHtml}</div>`;
 }
 
 
@@ -773,6 +815,55 @@ function syncGenderFilterButtons() {
   });
 }
 
+const FLAG_FILTER_LABELS = {
+  reviewed: { yes: "Revisados", no: "No revisados" },
+  contacted: { yes: "Contactados", no: "No contactados" },
+  rejected: { yes: "Rechazados", no: "No rechazados" },
+};
+
+function getFlagFilterValue(flag) {
+  return state.ui.flagFilters?.[flag] || "all";
+}
+
+function matchesFlagFilters(candidate) {
+  const id = candidate?.profile?.id;
+  return FLAG_ORDER.every((flag) => {
+    const value = getFlagFilterValue(flag);
+    if (value === "all") return true;
+    const flagged = isApplicantFlagged(flag, id);
+    return value === "yes" ? flagged : !flagged;
+  });
+}
+
+function getFlagFilterCounts(flag) {
+  return state.candidates.reduce((acc, candidate) => {
+    acc.all += 1;
+    if (isApplicantFlagged(flag, candidate?.profile?.id)) acc.yes += 1;
+    else acc.no += 1;
+    return acc;
+  }, { all: 0, yes: 0, no: 0 });
+}
+
+function syncFlagFilterButtons() {
+  if (!els.flagFilterSections) return;
+  els.flagFilterSections.forEach((section) => {
+    const flag = section.dataset.flagFilterSection;
+    if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
+    const counts = getFlagFilterCounts(flag);
+    const active = getFlagFilterValue(flag);
+    const labels = FLAG_FILTER_LABELS[flag] || { yes: "Sí", no: "No" };
+    section.querySelectorAll("[data-flag-filter-value]").forEach((button) => {
+      const value = button.dataset.flagFilterValue || "all";
+      const isActive = value === active;
+      const baseLabel = value === "all" ? "Todos" : (labels[value] || value);
+      const count = Number.isFinite(counts[value]) ? counts[value] : 0;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+      button.textContent = `${baseLabel} (${count})`;
+    });
+  });
+}
+
 const MONTH_MAP = {
   jan: 1,
   january: 1,
@@ -1410,7 +1501,7 @@ function buildCandidateRowEl(candidate) {
   const questions = state.applicantQuestions || {};
   const applicant = candidate.pipeline || {};
   const profile = candidate.profile;
-  const contacted = isApplicantContacted(profile.id);
+  const contacted = isApplicantFlagged("contacted", profile.id);
   const initials = buildInitials(profile.name);
 
   const countryInfo = resolveCountryInfo(profile.country);
@@ -1546,15 +1637,7 @@ function buildCandidateRowEl(candidate) {
         <div class="candidate-row__score-label">Match score</div>
         <span class="candidate-row__score-link" data-toggle-label>View reasons →</span>
       </div>
-      <label class="candidate-contact-toggle candidate-row__contact-toggle ${contacted ? "is-contacted" : ""}" data-stop="true">
-        <input
-          class="candidate-contact-checkbox"
-          type="checkbox"
-          data-applicant-id="${profile.id}"
-          ${contacted ? "checked" : ""}
-        />
-        <span>${contacted ? "Contacted" : "Not contacted"}</span>
-      </label>
+      ${buildFlagTogglesHtml(profile.id, { layout: "stacked" })}
       <div class="candidate-row__actions">
         ${linkedinAction}
         ${cvAction}
@@ -1571,7 +1654,11 @@ function getOrderedCandidates() {
       return { ...candidate, score };
     })
     .filter((candidate) => matchesGenderFilter(candidate))
+    .filter((candidate) => matchesFlagFilters(candidate))
     .sort((a, b) => {
+      const aRejected = isApplicantFlagged("rejected", a.profile?.id);
+      const bRejected = isApplicantFlagged("rejected", b.profile?.id);
+      if (aRejected !== bRejected) return aRejected ? 1 : -1;
       if (Number.isFinite(a.score) && Number.isFinite(b.score)) return b.score - a.score;
       if (Number.isFinite(a.score)) return -1;
       if (Number.isFinite(b.score)) return 1;
@@ -1598,6 +1685,7 @@ function renderCandidates() {
   const ordered = getOrderedCandidates();
 
   syncGenderFilterButtons();
+  syncFlagFilterButtons();
 
   if (state.paginationIndex >= ordered.length) state.paginationIndex = Math.max(0, ordered.length - 1);
   if (state.paginationIndex < 0) state.paginationIndex = 0;
@@ -1672,7 +1760,6 @@ function renderApplicantDrawer(entry) {
     : (applicant.location || "—");
   const phoneLabel = formatPhoneNumber(applicant.phone, countryInfo);
   const linkedinUrl = applicant.linkedin_url || "";
-  const contacted = isApplicantContacted(applicant.applicant_id);
   const linkedinLink = linkedinUrl
     ? `<a class="drawer-link" href="${escapeHtml(linkedinUrl)}" target="_blank" rel="noopener">Open LinkedIn →</a>`
     : "<span class=\"drawer-value\">—</span>";
@@ -1721,16 +1808,8 @@ function renderApplicantDrawer(entry) {
       </div>
       <div class="drawer-item"><span class="drawer-label">Location</span><span class="drawer-value">${escapeHtml(locationLabel)}</span></div>
       <div class="drawer-item drawer-item-contacted">
-        <span class="drawer-label">Contacted</span>
-        <label class="candidate-contact-toggle ${contacted ? "is-contacted" : ""}">
-          <input
-            class="candidate-contact-checkbox"
-            type="checkbox"
-            data-applicant-id="${applicant.applicant_id}"
-            ${contacted ? "checked" : ""}
-          />
-          <span>${contacted ? "Yes" : "No"}</span>
-        </label>
+        <span class="drawer-label">Status</span>
+        ${buildFlagTogglesHtml(applicant.applicant_id, { layout: "stacked" })}
       </div>
       <div class="drawer-item">
         <span class="drawer-label">LinkedIn</span>
@@ -1920,6 +1999,24 @@ async function init() {
     syncGenderFilterButtons();
   }
 
+  if (els.flagFilterSections && els.flagFilterSections.length) {
+    els.flagFilterSections.forEach((section) => {
+      const flag = section.dataset.flagFilterSection;
+      if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
+      section.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-flag-filter-value]");
+        if (!button) return;
+        const value = button.dataset.flagFilterValue || "all";
+        if (!state.ui.flagFilters) state.ui.flagFilters = {};
+        state.ui.flagFilters[flag] = value;
+        state.paginationIndex = 0;
+        syncFlagFilterButtons();
+        renderCandidates();
+      });
+    });
+    syncFlagFilterButtons();
+  }
+
   if (els.prevCandidateBtn) {
     els.prevCandidateBtn.addEventListener("click", () => changeCandidatePage(-1));
   }
@@ -1965,7 +2062,7 @@ async function init() {
 
     els.candidatesGrid.addEventListener("click", async (event) => {
       if (event.target.closest("[data-stop]")) return;
-      if (event.target.closest(".candidate-contact-toggle")) return;
+      if (event.target.closest(".candidate-flag-toggle")) return;
 
       const cvBtn = event.target.closest('[data-action="download-cv"]');
       if (cvBtn) {
@@ -2016,9 +2113,11 @@ async function init() {
     });
 
     els.candidatesGrid.addEventListener("change", (event) => {
-      const checkbox = event.target.closest(".candidate-contact-checkbox");
+      const checkbox = event.target.closest(".candidate-flag-checkbox");
       if (!checkbox) return;
-      setApplicantContacted(Number(checkbox.dataset.applicantId), checkbox.checked);
+      const flag = checkbox.dataset.flag;
+      if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
+      setApplicantFlag(flag, Number(checkbox.dataset.applicantId), checkbox.checked);
       renderCandidates();
     });
   }
@@ -2037,9 +2136,11 @@ async function init() {
 
   if (els.drawerBody) {
     els.drawerBody.addEventListener("change", (event) => {
-      const checkbox = event.target.closest(".candidate-contact-checkbox");
+      const checkbox = event.target.closest(".candidate-flag-checkbox");
       if (!checkbox) return;
-      setApplicantContacted(Number(checkbox.dataset.applicantId), checkbox.checked);
+      const flag = checkbox.dataset.flag;
+      if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
+      setApplicantFlag(flag, Number(checkbox.dataset.applicantId), checkbox.checked);
       renderCandidates();
       const selected = state.candidates.find(
         (entry) => entry.profile.id === state.selectedApplicantId
