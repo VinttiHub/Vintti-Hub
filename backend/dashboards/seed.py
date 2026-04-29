@@ -74,6 +74,8 @@ RESET_CHART_KEYS = {
         "gr_table_inactive_candidates",
         "gr_line_mrr",
         "gr_area_recruiting_upfront",
+        "gr_table_client_lifetime",
+        "gr_kpi_client_lifetime_avg",
     ],
 }
 
@@ -181,6 +183,35 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 15, "w": 6, "h": 5},
         "sort_order": 70,
+    },
+    {
+        "chart_key": "gr_table_client_lifetime",
+        "tab_key": "growth",
+        "title": "Tiempo de Vida del Cliente en Meses (Staffing)",
+        "type": "table",
+        "dataset_key": "client_lifetime_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "first_month_active",
+                    "last_month_active",
+                    "meses_con_al_menos_un_cliente",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 20, "w": 8, "h": 5},
+        "sort_order": 80,
+    },
+    {
+        "chart_key": "gr_kpi_client_lifetime_avg",
+        "tab_key": "growth",
+        "title": "Promedio meses por cliente",
+        "type": "kpi",
+        "dataset_key": "client_lifetime_avg",
+        "config": {"mapping": {"value": "promedio_meses_por_cliente", "formatter": "number"}},
+        "position": {"x": 8, "y": 20, "w": 4, "h": 5},
+        "sort_order": 90,
     },
 
     # Account Management
