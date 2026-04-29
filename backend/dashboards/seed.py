@@ -157,7 +157,9 @@ MAIN_CHARTS = [
             "mapping": {
                 "x": "mes",
                 "y": ["mrr_total", "growth_pct"],
-                "formatter": "number",
+                "twinAxis": True,
+                "formatter": "currency",
+                "formatter2": "percent",
             },
         },
         "position": {"x": 0, "y": 15, "w": 12, "h": 5},

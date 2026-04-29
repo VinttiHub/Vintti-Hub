@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 _ALLOWED_METRICS = {"Revenue", "Fee"}
@@ -19,11 +19,14 @@ def _parse_ym(value: str | None) -> datetime | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
-    today = datetime.utcnow().date().replace(day=1)
-    last_full_month = (today - timedelta(days=1)).replace(day=1)
+    current_month_start = datetime.utcnow().date().replace(day=1)
 
     from_dt = _parse_ym(filters.get("from")) or _parse_ym(filters.get("desde")) or datetime(2023, 1, 1)
-    to_dt = _parse_ym(filters.get("to")) or _parse_ym(filters.get("hasta")) or datetime.combine(last_full_month, datetime.min.time())
+    to_dt = (
+        _parse_ym(filters.get("to"))
+        or _parse_ym(filters.get("hasta"))
+        or datetime.combine(current_month_start, datetime.min.time())
+    )
     if to_dt < from_dt:
         to_dt = from_dt
 

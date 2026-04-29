@@ -259,6 +259,10 @@
     const formatter = fmt.pick(mapping.formatter || 'number');
     const ys = Array.isArray(mapping.y) ? mapping.y : (mapping.y ? [mapping.y] : []);
 
+    // Twin-axis: y[0] -> left axis (formatter), y[1..] -> right axis (formatter2 || 'percent')
+    const twin = mapping.twinAxis === true && ys.length >= 2 && type !== 'pie' && type !== 'donut';
+    const formatter2 = twin ? fmt.pick(mapping.formatter2 || 'percent') : null;
+
     const categories = aggregated.map(r => r[mapping.x]);
     const series = ys.map((y, i) => ({
       name: y,
@@ -270,6 +274,7 @@
       areaStyle: type === 'area' ? {} : undefined,
       radius: (type === 'donut') ? ['40%', '70%'] : undefined,
       itemStyle: { color: colorFor(i) },
+      yAxisIndex: twin ? (i === 0 ? 0 : 1) : 0,
     }));
 
     const option = (type === 'pie' || type === 'donut') ? {
@@ -277,11 +282,25 @@
       legend: { bottom: 0 },
       series,
     } : {
-      tooltip: { trigger: 'axis', valueFormatter: formatter },
+      tooltip: {
+        trigger: 'axis',
+        valueFormatter: formatter,
+        formatter: twin ? (params) => {
+          const head = params[0]?.axisValueLabel ?? params[0]?.name ?? '';
+          const lines = params.map(p => {
+            const fn = p.seriesIndex === 0 ? formatter : formatter2;
+            return `${p.marker} ${p.seriesName}: <b>${fn(p.value)}</b>`;
+          });
+          return `${head}<br>${lines.join('<br>')}`;
+        } : undefined,
+      },
       legend: { top: 0, show: ys.length > 1 },
-      grid: { left: 50, right: 20, top: ys.length > 1 ? 40 : 20, bottom: 40 },
+      grid: { left: 60, right: twin ? 60 : 20, top: ys.length > 1 ? 40 : 20, bottom: 40 },
       xAxis: { type: 'category', data: categories, axisLabel: { color: '#64748b' } },
-      yAxis: { type: 'value', axisLabel: { color: '#64748b', formatter } },
+      yAxis: twin ? [
+        { type: 'value', axisLabel: { color: '#64748b', formatter } },
+        { type: 'value', axisLabel: { color: '#64748b', formatter: formatter2 }, splitLine: { show: false } },
+      ] : { type: 'value', axisLabel: { color: '#64748b', formatter } },
       series,
     };
 
