@@ -1110,13 +1110,13 @@ def update_opportunity_fields(opportunity_id):
                                   WHERE b.batch_id = cb.batch_id
                                     AND b.opportunity_id = %s
                            )
-                    """, ('Client hired', candidate_hired_id, opportunity_id))
+                    """, ('Candidate hired', candidate_hired_id, opportunity_id))
                     if cursor.rowcount == 0:
                         cursor.execute("""
                             UPDATE candidates_batches
                                SET status = %s
                              WHERE candidate_id = %s
-                        """, ('Client hired', candidate_hired_id))
+                        """, ('Candidate hired', candidate_hired_id))
                     logging.info("🟢 candidates_batches actualizado")
 
                 if previous is not None:

@@ -1759,13 +1759,13 @@ def handle_candidate_hire_data(candidate_id):
                   WHERE b.batch_id = cb.batch_id
                     AND b.opportunity_id = %s
                )
-        """, ('Client hired', candidate_id, opportunity_id))
+        """, ('Candidate hired', candidate_id, opportunity_id))
         if cur.rowcount == 0:
             cur.execute("""
                 UPDATE candidates_batches
                    SET status = %s
                  WHERE candidate_id = %s
-            """, ('Client hired', candidate_id))
+            """, ('Candidate hired', candidate_id))
 
         # derive end_date from buyout if needed (only if caller didn’t set end_date)
         if ('buyout_dolar' in data or 'buyout_daterange' in data) and ('end_date' not in data):

@@ -3558,7 +3558,7 @@ function createCandidateCard(c, batchId) {
   }
 
   const dropdown = cardElement.querySelector('.candidate-status-dropdown');
-  dropdown.value = c.status || "Client interviewing/testing";
+  dropdown.value = getCanonicalCandidateStatus(c.status || "Client Interviewing");
   setDropdownValue(dropdown, c.status);
   paintCandidateStatus(dropdown);
 
@@ -3589,7 +3589,7 @@ function getCandidateStatusTone(status) {
   const normalized = String(status || '').toLowerCase();
   if (normalized.includes('hired')) return 'success';
   if (normalized.includes('rejected') || normalized.includes('abandoned')) return 'danger';
-  if (normalized.includes('interview')) return 'warning';
+  if (normalized.includes('interview') || normalized.includes('testing')) return 'warning';
   return 'info';
 }
 
@@ -3600,10 +3600,11 @@ function paintCandidateStatus(dropdown) {
 
 function setDropdownValue(dropdown, status) {
   if (!status) return;
+  const canonicalStatus = getCanonicalCandidateStatus(status);
   const options = dropdown.options;
   let found = false;
   for (let i = 0; i < options.length; i++) {
-    if (options[i].value.trim() === status.trim()) {
+    if (options[i].value.trim() === canonicalStatus.trim()) {
       options[i].selected = true;
       found = true;
       break;
@@ -3612,6 +3613,24 @@ function setDropdownValue(dropdown, status) {
   if (!found) {
     console.warn('⚠️ Status not found in options:', status);
   }
+}
+
+function getCanonicalCandidateStatus(status) {
+  const rawStatus = String(status || '').trim();
+  const normalized = rawStatus.toLowerCase();
+  const legacyStatusMap = {
+    'rejected by sales': 'Rejected By Sales',
+    'client rejected cv': 'Client Rejected CV',
+    'client interviewing/testing': 'Client Interviewing',
+    'client interviewing': 'Client Interviewing',
+    'candidate testing': 'Candidate Testing',
+    'client rejected after interviewing': 'Client Rejected after interviewing',
+    'candidate failed test': 'Candidate Failed Test',
+    'candidate abandoned process': 'Candidate abandoned process',
+    'client hired': 'Candidate hired',
+    'candidate hired': 'Candidate hired'
+  };
+  return legacyStatusMap[normalized] || rawStatus;
 }
 
 async function updateCandidateStatus(candidateId, batchId, newStatus) {

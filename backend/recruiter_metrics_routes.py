@@ -231,17 +231,21 @@ def register_recruiter_metrics_routes(app):
                 COUNT(DISTINCT (s.opportunity_id::text || '-' || s.candidate_id::text)) AS sent_candidate_count,
                 COUNT(DISTINCT (
                     CASE
-                        WHEN COALESCE(s.candidate_status, '') <> 'Client rejected CV'
+                        WHEN LOWER(COALESCE(s.candidate_status, '')) <> 'client rejected cv'
                         THEN (s.opportunity_id::text || '-' || s.candidate_id::text)
                         ELSE NULL
                     END
                 )) AS interview_eligible_candidate_count,
                 COUNT(DISTINCT (
                     CASE
-                        WHEN s.candidate_status IN (
-                            'Client hired',
-                            'Client rejected after interviewing',
-                            'Client interviewing/testing'
+                        WHEN LOWER(COALESCE(s.candidate_status, '')) IN (
+                            'client hired',
+                            'candidate hired',
+                            'client rejected after interviewing',
+                            'client interviewing/testing',
+                            'client interviewing',
+                            'candidate testing',
+                            'candidate failed test'
                         )
                         THEN (s.opportunity_id::text || '-' || s.candidate_id::text)
                         ELSE NULL
@@ -737,15 +741,19 @@ def register_recruiter_metrics_routes(app):
             sc.sent_date,
             sc.candidate_status,
             CASE
-                WHEN COALESCE(sc.candidate_status, '') <> 'Client rejected CV'
+                WHEN LOWER(COALESCE(sc.candidate_status, '')) <> 'client rejected cv'
                 THEN TRUE
                 ELSE FALSE
             END AS is_interview_eligible,
             CASE
-                WHEN sc.candidate_status IN (
-                    'Client hired',
-                    'Client rejected after interviewing',
-                    'Client interviewing/testing'
+                WHEN LOWER(COALESCE(sc.candidate_status, '')) IN (
+                    'client hired',
+                    'candidate hired',
+                    'client rejected after interviewing',
+                    'client interviewing/testing',
+                    'client interviewing',
+                    'candidate testing',
+                    'candidate failed test'
                 )
                 THEN TRUE
                 ELSE FALSE
