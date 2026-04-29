@@ -10,6 +10,8 @@ from . import (
     mrr_history,
     active_headcount_history,
     active_headcount_detail,
+    active_headcount_30d_total,
+    active_headcount_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -20,6 +22,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     mrr_history.DATASET["key"]: mrr_history.DATASET,
     active_headcount_history.DATASET["key"]: active_headcount_history.DATASET,
     active_headcount_detail.DATASET["key"]: active_headcount_detail.DATASET,
+    active_headcount_30d_total.DATASET["key"]: active_headcount_30d_total.DATASET,
+    active_headcount_30d_detail.DATASET["key"]: active_headcount_30d_detail.DATASET,
 }
 
 

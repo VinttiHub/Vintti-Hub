@@ -50,60 +50,34 @@ DASHBOARDS = [
 ]
 
 
-# Reduced Fase 1 seed (12 charts). Mapping convention understood by chart-factory.js:
+# Chart keys retired from the seed — DELETE-ed before upserts to keep seed idempotent.
+RETIRED_CHART_KEYS = {
+    "main": [
+        "gr_kpi_recruiting_30d",
+        "gr_kpi_active_staffing",
+        "gr_kpi_active_recruiting",
+        "gr_kpi_ltv_months",
+        "gr_line_tsr_tsf_history",
+        "gr_line_mrr",
+        "gr_line_mrr_growth",
+    ],
+}
+
+# Reduced Fase 1 seed. Mapping convention understood by chart-factory.js:
 #   { mapping: { x: dim, y: [measures], value: measure, formatter: 'currency'|'number'|'percent' } }
 MAIN_CHARTS = [
-    # Growth & Revenue
+    # Growth & Revenue — 30d rolling window (uses `corte` + `model` filters)
     {
-        "chart_key": "gr_kpi_recruiting_30d",
+        "chart_key": "gr_kpi_active_30d",
         "tab_key": "growth",
-        "title": "Recruiting Revenue (30d)",
+        "title": "Activos · Ventana 30 días",
         "type": "kpi",
-        "dataset_key": "management_dashboard",
-        "config": {"mapping": {"value": "recruiting_revenue_30d", "formatter": "currency"}},
-        "position": {"x": 0, "y": 0, "w": 3, "h": 2},
-        "sort_order": 10,
+        "dataset_key": "active_headcount_30d_total",
+        "config": {"mapping": {"value": "active_count", "formatter": "number"}},
+        "position": {"x": 0, "y": 0, "w": 12, "h": 2},
+        "sort_order": 5,
     },
-    {
-        "chart_key": "gr_kpi_active_staffing",
-        "tab_key": "growth",
-        "title": "Active Staffing",
-        "type": "kpi",
-        "dataset_key": "management_dashboard",
-        "config": {"mapping": {"value": "active_staffing", "formatter": "number"}},
-        "position": {"x": 3, "y": 0, "w": 3, "h": 2},
-        "sort_order": 20,
-    },
-    {
-        "chart_key": "gr_kpi_active_recruiting",
-        "tab_key": "growth",
-        "title": "Active Recruiting",
-        "type": "kpi",
-        "dataset_key": "management_dashboard",
-        "config": {"mapping": {"value": "active_recruiting", "formatter": "number"}},
-        "position": {"x": 6, "y": 0, "w": 3, "h": 2},
-        "sort_order": 30,
-    },
-    {
-        "chart_key": "gr_kpi_ltv_months",
-        "tab_key": "growth",
-        "title": "LTV (meses)",
-        "type": "kpi",
-        "dataset_key": "management_dashboard",
-        "config": {"mapping": {"value": "ltv_months", "formatter": "number"}},
-        "position": {"x": 9, "y": 0, "w": 3, "h": 2},
-        "sort_order": 40,
-    },
-    {
-        "chart_key": "gr_line_tsr_tsf_history",
-        "tab_key": "growth",
-        "title": "TSR + TSF por mes",
-        "type": "line",
-        "dataset_key": "ts_history",
-        "config": {"mapping": {"x": "month", "y": ["tsr", "tsf"], "formatter": "currency"}},
-        "position": {"x": 0, "y": 2, "w": 8, "h": 5},
-        "sort_order": 50,
-    },
+    # Growth & Revenue — kept from prior seed (do not move)
     {
         "chart_key": "gr_bar_active_headcount",
         "tab_key": "growth",
@@ -115,30 +89,18 @@ MAIN_CHARTS = [
         "sort_order": 60,
     },
     {
-        "chart_key": "gr_line_mrr",
+        "chart_key": "gr_table_active_30d_detail",
         "tab_key": "growth",
-        "title": "MRR",
-        "type": "line",
-        "dataset_key": "mrr_history",
+        "title": "Activos · Detalle 30 días",
+        "type": "table",
+        "dataset_key": "active_headcount_30d_detail",
         "config": {
-            "filters": {"metric": "Revenue"},
-            "mapping": {"x": "mes", "y": ["mrr_total"], "formatter": "currency"},
+            "mapping": {
+                "columns": ["cutoff_date", "model", "client_name", "candidate_name", "start_date"],
+            },
         },
-        "position": {"x": 0, "y": 7, "w": 8, "h": 5},
-        "sort_order": 70,
-    },
-    {
-        "chart_key": "gr_line_mrr_growth",
-        "tab_key": "growth",
-        "title": "MRR Growth %",
-        "type": "line",
-        "dataset_key": "mrr_history",
-        "config": {
-            "filters": {"metric": "Revenue"},
-            "mapping": {"x": "mes", "y": ["growth_pct"], "formatter": "percent"},
-        },
-        "position": {"x": 8, "y": 7, "w": 4, "h": 5},
-        "sort_order": 80,
+        "position": {"x": 0, "y": 7, "w": 12, "h": 6},
+        "sort_order": 65,
     },
     {
         "chart_key": "gr_table_active_headcount_detail",
@@ -242,6 +204,20 @@ def upsert_dashboard(cur, slug: str, name: str, layout: dict) -> int:
     return cur.fetchone()[0]
 
 
+def delete_retired_charts(cur, dashboard_id: int, chart_keys: list[str]) -> int:
+    if not chart_keys:
+        return 0
+    cur.execute(
+        """
+        DELETE FROM dashboard_charts
+        WHERE dashboard_id = %s
+          AND chart_key = ANY(%s)
+        """,
+        (dashboard_id, list(chart_keys)),
+    )
+    return cur.rowcount or 0
+
+
 def upsert_chart(cur, dashboard_id: int, chart: dict) -> None:
     cur.execute(
         """
@@ -273,6 +249,10 @@ def main() -> None:
         for d in DASHBOARDS:
             ids[d["slug"]] = upsert_dashboard(cur, d["slug"], d["name"], d["layout"])
             print(f"dashboard {d['slug']}: id={ids[d['slug']]}")
+
+        for slug, retired in RETIRED_CHART_KEYS.items():
+            removed = delete_retired_charts(cur, ids[slug], retired)
+            print(f"{slug} retired charts: {removed} deleted")
 
         for chart in MAIN_CHARTS:
             upsert_chart(cur, ids["main"], chart)

@@ -75,6 +75,7 @@
         { type: 'date',  key: 'desde', label: 'Desde' },
         { type: 'date',  key: 'hasta', label: 'Hasta' },
         { type: 'month', key: 'fecha', label: 'Mes' },
+        { type: 'date',  key: 'corte', label: 'Corte (30d)' },
         { type: 'select', key: 'model', label: 'Modelo', options: [
           { value: 'recruiting', label: 'Recruiting' },
           { value: 'staffing',   label: 'Staffing' },
