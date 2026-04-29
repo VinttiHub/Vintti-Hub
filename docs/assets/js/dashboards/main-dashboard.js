@@ -80,6 +80,10 @@
           { value: 'recruiting', label: 'Recruiting' },
           { value: 'staffing',   label: 'Staffing' },
         ]},
+        { type: 'select', key: 'metric', label: 'MRR Metric', options: [
+          { value: 'Revenue', label: 'Revenue (TSR)' },
+          { value: 'Fee',     label: 'Fee (TSF)' },
+        ]},
       ],
     });
   }

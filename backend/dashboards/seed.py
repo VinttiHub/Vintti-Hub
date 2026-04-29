@@ -58,7 +58,6 @@ RETIRED_CHART_KEYS = {
         "gr_kpi_active_recruiting",
         "gr_kpi_ltv_months",
         "gr_line_tsr_tsf_history",
-        "gr_line_mrr",
         "gr_line_mrr_growth",
     ],
 }
@@ -73,6 +72,7 @@ RESET_CHART_KEYS = {
         "gr_kpi_active_30d",
         "gr_table_active_30d_detail",
         "gr_table_inactive_candidates",
+        "gr_line_mrr",
     ],
 }
 
@@ -146,6 +146,22 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 10, "w": 12, "h": 5},
         "sort_order": 50,
+    },
+    {
+        "chart_key": "gr_line_mrr",
+        "tab_key": "growth",
+        "title": "MRR",
+        "type": "line",
+        "dataset_key": "mrr_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["mrr_total", "growth_pct"],
+                "formatter": "number",
+            },
+        },
+        "position": {"x": 0, "y": 15, "w": 12, "h": 5},
+        "sort_order": 60,
     },
 
     # Account Management
