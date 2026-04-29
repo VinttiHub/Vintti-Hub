@@ -86,7 +86,12 @@ MAIN_CHARTS = [
         "title": "Active Headcount por mes",
         "type": "bar",
         "dataset_key": "active_headcount_history",
-        "config": {"mapping": {"x": "month", "y": ["active_count"], "formatter": "number"}},
+        "config": {"mapping": {
+            "x": "month",
+            "y": ["active_count"],
+            "formatter": "number",
+            "drillKey": "fecha",
+        }},
         "position": {"x": 0, "y": 0, "w": 6, "h": 5},
         "sort_order": 10,
     },

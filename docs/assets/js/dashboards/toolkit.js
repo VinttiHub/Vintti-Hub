@@ -170,6 +170,15 @@
     reset.textContent = 'Reset';
     reset.addEventListener('click', () => { state.reset(); });
     el.appendChild(reset);
+
+    // Re-sync inputs when state is mutated from outside (e.g. chart drill-down click).
+    state.bus.on('filters:changed', (snap) => {
+      el.querySelectorAll('[data-key]').forEach(node => {
+        const key = node.dataset.key;
+        const v = snap[key] ?? '';
+        if (node.value !== String(v)) node.value = v;
+      });
+    });
   }
 
   /* ---------- chart factory ---------- */
