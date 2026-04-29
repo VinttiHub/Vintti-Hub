@@ -188,6 +188,7 @@
   }
 
   // Aggregate client-side when dataset returns raw rows.
+  // mapping.preserveOrder=true keeps the row order from the SQL (skip alphabetic sort).
   function aggregate(rows, mapping) {
     const x = mapping.x;
     const ys = Array.isArray(mapping.y) ? mapping.y : (mapping.y ? [mapping.y] : []);
@@ -214,6 +215,7 @@
       });
       out.push(row);
     });
+    if (mapping.preserveOrder) return out;
     return out.sort((a, b) => String(a[x]).localeCompare(String(b[x])));
   }
 
