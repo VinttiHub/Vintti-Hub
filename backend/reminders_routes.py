@@ -19,6 +19,7 @@ LAR_EMAIL  = "lara@vintti.com"
 AGUS_EMAIL = "agustin@vintti.com"
 AGOSTINA_EMAIL = "agostina@vintti.com"
 BAHIA_EMAIL = "bahia@vintti.com"
+MIA_EMAIL = "mia@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 ANGIE_EMAIL = "angie@vintti.com"
 PGONZALES_EMAIL = "pgonzales@vintti.com"

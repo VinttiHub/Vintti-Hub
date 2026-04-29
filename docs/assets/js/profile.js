@@ -654,6 +654,7 @@ const ADMIN_ALLOWED_EMAILS = new Set([
   "lara@vintti.com",
   "bahia@vintti.com",
   "agostina@vintti.com",
+  "mia@vintti.com",
   "jazmin@vintti.com"
 ]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;

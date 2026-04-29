@@ -13,7 +13,7 @@ const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 const allowedEmails = [
   'agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com',
   'lara@vintti.com','agostina@vintti.com', 'mariano@vintti.com',
-  'pgonzales@vintti.com'
+  'mia@vintti.com', 'pgonzales@vintti.com'
 ];
 
 const CRM_UNASSIGNED_SALES_LEAD_VALUE = '__unassigned__';
@@ -1244,6 +1244,7 @@ window.AVATAR_BY_EMAIL = Object.assign(
     'agustin@vintti.com':  'agus.png',
     'agustina@vintti.com': 'agustina_valentini.png',
     'mariano@vintti.com': 'mariano.png',
+    'mia@vintti.com': 'mia_cavanagh.png',
     'vianney@vintti.com': 'vianney.png'
   },
   window.AVATAR_BY_EMAIL || {}
@@ -1264,6 +1265,7 @@ function initialsForSalesLead(key='') {
   if (s.includes('lara'))    return 'LR';
   if (s.includes('agustin')) return 'AM';
   if (s.includes('mariano')) return 'MS';   // ✅ ADD
+  if (s.includes('mia')) return 'MC';
   return '--';
 }
 
@@ -1273,6 +1275,7 @@ function badgeClassForSalesLead(key='') {
   if (s.includes('lara'))    return 'lr';
   if (s.includes('agustin')) return 'am';
   if (s.includes('mariano')) return 'ms';   // ✅ ADD
+  if (s.includes('mia')) return '';
   return '';
 }
 
@@ -1282,6 +1285,7 @@ function emailFromNameGuess(name='') {
   if (s.includes('lara'))    return 'lara@vintti.com';
   if (s.includes('agustin')) return 'agustin@vintti.com';
   if (s.includes('mariano')) return 'mariano@vintti.com'; // ✅ ADD
+  if (s.includes('mia')) return 'mia@vintti.com';
   return '';
 }
 
@@ -2097,7 +2101,8 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'angie@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
-    'mariano@vintti.com'
+    'mariano@vintti.com',
+    'mia@vintti.com'
   ]);
 
   const sales = document.getElementById('salesLink');
@@ -2136,7 +2141,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   const summaryAllowed = [
     'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
     'lara@vintti.com','agostina@vintti.com','mariano@vintti.com',
-    'jazmin@vintti.com'
+    'mia@vintti.com','jazmin@vintti.com'
   ];
   const equipmentsAllowed = [
     'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'

@@ -1033,6 +1033,7 @@ function displayNameForSales(value){
   if (key.includes('lara'))    return 'Lara';
   if (key.includes('agustin')) return 'Agustín';
   if (key.includes('mariano')) return 'Mariano';
+  if (key.includes('mia'))     return 'Mia Cavanagh';
 
   // 4) Último recurso
   return String(value||'Unassigned');
@@ -1052,6 +1053,7 @@ const SALES_ALLOWED_EMAILS = new Set([
   'bahia@vintti.com',
   'lara@vintti.com',
   'mariano@vintti.com',
+  'mia@vintti.com',
 ].map((email) => email.toLowerCase()));
 
 const SALES_ALLOWED_NAME_OVERRIDES = new Map([
@@ -1059,6 +1061,7 @@ const SALES_ALLOWED_NAME_OVERRIDES = new Map([
   ['bahia@vintti.com', 'Bahía'],
   ['lara@vintti.com', 'Lara'],
   ['mariano@vintti.com', 'Mariano'],
+  ['mia@vintti.com', 'Mia Cavanagh'],
 ]);
 
 function buildDefaultSalesUsers() {
@@ -1104,6 +1107,25 @@ function buildUserDirectoryMap(users) {
   return map;
 }
 
+function ensureSalesUser(email, users = []) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return;
+  const existing = (window.allowedSalesUsers || []).some(
+    (user) => String(user.email_vintti || '').trim().toLowerCase() === normalizedEmail
+  );
+  if (existing) return;
+
+  const directoryUser = (Array.isArray(users) ? users : []).find(
+    (user) => String(user?.email_vintti || '').trim().toLowerCase() === normalizedEmail
+  );
+  window.allowedSalesUsers.push({
+    user_id: directoryUser?.user_id || null,
+    user_name: directoryUser?.user_name || SALES_ALLOWED_NAME_OVERRIDES.get(normalizedEmail) || prettyNameFromEmail(normalizedEmail, normalizedEmail),
+    email_vintti: normalizedEmail
+  });
+  window.allowedSalesUsers.sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
+}
+
 async function fetchRoleDirectories() {
   const [hrRes, salesRes, usersRes] = await Promise.all([
     fetch(`${API_BASE}/users/recruiters`, { credentials: 'include' }),
@@ -1129,6 +1151,7 @@ async function fetchRoleDirectories() {
       window.allowedSalesUsers = buildDefaultSalesUsers();
     }
   }
+  ensureSalesUser('mia@vintti.com', usersData);
 }
 
 function ensureRoleDirectoryPromise() {
@@ -2080,6 +2103,7 @@ function nameToEmail(label, isHR){
     if (lower.includes('lara'))    return 'lara@vintti.com';
     if (lower.includes('agustin')) return 'agustin@vintti.com';
     if (lower.includes('mariano')) return 'mariano@vintti.com';
+    if (lower.includes('mia'))     return 'mia@vintti.com';
   }
 
   return '';
@@ -2573,7 +2597,7 @@ helloBtn.addEventListener('click', async () => {
 const summaryLink = document.getElementById('summaryLink');
 const currentUserEmail = localStorage.getItem('user_email');
 const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 
-  'lara@vintti.com','agostina@vintti.com','mariano@vintti.com','jazmin@vintti.com'];
+  'lara@vintti.com','agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com'];
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
   summaryLink.style.display = 'flex';  // o '' para usar el de CSS
@@ -3130,7 +3154,8 @@ fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/users')
       'agustin@vintti.com',
       'bahia@vintti.com',
       'lara@vintti.com',
-      'mariano@vintti.com'
+      'mariano@vintti.com',
+      'mia@vintti.com'
     ]);
 
     // Limpia opciones previas y agrega placeholder
@@ -3758,7 +3783,8 @@ async function patchOppFields(oppId, payload) {
     'angie@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
-    'mariano@vintti.com'
+    'mariano@vintti.com',
+    'mia@vintti.com'
   ]);
 
   const sales = document.getElementById('salesLink');
@@ -3951,6 +3977,7 @@ function emailForSalesLead(opp) {
   if (name.includes('lara'))    return 'lara@vintti.com';
   if (name.includes('agustin')) return 'agustin@vintti.com';
   if (name.includes('mariano')) return 'mariano@vintti.com';
+  if (name.includes('mia'))     return 'mia@vintti.com';
   return '';
 }
 
@@ -3959,6 +3986,7 @@ function initialsForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'BL';
   if (key.includes('lara')    || key.includes('lara@'))    return 'LR';
   if (key.includes('mariano')    || key.includes('marian@'))    return 'MS';
+  if (key.includes('mia')) return 'MC';
   if (key.includes('agustin')) return 'AM';
   return '--';
 }
@@ -3968,6 +3996,7 @@ function badgeClassForSalesLead(key) {
   if (key.includes('bahia')   || key.includes('bahia@'))   return 'bl';
   if (key.includes('lara')    || key.includes('lara@'))    return 'lr';
   if (key.includes('mariano')    || key.includes('marian@'))    return 'ms';
+  if (key.includes('mia')) return '';
   if (key.includes('agustin')) return 'am';
   return '';
 }

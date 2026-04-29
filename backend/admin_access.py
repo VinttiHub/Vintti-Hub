@@ -10,6 +10,7 @@ ADMIN_ALLOWED_EMAILS: Set[str] = {
     "lara@vintti.com",
     "bahia@vintti.com",
     "agostina@vintti.com",
+    "mia@vintti.com",
     "jazmin@vintti.com",
 }
 

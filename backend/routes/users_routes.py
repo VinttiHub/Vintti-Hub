@@ -10,6 +10,22 @@ HIDDEN_USER_EMAILS = {
     'pilar.fernandez@vintti.com',
 }
 
+SALES_LEAD_EMAILS = {
+    'agustin@vintti.com',
+    'bahia@vintti.com',
+    'lara@vintti.com',
+    'mariano@vintti.com',
+    'mia@vintti.com',
+}
+
+SALES_LEAD_NAME_OVERRIDES = {
+    'agustin@vintti.com': 'Agustín',
+    'bahia@vintti.com': 'Bahía',
+    'lara@vintti.com': 'Lara',
+    'mariano@vintti.com': 'Mariano',
+    'mia@vintti.com': 'Mia Cavanagh',
+}
+
 
 @bp.route('/users')
 def users_list_or_by_email():
@@ -160,14 +176,52 @@ def list_sales_leads():
                   GROUP BY 1
                 )
                 SELECT
+                  u.user_id,
                   n.email,
+                  n.email AS email_vintti,
                   COALESCE(NULLIF(u.user_name, ''), n.email) AS user_name
                 FROM normalized n
                 LEFT JOIN users u ON LOWER(TRIM(u.email_vintti)) = n.email
                 ORDER BY COALESCE(NULLIF(u.user_name, ''), n.email) ASC;
             """)
-            rows = cur.fetchall() or []
-        return jsonify(rows), 200
+            rows = [dict(row) for row in (cur.fetchall() or [])]
+
+            cur.execute(
+                """
+                SELECT
+                  user_id,
+                  LOWER(TRIM(email_vintti)) AS email,
+                  LOWER(TRIM(email_vintti)) AS email_vintti,
+                  COALESCE(NULLIF(user_name, ''), LOWER(TRIM(email_vintti))) AS user_name
+                FROM users
+                WHERE LOWER(TRIM(email_vintti)) = ANY(%s)
+                """,
+                (list(SALES_LEAD_EMAILS),),
+            )
+            rows.extend(dict(row) for row in (cur.fetchall() or []))
+
+        deduped = {}
+        for row in rows:
+            email = str(row.get("email_vintti") or row.get("email") or "").strip().lower()
+            if not email:
+                continue
+            row["email"] = email
+            row["email_vintti"] = email
+            if email in SALES_LEAD_NAME_OVERRIDES and (not row.get("user_name") or row.get("user_name") == email):
+                row["user_name"] = SALES_LEAD_NAME_OVERRIDES[email]
+            deduped[email] = row
+
+        for email in SALES_LEAD_EMAILS:
+            if email not in deduped:
+                deduped[email] = {
+                    "user_id": None,
+                    "email": email,
+                    "email_vintti": email,
+                    "user_name": SALES_LEAD_NAME_OVERRIDES.get(email, email),
+                }
+
+        result = sorted(deduped.values(), key=lambda row: str(row.get("user_name") or row.get("email_vintti") or "").lower())
+        return jsonify(result), 200
     except Exception as exc:
         print("Error fetching sales leads:", exc)
         return jsonify({"error": str(exc)}), 500

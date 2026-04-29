@@ -755,6 +755,7 @@ document.addEventListener("DOMContentLoaded", () => {
       'agostina@vintti.com',
       'lara@vintti.com',
       'agustin@vintti.com',
+      'mia@vintti.com',
       'jazmin@vintti.com'
     ].map(email => email.toLowerCase()));
     const pipelineUserEmail = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').toLowerCase().trim();

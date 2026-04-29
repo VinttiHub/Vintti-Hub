@@ -1488,7 +1488,8 @@ function installAdvancedFilters(table) {
     'angie@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
-    'mariano@vintti.com'
+    'mariano@vintti.com',
+    'mia@vintti.com'
   ]);
 
   const sales = document.getElementById('salesLink');
@@ -1527,7 +1528,7 @@ function installAdvancedFilters(table) {
   const summaryAllowed = [
     'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
     'lara@vintti.com','agostina@vintti.com','mariano@vintti.com',
-    'jazmin@vintti.com'
+    'mia@vintti.com','jazmin@vintti.com'
   ];
   const equipmentsAllowed = [
     'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
