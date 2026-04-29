@@ -16,6 +16,8 @@ from . import (
     recruiting_upfront,
     client_lifetime_detail,
     client_lifetime_avg,
+    candidate_lifetime_detail,
+    candidate_lifetime_avg,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -32,6 +34,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     recruiting_upfront.DATASET["key"]: recruiting_upfront.DATASET,
     client_lifetime_detail.DATASET["key"]: client_lifetime_detail.DATASET,
     client_lifetime_avg.DATASET["key"]: client_lifetime_avg.DATASET,
+    candidate_lifetime_detail.DATASET["key"]: candidate_lifetime_detail.DATASET,
+    candidate_lifetime_avg.DATASET["key"]: candidate_lifetime_avg.DATASET,
 }
 
 

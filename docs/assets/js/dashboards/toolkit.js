@@ -263,6 +263,16 @@
     const twin = mapping.twinAxis === true && ys.length >= 2 && type !== 'pie' && type !== 'donut';
     const formatter2 = twin ? fmt.pick(mapping.formatter2 || 'percent') : null;
 
+    // Tooltip extras: extra fields to display in tooltip (looked up from raw rows by x value).
+    const extraKeys = Array.isArray(mapping.tooltipExtras) ? mapping.tooltipExtras : [];
+    const rawByX = new Map();
+    if (extraKeys.length) {
+      rows.forEach(r => {
+        const k = r[mapping.x] == null ? '(null)' : String(r[mapping.x]);
+        if (!rawByX.has(k)) rawByX.set(k, r);
+      });
+    }
+
     const categories = aggregated.map(r => r[mapping.x]);
     const series = ys.map((y, i) => ({
       name: y,
@@ -285,18 +295,31 @@
       tooltip: {
         trigger: 'axis',
         valueFormatter: formatter,
-        formatter: twin ? (params) => {
+        formatter: (twin || extraKeys.length) ? (params) => {
           const head = params[0]?.axisValueLabel ?? params[0]?.name ?? '';
           const lines = params.map(p => {
-            const fn = p.seriesIndex === 0 ? formatter : formatter2;
+            const fn = (twin && p.seriesIndex !== 0) ? formatter2 : formatter;
             return `${p.marker} ${p.seriesName}: <b>${fn(p.value)}</b>`;
           });
+          if (extraKeys.length) {
+            const raw = rawByX.get(String(head));
+            if (raw) {
+              extraKeys.forEach(k => {
+                if (raw[k] != null && raw[k] !== '') lines.push(`${k}: <b>${raw[k]}</b>`);
+              });
+            }
+          }
           return `${head}<br>${lines.join('<br>')}`;
         } : undefined,
       },
       legend: { top: 0, show: ys.length > 1 },
       grid: { left: 60, right: twin ? 60 : 20, top: ys.length > 1 ? 40 : 20, bottom: 40 },
-      xAxis: { type: 'category', data: categories, axisLabel: { color: '#64748b' } },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisLabel: { color: '#64748b', show: mapping.hideXLabels !== true },
+        axisTick: { show: mapping.hideXLabels !== true },
+      },
       yAxis: twin ? [
         { type: 'value', axisLabel: { color: '#64748b', formatter } },
         { type: 'value', axisLabel: { color: '#64748b', formatter: formatter2 }, splitLine: { show: false } },
