@@ -63,21 +63,22 @@ RETIRED_CHART_KEYS = {
     ],
 }
 
+# Chart keys whose layout/config we want to force-reset on this seed run
+# (DELETE + INSERT instead of skipping via ON CONFLICT DO NOTHING). Use sparingly:
+# this wipes any manual edits made through the editor for these chart_keys.
+RESET_CHART_KEYS = {
+    "main": [
+        "gr_bar_active_headcount",
+        "gr_table_active_headcount_detail",
+        "gr_kpi_active_30d",
+        "gr_table_active_30d_detail",
+    ],
+}
+
 # Reduced Fase 1 seed. Mapping convention understood by chart-factory.js:
 #   { mapping: { x: dim, y: [measures], value: measure, formatter: 'currency'|'number'|'percent' } }
 MAIN_CHARTS = [
-    # Growth & Revenue — 30d rolling window (uses `corte` + `model` filters)
-    {
-        "chart_key": "gr_kpi_active_30d",
-        "tab_key": "growth",
-        "title": "Activos · Ventana 30 días",
-        "type": "kpi",
-        "dataset_key": "active_headcount_30d_total",
-        "config": {"mapping": {"value": "active_count", "formatter": "number"}},
-        "position": {"x": 0, "y": 0, "w": 12, "h": 2},
-        "sort_order": 5,
-    },
-    # Growth & Revenue — kept from prior seed (do not move)
+    # Growth & Revenue — 2×2 layout: bar + monthly detail (top), 30d KPI + 30d detail (bottom)
     {
         "chart_key": "gr_bar_active_headcount",
         "tab_key": "growth",
@@ -85,22 +86,8 @@ MAIN_CHARTS = [
         "type": "bar",
         "dataset_key": "active_headcount_history",
         "config": {"mapping": {"x": "month", "y": ["active_count"], "formatter": "number"}},
-        "position": {"x": 8, "y": 2, "w": 4, "h": 5},
-        "sort_order": 60,
-    },
-    {
-        "chart_key": "gr_table_active_30d_detail",
-        "tab_key": "growth",
-        "title": "Activos · Detalle 30 días",
-        "type": "table",
-        "dataset_key": "active_headcount_30d_detail",
-        "config": {
-            "mapping": {
-                "columns": ["cutoff_date", "model", "client_name", "candidate_name", "start_date"],
-            },
-        },
-        "position": {"x": 0, "y": 7, "w": 12, "h": 6},
-        "sort_order": 65,
+        "position": {"x": 0, "y": 0, "w": 6, "h": 5},
+        "sort_order": 10,
     },
     {
         "chart_key": "gr_table_active_headcount_detail",
@@ -113,8 +100,32 @@ MAIN_CHARTS = [
                 "columns": ["month", "client_name", "candidate_name", "start_date"],
             },
         },
-        "position": {"x": 0, "y": 12, "w": 12, "h": 6},
-        "sort_order": 90,
+        "position": {"x": 6, "y": 0, "w": 6, "h": 5},
+        "sort_order": 20,
+    },
+    {
+        "chart_key": "gr_kpi_active_30d",
+        "tab_key": "growth",
+        "title": "Candidatos activos · Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "active_headcount_30d_total",
+        "config": {"mapping": {"value": "active_count", "formatter": "number"}},
+        "position": {"x": 0, "y": 5, "w": 6, "h": 5},
+        "sort_order": 30,
+    },
+    {
+        "chart_key": "gr_table_active_30d_detail",
+        "tab_key": "growth",
+        "title": "Detalle 30d",
+        "type": "table",
+        "dataset_key": "active_headcount_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["cutoff_date", "client_name", "candidate_name", "start_date"],
+            },
+        },
+        "position": {"x": 6, "y": 5, "w": 6, "h": 5},
+        "sort_order": 40,
     },
 
     # Account Management
@@ -253,6 +264,10 @@ def main() -> None:
         for slug, retired in RETIRED_CHART_KEYS.items():
             removed = delete_retired_charts(cur, ids[slug], retired)
             print(f"{slug} retired charts: {removed} deleted")
+
+        for slug, reset in RESET_CHART_KEYS.items():
+            removed = delete_retired_charts(cur, ids[slug], reset)
+            print(f"{slug} reset charts: {removed} deleted (will re-insert from seed)")
 
         for chart in MAIN_CHARTS:
             upsert_chart(cur, ids["main"], chart)
