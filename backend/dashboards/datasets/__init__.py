@@ -12,6 +12,7 @@ from . import (
     active_headcount_detail,
     active_headcount_30d_total,
     active_headcount_30d_detail,
+    inactive_candidates_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -24,6 +25,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     active_headcount_detail.DATASET["key"]: active_headcount_detail.DATASET,
     active_headcount_30d_total.DATASET["key"]: active_headcount_30d_total.DATASET,
     active_headcount_30d_detail.DATASET["key"]: active_headcount_30d_detail.DATASET,
+    inactive_candidates_detail.DATASET["key"]: inactive_candidates_detail.DATASET,
 }
 
 

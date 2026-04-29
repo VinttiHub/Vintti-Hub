@@ -72,6 +72,7 @@ RESET_CHART_KEYS = {
         "gr_table_active_headcount_detail",
         "gr_kpi_active_30d",
         "gr_table_active_30d_detail",
+        "gr_table_inactive_candidates",
     ],
 }
 
@@ -126,6 +127,20 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 5, "w": 6, "h": 5},
         "sort_order": 40,
+    },
+    {
+        "chart_key": "gr_table_inactive_candidates",
+        "tab_key": "growth",
+        "title": "Candidatos inactivos (detalle por mes)",
+        "type": "table",
+        "dataset_key": "inactive_candidates_detail",
+        "config": {
+            "mapping": {
+                "columns": ["month", "client_name", "candidate_name", "start_date", "end_date"],
+            },
+        },
+        "position": {"x": 0, "y": 10, "w": 12, "h": 5},
+        "sort_order": 50,
     },
 
     # Account Management
