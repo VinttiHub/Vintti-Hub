@@ -171,6 +171,7 @@ def _fetch_reference_feedback_email_context(cur, candidate_id, opportunity_id=No
                 o.opportunity_id,
                 o.opp_position_name,
                 o.opp_hr_lead,
+                o.opp_sales_lead,
                 COALESCE(a.client_name, 'Client') AS account_name
             FROM candidates c
             LEFT JOIN opportunity o ON o.opportunity_id = %s
@@ -191,6 +192,7 @@ def _fetch_reference_feedback_email_context(cur, candidate_id, opportunity_id=No
             o.opportunity_id,
             o.opp_position_name,
             o.opp_hr_lead,
+            o.opp_sales_lead,
             COALESCE(a.client_name, 'Client') AS account_name
         FROM candidates c
         LEFT JOIN hire_opportunity ho ON ho.candidate_id = c.candidate_id
@@ -253,6 +255,7 @@ def _send_reference_feedback_notifications(cur, candidate_id, opportunity_id, su
         return
 
     hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
+    sales_lead = str(ctx.get('opp_sales_lead') or '').strip().lower()
     recipients = ['pgonzales@vintti.com']
     if hr_lead:
         recipients.insert(0, hr_lead)
@@ -289,6 +292,8 @@ def _send_reference_feedback_notifications(cur, candidate_id, opportunity_id, su
     opportunity_name = ctx.get('opp_position_name') or 'Opportunity'
 
     if len(latest_by_reference) >= 2:
+        if sales_lead:
+            recipients.append(sales_lead)
         subject = f"Reference feedback completed for {candidate_name} • {opportunity_name}"
         rows_for_email = [latest_by_reference[idx] for idx in (1, 2) if idx in latest_by_reference]
     else:

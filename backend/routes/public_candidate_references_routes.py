@@ -199,6 +199,7 @@ def _fetch_reference_email_context(cur, candidate_id, opportunity_id=None):
                 o.opportunity_id,
                 o.opp_position_name,
                 o.opp_hr_lead,
+                o.opp_sales_lead,
                 COALESCE(a.client_name, 'Client') AS account_name
             FROM candidates c
             LEFT JOIN opportunity o ON o.opportunity_id = %s
@@ -219,6 +220,7 @@ def _fetch_reference_email_context(cur, candidate_id, opportunity_id=None):
             o.opportunity_id,
             o.opp_position_name,
             o.opp_hr_lead,
+            o.opp_sales_lead,
             COALESCE(a.client_name, 'Client') AS account_name
         FROM candidates c
         LEFT JOIN hire_opportunity ho ON ho.candidate_id = c.candidate_id
@@ -266,6 +268,7 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
     if not ctx:
         return
     hr_lead = str(ctx.get('opp_hr_lead') or '').strip().lower()
+    sales_lead = str(ctx.get('opp_sales_lead') or '').strip().lower()
     recipients = ['pgonzales@vintti.com']
     if hr_lead:
         recipients.insert(0, hr_lead)
@@ -281,8 +284,11 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
         _send_email(subject, _reference_email_html(ctx, merged, [ref_idx]), recipients)
 
     if after_complete and not before_complete:
+        combined_recipients = list(recipients)
+        if sales_lead:
+            combined_recipients.append(sales_lead)
         subject = f"Both references received for {candidate_name} • {opportunity_name}"
-        _send_email(subject, _reference_email_html(ctx, merged, [1, 2]), recipients)
+        _send_email(subject, _reference_email_html(ctx, merged, [1, 2]), combined_recipients)
 
 
 def _resolve_candidate_hire(cur, candidate_id, opportunity_id=None):
