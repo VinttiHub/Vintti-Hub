@@ -73,6 +73,7 @@ RESET_CHART_KEYS = {
         "gr_table_active_30d_detail",
         "gr_table_inactive_candidates",
         "gr_line_mrr",
+        "gr_area_recruiting_upfront",
     ],
 }
 
@@ -162,8 +163,24 @@ MAIN_CHARTS = [
                 "formatter2": "percent",
             },
         },
-        "position": {"x": 0, "y": 15, "w": 12, "h": 5},
+        "position": {"x": 0, "y": 15, "w": 6, "h": 5},
         "sort_order": 60,
+    },
+    {
+        "chart_key": "gr_area_recruiting_upfront",
+        "tab_key": "growth",
+        "title": "Recruiting (upfront payment)",
+        "type": "area",
+        "dataset_key": "recruiting_upfront",
+        "config": {
+            "mapping": {
+                "x": "mes_cierre",
+                "y": ["monto_recruiting"],
+                "formatter": "currency",
+            },
+        },
+        "position": {"x": 6, "y": 15, "w": 6, "h": 5},
+        "sort_order": 70,
     },
 
     # Account Management
