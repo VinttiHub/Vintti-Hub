@@ -1849,6 +1849,8 @@ function buildCandidateRowEl(candidate) {
         <span>${escapeHtml(locationLabel)}</span>
         ${profile.industry ? `<span class="dot">·</span><span>${escapeHtml(profile.industry)}</span>` : ""}
       </div>
+      ${experienceHtml}
+      ${educationHtml}
       ${skillChipsHtml ? `
       <div class="candidate-row__field">
         <span class="candidate-row__field-label">Skills match</span>
@@ -1859,8 +1861,6 @@ function buildCandidateRowEl(candidate) {
         <span class="candidate-row__field-value">${contactBits}</span>
       </div>
       ${screeningHtml}
-      ${experienceHtml}
-      ${educationHtml}
       ${referralRow}
       ${breakdownHtml}
     </div>
