@@ -1,9 +1,12 @@
+import json
 import logging
 from typing import Optional
 import os
 import uuid
 
+import openai
 from flask import Blueprint, jsonify, request
+from psycopg2.extras import Json
 from werkzeug.utils import secure_filename
 
 from ai_routes import (
@@ -302,6 +305,7 @@ def get_applicants():
                 match_score,
                 reasons,
                 extracted_pdf,
+                parsed_cv,
                 created_at,
                 updated_at
             FROM applicants
@@ -783,6 +787,118 @@ def refresh_applicant_ai_fields(applicant_id):
     finally:
         cur.close()
         conn.close()
+
+
+PARSE_CV_SYSTEM_PROMPT = (
+    "You extract structured work experience and education from CV text. "
+    "Return ONLY valid JSON matching this exact shape:\n"
+    "{\n"
+    '  "experience": [{"title": "", "company": "", "start": "", "end": ""}],\n'
+    '  "education":  [{"degree": "", "institution": "", "start": "", "end": ""}]\n'
+    "}\n"
+    "Rules:\n"
+    "- Use empty strings for missing fields. Do NOT invent data.\n"
+    "- Dates: prefer YYYY or YYYY-MM. Use 'Present' for current roles when stated.\n"
+    "- Order both arrays from most recent to oldest.\n"
+    "- If the CV has no clear experience or education section, return an empty array for it."
+)
+
+
+def _coerce_parse_cv_payload(raw):
+    if not isinstance(raw, dict):
+        return {"experience": [], "education": []}
+
+    def _coerce_entries(items, fields):
+        if not isinstance(items, list):
+            return []
+        cleaned = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            cleaned.append({field: str(item.get(field, "") or "").strip() for field in fields})
+        return cleaned
+
+    return {
+        "experience": _coerce_entries(raw.get("experience"), ("title", "company", "start", "end")),
+        "education": _coerce_entries(raw.get("education"), ("degree", "institution", "start", "end")),
+    }
+
+
+@bp.route("/applicants/<int:applicant_id>/parse-cv", methods=["POST", "OPTIONS"])
+def parse_applicant_cv(applicant_id):
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    force = request.args.get("force") in ("1", "true", "yes")
+
+    conn = None
+    cur = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT parsed_cv, extracted_pdf FROM applicants WHERE applicant_id = %s",
+            (applicant_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return jsonify({"error": "Applicant not found"}), 404
+
+        parsed_cv, extracted_pdf = row
+
+        if parsed_cv and not force:
+            if isinstance(parsed_cv, str):
+                try:
+                    parsed_cv = json.loads(parsed_cv)
+                except Exception:
+                    parsed_cv = None
+            if parsed_cv:
+                return jsonify({"parsed_cv": parsed_cv, "cached": True}), 200
+
+        cv_text = (extracted_pdf or "").strip()
+        if not cv_text:
+            return jsonify({"parsed_cv": None, "reason": "no_cv_text"}), 200
+
+        truncated = cv_text[:12000]
+
+        try:
+            response = openai.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": PARSE_CV_SYSTEM_PROMPT},
+                    {"role": "user", "content": truncated},
+                ],
+            )
+            content = response.choices[0].message.content or "{}"
+            raw = json.loads(content)
+        except Exception as exc:
+            logging.exception("OpenAI parse-cv call failed for applicant %s", applicant_id)
+            return jsonify({"error": "Failed to parse CV", "detail": str(exc)}), 502
+
+        normalized = _coerce_parse_cv_payload(raw)
+
+        cur.execute(
+            "UPDATE applicants SET parsed_cv = %s, updated_at = NOW() WHERE applicant_id = %s",
+            (Json(normalized), applicant_id),
+        )
+        conn.commit()
+
+        return jsonify({"parsed_cv": normalized, "cached": False}), 200
+    except Exception as exc:
+        logging.exception("parse-cv endpoint failed for applicant %s", applicant_id)
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        if cur is not None:
+            cur.close()
+        if conn is not None:
+            conn.close()
 
 
 @bp.route("/linkedin_hub", methods=["GET", "OPTIONS"])

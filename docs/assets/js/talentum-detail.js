@@ -1171,6 +1171,11 @@ function buildApplicantProfile(applicant) {
     .filter(Boolean)
     .join(" ");
 
+  let parsedCv = applicant.parsed_cv ?? null;
+  if (typeof parsedCv === "string") {
+    try { parsedCv = JSON.parse(parsedCv); } catch { parsedCv = null; }
+  }
+
   return {
     id: applicant.applicant_id,
     name: fallbackName,
@@ -1182,6 +1187,7 @@ function buildApplicantProfile(applicant) {
     salaryRange: null,
     searchableText,
     cvText,
+    parsedCv,
     linkedin: applicant.linkedin_url || "",
     core: null,
   };
@@ -1624,6 +1630,93 @@ function buildInitials(name) {
   );
 }
 
+function formatCvDateRange(start, end) {
+  const s = (start || "").toString().trim();
+  const e = (end || "").toString().trim();
+  if (s && e) return `${s} – ${e}`;
+  return s || e || "";
+}
+
+function extractCvEntries(rawEntries, primaryFields) {
+  if (!Array.isArray(rawEntries)) return [];
+  return rawEntries
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const title = primaryFields
+        .map((field) => (entry[field] || "").toString().trim())
+        .filter(Boolean)
+        .join(" · ");
+      if (!title) return null;
+      return { title, dates: formatCvDateRange(entry.start, entry.end) };
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function buildCvSectionHtml({ label, entries, hasParsedCv, hasCvText, isParsing }) {
+  let valueHtml;
+  if (entries.length) {
+    valueHtml = `<ul class="candidate-row__exp-list">${entries
+      .map(
+        (entry) => `
+          <li class="candidate-row__exp-item">
+            <span class="candidate-row__exp-title">${escapeHtml(entry.title)}</span>
+            ${entry.dates ? `<span class="candidate-row__exp-dates">${escapeHtml(entry.dates)}</span>` : ""}
+          </li>
+        `
+      )
+      .join("")}</ul>`;
+  } else if (hasParsedCv) {
+    valueHtml = `<span class="candidate-row__exp-summary">—</span>`;
+  } else if (isParsing && hasCvText) {
+    valueHtml = `<span class="candidate-row__exp-summary">Analyzing CV…</span>`;
+  } else if (!hasCvText) {
+    valueHtml = `<span class="candidate-row__exp-summary">—</span>`;
+  } else {
+    valueHtml = `<span class="candidate-row__exp-summary">Analyzing CV…</span>`;
+  }
+
+  return `
+    <div class="candidate-row__field">
+      <span class="candidate-row__field-label">${escapeHtml(label)}</span>
+      <div class="candidate-row__field-value">${valueHtml}</div>
+    </div>
+  `;
+}
+
+async function ensureParsedCv(candidate) {
+  if (!candidate || !candidate.profile) return;
+  const id = candidate.profile.id;
+  if (!id) return;
+  if (candidate.profile.parsedCv) return;
+  if (candidate._parsingCv) return;
+  const cvText = candidate.pipeline?.extracted_pdf;
+  if (!cvText || !String(cvText).trim()) return;
+
+  candidate._parsingCv = true;
+  try {
+    const visibleBefore = getOrderedCandidates()[state.paginationIndex];
+    if (visibleBefore?.profile?.id === id) renderCandidates();
+
+    const res = await fetchJSON(`${API_BASE}/applicants/${id}/parse-cv`, { method: "POST" });
+    if (res && res.parsed_cv && typeof res.parsed_cv === "object") {
+      candidate.profile.parsedCv = res.parsed_cv;
+      if (candidate.pipeline) candidate.pipeline.parsed_cv = res.parsed_cv;
+    } else {
+      candidate.profile.parsedCv = { experience: [], education: [] };
+      if (candidate.pipeline) candidate.pipeline.parsed_cv = candidate.profile.parsedCv;
+    }
+  } catch (err) {
+    console.warn("parse-cv failed", err);
+    candidate.profile.parsedCv = { experience: [], education: [] };
+    if (candidate.pipeline) candidate.pipeline.parsed_cv = candidate.profile.parsedCv;
+  } finally {
+    candidate._parsingCv = false;
+    const visibleAfter = getOrderedCandidates()[state.paginationIndex];
+    if (visibleAfter?.profile?.id === id) renderCandidates();
+  }
+}
+
 function buildCandidateRowEl(candidate) {
   const questions = state.applicantQuestions || {};
   const applicant = candidate.pipeline || {};
@@ -1698,6 +1791,21 @@ function buildCandidateRowEl(candidate) {
     ? `<div class="candidate-row__field"><span class="candidate-row__field-label">Source</span><span class="candidate-row__field-value">${escapeHtml(applicant.referral_source)}</span></div>`
     : "";
 
+  const experienceHtml = buildCvSectionHtml({
+    label: "Experience",
+    entries: extractCvEntries(profile.parsedCv?.experience, ["title", "company"]),
+    hasParsedCv: !!profile.parsedCv,
+    hasCvText: !!(applicant.extracted_pdf && applicant.extracted_pdf.trim()),
+    isParsing: !!candidate._parsingCv,
+  });
+  const educationHtml = buildCvSectionHtml({
+    label: "Education",
+    entries: extractCvEntries(profile.parsedCv?.education, ["degree", "institution"]),
+    hasParsedCv: !!profile.parsedCv,
+    hasCvText: !!(applicant.extracted_pdf && applicant.extracted_pdf.trim()),
+    isParsing: !!candidate._parsingCv,
+  });
+
   const breakdownRowsHtml = (matchModel.breakdown || [])
     .map((item) => {
       const percentValue = normalizePercent(item.percent, null);
@@ -1751,6 +1859,8 @@ function buildCandidateRowEl(candidate) {
         <span class="candidate-row__field-value">${contactBits}</span>
       </div>
       ${screeningHtml}
+      ${experienceHtml}
+      ${educationHtml}
       ${referralRow}
       ${breakdownHtml}
     </div>
@@ -1823,6 +1933,7 @@ function renderCandidates() {
   if (ordered.length) {
     const candidate = ordered[state.paginationIndex];
     els.candidatesGrid.appendChild(buildCandidateRowEl(candidate));
+    ensureParsedCv(candidate);
   }
 
   updatePaginatorUI(ordered.length);
