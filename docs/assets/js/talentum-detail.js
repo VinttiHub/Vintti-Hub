@@ -150,6 +150,133 @@ function setApplicantFlag(flag, applicantId, value) {
   writeFlagMap(flag, map);
 }
 
+function getApplicantById(applicantId) {
+  const normalizedId = Number(applicantId);
+  if (!Number.isFinite(normalizedId)) return null;
+  return state.candidates.find((entry) => Number(entry?.pipeline?.applicant_id) === normalizedId) || null;
+}
+
+function buildPipelineCandidatePayload(applicant) {
+  const firstName = applicant.first_name || "";
+  const lastName = applicant.last_name || "";
+  const name = `${firstName} ${lastName}`.trim() || applicant.email || "Applicant";
+  return {
+    name,
+    email: applicant.email || "",
+    phone: applicant.phone || "",
+    linkedin: applicant.linkedin_url || "",
+    country: applicant.location || "",
+    english_level: applicant.english_level || "",
+    stage: "Contactado",
+    created_by: state.currentUserEmail || getStoredEmail() || undefined,
+    candidate_source: "Talentum",
+    candidate_origin: "Talentum applicant",
+  };
+}
+
+async function createPipelineCandidateFromApplicant(opportunityId, applicant) {
+  const payload = buildPipelineCandidatePayload(applicant);
+  const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || `Failed to create pipeline candidate (${res.status})`);
+  }
+  return data?.candidate_id;
+}
+
+async function createOrFindPipelineCandidate(opportunityId, applicant) {
+  if (applicant.candidate_id) return applicant.candidate_id;
+
+  const payload = buildPipelineCandidatePayload(applicant);
+  const res = await fetch(`${API_BASE}/candidates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (res.status === 409) {
+    const existingId = data?.candidate?.candidate_id;
+    if (!existingId) throw new Error(data?.error || "Duplicate candidate without candidate ID");
+    return existingId;
+  }
+
+  if (!res.ok) {
+    const error = String(data?.error || "");
+    if (res.status === 400 && /missing required fields/i.test(error)) {
+      return createPipelineCandidateFromApplicant(opportunityId, applicant);
+    }
+    throw new Error(error || `Failed to create candidate (${res.status})`);
+  }
+
+  return data?.candidate_id;
+}
+
+async function setPipelineCandidateStage(opportunityId, candidateId, stage) {
+  await fetchJSON(`${API_BASE}/opportunities/${opportunityId}/candidates/${candidateId}/stage`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stage_pipeline: stage }),
+  });
+}
+
+async function linkCandidateToContactedStage(opportunityId, candidateId) {
+  const res = await fetch(`${API_BASE}/opportunities/${opportunityId}/candidates/link`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      candidate_id: candidateId,
+      stage: "Contactado",
+      created_by: state.currentUserEmail || getStoredEmail() || undefined,
+    }),
+  });
+
+  if (res.status === 409) {
+    await setPipelineCandidateStage(opportunityId, candidateId, "Contactado");
+    return;
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text}`);
+  }
+}
+
+async function syncApplicantToContactedPipeline(applicantId) {
+  const opportunityId = getOpportunityId();
+  const entry = getApplicantById(applicantId);
+  const applicant = entry?.pipeline;
+  if (!opportunityId || !applicant) return;
+
+  try {
+    setCandidateSubtitle("Adding applicant to contacted pipeline...");
+    const candidateId = await createOrFindPipelineCandidate(opportunityId, applicant);
+    if (!candidateId) throw new Error("Candidate ID was not returned");
+    applicant.candidate_id = candidateId;
+    await linkCandidateToContactedStage(opportunityId, candidateId);
+    setCandidateSubtitle("Applicant added to contacted pipeline.");
+  } catch (err) {
+    console.error("Failed to sync applicant to pipeline", err);
+    setCandidateSubtitle("Could not add applicant to pipeline.");
+  }
+}
+
+function handleFlagCheckboxChange(checkbox) {
+  const flag = checkbox.dataset.flag;
+  if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
+
+  const applicantId = Number(checkbox.dataset.applicantId);
+  setApplicantFlag(flag, applicantId, checkbox.checked);
+
+  if (flag === "contacted" && checkbox.checked) {
+    syncApplicantToContactedPipeline(applicantId);
+  }
+}
+
 function buildFlagTogglesHtml(applicantId, options = {}) {
   const layout = options.layout || "stacked";
   const togglesHtml = FLAG_ORDER.map((flag) => {
@@ -2111,9 +2238,7 @@ async function init() {
     els.candidatesGrid.addEventListener("change", (event) => {
       const checkbox = event.target.closest(".candidate-flag-checkbox");
       if (!checkbox) return;
-      const flag = checkbox.dataset.flag;
-      if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
-      setApplicantFlag(flag, Number(checkbox.dataset.applicantId), checkbox.checked);
+      handleFlagCheckboxChange(checkbox);
       renderCandidates();
     });
   }
@@ -2134,9 +2259,7 @@ async function init() {
     els.drawerBody.addEventListener("change", (event) => {
       const checkbox = event.target.closest(".candidate-flag-checkbox");
       if (!checkbox) return;
-      const flag = checkbox.dataset.flag;
-      if (!flag || !FLAG_STORAGE_KEYS[flag]) return;
-      setApplicantFlag(flag, Number(checkbox.dataset.applicantId), checkbox.checked);
+      handleFlagCheckboxChange(checkbox);
       renderCandidates();
       const selected = state.candidates.find(
         (entry) => entry.profile.id === state.selectedApplicantId
