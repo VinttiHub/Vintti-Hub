@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 
 def _parse_ym(value: str | None) -> date | None:
@@ -20,12 +20,16 @@ def _parse_ym(value: str | None) -> date | None:
     return None
 
 
+def _previous_month_start(today: date) -> date:
+    return (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     target = (
         _parse_ym(filters.get("fecha"))
         or _parse_ym(filters.get("mes"))
         or _parse_ym(filters.get("month"))
-        or datetime.utcnow().date().replace(day=1)
+        or _previous_month_start(datetime.utcnow().date())
     )
 
     sql = """
