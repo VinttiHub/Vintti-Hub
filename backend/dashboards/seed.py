@@ -65,6 +65,8 @@ RETIRED_CHART_KEYS = {
         "am_table_new_clients_month_detail",
         "am_kpi_new_clients_30d",
         "am_table_new_clients_30d_detail",
+        "op_bar_batches_by_month",
+        "op_kpi_avg_sourcing_days",
     ],
 }
 
@@ -105,6 +107,8 @@ RESET_CHART_KEYS = {
         "sa_table_new_clients_month_detail",
         "sa_kpi_new_clients_30d",
         "sa_table_new_clients_30d_detail",
+        "op_bar_new_placements",
+        "op_table_new_placements_detail",
     ],
 }
 
@@ -646,23 +650,42 @@ MAIN_CHARTS = [
 
     # Operations
     {
-        "chart_key": "op_bar_batches_by_month",
+        "chart_key": "op_bar_new_placements",
         "tab_key": "operations",
-        "title": "Batches por mes",
+        "title": "Nuevas colocaciones por mes",
         "type": "bar",
-        "dataset_key": "batch_sourcing",
-        "config": {"mapping": {"x": "month", "y": ["batch_id"], "agg": "count", "formatter": "number"}},
-        "position": {"x": 0, "y": 0, "w": 8, "h": 5},
+        "dataset_key": "new_placements_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["staffing_starts", "recruiting_starts"],
+                "formatter": "number",
+                "stacked": True,
+                "drillKey": "fecha",
+            },
+        },
+        "position": {"x": 0, "y": 0, "w": 6, "h": 5},
         "sort_order": 10,
     },
     {
-        "chart_key": "op_kpi_avg_sourcing_days",
+        "chart_key": "op_table_new_placements_detail",
         "tab_key": "operations",
-        "title": "Avg días sourcing → batch",
-        "type": "kpi",
-        "dataset_key": "batch_sourcing",
-        "config": {"mapping": {"value": "days_from_sourcing", "agg": "avg", "formatter": "number"}},
-        "position": {"x": 8, "y": 0, "w": 4, "h": 2},
+        "title": "Detalle - Nuevas colocaciones por mes",
+        "type": "table",
+        "dataset_key": "new_placements_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "mes",
+                    "opp_model",
+                    "candidate_name",
+                    "opportunity_id",
+                    "start_date",
+                    "end_date",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 0, "w": 6, "h": 5},
         "sort_order": 20,
     },
 ]

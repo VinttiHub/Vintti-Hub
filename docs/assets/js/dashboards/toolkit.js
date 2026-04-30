@@ -291,6 +291,7 @@
     }
 
     const seriesTypes = Array.isArray(mapping.seriesTypes) ? mapping.seriesTypes : null;
+    const stacked = mapping.stacked === true;
     const categories = aggregated.map(r => r[mapping.x]);
     const series = ys.map((y, i) => {
       const baseType = seriesTypes && seriesTypes[i] ? seriesTypes[i] : type;
@@ -313,6 +314,7 @@
         radius: (baseType === 'donut') ? ['40%', '70%'] : undefined,
         itemStyle: isPie ? undefined : { color: colorFor(i) },
         yAxisIndex: twin ? (i === 0 ? 0 : 1) : 0,
+        stack: (stacked && (echType === 'bar' || echType === 'line')) ? 'total' : undefined,
       };
     });
 
@@ -356,12 +358,15 @@
       tooltip: {
         trigger: 'axis',
         valueFormatter: formatter,
-        formatter: (twin || extraKeys.length) ? (params) => {
+        formatter: (twin || extraKeys.length || stacked) ? (params) => {
           const head = params[0]?.axisValueLabel ?? params[0]?.name ?? '';
+          const total = stacked ? params.reduce((s, p) => s + (Number(p.value) || 0), 0) : 0;
           const lines = params.map(p => {
             const fn = (twin && p.seriesIndex !== 0) ? formatter2 : formatter;
-            return `${p.marker} ${p.seriesName}: <b>${fn(p.value)}</b>`;
+            const pct = stacked && total ? ` (${((Number(p.value) || 0) * 100 / total).toFixed(2)}%)` : '';
+            return `${p.marker} ${p.seriesName}: <b>${fn(p.value)}</b>${pct}`;
           });
+          if (stacked) lines.push(`Total: <b>${formatter(total)}</b>`);
           if (extraKeys.length) {
             const raw = rawByX.get(String(head));
             if (raw) {
