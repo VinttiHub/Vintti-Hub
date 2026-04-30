@@ -84,6 +84,10 @@
           { value: 'Revenue', label: 'Revenue (TSR)' },
           { value: 'Fee',     label: 'Fee (TSF)' },
         ]},
+        { type: 'select', key: 'opp_stage', label: 'Stage', options: [
+          { value: 'Close Win',   label: 'Close Win' },
+          { value: 'Closed Lost', label: 'Closed Lost' },
+        ]},
       ],
     });
   }

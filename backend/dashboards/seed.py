@@ -441,6 +441,8 @@ MAIN_CHARTS = [
                 "x": "mes_close",
                 "y": ["conversion_pct"],
                 "formatter": "number",
+                "drillKey": "fecha",
+                "tooltipExtras": ["total_closed_opps", "close_win", "closed_lost", "unique_clients_closed_that_month"],
             },
         },
         "position": {"x": 0, "y": 0, "w": 6, "h": 5},

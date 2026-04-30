@@ -34,6 +34,13 @@ def _resolve_modelo(filters: dict) -> str | None:
     return None
 
 
+def _resolve_stage(filters: dict) -> str | None:
+    raw = (filters.get("opp_stage") or "").strip()
+    if raw in ("Close Win", "Closed Lost"):
+        return raw
+    return None
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     mes = (
         _parse_date(filters.get("mes"))
@@ -41,6 +48,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("month"))
     )
     modelo = _resolve_modelo(filters)
+    opp_stage = _resolve_stage(filters)
 
     sql = """
         WITH mes_objetivo AS (
@@ -105,10 +113,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE 1 = 1
           AND DATE_TRUNC('month', m.close_d)::date = mo.mes_pick
           AND (%(modelo)s::text IS NULL OR LOWER(TRIM(m.opp_model)) = LOWER(%(modelo)s))
+          AND (%(opp_stage)s::text IS NULL OR m.opp_stage = %(opp_stage)s)
         ORDER BY m.close_d, m.client_name;
     """
 
-    return sql, {"mes": mes, "modelo": modelo}
+    return sql, {"mes": mes, "modelo": modelo, "opp_stage": opp_stage}
 
 
 DATASET = {
