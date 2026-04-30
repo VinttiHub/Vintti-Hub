@@ -74,7 +74,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND (%(hasta)s::date IS NULL OR mo.mes_pick <= DATE_TRUNC('month', %(hasta)s::date))
         ),
         activos_inicio_detalle AS (
-          SELECT m.mes, m.fin_mes, c.*
+          SELECT
+            m.mes,
+            m.fin_mes,
+            c.candidate_id,
+            c.candidate_name,
+            c.client_name,
+            c.start_d,
+            c.end_d,
+            c.buyout_d
           FROM meses_filtrado m
           JOIN candidatos c
             ON c.start_d IS NOT NULL
@@ -82,7 +90,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            AND (c.end_d IS NULL OR c.end_d >= m.mes)
         ),
         altas_mes_detalle AS (
-          SELECT m.mes, m.fin_mes, c.*
+          SELECT
+            m.mes,
+            c.candidate_id,
+            c.candidate_name,
+            c.client_name,
+            c.start_d,
+            c.end_d
           FROM candidatos c
           JOIN meses_filtrado m
             ON c.start_d IS NOT NULL
@@ -90,12 +104,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         bajas_mes_detalle AS (
           SELECT
-            d.mes, d.fin_mes,
-            d.candidate_id, d.candidate_name, d.client_name, d.start_d, d.end_d,
+            d.mes,
+            d.candidate_id,
+            d.candidate_name,
+            d.client_name,
+            d.start_d,
+            d.end_d,
             CASE
               WHEN d.buyout_d IS NOT NULL AND d.buyout_d >= DATE_TRUNC('month', d.end_d)
-                THEN 'Baja – Buyout (Conversión)'
-              ELSE 'Baja – Real'
+                THEN 'Baja - Buyout (Conversion)'
+              ELSE 'Baja - Real'
             END AS estado
           FROM activos_inicio_detalle d
           WHERE d.end_d IS NOT NULL
@@ -104,12 +122,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         starts_y_bajas_mes AS (
           SELECT
-            m.mes, m.fin_mes,
-            c.candidate_id, c.candidate_name, c.client_name, c.start_d, c.end_d,
+            m.mes,
+            c.candidate_id,
+            c.candidate_name,
+            c.client_name,
+            c.start_d,
+            c.end_d,
             (CASE
               WHEN c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d)
-                THEN 'Baja – Buyout (Conversión)'
-              ELSE 'Baja – Real'
+                THEN 'Baja - Buyout (Conversion)'
+              ELSE 'Baja - Real'
             END) || ' (Start+End mismo mes)' AS estado
           FROM meses_filtrado m
           JOIN candidatos c
@@ -119,18 +141,40 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            AND c.end_d   >= m.mes AND c.end_d   <= m.fin_mes
         ),
         all_rows AS (
-          SELECT mes, candidate_id, candidate_name, client_name, start_d, end_d,
-                 'Activo al inicio'::text AS estado
+          SELECT
+            mes::date AS mes,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            'Activo al inicio'::text AS estado
           FROM activos_inicio_detalle
           UNION ALL
-          SELECT mes, candidate_id, candidate_name, client_name, start_d, end_d, estado
+          SELECT
+            mes::date AS mes,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            estado::text AS estado
           FROM bajas_mes_detalle
           UNION ALL
-          SELECT mes, candidate_id, candidate_name, client_name, start_d, end_d, estado
+          SELECT
+            mes::date AS mes,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            estado::text AS estado
           FROM starts_y_bajas_mes
           UNION ALL
-          SELECT mes, candidate_id, candidate_name, client_name, start_d, end_d,
-                 'Alta en el mes'::text AS estado
+          SELECT
+            mes::date AS mes,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            'Alta en el mes'::text AS estado
           FROM altas_mes_detalle
         )
         SELECT

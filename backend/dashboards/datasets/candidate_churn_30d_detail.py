@@ -64,7 +64,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_model = 'Staffing'
         ),
         activos_inicio AS (
-          SELECT v.win_ini, v.win_fin, c.*
+          SELECT
+            v.win_ini,
+            v.win_fin,
+            c.candidate_id,
+            c.candidate_name,
+            c.client_name,
+            c.start_d,
+            c.end_d,
+            c.buyout_d
           FROM candidatos c
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
@@ -73,12 +81,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         bajas_inicio AS (
           SELECT
-            d.win_ini, d.win_fin,
-            d.candidate_id, d.candidate_name, d.client_name, d.start_d, d.end_d,
+            d.win_ini,
+            d.candidate_name,
+            d.client_name,
+            d.start_d,
+            d.end_d,
             CASE
               WHEN d.buyout_d IS NOT NULL AND d.buyout_d >= DATE_TRUNC('month', d.end_d)
-                THEN 'Baja – Buyout (Conversión)'
-              ELSE 'Baja – Real'
+                THEN 'Baja - Buyout (Conversion)'
+              ELSE 'Baja - Real'
             END AS estado
           FROM activos_inicio d
           WHERE d.end_d IS NOT NULL
@@ -86,12 +97,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         bajas_starts AS (
           SELECT
-            v.win_ini, v.win_fin,
-            c.candidate_id, c.candidate_name, c.client_name, c.start_d, c.end_d,
+            v.win_ini,
+            c.candidate_name,
+            c.client_name,
+            c.start_d,
+            c.end_d,
             (CASE
               WHEN c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d)
-                THEN 'Baja – Buyout (Conversión)'
-              ELSE 'Baja – Real'
+                THEN 'Baja - Buyout (Conversion)'
+              ELSE 'Baja - Real'
             END) || ' (Start+End en ventana)' AS estado
           FROM candidatos c
           CROSS JOIN ventana v
@@ -101,25 +115,52 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND c.end_d   BETWEEN v.win_ini AND v.win_fin
         ),
         altas_ventana AS (
-          SELECT v.win_ini, v.win_fin, c.*
+          SELECT
+            v.win_ini,
+            c.candidate_name,
+            c.client_name,
+            c.start_d,
+            c.end_d
           FROM candidatos c
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
             AND c.start_d BETWEEN v.win_ini AND v.win_fin
         ),
         all_rows AS (
-          SELECT win_ini, win_fin, candidate_id, candidate_name, client_name, start_d, end_d,
-                 'Activo al inicio'::text AS estado
+          SELECT
+            win_ini::date AS win_ini,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            'Activo al inicio'::text AS estado
           FROM activos_inicio
           UNION ALL
-          SELECT win_ini, win_fin, candidate_id, candidate_name, client_name, start_d, end_d, estado
+          SELECT
+            win_ini::date AS win_ini,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            estado::text AS estado
           FROM bajas_inicio
           UNION ALL
-          SELECT win_ini, win_fin, candidate_id, candidate_name, client_name, start_d, end_d, estado
+          SELECT
+            win_ini::date AS win_ini,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            estado::text AS estado
           FROM bajas_starts
           UNION ALL
-          SELECT win_ini, win_fin, candidate_id, candidate_name, client_name, start_d, end_d,
-                 'Alta en ventana'::text AS estado
+          SELECT
+            win_ini::date AS win_ini,
+            candidate_name::text AS candidate_name,
+            client_name::text AS client_name,
+            start_d::date AS start_d,
+            end_d::date AS end_d,
+            'Alta en ventana'::text AS estado
           FROM altas_ventana
         )
         SELECT
