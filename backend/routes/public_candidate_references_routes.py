@@ -283,6 +283,13 @@ def _send_reference_notifications(cur, candidate_id, opportunity_id, merged, sub
         subject = f"Reference {ref_idx} received for {candidate_name} • {opportunity_name}"
         _send_email(subject, _reference_email_html(ctx, merged, [ref_idx]), recipients)
 
+    if len(submitted_refs) >= 2 and before_complete and after_complete:
+        combined_recipients = list(recipients)
+        if sales_lead:
+            combined_recipients.append(sales_lead)
+        subject = f"References updated for {candidate_name} • {opportunity_name}"
+        _send_email(subject, _reference_email_html(ctx, merged, [1, 2]), combined_recipients)
+
     if after_complete and not before_complete:
         combined_recipients = list(recipients)
         if sales_lead:
