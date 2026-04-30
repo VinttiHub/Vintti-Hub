@@ -311,9 +311,41 @@
       };
     });
 
+    const pieTotal = (type === 'pie' || type === 'donut')
+      ? aggregated.reduce((s, r) => s + (Number(r[ys[0]]) || 0), 0)
+      : 0;
+    const pieByName = new Map();
+    if (type === 'pie' || type === 'donut') {
+      aggregated.forEach(r => pieByName.set(String(r[mapping.x]), Number(r[ys[0]]) || 0));
+    }
+
     const option = (type === 'pie' || type === 'donut') ? {
-      tooltip: { trigger: 'item', valueFormatter: formatter },
-      legend: { bottom: 0 },
+      tooltip: {
+        trigger: 'item',
+        formatter: (p) => `${p.marker} ${p.name}: <b>${formatter(p.value)}</b> (${(p.percent ?? 0).toFixed(2)}%)`,
+      },
+      legend: {
+        bottom: 0,
+        formatter: (name) => {
+          const v = pieByName.get(String(name)) || 0;
+          const pct = pieTotal ? ((v * 100) / pieTotal).toFixed(2) : '0.00';
+          return `${name}  ${pct}%`;
+        },
+      },
+      graphic: type === 'donut' ? [{
+        type: 'text',
+        left: 'center',
+        top: 'middle',
+        style: {
+          text: `${formatter(pieTotal)}\nTotal`,
+          fill: '#0f172a',
+          fontSize: 16,
+          fontWeight: 600,
+          textAlign: 'center',
+          textVerticalAlign: 'middle',
+          lineHeight: 20,
+        },
+      }] : undefined,
       series,
     } : {
       tooltip: {

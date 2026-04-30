@@ -96,6 +96,8 @@ RESET_CHART_KEYS = {
         "sa_table_nda_30d_detail",
         "sa_bar_lead_source_month",
         "sa_bar_lead_source_30d",
+        "sa_donut_lead_source_30d",
+        "sa_table_lead_source_30d",
     ],
 }
 
@@ -548,6 +550,36 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 10, "w": 6, "h": 5},
         "sort_order": 60,
+    },
+    {
+        "chart_key": "sa_donut_lead_source_30d",
+        "tab_key": "sales",
+        "title": "Lead Source 30d",
+        "type": "donut",
+        "dataset_key": "nda_lead_source_30d_basic",
+        "config": {
+            "mapping": {
+                "x": "lead_source",
+                "y": ["total_closed_opps"],
+                "formatter": "number",
+            },
+        },
+        "position": {"x": 0, "y": 15, "w": 6, "h": 5},
+        "sort_order": 70,
+    },
+    {
+        "chart_key": "sa_table_lead_source_30d",
+        "tab_key": "sales",
+        "title": "Lead Source 30d - Detalle",
+        "type": "table",
+        "dataset_key": "nda_lead_source_30d_basic",
+        "config": {
+            "mapping": {
+                "columns": ["lead_source", "total_closed_opps", "close_win", "closed_lost"],
+            },
+        },
+        "position": {"x": 6, "y": 15, "w": 6, "h": 5},
+        "sort_order": 80,
     },
 
     # Operations
