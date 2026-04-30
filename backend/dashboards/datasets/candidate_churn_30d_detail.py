@@ -173,10 +173,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM all_rows
         ORDER BY
           CASE
-            WHEN estado = 'Alta en ventana'                  THEN 3
-            WHEN estado = 'Activo al inicio'                 THEN 2
-            WHEN estado LIKE 'Baja% (Start+End en ventana)'  THEN 1
-            WHEN estado LIKE 'Baja%'                         THEN 0
+            WHEN estado = 'Alta en ventana'                   THEN 3
+            WHEN estado = 'Activo al inicio'                  THEN 2
+            WHEN estado LIKE 'Baja%% (Start+End en ventana)'  THEN 1
+            WHEN estado LIKE 'Baja%%'                         THEN 0
             ELSE -1
           END DESC,
           client_name,

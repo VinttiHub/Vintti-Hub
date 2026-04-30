@@ -188,10 +188,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY
           mes,
           CASE
-            WHEN estado = 'Alta en el mes'                  THEN 3
-            WHEN estado = 'Activo al inicio'                THEN 2
-            WHEN estado LIKE 'Baja% (Start+End mismo mes)'  THEN 1
-            WHEN estado LIKE 'Baja%'                        THEN 0
+            WHEN estado = 'Alta en el mes'                    THEN 3
+            WHEN estado = 'Activo al inicio'                  THEN 2
+            WHEN estado LIKE 'Baja%% (Start+End mismo mes)'   THEN 1
+            WHEN estado LIKE 'Baja%%'                         THEN 0
             ELSE -1
           END DESC,
           client_name,
