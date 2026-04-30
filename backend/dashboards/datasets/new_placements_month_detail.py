@@ -36,7 +36,8 @@ def _resolve_modelo(filters: dict) -> str | None:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     mes = (
-        _parse_date(filters.get("fecha"))
+        _parse_date(filters.get("fecha_new_placements"))
+        or _parse_date(filters.get("fecha"))
         or _parse_date(filters.get("mes"))
         or _parse_date(filters.get("month"))
     )

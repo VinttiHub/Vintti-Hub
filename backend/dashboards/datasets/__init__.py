@@ -34,6 +34,8 @@ from . import (
     new_clients_30d_detail,
     new_placements_history,
     new_placements_month_detail,
+    placement_time_history,
+    placement_time_month_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -68,6 +70,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     new_clients_30d_detail.DATASET["key"]: new_clients_30d_detail.DATASET,
     new_placements_history.DATASET["key"]: new_placements_history.DATASET,
     new_placements_month_detail.DATASET["key"]: new_placements_month_detail.DATASET,
+    placement_time_history.DATASET["key"]: placement_time_history.DATASET,
+    placement_time_month_detail.DATASET["key"]: placement_time_month_detail.DATASET,
 }
 
 

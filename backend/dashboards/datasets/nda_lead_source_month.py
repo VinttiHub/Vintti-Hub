@@ -43,7 +43,8 @@ def _resolve_stage(filters: dict) -> str:
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     mes = (
-        _parse_date(filters.get("fecha"))
+        _parse_date(filters.get("fecha_nda"))
+        or _parse_date(filters.get("fecha"))
         or _parse_date(filters.get("mes"))
         or _parse_date(filters.get("month"))
     )
