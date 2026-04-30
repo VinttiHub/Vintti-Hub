@@ -38,6 +38,10 @@ from . import (
     placement_time_month_detail,
     placement_time_30d_summary,
     placement_time_30d_detail,
+    placement_time_repl_history,
+    placement_time_repl_month_detail,
+    placement_time_repl_30d_summary,
+    placement_time_repl_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -76,6 +80,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     placement_time_month_detail.DATASET["key"]: placement_time_month_detail.DATASET,
     placement_time_30d_summary.DATASET["key"]: placement_time_30d_summary.DATASET,
     placement_time_30d_detail.DATASET["key"]: placement_time_30d_detail.DATASET,
+    placement_time_repl_history.DATASET["key"]: placement_time_repl_history.DATASET,
+    placement_time_repl_month_detail.DATASET["key"]: placement_time_repl_month_detail.DATASET,
+    placement_time_repl_30d_summary.DATASET["key"]: placement_time_repl_30d_summary.DATASET,
+    placement_time_repl_30d_detail.DATASET["key"]: placement_time_repl_30d_detail.DATASET,
 }
 
 

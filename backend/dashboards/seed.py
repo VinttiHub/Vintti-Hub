@@ -113,6 +113,10 @@ RESET_CHART_KEYS = {
         "op_table_placement_time_detail",
         "op_kpi_placement_time_30d",
         "op_table_placement_time_30d_detail",
+        "op_line_placement_time_repl",
+        "op_table_placement_time_detail_repl",
+        "op_kpi_placement_time_30d_repl",
+        "op_table_placement_time_30d_detail_repl",
     ],
 }
 
@@ -776,6 +780,91 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 10, "w": 6, "h": 5},
         "sort_order": 60,
+    },
+    {
+        "chart_key": "op_line_placement_time_repl",
+        "tab_key": "operations",
+        "title": "Tiempo promedio de colocación (Replacement)",
+        "type": "line",
+        "dataset_key": "placement_time_repl_history",
+        "config": {
+            "mapping": {
+                "x": "mes_cierre",
+                "y": ["promedio_dias"],
+                "formatter": "number",
+                "drillKey": "fecha_placement_time_repl",
+                "tooltipExtras": ["opps_cerradas", "mediana_dias", "p90_dias"],
+            },
+        },
+        "position": {"x": 0, "y": 15, "w": 6, "h": 5},
+        "sort_order": 70,
+    },
+    {
+        "chart_key": "op_table_placement_time_detail_repl",
+        "tab_key": "operations",
+        "title": "Detalle - Tiempo promedio de colocación (Replacement)",
+        "type": "table",
+        "dataset_key": "placement_time_repl_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "month",
+                    "client_name",
+                    "opp_position_name",
+                    "opp_model",
+                    "close_result",
+                    "fecha_pedido",
+                    "fecha_cierre",
+                    "avg_days",
+                    "opportunity_id",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 15, "w": 6, "h": 5},
+        "sort_order": 80,
+    },
+    {
+        "chart_key": "op_kpi_placement_time_30d_repl",
+        "tab_key": "operations",
+        "title": "Promedio de días de colocación (Replacement) — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "placement_time_repl_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "promedio_dias", "label": "Promedio días", "formatter": "number"},
+                    {"key": "mediana_dias", "label": "Mediana días", "formatter": "number"},
+                    {"key": "p90_dias", "label": "P90 días", "formatter": "number"},
+                    {"key": "opps_cerradas", "label": "Opps cerradas", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 20, "w": 6, "h": 5},
+        "sort_order": 90,
+    },
+    {
+        "chart_key": "op_table_placement_time_30d_detail_repl",
+        "tab_key": "operations",
+        "title": "Detalle - 30 días (Replacement)",
+        "type": "table",
+        "dataset_key": "placement_time_repl_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "month",
+                    "client_name",
+                    "opp_position_name",
+                    "opp_model",
+                    "close_result",
+                    "fecha_pedido",
+                    "fecha_cierre",
+                    "avg_days",
+                    "opportunity_id",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 20, "w": 6, "h": 5},
+        "sort_order": 100,
     },
 ]
 
