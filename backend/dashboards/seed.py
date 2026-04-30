@@ -11,7 +11,6 @@ Usage (from repo root):
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -62,6 +61,10 @@ RETIRED_CHART_KEYS = {
         "gr_table_client_lifetime",
         "sa_donut_lead_source",
         "sa_bar_opps_close_month",
+        "am_area_new_clients_per_month",
+        "am_table_new_clients_month_detail",
+        "am_kpi_new_clients_30d",
+        "am_table_new_clients_30d_detail",
     ],
 }
 
@@ -98,10 +101,10 @@ RESET_CHART_KEYS = {
         "sa_bar_lead_source_30d",
         "sa_donut_lead_source_30d",
         "sa_table_lead_source_30d",
-        "am_area_new_clients_per_month",
-        "am_table_new_clients_month_detail",
-        "am_kpi_new_clients_30d",
-        "am_table_new_clients_30d_detail",
+        "sa_area_new_clients_per_month",
+        "sa_table_new_clients_month_detail",
+        "sa_kpi_new_clients_30d",
+        "sa_table_new_clients_30d_detail",
     ],
 }
 
@@ -438,61 +441,6 @@ MAIN_CHARTS = [
         "position": {"x": 8, "y": 0, "w": 4, "h": 2},
         "sort_order": 20,
     },
-    {
-        "chart_key": "am_area_new_clients_per_month",
-        "tab_key": "account-management",
-        "title": "New Clients Per Month",
-        "type": "area",
-        "dataset_key": "new_clients_history",
-        "config": {
-            "mapping": {
-                "x": "mes",
-                "y": ["new_clients"],
-                "formatter": "number",
-                "drillKey": "fecha",
-            },
-        },
-        "position": {"x": 0, "y": 5, "w": 6, "h": 5},
-        "sort_order": 30,
-    },
-    {
-        "chart_key": "am_table_new_clients_month_detail",
-        "tab_key": "account-management",
-        "title": "Details New Clients Per Month",
-        "type": "table",
-        "dataset_key": "new_clients_month_detail",
-        "config": {
-            "mapping": {
-                "columns": ["start_date", "client_name", "candidate_name"],
-            },
-        },
-        "position": {"x": 6, "y": 5, "w": 6, "h": 5},
-        "sort_order": 40,
-    },
-    {
-        "chart_key": "am_kpi_new_clients_30d",
-        "tab_key": "account-management",
-        "title": "Nuevos Clientes en ventana de 30 días",
-        "type": "kpi",
-        "dataset_key": "new_clients_30d_total",
-        "config": {"mapping": {"value": "new_clients_30d", "formatter": "number"}},
-        "position": {"x": 0, "y": 10, "w": 6, "h": 5},
-        "sort_order": 50,
-    },
-    {
-        "chart_key": "am_table_new_clients_30d_detail",
-        "tab_key": "account-management",
-        "title": "Detalle - 30",
-        "type": "table",
-        "dataset_key": "new_clients_30d_detail",
-        "config": {
-            "mapping": {
-                "columns": ["start_date", "client_name", "candidate_name"],
-            },
-        },
-        "position": {"x": 6, "y": 10, "w": 6, "h": 5},
-        "sort_order": 60,
-    },
 
     # Sales
     {
@@ -639,6 +587,61 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 15, "w": 6, "h": 5},
         "sort_order": 80,
+    },
+    {
+        "chart_key": "sa_area_new_clients_per_month",
+        "tab_key": "sales",
+        "title": "New Clients Per Month",
+        "type": "area",
+        "dataset_key": "new_clients_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["new_clients"],
+                "formatter": "number",
+                "drillKey": "fecha",
+            },
+        },
+        "position": {"x": 0, "y": 20, "w": 6, "h": 5},
+        "sort_order": 90,
+    },
+    {
+        "chart_key": "sa_table_new_clients_month_detail",
+        "tab_key": "sales",
+        "title": "Details New Clients Per Month",
+        "type": "table",
+        "dataset_key": "new_clients_month_detail",
+        "config": {
+            "mapping": {
+                "columns": ["start_date", "client_name", "candidate_name"],
+            },
+        },
+        "position": {"x": 6, "y": 20, "w": 6, "h": 5},
+        "sort_order": 100,
+    },
+    {
+        "chart_key": "sa_kpi_new_clients_30d",
+        "tab_key": "sales",
+        "title": "Nuevos Clientes en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "new_clients_30d_total",
+        "config": {"mapping": {"value": "new_clients_30d", "formatter": "number"}},
+        "position": {"x": 0, "y": 25, "w": 6, "h": 5},
+        "sort_order": 110,
+    },
+    {
+        "chart_key": "sa_table_new_clients_30d_detail",
+        "tab_key": "sales",
+        "title": "Detalle - 30",
+        "type": "table",
+        "dataset_key": "new_clients_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["start_date", "client_name", "candidate_name"],
+            },
+        },
+        "position": {"x": 6, "y": 25, "w": 6, "h": 5},
+        "sort_order": 120,
     },
 
     # Operations
