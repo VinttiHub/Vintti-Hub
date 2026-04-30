@@ -236,6 +236,21 @@
 
   function renderKpi(containerEl, chart, rows) {
     const mapping = (chart.config_json || {}).mapping || {};
+    // Multi-stat KPI: mapping.values = [{key,label,formatter}|"key", ...] reads first row.
+    if (Array.isArray(mapping.values) && mapping.values.length) {
+      const row = rows[0] || {};
+      const items = mapping.values.map(v => {
+        const key = typeof v === 'string' ? v : v.key;
+        const label = typeof v === 'string' ? v : (v.label || v.key);
+        const fmtName = (typeof v === 'object' && v.formatter) || mapping.formatter || 'number';
+        const fn = fmt.pick(fmtName);
+        const raw = row[key];
+        const display = (raw == null || raw === '') ? '—' : fn(raw);
+        return `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-top:1px solid rgba(15,23,42,.06)"><span style="font-size:.8rem;color:#64748b">${label}</span><span style="font-size:1.05rem;font-weight:600;color:#0f172a">${display}</span></div>`;
+      }).join('');
+      containerEl.innerHTML = `<h3>${chart.title}</h3><div style="display:flex;flex-direction:column;justify-content:center;height:100%">${items}</div>`;
+      return;
+    }
     const val = reduceSingle(rows, mapping);
     const formatter = fmt.pick(mapping.formatter || 'number');
     containerEl.innerHTML = `

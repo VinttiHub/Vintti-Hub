@@ -23,6 +23,8 @@ from . import (
     acpa_history,
     nda_to_clients_history,
     nda_to_clients_detail,
+    nda_to_clients_30d_summary,
+    nda_to_clients_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -46,6 +48,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     acpa_history.DATASET["key"]: acpa_history.DATASET,
     nda_to_clients_history.DATASET["key"]: nda_to_clients_history.DATASET,
     nda_to_clients_detail.DATASET["key"]: nda_to_clients_detail.DATASET,
+    nda_to_clients_30d_summary.DATASET["key"]: nda_to_clients_30d_summary.DATASET,
+    nda_to_clients_30d_detail.DATASET["key"]: nda_to_clients_30d_detail.DATASET,
 }
 
 

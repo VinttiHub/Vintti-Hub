@@ -92,6 +92,8 @@ RESET_CHART_KEYS = {
         "gr_combo_clients_candidates",
         "sa_line_nda_to_clients",
         "sa_table_nda_to_clients_detail",
+        "sa_kpi_nda_30d",
+        "sa_table_nda_30d_detail",
     ],
 }
 
@@ -469,6 +471,47 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 0, "w": 6, "h": 5},
         "sort_order": 20,
+    },
+    {
+        "chart_key": "sa_kpi_nda_30d",
+        "tab_key": "sales",
+        "title": "Conversión Global de NDA a Clientes — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "nda_to_clients_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "conversion_pct", "label": "Conversion %", "formatter": "percent"},
+                    {"key": "total_closed_opps", "label": "Total cerradas", "formatter": "number"},
+                    {"key": "close_win", "label": "Close Win", "formatter": "number"},
+                    {"key": "closed_lost", "label": "Closed Lost", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 5, "w": 6, "h": 5},
+        "sort_order": 30,
+    },
+    {
+        "chart_key": "sa_table_nda_30d_detail",
+        "tab_key": "sales",
+        "title": "Detalle - 30 días",
+        "type": "table",
+        "dataset_key": "nda_to_clients_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "lead_source",
+                    "opp_model",
+                    "nda_d_first_time",
+                    "close_d",
+                    "opp_stage",
+                    "is_unique_client_closed",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 5, "w": 6, "h": 5},
+        "sort_order": 40,
     },
 
     # Operations
