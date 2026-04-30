@@ -28,6 +28,10 @@ from . import (
     nda_lead_source_month,
     nda_lead_source_30d,
     nda_lead_source_30d_basic,
+    new_clients_history,
+    new_clients_month_detail,
+    new_clients_30d_total,
+    new_clients_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -56,6 +60,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     nda_lead_source_month.DATASET["key"]: nda_lead_source_month.DATASET,
     nda_lead_source_30d.DATASET["key"]: nda_lead_source_30d.DATASET,
     nda_lead_source_30d_basic.DATASET["key"]: nda_lead_source_30d_basic.DATASET,
+    new_clients_history.DATASET["key"]: new_clients_history.DATASET,
+    new_clients_month_detail.DATASET["key"]: new_clients_month_detail.DATASET,
+    new_clients_30d_total.DATASET["key"]: new_clients_30d_total.DATASET,
+    new_clients_30d_detail.DATASET["key"]: new_clients_30d_detail.DATASET,
 }
 
 

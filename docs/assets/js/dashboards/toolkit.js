@@ -297,16 +297,21 @@
       const echType = baseType === 'area' ? 'line'
                     : baseType === 'donut' ? 'pie'
                     : baseType;
+      const isPie = echType === 'pie';
       return {
         name: y,
         type: echType,
-        data: (echType === 'pie')
-          ? aggregated.map(r => ({ name: r[mapping.x], value: r[y] }))
+        data: isPie
+          ? aggregated.map((r, idx) => ({
+              name: r[mapping.x],
+              value: r[y],
+              itemStyle: { color: colorFor(idx) },
+            }))
           : aggregated.map(r => r[y]),
         smooth: (baseType === 'line' || baseType === 'area'),
         areaStyle: baseType === 'area' ? {} : undefined,
         radius: (baseType === 'donut') ? ['40%', '70%'] : undefined,
-        itemStyle: { color: colorFor(i) },
+        itemStyle: isPie ? undefined : { color: colorFor(i) },
         yAxisIndex: twin ? (i === 0 ? 0 : 1) : 0,
       };
     });
