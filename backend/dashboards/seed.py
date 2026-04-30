@@ -123,6 +123,10 @@ RESET_CHART_KEYS = {
         "am_table_client_churn_detail",
         "am_kpi_client_churn_30d",
         "am_table_client_churn_30d_detail",
+        "am_line_candidate_churn",
+        "am_table_candidate_churn_detail",
+        "am_kpi_candidate_churn_30d",
+        "am_table_candidate_churn_30d_detail",
     ],
 }
 
@@ -508,6 +512,74 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 5, "w": 6, "h": 5},
         "sort_order": 40,
+    },
+    {
+        "chart_key": "am_line_candidate_churn",
+        "tab_key": "account-management",
+        "title": "Candidatos",
+        "type": "line",
+        "dataset_key": "candidate_churn_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["activos_inicio", "bajas", "churn_pct"],
+                "formatter": "number",
+                "drillKey": "fecha_candidate_churn",
+                "tooltipExtras": ["bajas_real", "bajas_buyout", "churn_real_pct", "buyout_pct"],
+            },
+        },
+        "position": {"x": 0, "y": 10, "w": 6, "h": 5},
+        "sort_order": 50,
+    },
+    {
+        "chart_key": "am_table_candidate_churn_detail",
+        "tab_key": "account-management",
+        "title": "Details - Candidatos Churn",
+        "type": "table",
+        "dataset_key": "candidate_churn_month_detail",
+        "config": {
+            "mapping": {
+                "columns": ["mes", "client_name", "candidate_name", "start_d", "end_d", "estado"],
+            },
+        },
+        "position": {"x": 6, "y": 10, "w": 6, "h": 5},
+        "sort_order": 60,
+    },
+    {
+        "chart_key": "am_kpi_candidate_churn_30d",
+        "tab_key": "account-management",
+        "title": "Churn de candidatos (Staffing) — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "candidate_churn_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "candidatos_activos", "label": "Candidatos", "formatter": "number"},
+                    {"key": "bajas_real", "label": "Bajas Staffing", "formatter": "number"},
+                    {"key": "bajas_buyout", "label": "Bajas Buyout", "formatter": "number"},
+                    {"key": "bajas_total_staffing", "label": "Bajas Staffing + Buyout", "formatter": "number"},
+                    {"key": "churn_real_pct", "label": "Churn Staffing %", "formatter": "percent"},
+                    {"key": "buyout_pct", "label": "Churn Buyout %", "formatter": "percent"},
+                    {"key": "churn_total_staffing_pct", "label": "Churn Staffing + Buyout %", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 15, "w": 6, "h": 5},
+        "sort_order": 70,
+    },
+    {
+        "chart_key": "am_table_candidate_churn_30d_detail",
+        "tab_key": "account-management",
+        "title": "Details - Candidatos Churn - 30",
+        "type": "table",
+        "dataset_key": "candidate_churn_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["win_ini", "client_name", "candidate_name", "start_d", "end_d", "estado"],
+            },
+        },
+        "position": {"x": 6, "y": 15, "w": 6, "h": 5},
+        "sort_order": 80,
     },
 
     # Sales
