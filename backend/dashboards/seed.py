@@ -67,6 +67,8 @@ RETIRED_CHART_KEYS = {
         "am_table_new_clients_30d_detail",
         "op_bar_batches_by_month",
         "op_kpi_avg_sourcing_days",
+        "am_bar_opps_by_stage",
+        "am_kpi_close_win_count",
     ],
 }
 
@@ -117,6 +119,8 @@ RESET_CHART_KEYS = {
         "op_table_placement_time_detail_repl",
         "op_kpi_placement_time_30d_repl",
         "op_table_placement_time_30d_detail_repl",
+        "am_line_client_churn",
+        "am_table_client_churn_detail",
     ],
 }
 
@@ -431,26 +435,40 @@ MAIN_CHARTS = [
 
     # Account Management
     {
-        "chart_key": "am_bar_opps_by_stage",
+        "chart_key": "am_line_client_churn",
         "tab_key": "account-management",
-        "title": "Opportunities por Stage",
-        "type": "bar",
-        "dataset_key": "opportunities",
-        "config": {"mapping": {"x": "opp_stage", "y": ["opportunity_id"], "agg": "count", "formatter": "number"}},
-        "position": {"x": 0, "y": 0, "w": 8, "h": 5},
+        "title": "Clientes",
+        "type": "line",
+        "dataset_key": "client_churn_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["clientes_activos", "bajas_real", "churn_real_pct"],
+                "formatter": "number",
+                "drillKey": "fecha_client_churn",
+                "tooltipExtras": [
+                    "bajas_buyout",
+                    "bajas_total_staffing",
+                    "buyout_pct",
+                    "churn_total_staffing_pct",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 0, "w": 6, "h": 5},
         "sort_order": 10,
     },
     {
-        "chart_key": "am_kpi_close_win_count",
+        "chart_key": "am_table_client_churn_detail",
         "tab_key": "account-management",
-        "title": "Close Win (total)",
-        "type": "kpi",
-        "dataset_key": "opportunities",
+        "title": "Details - Clientes Churn",
+        "type": "table",
+        "dataset_key": "client_churn_month_detail",
         "config": {
-            "filters": {"stage": "Close Win"},
-            "mapping": {"value": "opportunity_id", "agg": "count", "formatter": "number"},
+            "mapping": {
+                "columns": ["mes", "client_name", "fecha_baja", "estado_cliente_mes"],
+            },
         },
-        "position": {"x": 8, "y": 0, "w": 4, "h": 2},
+        "position": {"x": 6, "y": 0, "w": 6, "h": 5},
         "sort_order": 20,
     },
 
