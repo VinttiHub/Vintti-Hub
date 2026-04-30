@@ -86,6 +86,8 @@ RESET_CHART_KEYS = {
         "gr_line_arpc",
         "gr_line_arpc_total",
         "gr_line_arpc_pct",
+        "gr_line_acpa",
+        "gr_combo_clients_candidates",
     ],
 }
 
@@ -271,6 +273,39 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 45, "w": 6, "h": 5},
         "sort_order": 180,
+    },
+    {
+        "chart_key": "gr_line_acpa",
+        "tab_key": "growth",
+        "title": "ACPA",
+        "type": "line",
+        "dataset_key": "acpa_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["acpa", "acpa_mom_pct"],
+                "formatter": "number",
+            },
+        },
+        "position": {"x": 0, "y": 50, "w": 6, "h": 5},
+        "sort_order": 190,
+    },
+    {
+        "chart_key": "gr_combo_clients_candidates",
+        "tab_key": "growth",
+        "title": "Clientes y Candidatos Activos",
+        "type": "line",
+        "dataset_key": "acpa_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["candidatos_activos", "cuentas_activas"],
+                "seriesTypes": ["line", "bar"],
+                "formatter": "number",
+            },
+        },
+        "position": {"x": 6, "y": 50, "w": 6, "h": 5},
+        "sort_order": 200,
     },
     {
         "chart_key": "gr_line_mrr",

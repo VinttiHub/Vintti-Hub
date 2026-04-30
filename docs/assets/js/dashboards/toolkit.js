@@ -275,19 +275,26 @@
       });
     }
 
+    const seriesTypes = Array.isArray(mapping.seriesTypes) ? mapping.seriesTypes : null;
     const categories = aggregated.map(r => r[mapping.x]);
-    const series = ys.map((y, i) => ({
-      name: y,
-      type: (type === 'area' ? 'line' : (type === 'donut' ? 'pie' : type)),
-      data: (type === 'pie' || type === 'donut')
-        ? aggregated.map(r => ({ name: r[mapping.x], value: r[y] }))
-        : aggregated.map(r => r[y]),
-      smooth: (type === 'line' || type === 'area'),
-      areaStyle: type === 'area' ? {} : undefined,
-      radius: (type === 'donut') ? ['40%', '70%'] : undefined,
-      itemStyle: { color: colorFor(i) },
-      yAxisIndex: twin ? (i === 0 ? 0 : 1) : 0,
-    }));
+    const series = ys.map((y, i) => {
+      const baseType = seriesTypes && seriesTypes[i] ? seriesTypes[i] : type;
+      const echType = baseType === 'area' ? 'line'
+                    : baseType === 'donut' ? 'pie'
+                    : baseType;
+      return {
+        name: y,
+        type: echType,
+        data: (echType === 'pie')
+          ? aggregated.map(r => ({ name: r[mapping.x], value: r[y] }))
+          : aggregated.map(r => r[y]),
+        smooth: (baseType === 'line' || baseType === 'area'),
+        areaStyle: baseType === 'area' ? {} : undefined,
+        radius: (baseType === 'donut') ? ['40%', '70%'] : undefined,
+        itemStyle: { color: colorFor(i) },
+        yAxisIndex: twin ? (i === 0 ? 0 : 1) : 0,
+      };
+    });
 
     const option = (type === 'pie' || type === 'donut') ? {
       tooltip: { trigger: 'item', valueFormatter: formatter },
