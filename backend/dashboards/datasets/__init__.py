@@ -21,6 +21,8 @@ from . import (
     arpa_history,
     arpc_history,
     acpa_history,
+    nda_to_clients_history,
+    nda_to_clients_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -42,6 +44,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     arpa_history.DATASET["key"]: arpa_history.DATASET,
     arpc_history.DATASET["key"]: arpc_history.DATASET,
     acpa_history.DATASET["key"]: acpa_history.DATASET,
+    nda_to_clients_history.DATASET["key"]: nda_to_clients_history.DATASET,
+    nda_to_clients_detail.DATASET["key"]: nda_to_clients_detail.DATASET,
 }
 
 

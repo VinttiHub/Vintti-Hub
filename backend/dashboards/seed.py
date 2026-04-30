@@ -60,6 +60,8 @@ RETIRED_CHART_KEYS = {
         "gr_line_tsr_tsf_history",
         "gr_line_mrr_growth",
         "gr_table_client_lifetime",
+        "sa_donut_lead_source",
+        "sa_bar_opps_close_month",
     ],
 }
 
@@ -88,6 +90,8 @@ RESET_CHART_KEYS = {
         "gr_line_arpc_pct",
         "gr_line_acpa",
         "gr_combo_clients_candidates",
+        "sa_line_nda_to_clients",
+        "sa_table_nda_to_clients_detail",
     ],
 }
 
@@ -427,22 +431,40 @@ MAIN_CHARTS = [
 
     # Sales
     {
-        "chart_key": "sa_donut_lead_source",
+        "chart_key": "sa_line_nda_to_clients",
         "tab_key": "sales",
-        "title": "Lead Source",
-        "type": "donut",
-        "dataset_key": "opportunities",
-        "config": {"mapping": {"x": "lead_source", "y": ["opportunity_id"], "agg": "count"}},
+        "title": "NDA a Clientes",
+        "type": "line",
+        "dataset_key": "nda_to_clients_history",
+        "config": {
+            "mapping": {
+                "x": "mes_close",
+                "y": ["conversion_pct"],
+                "formatter": "number",
+            },
+        },
         "position": {"x": 0, "y": 0, "w": 6, "h": 5},
         "sort_order": 10,
     },
     {
-        "chart_key": "sa_bar_opps_close_month",
+        "chart_key": "sa_table_nda_to_clients_detail",
         "tab_key": "sales",
-        "title": "Opportunities by Close Month",
-        "type": "bar",
-        "dataset_key": "opportunities",
-        "config": {"mapping": {"x": "opp_close_date", "y": ["opportunity_id"], "agg": "count", "bucket": "month"}},
+        "title": "Detalle",
+        "type": "table",
+        "dataset_key": "nda_to_clients_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "lead_source",
+                    "opp_model",
+                    "nda_d_first_time",
+                    "close_d",
+                    "opp_stage",
+                    "is_unique_client_closed",
+                ],
+            },
+        },
         "position": {"x": 6, "y": 0, "w": 6, "h": 5},
         "sort_order": 20,
     },
