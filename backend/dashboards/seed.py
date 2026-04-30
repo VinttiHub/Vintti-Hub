@@ -83,6 +83,9 @@ RESET_CHART_KEYS = {
         "gr_line_arpa_total",
         "gr_line_arpa_pct",
         "gr_bar_active_clients",
+        "gr_line_arpc",
+        "gr_line_arpc_total",
+        "gr_line_arpc_pct",
     ],
 }
 
@@ -220,6 +223,54 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 35, "w": 6, "h": 5},
         "sort_order": 150,
+    },
+    {
+        "chart_key": "gr_line_arpc",
+        "tab_key": "growth",
+        "title": "ARPC",
+        "type": "line",
+        "dataset_key": "arpc_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["arpc_revenue", "arpc_fee"],
+                "formatter": "currency",
+            },
+        },
+        "position": {"x": 0, "y": 40, "w": 6, "h": 5},
+        "sort_order": 160,
+    },
+    {
+        "chart_key": "gr_line_arpc_total",
+        "tab_key": "growth",
+        "title": "ARPC Total",
+        "type": "line",
+        "dataset_key": "arpc_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["revenue_total_mes", "fee_total_mes"],
+                "formatter": "currency",
+            },
+        },
+        "position": {"x": 6, "y": 40, "w": 6, "h": 5},
+        "sort_order": 170,
+    },
+    {
+        "chart_key": "gr_line_arpc_pct",
+        "tab_key": "growth",
+        "title": "% ARPC",
+        "type": "line",
+        "dataset_key": "arpc_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["arpc_revenue_mom_pct", "arpc_fee_mom_pct"],
+                "formatter": "percent",
+            },
+        },
+        "position": {"x": 0, "y": 45, "w": 6, "h": 5},
+        "sort_order": 180,
     },
     {
         "chart_key": "gr_line_mrr",

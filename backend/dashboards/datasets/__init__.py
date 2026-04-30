@@ -19,6 +19,7 @@ from . import (
     candidate_lifetime_detail,
     candidate_lifetime_avg,
     arpa_history,
+    arpc_history,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -38,6 +39,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     candidate_lifetime_detail.DATASET["key"]: candidate_lifetime_detail.DATASET,
     candidate_lifetime_avg.DATASET["key"]: candidate_lifetime_avg.DATASET,
     arpa_history.DATASET["key"]: arpa_history.DATASET,
+    arpc_history.DATASET["key"]: arpc_history.DATASET,
 }
 
 
