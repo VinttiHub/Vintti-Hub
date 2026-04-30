@@ -121,6 +121,8 @@ RESET_CHART_KEYS = {
         "op_table_placement_time_30d_detail_repl",
         "am_line_client_churn",
         "am_table_client_churn_detail",
+        "am_kpi_client_churn_30d",
+        "am_table_client_churn_30d_detail",
     ],
 }
 
@@ -470,6 +472,42 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 0, "w": 6, "h": 5},
         "sort_order": 20,
+    },
+    {
+        "chart_key": "am_kpi_client_churn_30d",
+        "tab_key": "account-management",
+        "title": "Churn de clientes (Staffing) — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "client_churn_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "clientes_activos", "label": "Clientes activos", "formatter": "number"},
+                    {"key": "bajas_real", "label": "Bajas Staffing", "formatter": "number"},
+                    {"key": "bajas_buyout", "label": "Bajas Buyout", "formatter": "number"},
+                    {"key": "bajas_total_staffing", "label": "Bajas Staffing + Buyout", "formatter": "number"},
+                    {"key": "churn_real_pct", "label": "Churn Staffing %", "formatter": "percent"},
+                    {"key": "buyout_pct", "label": "Churn Buyout %", "formatter": "percent"},
+                    {"key": "churn_total_staffing_pct", "label": "Churn Staffing + Buyout %", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 5, "w": 6, "h": 5},
+        "sort_order": 30,
+    },
+    {
+        "chart_key": "am_table_client_churn_30d_detail",
+        "tab_key": "account-management",
+        "title": "Details - Clientes Churn - 30",
+        "type": "table",
+        "dataset_key": "client_churn_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["win_ini", "win_fin", "client_name", "fecha_baja", "estado_cliente_ventana"],
+            },
+        },
+        "position": {"x": 6, "y": 5, "w": 6, "h": 5},
+        "sort_order": 40,
     },
 
     # Sales
