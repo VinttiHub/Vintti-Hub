@@ -223,6 +223,29 @@ def _fetch_reference_email_context(cur, candidate_id, opportunity_id=None):
             o.opp_sales_lead,
             COALESCE(a.client_name, 'Client') AS account_name
         FROM candidates c
+        JOIN opportunity_candidates oc ON oc.candidate_id = c.candidate_id
+        JOIN opportunity o ON o.opportunity_id = oc.opportunity_id
+        LEFT JOIN account a ON a.account_id = o.account_id
+        WHERE c.candidate_id = %s
+        ORDER BY o.opportunity_id DESC
+        LIMIT 1
+        """,
+        (candidate_id,),
+    )
+    row = cur.fetchone()
+    if row:
+        return row
+
+    cur.execute(
+        """
+        SELECT
+            c.name AS candidate_name,
+            o.opportunity_id,
+            o.opp_position_name,
+            o.opp_hr_lead,
+            o.opp_sales_lead,
+            COALESCE(a.client_name, 'Client') AS account_name
+        FROM candidates c
         LEFT JOIN hire_opportunity ho ON ho.candidate_id = c.candidate_id
         LEFT JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
         LEFT JOIN account a ON a.account_id = o.account_id
@@ -354,6 +377,28 @@ def _resolve_candidate_hire(cur, candidate_id, opportunity_id=None):
         LEFT JOIN account a ON a.account_id = ho.account_id
         WHERE ho.candidate_id = %s
         ORDER BY ho.start_date DESC NULLS LAST, ho.hire_opp_id DESC
+        LIMIT 1
+        """,
+        (candidate_id,),
+    )
+    row = cur.fetchone()
+    if row:
+        return row
+
+    cur.execute(
+        """
+        SELECT
+            c.candidate_id,
+            oc.opportunity_id,
+            o.account_id,
+            c.name AS candidate_name,
+            a.client_name AS account_name
+        FROM candidates c
+        JOIN opportunity_candidates oc ON oc.candidate_id = c.candidate_id
+        JOIN opportunity o ON o.opportunity_id = oc.opportunity_id
+        LEFT JOIN account a ON a.account_id = o.account_id
+        WHERE c.candidate_id = %s
+        ORDER BY o.opportunity_id DESC
         LIMIT 1
         """,
         (candidate_id,),
