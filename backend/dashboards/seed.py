@@ -81,6 +81,8 @@ RESET_CHART_KEYS = {
         "gr_kpi_candidate_lifetime_avg",
         "gr_line_arpa",
         "gr_line_arpa_total",
+        "gr_line_arpa_pct",
+        "gr_bar_active_clients",
     ],
 }
 
@@ -186,6 +188,38 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 30, "w": 6, "h": 5},
         "sort_order": 130,
+    },
+    {
+        "chart_key": "gr_line_arpa_pct",
+        "tab_key": "growth",
+        "title": "% ARPA",
+        "type": "line",
+        "dataset_key": "arpa_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["arpa_revenue_mom_pct", "arpa_fee_mom_pct"],
+                "formatter": "percent",
+            },
+        },
+        "position": {"x": 0, "y": 35, "w": 6, "h": 5},
+        "sort_order": 140,
+    },
+    {
+        "chart_key": "gr_bar_active_clients",
+        "tab_key": "growth",
+        "title": "Clientes Activos",
+        "type": "bar",
+        "dataset_key": "arpa_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["clientes_activos"],
+                "formatter": "number",
+            },
+        },
+        "position": {"x": 6, "y": 35, "w": 6, "h": 5},
+        "sort_order": 150,
     },
     {
         "chart_key": "gr_line_mrr",

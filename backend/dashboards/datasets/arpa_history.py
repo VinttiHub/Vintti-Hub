@@ -178,15 +178,44 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            )
           GROUP BY 1
         )
+        ,
+        base AS (
+          SELECT
+            c.mes,
+            c.clientes_activos,
+            ROUND(COALESCE(i.revenue_prorrateado, 0), 2) AS revenue_total_mes,
+            ROUND(COALESCE(i.fee_prorrateado, 0), 2)     AS fee_total_mes,
+            ROUND(COALESCE(i.revenue_prorrateado, 0) / NULLIF(c.clientes_activos, 0), 2) AS arpa_revenue,
+            ROUND(COALESCE(i.fee_prorrateado, 0)     / NULLIF(c.clientes_activos, 0), 2) AS arpa_fee
+          FROM clientes_activos c
+          LEFT JOIN ingresos_mes i USING (mes)
+        )
         SELECT
-          TO_CHAR(c.mes, 'YYYY-MM') AS mes,
-          c.clientes_activos::int   AS clientes_activos,
-          ROUND(COALESCE(i.revenue_prorrateado, 0), 2) AS revenue_total_mes,
-          ROUND(COALESCE(i.fee_prorrateado, 0), 2)     AS fee_total_mes,
-          ROUND(COALESCE(i.revenue_prorrateado, 0) / NULLIF(c.clientes_activos, 0), 2) AS arpa_revenue,
-          ROUND(COALESCE(i.fee_prorrateado, 0)     / NULLIF(c.clientes_activos, 0), 2) AS arpa_fee
-        FROM clientes_activos c
-        LEFT JOIN ingresos_mes i USING (mes)
+          TO_CHAR(b.mes, 'YYYY-MM') AS mes,
+          b.clientes_activos::int   AS clientes_activos,
+          b.revenue_total_mes,
+          b.fee_total_mes,
+          b.arpa_revenue,
+          b.arpa_fee,
+          ROUND(
+            CASE
+              WHEN LAG(b.arpa_revenue) OVER (ORDER BY b.mes) IS NULL
+                OR LAG(b.arpa_revenue) OVER (ORDER BY b.mes) = 0
+              THEN NULL
+              ELSE (b.arpa_revenue - LAG(b.arpa_revenue) OVER (ORDER BY b.mes))
+                   / LAG(b.arpa_revenue) OVER (ORDER BY b.mes) * 100
+            END, 2
+          ) AS arpa_revenue_mom_pct,
+          ROUND(
+            CASE
+              WHEN LAG(b.arpa_fee) OVER (ORDER BY b.mes) IS NULL
+                OR LAG(b.arpa_fee) OVER (ORDER BY b.mes) = 0
+              THEN NULL
+              ELSE (b.arpa_fee - LAG(b.arpa_fee) OVER (ORDER BY b.mes))
+                   / LAG(b.arpa_fee) OVER (ORDER BY b.mes) * 100
+            END, 2
+          ) AS arpa_fee_mom_pct
+        FROM base b
         ORDER BY 1;
     """
 
@@ -205,6 +234,8 @@ DATASET = {
         {"key": "fee_total_mes", "label": "Fee total mes", "type": "currency"},
         {"key": "arpa_revenue", "label": "ARPA Revenue", "type": "currency"},
         {"key": "arpa_fee", "label": "ARPA Fee", "type": "currency"},
+        {"key": "arpa_revenue_mom_pct", "label": "ARPA Revenue MoM %", "type": "percent"},
+        {"key": "arpa_fee_mom_pct", "label": "ARPA Fee MoM %", "type": "percent"},
     ],
     "default_filters": {},
     "query": query,
