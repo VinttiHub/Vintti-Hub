@@ -111,6 +111,8 @@ RESET_CHART_KEYS = {
         "op_table_new_placements_detail",
         "op_line_placement_time",
         "op_table_placement_time_detail",
+        "op_kpi_placement_time_30d",
+        "op_table_placement_time_30d_detail",
     ],
 }
 
@@ -731,6 +733,49 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 5, "w": 6, "h": 5},
         "sort_order": 40,
+    },
+    {
+        "chart_key": "op_kpi_placement_time_30d",
+        "tab_key": "operations",
+        "title": "Promedio de días de colocación — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "placement_time_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "promedio_dias", "label": "Promedio días", "formatter": "number"},
+                    {"key": "mediana_dias", "label": "Mediana días", "formatter": "number"},
+                    {"key": "p90_dias", "label": "P90 días", "formatter": "number"},
+                    {"key": "opps_cerradas", "label": "Opps cerradas", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 10, "w": 6, "h": 5},
+        "sort_order": 50,
+    },
+    {
+        "chart_key": "op_table_placement_time_30d_detail",
+        "tab_key": "operations",
+        "title": "Detalle - 30 días",
+        "type": "table",
+        "dataset_key": "placement_time_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "month",
+                    "client_name",
+                    "opp_position_name",
+                    "opp_model",
+                    "close_result",
+                    "fecha_pedido",
+                    "fecha_cierre",
+                    "avg_days",
+                    "opportunity_id",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 10, "w": 6, "h": 5},
+        "sort_order": 60,
     },
 ]
 
