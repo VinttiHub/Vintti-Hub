@@ -94,6 +94,8 @@ RESET_CHART_KEYS = {
         "sa_table_nda_to_clients_detail",
         "sa_kpi_nda_30d",
         "sa_table_nda_30d_detail",
+        "sa_bar_lead_source_month",
+        "sa_bar_lead_source_30d",
     ],
 }
 
@@ -512,6 +514,40 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 5, "w": 6, "h": 5},
         "sort_order": 40,
+    },
+    {
+        "chart_key": "sa_bar_lead_source_month",
+        "tab_key": "sales",
+        "title": "Lead Source x Close Win/Closed Lost",
+        "type": "bar",
+        "dataset_key": "nda_lead_source_month",
+        "config": {
+            "mapping": {
+                "x": "lead_source",
+                "y": ["pct_of_selected_stage"],
+                "formatter": "percent",
+                "tooltipExtras": ["total_closed_opps", "close_win", "closed_lost", "unique_clients"],
+            },
+        },
+        "position": {"x": 0, "y": 10, "w": 6, "h": 5},
+        "sort_order": 50,
+    },
+    {
+        "chart_key": "sa_bar_lead_source_30d",
+        "tab_key": "sales",
+        "title": "Lead Source x Close Win/Closed Lost - 30d",
+        "type": "bar",
+        "dataset_key": "nda_lead_source_30d",
+        "config": {
+            "mapping": {
+                "x": "lead_source",
+                "y": ["pct_of_selected_stage"],
+                "formatter": "percent",
+                "tooltipExtras": ["total_closed_opps", "close_win", "closed_lost", "unique_clients"],
+            },
+        },
+        "position": {"x": 6, "y": 10, "w": 6, "h": 5},
+        "sort_order": 60,
     },
 
     # Operations
