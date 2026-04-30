@@ -179,7 +179,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           GROUP BY 1
         )
         ,
-        base AS (
+        arpa_per_mes AS (
           SELECT
             c.mes,
             c.clientes_activos,
@@ -191,31 +191,31 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           LEFT JOIN ingresos_mes i USING (mes)
         )
         SELECT
-          TO_CHAR(b.mes, 'YYYY-MM') AS mes,
-          b.clientes_activos::int   AS clientes_activos,
-          b.revenue_total_mes,
-          b.fee_total_mes,
-          b.arpa_revenue,
-          b.arpa_fee,
+          TO_CHAR(p.mes, 'YYYY-MM') AS mes,
+          p.clientes_activos::int   AS clientes_activos,
+          p.revenue_total_mes,
+          p.fee_total_mes,
+          p.arpa_revenue,
+          p.arpa_fee,
           ROUND(
             CASE
-              WHEN LAG(b.arpa_revenue) OVER (ORDER BY b.mes) IS NULL
-                OR LAG(b.arpa_revenue) OVER (ORDER BY b.mes) = 0
+              WHEN LAG(p.arpa_revenue) OVER (ORDER BY p.mes) IS NULL
+                OR LAG(p.arpa_revenue) OVER (ORDER BY p.mes) = 0
               THEN NULL
-              ELSE (b.arpa_revenue - LAG(b.arpa_revenue) OVER (ORDER BY b.mes))
-                   / LAG(b.arpa_revenue) OVER (ORDER BY b.mes) * 100
+              ELSE (p.arpa_revenue - LAG(p.arpa_revenue) OVER (ORDER BY p.mes))
+                   / LAG(p.arpa_revenue) OVER (ORDER BY p.mes) * 100
             END, 2
           ) AS arpa_revenue_mom_pct,
           ROUND(
             CASE
-              WHEN LAG(b.arpa_fee) OVER (ORDER BY b.mes) IS NULL
-                OR LAG(b.arpa_fee) OVER (ORDER BY b.mes) = 0
+              WHEN LAG(p.arpa_fee) OVER (ORDER BY p.mes) IS NULL
+                OR LAG(p.arpa_fee) OVER (ORDER BY p.mes) = 0
               THEN NULL
-              ELSE (b.arpa_fee - LAG(b.arpa_fee) OVER (ORDER BY b.mes))
-                   / LAG(b.arpa_fee) OVER (ORDER BY b.mes) * 100
+              ELSE (p.arpa_fee - LAG(p.arpa_fee) OVER (ORDER BY p.mes))
+                   / LAG(p.arpa_fee) OVER (ORDER BY p.mes) * 100
             END, 2
           ) AS arpa_fee_mom_pct
-        FROM base b
+        FROM arpa_per_mes p
         ORDER BY 1;
     """
 
