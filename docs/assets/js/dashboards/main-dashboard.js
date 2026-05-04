@@ -80,9 +80,10 @@
           { value: 'recruiting', label: 'Recruiting' },
           { value: 'staffing',   label: 'Staffing' },
         ]},
-        { type: 'select', key: 'metric', label: 'MRR Metric', options: [
-          { value: 'Revenue', label: 'Revenue (TSR)' },
-          { value: 'Fee',     label: 'Fee (TSF)' },
+        { type: 'select', key: 'metric', label: 'Metric', options: [
+          { value: 'All',     label: 'All' },
+          { value: 'Revenue', label: 'Revenue' },
+          { value: 'Fee',     label: 'Fee' },
         ]},
         { type: 'select', key: 'opp_stage', label: 'Stage', options: [
           { value: 'Close Win',   label: 'Close Win' },

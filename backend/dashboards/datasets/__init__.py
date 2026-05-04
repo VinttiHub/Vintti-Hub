@@ -77,6 +77,10 @@ from . import (
     risk_score_by_label,
     risk_score_detail,
     risk_score_distribution,
+    nrr_history,
+    nrr_month_detail,
+    nrr_30d_summary,
+    nrr_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -154,6 +158,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     risk_score_by_label.DATASET["key"]: risk_score_by_label.DATASET,
     risk_score_detail.DATASET["key"]: risk_score_detail.DATASET,
     risk_score_distribution.DATASET["key"]: risk_score_distribution.DATASET,
+    nrr_history.DATASET["key"]: nrr_history.DATASET,
+    nrr_month_detail.DATASET["key"]: nrr_month_detail.DATASET,
+    nrr_30d_summary.DATASET["key"]: nrr_30d_summary.DATASET,
+    nrr_30d_detail.DATASET["key"]: nrr_30d_detail.DATASET,
 }
 
 

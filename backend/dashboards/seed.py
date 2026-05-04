@@ -159,6 +159,10 @@ RESET_CHART_KEYS = {
         "am_table_risk_score_detail",
         "am_bar_risk_score_points",
         "am_bar_risk_score_distribution",
+        "am_line_nrr",
+        "am_table_nrr_month_detail",
+        "am_kpi_nrr_30d",
+        "am_table_nrr_30d_detail",
     ],
 }
 
@@ -1194,6 +1198,97 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 85, "w": 6, "h": 5},
         "sort_order": 400,
+    },
+    {
+        "chart_key": "am_line_nrr",
+        "tab_key": "account-management",
+        "title": "NRR",
+        "type": "line",
+        "dataset_key": "nrr_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["nrr_pct"],
+                "formatter": "number",
+                "drillKey": "fecha_nrr",
+                "tooltipExtras": [
+                    "mrr_inicial",
+                    "upsells_lara",
+                    "downgrades_recorte",
+                    "churn_no_recorte",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 90, "w": 6, "h": 5},
+        "sort_order": 410,
+    },
+    {
+        "chart_key": "am_table_nrr_month_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - NRR",
+        "type": "table",
+        "dataset_key": "nrr_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "mes",
+                    "componente",
+                    "client_name",
+                    "candidate_name",
+                    "opportunity_id",
+                    "start_d",
+                    "end_d",
+                    "inactive_reason",
+                    "monto",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 90, "w": 6, "h": 5},
+        "sort_order": 420,
+    },
+    {
+        "chart_key": "am_kpi_nrr_30d",
+        "tab_key": "account-management",
+        "title": "NRR en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "nrr_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "mrr_inicial", "label": "MRR", "formatter": "currency"},
+                    {"key": "upsells_lara", "label": "Upsells", "formatter": "currency"},
+                    {"key": "downgrades_recorte", "label": "Downgrades", "formatter": "currency"},
+                    {"key": "churn_no_recorte", "label": "Churn", "formatter": "currency"},
+                    {"key": "nrr_pct", "label": "NRR %", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 95, "w": 6, "h": 5},
+        "sort_order": 430,
+    },
+    {
+        "chart_key": "am_table_nrr_30d_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - 30d",
+        "type": "table",
+        "dataset_key": "nrr_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "mes",
+                    "componente",
+                    "client_name",
+                    "candidate_name",
+                    "opportunity_id",
+                    "start_d",
+                    "end_d",
+                    "inactive_reason",
+                    "monto",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 95, "w": 6, "h": 5},
+        "sort_order": 440,
     },
 
     # Sales
