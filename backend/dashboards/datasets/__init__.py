@@ -54,6 +54,10 @@ from . import (
     candidate_churn_window_month_detail,
     candidate_churn_window_summary,
     candidate_churn_window_detail,
+    crr_history,
+    crr_month_detail,
+    crr_30d_summary,
+    crr_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -108,6 +112,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     candidate_churn_window_month_detail.DATASET["key"]: candidate_churn_window_month_detail.DATASET,
     candidate_churn_window_summary.DATASET["key"]: candidate_churn_window_summary.DATASET,
     candidate_churn_window_detail.DATASET["key"]: candidate_churn_window_detail.DATASET,
+    crr_history.DATASET["key"]: crr_history.DATASET,
+    crr_month_detail.DATASET["key"]: crr_month_detail.DATASET,
+    crr_30d_summary.DATASET["key"]: crr_30d_summary.DATASET,
+    crr_30d_detail.DATASET["key"]: crr_30d_detail.DATASET,
 }
 
 
