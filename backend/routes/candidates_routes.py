@@ -1168,16 +1168,26 @@ def get_candidate_by_id(candidate_id):
 @bp.route('/candidates/<int:candidate_id>/hire_opportunity', methods=['GET'])
 def get_hire_opportunity(candidate_id):
     """
-    Returns the opportunity_id and opp_model for the candidate based on the
-    hire_opportunity table, not the opportunity.candidato_contratado column.
-    If multiple hire_opportunity rows exist for the candidate, the most recent
-    one is returned (by hire_opportunity_id DESC).
+    Returns the primary opportunity_id and opp_model for the candidate.
+    Prefer the opportunity where this candidate is currently marked as hired
+    in opportunity.candidato_contratado. Fallback to the most recent
+    hire_opportunity row if no current hired opportunity is set.
     """
     try:
         conn = get_connection()
         cur = conn.cursor()
 
         cur.execute("""
+            SELECT opportunity_id, opp_model
+            FROM opportunity
+            WHERE candidato_contratado = %s
+            ORDER BY opportunity_id DESC
+            LIMIT 1;
+        """, (candidate_id,))
+
+        row = cur.fetchone()
+        if not row:
+            cur.execute("""
             SELECT o.opportunity_id, o.opp_model
             FROM hire_opportunity h
             JOIN opportunity o ON o.opportunity_id = h.opportunity_id
@@ -1185,8 +1195,7 @@ def get_hire_opportunity(candidate_id):
             ORDER BY h.start_date DESC NULLS LAST, h.hire_opp_id DESC
             LIMIT 1;
         """, (candidate_id,))
-
-        row = cur.fetchone()
+            row = cur.fetchone()
         if not row:
             cur.close(); conn.close()
             return jsonify({}), 404
@@ -1452,8 +1461,18 @@ def handle_candidate_hire_data(candidate_id):
                 """, (opp_id_param,))
                 opp = cur.fetchone()
             else:
-                # fallback: the latest hire_opportunity row for this candidate
                 cur.execute("""
+                    SELECT opportunity_id, opp_model, account_id
+                    FROM opportunity
+                    WHERE candidato_contratado = %s
+                    ORDER BY opportunity_id DESC
+                    LIMIT 1
+                """, (candidate_id,))
+                opp = cur.fetchone()
+
+                if not opp:
+                    # fallback: the latest hire_opportunity row for this candidate
+                    cur.execute("""
                     SELECT
                         o.opportunity_id,
                         o.opp_model,
@@ -1464,15 +1483,6 @@ def handle_candidate_hire_data(candidate_id):
                     ORDER BY h.start_date DESC NULLS LAST, h.hire_opp_id DESC
                     LIMIT 1
                 """, (candidate_id,))
-                opp = cur.fetchone()
-                if not opp:
-                    cur.execute("""
-                        SELECT opportunity_id, opp_model, account_id
-                        FROM opportunity
-                        WHERE candidato_contratado = %s
-                        ORDER BY opportunity_id DESC
-                        LIMIT 1
-                    """, (candidate_id,))
                     opp = cur.fetchone()
 
             if not opp:
