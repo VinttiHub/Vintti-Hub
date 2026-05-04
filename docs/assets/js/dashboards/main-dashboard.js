@@ -97,6 +97,11 @@
           { value: '6', label: '6 meses' },
           { value: '12', label: '12 meses' },
         ]},
+        { type: 'select', key: 'segmento', label: 'Segmento', options: [
+          { value: 'Total', label: 'Total' },
+          { value: 'Staffing', label: 'Staffing' },
+          { value: 'Recruiting', label: 'Recruiting' },
+        ]},
       ],
     });
   }

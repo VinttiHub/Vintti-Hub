@@ -146,6 +146,11 @@ RESET_CHART_KEYS = {
         "am_kpi_lara_winrate_30d",
         "am_kpi_lara_winrate_30d_breakdown",
         "am_table_lara_winrate_30d_detail",
+        "am_line_clients_multi",
+        "am_table_clients_multi_month_detail",
+        "am_kpi_clients_multi_30d",
+        "am_kpi_clients_multi_30d_breakdown",
+        "am_table_clients_multi_30d_detail",
     ],
 }
 
@@ -876,6 +881,7 @@ MAIN_CHARTS = [
                 "y": ["conversion_pct"],
                 "formatter": "number",
                 "drillKey": "fecha_lara",
+                "tooltipExtras": ["total_closed", "close_win", "closed_lost"],
             },
         },
         "position": {"x": 0, "y": 50, "w": 6, "h": 5},
@@ -951,6 +957,79 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 55, "w": 6, "h": 5},
         "sort_order": 270,
+    },
+    {
+        "chart_key": "am_line_clients_multi",
+        "tab_key": "account-management",
+        "title": "% Clientes > 1 candidato",
+        "type": "line",
+        "dataset_key": "clients_multi_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["pct_percent"],
+                "formatter": "number",
+                "drillKey": "fecha_clients_multi",
+                "tooltipExtras": ["clientes_activos", "mayor_a_1"],
+            },
+        },
+        "position": {"x": 0, "y": 60, "w": 6, "h": 5},
+        "sort_order": 280,
+    },
+    {
+        "chart_key": "am_table_clients_multi_month_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - % Clientes > 1 candidato",
+        "type": "table",
+        "dataset_key": "clients_multi_month_detail",
+        "config": {
+            "mapping": {
+                "columns": ["mes", "client_name", "candidate_name"],
+            },
+        },
+        "position": {"x": 6, "y": 60, "w": 6, "h": 5},
+        "sort_order": 290,
+    },
+    {
+        "chart_key": "am_kpi_clients_multi_30d",
+        "tab_key": "account-management",
+        "title": "Conversión Global en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "clients_multi_30d_summary",
+        "config": {"mapping": {"value": "pct_percent", "formatter": "percent"}},
+        "position": {"x": 0, "y": 65, "w": 3, "h": 5},
+        "sort_order": 300,
+    },
+    {
+        "chart_key": "am_kpi_clients_multi_30d_breakdown",
+        "tab_key": "account-management",
+        "title": "Detalle % - 30 días",
+        "type": "kpi",
+        "dataset_key": "clients_multi_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "clientes_activos", "label": "Clientes activos", "formatter": "number"},
+                    {"key": "mayor_a_1", "label": "Clientes > 1", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 3, "y": 65, "w": 3, "h": 5},
+        "sort_order": 310,
+    },
+    {
+        "chart_key": "am_table_clients_multi_30d_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - 30",
+        "type": "table",
+        "dataset_key": "clients_multi_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["periodo", "client_name", "candidate_name"],
+            },
+        },
+        "position": {"x": 6, "y": 65, "w": 6, "h": 5},
+        "sort_order": 320,
     },
 
     # Sales
