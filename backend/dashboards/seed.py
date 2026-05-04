@@ -151,6 +151,10 @@ RESET_CHART_KEYS = {
         "am_kpi_clients_multi_30d",
         "am_kpi_clients_multi_30d_breakdown",
         "am_table_clients_multi_30d_detail",
+        "am_line_headcount_growth",
+        "am_table_headcount_growth_month_detail",
+        "am_kpi_headcount_growth_30d",
+        "am_table_headcount_growth_30d_detail",
     ],
 }
 
@@ -1030,6 +1034,90 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 65, "w": 6, "h": 5},
         "sort_order": 320,
+    },
+    {
+        "chart_key": "am_line_headcount_growth",
+        "tab_key": "account-management",
+        "title": "Headcount Growth",
+        "type": "line",
+        "dataset_key": "headcount_growth_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["pct_activos_que_aumentaron", "pct_activos_paso_1_a_2_o_mas"],
+                "formatter": "number",
+                "drillKey": "fecha_headcount",
+                "tooltipExtras": [
+                    "clientes_activos",
+                    "clientes_que_aumentaron",
+                    "pasaron_de_1_a_2_o_mas",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 70, "w": 6, "h": 5},
+        "sort_order": 330,
+    },
+    {
+        "chart_key": "am_table_headcount_growth_month_detail",
+        "tab_key": "account-management",
+        "title": "Headcount Growth - Modificados",
+        "type": "table",
+        "dataset_key": "headcount_growth_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "mes",
+                    "client_name",
+                    "candidatos_prev",
+                    "candidatos_activos",
+                    "aumento",
+                    "paso_1_a_2_o_mas",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 70, "w": 6, "h": 5},
+        "sort_order": 340,
+    },
+    {
+        "chart_key": "am_kpi_headcount_growth_30d",
+        "tab_key": "account-management",
+        "title": "Headcount Growth - 30d",
+        "type": "kpi",
+        "dataset_key": "headcount_growth_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "clientes_activos", "label": "Clientes activos", "formatter": "number"},
+                    {"key": "clientes_que_aumentaron", "label": "Aumentaron", "formatter": "number"},
+                    {"key": "pasaron_de_1_a_2_o_mas", "label": "1→2+", "formatter": "number"},
+                    {"key": "pct_activos_que_aumentaron", "label": "% aumentaron", "formatter": "percent"},
+                    {"key": "pct_activos_paso_1_a_2_o_mas", "label": "% 1→2+", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 75, "w": 6, "h": 5},
+        "sort_order": 350,
+    },
+    {
+        "chart_key": "am_table_headcount_growth_30d_detail",
+        "tab_key": "account-management",
+        "title": "Headcount Growth - 30",
+        "type": "table",
+        "dataset_key": "headcount_growth_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "cutoff",
+                    "client_name",
+                    "candidatos_prev",
+                    "candidatos_activos",
+                    "aumento",
+                    "paso_1_a_2_o_mas",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 75, "w": 6, "h": 5},
+        "sort_order": 360,
     },
 
     # Sales

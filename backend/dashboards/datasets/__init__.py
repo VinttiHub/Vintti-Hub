@@ -70,6 +70,10 @@ from . import (
     clients_multi_month_detail,
     clients_multi_30d_summary,
     clients_multi_30d_detail,
+    headcount_growth_history,
+    headcount_growth_month_detail,
+    headcount_growth_30d_summary,
+    headcount_growth_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -140,6 +144,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     clients_multi_month_detail.DATASET["key"]: clients_multi_month_detail.DATASET,
     clients_multi_30d_summary.DATASET["key"]: clients_multi_30d_summary.DATASET,
     clients_multi_30d_detail.DATASET["key"]: clients_multi_30d_detail.DATASET,
+    headcount_growth_history.DATASET["key"]: headcount_growth_history.DATASET,
+    headcount_growth_month_detail.DATASET["key"]: headcount_growth_month_detail.DATASET,
+    headcount_growth_30d_summary.DATASET["key"]: headcount_growth_30d_summary.DATASET,
+    headcount_growth_30d_detail.DATASET["key"]: headcount_growth_30d_detail.DATASET,
 }
 
 
