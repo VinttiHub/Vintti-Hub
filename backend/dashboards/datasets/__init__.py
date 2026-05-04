@@ -62,6 +62,10 @@ from . import (
     replacements_detail,
     replacements_history,
     replacements_month_detail,
+    lara_winrate_history,
+    lara_winrate_month_detail,
+    lara_winrate_30d_summary,
+    lara_winrate_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -124,6 +128,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     replacements_detail.DATASET["key"]: replacements_detail.DATASET,
     replacements_history.DATASET["key"]: replacements_history.DATASET,
     replacements_month_detail.DATASET["key"]: replacements_month_detail.DATASET,
+    lara_winrate_history.DATASET["key"]: lara_winrate_history.DATASET,
+    lara_winrate_month_detail.DATASET["key"]: lara_winrate_month_detail.DATASET,
+    lara_winrate_30d_summary.DATASET["key"]: lara_winrate_30d_summary.DATASET,
+    lara_winrate_30d_detail.DATASET["key"]: lara_winrate_30d_detail.DATASET,
 }
 
 

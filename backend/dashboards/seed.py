@@ -141,6 +141,11 @@ RESET_CHART_KEYS = {
         "am_table_replacements_detail",
         "am_line_replacements_pct",
         "am_table_replacements_month_detail",
+        "am_line_lara_winrate",
+        "am_table_lara_winrate_month_detail",
+        "am_kpi_lara_winrate_30d",
+        "am_kpi_lara_winrate_30d_breakdown",
+        "am_table_lara_winrate_30d_detail",
     ],
 }
 
@@ -785,13 +790,6 @@ MAIN_CHARTS = [
                 "x": "cohorte_mes",
                 "y": ["start_candidate", "stay_candidate", "retention"],
                 "formatter": "number",
-                "tooltipExtras": [
-                    "start_candidate_total",
-                    "umbral_meses",
-                    "ventana_inicio_mes",
-                    "ventana_fin_mes",
-                    "eligible_n",
-                ],
             },
         },
         "position": {"x": 0, "y": 40, "w": 6, "h": 5},
@@ -834,10 +832,8 @@ MAIN_CHARTS = [
                 "formatter": "number",
                 "drillKey": "fecha_replacements",
                 "tooltipExtras": [
-                    "opp_model",
                     "replacements",
                     "total_closed",
-                    "avg_days_to_replace",
                 ],
             },
         },
@@ -867,6 +863,94 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 45, "w": 6, "h": 5},
         "sort_order": 220,
+    },
+    {
+        "chart_key": "am_line_lara_winrate",
+        "tab_key": "account-management",
+        "title": "Win Rate Re contrataciones",
+        "type": "line",
+        "dataset_key": "lara_winrate_history",
+        "config": {
+            "mapping": {
+                "x": "mes_close",
+                "y": ["conversion_pct"],
+                "formatter": "number",
+                "drillKey": "fecha_lara",
+            },
+        },
+        "position": {"x": 0, "y": 50, "w": 6, "h": 5},
+        "sort_order": 230,
+    },
+    {
+        "chart_key": "am_table_lara_winrate_month_detail",
+        "tab_key": "account-management",
+        "title": "Detalle - Win Rate Re contrataciones",
+        "type": "table",
+        "dataset_key": "lara_winrate_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "opp_position_name",
+                    "nda_d",
+                    "close_d",
+                    "opp_stage",
+                    "dias_nda_a_close",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 50, "w": 6, "h": 5},
+        "sort_order": 240,
+    },
+    {
+        "chart_key": "am_kpi_lara_winrate_30d",
+        "tab_key": "account-management",
+        "title": "% de conversión de Client a Close Win en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "lara_winrate_30d_summary",
+        "config": {"mapping": {"value": "conversion_30d_pct", "formatter": "percent"}},
+        "position": {"x": 0, "y": 55, "w": 3, "h": 5},
+        "sort_order": 250,
+    },
+    {
+        "chart_key": "am_kpi_lara_winrate_30d_breakdown",
+        "tab_key": "account-management",
+        "title": "Detalle 30d",
+        "type": "kpi",
+        "dataset_key": "lara_winrate_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "total_closed", "label": "Total cerradas", "formatter": "number"},
+                    {"key": "close_win", "label": "Close Win", "formatter": "number"},
+                    {"key": "closed_lost", "label": "Closed Lost", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 3, "y": 55, "w": 3, "h": 5},
+        "sort_order": 260,
+    },
+    {
+        "chart_key": "am_table_lara_winrate_30d_detail",
+        "tab_key": "account-management",
+        "title": "Detalle Win Rate Re contrataciones - 30",
+        "type": "table",
+        "dataset_key": "lara_winrate_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "opp_position_name",
+                    "nda_d",
+                    "close_d",
+                    "opp_stage",
+                    "estado_final",
+                    "dias_nda_a_close",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 55, "w": 6, "h": 5},
+        "sort_order": 270,
     },
 
     # Sales
