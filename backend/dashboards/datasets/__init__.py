@@ -58,6 +58,10 @@ from . import (
     crr_month_detail,
     crr_30d_summary,
     crr_30d_detail,
+    candidate_retention_rate,
+    replacements_detail,
+    replacements_history,
+    replacements_month_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -116,6 +120,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     crr_month_detail.DATASET["key"]: crr_month_detail.DATASET,
     crr_30d_summary.DATASET["key"]: crr_30d_summary.DATASET,
     crr_30d_detail.DATASET["key"]: crr_30d_detail.DATASET,
+    candidate_retention_rate.DATASET["key"]: candidate_retention_rate.DATASET,
+    replacements_detail.DATASET["key"]: replacements_detail.DATASET,
+    replacements_history.DATASET["key"]: replacements_history.DATASET,
+    replacements_month_detail.DATASET["key"]: replacements_month_detail.DATASET,
 }
 
 

@@ -137,6 +137,10 @@ RESET_CHART_KEYS = {
         "am_kpi_crr_30d_retention",
         "am_kpi_crr_30d",
         "am_table_crr_30d_detail",
+        "am_line_candidate_retention",
+        "am_table_replacements_detail",
+        "am_line_replacements_pct",
+        "am_table_replacements_month_detail",
     ],
 }
 
@@ -769,6 +773,100 @@ MAIN_CHARTS = [
         },
         "position": {"x": 9, "y": 35, "w": 3, "h": 5},
         "sort_order": 180,
+    },
+    {
+        "chart_key": "am_line_candidate_retention",
+        "tab_key": "account-management",
+        "title": "Retention Rate de Candidatos - Modificados",
+        "type": "line",
+        "dataset_key": "candidate_retention_rate",
+        "config": {
+            "mapping": {
+                "x": "cohorte_mes",
+                "y": ["start_candidate", "stay_candidate", "retention"],
+                "formatter": "number",
+                "tooltipExtras": [
+                    "start_candidate_total",
+                    "umbral_meses",
+                    "ventana_inicio_mes",
+                    "ventana_fin_mes",
+                    "eligible_n",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 40, "w": 6, "h": 5},
+        "sort_order": 190,
+    },
+    {
+        "chart_key": "am_table_replacements_detail",
+        "tab_key": "account-management",
+        "title": "Detalle % de reemplazos realizados",
+        "type": "table",
+        "dataset_key": "replacements_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "month",
+                    "client_name",
+                    "opp_model",
+                    "opp_stage",
+                    "replaced_candidate_id",
+                    "old_end_date",
+                    "new_candidate_id",
+                    "new_start_date",
+                    "days_to_replace",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 40, "w": 6, "h": 5},
+        "sort_order": 200,
+    },
+    {
+        "chart_key": "am_line_replacements_pct",
+        "tab_key": "account-management",
+        "title": "% de reemplazos realizados",
+        "type": "line",
+        "dataset_key": "replacements_history",
+        "config": {
+            "mapping": {
+                "x": "month",
+                "y": ["pct_replacements"],
+                "formatter": "number",
+                "drillKey": "fecha_replacements",
+                "tooltipExtras": [
+                    "opp_model",
+                    "replacements",
+                    "total_closed",
+                    "avg_days_to_replace",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 45, "w": 6, "h": 5},
+        "sort_order": 210,
+    },
+    {
+        "chart_key": "am_table_replacements_month_detail",
+        "tab_key": "account-management",
+        "title": "% de reemplazos realizados - Detalle",
+        "type": "table",
+        "dataset_key": "replacements_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "month",
+                    "client_name",
+                    "opp_model",
+                    "opp_stage",
+                    "replaced_candidate_name",
+                    "old_end_date",
+                    "new_candidate_name",
+                    "new_start_date",
+                    "days_to_replace",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 45, "w": 6, "h": 5},
+        "sort_order": 220,
     },
 
     # Sales

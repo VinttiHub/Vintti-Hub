@@ -92,6 +92,11 @@
           { value: '3', label: '3 meses (90 días)' },
           { value: '6', label: '6 meses (180 días)' },
         ]},
+        { type: 'select', key: 'umbral', label: 'Número (3/6/12)', options: [
+          { value: '3', label: '3 meses' },
+          { value: '6', label: '6 meses' },
+          { value: '12', label: '12 meses' },
+        ]},
       ],
     });
   }
