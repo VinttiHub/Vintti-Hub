@@ -127,6 +127,10 @@ RESET_CHART_KEYS = {
         "am_table_candidate_churn_detail",
         "am_kpi_candidate_churn_30d",
         "am_table_candidate_churn_30d_detail",
+        "am_line_candidate_churn_window",
+        "am_table_candidate_churn_window_detail",
+        "am_kpi_candidate_churn_window",
+        "am_table_candidate_churn_window_cohort_detail",
     ],
 }
 
@@ -580,6 +584,94 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 15, "w": 6, "h": 5},
         "sort_order": 80,
+    },
+    {
+        "chart_key": "am_line_candidate_churn_window",
+        "tab_key": "account-management",
+        "title": "3 y 6 meses",
+        "type": "line",
+        "dataset_key": "candidate_churn_window_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["starts", "bajas_real", "churn_real_pct"],
+                "formatter": "number",
+                "drillKey": "fecha_candidate_window_churn",
+                "tooltipExtras": [
+                    "bajas",
+                    "bajas_buyout",
+                    "activos_al_cierre",
+                    "churn_pct",
+                    "buyout_pct",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 20, "w": 6, "h": 5},
+        "sort_order": 90,
+    },
+    {
+        "chart_key": "am_table_candidate_churn_window_detail",
+        "tab_key": "account-management",
+        "title": "Details - 3 y 6 meses",
+        "type": "table",
+        "dataset_key": "candidate_churn_window_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "win_ini",
+                    "m_fin",
+                    "candidate_name",
+                    "account_name",
+                    "start_d",
+                    "end_d",
+                    "baja_tipo",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 20, "w": 6, "h": 5},
+        "sort_order": 100,
+    },
+    {
+        "chart_key": "am_kpi_candidate_churn_window",
+        "tab_key": "account-management",
+        "title": "3 y 6 meses con ventana de 90 o 180 días",
+        "type": "kpi",
+        "dataset_key": "candidate_churn_window_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "candidatos", "label": "Candidatos", "formatter": "number"},
+                    {"key": "bajas_real", "label": "Bajas Staffing", "formatter": "number"},
+                    {"key": "bajas_buyout", "label": "Bajas Buyout", "formatter": "number"},
+                    {"key": "churn_real_pct", "label": "Churn Staffing %", "formatter": "percent"},
+                    {"key": "buyout_pct", "label": "Churn Buyout %", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 25, "w": 6, "h": 5},
+        "sort_order": 110,
+    },
+    {
+        "chart_key": "am_table_candidate_churn_window_cohort_detail",
+        "tab_key": "account-management",
+        "title": "Details - 3 y 6 meses - Cohorte",
+        "type": "table",
+        "dataset_key": "candidate_churn_window_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "corte_d",
+                    "win_ini",
+                    "candidate_name",
+                    "account_name",
+                    "start_d",
+                    "end_d",
+                    "baja_tipo",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 25, "w": 6, "h": 5},
+        "sort_order": 120,
     },
 
     # Sales

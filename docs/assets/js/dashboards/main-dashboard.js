@@ -88,6 +88,10 @@
           { value: 'Close Win',   label: 'Close Win' },
           { value: 'Closed Lost', label: 'Closed Lost' },
         ]},
+        { type: 'select', key: 'meses', label: 'Meses (3/6)', options: [
+          { value: '3', label: '3 meses (90 días)' },
+          { value: '6', label: '6 meses (180 días)' },
+        ]},
       ],
     });
   }
