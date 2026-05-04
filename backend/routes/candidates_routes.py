@@ -1707,19 +1707,24 @@ def handle_candidate_hire_data(candidate_id):
                 WHERE candidate_id = %s AND opportunity_id = %s
             """, seed_vals)
 
+        merged_reference_state = {
+            field: current_hire_reference_row.get(field) or candidate_reference_row.get(field) or ''
+            for field in _REFERENCE_CANDIDATE_FIELDS
+            if field != 'references_notes'
+        }
         reference_fields_in_payload = [
             field for field in _REFERENCE_CANDIDATE_FIELDS
             if field != 'references_notes' and field in data
         ]
-        if reference_fields_in_payload and 'references_notes' not in data:
-            merged_reference_state = {
-                field: current_hire_reference_row.get(field) or candidate_reference_row.get(field) or ''
-                for field in _REFERENCE_CANDIDATE_FIELDS
-                if field != 'references_notes'
-            }
-            for field in reference_fields_in_payload:
-                merged_reference_state[field] = data.get(field) or ''
+        for field in reference_fields_in_payload:
+            merged_reference_state[field] = data.get(field) or ''
 
+        if 'references_notes' in data:
+            data['references_notes'] = _merge_structured_reference_notes(
+                data.get('references_notes') or '',
+                merged_reference_state,
+            )
+        elif reference_fields_in_payload:
             existing_reference_notes = (
                 current_hire_reference_row.get('references_notes')
                 or candidate_reference_row.get('references_notes')
