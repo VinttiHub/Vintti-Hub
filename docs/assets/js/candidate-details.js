@@ -2920,8 +2920,7 @@ hireReferenceFields.forEach(([id, field]) => {
   const input = document.getElementById(id);
   if (input) {
     input.addEventListener('blur', () => patchHireFields({
-      [field]: input.value,
-      references_notes: mergeStructuredReferencesIntoNotes()
+      [field]: input.value
     }, { skipReload: true }));
   }
 });

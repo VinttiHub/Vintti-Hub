@@ -49,10 +49,57 @@ _REFERENCE_CANDIDATE_FIELDS = [
     'reference_2_email',
     'reference_2_linkedin',
 ]
+_STRUCTURED_REFERENCE_NOTES_RE = re.compile(
+    r'<div[^>]*data-structured-references="true"[^>]*>.*?</div>',
+    flags=re.I | re.S,
+)
 
 
 def _normalize_name(value):
     return (value or '').strip().lower()
+
+
+def _strip_structured_reference_notes(html_value):
+    return _STRUCTURED_REFERENCE_NOTES_RE.sub('', html_value or '').strip()
+
+
+def _escape_reference_html(value):
+    return (
+        str(value or '')
+        .replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+        .replace('"', '&quot;')
+        .replace("'", '&#39;')
+    )
+
+
+def _build_structured_reference_notes(reference_values):
+    sections = []
+    for idx in (1, 2):
+        fields = [
+            ('Name', f'reference_{idx}_name'),
+            ('Position', f'reference_{idx}_position'),
+            ('Phone', f'reference_{idx}_phone'),
+            ('Email', f'reference_{idx}_email'),
+            ('LinkedIn', f'reference_{idx}_linkedin'),
+        ]
+        if not any(str(reference_values.get(field) or '').strip() for _, field in fields):
+            continue
+        lines = '<br>'.join(
+            f'<span data-reference-field="{field}"><strong>{label}:</strong> {_escape_reference_html(str(reference_values.get(field) or "").strip() or "-")}</span>'
+            for label, field in fields
+        )
+        sections.append(f'<p><strong>Reference {idx}</strong><br>{lines}</p>')
+    if not sections:
+        return ''
+    return f'<div data-structured-references="true">{"".join(sections)}</div>'
+
+
+def _merge_structured_reference_notes(existing_notes, reference_values):
+    manual_notes = _strip_structured_reference_notes(existing_notes or '')
+    structured_html = _build_structured_reference_notes(reference_values)
+    return '<br>'.join(part for part in [structured_html, manual_notes] if part)
 
 
 def _normalize_phone_digits(value):
@@ -1617,6 +1664,25 @@ def handle_candidate_hire_data(candidate_id):
             ON CONFLICT (candidate_id, opportunity_id) DO NOTHING
         """, (candidate_id, opportunity_id, account_id))
 
+        cur.execute("""
+            SELECT
+                references_notes,
+                reference_1_name,
+                reference_1_position,
+                reference_1_phone,
+                reference_1_email,
+                reference_1_linkedin,
+                reference_2_name,
+                reference_2_position,
+                reference_2_phone,
+                reference_2_email,
+                reference_2_linkedin
+            FROM hire_opportunity
+            WHERE candidate_id = %s AND opportunity_id = %s
+            LIMIT 1
+        """, (candidate_id, opportunity_id))
+        current_hire_reference_row = cur.fetchone() or {}
+
         candidate_seed_updates = {
             field: candidate_reference_row.get(field)
             for field in _REFERENCE_CANDIDATE_FIELDS
@@ -1630,6 +1696,29 @@ def handle_candidate_hire_data(candidate_id):
                 SET {', '.join(seed_cols)}
                 WHERE candidate_id = %s AND opportunity_id = %s
             """, seed_vals)
+
+        reference_fields_in_payload = [
+            field for field in _REFERENCE_CANDIDATE_FIELDS
+            if field != 'references_notes' and field in data
+        ]
+        if reference_fields_in_payload and 'references_notes' not in data:
+            merged_reference_state = {
+                field: current_hire_reference_row.get(field) or candidate_reference_row.get(field) or ''
+                for field in _REFERENCE_CANDIDATE_FIELDS
+                if field != 'references_notes'
+            }
+            for field in reference_fields_in_payload:
+                merged_reference_state[field] = data.get(field) or ''
+
+            existing_reference_notes = (
+                current_hire_reference_row.get('references_notes')
+                or candidate_reference_row.get('references_notes')
+                or ''
+            )
+            data['references_notes'] = _merge_structured_reference_notes(
+                existing_reference_notes,
+                merged_reference_state,
+            )
 
         # mapping of incoming JSON → columns
         mapping = {
