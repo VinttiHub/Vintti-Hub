@@ -2791,7 +2791,6 @@ async function generateReferenceFeedbackForm() {
     const payload = {
       candidate_id: Number(candidateId),
       opportunity_id: opportunityId,
-      api_base: 'https://7m6mw95m8y.us-east-2.awsapprunner.com',
       reference_number: draft.referenceNumber,
       reference_name: draft.reference.reference_name,
       reference_position: draft.reference.reference_position,
@@ -2802,19 +2801,27 @@ async function generateReferenceFeedbackForm() {
       questions: draft.questions,
     };
 
-    const url = new URL('reference-feedback-form.html', window.location.href);
-    url.searchParams.set('data', encodeReferenceFeedbackPayload(payload));
-    draft.publicUrl = url.toString();
-    draft.submittedAt = null;
+    const res = await fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/public/reference_feedback/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(txt || `Request failed with status ${res.status}`);
+    }
+
+    const saved = await res.json();
+    draft.publicUrl = saved.public_url || '';
+    draft.submittedAt = saved.submitted_at || null;
     window.__referenceFeedbackRequests[String(draft.referenceNumber)] = {
+      ...saved,
+      public_url: saved.public_url || '',
       reference_number: draft.referenceNumber,
-      public_url: draft.publicUrl,
-      candidate_id: payload.candidate_id,
-      opportunity_id: payload.opportunity_id,
-      reference_name: payload.reference_name,
-      questions: [...payload.questions],
-      answers: [],
-      submitted_at: null,
+      questions: Array.isArray(saved.questions) ? saved.questions : [...payload.questions],
+      answers: Array.isArray(saved.answers) ? saved.answers : [],
+      submitted_at: saved.submitted_at || null,
     };
     setStoredReferenceFeedbackRequests(window.__referenceFeedbackRequests, opportunityId);
     setReferenceFeedbackLink(draft.publicUrl);
