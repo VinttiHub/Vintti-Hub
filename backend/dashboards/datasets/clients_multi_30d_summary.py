@@ -39,7 +39,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("fecha_corte"))
         or datetime.utcnow().date()
     )
-    segmento = _norm_segmento(filters.get("segmento"))
+    segmento = _norm_segmento(filters.get("segmento") or filters.get("model"))
 
     sql = """
         WITH hires AS (

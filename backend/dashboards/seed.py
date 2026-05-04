@@ -155,6 +155,10 @@ RESET_CHART_KEYS = {
         "am_table_headcount_growth_month_detail",
         "am_kpi_headcount_growth_30d",
         "am_table_headcount_growth_30d_detail",
+        "am_donut_risk_score",
+        "am_table_risk_score_detail",
+        "am_bar_risk_score_points",
+        "am_bar_risk_score_distribution",
     ],
 }
 
@@ -1118,6 +1122,78 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 75, "w": 6, "h": 5},
         "sort_order": 360,
+    },
+    {
+        "chart_key": "am_donut_risk_score",
+        "tab_key": "account-management",
+        "title": "Risk Score",
+        "type": "donut",
+        "dataset_key": "risk_score_by_label",
+        "config": {
+            "mapping": {
+                "x": "riesgo_label",
+                "y": ["clientes"],
+                "formatter": "number",
+                "drillKey": "riesgo_click",
+            },
+        },
+        "position": {"x": 0, "y": 80, "w": 6, "h": 5},
+        "sort_order": 370,
+    },
+    {
+        "chart_key": "am_table_risk_score_detail",
+        "tab_key": "account-management",
+        "title": "Risk Score - Detalle",
+        "type": "table",
+        "dataset_key": "risk_score_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "riesgo",
+                    "client_name",
+                    "estado_procesos",
+                    "candidatos_activos",
+                    "last_hire_d",
+                    "replacements",
+                    "risk_score",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 80, "w": 6, "h": 5},
+        "sort_order": 380,
+    },
+    {
+        "chart_key": "am_bar_risk_score_points",
+        "tab_key": "account-management",
+        "title": "Risk Score - Puntos acumulados",
+        "type": "bar",
+        "dataset_key": "risk_score_by_label",
+        "config": {
+            "mapping": {
+                "x": "riesgo_label",
+                "y": ["puntos"],
+                "formatter": "number",
+                "tooltipExtras": ["clientes"],
+            },
+        },
+        "position": {"x": 0, "y": 85, "w": 6, "h": 5},
+        "sort_order": 390,
+    },
+    {
+        "chart_key": "am_bar_risk_score_distribution",
+        "tab_key": "account-management",
+        "title": "Risk Score - Contador",
+        "type": "bar",
+        "dataset_key": "risk_score_distribution",
+        "config": {
+            "mapping": {
+                "x": "risk_score",
+                "y": ["clientes"],
+                "formatter": "number",
+            },
+        },
+        "position": {"x": 6, "y": 85, "w": 6, "h": 5},
+        "sort_order": 400,
     },
 
     # Sales

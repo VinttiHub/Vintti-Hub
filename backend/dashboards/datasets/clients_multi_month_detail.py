@@ -38,7 +38,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("mes_click"))
         or _parse_date(filters.get("mes"))
     )
-    segmento = _norm_segmento(filters.get("segmento"))
+    segmento = _norm_segmento(filters.get("segmento") or filters.get("model"))
 
     sql = """
         WITH mes_objetivo AS (

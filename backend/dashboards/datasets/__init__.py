@@ -74,6 +74,9 @@ from . import (
     headcount_growth_month_detail,
     headcount_growth_30d_summary,
     headcount_growth_30d_detail,
+    risk_score_by_label,
+    risk_score_detail,
+    risk_score_distribution,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -148,6 +151,9 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     headcount_growth_month_detail.DATASET["key"]: headcount_growth_month_detail.DATASET,
     headcount_growth_30d_summary.DATASET["key"]: headcount_growth_30d_summary.DATASET,
     headcount_growth_30d_detail.DATASET["key"]: headcount_growth_30d_detail.DATASET,
+    risk_score_by_label.DATASET["key"]: risk_score_by_label.DATASET,
+    risk_score_detail.DATASET["key"]: risk_score_detail.DATASET,
+    risk_score_distribution.DATASET["key"]: risk_score_distribution.DATASET,
 }
 
 
