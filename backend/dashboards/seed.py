@@ -119,6 +119,8 @@ RESET_CHART_KEYS = {
         "op_table_placement_time_detail_repl",
         "op_kpi_placement_time_30d_repl",
         "op_table_placement_time_30d_detail_repl",
+        "op_line_batch_delivery_time",
+        "op_table_batch_delivery_time_detail",
         "am_line_client_churn",
         "am_table_client_churn_detail",
         "am_kpi_client_churn_30d",
@@ -1698,6 +1700,45 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 20, "w": 6, "h": 5},
         "sort_order": 100,
+    },
+    {
+        "chart_key": "op_line_batch_delivery_time",
+        "tab_key": "operations",
+        "title": "Tiempo promedio en entregar un batch",
+        "type": "line",
+        "dataset_key": "batch_delivery_time_history",
+        "config": {
+            "mapping": {
+                "x": "opportunity_id",
+                "y": ["dias_promedio_entrega"],
+                "formatter": "number",
+                "drillKey": "opp_id_batch",
+                "tooltipExtras": ["client_name", "opp_position_name", "opp_stage", "total_batches"],
+            },
+        },
+        "position": {"x": 0, "y": 25, "w": 6, "h": 5},
+        "sort_order": 110,
+    },
+    {
+        "chart_key": "op_table_batch_delivery_time_detail",
+        "tab_key": "operations",
+        "title": "Detalle - Tiempo promedio en entregar un batch",
+        "type": "table",
+        "dataset_key": "batch_delivery_time_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "opportunity_id",
+                    "batch_number",
+                    "opp_model",
+                    "pedido_d",
+                    "batch_d",
+                    "dias_entrega",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 25, "w": 6, "h": 5},
+        "sort_order": 120,
     },
 ]
 
