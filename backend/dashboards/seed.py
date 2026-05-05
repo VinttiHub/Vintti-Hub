@@ -2130,7 +2130,7 @@ MAIN_CHARTS = [
         "dataset_key": "interviewed_sent_30d_summary",
         "config": {
             "mapping": {
-                "value": "pct_ponderado_total",
+                "value": "promedio_pct_por_opportunity",
                 "label": "%",
                 "formatter": "percent",
             },
