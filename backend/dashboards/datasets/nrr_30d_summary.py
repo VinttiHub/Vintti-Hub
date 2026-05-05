@@ -142,23 +142,27 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND h.end_d <= v.win_fin
         )
         SELECT
-          TO_CHAR((SELECT win_ini FROM ventana), 'YYYY-MM-DD')                       AS win_ini,
-          TO_CHAR((SELECT win_fin FROM ventana), 'YYYY-MM-DD')                       AS win_fin,
-          COALESCE((SELECT mrr_inicial        FROM mrr_base), 0)::float              AS mrr_inicial,
-          COALESCE((SELECT upsells_lara       FROM upsells),  0)::float              AS upsells_lara,
-          COALESCE((SELECT downgrades_recorte FROM perdidas), 0)::float              AS downgrades_recorte,
-          COALESCE((SELECT churn_no_recorte   FROM perdidas), 0)::float              AS churn_no_recorte,
+          TO_CHAR(v.win_ini, 'YYYY-MM-DD')                                           AS win_ini,
+          TO_CHAR(v.win_fin, 'YYYY-MM-DD')                                           AS win_fin,
+          COALESCE(mb.mrr_inicial,        0)::float                                  AS mrr_inicial,
+          COALESCE(u.upsells_lara,        0)::float                                  AS upsells_lara,
+          COALESCE(p.downgrades_recorte,  0)::float                                  AS downgrades_recorte,
+          COALESCE(p.churn_no_recorte,    0)::float                                  AS churn_no_recorte,
           ROUND(
             100.0 *
             (
-              (COALESCE((SELECT mrr_inicial        FROM mrr_base), 0)
-               + COALESCE((SELECT upsells_lara       FROM upsells),  0)
-               - COALESCE((SELECT downgrades_recorte FROM perdidas), 0)
-               - COALESCE((SELECT churn_no_recorte   FROM perdidas), 0)
+              (COALESCE(mb.mrr_inicial, 0)
+               + COALESCE(u.upsells_lara, 0)
+               - COALESCE(p.downgrades_recorte, 0)
+               - COALESCE(p.churn_no_recorte, 0)
               )
-              / NULLIF((SELECT mrr_inicial FROM mrr_base), 0)
+              / NULLIF(mb.mrr_inicial, 0)
             )
-          , 2)::float                                                                AS nrr_pct;
+          , 2)::float                                                                AS nrr_pct
+        FROM ventana v
+        CROSS JOIN mrr_base mb
+        LEFT JOIN upsells u  ON TRUE
+        LEFT JOIN perdidas p ON TRUE;
     """
 
     return sql, {"metric": metric, "corte": corte}
