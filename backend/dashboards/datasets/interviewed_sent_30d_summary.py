@@ -51,14 +51,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("cutoff"))
         or _parse_date(filters.get("fecha_corte"))
         or _parse_date(filters.get("mes"))
-        or datetime.now(timezone.utc).date()
     )
 
     sql = """
-        WITH ventana AS (
+        WITH cutoff_sel AS (
+          SELECT COALESCE(%(corte)s::date, CURRENT_DATE)::date AS cutoff_d
+        ),
+        ventana AS (
           SELECT
-            (%(corte)s::date - INTERVAL '30 day')::date AS win_ini,
-            %(corte)s::date                              AS win_fin
+            (c.cutoff_d - INTERVAL '30 day')::date AS win_ini,
+            c.cutoff_d::date                       AS win_fin
+          FROM cutoff_sel c
         ),
         base AS (
           SELECT
