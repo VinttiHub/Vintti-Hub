@@ -100,8 +100,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ELSE NULL
           END::float                            AS conversion_pct
         FROM opp o
-        LEFT JOIN sent  s ON s.opportunity_id = o.opportunity_id
+        JOIN sent  s ON s.opportunity_id = o.opportunity_id
         LEFT JOIN hired h ON h.opportunity_id = o.opportunity_id
+        WHERE COALESCE(s.enviados, 0) > 0
         ORDER BY o.client_name, o.opportunity_id;
     """
 
