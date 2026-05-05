@@ -88,7 +88,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           CROSS JOIN ventana v
           WHERE cu.close_d >= v.window_start
             AND cu.close_d <  v.window_end_excl
-            AND (%(resultado)s = 'Total' OR cu.opp_stage = %(resultado)s)
         )
         SELECT
           TO_CHAR(MIN(cutoff_d),     'YYYY-MM-DD') AS cutoff_d,
@@ -99,15 +98,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(*) FILTER (WHERE opp_stage = 'Closed Lost')::int AS close_lost,
           CASE
             WHEN COUNT(*) = 0 THEN 0
+            WHEN %(resultado)s = 'Close Win'
+              THEN ROUND(
+                (COUNT(*) FILTER (WHERE opp_stage = 'Close Win'))::numeric * 100.0
+                / NULLIF(COUNT(*), 0),
+                1)
             WHEN %(resultado)s = 'Closed Lost'
               THEN ROUND(
                 (COUNT(*) FILTER (WHERE opp_stage = 'Closed Lost'))::numeric * 100.0
                 / NULLIF(COUNT(*), 0),
                 1)
-            ELSE ROUND(
-              (COUNT(*) FILTER (WHERE opp_stage = 'Close Win'))::numeric * 100.0
-              / NULLIF(COUNT(*), 0),
-              1)
+            ELSE 100.0
           END::float AS conversion_pct
         FROM windowed;
     """
