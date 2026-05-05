@@ -125,6 +125,11 @@ RESET_CHART_KEYS = {
         "op_table_batch_delivery_time_month_detail",
         "op_kpi_batch_delivery_time_30d",
         "op_table_batch_delivery_time_30d_detail",
+        "sa_line_nda_close_win",
+        "sa_table_nda_close_win_detail",
+        "sa_kpi_nda_close_win_30d",
+        "sa_kpi_nda_close_win_30d_breakdown",
+        "sa_table_nda_close_win_30d_detail",
         "am_line_client_churn",
         "am_table_client_churn_detail",
         "am_kpi_client_churn_30d",
@@ -1827,6 +1832,98 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 35, "w": 6, "h": 5},
         "sort_order": 160,
+    },
+    {
+        "chart_key": "sa_line_nda_close_win",
+        "tab_key": "sales",
+        "title": "All NDA a close win",
+        "type": "line",
+        "dataset_key": "nda_close_win_history",
+        "config": {
+            "mapping": {
+                "x": "mes_close",
+                "y": ["conversion_pct"],
+                "formatter": "percent",
+                "drillKey": "mes_nda_close_win",
+                "tooltipExtras": ["total_closed", "close_win", "close_lost"],
+            },
+        },
+        "position": {"x": 0, "y": 40, "w": 6, "h": 5},
+        "sort_order": 200,
+    },
+    {
+        "chart_key": "sa_table_nda_close_win_detail",
+        "tab_key": "sales",
+        "title": "Detalle - All NDA a close win",
+        "type": "table",
+        "dataset_key": "nda_close_win_month_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "opp_model",
+                    "close_d",
+                    "opp_stage",
+                    "converted_to_client",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 40, "w": 6, "h": 5},
+        "sort_order": 210,
+    },
+    {
+        "chart_key": "sa_kpi_nda_close_win_30d",
+        "tab_key": "sales",
+        "title": "Conversión Global de todos los NDA a Clientes en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "nda_close_win_30d_summary",
+        "config": {
+            "mapping": {
+                "value": "conversion_pct",
+                "label": "%",
+                "formatter": "percent",
+            },
+        },
+        "position": {"x": 0, "y": 45, "w": 3, "h": 5},
+        "sort_order": 220,
+    },
+    {
+        "chart_key": "sa_kpi_nda_close_win_30d_breakdown",
+        "tab_key": "sales",
+        "title": "NDA a Close Win",
+        "type": "kpi",
+        "dataset_key": "nda_close_win_30d_summary",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "total_closed", "label": "total_closed", "formatter": "number"},
+                    {"key": "close_win",    "label": "close_win",    "formatter": "number"},
+                    {"key": "close_lost",   "label": "close_lost",   "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 3, "y": 45, "w": 3, "h": 5},
+        "sort_order": 230,
+    },
+    {
+        "chart_key": "sa_table_nda_close_win_30d_detail",
+        "tab_key": "sales",
+        "title": "Detalle - 30",
+        "type": "table",
+        "dataset_key": "nda_close_win_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "opp_model",
+                    "close_d",
+                    "opp_stage",
+                    "converted_to_client",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 45, "w": 6, "h": 5},
+        "sort_order": 240,
     },
 ]
 
