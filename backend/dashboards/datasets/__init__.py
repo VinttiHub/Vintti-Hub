@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 from . import (
     ts_history,
@@ -56,6 +56,9 @@ from . import (
     interview_conversion_month_detail,
     interview_conversion_30d_history,
     interview_conversion_30d_summary,
+    sent_hired_30d_history,
+    sent_hired_30d_detail,
+    sent_hired_30d_summary,
     client_churn_history,
     client_churn_month_detail,
     client_churn_30d_summary,
@@ -151,6 +154,9 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     interview_conversion_month_detail.DATASET["key"]: interview_conversion_month_detail.DATASET,
     interview_conversion_30d_history.DATASET["key"]: interview_conversion_30d_history.DATASET,
     interview_conversion_30d_summary.DATASET["key"]: interview_conversion_30d_summary.DATASET,
+    sent_hired_30d_history.DATASET["key"]: sent_hired_30d_history.DATASET,
+    sent_hired_30d_detail.DATASET["key"]: sent_hired_30d_detail.DATASET,
+    sent_hired_30d_summary.DATASET["key"]: sent_hired_30d_summary.DATASET,
     client_churn_history.DATASET["key"]: client_churn_history.DATASET,
     client_churn_month_detail.DATASET["key"]: client_churn_month_detail.DATASET,
     client_churn_30d_summary.DATASET["key"]: client_churn_30d_summary.DATASET,

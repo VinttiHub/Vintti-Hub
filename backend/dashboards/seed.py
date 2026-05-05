@@ -139,6 +139,9 @@ RESET_CHART_KEYS = {
         "op_table_interview_conversion_detail",
         "op_line_interview_conversion_30d",
         "op_kpi_interview_conversion_30d",
+        "op_line_sent_hired_30d",
+        "op_table_sent_hired_30d_detail",
+        "op_kpi_sent_hired_30d",
         "am_line_client_churn",
         "am_table_client_churn_detail",
         "am_kpi_client_churn_30d",
@@ -2012,6 +2015,66 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 55, "w": 6, "h": 5},
         "sort_order": 280,
+    },
+    {
+        "chart_key": "op_line_sent_hired_30d",
+        "tab_key": "operations",
+        "title": "Enviados vs Contratados — Ventana 30 días",
+        "type": "line",
+        "dataset_key": "sent_hired_30d_history",
+        "config": {
+            "mapping": {
+                "x": "opportunity_id",
+                "y": ["conversion_pct"],
+                "formatter": "percent",
+                "drillKey": "opportunity_id",
+                "tooltipExtras": [
+                    "client_name",
+                    "opp_position_name",
+                    "opp_model",
+                    "enviados",
+                    "contratados",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 60, "w": 6, "h": 5},
+        "sort_order": 290,
+    },
+    {
+        "chart_key": "op_table_sent_hired_30d_detail",
+        "tab_key": "operations",
+        "title": "Enviados vs Contratados — Detalle por candidato",
+        "type": "table",
+        "dataset_key": "sent_hired_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "client_name",
+                    "opp_position_name",
+                    "candidate_name",
+                    "sent_date",
+                    "contratado",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 60, "w": 6, "h": 5},
+        "sort_order": 300,
+    },
+    {
+        "chart_key": "op_kpi_sent_hired_30d",
+        "tab_key": "operations",
+        "title": "Conversión global Enviados → Contratados — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "sent_hired_30d_summary",
+        "config": {
+            "mapping": {
+                "value": "conversion_pct_general",
+                "label": "%",
+                "formatter": "percent",
+            },
+        },
+        "position": {"x": 0, "y": 65, "w": 6, "h": 5},
+        "sort_order": 310,
     },
 ]
 
