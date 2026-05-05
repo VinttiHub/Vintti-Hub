@@ -80,7 +80,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               END
             ) IS NOT NULL
         ),
-        activos_ini AS (
+        activos_cutoff AS (
           SELECT DISTINCT ON (h.opportunity_id, h.candidate_id)
             h.opportunity_id,
             h.candidate_id,
@@ -88,8 +88,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             h.fee
           FROM ventana v
           JOIN hires_full h
-            ON h.start_d <= v.win_ini
-           AND (h.end_d IS NULL OR h.end_d >= v.win_ini)
+            ON h.start_d <= v.win_fin
+           AND (h.end_d IS NULL OR h.end_d >= v.win_fin)
           ORDER BY h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
         ),
         mrr_base AS (
@@ -100,7 +100,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 ELSE (a.salary + a.fee)
               END
             )::numeric AS mrr_inicial
-          FROM activos_ini a
+          FROM activos_cutoff a
         ),
         upsells AS (
           SELECT
