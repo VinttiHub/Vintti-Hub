@@ -52,11 +52,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH base AS (
           SELECT
             o.opportunity_id,
+            a.client_name,
             o.opp_model,
+            o.opp_type,
             TRIM(o.opp_stage) AS close_result,
             NULLIF(o.nda_signature_or_start_date::text,'')::date AS pedido_d,
             NULLIF(o.opp_close_date::text,'')::date              AS close_d
           FROM opportunity o
+          JOIN account a ON a.account_id = o.account_id
           WHERE o.opportunity_id IS NOT NULL
             AND NULLIF(o.nda_signature_or_start_date::text,'') IS NOT NULL
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL
@@ -67,10 +70,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         )
         SELECT
           TO_CHAR(DATE_TRUNC('month', close_d)::date, 'YYYY-MM-DD') AS mes_cierre,
-          COUNT(*)::int AS opps_cerradas,
-          ROUND(AVG((close_d - pedido_d))::numeric)::int AS promedio_dias,
-          ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY (close_d - pedido_d))::numeric, 1) AS mediana_dias,
-          ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY (close_d - pedido_d))::numeric, 1) AS p90_dias
+          ROUND(AVG((close_d - pedido_d))::numeric)::int AS promedio_dias
         FROM base
         WHERE 1=1
           AND (%(desde)s::date IS NULL OR close_d >= %(desde)s::date)
@@ -90,10 +90,7 @@ DATASET = {
         {"key": "mes_cierre", "label": "Mes cierre", "type": "date"},
     ],
     "measures": [
-        {"key": "opps_cerradas", "label": "Opps cerradas", "type": "number"},
         {"key": "promedio_dias", "label": "Promedio días", "type": "number"},
-        {"key": "mediana_dias", "label": "Mediana días", "type": "number"},
-        {"key": "p90_dias", "label": "P90 días", "type": "number"},
     ],
     "default_filters": {},
     "query": query,

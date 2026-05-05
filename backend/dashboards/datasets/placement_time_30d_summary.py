@@ -74,10 +74,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
         )
         SELECT
-          COUNT(*)::int AS opps_cerradas,
-          ROUND(AVG((b.close_d - b.pedido_d))::numeric)::int AS promedio_dias,
-          ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY (b.close_d - b.pedido_d))::numeric, 1) AS mediana_dias,
-          ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY (b.close_d - b.pedido_d))::numeric, 1) AS p90_dias
+          ROUND(AVG((b.close_d - b.pedido_d))::numeric)::int AS promedio_dias
         FROM base b
         CROSS JOIN ventana v
         WHERE b.close_d BETWEEN v.win_ini AND v.win_fin
@@ -92,10 +89,7 @@ DATASET = {
     "label": "Tiempo promedio de colocación — Ventana 30 días",
     "dimensions": [],
     "measures": [
-        {"key": "opps_cerradas", "label": "Opps cerradas", "type": "number"},
         {"key": "promedio_dias", "label": "Promedio días", "type": "number"},
-        {"key": "mediana_dias", "label": "Mediana días", "type": "number"},
-        {"key": "p90_dias", "label": "P90 días", "type": "number"},
     ],
     "default_filters": {},
     "query": query,

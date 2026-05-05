@@ -1545,7 +1545,6 @@ MAIN_CHARTS = [
                 "y": ["promedio_dias"],
                 "formatter": "number",
                 "drillKey": "fecha_placement_time",
-                "tooltipExtras": ["opps_cerradas", "mediana_dias", "p90_dias"],
             },
         },
         "position": {"x": 0, "y": 5, "w": 6, "h": 5},
@@ -1583,12 +1582,9 @@ MAIN_CHARTS = [
         "dataset_key": "placement_time_30d_summary",
         "config": {
             "mapping": {
-                "values": [
-                    {"key": "promedio_dias", "label": "Promedio días", "formatter": "number"},
-                    {"key": "mediana_dias", "label": "Mediana días", "formatter": "number"},
-                    {"key": "p90_dias", "label": "P90 días", "formatter": "number"},
-                    {"key": "opps_cerradas", "label": "Opps cerradas", "formatter": "number"},
-                ],
+                "value": "promedio_dias",
+                "label": "Promedio días",
+                "formatter": "number",
             },
         },
         "position": {"x": 0, "y": 10, "w": 6, "h": 5},
