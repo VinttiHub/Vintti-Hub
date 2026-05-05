@@ -2076,6 +2076,68 @@ MAIN_CHARTS = [
         "position": {"x": 0, "y": 65, "w": 6, "h": 5},
         "sort_order": 310,
     },
+    {
+        "chart_key": "op_line_interviewed_sent_30d",
+        "tab_key": "operations",
+        "title": "Entrevistados vs Enviados en Clientes — Ventana 30 días",
+        "type": "line",
+        "dataset_key": "interviewed_sent_30d_history",
+        "config": {
+            "mapping": {
+                "x": "opportunity_id",
+                "y": ["entrevistados_sobre_enviados_pct"],
+                "formatter": "percent",
+                "drillKey": "opportunity_id",
+                "tooltipExtras": [
+                    "client_name",
+                    "opp_position_name",
+                    "resultado",
+                    "candidatos_enviados",
+                    "candidatos_entrevistados",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 70, "w": 6, "h": 5},
+        "sort_order": 320,
+    },
+    {
+        "chart_key": "op_table_interviewed_sent_30d_detail",
+        "tab_key": "operations",
+        "title": "Entrevistados vs Enviados en Clientes — Detalle por candidato",
+        "type": "table",
+        "dataset_key": "interviewed_sent_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "opportunity_id",
+                    "client_name",
+                    "opp_position_name",
+                    "opp_model",
+                    "resultado",
+                    "candidate_name",
+                    "status_final",
+                ],
+            },
+        },
+        "position": {"x": 6, "y": 70, "w": 6, "h": 5},
+        "sort_order": 330,
+    },
+    {
+        "chart_key": "op_kpi_interviewed_sent_30d",
+        "tab_key": "operations",
+        "title": "Conversión global Entrevistados → Enviados — Ventana 30 días",
+        "type": "kpi",
+        "dataset_key": "interviewed_sent_30d_summary",
+        "config": {
+            "mapping": {
+                "value": "pct_ponderado_total",
+                "label": "%",
+                "formatter": "percent",
+            },
+        },
+        "position": {"x": 0, "y": 75, "w": 6, "h": 5},
+        "sort_order": 340,
+    },
 ]
 
 
