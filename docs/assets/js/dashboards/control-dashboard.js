@@ -58,9 +58,10 @@
   };
 
   /* ---------- API ---------- */
-  async function fetchChart(chartKey) {
+  async function fetchChart(chartKey, overrides) {
     const url = new URL(API_BASE + `/dashboards/${SLUG}/charts/${chartKey}/data`);
-    Object.entries(state).forEach(([k, v]) => {
+    const params = { ...state, ...(overrides || {}) };
+    Object.entries(params).forEach(([k, v]) => {
       if (v != null && v !== '') url.searchParams.set(k, v);
     });
     const email = (localStorage.getItem('user_email') || sessionStorage.getItem('user_email') || '').trim();
@@ -361,6 +362,18 @@
       guide.setAttribute('opacity', '0');
       tracks.forEach(d => d.setAttribute('opacity', '0'));
     });
+    overlay.addEventListener('click', (e) => {
+      const vbX = eventToVbX(e);
+      const idx = nearestIndex(vbX);
+      const refProj = seriesInfo[0].proj;
+      if (idx < 0 || idx >= refProj.length) return;
+      const xVal = refProj[idx].raw[xKey];
+      // Only meaningful if x looks like a month (YYYY-MM)
+      if (xVal && /^\d{4}-\d{2}/.test(String(xVal))) {
+        const m = String(xVal).slice(0, 7);
+        setSelectedMonth(m);
+      }
+    });
   }
 
   /* ---------- bar hover tooltip ---------- */
@@ -597,7 +610,9 @@
         });
       }
       if (bind === 'list') return renderList(el, rows);
-      if (bind === 'monthly-detail') return renderMonthlyDetail(el, rows);
+      // month-detail panels are NOT hydrated by the generic flow — they
+      // refetch with mes= filter via refetchMonthDetails() instead.
+      if (bind === 'month-detail') return;
       if (bind === 'bars') {
         return renderBars(el, rows, {
           x: el.dataset.x,
@@ -642,39 +657,122 @@
     }).join('');
   }
 
-  /* ---------- monthly grouped detail (active by month, etc) ---------- */
-  function renderMonthlyDetail(el, rows) {
+  /* ---------- selected month state (shared across detail panels + chart) ---------- */
+  const monthState = { selected: null, listeners: [] };
+  function setSelectedMonth(m) {
+    if (!m || m === monthState.selected) return;
+    monthState.selected = m;
+    monthState.listeners.forEach(fn => { try { fn(m); } catch (e) { console.error(e); } });
+    // Refetch all month-detail panels with the new month
+    refetchMonthDetails(m);
+  }
+  function onMonthChange(fn) { monthState.listeners.push(fn); }
+
+  function formatMonthHuman(m) {
+    if (!m) return '—';
+    const mt = String(m).match(/^(\d{4})-(\d{2})/);
+    if (!mt) return String(m);
+    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return `${months[+mt[2] - 1] || mt[2]} ${mt[1]}`;
+  }
+
+  /* ---------- last N months helper ---------- */
+  function lastNMonths(n) {
+    const now = new Date();
+    const out = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    return out;
+  }
+
+  /* ---------- month detail (one month at a time, grouped by client) ----------
+     Data is server-filtered to the selected month (passes mes=YYYY-MM).
+     Re-fetches when month changes. */
+  function renderMonthDetail(el, rows, opts) {
     const nameField  = el.dataset.listName  || 'candidate_name';
     const subField   = el.dataset.listSub   || 'client_name';
     const dateField  = el.dataset.listDate  || 'start_date';
-    const monthField = el.dataset.listMonth || 'month';
-    const monthsLimit = parseInt(el.dataset.monthsLimit || '6', 10);
-    if (!rows.length) {
-      el.innerHTML = '<div class="dlist__empty">No data</div>';
-      return;
-    }
-    // Group by month
-    const groups = {};
-    rows.forEach(r => {
-      const m = String(r[monthField] || '');
-      (groups[m] = groups[m] || []).push(r);
-    });
-    const monthKeys = Object.keys(groups).sort().reverse().slice(0, monthsLimit);
-    el.innerHTML = monthKeys.map(m => {
-      const entries = groups[m];
-      const items = entries.map(r => `
-        <div class="item">
-          <div>
-            <div class="nm">${esc(r[nameField] || '—')}</div>
-            <div class="cl">${esc(r[subField] || '')}</div>
+    const emptyText  = el.dataset.emptyText || 'No data';
+    const month      = (opts && opts.month) || monthState.selected;
+
+    const monthKeys = lastNMonths(12);
+    const currentMonth = month || monthKeys[monthKeys.length - 1];
+
+    function buildBody(entries) {
+      if (!entries.length) {
+        return `<div class="mdetail__empty">${esc(emptyText)}</div>`;
+      }
+      const byClient = {};
+      entries.forEach(r => {
+        const c = String(r[subField] || '—');
+        (byClient[c] = byClient[c] || []).push(r);
+      });
+      const clientNames = Object.keys(byClient).sort((a, b) => byClient[b].length - byClient[a].length);
+      return clientNames.map(c => {
+        const cands = byClient[c]
+          .slice()
+          .sort((a, b) => String(a[nameField] || '').localeCompare(String(b[nameField] || '')))
+          .map(r => `
+            <div class="mdetail__cand">
+              <span class="mdetail__cand-name">${esc(r[nameField] || '—')}</span>
+              <span class="mdetail__cand-date">${esc(r[dateField] || '')}</span>
+            </div>
+          `).join('');
+        return `
+          <div class="mdetail__group">
+            <div class="mdetail__client">
+              <span class="mdetail__client-name">${esc(c)}</span>
+              <span class="mdetail__client-count">${byClient[c].length}</span>
+            </div>
+            ${cands}
           </div>
-          <span class="dt">${esc(r[dateField] || '')}</span>
-        </div>`).join('');
-      return `<div class="expander__group">
-        <h5>${esc(m)} <span style="color:var(--ink-4);font-weight:500;margin-left:6px">·  ${entries.length}</span></h5>
-        <div class="expander__rows">${items}</div>
-      </div>`;
-    }).join('');
+        `;
+      }).join('');
+    }
+
+    function buildNav(currMonth) {
+      const pills = monthKeys.map(m => `
+        <button type="button" class="mdetail__pill ${m === currMonth ? 'is-selected' : ''}" data-mdetail-month="${esc(m)}">
+          ${esc(formatMonthHuman(m))}
+        </button>
+      `).join('');
+      return `<div class="mdetail__nav">${pills}<span class="mdetail__hint">Click a month or the chart point</span></div>`;
+    }
+
+    const entries = rows || [];
+    const clients = new Set(entries.map(r => r[subField])).size;
+    el.innerHTML = `
+      ${buildNav(currentMonth)}
+      <div class="mdetail__head">
+        <h4>${esc(formatMonthHuman(currentMonth))}</h4>
+        <span class="meta"><strong>${entries.length}</strong> ${entries.length === 1 ? 'entry' : 'entries'} · <strong>${clients}</strong> ${clients === 1 ? 'client' : 'clients'}</span>
+      </div>
+      <div class="mdetail__body">
+        ${buildBody(entries)}
+      </div>
+    `;
+    // Wire month-pill clicks
+    el.querySelectorAll('[data-mdetail-month]').forEach(btn => {
+      btn.addEventListener('click', () => setSelectedMonth(btn.dataset.mdetailMonth));
+    });
+  }
+
+  /* ---------- refetch all month-detail panels for a given month ---------- */
+  async function refetchMonthDetails(month) {
+    const els = document.querySelectorAll('[data-bind="month-detail"]');
+    await Promise.all([...els].map(async (el) => {
+      const chartKey = el.dataset.chart;
+      if (!chartKey) return;
+      try {
+        const res = await fetchChart(chartKey, { mes: month });
+        renderMonthDetail(el, res.rows || [], { month });
+      } catch (e) {
+        console.error('month-detail fetch failed', chartKey, e);
+        el.innerHTML = `<div class="mdetail__empty">Error loading data</div>`;
+      }
+    }));
   }
 
   /* ---------- flip card toggle ---------- */
@@ -790,6 +888,10 @@
       });
 
       renderDetailTable();
+      // Populate month-detail panels with the currently selected month
+      if (monthState.selected) {
+        refetchMonthDetails(monthState.selected);
+      }
     } finally {
       document.body.classList.remove('is-loading');
       hydrateInflight = false;
@@ -801,10 +903,10 @@
     const wrap = label || document.querySelector(`[data-filter-key="${key}"]`);
     if (!wrap) return;
     const slot = wrap.querySelector('[data-filter-slot]');
-    const placeholder = wrap.querySelector('[data-filter-placeholder]');
     if (!slot) return;
     if (value === '' || value == null) {
-      slot.textContent = placeholder ? placeholder.textContent : 'All';
+      // Restore the original placeholder text cached at boot
+      slot.textContent = slot.dataset.placeholderText || 'All';
       wrap.classList.remove('filter-pill--set');
     } else {
       slot.textContent = displayText || value;
@@ -813,6 +915,14 @@
   }
 
   function bindFilters() {
+    // Cache the original placeholder text on each filter slot once, before any
+    // value gets written. Slot and placeholder share the same DOM node.
+    document.querySelectorAll('[data-filter-slot]').forEach(slot => {
+      if (slot.dataset.placeholderText == null) {
+        slot.dataset.placeholderText = (slot.textContent || '').trim() || 'All';
+      }
+    });
+
     document.querySelectorAll('[data-filter-input]').forEach(input => {
       const key = input.dataset.filterInput;
       const wrap = input.closest('[data-filter-key]');
@@ -832,12 +942,18 @@
     if (reset) {
       reset.addEventListener('click', (e) => {
         e.preventDefault();
+        // 1) Clear filter state
         FILTER_KEYS.forEach(k => state[k] = '');
+        // 2) Clear inputs + restore pill labels to their placeholders
         document.querySelectorAll('[data-filter-input]').forEach(input => {
           input.value = '';
           const wrap = input.closest('[data-filter-key]');
           setFilterSlot(wrap, input.dataset.filterInput, '', '');
         });
+        // 3) Reset month-detail selection back to current month
+        const d = new Date();
+        monthState.selected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        // 4) Refetch everything
         hydrate();
       });
     }
@@ -845,6 +961,9 @@
 
   /* ---------- boot ---------- */
   function boot() {
+    // Default month selection = current month, so both detail panels start in sync
+    const d = new Date();
+    monthState.selected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     bindFilters();
     bindFlipCards();
     bindExpanders();
