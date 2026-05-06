@@ -20,7 +20,7 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _norm_segmento(value) -> str:
+def _norm_modelo(value) -> str:
     if not value:
         return "Total"
     raw = str(value).strip()
@@ -35,7 +35,7 @@ def _norm_segmento(value) -> str:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
-    segmento = _norm_segmento(filters.get("segmento") or filters.get("model"))
+    modelo = _norm_modelo(filters.get("modelo") or filters.get("model") or filters.get("segmento"))
 
     sql = """
         WITH hires AS (
@@ -78,7 +78,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN hires h
             ON h.start_d <= (m.mes + interval '1 month - 1 day')::date
            AND COALESCE(h.end_d, DATE '9999-12-31') >= m.mes
-           AND (%(segmento)s = 'Total' OR h.model = %(segmento)s)
+           AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
         ),
         candidatos_por_cliente_mes AS (
           SELECT mes, account_id, COUNT(DISTINCT candidate_id) AS candidatos_activos
@@ -140,7 +140,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY mes;
     """
 
-    return sql, {"desde": desde, "hasta": hasta, "segmento": segmento}
+    return sql, {"desde": desde, "hasta": hasta, "modelo": modelo}
 
 
 DATASET = {

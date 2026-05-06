@@ -15,10 +15,11 @@ def _parse_ym(value: str | None) -> date | None:
         return None
 
 
-def _resolve_segment(filters: dict) -> str:
+def _resolve_modelo(filters: dict) -> str:
     raw = (
-        filters.get("segmento")
+        filters.get("modelo")
         or filters.get("model")
+        or filters.get("segmento")
         or filters.get("opp_model")
         or ""
     ).strip().lower()
@@ -36,7 +37,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_ym(filters.get("month"))
         or datetime.utcnow().date().replace(day=1)
     )
-    segment = _resolve_segment(filters)
+    modelo = _resolve_modelo(filters)
 
     sql = """
         WITH target AS (
@@ -126,11 +127,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               AND (r.end_d IS NULL OR r.end_d >= CURRENT_DATE)
             )
           )
-         AND (%(segment)s = 'total' OR r.model = %(segment)s)
+         AND (%(modelo)s = 'total' OR r.model = %(modelo)s)
         ORDER BY r.model, r.client_name, r.candidate_name NULLS LAST;
     """
 
-    return sql, {"target": target, "segment": segment}
+    return sql, {"target": target, "modelo": modelo}
 
 
 DATASET = {

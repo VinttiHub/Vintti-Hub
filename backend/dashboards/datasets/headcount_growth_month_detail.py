@@ -20,7 +20,7 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _norm_segmento(value) -> str:
+def _norm_modelo(value) -> str:
     if not value:
         return "Total"
     raw = str(value).strip()
@@ -40,7 +40,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
-    segmento = _norm_segmento(filters.get("segmento") or filters.get("model"))
+    modelo = _norm_modelo(filters.get("modelo") or filters.get("model") or filters.get("segmento"))
 
     sql = """
         WITH mes_objetivo AS (
@@ -87,7 +87,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN hires h ON TRUE
           WHERE h.start_d <= (p.mes_sel + interval '1 month - 1 day')::date
             AND COALESCE(h.end_d, DATE '9999-12-31') >= p.mes_sel
-            AND (%(segmento)s = 'Total' OR h.model = %(segmento)s)
+            AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
         ),
         activos_prev AS (
           SELECT DISTINCT
@@ -98,7 +98,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN hires h ON TRUE
           WHERE h.start_d <= (p.mes_prev + interval '1 month - 1 day')::date
             AND COALESCE(h.end_d, DATE '9999-12-31') >= p.mes_prev
-            AND (%(segmento)s = 'Total' OR h.model = %(segmento)s)
+            AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
         ),
         conteo AS (
           SELECT
@@ -131,7 +131,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           a.client_name;
     """
 
-    return sql, {"mes": mes, "desde": desde, "hasta": hasta, "segmento": segmento}
+    return sql, {"mes": mes, "desde": desde, "hasta": hasta, "modelo": modelo}
 
 
 DATASET = {

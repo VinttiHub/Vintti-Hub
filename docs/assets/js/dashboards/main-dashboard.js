@@ -76,9 +76,10 @@
         { type: 'date',  key: 'hasta', label: 'Hasta' },
         { type: 'month', key: 'fecha', label: 'Mes' },
         { type: 'date',  key: 'corte', label: 'Corte (30d)' },
-        { type: 'select', key: 'model', label: 'Modelo', options: [
-          { value: 'recruiting', label: 'Recruiting' },
-          { value: 'staffing',   label: 'Staffing' },
+        { type: 'select', key: 'modelo', label: 'Modelo', options: [
+          { value: 'Total',      label: 'Total' },
+          { value: 'Staffing',   label: 'Staffing' },
+          { value: 'Recruiting', label: 'Recruiting' },
         ]},
         { type: 'select', key: 'metric', label: 'Metric', options: [
           { value: 'All',     label: 'All' },
@@ -97,11 +98,6 @@
           { value: '3', label: '3 meses' },
           { value: '6', label: '6 meses' },
           { value: '12', label: '12 meses' },
-        ]},
-        { type: 'select', key: 'segmento', label: 'Segmento', options: [
-          { value: 'Total', label: 'Total' },
-          { value: 'Staffing', label: 'Staffing' },
-          { value: 'Recruiting', label: 'Recruiting' },
         ]},
       ],
     });

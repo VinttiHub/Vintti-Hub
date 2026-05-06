@@ -20,7 +20,7 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _norm_segmento(value) -> str:
+def _norm_modelo(value) -> str:
     if not value:
         return "Total"
     raw = str(value).strip()
@@ -39,7 +39,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("fecha_corte"))
         or datetime.utcnow().date()
     )
-    segmento = _norm_segmento(filters.get("segmento") or filters.get("model"))
+    modelo = _norm_modelo(filters.get("modelo") or filters.get("model") or filters.get("segmento"))
 
     sql = """
         WITH hires AS (
@@ -71,7 +71,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN hires h
             ON h.start_d <= c.fecha_corte
            AND COALESCE(h.end_d, DATE '9999-12-31') >= c.fecha_corte
-           AND (%(segmento)s = 'Total' OR h.model = %(segmento)s)
+           AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
         ),
         candidatos_por_cliente AS (
           SELECT
@@ -93,7 +93,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY fecha_corte;
     """
 
-    return sql, {"corte": corte, "segmento": segmento}
+    return sql, {"corte": corte, "modelo": modelo}
 
 
 DATASET = {

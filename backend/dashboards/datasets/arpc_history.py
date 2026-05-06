@@ -20,10 +20,11 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _resolve_segment(filters: dict) -> str:
+def _resolve_modelo(filters: dict) -> str:
     raw = (
-        filters.get("segmento")
+        filters.get("modelo")
         or filters.get("model")
+        or filters.get("segmento")
         or filters.get("opp_model")
         or ""
     ).strip().lower()
@@ -37,7 +38,7 @@ def _resolve_segment(filters: dict) -> str:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde")) or _parse_date(filters.get("from"))
     hasta = _parse_date(filters.get("hasta")) or _parse_date(filters.get("to"))
-    segmento = _resolve_segment(filters)
+    modelo = _resolve_modelo(filters)
 
     sql = """
         WITH hire_rows AS (
@@ -133,19 +134,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               )
             )
            AND (
-             %(segmento)s = 'Total'
-             OR r.model = LOWER(%(segmento)s)
+             %(modelo)s = 'Total'
+             OR r.model = LOWER(%(modelo)s)
            )
         ),
         candidatos_activos AS (
           SELECT
             mes,
             CASE
-              WHEN %(segmento)s = 'Staffing'
+              WHEN %(modelo)s = 'Staffing'
                 THEN COUNT(DISTINCT candidate_id) FILTER (
                   WHERE model = 'staffing' AND candidate_id IS NOT NULL
                 )::numeric
-              WHEN %(segmento)s = 'Recruiting'
+              WHEN %(modelo)s = 'Recruiting'
                 THEN COUNT(DISTINCT row_id) FILTER (
                   WHERE model = 'recruiting'
                 )::numeric
@@ -208,8 +209,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            AND r.start_d <= m.mes_fin
            AND COALESCE(r.end_d, DATE '9999-12-31') >= m.mes_ini
            AND (
-             %(segmento)s = 'Total'
-             OR r.model = LOWER(%(segmento)s)
+             %(modelo)s = 'Total'
+             OR r.model = LOWER(%(modelo)s)
            )
           GROUP BY 1
         ),
@@ -266,7 +267,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY 1;
     """
 
-    return sql, {"desde": desde, "hasta": hasta, "segmento": segmento}
+    return sql, {"desde": desde, "hasta": hasta, "modelo": modelo}
 
 
 DATASET = {

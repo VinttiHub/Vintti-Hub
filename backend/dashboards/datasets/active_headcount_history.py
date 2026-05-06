@@ -18,10 +18,11 @@ def _parse_ym(value: str | None) -> date | None:
         return None
 
 
-def _resolve_segment(filters: dict) -> str:
+def _resolve_modelo(filters: dict) -> str:
     raw = (
-        filters.get("segmento")
+        filters.get("modelo")
         or filters.get("model")
+        or filters.get("segmento")
         or filters.get("opp_model")
         or ""
     ).strip().lower()
@@ -49,7 +50,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     if hasta < desde:
         hasta = desde
 
-    segment = _resolve_segment(filters)
+    modelo = _resolve_modelo(filters)
 
     sql = """
         WITH hire_rows AS (
@@ -131,16 +132,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 AND (r.end_d IS NULL OR r.end_d >= CURRENT_DATE)
               )
             )
-           AND (%(segment)s = 'total' OR r.model = %(segment)s)
+           AND (%(modelo)s = 'total' OR r.model = %(modelo)s)
         ),
         metricas_mes AS (
           SELECT
             mes,
             CASE
-              WHEN %(segment)s = 'staffing'
+              WHEN %(modelo)s = 'staffing'
                 THEN COUNT(DISTINCT candidate_id)
                        FILTER (WHERE model = 'staffing' AND candidate_id IS NOT NULL)
-              WHEN %(segment)s = 'recruiting'
+              WHEN %(modelo)s = 'recruiting'
                 THEN COUNT(DISTINCT row_id) FILTER (WHERE model = 'recruiting')
               ELSE
                 COUNT(DISTINCT candidate_id)
@@ -161,7 +162,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     params = {
         "desde": desde,
         "hasta": hasta,
-        "segment": segment,
+        "modelo": modelo,
     }
     return sql, params
 

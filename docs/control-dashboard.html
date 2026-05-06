@@ -1,292 +1,1675 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- ===== Document meta ===== -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Vintti HUB · Dashboard</title>
+  <title>VINTTI · Control Dashboard</title>
   <script src="./assets/js/auth-guard.js"></script>
 
-  <!-- ===== Fonts (kept names to avoid CSS breakage) ===== -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- ===== App assets ===== -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/sidebar.css" />
-  <link rel="stylesheet" href="./assets/css/dashboard.css?v=8">
-  <link rel="stylesheet" href="./assets/css/mobile.css?v=4">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=2">
 </head>
 <body>
-  <div id="sidebarMount"></div>
-  <main class="main-content">
-  <div class="content">
-    <!-- =====================================================
-         TOP BAR
-         ===================================================== -->
-    <header class="topbar">
-      <div class="spacer"></div>
-      <h1>Management Metrics</h1>
-    </header>
 
-    <!-- =====================================================
-         MAIN CONTENT
-         ===================================================== -->
-    
+<!-- Shared SVG defs (gradient fills) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="fill-blue" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%"  stop-color="#003bff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#003bff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fill-violet" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%"  stop-color="#6c38ff" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#6c38ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fill-cyan" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%"  stop-color="#4ba9ff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#4ba9ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fill-mag" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%"  stop-color="#ff1fdb" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ff1fdb" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fill-lime" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%"  stop-color="#c1ff72" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#c1ff72" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
 
-      <!-- =====================================================
-           CARD: Opportunities — Pipeline
-           ===================================================== -->
-      <section class="card glass" id="oppsCard">
-        <div class="card-head card-head--center">
-          <h2 class="h2--bluegrad title-with-info">
-            Opportunities — Pipeline
-            <button
-              class="info-ghost"
-              aria-label="Excluded stages: Deep Dive, NDA Sent, Close Won and Close Lost"
-              data-tip="Deep Dive, NDA Sent, Close Won/Lost">
-              <span aria-hidden="true">i</span>
-            </button>
-          </h2>
-        </div>
+<!-- Tab radios -->
+<input class="tab-radios" type="radio" name="tab" id="tab-growth" checked>
+<input class="tab-radios" type="radio" name="tab" id="tab-am">
+<input class="tab-radios" type="radio" name="tab" id="tab-sales">
+<input class="tab-radios" type="radio" name="tab" id="tab-ops">
 
-        <div class="table-wrap">
-          <table class="v-table" id="oppsTable" aria-describedby="oppsTableDesc">
-            <caption id="oppsTableDesc" class="sr-only">
-              Opportunities by model and type excluding Deep Dive, NDA Sent, Close Won and Close Lost.
-            </caption>
+<div class="shell">
 
-            <!-- Column sizing for CSS; classes retained -->
-            <colgroup>
-              <col class="col-model">
-              <col class="col-new">
-              <col class="col-repl">
-              <col class="col-total">
-            </colgroup>
-
-            <thead>
-              <tr>
-                <th class="sticky-col" scope="col">Model</th>
-                <th scope="col">New</th>
-                <th scope="col">Replacement</th>
-                <th class="total-col" scope="col">Total</th>
-              </tr>
-            </thead>
-
-            <!-- JS populates this -->
-            <tbody id="oppsTbody"></tbody>
-
-            <!-- Totals row (ids kept for JS aggregation) -->
-            <tfoot>
-              <tr class="row-total">
-                <th class="sticky-col" scope="row">Total</th>
-                <th id="colTotalNew">0</th>
-                <th id="colTotalReplacement">0</th>
-                <th id="grandTotal" class="total-col">0</th>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
-
-      <!-- =====================================================
-           CARD: Expected · Pipeline
-           ===================================================== -->
-      <section class="card expected glass" id="expectedCard">
-        <div class="card-head expected-head">
-          <div class="expected-icon" aria-hidden="true">💸</div>
-          <div>
-            <h2 class="expected-title">Expected · Pipeline</h2>
-            <div class="muted">
-              Same filters as Opportunities — Pipeline (excludes Deep Dive, NDA Sent, Close Won/Lost)
-            </div>
-          </div>
-        </div>
-
-        <div class="expected-grid expected-grid--pretty">
-          <!-- Row 1 -->
-          <div class="kpi kpi--fee kpi--staff">
-            <div class="kpi-label">
-              <span class="badge-model badge-staff">Staffing</span> Fee
-            </div>
-            <div class="kpi-value" id="kpiExpectedFeeStaff">—</div>
-          </div>
-
-          <div class="kpi kpi--rev kpi--staff">
-            <div class="kpi-label">
-              <span class="badge-model badge-staff">Staffing</span> Revenue
-            </div>
-            <div class="kpi-value" id="kpiExpectedRevStaff">—</div>
-          </div>
-
-          <!-- Row 2 (spans both columns) -->
-          <div class="kpi kpi--rev kpi--rec kpi--span2">
-            <div class="kpi-label">
-              <span class="badge-model badge-rec">Recruiting</span> Revenue
-            </div>
-            <div class="kpi-value" id="kpiExpectedRevRec">—</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =====================================================
-           CARD: MRR · Staffing Only
-           ===================================================== -->
-      <section class="card money glass" id="mrrCard">
-        <div class="card-head money-head">
-          <div class="money-visual" aria-hidden="true">
-            <div class="gif-circle">
-              <img class="money-gif" src="./assets/img/piggy-mrr.gif" alt="Piggy bank" loading="lazy" />
-            </div>
-          </div>
-          <div>
-            <h2>MRR · Staffing Only</h2>
-            <div class="muted">Based on hires (Closed Win) in Staffing</div>
-          </div>
-        </div>
-
-        <div class="money-grid">
-          <div class="kpi">
-            <div class="kpi-label">By revenue (TSR)</div>
-            <div class="kpi-value" id="kpiTSR">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-label">By fee (TSF)</div>
-            <div class="kpi-value" id="kpiTSF">—</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- =====================================================
-           CARD: Recruiting Revenue Snapshots
-           ===================================================== -->
-      <section class="card glass metrics-card metrics-card--revenue" id="recruitingRevenueCard">
-        <div class="card-head card-head--center">
-          <h2>Recruiting Revenue</h2>
-          <div class="muted">Rolling 30 days vs. previous month</div>
-        </div>
-        <div class="metrics-grid metrics-grid--dual">
-          <button class="metrics-tile" type="button" data-range="last30">
-            <div class="metrics-label">Last 30 days</div>
-            <div class="metrics-value" id="recRevenueLast30Value">—</div>
-            <div class="metrics-sub" id="recRevenueLast30Dates">—</div>
-            <div class="metrics-count" id="recRevenueLast30Accounts">— accounts</div>
-          </button>
-          <button class="metrics-tile" type="button" data-range="previousMonth">
-            <div class="metrics-label">Previous month</div>
-            <div class="metrics-value" id="recRevenuePrevValue">—</div>
-            <div class="metrics-sub" id="recRevenuePrevDates">—</div>
-            <div class="metrics-count" id="recRevenuePrevAccounts">— accounts</div>
-          </button>
-        </div>
-      </section>
-
-      <!-- =====================================================
-           CARD: Active Employees Snapshot
-           ===================================================== -->
-      <section class="card glass metrics-card metrics-card--active" id="activeEmployeesCard">
-        <div class="card-head card-head--center">
-          <h2>Active Employees</h2>
-          <div class="muted" id="activeEmployeesAsOf">As of —</div>
-        </div>
-        <div class="metrics-grid metrics-grid--dual">
-          <button class="metrics-tile" type="button" data-model="staffing">
-            <div class="metrics-label">Staffing</div>
-            <div class="metrics-value" id="activeStaffingValue">—</div>
-            <div class="metrics-count" id="activeStaffingAccounts">— accounts</div>
-            <div class="metrics-sub">Click to explore</div>
-          </button>
-          <button class="metrics-tile" type="button" data-model="recruiting">
-            <div class="metrics-label">Recruiting</div>
-            <div class="metrics-value" id="activeRecruitingValue">—</div>
-            <div class="metrics-count" id="activeRecruitingAccounts">— accounts</div>
-            <div class="metrics-sub">Click to explore</div>
-          </button>
-        </div>
-      </section>
-
-      <!-- =====================================================
-           CARD: TSR/TSF History · Staffing (Closed Won)
-           ===================================================== -->
-      <section class="card glass" id="tsHistoryCard">
-        <div class="card-head card-head--center">
-          <h2 class="h2--bluegrad">TSR/TSF History · Staffing (Closed Won)</h2>
-          <div class="muted">
-            Each point shows the value at the end of each month, counting only hires that were active at that time.
-          </div>
-        </div>
-
-        <div id="tsHistoryWrap" class="chart-wrap">
-          <div class="chart-legend" id="tsLegend" aria-label="Chart legend">
-            <button class="legend-item on" data-series="tsr">
-              <span class="legend-dot legend-dot--tsr" aria-hidden="true"></span> TSR (revenue)
-            </button>
-            <button class="legend-item on" data-series="tsf">
-              <span class="legend-dot legend-dot--tsf" aria-hidden="true"></span> TSF (fee)
-            </button>
-          </div>
-
-          <!-- SVG chart populated by JS -->
-          <svg id="tsHistoryChart" viewBox="0 0 720 220" role="img" aria-label="TSR versus TSF over time"></svg>
-
-          <!-- Tooltip for chart interactions -->
-          <div id="tsTooltip" class="chart-tooltip" role="status" aria-live="polite"></div>
-        </div>
-
-        <div class="table-wrap">
-          <table class="v-table compact" aria-describedby="tsHistoryDesc">
-            <caption id="tsHistoryDesc" class="sr-only">
-              Monthly TSR and TSF with active hires.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Month</th>
-                <th scope="col">TSR (revenue)</th>
-                <th scope="col">TSF (fee)</th>
-                <th scope="col">Active Hires</th>
-              </tr>
-            </thead>
-            <tbody id="tsHistoryTableBody"></tbody>
-          </table>
-        </div>
-      </section>
-
-    
-  </div>
-
-  <!-- =====================================================
-       TEMPLATE: Row for Opportunities table
-       ===================================================== -->
-  <template id="rowTemplate">
-    <tr>
-      <th class="sticky-col row-head" scope="row"></th>
-      <td class="cell" data-key="new">0</td>
-      <td class="cell" data-key="replacement">0</td>
-      <td class="cell total-col row-total-val">0</td>
-    </tr>
-  </template>
-
-  <!-- ===== Popup / Details dialog ===== -->
-  <div id="metricsDialog" class="metrics-dialog" aria-hidden="true">
-    <div class="metrics-dialog__backdrop" data-close-dialog></div>
-    <div class="metrics-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="metricsDialogTitle">
-      <header class="metrics-dialog__header">
-        <div>
-          <h3 id="metricsDialogTitle">Details</h3>
-          <p id="metricsDialogSubtitle" class="muted"></p>
-        </div>
-        <button class="metrics-dialog__close" type="button" aria-label="Close details">
-          ×
-        </button>
-      </header>
-      <div class="metrics-dialog__body" id="metricsDialogBody"></div>
+  <!-- ============================================================
+       TOP BAR
+       ============================================================ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__mark">V</div>
+      <div class="brand__name">Vintti <span>· Control Dashboard</span></div>
     </div>
-  </div>
-  </main>
+    <div class="topbar__right">
+      <span class="pill"><span class="dot"></span>All systems · live</span>
+      <span class="pill">Sync · 2026-05-06 21:54 UTC</span>
+      <span class="pill pill--dark">Operator · info@vintti.com <span class="chev">▾</span></span>
+    </div>
+  </header>
 
-  <!-- ===== JS ===== -->
-   <script src="./assets/js/avatar-map.js" defer></script>
-  <script src="./assets/js/sidebar.js" defer></script>
-  <script src="./assets/js/dashboard.js?v=3"></script>
+  <!-- ============================================================
+       TABS
+       ============================================================ -->
+  <nav class="tabs" role="tablist">
+    <label class="tabs__btn" for="tab-growth">Growth & Revenue <span class="ct">20</span></label>
+    <label class="tabs__btn" for="tab-am">Account Management <span class="ct">44</span></label>
+    <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
+    <label class="tabs__btn" for="tab-ops">Operations <span class="ct">31</span></label>
+  </nav>
+
+  <!-- ============================================================
+       FILTER BAR · 9 filtros (matches backend dataset params)
+       ============================================================ -->
+  <div class="filter-bar">
+    <span class="filter-bar__lab">Filters</span>
+
+    <!-- Date range -->
+    <label class="filter-pill" data-filter-key="desde">
+      <span class="k">Desde</span>
+      <span class="v" data-filter-slot data-filter-placeholder>All</span>
+      <span class="chev">▾</span>
+      <input type="date" class="filter-pill__sel" data-filter-input="desde">
+    </label>
+    <label class="filter-pill" data-filter-key="hasta">
+      <span class="k">Hasta</span>
+      <span class="v" data-filter-slot data-filter-placeholder>All</span>
+      <span class="chev">▾</span>
+      <input type="date" class="filter-pill__sel" data-filter-input="hasta">
+    </label>
+    <label class="filter-pill" data-filter-key="mes">
+      <span class="k">Mes</span>
+      <span class="v" data-filter-slot data-filter-placeholder>All</span>
+      <span class="chev">▾</span>
+      <input type="month" class="filter-pill__sel" data-filter-input="mes">
+    </label>
+    <label class="filter-pill" data-filter-key="corte">
+      <span class="k">Corte 30d</span>
+      <span class="v" data-filter-slot data-filter-placeholder>Today</span>
+      <span class="chev">▾</span>
+      <input type="date" class="filter-pill__sel" data-filter-input="corte">
+    </label>
+
+    <span class="filter-bar__sep"></span>
+
+    <!-- Modelo / Metric / Stage -->
+    <label class="filter-pill filter-pill--lime" data-filter-key="modelo">
+      <span class="k">Modelo</span>
+      <span class="v" data-filter-slot data-filter-placeholder>Total</span>
+      <span class="chev">▾</span>
+      <select class="filter-pill__sel" data-filter-input="modelo">
+        <option value="">Total</option>
+        <option value="Staffing">Staffing</option>
+        <option value="Recruiting">Recruiting</option>
+      </select>
+    </label>
+    <label class="filter-pill" data-filter-key="metric">
+      <span class="k">Metric</span>
+      <span class="v" data-filter-slot data-filter-placeholder>All</span>
+      <span class="chev">▾</span>
+      <select class="filter-pill__sel" data-filter-input="metric">
+        <option value="">All</option>
+        <option value="Revenue">Revenue</option>
+        <option value="Fee">Fee</option>
+      </select>
+    </label>
+    <label class="filter-pill" data-filter-key="opp_stage">
+      <span class="k">Stage</span>
+      <span class="v" data-filter-slot data-filter-placeholder>All</span>
+      <span class="chev">▾</span>
+      <select class="filter-pill__sel" data-filter-input="opp_stage">
+        <option value="">All</option>
+        <option value="Close Win">Close Win</option>
+        <option value="Closed Lost">Closed Lost</option>
+      </select>
+    </label>
+
+    <span class="filter-bar__sep"></span>
+
+    <!-- Cohort windows -->
+    <label class="filter-pill" data-filter-key="meses">
+      <span class="k">Meses</span>
+      <span class="v" data-filter-slot data-filter-placeholder>3 / 6</span>
+      <span class="chev">▾</span>
+      <select class="filter-pill__sel" data-filter-input="meses">
+        <option value="">3 / 6</option>
+        <option value="3">3 meses · 90d</option>
+        <option value="6">6 meses · 180d</option>
+      </select>
+    </label>
+    <label class="filter-pill" data-filter-key="umbral">
+      <span class="k">Número</span>
+      <span class="v" data-filter-slot data-filter-placeholder>3 / 6 / 12</span>
+      <span class="chev">▾</span>
+      <select class="filter-pill__sel" data-filter-input="umbral">
+        <option value="">All</option>
+        <option value="3">3 meses</option>
+        <option value="6">6 meses</option>
+        <option value="12">12 meses</option>
+      </select>
+    </label>
+
+    <button class="filter-bar__reset" type="button" data-filter-reset>↺ Reset</button>
+  </div>
+
+  <!-- ============================================================
+       CHANNEL · GROWTH & REVENUE
+       ============================================================ -->
+  <section class="channel" data-channel="growth">
+    <div class="grid">
+
+      <!-- Profile-style card (snapshot of the company) -->
+      <div class="hero-profile s-4">
+        <div class="hero-profile__head">
+          <h3>Snapshot</h3>
+          <span class="card__menu">↻</span>
+        </div>
+        <div class="hero-profile__center">
+          <div class="profile-ring">
+            <svg viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#c1ff72" stroke-width="6"
+                      stroke-linecap="round" stroke-dasharray="364 364" stroke-dashoffset="58"
+                      transform="rotate(-90 64 64)"/>
+            </svg>
+            <div class="profile-ring__face">V</div>
+            <div class="profile-ring__star">★</div>
+          </div>
+          <div class="hero-profile__name">Vintti · ops</div>
+          <div class="hero-profile__role">Live · Internal</div>
+        </div>
+        <div class="hero-profile__pills">
+          <span class="mini-pill"><span class="ic">⚐</span><span data-chart="active_headcount_30d_total" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span></span>
+          <span class="mini-pill"><span class="ic ic--cyan">◉</span><span data-chart="acpa_history" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span></span>
+          <span class="mini-pill"><span class="ic ic--mag">★</span><span data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span></span>
+        </div>
+      </div>
+
+      <!-- Hero KPI 1 · MRR -->
+      <div class="hero-kpi bg-grad-warm s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">MRR<br/>(Staffing)</div>
+          <div class="hero-kpi__icon">$</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
+          <div class="hero-kpi__label">
+            <span data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM · 30 day window
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero KPI 2 · Active candidates -->
+      <div class="hero-kpi bg-grad-cool s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">Active<br/>candidates</div>
+          <div class="hero-kpi__icon">⚐</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value" data-chart="active_headcount_30d_total" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
+          <div class="hero-kpi__label">
+            <span data-chart="active_headcount_history" data-bind="text" data-field="active_count" data-reduce="delta-mom-abs" data-fmt="delta-int">—</span> vs prev month
+          </div>
+        </div>
+      </div>
+
+      <!-- Connectors / status -->
+      <div class="connectors s-12">
+        <div class="connectors__txt">
+          <h4>Datasets connected · all green</h4>
+          <p>20 datasets feeding this channel · live from <span class="muted">vinttihub backend</span></p>
+        </div>
+        <div class="connectors__icons">
+          <span class="conn-ic c1">A</span>
+          <span class="conn-ic c2">H</span>
+          <span class="conn-ic c3">M</span>
+          <span class="conn-ic c4">L</span>
+          <span class="conn-ic c5">+16</span>
+        </div>
+      </div>
+
+      <!-- ============== Section: Headcount evolution (focus) -->
+      <div class="section s-12">
+        <div>
+          <h2>Headcount evolution</h2>
+          <p>Active staffing headcount month over month — with rolling avg.</p>
+        </div>
+        <span class="pill">Range: 24 months <span class="chev">▾</span></span>
+      </div>
+
+      <!-- FOCUS CARD: smooth wave -->
+      <div class="focus-card s-12">
+        <div class="focus-card__head">
+          <div>
+            <h3>Active candidates · history</h3>
+            <p>Candidatos únicos activos al fin de cada mes. Live desde el backend.</p>
+          </div>
+          <div class="metric-row">
+            <div>
+              <span class="num" data-chart="active_headcount_30d_total" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span>
+              <span class="lab">Latest</span>
+            </div>
+            <div>
+              <span class="num" data-chart="active_headcount_history" data-bind="text" data-field="active_count" data-reduce="avg-last-12" data-fmt="number">—</span>
+              <span class="lab">Avg 12m</span>
+            </div>
+            <div>
+              <span class="num green" data-chart="active_headcount_history" data-bind="text" data-field="active_count" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</span>
+              <span class="lab">YoY</span>
+            </div>
+          </div>
+        </div>
+        <div class="focus-card__body dotted-bg" style="background-color:#f7f9fc;border-radius:18px;padding:20px;">
+          <div class="focus-card__months">
+            <span>−24m</span>
+            <span>−12m</span>
+            <span class="active">Now</span>
+          </div>
+          <div class="chart" style="position:relative">
+            <svg data-chart="active_headcount_history" data-bind="area" data-x="month" data-y="active_count" data-color="rose"
+                 viewBox="0 0 720 240" preserveAspectRatio="none">
+              <line x1="0" y1="200" x2="720" y2="200" stroke="#d9dde5" stroke-dasharray="2 5"/>
+            </svg>
+          </div>
+          <div class="focus-card__avg">
+            <div class="num" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</div>
+            <div class="lab">YoY MRR growth</div>
+          </div>
+        </div>
+        <div class="legend">
+          <span class="legend__item"><span class="legend__sw" style="background:#f590ad"></span>Active candidates</span>
+          <span class="legend__item"><span class="legend__sw" style="background:#d9dde5"></span>Baseline</span>
+        </div>
+      </div>
+
+      <!-- ============== Section: Revenue -->
+      <div class="section s-12">
+        <div>
+          <h2>Revenue per account</h2>
+          <p>ARPA y ARPC con su total ponderado y la variación mes contra mes.</p>
+        </div>
+      </div>
+
+      <!-- ARPA composite -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">ARPA · revenue per account</h3>
+            <p class="card__sub">Promedio mensual + total ponderado</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="metric-row">
+          <div>
+            <span class="num" data-chart="arpa_history" data-bind="text" data-field="arpa_revenue" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="lab">ARPA · latest</span>
+          </div>
+          <div>
+            <span class="num" data-chart="arpa_history" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="lab">ARPA Total</span>
+          </div>
+          <div>
+            <span class="num green" data-chart="arpa_history" data-bind="text" data-field="arpa_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
+            <span class="lab">Δ MoM</span>
+          </div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="arpa_history" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpa_revenue" data-color="cyan,lime"
+               viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="20" y1="40" x2="540" y2="40"/>
+              <line x1="20" y1="100" x2="540" y2="100"/>
+              <line x1="20" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+          <span class="series-pill sp-cyan" style="position:absolute; top:14%; right:-6px;">ARPA Total</span>
+          <span class="series-pill sp-lime" style="position:absolute; top:38%; right:-6px;">ARPA</span>
+        </div>
+      </div>
+
+      <!-- ARPC composite -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">ARPC · revenue per candidate</h3>
+            <p class="card__sub">Promedio mensual + total ponderado</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="metric-row">
+          <div>
+            <span class="num" data-chart="arpc_history" data-bind="text" data-field="arpc_revenue" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="lab">ARPC · latest</span>
+          </div>
+          <div>
+            <span class="num" data-chart="arpc_history" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="lab">Total revenue</span>
+          </div>
+          <div>
+            <span class="num green" data-chart="arpc_history" data-bind="text" data-field="arpc_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
+            <span class="lab">Δ MoM</span>
+          </div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="arpc_history" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpc_revenue" data-color="lime,cyan"
+               viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="20" y1="40" x2="540" y2="40"/>
+              <line x1="20" y1="100" x2="540" y2="100"/>
+              <line x1="20" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+          <span class="series-pill sp-lime" style="position:absolute; top:8%; right:-6px;">Total</span>
+          <span class="series-pill sp-cyan" style="position:absolute; top:38%; right:-6px;">ARPC</span>
+        </div>
+      </div>
+
+      <!-- MRR full -->
+      <div class="card s-8">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">MRR · Staffing</h3>
+            <p class="card__sub">Monthly recurring revenue basado en hires activos al fin de mes.</p>
+          </div>
+          <span class="callout">
+            <span data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency">—</span>
+            <span class="pos" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span>
+          </span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="mrr_history" data-bind="area" data-x="mes" data-y="mrr_total" data-color="blue"
+               viewBox="0 0 720 240" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="720" y2="40"/>
+              <line x1="0" y1="100" x2="720" y2="100"/>
+              <line x1="0" y1="160" x2="720" y2="160"/>
+              <line x1="0" y1="200" x2="720" y2="200"/>
+            </g>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">Latest</div><div class="stat__val" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">Peak 12m</div><div class="stat__val" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="max" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">Avg 12m</div><div class="stat__val" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="avg-last-12" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">YoY</div><div class="stat__val green" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</div></div>
+        </div>
+      </div>
+
+      <!-- Recruiting upfront area -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Recruiting · upfront</h3>
+            <p class="card__sub">Pagos one-time de Recruiting</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="kpi-card__val" style="margin-top:8px" data-chart="recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="last" data-fmt="currency-k">—</div>
+        <div class="chart" style="margin-top:12px;position:relative">
+          <svg data-chart="recruiting_upfront" data-bind="area" data-x="mes_cierre" data-y="monto_recruiting" data-color="violet"
+               viewBox="0 0 320 160" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">YTD</div><div class="stat__val" data-chart="recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="sum" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">Avg/mes</div><div class="stat__val" data-chart="recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="avg" data-fmt="currency-k">—</div></div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Accounts -->
+      <div class="section s-12">
+        <div>
+          <h2>Accounts & headcount</h2>
+          <p>Clientes activos, candidatos por cuenta, y la combinación de ambos.</p>
+        </div>
+      </div>
+
+      <!-- Active clients bar -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Active clients · history</h3>
+            <p class="card__sub">Cuentas activas al fin de mes (fuente: arpa_history)</p>
+          </div>
+          <span class="callout callout--soft">
+            <span data-chart="arpa_history" data-bind="text" data-field="clientes_activos" data-reduce="last" data-fmt="int">—</span>
+            <span class="pos" style="color:#2e9b5d" data-chart="arpa_history" data-bind="text" data-field="clientes_activos" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
+          </span>
+        </div>
+        <div class="chart">
+          <svg data-chart="arpa_history" data-bind="bars" data-y="clientes_activos" data-color="blue"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Clients & Candidates combo -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Clients × Candidates</h3>
+            <p class="card__sub">Ambos en una sola línea + ACPA derivado</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="metric-row">
+          <div><span class="num" data-chart="acpa_history" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span><span class="lab">Clients</span></div>
+          <div><span class="num" data-chart="acpa_history" data-bind="text" data-field="candidatos_activos" data-reduce="last" data-fmt="int">—</span><span class="lab">Candidates</span></div>
+          <div><span class="num" data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span><span class="lab">ACPA</span></div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="acpa_history" data-bind="line" data-x="mes" data-y="candidatos_activos,cuentas_activas" data-color="blue,cyan"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+          <span class="series-pill sp-blue" style="position:absolute; top:8%; right:-6px;">Candidates</span>
+          <span class="series-pill sp-cyan" style="position:absolute; top:60%; right:-6px;">Clients</span>
+        </div>
+      </div>
+
+      <!-- ACPA solo -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">ACPA · candidates per active account</h3>
+            <p class="card__sub">Mes a mes</p>
+          </div>
+          <span class="callout">
+            <span data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span>
+            <span class="pos" data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
+          </span>
+        </div>
+        <div class="chart">
+          <svg data-chart="acpa_history" data-bind="line" data-x="mes" data-y="acpa" data-color="violet"
+               viewBox="0 0 1100 180" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="1100" y2="40"/>
+              <line x1="0" y1="90" x2="1100" y2="90"/>
+              <line x1="0" y1="140" x2="1100" y2="140"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ============== Section: Lifetime -->
+      <div class="section s-12">
+        <div>
+          <h2>Lifetime · staying power</h2>
+          <p>Cuánto duran cuentas y candidatos con Vintti, en meses.</p>
+        </div>
+      </div>
+
+      <!-- Client lifetime -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Client lifetime</h3>
+            <p class="card__sub">Distribución de meses activo por cliente</p>
+          </div>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="client_lifetime_avg" data-bind="text" data-field="promedio_meses_por_cliente" data-reduce="first" data-fmt="months">—</span>
+          </span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="client_lifetime_detail" data-bind="line" data-x="client_name" data-y="meses_con_al_menos_un_cliente" data-color="cyan"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">Avg</div><div class="stat__val" data-chart="client_lifetime_avg" data-bind="text" data-field="promedio_meses_por_cliente" data-reduce="first" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">Max</div><div class="stat__val" data-chart="client_lifetime_detail" data-bind="text" data-field="meses_con_al_menos_un_cliente" data-reduce="max" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">N</div><div class="stat__val" data-chart="client_lifetime_detail" data-bind="text" data-field="meses_con_al_menos_un_cliente" data-reduce="last" data-fmt="int">—</div></div>
+        </div>
+      </div>
+
+      <!-- Candidate lifetime -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Candidate lifetime</h3>
+            <p class="card__sub">Distribución de meses por candidato en cliente</p>
+          </div>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="candidate_lifetime_avg" data-bind="text" data-field="promedio_meses_por_candidato_en_cliente" data-reduce="first" data-fmt="months">—</span>
+          </span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="candidate_lifetime_detail" data-bind="line" data-x="row_key" data-y="meses_activo" data-color="violet"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">Avg</div><div class="stat__val" data-chart="candidate_lifetime_avg" data-bind="text" data-field="promedio_meses_por_candidato_en_cliente" data-reduce="first" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">Max</div><div class="stat__val" data-chart="candidate_lifetime_detail" data-bind="text" data-field="meses_activo" data-reduce="max" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">N</div><div class="stat__val" data-chart="candidate_lifetime_avg" data-bind="text" data-field="n_candidato_cliente" data-reduce="first" data-fmt="int">—</div></div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Detail -->
+      <div class="section s-12">
+        <div>
+          <h2>Detail · headcount + revenue</h2>
+          <p>Snapshot mensual de las 11 tablas drill-down consolidadas.</p>
+        </div>
+        <span class="pill">Last 6 months</span>
+      </div>
+
+      <!-- Detail table -->
+      <div class="card s-12">
+        <div class="scroll-x">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th class="num">Candidatos</th>
+                <th class="num">Clients</th>
+                <th class="num">ACPA</th>
+                <th class="num">ARPA</th>
+                <th class="num">ARPC</th>
+                <th class="num">MRR</th>
+                <th class="num">Upfront</th>
+                <th class="num">MoM %</th>
+              </tr>
+            </thead>
+            <tbody data-detail-table="growth">
+              <tr><td colspan="9" class="muted" style="text-align:center;padding:18px">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CHANNEL · ACCOUNT MANAGEMENT
+       ============================================================ -->
+  <section class="channel" data-channel="am">
+    <div class="grid">
+
+      <!-- Risk overview profile-style card -->
+      <div class="hero-profile s-4">
+        <div class="hero-profile__head">
+          <h3>Risk pulse</h3>
+          <span class="card__menu">↻</span>
+        </div>
+        <div class="hero-profile__center">
+          <div class="profile-ring">
+            <svg viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#ff1fdb" stroke-width="6"
+                      stroke-linecap="round" stroke-dasharray="120 364" stroke-dashoffset="58"
+                      transform="rotate(-90 64 64)"/>
+            </svg>
+            <div class="profile-ring__face" style="background:linear-gradient(135deg,#fbd0ec 0%,#ecdaf6 100%);">42</div>
+          </div>
+          <div class="hero-profile__name">42 accounts</div>
+          <div class="hero-profile__role">10 high or critical risk</div>
+        </div>
+        <div class="hero-profile__pills">
+          <span class="mini-pill"><span class="ic">L</span>19</span>
+          <span class="mini-pill"><span class="ic ic--cyan">M</span>13</span>
+          <span class="mini-pill"><span class="ic ic--mag">H</span>10</span>
+        </div>
+      </div>
+
+      <!-- Hero KPI: Candidate churn 30d -->
+      <div class="hero-kpi bg-grad-mag s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">Candidate<br/>churn · 30d</div>
+          <div class="hero-kpi__icon">↓</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value">9.0<span class="unit">%</span></div>
+          <div class="hero-kpi__label">7.3% real · 1.7% buyout</div>
+        </div>
+      </div>
+
+      <!-- Hero KPI: NRR 30d -->
+      <div class="hero-kpi bg-grad-lime s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">Net revenue<br/>retention · 30d</div>
+          <div class="hero-kpi__icon">↑</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value">104.8<span class="unit">%</span></div>
+          <div class="hero-kpi__label">+1.2pp MoM · expansion</div>
+        </div>
+      </div>
+
+      <!-- Strip with KPIs -->
+      <div class="grid s-12" style="grid-column:span 12;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;">
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Client churn · 30d</div>
+          <div class="kpi-card__val">3.4<span class="unit">%</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▼ 0.6pp</span><span>better</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__lab">CRR · 30d</div>
+          <div class="kpi-card__val">96.6<span class="unit">%</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▲ 0.4pp</span><span>retain</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Headcount growth · 30d</div>
+          <div class="kpi-card__val">+5.1<span class="unit">%</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▲ 1.8pp</span><span>net hire</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Win rate · re-hires (LARA)</div>
+          <div class="kpi-card__val">68<span class="unit">%</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▲ 14pp YoY</span><span>conversion</span></div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Churn -->
+      <div class="section s-12">
+        <div>
+          <h2>Churn · clients & candidates</h2>
+          <p>Real vs buyout (conversiones) y la ventana móvil 30d.</p>
+        </div>
+      </div>
+
+      <!-- Client churn -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Client churn · monthly</h3>
+            <p class="card__sub">% de cuentas Staffing que se desactivaron en el mes</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">3.4%</span> <span class="pos">↓ 0.6pp</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+            <line x1="0" y1="84" x2="540" y2="84" stroke="#c5cad5" stroke-dasharray="2 5"/>
+            <text x="530" y="80" text-anchor="end" fill="#8a90a0" font-size="11">Avg · 4.1%</text>
+            <path d="M0,80 C60,72 120,98 180,76 C240,90 300,68 360,92 C420,82 480,72 540,84"
+                  class="line line-mag" stroke-width="3.5"/>
+            <circle cx="540" cy="84" r="6" fill="#fff" stroke="#ff1fdb" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Candidate churn (real + buyout) -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Candidate churn · split</h3>
+            <p class="card__sub">Real (rosa) vs Buyout/Conversión (cian)</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+            <path d="M0,100 C60,78 120,82 180,68 C240,72 300,80 360,64 C420,80 480,68 540,80"
+                  class="line line-rose" stroke-width="3.5"/>
+            <path d="M0,150 C60,142 120,140 180,134 C240,138 300,128 360,138 C420,128 480,134 540,128"
+                  class="line line-cyan" stroke-width="3.5"/>
+            <circle cx="540" cy="80" r="6" fill="#fff" stroke="#f590ad" stroke-width="3"/>
+            <circle cx="540" cy="128" r="6" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
+          </svg>
+          <span class="series-pill sp-rose" style="position:absolute; top:30%; right:-6px;">Real · 7.3%</span>
+          <span class="series-pill sp-cyan" style="position:absolute; top:60%; right:-6px;">Buyout · 1.7%</span>
+        </div>
+      </div>
+
+      <!-- 3m & 6m windows -->
+      <div class="card s-8">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Cohort retention · 3m & 6m</h3>
+            <p class="card__sub">Sobrevivientes en la primera ventana de exposure (90 / 180 días)</p>
+          </div>
+          <div class="metric-row" style="gap:24px">
+            <div><span class="num">92.1<span style="font-size:0.45em">%</span></span><span class="lab">3m</span></div>
+            <div><span class="num">84.4<span style="font-size:0.45em">%</span></span><span class="lab">6m</span></div>
+          </div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 720 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="44" x2="720" y2="44"/>
+              <line x1="0" y1="110" x2="720" y2="110"/>
+              <line x1="0" y1="176" x2="720" y2="176"/>
+            </g>
+            <path d="M0,80 C70,76 140,68 210,62 C280,58 350,52 420,48 C490,44 560,46 640,42 C700,40 720,38 720,38"
+                  class="line line-lime" stroke-width="3.5"/>
+            <path d="M0,128 C70,120 140,108 210,104 C280,100 350,98 420,94 C490,88 560,84 640,82 C700,80 720,80 720,80"
+                  class="line line-violet" stroke-width="3.5"/>
+            <circle cx="720" cy="38" r="6" fill="#fff" stroke="#c1ff72" stroke-width="3"/>
+            <circle cx="720" cy="80" r="6" fill="#fff" stroke="#6c38ff" stroke-width="3"/>
+          </svg>
+          <span class="series-pill sp-lime" style="position:absolute; top:8%; right:-6px;">3 meses</span>
+          <span class="series-pill sp-violet" style="position:absolute; top:34%; right:-6px;">6 meses</span>
+        </div>
+      </div>
+
+      <!-- Risk donut -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Risk score · current</h3>
+            <p class="card__sub">42 cuentas activas</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg viewBox="0 0 180 180">
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#f4f6fa" stroke-width="14"/>
+            <!-- Detached arcs with small gaps -->
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#c1ff72" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="178 224" transform="rotate(-90 90 90)"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#4ba9ff" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="118 284" stroke-dashoffset="-186" transform="rotate(-90 90 90)"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#6c38ff" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="55 347" stroke-dashoffset="-312" transform="rotate(-90 90 90)"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#ff1fdb" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="35 367" stroke-dashoffset="-371" transform="rotate(-90 90 90)"/>
+            <text x="90" y="86" text-anchor="middle" fill="#0e1117" font-size="28" font-weight="700">42</text>
+            <text x="90" y="104" text-anchor="middle" fill="#8a90a0" font-size="11">accounts</text>
+          </svg>
+          <div class="donut__legend">
+            <ul>
+              <li><span class="swatch" style="background:#c1ff72"></span><span>Low</span><span class="leader"></span><span class="val">19</span></li>
+              <li><span class="swatch" style="background:#4ba9ff"></span><span>Medium</span><span class="leader"></span><span class="val">13</span></li>
+              <li><span class="swatch" style="background:#6c38ff"></span><span>High</span><span class="leader"></span><span class="val">6</span></li>
+              <li><span class="swatch" style="background:#ff1fdb"></span><span>Critical</span><span class="leader"></span><span class="val">4</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Retention -->
+      <div class="section s-12">
+        <div>
+          <h2>Retention · expansion · NRR</h2>
+          <p>Cómo se comporta el ingreso retenido vs. la expansión neta.</p>
+        </div>
+      </div>
+
+      <!-- CRR composite -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">CRR · growth & retention</h3>
+            <p class="card__sub">% retenido y % en expansión</p>
+          </div>
+          <span class="callout"><span style="color:#fff;font-weight:600">96.6%</span> <span class="pos">▲ 0.4pp</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+            <path d="M0,60 C60,56 120,52 180,52 C240,48 300,46 360,42 C420,40 480,40 540,38"
+                  class="line line-lime" stroke-width="3.5"/>
+            <path d="M0,128 C60,124 120,118 180,120 C240,114 300,112 360,108 C420,106 480,98 540,96"
+                  class="line line-cyan" stroke-width="3.5"/>
+          </svg>
+          <span class="series-pill sp-lime" style="position:absolute; top:14%; right:-6px;">Retain</span>
+          <span class="series-pill sp-cyan" style="position:absolute; top:42%; right:-6px;">Growth</span>
+        </div>
+      </div>
+
+      <!-- NRR focus chart -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">NRR · history</h3>
+            <p class="card__sub">>100% es expansión neta</p>
+          </div>
+          <span class="callout"><span style="color:#fff;font-weight:600">104.8%</span> <span class="pos">▲ 1.2pp</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+            <line x1="0" y1="100" x2="540" y2="100" stroke="#c5cad5" stroke-dasharray="2 5"/>
+            <text x="530" y="96" text-anchor="end" fill="#8a90a0" font-size="11">100% baseline</text>
+            <path d="M0,108 C60,98 120,92 180,84 C240,78 300,72 360,68 C420,62 480,58 540,52 L540,200 L0,200 Z"
+                  class="area-lime"/>
+            <path d="M0,108 C60,98 120,92 180,84 C240,78 300,72 360,68 C420,62 480,58 540,52"
+                  class="line line-lime" stroke-width="3.5"/>
+            <circle cx="540" cy="52" r="6" fill="#fff" stroke="#c1ff72" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Headcount growth -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Headcount growth · per active client</h3>
+            <p class="card__sub">Net hires (altas - bajas) normalizado por cuentas activas</p>
+          </div>
+          <span class="callout"><span style="color:#fff;font-weight:600">+5.1%</span> <span class="pos">▲ 1.8pp</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 1100 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="1100" y2="40"/>
+              <line x1="0" y1="100" x2="1100" y2="100"/>
+              <line x1="0" y1="160" x2="1100" y2="160"/>
+            </g>
+            <line x1="0" y1="100" x2="1100" y2="100" stroke="#c5cad5" stroke-dasharray="2 5"/>
+            <text x="1090" y="96" text-anchor="end" fill="#8a90a0" font-size="11">0%</text>
+            <path d="M0,108 C90,82 180,118 270,72 C360,128 450,86 540,72 C630,108 720,68 810,80 C900,62 990,86 1100,68"
+                  class="line line-blue" stroke-width="3.5"/>
+            <circle cx="1100" cy="68" r="6" fill="#fff" stroke="#003bff" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ============== Section: Win rates -->
+      <div class="section s-12">
+        <div>
+          <h2>Win rates · multi-candidate · replacements</h2>
+          <p>Conversión de re-contrataciones y propensión a expandir cuentas.</p>
+        </div>
+      </div>
+
+      <!-- % replacements -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">% reemplazos realizados</h3>
+            <p class="card__sub">Sobre el total de oportunidades de reemplazo</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">62%</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 320 160" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="320" y2="40"/>
+              <line x1="0" y1="80" x2="320" y2="80"/>
+              <line x1="0" y1="120" x2="320" y2="120"/>
+            </g>
+            <path d="M0,90 C40,84 80,78 120,82 C160,72 200,66 240,72 C280,58 300,62 320,62"
+                  class="line line-cyan" stroke-width="3.5"/>
+            <circle cx="320" cy="62" r="6" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">Latest</div><div class="stat__val">62%</div></div>
+          <div><div class="stat__lab">12m avg</div><div class="stat__val">54%</div></div>
+        </div>
+      </div>
+
+      <!-- LARA win rate -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">LARA · re-hire win rate</h3>
+            <p class="card__sub">Conversión Client → Close Win 30d</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">68%</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 320 160" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="320" y2="40"/>
+              <line x1="0" y1="80" x2="320" y2="80"/>
+              <line x1="0" y1="120" x2="320" y2="120"/>
+            </g>
+            <path d="M0,108 C40,98 80,92 120,86 C160,76 200,82 240,68 C280,56 300,52 320,52"
+                  class="line line-violet" stroke-width="3.5"/>
+            <circle cx="320" cy="52" r="6" fill="#fff" stroke="#6c38ff" stroke-width="3"/>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">30d</div><div class="stat__val green">68%</div></div>
+          <div><div class="stat__lab">12m</div><div class="stat__val">54%</div></div>
+        </div>
+      </div>
+
+      <!-- Multi-candidate clients -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Clients > 1 candidate</h3>
+            <p class="card__sub">% de cuentas multi-asignación</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">71%</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 320 160" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="320" y2="40"/>
+              <line x1="0" y1="80" x2="320" y2="80"/>
+              <line x1="0" y1="120" x2="320" y2="120"/>
+            </g>
+            <path d="M0,110 C40,98 80,92 120,82 C160,82 200,68 240,64 C280,52 300,48 320,46"
+                  class="line line-blue" stroke-width="3.5"/>
+            <circle cx="320" cy="46" r="6" fill="#fff" stroke="#003bff" stroke-width="3"/>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">Now</div><div class="stat__val green">71%</div></div>
+          <div><div class="stat__lab">YoY</div><div class="stat__val">+18pp</div></div>
+        </div>
+      </div>
+
+      <!-- Risk top accounts -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Risk · top accounts</h3>
+            <p class="card__sub">Score acumulado por cuenta</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="bars">
+          <div class="bars__row"><span class="bars__name">Goat Labs</span><span class="bars__val">9.2</span><span class="bars__bar mag"><span style="width:92%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Talos Group</span><span class="bars__val">7.4</span><span class="bars__bar mag"><span style="width:74%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Northwave</span><span class="bars__val">6.1</span><span class="bars__bar violet"><span style="width:61%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Velvet Co</span><span class="bars__val">5.8</span><span class="bars__bar violet"><span style="width:58%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Atlas Studio</span><span class="bars__val">5.2</span><span class="bars__bar cyan"><span style="width:52%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Helix Inc</span><span class="bars__val">4.4</span><span class="bars__bar cyan"><span style="width:44%"></span></span></div>
+        </div>
+      </div>
+
+      <!-- Candidate retention rate (modificados) -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Candidate retention rate</h3>
+            <p class="card__sub">Modificados — cohort survival 12m</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">81.2%</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="160" x2="540" y2="160"/>
+            </g>
+            <path d="M0,40 C60,46 120,54 180,68 C240,86 300,102 360,118 C420,128 480,138 540,148 L540,220 L0,220 Z"
+                  class="area-cyan"/>
+            <path d="M0,40 C60,46 120,54 180,68 C240,86 300,102 360,118 C420,128 480,138 540,148"
+                  class="line line-cyan" stroke-width="3.5"/>
+            <circle cx="540" cy="148" r="6" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Detail roll-up -->
+      <div class="section s-12">
+        <div>
+          <h2>Detail · monthly snapshot</h2>
+          <p>Consolidación de las 19 tablas drill-down de Account Management.</p>
+        </div>
+      </div>
+      <div class="card s-12">
+        <div class="scroll-x">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th class="num">Active</th>
+                <th class="num">Bajas reales</th>
+                <th class="num">Buyouts</th>
+                <th class="num">Cand churn %</th>
+                <th class="num">Client churn %</th>
+                <th class="num">CRR %</th>
+                <th class="num">NRR %</th>
+                <th class="num">3m ret</th>
+                <th class="num">6m ret</th>
+                <th class="num">% Multi</th>
+                <th class="num">LARA win</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="ink">2025-12</td><td class="num">69</td><td class="num">5</td><td class="num">0</td><td class="num">7.25</td><td class="num">3.6</td><td class="num">95.8</td><td class="num">99.6</td><td class="num">88.2</td><td class="num">79.4</td><td class="num">62</td><td class="num">52</td></tr>
+              <tr><td class="ink">2026-01</td><td class="num">66</td><td class="num">10</td><td class="num">2</td><td class="num">17.39</td><td class="num">4.9</td><td class="num">94.6</td><td class="num">98.1</td><td class="num">89.1</td><td class="num">80.6</td><td class="num">64</td><td class="num">55</td></tr>
+              <tr><td class="ink">2026-02</td><td class="num">70</td><td class="num">5</td><td class="num">1</td><td class="num">9.09</td><td class="num">3.8</td><td class="num">95.4</td><td class="num">100.4</td><td class="num">90.0</td><td class="num">81.8</td><td class="num">66</td><td class="num">58</td></tr>
+              <tr><td class="ink">2026-03</td><td class="num">75</td><td class="num">4</td><td class="num">0</td><td class="num">5.71</td><td class="num">2.9</td><td class="num">96.4</td><td class="num">102.6</td><td class="num">91.2</td><td class="num">82.7</td><td class="num">68</td><td class="num">62</td></tr>
+              <tr><td class="ink">2026-04</td><td class="num">78</td><td class="num">6</td><td class="num">1</td><td class="num">9.33</td><td class="num">3.6</td><td class="num">96.0</td><td class="num">103.4</td><td class="num">91.8</td><td class="num">83.6</td><td class="num">70</td><td class="num">66</td></tr>
+              <tr class="hl"><td class="ink">2026-05</td><td class="num ink">78</td><td class="num">0</td><td class="num">0</td><td class="num">0.00</td><td class="num">3.4</td><td class="num">96.6</td><td class="num">104.8</td><td class="num">92.1</td><td class="num">84.4</td><td class="num">71</td><td class="num">68</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CHANNEL · SALES
+       ============================================================ -->
+  <section class="channel" data-channel="sales">
+    <div class="grid">
+
+      <!-- Profile-style sales pulse -->
+      <div class="hero-profile s-4">
+        <div class="hero-profile__head">
+          <h3>Sales pulse</h3>
+          <span class="card__menu">↻</span>
+        </div>
+        <div class="hero-profile__center">
+          <div class="profile-ring">
+            <svg viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#003bff" stroke-width="6"
+                      stroke-linecap="round" stroke-dasharray="252 364" stroke-dashoffset="58"
+                      transform="rotate(-90 64 64)"/>
+            </svg>
+            <div class="profile-ring__face" style="background:linear-gradient(135deg,#cfe6f1 0%,#dbdef4 100%);">7</div>
+          </div>
+          <div class="hero-profile__name">7 new clients · May</div>
+          <div class="hero-profile__role">+2 vs Apr · 38 NDAs sent</div>
+        </div>
+        <div class="hero-profile__pills">
+          <span class="mini-pill"><span class="ic">⚐</span>38</span>
+          <span class="mini-pill"><span class="ic ic--cyan">→</span>14d</span>
+          <span class="mini-pill"><span class="ic ic--mag">$</span>62</span>
+        </div>
+      </div>
+
+      <!-- Hero KPI: NDA → client -->
+      <div class="hero-kpi bg-grad-cool s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">NDA → Client<br/>conversion · 30d</div>
+          <div class="hero-kpi__icon">⤴</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value">28.4<span class="unit">%</span></div>
+          <div class="hero-kpi__label">+3.1pp MoM · 7 close-wins de 38</div>
+        </div>
+      </div>
+
+      <!-- Hero KPI: avg time -->
+      <div class="hero-kpi bg-grad-rose s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">Avg time<br/>NDA → Win</div>
+          <div class="hero-kpi__icon">◷</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value">14.2<span class="unit">d</span></div>
+          <div class="hero-kpi__label">−1.8d MoM · faster ciclo</div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Pipeline -->
+      <div class="section s-12">
+        <div>
+          <h2>NDA pipeline</h2>
+          <p>Conversión a cliente desde el momento que se envía el NDA.</p>
+        </div>
+        <span class="pill">All sources <span class="chev">▾</span></span>
+      </div>
+
+      <!-- NDA conversion focus -->
+      <div class="card s-8">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">NDA → Client · monthly</h3>
+            <p class="card__sub">% de NDAs enviados que cerraron en cliente · Total + 30d window</p>
+          </div>
+          <div class="metric-row">
+            <div><span class="num">28.4<span style="font-size:0.45em">%</span></span><span class="lab">30d window</span></div>
+            <div><span class="num">22.6<span style="font-size:0.45em">%</span></span><span class="lab">12m avg</span></div>
+            <div><span class="num green">+3.1pp</span><span class="lab">MoM</span></div>
+          </div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 720 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="720" y2="40"/>
+              <line x1="0" y1="100" x2="720" y2="100"/>
+              <line x1="0" y1="160" x2="720" y2="160"/>
+            </g>
+            <path d="M0,148 C60,138 120,124 180,128 C240,114 300,118 360,108 C420,98 480,98 540,86 C600,80 660,72 720,60 L720,220 L0,220 Z"
+                  class="area-blue"/>
+            <path d="M0,148 C60,138 120,124 180,128 C240,114 300,118 360,108 C420,98 480,98 540,86 C600,80 660,72 720,60"
+                  class="line line-blue" stroke-width="3.5"/>
+            <circle cx="720" cy="60" r="7" fill="#fff" stroke="#003bff" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Lead source donut -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Lead source · 30d</h3>
+            <p class="card__sub">Acquisition mix</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg viewBox="0 0 180 180">
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#f4f6fa" stroke-width="14"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#003bff" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="165 237" transform="rotate(-90 90 90)"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#6cd391" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="100 302" stroke-dashoffset="-173" transform="rotate(-90 90 90)"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#f5b94a" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="80 322" stroke-dashoffset="-281" transform="rotate(-90 90 90)"/>
+            <circle cx="90" cy="90" r="64" fill="none" stroke="#ff1fdb" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="50 352" stroke-dashoffset="-369" transform="rotate(-90 90 90)"/>
+            <text x="90" y="86" text-anchor="middle" fill="#0e1117" font-size="26" font-weight="700">38</text>
+            <text x="90" y="104" text-anchor="middle" fill="#8a90a0" font-size="11">NDAs · 30d</text>
+          </svg>
+          <div class="donut__legend">
+            <ul>
+              <li><span class="swatch" style="background:#003bff"></span><span>Referral</span><span class="leader"></span><span class="val">41%</span></li>
+              <li><span class="swatch" style="background:#6cd391"></span><span>Outbound</span><span class="leader"></span><span class="val">25%</span></li>
+              <li><span class="swatch" style="background:#f5b94a"></span><span>LinkedIn</span><span class="leader"></span><span class="val">20%</span></li>
+              <li><span class="swatch" style="background:#ff1fdb"></span><span>Web</span><span class="leader"></span><span class="val">14%</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- New clients per month area -->
+      <div class="card s-8">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">New clients · per month</h3>
+            <p class="card__sub">Acumulado anual y ritmo mensual</p>
+          </div>
+          <span class="callout"><span style="color:#fff;font-weight:600">7</span> <span class="pos">▲ 2 vs Apr</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 720 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="720" y2="40"/>
+              <line x1="0" y1="100" x2="720" y2="100"/>
+              <line x1="0" y1="160" x2="720" y2="160"/>
+            </g>
+            <path d="M0,170 C60,156 120,148 180,150 C240,138 300,128 360,108 C420,98 480,86 540,78 C600,68 660,58 720,46 L720,220 L0,220 Z"
+                  class="area-cyan"/>
+            <path d="M0,170 C60,156 120,148 180,150 C240,138 300,128 360,108 C420,98 480,86 540,78 C600,68 660,58 720,46"
+                  class="line line-cyan" stroke-width="3.5"/>
+            <circle cx="720" cy="46" r="7" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Lead source by month bars -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Lead mix · 12m</h3>
+            <p class="card__sub">Origen acumulado del último año</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="bars" style="margin-top:8px">
+          <div class="bars__row"><span class="bars__name">Referral</span><span class="bars__val">187</span><span class="bars__bar"><span style="width:78%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Outbound</span><span class="bars__val">112</span><span class="bars__bar cyan"><span style="width:48%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">LinkedIn</span><span class="bars__val">89</span><span class="bars__bar amber"><span style="width:38%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Web inbound</span><span class="bars__val">61</span><span class="bars__bar mag"><span style="width:26%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Other</span><span class="bars__val">18</span><span class="bars__bar violet"><span style="width:8%"></span></span></div>
+        </div>
+      </div>
+
+      <!-- Detail consolidated -->
+      <div class="section s-12">
+        <div>
+          <h2>Detail · sales pipeline</h2>
+          <p>Consolidación de NDAs, source y new clients por mes.</p>
+        </div>
+      </div>
+      <div class="card s-12">
+        <div class="scroll-x">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th class="num">NDAs sent</th>
+                <th class="num">Closed Won</th>
+                <th class="num">Win %</th>
+                <th class="num">Avg time (d)</th>
+                <th class="num">New clients</th>
+                <th class="num">Top source</th>
+                <th class="num">Referral %</th>
+                <th class="num">Outbound %</th>
+                <th class="num">LinkedIn %</th>
+                <th class="num">Web %</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="ink">2025-12</td><td class="num">28</td><td class="num">5</td><td class="num">17.9</td><td class="num">18.6</td><td class="num">5</td><td class="num">Referral</td><td class="num">38</td><td class="num">26</td><td class="num">22</td><td class="num">14</td></tr>
+              <tr><td class="ink">2026-01</td><td class="num">31</td><td class="num">6</td><td class="num">19.4</td><td class="num">17.2</td><td class="num">6</td><td class="num">Outbound</td><td class="num">36</td><td class="num">29</td><td class="num">22</td><td class="num">13</td></tr>
+              <tr><td class="ink">2026-02</td><td class="num">26</td><td class="num">5</td><td class="num">19.2</td><td class="num">16.0</td><td class="num">5</td><td class="num">Referral</td><td class="num">42</td><td class="num">23</td><td class="num">22</td><td class="num">13</td></tr>
+              <tr><td class="ink">2026-03</td><td class="num">34</td><td class="num">8</td><td class="num">23.5</td><td class="num">15.4</td><td class="num">8</td><td class="num">Referral</td><td class="num">44</td><td class="num">22</td><td class="num">21</td><td class="num">13</td></tr>
+              <tr><td class="ink">2026-04</td><td class="num">27</td><td class="num">5</td><td class="num">25.3</td><td class="num">16.0</td><td class="num">5</td><td class="num">LinkedIn</td><td class="num">36</td><td class="num">25</td><td class="num">25</td><td class="num">14</td></tr>
+              <tr class="hl"><td class="ink">2026-05</td><td class="num">38</td><td class="num">7</td><td class="num">28.4</td><td class="num">14.2</td><td class="num ink">7</td><td class="num">Referral</td><td class="num">41</td><td class="num">25</td><td class="num">20</td><td class="num">14</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CHANNEL · OPERATIONS
+       ============================================================ -->
+  <section class="channel" data-channel="ops">
+    <div class="grid">
+
+      <!-- Ops profile -->
+      <div class="hero-profile s-4">
+        <div class="hero-profile__head">
+          <h3>Operations pulse</h3>
+          <span class="card__menu">↻</span>
+        </div>
+        <div class="hero-profile__center">
+          <div class="profile-ring">
+            <svg viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+              <circle cx="64" cy="64" r="58" fill="none" stroke="#6c38ff" stroke-width="6"
+                      stroke-linecap="round" stroke-dasharray="290 364" stroke-dashoffset="58"
+                      transform="rotate(-90 64 64)"/>
+            </svg>
+            <div class="profile-ring__face" style="background:linear-gradient(135deg,#e6dcff 0%,#d2e1ff 100%);">12</div>
+          </div>
+          <div class="hero-profile__name">12 placements</div>
+          <div class="hero-profile__role">May 2026 · +2 vs Apr</div>
+        </div>
+        <div class="hero-profile__pills">
+          <span class="mini-pill"><span class="ic">↓</span>17.4d</span>
+          <span class="mini-pill"><span class="ic ic--cyan">⏱</span>6.8d</span>
+          <span class="mini-pill"><span class="ic ic--mag">↗</span>52%</span>
+        </div>
+      </div>
+
+      <!-- Hero KPI: placement time -->
+      <div class="hero-kpi bg-grad-violet s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">Avg placement<br/>time · 30d</div>
+          <div class="hero-kpi__icon">↓</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value">17.4<span class="unit">d</span></div>
+          <div class="hero-kpi__label">−2.1d MoM · faster placements</div>
+        </div>
+      </div>
+
+      <!-- Hero KPI: interview conversion -->
+      <div class="hero-kpi bg-grad-lime s-4">
+        <div class="hero-kpi__head">
+          <div class="hero-kpi__title">Interview<br/>conversion · 30d</div>
+          <div class="hero-kpi__icon">⤴</div>
+        </div>
+        <div>
+          <div class="hero-kpi__value">52.4<span class="unit">%</span></div>
+          <div class="hero-kpi__label">+4.1pp MoM · weighted</div>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="grid s-12" style="grid-column:span 12;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;">
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Batch delivery · 30d</div>
+          <div class="kpi-card__val">6.8<span class="unit">d</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▼ 0.9d</span><span>faster</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Replacement time · 30d</div>
+          <div class="kpi-card__val">22.6<span class="unit">d</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--down">▲ 1.4d</span><span>slower</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Sent → Hired · 30d</div>
+          <div class="kpi-card__val">43.0<span class="unit">%</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▲ 1.6pp</span><span>weighted</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-card__lab">Interviewed → Sent · 30d</div>
+          <div class="kpi-card__val">44.2<span class="unit">%</span></div>
+          <div class="kpi-card__foot"><span class="delta delta--up">▲ 1.2pp</span><span>avg/opp</span></div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Velocity -->
+      <div class="section s-12">
+        <div>
+          <h2>Placement velocity</h2>
+          <p>Cantidad y tiempo de colocaciones — separadas por nuevo y reemplazo.</p>
+        </div>
+      </div>
+
+      <!-- New placements -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">New placements · monthly</h3>
+            <p class="card__sub">Cantidad de colocaciones nuevas (no reemplazos)</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">12 · May</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="110" x2="540" y2="110"/>
+              <line x1="0" y1="170" x2="540" y2="170"/>
+            </g>
+            <g>
+              <rect x="14"  y="160" width="32" height="38" rx="6" fill="#ece4ff"/>
+              <rect x="58"  y="148" width="32" height="50" rx="6" fill="#e2d4ff"/>
+              <rect x="102" y="138" width="32" height="60" rx="6" fill="#d5c2ff"/>
+              <rect x="146" y="128" width="32" height="70" rx="6" fill="#c4adff"/>
+              <rect x="190" y="132" width="32" height="66" rx="6" fill="#c4adff"/>
+              <rect x="234" y="116" width="32" height="82" rx="6" fill="#a98aff"/>
+              <rect x="278" y="100" width="32" height="98" rx="6" fill="#9573ff"/>
+              <rect x="322" y="92"  width="32" height="106" rx="6" fill="#825aff"/>
+              <rect x="366" y="108" width="32" height="90" rx="6" fill="#825aff"/>
+              <rect x="410" y="84"  width="32" height="114" rx="6" fill="#7345ff"/>
+              <rect x="454" y="74"  width="32" height="124" rx="6" fill="#6c38ff"/>
+              <rect x="498" y="62"  width="32" height="136" rx="6" fill="#6c38ff"/>
+            </g>
+          </svg>
+        </div>
+        <div class="stat-row">
+          <div><div class="stat__lab">May</div><div class="stat__val violet" style="color:#6c38ff">12</div></div>
+          <div><div class="stat__lab">Avg 12m</div><div class="stat__val">8.4</div></div>
+          <div><div class="stat__lab">YoY</div><div class="stat__val green">+44%</div></div>
+        </div>
+      </div>
+
+      <!-- Placement time line -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Placement time</h3>
+            <p class="card__sub">Días promedio · nuevo vs reemplazo</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="110" x2="540" y2="110"/>
+              <line x1="0" y1="170" x2="540" y2="170"/>
+            </g>
+            <path d="M0,80 C60,90 120,82 180,72 C240,76 300,68 360,60 C420,72 480,58 540,40"
+                  class="line line-lime" stroke-width="3.5"/>
+            <path d="M0,108 C60,116 120,110 180,118 C240,124 300,118 360,128 C420,116 480,124 540,140"
+                  class="line line-mag" stroke-width="3.5"/>
+            <circle cx="540" cy="40" r="6" fill="#fff" stroke="#c1ff72" stroke-width="3"/>
+            <circle cx="540" cy="140" r="6" fill="#fff" stroke="#ff1fdb" stroke-width="3"/>
+          </svg>
+          <span class="series-pill sp-lime" style="position:absolute; top:8%; right:-6px;">New · 17.4d</span>
+          <span class="series-pill sp-mag" style="position:absolute; top:62%; right:-6px;">Repl · 22.6d</span>
+        </div>
+      </div>
+
+      <!-- Batch delivery time -->
+      <div class="card s-8">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Batch delivery time</h3>
+            <p class="card__sub">Días promedio entre opportunity y batch presented</p>
+          </div>
+          <div class="metric-row" style="gap:24px">
+            <div><span class="num">6.8d</span><span class="lab">30d window</span></div>
+            <div><span class="num">8.2d</span><span class="lab">12m avg</span></div>
+            <div><span class="num green">−1.4d</span><span class="lab">YoY</span></div>
+          </div>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 720 220" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="44" x2="720" y2="44"/>
+              <line x1="0" y1="110" x2="720" y2="110"/>
+              <line x1="0" y1="176" x2="720" y2="176"/>
+            </g>
+            <path d="M0,100 C60,108 120,98 180,86 C240,92 300,80 360,72 C420,84 480,72 540,66 C600,60 660,52 720,42 L720,220 L0,220 Z"
+                  class="area-cyan"/>
+            <path d="M0,100 C60,108 120,98 180,86 C240,92 300,80 360,72 C420,84 480,72 540,66 C600,60 660,52 720,42"
+                  class="line line-cyan" stroke-width="3.5"/>
+            <circle cx="720" cy="42" r="7" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Per-batch list -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Per-batch · last 8</h3>
+            <p class="card__sub">Días de entrega individual</p>
+          </div>
+          <span class="card__menu">⋯</span>
+        </div>
+        <div class="bars" style="margin-top:8px">
+          <div class="bars__row"><span class="bars__name">Batch 0223</span><span class="bars__val">6.0d</span><span class="bars__bar cyan"><span style="width:40%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Batch 0222</span><span class="bars__val">9.2d</span><span class="bars__bar mag"><span style="width:62%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Batch 0221</span><span class="bars__val">4.8d</span><span class="bars__bar lime"><span style="width:32%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Batch 0220</span><span class="bars__val">6.4d</span><span class="bars__bar cyan"><span style="width:42%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Batch 0219</span><span class="bars__val">7.1d</span><span class="bars__bar"><span style="width:48%"></span></span></div>
+          <div class="bars__row"><span class="bars__name">Batch 0218</span><span class="bars__val">5.2d</span><span class="bars__bar lime"><span style="width:35%"></span></span></div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Conversion funnel -->
+      <div class="section s-12">
+        <div>
+          <h2>Conversion funnel · 30d</h2>
+          <p>De candidato sourced a entrevistado a contratado.</p>
+        </div>
+      </div>
+
+      <!-- Sent vs Hired per opp -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Enviados → Contratados</h3>
+            <p class="card__sub">Por opportunity Close Win — 30d</p>
+          </div>
+          <span class="callout"><span style="color:#fff;font-weight:600">43.0%</span> <span class="pos">▲ 1.6pp</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
+            </g>
+            <path d="M0,128 C50,150 100,138 150,82 C200,150 250,150 300,134 C350,16 400,180 450,180 C500,144 540,144 540,144"
+                  class="line line-lime" stroke-width="3.5"/>
+            <g>
+              <circle cx="0"   cy="128" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="60"  cy="160" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="120" cy="146" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="180" cy="82"  r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="240" cy="150" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="300" cy="134" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="360" cy="16"  r="6" fill="#c1ff72" stroke="#0e1117" stroke-width="2"/>
+              <circle cx="420" cy="180" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="480" cy="180" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+              <circle cx="540" cy="144" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
+            </g>
+            <line x1="360" y1="0" x2="360" y2="200" stroke="#0e1117" stroke-dasharray="2 4" stroke-width="1"/>
+          </svg>
+          <span class="callout" style="position:absolute; top:6%; left:60%;">100% · best opp</span>
+        </div>
+      </div>
+
+      <!-- Interviewed vs Sent -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Entrevistados → Enviados</h3>
+            <p class="card__sub">% de enviados que avanzaron a entrevista — por opp</p>
+          </div>
+          <span class="callout"><span style="color:#fff;font-weight:600">44.2%</span> <span class="pos">▲ 1.2pp</span></span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
+            </g>
+            <path d="M0,68 C50,80 100,108 150,108 C200,118 250,138 300,148 C350,154 400,154 450,150 C500,148 540,148 540,148"
+                  class="line line-violet" stroke-width="3.5"/>
+            <circle cx="0" cy="68" r="6" fill="#6c38ff" stroke="#0e1117" stroke-width="2"/>
+            <circle cx="540" cy="148" r="6" fill="#fff" stroke="#6c38ff" stroke-width="3"/>
+          </svg>
+          <span class="callout" style="position:absolute; top:18%; left:6%;">67% · top</span>
+        </div>
+      </div>
+
+      <!-- Interview conversion -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Interview conversion</h3>
+            <p class="card__sub">Tasa global ponderada · monthly</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">52.4%</span> <span class="pos">▲ 4.1pp</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 540 180" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="90" x2="540" y2="90"/>
+              <line x1="0" y1="140" x2="540" y2="140"/>
+            </g>
+            <path d="M0,108 C60,98 120,92 180,98 C240,86 300,82 360,72 C420,68 480,58 540,52"
+                  class="line line-cyan" stroke-width="3.5"/>
+            <circle cx="540" cy="52" r="6" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- NDA to Win -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">All NDA → Close Win</h3>
+            <p class="card__sub">Tasa global incluyendo todos los NDAs</p>
+          </div>
+          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">31.2%</span> <span class="pos">▲ 2.8pp</span></span>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 540 180" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="540" y2="40"/>
+              <line x1="0" y1="90" x2="540" y2="90"/>
+              <line x1="0" y1="140" x2="540" y2="140"/>
+            </g>
+            <path d="M0,128 C60,118 120,112 180,118 C240,108 300,112 360,98 C420,92 480,76 540,58"
+                  class="line line-mag" stroke-width="3.5"/>
+            <circle cx="540" cy="58" r="6" fill="#fff" stroke="#ff1fdb" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Detail consolidated -->
+      <div class="section s-12">
+        <div>
+          <h2>Detail · operations</h2>
+          <p>Consolidación de las 14 tablas drill-down operativas.</p>
+        </div>
+      </div>
+      <div class="card s-12">
+        <div class="scroll-x">
+          <table class="dtable">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th class="num">Placements</th>
+                <th class="num">Avg time (d)</th>
+                <th class="num">Replacement (d)</th>
+                <th class="num">Batch (d)</th>
+                <th class="num">Interview conv %</th>
+                <th class="num">Sent → Hired %</th>
+                <th class="num">Int → Sent %</th>
+                <th class="num">NDA → Win %</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="ink">2025-12</td><td class="num">5</td><td class="num">22.4</td><td class="num">26.1</td><td class="num">9.1</td><td class="num">42.6</td><td class="num">38.2</td><td class="num">39.4</td><td class="num">23.8</td></tr>
+              <tr><td class="ink">2026-01</td><td class="num">7</td><td class="num">21.8</td><td class="num">24.4</td><td class="num">8.4</td><td class="num">44.0</td><td class="num">39.6</td><td class="num">40.1</td><td class="num">25.6</td></tr>
+              <tr><td class="ink">2026-02</td><td class="num">8</td><td class="num">20.2</td><td class="num">23.8</td><td class="num">8.0</td><td class="num">46.4</td><td class="num">40.8</td><td class="num">41.6</td><td class="num">26.4</td></tr>
+              <tr><td class="ink">2026-03</td><td class="num">10</td><td class="num">19.0</td><td class="num">22.6</td><td class="num">7.4</td><td class="num">48.6</td><td class="num">41.2</td><td class="num">42.8</td><td class="num">27.8</td></tr>
+              <tr><td class="ink">2026-04</td><td class="num">10</td><td class="num">18.4</td><td class="num">21.2</td><td class="num">7.0</td><td class="num">50.2</td><td class="num">42.0</td><td class="num">43.4</td><td class="num">28.4</td></tr>
+              <tr class="hl"><td class="ink">2026-05</td><td class="num ink">12</td><td class="num">17.4</td><td class="num">22.6</td><td class="num">6.8</td><td class="num">52.4</td><td class="num">43.0</td><td class="num">44.2</td><td class="num">31.2</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer class="footer">
+    <div>VINTTI · Control Dashboard</div>
+    <div class="muted">
+      MRR <span class="bold" style="color:#0e1117">$78.4K</span>
+      <span class="ftr-sep">·</span>
+      Headcount <span class="bold" style="color:#0e1117">78</span>
+      <span class="ftr-sep">·</span>
+      NRR <span class="bold" style="color:#0e1117">104.8%</span>
+      <span class="ftr-sep">·</span>
+      Win rate <span class="bold" style="color:#0e1117">28.4%</span>
+      <span class="ftr-sep">·</span>
+      Placement <span class="bold" style="color:#0e1117">17.4 d</span>
+    </div>
+    <div class="muted">Synced 2026-05-06 21:54 UTC</div>
+  </footer>
+
+</div>
+
+<script src="./assets/js/dashboards/control-dashboard.js?v=1" defer></script>
 </body>
 </html>

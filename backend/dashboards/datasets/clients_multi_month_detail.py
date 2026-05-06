@@ -20,7 +20,7 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _norm_segmento(value) -> str:
+def _norm_modelo(value) -> str:
     if not value:
         return "Total"
     raw = str(value).strip()
@@ -38,7 +38,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("mes_click"))
         or _parse_date(filters.get("mes"))
     )
-    segmento = _norm_segmento(filters.get("segmento") or filters.get("model"))
+    modelo = _norm_modelo(filters.get("modelo") or filters.get("model") or filters.get("segmento"))
 
     sql = """
         WITH mes_objetivo AS (
@@ -82,7 +82,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN hires h
             ON h.start_d <= (m.mes + interval '1 month - 1 day')::date
            AND COALESCE(h.end_d, DATE '9999-12-31') >= (m.mes + interval '1 month - 1 day')::date
-           AND (%(segmento)s = 'Total' OR h.model = %(segmento)s)
+           AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
         ),
         clientes_con_mas_de_1 AS (
           SELECT mes, account_id
@@ -101,7 +101,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY a.mes, a.client_name, a.candidate_name;
     """
 
-    return sql, {"mes": mes, "segmento": segmento}
+    return sql, {"mes": mes, "modelo": modelo}
 
 
 DATASET = {
