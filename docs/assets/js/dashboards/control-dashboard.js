@@ -133,10 +133,14 @@
     const xKey = opts.x;
     const ys = (opts.y || '').split(',').map(s => s.trim()).filter(Boolean);
     const colors = (opts.color || 'blue').split(',').map(s => s.trim());
+    const labels = (opts.labels || '').split(',').map(s => s.trim());
+    const fmts = (opts.fmtY || '').split(',').map(s => s.trim());
     const area = opts.area === 'true' || opts.area === true;
 
     // Wipe previously rendered series
     svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
+
+    const seriesInfo = [];
 
     ys.forEach((yKey, idx) => {
       const projed = projectPoints(rows, xKey, yKey, w, h, padX, padY);
@@ -178,6 +182,155 @@
       dot.setAttribute('stroke-width', '3');
       dot.setAttribute('data-rendered', '');
       svg.appendChild(dot);
+
+      seriesInfo.push({
+        proj: projed.proj,
+        color: stroke,
+        fmt: fmts[idx] || opts.fmtY || 'number',
+        label: labels[idx] || yKey,
+        yKey,
+      });
+    });
+
+    // Attach interactive hover (vertical guide + tracking dots + tooltip)
+    if (seriesInfo.length) {
+      attachHoverTooltip(svg, seriesInfo, { xKey, rows, w, h });
+    }
+  }
+
+  /* ---------- shared tooltip ---------- */
+  let _tipEl = null;
+  function getTip() {
+    if (_tipEl) return _tipEl;
+    _tipEl = document.createElement('div');
+    _tipEl.className = 'chart-tip';
+    document.body.appendChild(_tipEl);
+    return _tipEl;
+  }
+
+  function formatXLabel(raw) {
+    if (raw == null || raw === '') return '—';
+    const s = String(raw);
+    // YYYY-MM or YYYY-MM-DD
+    const m = s.match(/^(\d{4})-(\d{2})(?:-(\d{2}))?/);
+    if (m) {
+      const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      const mo = months[parseInt(m[2], 10) - 1] || m[2];
+      return `${mo} ${m[1]}`;
+    }
+    return s;
+  }
+
+  /* ---------- hover overlay (vertical guide + tracking dots + tip) ---------- */
+  function attachHoverTooltip(svg, seriesInfo, opts) {
+    const { xKey, w, h } = opts;
+    const tip = getTip();
+
+    // Transparent overlay for mouse capture
+    const overlay = document.createElementNS(SVG_NS, 'rect');
+    overlay.setAttribute('x', '0');
+    overlay.setAttribute('y', '0');
+    overlay.setAttribute('width', w);
+    overlay.setAttribute('height', h);
+    overlay.setAttribute('fill', 'transparent');
+    overlay.setAttribute('data-rendered', '');
+    overlay.setAttribute('data-hover-overlay', '');
+    svg.appendChild(overlay);
+
+    // Vertical guide line
+    const guide = document.createElementNS(SVG_NS, 'line');
+    guide.setAttribute('y1', '0');
+    guide.setAttribute('y2', h);
+    guide.setAttribute('stroke', '#0e1117');
+    guide.setAttribute('stroke-width', '1');
+    guide.setAttribute('stroke-dasharray', '2 4');
+    guide.setAttribute('opacity', '0');
+    guide.setAttribute('data-rendered', '');
+    guide.setAttribute('pointer-events', 'none');
+    svg.appendChild(guide);
+
+    // Tracking dots per series
+    const tracks = seriesInfo.map(s => {
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('r', '7');
+      dot.setAttribute('fill', '#fff');
+      dot.setAttribute('stroke', s.color);
+      dot.setAttribute('stroke-width', '3');
+      dot.setAttribute('opacity', '0');
+      dot.setAttribute('pointer-events', 'none');
+      dot.setAttribute('data-rendered', '');
+      svg.appendChild(dot);
+      return dot;
+    });
+
+    function svgPoint(e) {
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm.inverse());
+    }
+
+    function showAt(idx, screenX, screenY) {
+      // Use first series proj for guide x
+      const refProj = seriesInfo[0].proj;
+      if (idx < 0 || idx >= refProj.length) return;
+      const refPt = refProj[idx];
+      guide.setAttribute('x1', refPt.x);
+      guide.setAttribute('x2', refPt.x);
+      guide.setAttribute('opacity', '0.32');
+
+      let html = '';
+      // Pull X label from first available series at idx
+      const xVal = refPt.raw[xKey];
+      html += `<div class="chart-tip__x">${formatXLabel(xVal)}</div>`;
+
+      seriesInfo.forEach((s, i) => {
+        const p = s.proj[idx];
+        if (!p) {
+          tracks[i].setAttribute('opacity', '0');
+          return;
+        }
+        tracks[i].setAttribute('cx', p.x);
+        tracks[i].setAttribute('cy', p.y);
+        tracks[i].setAttribute('opacity', '1');
+        const fn = fmt.pick(s.fmt);
+        html += `<div class="chart-tip__row">
+          <span class="chart-tip__dot" style="background:${s.color}"></span>
+          <span class="chart-tip__lab">${s.label}</span>
+          <span class="chart-tip__val">${fn(p.val)}</span>
+        </div>`;
+      });
+
+      tip.innerHTML = html;
+      // Position tooltip above the cursor's x in screen coords
+      tip.style.left = (screenX + window.scrollX) + 'px';
+      tip.style.top  = (screenY + window.scrollY) + 'px';
+      tip.classList.add('show');
+    }
+
+    overlay.addEventListener('mousemove', (e) => {
+      const pt = svgPoint(e);
+      if (!pt) return;
+      // Find nearest index from first series
+      const ref = seriesInfo[0].proj;
+      let best = 0, bestDiff = Infinity;
+      ref.forEach((p, i) => {
+        const d = Math.abs(p.x - pt.x);
+        if (d < bestDiff) { bestDiff = d; best = i; }
+      });
+      // Map svg coords back to screen for tip placement
+      const ctm = svg.getScreenCTM();
+      const refPt = ref[best];
+      const screenX = ctm ? (refPt.x * ctm.a + refPt.f + ctm.e) : e.clientX;
+      const screenY = ctm ? (refPt.y * ctm.d + ctm.f) : e.clientY;
+      showAt(best, screenX, screenY);
+    });
+    overlay.addEventListener('mouseleave', () => {
+      tip.classList.remove('show');
+      guide.setAttribute('opacity', '0');
+      tracks.forEach(d => d.setAttribute('opacity', '0'));
     });
   }
 
@@ -310,6 +463,8 @@
           y: el.dataset.y,
           color: el.dataset.color,
           area: el.dataset.area || (bind === 'area' ? 'true' : 'false'),
+          labels: el.dataset.labels,
+          fmtY: el.dataset.fmtY,
         });
       }
       if (bind === 'bars') {

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=2">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=3">
 </head>
 <body>
 
@@ -282,7 +282,7 @@
             <span class="active">Now</span>
           </div>
           <div class="chart" style="position:relative">
-            <svg data-chart="gr_bar_active_headcount" data-bind="area" data-x="month" data-y="active_count" data-color="rose"
+            <svg data-chart="gr_bar_active_headcount" data-bind="area" data-x="month" data-y="active_count" data-color="rose" data-labels="Active candidates" data-fmt-y="int"
                  viewBox="0 0 720 240" preserveAspectRatio="none">
               <line x1="0" y1="200" x2="720" y2="200" stroke="#d9dde5" stroke-dasharray="2 5"/>
             </svg>
@@ -330,7 +330,7 @@
           </div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="gr_line_arpa" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpa_revenue" data-color="cyan,lime"
+          <svg data-chart="gr_line_arpa" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpa_revenue" data-color="cyan,lime" data-labels="ARPA Total,ARPA" data-fmt-y="currency-k,currency-k"
                viewBox="0 0 540 220" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="20" y1="40" x2="540" y2="40"/>
@@ -367,7 +367,7 @@
           </div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="gr_line_arpc" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpc_revenue" data-color="lime,cyan"
+          <svg data-chart="gr_line_arpc" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpc_revenue" data-color="lime,cyan" data-labels="Total revenue,ARPC" data-fmt-y="currency-k,currency-k"
                viewBox="0 0 540 220" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="20" y1="40" x2="540" y2="40"/>
@@ -393,7 +393,7 @@
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="gr_line_mrr" data-bind="area" data-x="mes" data-y="mrr_total" data-color="blue"
+          <svg data-chart="gr_line_mrr" data-bind="area" data-x="mes" data-y="mrr_total" data-color="blue" data-labels="MRR" data-fmt-y="currency"
                viewBox="0 0 720 240" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="720" y2="40"/>
@@ -422,7 +422,7 @@
         </div>
         <div class="kpi-card__val" style="margin-top:8px" data-chart="gr_area_recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="last" data-fmt="currency-k">—</div>
         <div class="chart" style="margin-top:12px;position:relative">
-          <svg data-chart="gr_area_recruiting_upfront" data-bind="area" data-x="mes_cierre" data-y="monto_recruiting" data-color="violet"
+          <svg data-chart="gr_area_recruiting_upfront" data-bind="area" data-x="mes_cierre" data-y="monto_recruiting" data-color="violet" data-labels="Upfront" data-fmt-y="currency"
                viewBox="0 0 320 160" preserveAspectRatio="none"></svg>
         </div>
         <div class="stat-row">
@@ -478,7 +478,7 @@
           <div><span class="num" data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span><span class="lab">ACPA</span></div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="gr_line_acpa" data-bind="line" data-x="mes" data-y="candidatos_activos,cuentas_activas" data-color="blue,cyan"
+          <svg data-chart="gr_line_acpa" data-bind="line" data-x="mes" data-y="candidatos_activos,cuentas_activas" data-color="blue,cyan" data-labels="Candidates,Clients" data-fmt-y="int,int"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -504,7 +504,7 @@
           </span>
         </div>
         <div class="chart">
-          <svg data-chart="gr_line_acpa" data-bind="line" data-x="mes" data-y="acpa" data-color="violet"
+          <svg data-chart="gr_line_acpa" data-bind="line" data-x="mes" data-y="acpa" data-color="violet" data-labels="ACPA" data-fmt-y="decimal"
                viewBox="0 0 1100 180" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="1100" y2="40"/>
@@ -535,7 +535,7 @@
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="gr_line_client_lifetime" data-bind="line" data-x="client_name" data-y="meses_con_al_menos_un_cliente" data-color="cyan"
+          <svg data-chart="gr_line_client_lifetime" data-bind="line" data-x="client_name" data-y="meses_con_al_menos_un_cliente" data-color="cyan" data-labels="Months active" data-fmt-y="months"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -563,7 +563,7 @@
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="gr_line_candidate_lifetime" data-bind="line" data-x="row_key" data-y="meses_activo" data-color="violet"
+          <svg data-chart="gr_line_candidate_lifetime" data-bind="line" data-x="row_key" data-y="meses_activo" data-color="violet" data-labels="Months active" data-fmt-y="months"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -1670,6 +1670,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=3" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=4" defer></script>
 </body>
 </html>

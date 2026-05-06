@@ -248,6 +248,69 @@ table { border-collapse: collapse; }
 .filter-pill--set .v { color: #fff; }
 .filter-pill--set .chev { color: rgba(255,255,255,0.7); }
 
+/* ---------- HOVER TOOLTIP (dark pill, like image 2 reference) ---------- */
+.chart-tip {
+  position: absolute;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 14px;
+  padding: 10px 14px;
+  pointer-events: none;
+  z-index: 1000;
+  font-size: 12.5px;
+  box-shadow: 0 8px 24px rgba(13,18,30,0.22);
+  transform: translate(-50%, -100%);
+  opacity: 0;
+  transition: opacity 0.10s ease, transform 0.10s ease;
+  min-width: 140px;
+  white-space: nowrap;
+  font-family: var(--font);
+}
+.chart-tip.show { opacity: 1; transform: translate(-50%, calc(-100% - 8px)); }
+.chart-tip::after {
+  content: "";
+  position: absolute;
+  bottom: -5px; left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px; height: 10px;
+  background: var(--ink);
+}
+.chart-tip__x {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 500;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.chart-tip__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3px;
+  font-weight: 500;
+}
+.chart-tip__row + .chart-tip__row { margin-top: 4px; }
+.chart-tip__dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.chart-tip__lab {
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  margin-right: 8px;
+}
+.chart-tip__val {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* svg cursor for hoverable charts */
+.chart svg [data-hover-overlay] { cursor: crosshair; }
+
 /* Loading state — subtle pulse on cards */
 body.is-loading .card,
 body.is-loading .focus-card,
