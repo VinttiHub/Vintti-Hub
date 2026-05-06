@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=4">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=5">
 </head>
 <body>
 
@@ -216,16 +216,33 @@
       </div>
 
       <!-- Hero KPI 2 · Active candidates -->
-      <div class="hero-kpi bg-grad-cool s-4">
-        <div class="hero-kpi__head">
-          <div class="hero-kpi__title">Active<br/>candidates</div>
-          <div class="hero-kpi__icon">⚐</div>
-        </div>
-        <div>
-          <div class="hero-kpi__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
-          <div class="hero-kpi__label">
-            <span data-chart="gr_bar_active_headcount" data-bind="text" data-field="active_count" data-reduce="delta-mom-abs" data-fmt="delta-int">—</span> vs prev month
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+
+          <!-- FRONT face: KPI -->
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-cool">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">Active<br/>candidates</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle de candidatos">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
+              <div class="hero-kpi__label">
+                <span data-chart="gr_bar_active_headcount" data-bind="text" data-field="active_count" data-reduce="delta-mom-abs" data-fmt="delta-int">—</span> vs prev month
+              </div>
+            </div>
           </div>
+
+          <!-- BACK face: scrollable list of who is active -->
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Active candidates <span class="count" data-chart="gr_table_active_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Volver">×</button>
+            </div>
+            <div class="dlist" data-chart="gr_table_active_30d_detail" data-bind="list"
+                 data-list-name="candidate_name" data-list-sub="client_name" data-list-date="start_date"></div>
+          </div>
+
         </div>
       </div>
 
@@ -303,6 +320,39 @@
           <span class="legend__item"><span class="legend__sw" style="background:#f590ad"></span>Active candidates</span>
           <span class="legend__item"><span class="legend__sw" style="background:#4ba9ff"></span>Active clients</span>
           <span class="legend__item"><span class="legend__sw" style="background:#d9dde5"></span>Baseline</span>
+        </div>
+
+        <!-- Expander: monthly drill-down — who is active each month -->
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="gr_table_active_headcount_detail" data-bind="monthly-detail"
+                 data-list-month="month" data-list-name="candidate_name" data-list-sub="client_name" data-list-date="start_date"
+                 data-months-limit="6"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inactive candidates card (back, as requested) -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Inactive candidates</h3>
+            <p class="card__sub">Candidatos que se desactivaron — agrupados por mes</p>
+          </div>
+          <span class="callout callout--soft">
+            <span data-chart="gr_table_inactive_candidates" data-bind="text" data-reduce="count" data-fmt="int">—</span>
+            <span class="muted" style="margin-left:6px">total · last 6 months</span>
+          </span>
+        </div>
+        <div class="expander is-open" style="border-top:0;padding-top:4px;margin-top:0">
+          <div class="expander__panel" style="display:block">
+            <div data-chart="gr_table_inactive_candidates" data-bind="monthly-detail"
+                 data-list-month="month" data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_date"
+                 data-months-limit="6"></div>
+          </div>
         </div>
       </div>
 
@@ -1626,6 +1676,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=7" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=8" defer></script>
 </body>
 </html>

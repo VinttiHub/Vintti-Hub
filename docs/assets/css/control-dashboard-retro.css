@@ -616,6 +616,187 @@ body.is-loading .kpi-card::after {
 .bg-grad-cyan   { background: linear-gradient(135deg, #d4ecff 0%, #e0e9fb 100%); }
 .bg-grad-rose   { background: linear-gradient(135deg, #ffd9c8 0%, #f6c9e1 100%); }
 
+/* ---------- FLIP CARD (hero KPI with detail on back) ---------- */
+.hero-kpi.is-flippable {
+  perspective: 1200px;
+  background: transparent;
+  padding: 0;
+  overflow: visible;
+  /* keep the outer shadow on the inner faces instead */
+  box-shadow: none;
+}
+.hero-kpi__inner {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  height: 100%;
+  transition: transform 0.65s cubic-bezier(0.2, 0.8, 0.25, 1);
+  transform-style: preserve-3d;
+}
+.hero-kpi.is-flipped .hero-kpi__inner { transform: rotateY(180deg); }
+.hero-kpi__face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-md);
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+.hero-kpi__face--back {
+  transform: rotateY(180deg);
+  background: var(--card);
+  padding: 18px 0 14px;
+  justify-content: flex-start;
+  gap: 4px;
+}
+.hero-kpi__back-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 22px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.hero-kpi__back-head h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+}
+.hero-kpi__back-head .count {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-left: 8px;
+}
+.hero-kpi__icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.65);
+  display: grid; place-items: center;
+  color: var(--ink);
+  font-size: 16px;
+  box-shadow: 0 1px 1px rgba(13,18,30,0.04);
+  cursor: pointer;
+  border: 0;
+  font-family: inherit;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+.hero-kpi__icon:hover { transform: translateY(-1px); background: rgba(255,255,255,0.85); }
+.hero-kpi__face--back .hero-kpi__icon {
+  background: rgba(13,18,30,0.06);
+  box-shadow: none;
+  width: 32px; height: 32px;
+  font-size: 18px;
+  border-radius: 50%;
+}
+
+/* ---------- DETAIL LIST (used inside flip-back / expandable panels) ---------- */
+.dlist {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 22px;
+  scrollbar-width: thin;
+}
+.dlist::-webkit-scrollbar { width: 6px; }
+.dlist::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 3px; }
+.dlist__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.dlist__row:last-child { border-bottom: 0; }
+.dlist__name {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.2;
+}
+.dlist__sub {
+  color: var(--ink-3);
+  font-size: 11.5px;
+  display: block;
+  margin-top: 2px;
+}
+.dlist__date {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dlist__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+/* ---------- EXPANDABLE PANEL (used under focus card) ---------- */
+.expander {
+  margin-top: 16px;
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+}
+.expander__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  background: var(--card-soft);
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.expander__toggle:hover { background: rgba(13,18,30,0.06); color: var(--ink); }
+.expander__toggle .arrow { transition: transform 0.18s ease; font-size: 11px; color: var(--ink-3); }
+.expander.is-open .expander__toggle .arrow { transform: rotate(180deg); }
+.expander__panel {
+  display: none;
+  margin-top: 14px;
+}
+.expander.is-open .expander__panel { display: block; }
+.expander__group {
+  margin-top: 14px;
+}
+.expander__group h5 {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.expander__rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+}
+.expander__rows .item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 12.5px;
+  align-items: baseline;
+}
+.expander__rows .item .nm { font-weight: 500; color: var(--ink); }
+.expander__rows .item .cl { color: var(--ink-3); font-size: 11.5px; }
+.expander__rows .item .dt { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+
 /* ---------- TRACKERS / CONNECTORS ROW ---------- */
 .connectors {
   background: var(--card);

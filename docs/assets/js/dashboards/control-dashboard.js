@@ -529,6 +529,7 @@
       const tail = nums.slice(-12);
       return tail.reduce((a, b) => a + b, 0) / tail.length;
     }
+    if (mode === 'count') return rows.length;
     if (mode === 'delta-mom') {
       // Last - prev
       const last = +rows[rows.length - 1]?.[field];
@@ -595,6 +596,8 @@
           fmtY: el.dataset.fmtY,
         });
       }
+      if (bind === 'list') return renderList(el, rows);
+      if (bind === 'monthly-detail') return renderMonthlyDetail(el, rows);
       if (bind === 'bars') {
         return renderBars(el, rows, {
           x: el.dataset.x,
@@ -607,6 +610,94 @@
     } catch (e) {
       console.error(`render bind=${bind} failed`, el, e);
     }
+  }
+
+  /* ---------- escape helper ---------- */
+  function esc(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  /* ---------- list (used inside flip-back / panels) ---------- */
+  function renderList(el, rows) {
+    const nameField = el.dataset.listName || 'name';
+    const subField  = el.dataset.listSub  || '';
+    const dateField = el.dataset.listDate || '';
+    const limit     = parseInt(el.dataset.limit || '500', 10);
+    if (!rows.length) {
+      el.innerHTML = '<div class="dlist__empty">No data</div>';
+      return;
+    }
+    const items = rows.slice(0, limit);
+    el.innerHTML = items.map(r => {
+      const name = esc(r[nameField] || '—');
+      const sub  = subField  ? `<span class="dlist__sub">${esc(r[subField] || '')}</span>` : '';
+      const date = dateField ? `<span class="dlist__date">${esc(r[dateField] || '')}</span>` : '';
+      return `<div class="dlist__row"><div><span class="dlist__name">${name}</span>${sub}</div>${date}</div>`;
+    }).join('');
+  }
+
+  /* ---------- monthly grouped detail (active by month, etc) ---------- */
+  function renderMonthlyDetail(el, rows) {
+    const nameField  = el.dataset.listName  || 'candidate_name';
+    const subField   = el.dataset.listSub   || 'client_name';
+    const dateField  = el.dataset.listDate  || 'start_date';
+    const monthField = el.dataset.listMonth || 'month';
+    const monthsLimit = parseInt(el.dataset.monthsLimit || '6', 10);
+    if (!rows.length) {
+      el.innerHTML = '<div class="dlist__empty">No data</div>';
+      return;
+    }
+    // Group by month
+    const groups = {};
+    rows.forEach(r => {
+      const m = String(r[monthField] || '');
+      (groups[m] = groups[m] || []).push(r);
+    });
+    const monthKeys = Object.keys(groups).sort().reverse().slice(0, monthsLimit);
+    el.innerHTML = monthKeys.map(m => {
+      const entries = groups[m];
+      const items = entries.map(r => `
+        <div class="item">
+          <div>
+            <div class="nm">${esc(r[nameField] || '—')}</div>
+            <div class="cl">${esc(r[subField] || '')}</div>
+          </div>
+          <span class="dt">${esc(r[dateField] || '')}</span>
+        </div>`).join('');
+      return `<div class="expander__group">
+        <h5>${esc(m)} <span style="color:var(--ink-4);font-weight:500;margin-left:6px">·  ${entries.length}</span></h5>
+        <div class="expander__rows">${items}</div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ---------- flip card toggle ---------- */
+  function bindFlipCards() {
+    document.querySelectorAll('[data-flip-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = btn.closest('[data-flip-card]');
+        if (card) card.classList.toggle('is-flipped');
+      });
+    });
+  }
+
+  /* ---------- expander toggle ---------- */
+  function bindExpanders() {
+    document.querySelectorAll('[data-expand-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const wrap = btn.closest('.expander');
+        if (wrap) wrap.classList.toggle('is-open');
+      });
+    });
   }
 
   /* ---------- detail table (multi-source) ---------- */
@@ -755,6 +846,8 @@
   /* ---------- boot ---------- */
   function boot() {
     bindFilters();
+    bindFlipCards();
+    bindExpanders();
     hydrate();
   }
 
