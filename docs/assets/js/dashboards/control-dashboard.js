@@ -210,10 +210,23 @@
       });
     });
 
-    // Attach interactive hover (vertical guide + tracking dots + tooltip)
+    // Attach interactive hover (vertical guide + tracking dots + tooltip).
+    // tooltipExtras = "field|Label|fmt,field|Label|fmt,..." renders extra rows
+    // in the tooltip showing additional row-level fields.
     if (seriesInfo.length) {
-      attachHoverTooltip(svg, seriesInfo, { xKey, rows, w, h });
+      attachHoverTooltip(svg, seriesInfo, {
+        xKey, rows, w, h,
+        extras: parseTooltipExtras(opts.tooltipExtras),
+      });
     }
+  }
+
+  function parseTooltipExtras(spec) {
+    if (!spec) return [];
+    return String(spec).split(',').map(part => {
+      const bits = part.split('|').map(s => s.trim());
+      return { field: bits[0], label: bits[1] || bits[0], fmt: bits[2] || 'number' };
+    }).filter(e => e.field);
   }
 
   /* ---------- shared tooltip ---------- */
@@ -318,12 +331,15 @@
       const xVal = refPt.raw[xKey];
       html += `<div class="chart-tip__x">${formatXLabel(xVal)}</div>`;
 
+      // Pull row from any series that has a valid point at this index
+      let row = null;
       seriesInfo.forEach((s, i) => {
         const p = s.proj[idx];
         if (!p || !p.valid) {
           tracks[i].setAttribute('opacity', '0');
           return;
         }
+        if (!row) row = p.raw;
         tracks[i].setAttribute('cx', p.x);
         tracks[i].setAttribute('cy', p.y);
         tracks[i].setAttribute('opacity', '1');
@@ -334,6 +350,21 @@
           <span class="chart-tip__val">${fn(p.val)}</span>
         </div>`;
       });
+
+      // Extra contextual fields (counts, breakdowns, etc)
+      const extras = opts.extras || [];
+      if (extras.length && row) {
+        html += '<div class="chart-tip__sep"></div>';
+        extras.forEach(e => {
+          const v = row[e.field];
+          const fn = fmt.pick(e.fmt);
+          html += `<div class="chart-tip__row chart-tip__row--extra">
+            <span class="chart-tip__dot"></span>
+            <span class="chart-tip__lab">${e.label}</span>
+            <span class="chart-tip__val">${fn(v)}</span>
+          </div>`;
+        });
+      }
 
       tip.innerHTML = html;
       const pos = viewBoxToPage(refPt.x, refPt.y);
@@ -606,7 +637,7 @@
       }
       if (bind === 'text') return renderText(el, scopedRows);
       if (bind === 'line' || bind === 'area') {
-        return renderLine(el, rows, {
+        return renderLine(el, scopedRows, {
           x: el.dataset.x,
           y: el.dataset.y,
           color: el.dataset.color,
@@ -614,6 +645,7 @@
           areaFill: el.dataset.areaFill,
           labels: el.dataset.labels,
           fmtY: el.dataset.fmtY,
+          tooltipExtras: el.dataset.tooltipExtras,
         });
       }
       if (bind === 'list') return renderList(el, scopedRows);
@@ -849,6 +881,25 @@
     return out;
   }
 
+  /* ---------- state classification (used by month-detail dedupe + badges) ---------- */
+  const STATE_RULES = [
+    { match: /Baja\s*[-–]\s*Real/i,            cls: 'baja-real',   label: 'Baja real',  prio: 5, dateField: 'endField' },
+    { match: /Baja\s*[-–]\s*Buyout|Conversion/i, cls: 'baja-buyout', label: 'Buyout',    prio: 4, dateField: 'endField' },
+    { match: /Baja/i,                          cls: 'baja-real',   label: 'Baja',      prio: 4, dateField: 'endField' },
+    { match: /Alta/i,                          cls: 'alta',        label: 'Alta',      prio: 3, dateField: 'startField' },
+    { match: /Activo/i,                        cls: 'activo',      label: 'Activo',    prio: 1, dateField: 'startField' },
+    { match: /retenido/i,                      cls: 'activo',      label: 'Retenido',  prio: 2, dateField: 'startField' },
+    { match: /churn/i,                         cls: 'baja-real',   label: 'Churn',     prio: 5, dateField: 'endField' },
+  ];
+  function classifyState(s) {
+    if (!s) return null;
+    const str = String(s);
+    for (const rule of STATE_RULES) {
+      if (rule.match.test(str)) return rule;
+    }
+    return { cls: '', label: str, prio: 0, dateField: 'endField' };
+  }
+
   /* ---------- month detail (one month at a time, grouped by client) ----------
      Data is server-filtered to the selected month (passes mes=YYYY-MM).
      Re-fetches when month changes. */
@@ -856,6 +907,9 @@
     const nameField  = el.dataset.listName  || 'candidate_name';
     const subField   = el.dataset.listSub   || 'client_name';
     const dateField  = el.dataset.listDate  || 'start_date';
+    const startField = el.dataset.listStart || 'start_d';
+    const endField   = el.dataset.listEnd   || 'end_d';
+    const stateField = el.dataset.listState;  // optional: when set, dedupe + show badge
     const emptyText  = el.dataset.emptyText || 'No data';
     const month      = (opts && opts.month) || monthState.selected;
 
@@ -871,17 +925,49 @@
         const c = String(r[subField] || '—');
         (byClient[c] = byClient[c] || []).push(r);
       });
+
+      // Dedupe within each client by name, keeping highest-priority state
+      if (stateField) {
+        Object.keys(byClient).forEach(c => {
+          const byName = {};
+          byClient[c].forEach(r => {
+            const k = String(r[nameField] || '');
+            const cur = byName[k];
+            const rule = classifyState(r[stateField]);
+            const curRule = cur ? classifyState(cur[stateField]) : null;
+            if (!cur || (rule && (!curRule || rule.prio > curRule.prio))) {
+              byName[k] = r;
+            }
+          });
+          byClient[c] = Object.values(byName);
+        });
+      }
+
       const clientNames = Object.keys(byClient).sort((a, b) => byClient[b].length - byClient[a].length);
       return clientNames.map(c => {
         const cands = byClient[c]
           .slice()
           .sort((a, b) => String(a[nameField] || '').localeCompare(String(b[nameField] || '')))
-          .map(r => `
-            <div class="mdetail__cand">
-              <span class="mdetail__cand-name">${esc(r[nameField] || '—')}</span>
-              <span class="mdetail__cand-date">${esc(r[dateField] || '')}</span>
-            </div>
-          `).join('');
+          .map(r => {
+            const rule = stateField ? classifyState(r[stateField]) : null;
+            // Pick the date field based on state (end for bajas, start for altas/activos)
+            let date = '';
+            if (rule) {
+              const fieldName = rule.dateField === 'endField' ? endField : startField;
+              date = r[fieldName] || r[dateField] || '';
+            } else {
+              date = r[dateField] || '';
+            }
+            const stateBadge = rule
+              ? `<span class="mdetail__cand-state mdetail__cand-state--${rule.cls}">${esc(rule.label)}</span>`
+              : '';
+            return `
+              <div class="mdetail__cand">
+                <span class="mdetail__cand-name">${esc(r[nameField] || '—')}</span>
+                <span class="mdetail__cand-date">${stateBadge}${esc(date)}</span>
+              </div>
+            `;
+          }).join('');
         return `
           <div class="mdetail__group">
             <div class="mdetail__client">

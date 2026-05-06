@@ -307,6 +307,24 @@ table { border-collapse: collapse; }
   font-variant-numeric: tabular-nums;
   font-size: 13px;
 }
+.chart-tip__sep {
+  height: 1px;
+  background: rgba(255,255,255,0.12);
+  margin: 8px 0 6px;
+}
+.chart-tip__row--extra .chart-tip__lab {
+  color: rgba(255,255,255,0.55);
+  font-size: 11px;
+}
+.chart-tip__row--extra .chart-tip__val {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.92);
+}
+.chart-tip__row--extra .chart-tip__dot {
+  background: rgba(255,255,255,0.18);
+  width: 6px; height: 6px;
+}
 
 /* svg cursor for hoverable charts */
 .chart svg [data-hover-overlay] { cursor: crosshair; }
@@ -845,6 +863,24 @@ body.is-loading .kpi-card::after {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.mdetail__cand-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 6px;
+  background: var(--card-soft);
+  color: var(--ink-3);
+}
+.mdetail__cand-state--baja-real { background: rgba(255,31,219,0.12); color: #c81399; }
+.mdetail__cand-state--baja-buyout { background: rgba(75,169,255,0.14); color: #1a72c4; }
+.mdetail__cand-state--alta { background: rgba(193,255,114,0.32); color: #5a8a1f; }
+.mdetail__cand-state--activo { background: rgba(13,18,30,0.05); color: var(--ink-2); }
 .mdetail__empty {
   grid-column: 1 / -1;
   padding: 32px;

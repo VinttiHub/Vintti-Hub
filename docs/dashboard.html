@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=6">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=8">
 </head>
 <body>
 
@@ -759,6 +759,7 @@
           <svg data-chart="am_line_client_churn" data-bind="line"
                data-x="mes" data-y="churn_real_pct,buyout_pct" data-color="mag,cyan"
                data-labels="Real %,Buyout %" data-fmt-y="percent,percent"
+               data-tooltip-extras="clientes_activos|Clientes activos|int,bajas_real|Bajas reales|int,bajas_buyout|Buyouts|int,bajas_total_staffing|Bajas total|int"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -787,6 +788,7 @@
           <svg data-chart="am_line_candidate_churn" data-bind="line"
                data-x="mes" data-y="churn_real_pct,buyout_pct" data-color="rose,cyan"
                data-labels="Real %,Buyout %" data-fmt-y="percent,percent"
+               data-tooltip-extras="activos_inicio|Activos al inicio|int,bajas|Bajas total|int,bajas_real|Bajas reales|int,bajas_buyout|Buyouts|int,churn_pct|Churn total %|percent"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -816,11 +818,13 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">Candidate churn · detail</h3>
-            <p class="card__sub">Altas y bajas del mes seleccionado</p>
+            <p class="card__sub">Altas y bajas del mes seleccionado · estado visible, dedup por candidato</p>
           </div>
         </div>
         <div data-chart="am_table_candidate_churn_detail" data-bind="month-detail"
-             data-list-month="month" data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_d"
+             data-list-month="month" data-list-name="candidate_name" data-list-sub="client_name"
+             data-list-date="end_d" data-list-start="start_d" data-list-end="end_d"
+             data-list-state="estado"
              data-empty-text="No candidate churn this month"></div>
       </div>
 
@@ -850,6 +854,7 @@
           <svg data-chart="am_line_candidate_churn_window" data-bind="line"
                data-x="mes" data-y="churn_real_pct" data-color="violet"
                data-labels="Cohort churn %" data-fmt-y="percent"
+               data-tooltip-extras="starts|Starts|int,bajas_real|Bajas reales|int,bajas_buyout|Buyouts|int,activos_al_cierre|Activos al cierre|int,churn_pct|Churn total %|percent"
                viewBox="0 0 1100 180" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="1100" y2="40"/>
@@ -1740,6 +1745,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=13" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=15" defer></script>
 </body>
 </html>
