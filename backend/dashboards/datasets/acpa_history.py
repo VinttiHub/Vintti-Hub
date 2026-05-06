@@ -92,7 +92,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         bounds AS (
           SELECT
             DATE_TRUNC('month', MIN(start_d))::date AS min_month,
-            DATE_TRUNC('month', COALESCE(MAX(end_d), CURRENT_DATE))::date AS max_month
+            DATE_TRUNC('month', GREATEST(COALESCE(MAX(end_d), CURRENT_DATE), CURRENT_DATE))::date AS max_month
           FROM account_rows
           WHERE start_d IS NOT NULL
         ),

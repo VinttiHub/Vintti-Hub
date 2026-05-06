@@ -818,6 +818,84 @@ body.is-loading .kpi-card::after {
 .area-cyan   { fill: url(#fill-cyan); }
 .area-mag    { fill: url(#fill-mag); }
 .area-lime   { fill: url(#fill-lime); }
+.area-ink    { fill: #0e1117; }
+
+/* ---------- FOCUS HEADCOUNT (dark silhouette style) ---------- */
+.focus-hc__body {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 28px;
+  align-items: stretch;
+  margin-top: 18px;
+  background: #f5f7fb;
+  border-radius: 22px;
+  padding: 28px 30px;
+  position: relative;
+  background-image: radial-gradient(circle at 1px 1px, rgba(13,18,30,0.08) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+}
+.focus-hc__yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-weight: 600;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  z-index: 1;
+  position: relative;
+}
+.focus-hc__yaxis .now-pill {
+  background: var(--ink);
+  color: #fff;
+  padding: 7px 16px;
+  border-radius: var(--radius-pill);
+  display: inline-block;
+  width: max-content;
+  font-weight: 600;
+  font-size: 12.5px;
+  box-shadow: var(--shadow-sm);
+}
+.focus-hc__chart {
+  position: relative;
+  z-index: 1;
+}
+.focus-hc__chart svg {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+.focus-hc__yoy {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding-bottom: 8px;
+  position: relative;
+  z-index: 1;
+  min-width: 160px;
+}
+.focus-hc__yoy .num {
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+  line-height: 0.95;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.focus-hc__yoy .lab {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+@media (max-width: 900px) {
+  .focus-hc__body { grid-template-columns: 1fr; gap: 16px; }
+  .focus-hc__yaxis { flex-direction: row; justify-content: space-between; gap: 8px; }
+  .focus-hc__yoy { text-align: left; }
+}
 
 .dotted-bg {
   background-image: radial-gradient(circle at 1px 1px, rgba(13,18,30,0.08) 1px, transparent 1.4px);

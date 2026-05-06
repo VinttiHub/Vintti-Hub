@@ -71,31 +71,40 @@
     return res.json();
   }
 
-  /* ---------- math: smooth bezier path ---------- */
+  /* ---------- math: smooth bezier path ----------
+     Project ALL rows to a uniform x-axis (index-based). Invalid y values
+     get y=null so series of different validity stay aligned by index;
+     line drawing uses only the valid subset. */
   function projectPoints(rows, xKey, yKey, w, h, padX, padY) {
-    const pts = [];
-    rows.forEach((r, i) => {
+    if (!rows.length) return null;
+    const validVals = [];
+    rows.forEach(r => {
       const v = +r[yKey];
-      if (!isFinite(v)) return;
-      pts.push({ i, raw: r, val: v });
+      if (isFinite(v)) validVals.push(v);
     });
-    if (!pts.length) return null;
+    if (!validVals.length) return null;
 
-    const ys = pts.map(p => p.val);
-    const minY = Math.min(...ys, 0);
-    const maxY = Math.max(...ys);
+    const minY = Math.min(...validVals, 0);
+    const maxY = Math.max(...validVals);
     const spanY = (maxY - minY) || 1;
-    const idxs = pts.map(p => p.i);
-    const minX = Math.min(...idxs);
-    const maxX = Math.max(...idxs);
-    const spanX = (maxX - minX) || 1;
+    const N = rows.length;
+    const spanX = Math.max(N - 1, 1);
 
-    const proj = pts.map(p => ({
-      x: padX + ((p.i - minX) / spanX) * (w - 2 * padX),
-      y: h - padY - ((p.val - minY) / spanY) * (h - 2 * padY),
-      val: p.val,
-      raw: p.raw,
-    }));
+    // proj[i] for every row index — null y when invalid
+    const proj = rows.map((r, i) => {
+      const v = +r[yKey];
+      const x = padX + (i / spanX) * (w - 2 * padX);
+      if (!isFinite(v)) {
+        return { x, y: null, val: null, raw: r, valid: false };
+      }
+      return {
+        x,
+        y: h - padY - ((v - minY) / spanY) * (h - 2 * padY),
+        val: v,
+        raw: r,
+        valid: true,
+      };
+    });
     return { proj, minY, maxY };
   }
 
@@ -136,6 +145,7 @@
     const labels = (opts.labels || '').split(',').map(s => s.trim());
     const fmts = (opts.fmtY || '').split(',').map(s => s.trim());
     const area = opts.area === 'true' || opts.area === true;
+    const areaFill = opts.areaFill || '';  // e.g. "ink" → solid var(--ink)
 
     // Wipe previously rendered series
     svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
@@ -147,15 +157,18 @@
       if (!projed) return;
       const col = colors[idx] || colors[0];
       const stroke = COLOR[col] || COLOR.blue;
-      const d = smoothPath(projed.proj);
+      // Only valid points get drawn (line and area)
+      const validProj = projed.proj.filter(p => p.valid);
+      if (!validProj.length) return;
+      const d = smoothPath(validProj);
 
       // Area fill (only first series)
       if (area && idx === 0) {
-        const last = projed.proj[projed.proj.length - 1];
-        const first = projed.proj[0];
+        const last = validProj[validProj.length - 1];
+        const first = validProj[0];
         const ap = document.createElementNS(SVG_NS, 'path');
         ap.setAttribute('d', d + ` L ${last.x.toFixed(2)},${h} L ${first.x.toFixed(2)},${h} Z`);
-        ap.setAttribute('class', `area-${col}`);
+        ap.setAttribute('class', `area-${areaFill || col}`);
         ap.setAttribute('data-rendered', '');
         svg.appendChild(ap);
       }
@@ -165,14 +178,18 @@
       lp.setAttribute('d', d);
       lp.setAttribute('fill', 'none');
       lp.setAttribute('stroke', stroke);
-      lp.setAttribute('stroke-width', '3.5');
+      lp.setAttribute('stroke-width', idx === 0 ? '3.5' : '3');
       lp.setAttribute('stroke-linecap', 'round');
       lp.setAttribute('stroke-linejoin', 'round');
       lp.setAttribute('data-rendered', '');
+      // Secondary lines on top of dark area get a subtle white halo for readability
+      if (idx > 0 && areaFill === 'ink') {
+        lp.setAttribute('filter', 'drop-shadow(0 0 1px rgba(255,255,255,0.35))');
+      }
       svg.appendChild(lp);
 
-      // End dot
-      const last = projed.proj[projed.proj.length - 1];
+      // End dot at last valid point
+      const last = validProj[validProj.length - 1];
       const dot = document.createElementNS(SVG_NS, 'circle');
       dot.setAttribute('cx', last.x.toFixed(2));
       dot.setAttribute('cy', last.y.toFixed(2));
@@ -184,7 +201,7 @@
       svg.appendChild(dot);
 
       seriesInfo.push({
-        proj: projed.proj,
+        proj: projed.proj,           // full-length, includes invalid points
         color: stroke,
         fmt: fmts[idx] || opts.fmtY || 'number',
         label: labels[idx] || yKey,
@@ -302,7 +319,7 @@
 
       seriesInfo.forEach((s, i) => {
         const p = s.proj[idx];
-        if (!p) {
+        if (!p || !p.valid) {
           tracks[i].setAttribute('opacity', '0');
           return;
         }
@@ -573,6 +590,7 @@
           y: el.dataset.y,
           color: el.dataset.color,
           area: el.dataset.area || (bind === 'area' ? 'true' : 'false'),
+          areaFill: el.dataset.areaFill,
           labels: el.dataset.labels,
           fmtY: el.dataset.fmtY,
         });
