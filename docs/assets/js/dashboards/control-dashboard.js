@@ -263,17 +263,32 @@
       return dot;
     });
 
-    function svgPoint(e) {
-      const pt = svg.createSVGPoint();
-      pt.x = e.clientX;
-      pt.y = e.clientY;
-      const ctm = svg.getScreenCTM();
-      if (!ctm) return null;
-      return pt.matrixTransform(ctm.inverse());
+    // Convert a viewBox point to page (document) coords using bounding rect
+    function viewBoxToPage(vbX, vbY) {
+      const rect = svg.getBoundingClientRect();
+      const xPx = rect.left + (vbX / w) * rect.width;
+      const yPx = rect.top  + (vbY / h) * rect.height;
+      return { x: xPx + window.scrollX, y: yPx + window.scrollY };
     }
 
-    function showAt(idx, screenX, screenY) {
-      // Use first series proj for guide x
+    // Find nearest index from cursor's viewBox-x
+    function nearestIndex(vbX) {
+      const ref = seriesInfo[0].proj;
+      let best = 0, bestDiff = Infinity;
+      ref.forEach((p, i) => {
+        const d = Math.abs(p.x - vbX);
+        if (d < bestDiff) { bestDiff = d; best = i; }
+      });
+      return best;
+    }
+
+    function eventToVbX(e) {
+      const rect = svg.getBoundingClientRect();
+      if (rect.width === 0) return 0;
+      return ((e.clientX - rect.left) / rect.width) * w;
+    }
+
+    function showAt(idx) {
       const refProj = seriesInfo[0].proj;
       if (idx < 0 || idx >= refProj.length) return;
       const refPt = refProj[idx];
@@ -282,7 +297,6 @@
       guide.setAttribute('opacity', '0.32');
 
       let html = '';
-      // Pull X label from first available series at idx
       const xVal = refPt.raw[xKey];
       html += `<div class="chart-tip__x">${formatXLabel(xVal)}</div>`;
 
@@ -304,33 +318,113 @@
       });
 
       tip.innerHTML = html;
-      // Position tooltip above the cursor's x in screen coords
-      tip.style.left = (screenX + window.scrollX) + 'px';
-      tip.style.top  = (screenY + window.scrollY) + 'px';
+      const pos = viewBoxToPage(refPt.x, refPt.y);
+      tip.style.left = pos.x + 'px';
+      tip.style.top  = pos.y + 'px';
       tip.classList.add('show');
+
+      // Clamp horizontally to the viewport so it never escapes off-edge
+      const tRect = tip.getBoundingClientRect();
+      const margin = 8;
+      let leftPx = pos.x;
+      const halfW = tRect.width / 2;
+      const minLeft = window.scrollX + margin + halfW;
+      const maxLeft = window.scrollX + window.innerWidth - margin - halfW;
+      if (leftPx < minLeft) leftPx = minLeft;
+      if (leftPx > maxLeft) leftPx = maxLeft;
+      tip.style.left = leftPx + 'px';
     }
 
     overlay.addEventListener('mousemove', (e) => {
-      const pt = svgPoint(e);
-      if (!pt) return;
-      // Find nearest index from first series
-      const ref = seriesInfo[0].proj;
-      let best = 0, bestDiff = Infinity;
-      ref.forEach((p, i) => {
-        const d = Math.abs(p.x - pt.x);
-        if (d < bestDiff) { bestDiff = d; best = i; }
-      });
-      // Map svg coords back to screen for tip placement
-      const ctm = svg.getScreenCTM();
-      const refPt = ref[best];
-      const screenX = ctm ? (refPt.x * ctm.a + refPt.f + ctm.e) : e.clientX;
-      const screenY = ctm ? (refPt.y * ctm.d + ctm.f) : e.clientY;
-      showAt(best, screenX, screenY);
+      const vbX = eventToVbX(e);
+      showAt(nearestIndex(vbX));
     });
     overlay.addEventListener('mouseleave', () => {
       tip.classList.remove('show');
       guide.setAttribute('opacity', '0');
       tracks.forEach(d => d.setAttribute('opacity', '0'));
+    });
+  }
+
+  /* ---------- bar hover tooltip ---------- */
+  function attachBarHover(svg, barEntries, opts) {
+    const w = svg.viewBox.baseVal.width, h = svg.viewBox.baseVal.height;
+    const tip = getTip();
+
+    function viewBoxToPage(vbX, vbY) {
+      const rect = svg.getBoundingClientRect();
+      const xPx = rect.left + (vbX / w) * rect.width;
+      const yPx = rect.top  + (vbY / h) * rect.height;
+      return { x: xPx + window.scrollX, y: yPx + window.scrollY };
+    }
+
+    barEntries.forEach(({ rect, row, color, fmtName, label, xLabel, cx, cy }) => {
+      rect.style.cursor = 'pointer';
+      rect.addEventListener('mouseenter', () => {
+        rect.setAttribute('opacity', '0.85');
+        const fn = fmt.pick(fmtName);
+        const v = +row[opts.y];
+        tip.innerHTML = `
+          <div class="chart-tip__x">${formatXLabel(xLabel)}</div>
+          <div class="chart-tip__row">
+            <span class="chart-tip__dot" style="background:${color}"></span>
+            <span class="chart-tip__lab">${label}</span>
+            <span class="chart-tip__val">${fn(v)}</span>
+          </div>`;
+        const pos = viewBoxToPage(cx, cy);
+        tip.style.left = pos.x + 'px';
+        tip.style.top  = pos.y + 'px';
+        tip.classList.add('show');
+        // Clamp
+        const tRect = tip.getBoundingClientRect();
+        const margin = 8;
+        const halfW = tRect.width / 2;
+        const minLeft = window.scrollX + margin + halfW;
+        const maxLeft = window.scrollX + window.innerWidth - margin - halfW;
+        let leftPx = pos.x;
+        if (leftPx < minLeft) leftPx = minLeft;
+        if (leftPx > maxLeft) leftPx = maxLeft;
+        tip.style.left = leftPx + 'px';
+      });
+      rect.addEventListener('mouseleave', () => {
+        rect.setAttribute('opacity', '1');
+        tip.classList.remove('show');
+      });
+    });
+  }
+
+  /* ---------- donut hover tooltip ---------- */
+  function attachDonutHover(svg, segments, opts) {
+    const w = svg.viewBox.baseVal.width, h = svg.viewBox.baseVal.height;
+    const tip = getTip();
+
+    function viewBoxToPage(vbX, vbY) {
+      const rect = svg.getBoundingClientRect();
+      const xPx = rect.left + (vbX / w) * rect.width;
+      const yPx = rect.top  + (vbY / h) * rect.height;
+      return { x: xPx + window.scrollX, y: yPx + window.scrollY };
+    }
+
+    segments.forEach(({ arc, color, label, value, fmtName, cx, cy }) => {
+      arc.style.cursor = 'pointer';
+      arc.addEventListener('mouseenter', () => {
+        arc.setAttribute('opacity', '0.85');
+        const fn = fmt.pick(fmtName || 'number');
+        tip.innerHTML = `
+          <div class="chart-tip__row">
+            <span class="chart-tip__dot" style="background:${color}"></span>
+            <span class="chart-tip__lab">${label}</span>
+            <span class="chart-tip__val">${fn(value)}</span>
+          </div>`;
+        const pos = viewBoxToPage(cx, cy);
+        tip.style.left = pos.x + 'px';
+        tip.style.top  = pos.y + 'px';
+        tip.classList.add('show');
+      });
+      arc.addEventListener('mouseleave', () => {
+        arc.setAttribute('opacity', '1');
+        tip.classList.remove('show');
+      });
     });
   }
 
@@ -341,8 +435,11 @@
     const w = vb.width, h = vb.height;
     const padX = 8, padY = 12;
     const yKey = opts.y;
+    const xKey = opts.x;
     const col = opts.color || 'violet';
     const baseColor = COLOR[col] || COLOR.blue;
+    const label = opts.label || yKey;
+    const fmtName = opts.fmtY || 'number';
 
     const vals = rows.map(r => +r[yKey]).filter(v => isFinite(v));
     if (!vals.length) return;
@@ -353,6 +450,7 @@
     const n = rows.length;
     const slot = (w - 2 * padX) / Math.max(n, 1);
     const barW = Math.max(8, Math.min(34, slot * 0.62));
+    const barEntries = [];
 
     rows.forEach((r, i) => {
       const v = +r[yKey];
@@ -361,11 +459,8 @@
       const barH = Math.max(2, ((v / maxV) * (h - 2 * padY)));
       const y = h - padY - barH;
 
-      // Color intensity scales with index (older = lighter, newer = bolder)
       const intensity = 0.32 + (i / Math.max(n - 1, 1)) * 0.68;
-      const fill = i === n - 1
-        ? baseColor
-        : tintColor(baseColor, 1 - intensity);
+      const fill = i === n - 1 ? baseColor : tintColor(baseColor, 1 - intensity);
 
       const rect = document.createElementNS(SVG_NS, 'rect');
       rect.setAttribute('x', x.toFixed(2));
@@ -376,7 +471,22 @@
       rect.setAttribute('fill', fill);
       rect.setAttribute('data-rendered', '');
       svg.appendChild(rect);
+
+      barEntries.push({
+        rect,
+        row: r,
+        color: baseColor,
+        fmtName,
+        label,
+        xLabel: xKey ? r[xKey] : '',
+        cx: x + barW / 2,
+        cy: y,
+      });
     });
+
+    if (barEntries.length) {
+      attachBarHover(svg, barEntries, { y: yKey });
+    }
   }
 
   function tintColor(hex, lightness) {
@@ -469,8 +579,11 @@
       }
       if (bind === 'bars') {
         return renderBars(el, rows, {
+          x: el.dataset.x,
           y: el.dataset.y,
           color: el.dataset.color,
+          label: el.dataset.label || (el.dataset.labels || '').split(',')[0],
+          fmtY: el.dataset.fmtY,
         });
       }
     } catch (e) {
