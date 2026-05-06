@@ -597,7 +597,14 @@
     const bind = el.dataset.bind;
     try {
       if (!bind) return;
-      if (bind === 'text') return renderText(el, rows);
+      // Optional row filter: data-where-field + data-where-value
+      let scopedRows = rows;
+      if (el.dataset.whereField && el.dataset.whereValue != null) {
+        const wf = el.dataset.whereField;
+        const wv = el.dataset.whereValue;
+        scopedRows = (rows || []).filter(r => String(r[wf]) === wv);
+      }
+      if (bind === 'text') return renderText(el, scopedRows);
       if (bind === 'line' || bind === 'area') {
         return renderLine(el, rows, {
           x: el.dataset.x,
@@ -609,12 +616,15 @@
           fmtY: el.dataset.fmtY,
         });
       }
-      if (bind === 'list') return renderList(el, rows);
+      if (bind === 'list') return renderList(el, scopedRows);
+      if (bind === 'donut') return renderDonut(el, scopedRows);
+      if (bind === 'donut-legend') return renderDonutLegend(el, scopedRows);
+      if (bind === 'bar-list') return renderBarList(el, scopedRows);
       // month-detail panels are NOT hydrated by the generic flow — they
       // refetch with mes= filter via refetchMonthDetails() instead.
       if (bind === 'month-detail') return;
       if (bind === 'bars') {
-        return renderBars(el, rows, {
+        return renderBars(el, scopedRows, {
           x: el.dataset.x,
           y: el.dataset.y,
           color: el.dataset.color,
@@ -625,6 +635,158 @@
     } catch (e) {
       console.error(`render bind=${bind} failed`, el, e);
     }
+  }
+
+  /* ---------- donut ---------- */
+  const RISK_COLORS = {
+    'Alto': '#ff1fdb', 'Critical': '#ff1fdb', 'High': '#ff1fdb',
+    'Medio': '#6c38ff', 'Medium': '#6c38ff',
+    'Bajo': '#c1ff72', 'Low': '#c1ff72', 'Safe': '#c1ff72',
+  };
+  const DEFAULT_PALETTE = ['#003bff', '#6c38ff', '#4ba9ff', '#ff1fdb', '#c1ff72', '#f5b94a', '#6cd391', '#f590ad'];
+
+  function colorForLabel(label, idx) {
+    return RISK_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
+  }
+
+  function renderDonut(svg, rows) {
+    if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
+    const labelKey = svg.dataset.label || 'label';
+    const valueKey = svg.dataset.value || 'value';
+    const w = svg.viewBox.baseVal.width, h = svg.viewBox.baseVal.height;
+    const cx = w / 2, cy = h / 2, r = 64, sw = 14;
+    svg.innerHTML = '';
+
+    if (!rows.length) {
+      // Empty placeholder ring
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', r);
+      c.setAttribute('fill', 'none'); c.setAttribute('stroke', '#f4f6fa');
+      c.setAttribute('stroke-width', sw);
+      svg.appendChild(c);
+      return;
+    }
+
+    const total = rows.reduce((acc, r) => acc + (+r[valueKey] || 0), 0) || 1;
+    const circumference = 2 * Math.PI * r;
+    const gap = 4; // px gap between segments
+
+    // Bg ring
+    const bg = document.createElementNS(SVG_NS, 'circle');
+    bg.setAttribute('cx', cx); bg.setAttribute('cy', cy); bg.setAttribute('r', r);
+    bg.setAttribute('fill', 'none'); bg.setAttribute('stroke', '#f4f6fa');
+    bg.setAttribute('stroke-width', sw);
+    svg.appendChild(bg);
+
+    let offset = 0;
+    const segments = [];
+    rows.forEach((row, i) => {
+      const v = +row[valueKey] || 0;
+      const len = (v / total) * circumference;
+      const drawLen = Math.max(0, len - gap);
+      const color = colorForLabel(String(row[labelKey] || ''), i);
+      const arc = document.createElementNS(SVG_NS, 'circle');
+      arc.setAttribute('cx', cx); arc.setAttribute('cy', cy); arc.setAttribute('r', r);
+      arc.setAttribute('fill', 'none');
+      arc.setAttribute('stroke', color);
+      arc.setAttribute('stroke-width', sw);
+      arc.setAttribute('stroke-linecap', 'round');
+      arc.setAttribute('stroke-dasharray', `${drawLen} ${circumference - drawLen}`);
+      arc.setAttribute('stroke-dashoffset', String(-offset));
+      arc.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+      svg.appendChild(arc);
+      segments.push({
+        arc, color,
+        label: String(row[labelKey] || '—'),
+        value: v,
+        fmtName: 'int',
+        cx, cy: cy - r,
+      });
+      offset += len;
+    });
+
+    // Center text
+    const txt1 = document.createElementNS(SVG_NS, 'text');
+    txt1.setAttribute('x', cx); txt1.setAttribute('y', cy - 2);
+    txt1.setAttribute('text-anchor', 'middle');
+    txt1.setAttribute('fill', '#0e1117');
+    txt1.setAttribute('font-size', '26');
+    txt1.setAttribute('font-weight', '700');
+    txt1.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+    txt1.textContent = String(total);
+    svg.appendChild(txt1);
+
+    const txt2 = document.createElementNS(SVG_NS, 'text');
+    txt2.setAttribute('x', cx); txt2.setAttribute('y', cy + 16);
+    txt2.setAttribute('text-anchor', 'middle');
+    txt2.setAttribute('fill', '#8a90a0');
+    txt2.setAttribute('font-size', '11');
+    txt2.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+    txt2.textContent = 'total';
+    svg.appendChild(txt2);
+
+    attachDonutHover(svg, segments, {});
+  }
+
+  function renderDonutLegend(el, rows) {
+    const labelKey = el.dataset.label || 'label';
+    const valueKey = el.dataset.value || 'value';
+    const ul = el.querySelector('ul') || el;
+    if (ul.tagName !== 'UL') {
+      el.innerHTML = '<ul></ul>';
+    }
+    const list = el.querySelector('ul');
+    list.innerHTML = '';
+    const total = rows.reduce((a, r) => a + (+r[valueKey] || 0), 0) || 1;
+    rows.forEach((row, i) => {
+      const v = +row[valueKey] || 0;
+      const pct = ((v / total) * 100).toFixed(1) + '%';
+      const color = colorForLabel(String(row[labelKey] || ''), i);
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="swatch" style="background:${color}"></span>
+        <span>${esc(row[labelKey] || '—')}</span>
+        <span class="leader"></span>
+        <span class="val">${v} <span class="muted" style="font-weight:500;color:var(--ink-3);font-size:11px">${pct}</span></span>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  /* ---------- bar list (top N items by value) ---------- */
+  function renderBarList(el, rows) {
+    const nameField = el.dataset.barName || 'name';
+    const valField = el.dataset.barValue || 'value';
+    const limit = parseInt(el.dataset.barLimit || '10', 10);
+    const colorByValue = el.dataset.barColorByValue === 'true';
+
+    if (!rows.length) {
+      el.innerHTML = '<div class="muted" style="padding:12px;font-size:13px;text-align:center">No data</div>';
+      return;
+    }
+
+    const sorted = rows.slice()
+      .sort((a, b) => (+b[valField] || 0) - (+a[valField] || 0))
+      .slice(0, limit);
+    const max = Math.max(...sorted.map(r => +r[valField] || 0), 1);
+
+    el.innerHTML = sorted.map(r => {
+      const v = +r[valField] || 0;
+      const pct = (v / max) * 100;
+      let cls = '';
+      if (colorByValue) {
+        if (v >= max * 0.7) cls = 'mag';
+        else if (v >= max * 0.4) cls = 'violet';
+        else cls = 'cyan';
+      }
+      return `
+        <div class="bars__row">
+          <span class="bars__name">${esc(r[nameField] || '—')}</span>
+          <span class="bars__val">${esc(v)}</span>
+          <span class="bars__bar ${cls}"><span style="width:${pct.toFixed(1)}%"></span></span>
+        </div>
+      `;
+    }).join('');
   }
 
   /* ---------- escape helper ---------- */
@@ -798,6 +960,61 @@
     });
   }
 
+  /* ---------- AM detail table (multi-source roll-up) ---------- */
+  async function renderAmDetailTable() {
+    const tbody = document.querySelector('[data-detail-table="am"]');
+    if (!tbody) return;
+    try {
+      const [cChurn, candChurn, crr, nrr, multi, hcg] = await Promise.all([
+        fetchChart('am_line_client_churn').catch(() => ({ rows: [] })),
+        fetchChart('am_line_candidate_churn').catch(() => ({ rows: [] })),
+        fetchChart('am_line_crr').catch(() => ({ rows: [] })),
+        fetchChart('am_line_nrr').catch(() => ({ rows: [] })),
+        fetchChart('am_line_clients_multi').catch(() => ({ rows: [] })),
+        fetchChart('am_line_headcount_growth').catch(() => ({ rows: [] })),
+      ]);
+      const ym = (s) => String(s || '').slice(0, 7);
+      const byMes = {};
+      const upsert = (m, k, v) => { if (!m) return; (byMes[m] = byMes[m] || { mes: m })[k] = v; };
+      (cChurn.rows || []).forEach(r => {
+        upsert(ym(r.mes), 'clients_active', r.clientes_activos);
+        upsert(ym(r.mes), 'client_churn', r.churn_real_pct);
+      });
+      (candChurn.rows || []).forEach(r => {
+        upsert(ym(r.mes), 'cands_active', r.activos_inicio);
+        upsert(ym(r.mes), 'cand_churn', r.churn_real_pct);
+      });
+      (crr.rows || []).forEach(r => {
+        upsert(ym(r.mes), 'crr', r.crr_pct);
+        upsert(ym(r.mes), 'grr', r.grr_pct);
+      });
+      (nrr.rows || []).forEach(r => upsert(ym(r.mes), 'nrr', r.nrr_pct));
+      (multi.rows || []).forEach(r => upsert(ym(r.mes), 'multi', r.pct_percent));
+      (hcg.rows  || []).forEach(r => upsert(ym(r.mes), 'hcg',   r.pct_activos_que_aumentaron));
+
+      const months = Object.keys(byMes).sort().slice(-6);
+      tbody.innerHTML = months.map((m, i) => {
+        const r = byMes[m];
+        const hl = i === months.length - 1 ? ' class="hl"' : '';
+        return `
+          <tr${hl}>
+            <td class="ink">${m}</td>
+            <td class="num">${fmt.int(r.clients_active)}</td>
+            <td class="num">${fmt.percent(r.client_churn)}</td>
+            <td class="num">${fmt.int(r.cands_active)}</td>
+            <td class="num">${fmt.percent(r.cand_churn)}</td>
+            <td class="num">${fmt.percent(r.crr)}</td>
+            <td class="num">${fmt.percent(r.grr)}</td>
+            <td class="num">${fmt.percent(r.nrr)}</td>
+            <td class="num">${fmt.percent(r.multi)}</td>
+            <td class="num">${fmt.percent(r.hcg)}</td>
+          </tr>`;
+      }).join('');
+    } catch (e) {
+      console.error('AM detail table failed', e);
+    }
+  }
+
   /* ---------- detail table (multi-source) ---------- */
   async function renderDetailTable() {
     const tbody = document.querySelector('[data-detail-table="growth"]');
@@ -888,6 +1105,7 @@
       });
 
       renderDetailTable();
+      renderAmDetailTable();
       // Populate month-detail panels with the currently selected month
       if (monthState.selected) {
         refetchMonthDetails(monthState.selected);
