@@ -75,7 +75,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM meses_filtrado m
           JOIN candidatos c
             ON c.start_d IS NOT NULL
-           AND c.start_d <= m.mes
+           AND c.start_d < m.mes
            AND (c.end_d IS NULL OR c.end_d >= m.mes)
         ),
         candidatos_activos AS (
