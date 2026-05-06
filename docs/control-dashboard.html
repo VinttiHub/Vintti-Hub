@@ -195,9 +195,9 @@
           <div class="hero-profile__role">Live · Internal</div>
         </div>
         <div class="hero-profile__pills">
-          <span class="mini-pill"><span class="ic">⚐</span><span data-chart="active_headcount_30d_total" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span></span>
-          <span class="mini-pill"><span class="ic ic--cyan">◉</span><span data-chart="acpa_history" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span></span>
-          <span class="mini-pill"><span class="ic ic--mag">★</span><span data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span></span>
+          <span class="mini-pill"><span class="ic">⚐</span><span data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span></span>
+          <span class="mini-pill"><span class="ic ic--cyan">◉</span><span data-chart="gr_line_acpa" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span></span>
+          <span class="mini-pill"><span class="ic ic--mag">★</span><span data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span></span>
         </div>
       </div>
 
@@ -208,9 +208,9 @@
           <div class="hero-kpi__icon">$</div>
         </div>
         <div>
-          <div class="hero-kpi__value" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
+          <div class="hero-kpi__value" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
           <div class="hero-kpi__label">
-            <span data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM · 30 day window
+            <span data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM · 30 day window
           </div>
         </div>
       </div>
@@ -222,9 +222,9 @@
           <div class="hero-kpi__icon">⚐</div>
         </div>
         <div>
-          <div class="hero-kpi__value" data-chart="active_headcount_30d_total" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
+          <div class="hero-kpi__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
           <div class="hero-kpi__label">
-            <span data-chart="active_headcount_history" data-bind="text" data-field="active_count" data-reduce="delta-mom-abs" data-fmt="delta-int">—</span> vs prev month
+            <span data-chart="gr_bar_active_headcount" data-bind="text" data-field="active_count" data-reduce="delta-mom-abs" data-fmt="delta-int">—</span> vs prev month
           </div>
         </div>
       </div>
@@ -262,15 +262,15 @@
           </div>
           <div class="metric-row">
             <div>
-              <span class="num" data-chart="active_headcount_30d_total" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span>
+              <span class="num" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span>
               <span class="lab">Latest</span>
             </div>
             <div>
-              <span class="num" data-chart="active_headcount_history" data-bind="text" data-field="active_count" data-reduce="avg-last-12" data-fmt="number">—</span>
+              <span class="num" data-chart="gr_bar_active_headcount" data-bind="text" data-field="active_count" data-reduce="avg-last-12" data-fmt="number">—</span>
               <span class="lab">Avg 12m</span>
             </div>
             <div>
-              <span class="num green" data-chart="active_headcount_history" data-bind="text" data-field="active_count" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</span>
+              <span class="num green" data-chart="gr_bar_active_headcount" data-bind="text" data-field="active_count" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</span>
               <span class="lab">YoY</span>
             </div>
           </div>
@@ -282,13 +282,13 @@
             <span class="active">Now</span>
           </div>
           <div class="chart" style="position:relative">
-            <svg data-chart="active_headcount_history" data-bind="area" data-x="month" data-y="active_count" data-color="rose"
+            <svg data-chart="gr_bar_active_headcount" data-bind="area" data-x="month" data-y="active_count" data-color="rose"
                  viewBox="0 0 720 240" preserveAspectRatio="none">
               <line x1="0" y1="200" x2="720" y2="200" stroke="#d9dde5" stroke-dasharray="2 5"/>
             </svg>
           </div>
           <div class="focus-card__avg">
-            <div class="num" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</div>
+            <div class="num" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</div>
             <div class="lab">YoY MRR growth</div>
           </div>
         </div>
@@ -317,20 +317,20 @@
         </div>
         <div class="metric-row">
           <div>
-            <span class="num" data-chart="arpa_history" data-bind="text" data-field="arpa_revenue" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpa" data-bind="text" data-field="arpa_revenue" data-reduce="last" data-fmt="currency-k">—</span>
             <span class="lab">ARPA · latest</span>
           </div>
           <div>
-            <span class="num" data-chart="arpa_history" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpa" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
             <span class="lab">ARPA Total</span>
           </div>
           <div>
-            <span class="num green" data-chart="arpa_history" data-bind="text" data-field="arpa_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
+            <span class="num green" data-chart="gr_line_arpa" data-bind="text" data-field="arpa_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
             <span class="lab">Δ MoM</span>
           </div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="arpa_history" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpa_revenue" data-color="cyan,lime"
+          <svg data-chart="gr_line_arpa" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpa_revenue" data-color="cyan,lime"
                viewBox="0 0 540 220" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="20" y1="40" x2="540" y2="40"/>
@@ -354,20 +354,20 @@
         </div>
         <div class="metric-row">
           <div>
-            <span class="num" data-chart="arpc_history" data-bind="text" data-field="arpc_revenue" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpc" data-bind="text" data-field="arpc_revenue" data-reduce="last" data-fmt="currency-k">—</span>
             <span class="lab">ARPC · latest</span>
           </div>
           <div>
-            <span class="num" data-chart="arpc_history" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpc" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
             <span class="lab">Total revenue</span>
           </div>
           <div>
-            <span class="num green" data-chart="arpc_history" data-bind="text" data-field="arpc_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
+            <span class="num green" data-chart="gr_line_arpc" data-bind="text" data-field="arpc_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
             <span class="lab">Δ MoM</span>
           </div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="arpc_history" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpc_revenue" data-color="lime,cyan"
+          <svg data-chart="gr_line_arpc" data-bind="line" data-x="mes" data-y="revenue_total_mes,arpc_revenue" data-color="lime,cyan"
                viewBox="0 0 540 220" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="20" y1="40" x2="540" y2="40"/>
@@ -388,12 +388,12 @@
             <p class="card__sub">Monthly recurring revenue basado en hires activos al fin de mes.</p>
           </div>
           <span class="callout">
-            <span data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency">—</span>
-            <span class="pos" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span>
+            <span data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency">—</span>
+            <span class="pos" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="mrr_history" data-bind="area" data-x="mes" data-y="mrr_total" data-color="blue"
+          <svg data-chart="gr_line_mrr" data-bind="area" data-x="mes" data-y="mrr_total" data-color="blue"
                viewBox="0 0 720 240" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="720" y2="40"/>
@@ -404,10 +404,10 @@
           </svg>
         </div>
         <div class="stat-row">
-          <div><div class="stat__lab">Latest</div><div class="stat__val" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div></div>
-          <div><div class="stat__lab">Peak 12m</div><div class="stat__val" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="max" data-fmt="currency-k">—</div></div>
-          <div><div class="stat__lab">Avg 12m</div><div class="stat__val" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="avg-last-12" data-fmt="currency-k">—</div></div>
-          <div><div class="stat__lab">YoY</div><div class="stat__val green" data-chart="mrr_history" data-bind="text" data-field="mrr_total" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</div></div>
+          <div><div class="stat__lab">Latest</div><div class="stat__val" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">Peak 12m</div><div class="stat__val" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="max" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">Avg 12m</div><div class="stat__val" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="avg-last-12" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">YoY</div><div class="stat__val green" data-chart="gr_line_mrr" data-bind="text" data-field="mrr_total" data-reduce="delta-yoy" data-fmt="delta-percent" data-class-on-sign>—</div></div>
         </div>
       </div>
 
@@ -420,14 +420,14 @@
           </div>
           <span class="card__menu">⋯</span>
         </div>
-        <div class="kpi-card__val" style="margin-top:8px" data-chart="recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="last" data-fmt="currency-k">—</div>
+        <div class="kpi-card__val" style="margin-top:8px" data-chart="gr_area_recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="last" data-fmt="currency-k">—</div>
         <div class="chart" style="margin-top:12px;position:relative">
-          <svg data-chart="recruiting_upfront" data-bind="area" data-x="mes_cierre" data-y="monto_recruiting" data-color="violet"
+          <svg data-chart="gr_area_recruiting_upfront" data-bind="area" data-x="mes_cierre" data-y="monto_recruiting" data-color="violet"
                viewBox="0 0 320 160" preserveAspectRatio="none"></svg>
         </div>
         <div class="stat-row">
-          <div><div class="stat__lab">YTD</div><div class="stat__val" data-chart="recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="sum" data-fmt="currency-k">—</div></div>
-          <div><div class="stat__lab">Avg/mes</div><div class="stat__val" data-chart="recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="avg" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">YTD</div><div class="stat__val" data-chart="gr_area_recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="sum" data-fmt="currency-k">—</div></div>
+          <div><div class="stat__lab">Avg/mes</div><div class="stat__val" data-chart="gr_area_recruiting_upfront" data-bind="text" data-field="monto_recruiting" data-reduce="avg" data-fmt="currency-k">—</div></div>
         </div>
       </div>
 
@@ -447,12 +447,12 @@
             <p class="card__sub">Cuentas activas al fin de mes (fuente: arpa_history)</p>
           </div>
           <span class="callout callout--soft">
-            <span data-chart="arpa_history" data-bind="text" data-field="clientes_activos" data-reduce="last" data-fmt="int">—</span>
-            <span class="pos" style="color:#2e9b5d" data-chart="arpa_history" data-bind="text" data-field="clientes_activos" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
+            <span data-chart="gr_line_arpa" data-bind="text" data-field="clientes_activos" data-reduce="last" data-fmt="int">—</span>
+            <span class="pos" style="color:#2e9b5d" data-chart="gr_line_arpa" data-bind="text" data-field="clientes_activos" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
           </span>
         </div>
         <div class="chart">
-          <svg data-chart="arpa_history" data-bind="bars" data-y="clientes_activos" data-color="blue"
+          <svg data-chart="gr_line_arpa" data-bind="bars" data-y="clientes_activos" data-color="blue"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="50" x2="540" y2="50"/>
@@ -473,12 +473,12 @@
           <span class="card__menu">⋯</span>
         </div>
         <div class="metric-row">
-          <div><span class="num" data-chart="acpa_history" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span><span class="lab">Clients</span></div>
-          <div><span class="num" data-chart="acpa_history" data-bind="text" data-field="candidatos_activos" data-reduce="last" data-fmt="int">—</span><span class="lab">Candidates</span></div>
-          <div><span class="num" data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span><span class="lab">ACPA</span></div>
+          <div><span class="num" data-chart="gr_line_acpa" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span><span class="lab">Clients</span></div>
+          <div><span class="num" data-chart="gr_line_acpa" data-bind="text" data-field="candidatos_activos" data-reduce="last" data-fmt="int">—</span><span class="lab">Candidates</span></div>
+          <div><span class="num" data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span><span class="lab">ACPA</span></div>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="acpa_history" data-bind="line" data-x="mes" data-y="candidatos_activos,cuentas_activas" data-color="blue,cyan"
+          <svg data-chart="gr_line_acpa" data-bind="line" data-x="mes" data-y="candidatos_activos,cuentas_activas" data-color="blue,cyan"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -499,12 +499,12 @@
             <p class="card__sub">Mes a mes</p>
           </div>
           <span class="callout">
-            <span data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span>
-            <span class="pos" data-chart="acpa_history" data-bind="text" data-field="acpa" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
+            <span data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span>
+            <span class="pos" data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
           </span>
         </div>
         <div class="chart">
-          <svg data-chart="acpa_history" data-bind="line" data-x="mes" data-y="acpa" data-color="violet"
+          <svg data-chart="gr_line_acpa" data-bind="line" data-x="mes" data-y="acpa" data-color="violet"
                viewBox="0 0 1100 180" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="1100" y2="40"/>
@@ -531,11 +531,11 @@
             <p class="card__sub">Distribución de meses activo por cliente</p>
           </div>
           <span class="callout callout--soft">
-            <span style="color:#0e1117;font-weight:700" data-chart="client_lifetime_avg" data-bind="text" data-field="promedio_meses_por_cliente" data-reduce="first" data-fmt="months">—</span>
+            <span style="color:#0e1117;font-weight:700" data-chart="gr_kpi_client_lifetime_avg" data-bind="text" data-field="promedio_meses_por_cliente" data-reduce="first" data-fmt="months">—</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="client_lifetime_detail" data-bind="line" data-x="client_name" data-y="meses_con_al_menos_un_cliente" data-color="cyan"
+          <svg data-chart="gr_line_client_lifetime" data-bind="line" data-x="client_name" data-y="meses_con_al_menos_un_cliente" data-color="cyan"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -545,9 +545,9 @@
           </svg>
         </div>
         <div class="stat-row">
-          <div><div class="stat__lab">Avg</div><div class="stat__val" data-chart="client_lifetime_avg" data-bind="text" data-field="promedio_meses_por_cliente" data-reduce="first" data-fmt="months">—</div></div>
-          <div><div class="stat__lab">Max</div><div class="stat__val" data-chart="client_lifetime_detail" data-bind="text" data-field="meses_con_al_menos_un_cliente" data-reduce="max" data-fmt="months">—</div></div>
-          <div><div class="stat__lab">N</div><div class="stat__val" data-chart="client_lifetime_detail" data-bind="text" data-field="meses_con_al_menos_un_cliente" data-reduce="last" data-fmt="int">—</div></div>
+          <div><div class="stat__lab">Avg</div><div class="stat__val" data-chart="gr_kpi_client_lifetime_avg" data-bind="text" data-field="promedio_meses_por_cliente" data-reduce="first" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">Max</div><div class="stat__val" data-chart="gr_line_client_lifetime" data-bind="text" data-field="meses_con_al_menos_un_cliente" data-reduce="max" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">N</div><div class="stat__val" data-chart="gr_line_client_lifetime" data-bind="text" data-field="meses_con_al_menos_un_cliente" data-reduce="last" data-fmt="int">—</div></div>
         </div>
       </div>
 
@@ -559,11 +559,11 @@
             <p class="card__sub">Distribución de meses por candidato en cliente</p>
           </div>
           <span class="callout callout--soft">
-            <span style="color:#0e1117;font-weight:700" data-chart="candidate_lifetime_avg" data-bind="text" data-field="promedio_meses_por_candidato_en_cliente" data-reduce="first" data-fmt="months">—</span>
+            <span style="color:#0e1117;font-weight:700" data-chart="gr_kpi_candidate_lifetime_avg" data-bind="text" data-field="promedio_meses_por_candidato_en_cliente" data-reduce="first" data-fmt="months">—</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg data-chart="candidate_lifetime_detail" data-bind="line" data-x="row_key" data-y="meses_activo" data-color="violet"
+          <svg data-chart="gr_line_candidate_lifetime" data-bind="line" data-x="row_key" data-y="meses_activo" data-color="violet"
                viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="540" y2="40"/>
@@ -573,9 +573,9 @@
           </svg>
         </div>
         <div class="stat-row">
-          <div><div class="stat__lab">Avg</div><div class="stat__val" data-chart="candidate_lifetime_avg" data-bind="text" data-field="promedio_meses_por_candidato_en_cliente" data-reduce="first" data-fmt="months">—</div></div>
-          <div><div class="stat__lab">Max</div><div class="stat__val" data-chart="candidate_lifetime_detail" data-bind="text" data-field="meses_activo" data-reduce="max" data-fmt="months">—</div></div>
-          <div><div class="stat__lab">N</div><div class="stat__val" data-chart="candidate_lifetime_avg" data-bind="text" data-field="n_candidato_cliente" data-reduce="first" data-fmt="int">—</div></div>
+          <div><div class="stat__lab">Avg</div><div class="stat__val" data-chart="gr_kpi_candidate_lifetime_avg" data-bind="text" data-field="promedio_meses_por_candidato_en_cliente" data-reduce="first" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">Max</div><div class="stat__val" data-chart="gr_line_candidate_lifetime" data-bind="text" data-field="meses_activo" data-reduce="max" data-fmt="months">—</div></div>
+          <div><div class="stat__lab">N</div><div class="stat__val" data-chart="gr_kpi_candidate_lifetime_avg" data-bind="text" data-field="n_candidato_cliente" data-reduce="first" data-fmt="int">—</div></div>
         </div>
       </div>
 
@@ -1670,6 +1670,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=1" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=3" defer></script>
 </body>
 </html>
