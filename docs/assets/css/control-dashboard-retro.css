@@ -215,6 +215,13 @@ table { border-collapse: collapse; }
 }
 .filter-bar__reset:hover { color: var(--ink); border-color: var(--rule-2); }
 
+/* Tab-aware filter visibility · pills with data-tabs are only shown when the
+   active tab is in their list. Pills without data-tabs are always visible. */
+#tab-growth:checked ~ .shell .filter-bar [data-tabs]:not([data-tabs~="growth"]) { display: none; }
+#tab-am:checked     ~ .shell .filter-bar [data-tabs]:not([data-tabs~="am"])     { display: none; }
+#tab-sales:checked  ~ .shell .filter-bar [data-tabs]:not([data-tabs~="sales"])  { display: none; }
+#tab-ops:checked    ~ .shell .filter-bar [data-tabs]:not([data-tabs~="ops"])    { display: none; }
+
 .filter-pill { position: relative; }
 .filter-pill__sel {
   position: absolute;

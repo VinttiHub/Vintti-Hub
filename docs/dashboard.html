@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=12">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=13">
 </head>
 <body>
 
@@ -121,7 +121,7 @@
         <option value="Recruiting">Recruiting</option>
       </select>
     </label>
-    <label class="filter-pill" data-filter-key="metric">
+    <label class="filter-pill" data-filter-key="metric" data-tabs="growth">
       <span class="k">Metric</span>
       <span class="v" data-filter-slot data-filter-placeholder>All</span>
       <span class="chev">▾</span>
@@ -131,7 +131,7 @@
         <option value="Fee">Fee</option>
       </select>
     </label>
-    <label class="filter-pill filter-pill--set" data-filter-key="opp_stage">
+    <label class="filter-pill filter-pill--set" data-filter-key="opp_stage" data-tabs="am sales ops">
       <span class="k">Stage</span>
       <span class="v" data-filter-slot data-filter-placeholder>All</span>
       <span class="chev">▾</span>
@@ -142,10 +142,10 @@
       </select>
     </label>
 
-    <span class="filter-bar__sep"></span>
+    <span class="filter-bar__sep" data-tabs="am"></span>
 
     <!-- Cohort windows -->
-    <label class="filter-pill" data-filter-key="meses">
+    <label class="filter-pill" data-filter-key="meses" data-tabs="am">
       <span class="k">Meses</span>
       <span class="v" data-filter-slot data-filter-placeholder>3 / 6</span>
       <span class="chev">▾</span>
@@ -155,7 +155,7 @@
         <option value="6">6 meses · 180d</option>
       </select>
     </label>
-    <label class="filter-pill" data-filter-key="umbral">
+    <label class="filter-pill" data-filter-key="umbral" data-tabs="am">
       <span class="k">Número</span>
       <span class="v" data-filter-slot data-filter-placeholder>3 / 6 / 12</span>
       <span class="chev">▾</span>
