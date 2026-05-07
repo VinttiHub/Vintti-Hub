@@ -1053,11 +1053,22 @@
     el.innerHTML = `<div class="mdetail__body">${blocks}</div>`;
   }
 
-  /* ---------- selected month state (shared across detail panels + chart) ---------- */
+  /* ---------- selected month state (shared across detail panels + chart + Mes filter pill) ---------- */
   const monthState = { selected: null, listeners: [] };
   function setSelectedMonth(m) {
     if (!m || m === monthState.selected) return;
     monthState.selected = m;
+    // Sync the Mes filter pill UI (so the user sees the current month selection)
+    const mesInput = document.querySelector('[data-filter-input="mes"]');
+    if (mesInput && mesInput.value !== m) {
+      mesInput.value = m;
+      const wrap = mesInput.closest('[data-filter-key]');
+      const display = (mesInput.tagName === 'SELECT' && mesInput.options[mesInput.selectedIndex])
+        ? mesInput.options[mesInput.selectedIndex].text
+        : m;
+      setFilterSlot(wrap, 'mes', m, display);
+      state.mes = m;  // keep state in sync too
+    }
     monthState.listeners.forEach(fn => { try { fn(m); } catch (e) { console.error(e); } });
     // Refetch all month-detail panels with the new month
     refetchMonthDetails(m);
@@ -1527,6 +1538,18 @@
   }
 
   /* ---------- filter bar ---------- */
+  function syncFilterUI(key, value) {
+    const input = document.querySelector(`[data-filter-input="${key}"]`);
+    if (!input) return;
+    input.value = value || '';
+    const wrap = input.closest('[data-filter-key]');
+    let display = value;
+    if (value && input.tagName === 'SELECT' && input.options[input.selectedIndex]) {
+      display = input.options[input.selectedIndex].text;
+    }
+    setFilterSlot(wrap, key, value || '', display);
+  }
+
   function setFilterSlot(label, key, value, displayText) {
     const wrap = label || document.querySelector(`[data-filter-key="${key}"]`);
     if (!wrap) return;
@@ -1549,6 +1572,17 @@
       if (slot.dataset.placeholderText == null) {
         slot.dataset.placeholderText = (slot.textContent || '').trim() || 'All';
       }
+    });
+
+    // Populate dynamic option lists (e.g. "recent-months" → last 24 months)
+    document.querySelectorAll('select[data-populate="recent-months"]').forEach(sel => {
+      const months = lastNMonths(24).reverse();  // most recent first
+      months.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = formatMonthHuman(m);
+        sel.appendChild(opt);
+      });
     });
 
     // Sync slot/input visuals to the initial state (defaults like opp_stage='Close Win').
@@ -1577,6 +1611,32 @@
           display = input.options[input.selectedIndex].text;
         }
         setFilterSlot(wrap, key, v, display);
+        // Mes is the global month picker — drives monthState.selected (for
+        // month-detail panels) AND auto-sets desde/hasta to span that month
+        // so monthly line charts also filter to it. 30d window charts use
+        // `corte` (left untouched).
+        if (key === 'mes') {
+          if (v) {
+            const [y, m] = v.split('-').map(Number);
+            const firstDay = `${y}-${String(m).padStart(2,'0')}-01`;
+            const lastDayD = new Date(y, m, 0); // m is 1-based, so day 0 of next month = last day of m
+            const lastDay = `${lastDayD.getFullYear()}-${String(lastDayD.getMonth()+1).padStart(2,'0')}-${String(lastDayD.getDate()).padStart(2,'0')}`;
+            state.desde = firstDay;
+            state.hasta = lastDay;
+            syncFilterUI('desde', firstDay);
+            syncFilterUI('hasta', lastDay);
+            setSelectedMonth(v);
+          } else {
+            // Cleared — release the date range too
+            state.desde = '';
+            state.hasta = '';
+            syncFilterUI('desde', '');
+            syncFilterUI('hasta', '');
+            const d = new Date();
+            const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            setSelectedMonth(ym);
+          }
+        }
         hydrate();
       });
     });

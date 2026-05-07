@@ -95,9 +95,11 @@
     </label>
     <label class="filter-pill" data-filter-key="mes">
       <span class="k">Mes</span>
-      <span class="v" data-filter-slot data-filter-placeholder>All</span>
+      <span class="v" data-filter-slot data-filter-placeholder>This month</span>
       <span class="chev">▾</span>
-      <input type="month" class="filter-pill__sel" data-filter-input="mes">
+      <select class="filter-pill__sel" data-filter-input="mes" data-populate="recent-months">
+        <option value="">This month</option>
+      </select>
     </label>
     <label class="filter-pill" data-filter-key="corte">
       <span class="k">Corte 30d</span>
@@ -2236,6 +2238,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=31" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=33" defer></script>
 </body>
 </html>
