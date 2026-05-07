@@ -1079,20 +1079,34 @@
         (byClient[c] = byClient[c] || []).push(r);
       });
 
-      // Dedupe within each client by name, keeping highest-priority state
+      // Dedupe within each client group: same `nameField` rows are merged into
+      // ONE only when their states have DIFFERENT priorities (so we keep the
+      // most meaningful state, e.g. "Baja Real" over "Activo al inicio").
+      // If all duplicates have the same priority (e.g. two independent
+      // "Close Win" events for the same client in the same month), we keep
+      // ALL of them — they represent distinct events.
       if (stateField) {
         Object.keys(byClient).forEach(c => {
           const byName = {};
           byClient[c].forEach(r => {
             const k = String(r[nameField] || '');
-            const cur = byName[k];
-            const rule = classifyState(r[stateField]);
-            const curRule = cur ? classifyState(cur[stateField]) : null;
-            if (!cur || (rule && (!curRule || rule.prio > curRule.prio))) {
-              byName[k] = r;
+            (byName[k] = byName[k] || []).push(r);
+          });
+          const final = [];
+          Object.values(byName).forEach(list => {
+            if (list.length === 1) { final.push(list[0]); return; }
+            const rated = list.map(r => ({ row: r, prio: (classifyState(r[stateField]) || {}).prio || 0 }));
+            const maxP = Math.max(...rated.map(x => x.prio));
+            const allEqual = rated.every(x => x.prio === maxP);
+            if (allEqual) {
+              // Same-priority duplicates → keep all (independent events)
+              rated.forEach(x => final.push(x.row));
+            } else {
+              // Different priorities → keep only the highest one
+              final.push(rated.find(x => x.prio === maxP).row);
             }
           });
-          byClient[c] = Object.values(byName);
+          byClient[c] = final;
         });
       }
 
@@ -1151,12 +1165,12 @@
     }
 
     const entries = rows || [];
-    const clients = new Set(entries.map(r => r[subField])).size;
+    const uniqueNames = new Set(entries.map(r => r[nameField]).filter(v => v != null)).size;
     el.innerHTML = `
       ${buildNav(currentMonth)}
       <div class="mdetail__head">
         <h4>${esc(formatMonthHuman(currentMonth))}</h4>
-        <span class="meta"><strong>${entries.length}</strong> ${entries.length === 1 ? 'entry' : 'entries'} · <strong>${clients}</strong> ${clients === 1 ? 'client' : 'clients'}</span>
+        <span class="meta"><strong>${entries.length}</strong> ${entries.length === 1 ? 'entry' : 'entries'} · <strong>${uniqueNames}</strong> distinct</span>
       </div>
       <div class="mdetail__body">
         ${buildBody(entries)}
@@ -1205,6 +1219,47 @@
         if (wrap) wrap.classList.toggle('is-open');
       });
     });
+  }
+
+  /* ---------- Sales detail table ---------- */
+  async function renderSalesDetailTable() {
+    const tbody = document.querySelector('[data-detail-table="sales"]');
+    if (!tbody) return;
+    try {
+      const [nda, newClients] = await Promise.all([
+        fetchChart('sa_line_nda_to_clients').catch(() => ({ rows: [] })),
+        fetchChart('sa_area_new_clients_per_month').catch(() => ({ rows: [] })),
+      ]);
+      const ym = (s) => String(s || '').slice(0, 7);
+      const byMes = {};
+      const upsert = (m, k, v) => { if (!m) return; (byMes[m] = byMes[m] || { mes: m })[k] = v; };
+      (nda.rows || []).forEach(r => {
+        const m = ym(r.mes_close);
+        upsert(m, 'total_closed', r.total_closed_opps);
+        upsert(m, 'close_win', r.close_win);
+        upsert(m, 'closed_lost', r.closed_lost);
+        upsert(m, 'conversion', r.conversion_pct);
+        upsert(m, 'unique_clients', r.unique_clients_closed_that_month);
+      });
+      (newClients.rows || []).forEach(r => upsert(ym(r.mes), 'new_clients', r.new_clients));
+      const months = Object.keys(byMes).sort().slice(-6);
+      tbody.innerHTML = months.map((m, i) => {
+        const r = byMes[m];
+        const hl = i === months.length - 1 ? ' class="hl"' : '';
+        return `
+          <tr${hl}>
+            <td class="ink">${m}</td>
+            <td class="num">${fmt.int(r.total_closed)}</td>
+            <td class="num">${fmt.int(r.close_win)}</td>
+            <td class="num">${fmt.int(r.closed_lost)}</td>
+            <td class="num">${fmt.percent(r.conversion)}</td>
+            <td class="num">${fmt.int(r.unique_clients)}</td>
+            <td class="num">${fmt.int(r.new_clients)}</td>
+          </tr>`;
+      }).join('');
+    } catch (e) {
+      console.error('Sales detail table failed', e);
+    }
   }
 
   /* ---------- AM detail table (multi-source roll-up) ---------- */
@@ -1353,6 +1408,7 @@
 
       renderDetailTable();
       renderAmDetailTable();
+      renderSalesDetailTable();
       // Populate month-detail panels with the currently selected month
       if (monthState.selected) {
         refetchMonthDetails(monthState.selected);
