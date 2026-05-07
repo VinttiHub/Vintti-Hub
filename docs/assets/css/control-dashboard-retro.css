@@ -651,6 +651,11 @@ body.is-loading .kpi-card::after {
   transition: transform 0.65s cubic-bezier(0.2, 0.8, 0.25, 1);
   transform-style: preserve-3d;
 }
+/* Profile-style faces (with circular ring) need more vertical room than
+   the default gradient hero KPI cards. */
+.hero-kpi.is-flippable .hero-kpi__inner:has(.hero-profile__center) {
+  min-height: 340px;
+}
 .hero-kpi.is-flipped .hero-kpi__inner { transform: rotateY(180deg); }
 .hero-kpi__face {
   position: absolute;

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=11">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=12">
 </head>
 <body>
 
@@ -129,13 +129,13 @@
         <option value="Fee">Fee</option>
       </select>
     </label>
-    <label class="filter-pill" data-filter-key="opp_stage">
+    <label class="filter-pill filter-pill--set" data-filter-key="opp_stage">
       <span class="k">Stage</span>
       <span class="v" data-filter-slot data-filter-placeholder>All</span>
       <span class="chev">▾</span>
       <select class="filter-pill__sel" data-filter-input="opp_stage">
         <option value="">All</option>
-        <option value="Close Win">Close Win</option>
+        <option value="Close Win" selected>Close Win</option>
         <option value="Closed Lost">Closed Lost</option>
       </select>
     </label>
@@ -1607,323 +1607,586 @@
   <section class="channel" data-channel="ops">
     <div class="grid">
 
-      <!-- Ops profile -->
-      <div class="hero-profile s-4">
-        <div class="hero-profile__head">
-          <h3>Operations pulse</h3>
-          <span class="card__menu">↻</span>
-        </div>
-        <div class="hero-profile__center">
-          <div class="profile-ring">
-            <svg viewBox="0 0 128 128">
-              <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
-              <circle cx="64" cy="64" r="58" fill="none" stroke="#6c38ff" stroke-width="6"
-                      stroke-linecap="round" stroke-dasharray="290 364" stroke-dashoffset="58"
-                      transform="rotate(-90 64 64)"/>
-            </svg>
-            <div class="profile-ring__face" style="background:linear-gradient(135deg,#e6dcff 0%,#d2e1ff 100%);">12</div>
+      <!-- Hero · New placement time 30d (profile-style with ring + flip) -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front" style="background:#fff">
+            <div class="hero-profile__head">
+              <h3>New placement time · 30d</h3>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⏱</button>
+            </div>
+            <div class="hero-profile__center">
+              <div class="profile-ring">
+                <svg viewBox="0 0 128 128">
+                  <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+                  <circle cx="64" cy="64" r="58" fill="none" stroke="#6c38ff" stroke-width="6"
+                          stroke-linecap="round" stroke-dasharray="280 364" stroke-dashoffset="58"
+                          transform="rotate(-90 64 64)"/>
+                </svg>
+                <div class="profile-ring__face" style="background:linear-gradient(135deg,#e6dcff 0%,#d2e1ff 100%);font-size:30px;">
+                  <span data-chart="op_kpi_placement_time_30d" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+              <div class="hero-profile__name">
+                <span data-chart="op_kpi_placement_time_30d" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span> días avg
+              </div>
+              <div class="hero-profile__role">desde fecha pedido a cierre · 30d</div>
+            </div>
+            <div class="hero-profile__pills">
+              <span class="mini-pill"><span class="ic" style="background:#6c38ff;color:#fff">⚐</span><span data-chart="op_table_placement_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span> opps</span>
+              <span class="mini-pill"><span class="ic" style="background:#6c38ff;color:#fff">⏱</span><span data-chart="op_kpi_placement_time_30d" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span> días</span>
+            </div>
           </div>
-          <div class="hero-profile__name">12 placements</div>
-          <div class="hero-profile__role">May 2026 · +2 vs Apr</div>
-        </div>
-        <div class="hero-profile__pills">
-          <span class="mini-pill"><span class="ic">↓</span>17.4d</span>
-          <span class="mini-pill"><span class="ic ic--cyan">⏱</span>6.8d</span>
-          <span class="mini-pill"><span class="ic ic--mag">↗</span>52%</span>
-        </div>
-      </div>
-
-      <!-- Hero KPI: placement time -->
-      <div class="hero-kpi bg-grad-violet s-4">
-        <div class="hero-kpi__head">
-          <div class="hero-kpi__title">Avg placement<br/>time · 30d</div>
-          <div class="hero-kpi__icon">↓</div>
-        </div>
-        <div>
-          <div class="hero-kpi__value">17.4<span class="unit">d</span></div>
-          <div class="hero-kpi__label">−2.1d MoM · faster placements</div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>New placements · last 30d <span class="count" data-chart="op_table_placement_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_table_placement_time_30d_detail" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="avg_days" data-limit="80"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Hero KPI: interview conversion -->
-      <div class="hero-kpi bg-grad-lime s-4">
-        <div class="hero-kpi__head">
-          <div class="hero-kpi__title">Interview<br/>conversion · 30d</div>
-          <div class="hero-kpi__icon">⤴</div>
-        </div>
-        <div>
-          <div class="hero-kpi__value">52.4<span class="unit">%</span></div>
-          <div class="hero-kpi__label">+4.1pp MoM · weighted</div>
+      <!-- Hero · Replacement placement time 30d (profile-style with ring + flip) -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front" style="background:#fff">
+            <div class="hero-profile__head">
+              <h3>Replacement placement time · 30d</h3>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">↻</button>
+            </div>
+            <div class="hero-profile__center">
+              <div class="profile-ring">
+                <svg viewBox="0 0 128 128">
+                  <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+                  <circle cx="64" cy="64" r="58" fill="none" stroke="#ff1fdb" stroke-width="6"
+                          stroke-linecap="round" stroke-dasharray="240 364" stroke-dashoffset="58"
+                          transform="rotate(-90 64 64)"/>
+                </svg>
+                <div class="profile-ring__face" style="background:linear-gradient(135deg,#fbd0ec 0%,#ecdaf6 100%);font-size:30px;">
+                  <span data-chart="op_kpi_placement_time_30d_repl" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+              <div class="hero-profile__name">
+                <span data-chart="op_kpi_placement_time_30d_repl" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span> días avg
+              </div>
+              <div class="hero-profile__role">solo replacements · 30d</div>
+            </div>
+            <div class="hero-profile__pills">
+              <span class="mini-pill"><span class="ic" style="background:#ff1fdb;color:#fff">⚐</span><span data-chart="op_kpi_placement_time_30d_repl" data-bind="text" data-field="opps_cerradas" data-reduce="first" data-fmt="int">—</span> opps</span>
+              <span class="mini-pill"><span class="ic" style="background:#ff1fdb;color:#fff">⏱</span><span data-chart="op_kpi_placement_time_30d_repl" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span> días</span>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Replacements · last 30d <span class="count" data-chart="op_table_placement_time_30d_detail_repl" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_table_placement_time_30d_detail_repl" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="avg_days" data-limit="80"></div>
+          </div>
         </div>
       </div>
 
-      <!-- KPI strip -->
-      <div class="grid s-12" style="grid-column:span 12;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;">
-        <div class="kpi-card">
-          <div class="kpi-card__lab">Batch delivery · 30d</div>
-          <div class="kpi-card__val">6.8<span class="unit">d</span></div>
-          <div class="kpi-card__foot"><span class="delta delta--up">▼ 0.9d</span><span>faster</span></div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-card__lab">Replacement time · 30d</div>
-          <div class="kpi-card__val">22.6<span class="unit">d</span></div>
-          <div class="kpi-card__foot"><span class="delta delta--down">▲ 1.4d</span><span>slower</span></div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-card__lab">Sent → Hired · 30d</div>
-          <div class="kpi-card__val">43.0<span class="unit">%</span></div>
-          <div class="kpi-card__foot"><span class="delta delta--up">▲ 1.6pp</span><span>weighted</span></div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-card__lab">Interviewed → Sent · 30d</div>
-          <div class="kpi-card__val">44.2<span class="unit">%</span></div>
-          <div class="kpi-card__foot"><span class="delta delta--up">▲ 1.2pp</span><span>avg/opp</span></div>
+      <!-- Hero · Batch delivery time 30d (profile-style) -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front" style="background:#fff">
+            <div class="hero-profile__head">
+              <h3>Batch delivery · 30d</h3>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div class="hero-profile__center">
+              <div class="profile-ring">
+                <svg viewBox="0 0 128 128">
+                  <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+                  <circle cx="64" cy="64" r="58" fill="none" stroke="#4ba9ff" stroke-width="6"
+                          stroke-linecap="round" stroke-dasharray="310 364" stroke-dashoffset="58"
+                          transform="rotate(-90 64 64)"/>
+                </svg>
+                <div class="profile-ring__face" style="background:linear-gradient(135deg,#d4ecff 0%,#e0e9fb 100%);font-size:30px;">
+                  <span data-chart="op_kpi_batch_delivery_time_30d" data-bind="text" data-field="avg_dias_entrega_30d" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+              <div class="hero-profile__name">
+                <span data-chart="op_kpi_batch_delivery_time_30d" data-bind="text" data-field="avg_dias_entrega_30d" data-reduce="first" data-fmt="int">—</span> días avg
+              </div>
+              <div class="hero-profile__role">desde opp creation a batch presented · 30d</div>
+            </div>
+            <div class="hero-profile__pills">
+              <span class="mini-pill"><span class="ic ic--cyan">B</span><span data-chart="op_kpi_batch_delivery_time_30d" data-bind="text" data-field="total_batches_30d" data-reduce="first" data-fmt="int">—</span> batches</span>
+              <span class="mini-pill"><span class="ic" style="background:#6c38ff;color:#fff">O</span><span data-chart="op_kpi_batch_delivery_time_30d" data-bind="text" data-field="opps_con_batches_30d" data-reduce="first" data-fmt="int">—</span> opps</span>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Batches · last 30d <span class="count" data-chart="op_table_batch_delivery_time_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_table_batch_delivery_time_30d_detail" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="dias_entrega" data-limit="80"></div>
+          </div>
         </div>
       </div>
 
-      <!-- ============== Section: Velocity -->
+      <!-- Hero KPI 3 · NDA → Close Win conversion 30d -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">NDA → Close Win<br/>· 30d</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value" data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
+                <span data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+                <span data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+                <span data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
+              </div>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>NDA → Win · last 30d <span class="count" data-chart="op_table_nda_close_win_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_table_nda_close_win_30d_detail" data-bind="list"
+                 data-list-name="client_name" data-list-sub="opp_stage" data-list-date="close_d" data-limit="80"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero row 2 · Sent → Hired / Interviewed → Sent / Interview conversion -->
+
+      <!-- Sent → Hired 30d -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">Sent → Hired<br/>· 30d</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value" data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="conversion_pct_general" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
+                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_contratados" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_enviados" data-reduce="first" data-fmt="int">—</span> contratados ·
+                <span data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="total_opps_close_win" data-reduce="first" data-fmt="int">—</span> opps
+              </div>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Sent → Hired · 30d <span class="count" data-chart="op_table_sent_hired_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_table_sent_hired_30d_detail" data-bind="list"
+                 data-list-name="candidate_name" data-list-sub="client_name" data-list-date="contratado" data-limit="120"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interviewed → Sent 30d -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">Interviewed → Sent<br/>· 30d</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value" data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="pct_ponderado_total" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
+                <span data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="total_entrevistados" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="total_enviados" data-reduce="first" data-fmt="int">—</span> entrevistados ·
+                <span data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="total_opps" data-reduce="first" data-fmt="int">—</span> opps
+              </div>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Interviewed → Sent · 30d <span class="count" data-chart="op_table_interviewed_sent_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_table_interviewed_sent_30d_detail" data-bind="list"
+                 data-list-name="candidate_name" data-list-sub="client_name" data-list-date="status_final" data-limit="120"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interview conversion 30d (weighted, ponderado) -->
+      <div class="hero-kpi is-flippable s-4" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-warm">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">Interview conv.<br/>· 30d (weighted)</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value" data-chart="op_kpi_interview_conversion_30d" data-bind="text" data-field="conversion_global_ponderada_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
+                presentados / entrevistados — opps Close Win últimos 30d
+              </div>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Interview conv · 30d <span class="count" data-chart="op_line_interview_conversion_30d" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist" data-chart="op_line_interview_conversion_30d" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="conversion_pct" data-limit="40"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== Section: Velocity ============== -->
       <div class="section s-12">
         <div>
           <h2>Placement velocity</h2>
-          <p>Cantidad y tiempo de colocaciones — separadas por nuevo y reemplazo.</p>
+          <p>Cuántas colocaciones por mes y cuánto tardan en cerrar.</p>
         </div>
       </div>
 
-      <!-- New placements -->
+      <!-- New placements (bar) -->
       <div class="card s-6">
         <div class="card__head">
           <div>
             <h3 class="card__title">New placements · monthly</h3>
-            <p class="card__sub">Cantidad de colocaciones nuevas (no reemplazos)</p>
+            <p class="card__sub">Hires que arrancaron en el mes (Staffing + Recruiting).</p>
           </div>
-          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">12 · May</span></span>
+          <span class="card__menu">⋯</span>
         </div>
         <div class="chart">
-          <svg viewBox="0 0 540 220" preserveAspectRatio="none">
+          <svg data-chart="op_bar_new_placements" data-bind="bars"
+               data-x="mes" data-y="total_starts" data-color="violet"
+               data-label="Total starts" data-fmt-y="int"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="50" x2="540" y2="50"/>
-              <line x1="0" y1="110" x2="540" y2="110"/>
-              <line x1="0" y1="170" x2="540" y2="170"/>
-            </g>
-            <g>
-              <rect x="14"  y="160" width="32" height="38" rx="6" fill="#ece4ff"/>
-              <rect x="58"  y="148" width="32" height="50" rx="6" fill="#e2d4ff"/>
-              <rect x="102" y="138" width="32" height="60" rx="6" fill="#d5c2ff"/>
-              <rect x="146" y="128" width="32" height="70" rx="6" fill="#c4adff"/>
-              <rect x="190" y="132" width="32" height="66" rx="6" fill="#c4adff"/>
-              <rect x="234" y="116" width="32" height="82" rx="6" fill="#a98aff"/>
-              <rect x="278" y="100" width="32" height="98" rx="6" fill="#9573ff"/>
-              <rect x="322" y="92"  width="32" height="106" rx="6" fill="#825aff"/>
-              <rect x="366" y="108" width="32" height="90" rx="6" fill="#825aff"/>
-              <rect x="410" y="84"  width="32" height="114" rx="6" fill="#7345ff"/>
-              <rect x="454" y="74"  width="32" height="124" rx="6" fill="#6c38ff"/>
-              <rect x="498" y="62"  width="32" height="136" rx="6" fill="#6c38ff"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
           </svg>
         </div>
-        <div class="stat-row">
-          <div><div class="stat__lab">May</div><div class="stat__val violet" style="color:#6c38ff">12</div></div>
-          <div><div class="stat__lab">Avg 12m</div><div class="stat__val">8.4</div></div>
-          <div><div class="stat__lab">YoY</div><div class="stat__val green">+44%</div></div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_new_placements_detail" data-bind="month-detail"
+                 data-list-month="mes" data-list-name="candidate_name" data-list-sub="opp_model"
+                 data-list-date="start_date" data-list-start="start_date" data-list-end="end_date"
+                 data-empty-text="No new placements this month"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Placement time line -->
+      <!-- Placement time line · new + replacement -->
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Placement time</h3>
-            <p class="card__sub">Días promedio · nuevo vs reemplazo</p>
+            <h3 class="card__title">Placement time · monthly</h3>
+            <p class="card__sub">Días promedio · nuevo (lima) vs replacement (rosa)</p>
           </div>
-          <span class="card__menu">⋯</span>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_placement_time_30d" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>
+            d · 30d
+          </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg viewBox="0 0 540 220" preserveAspectRatio="none">
+          <svg data-chart="op_line_placement_time" data-bind="line"
+               data-x="mes_cierre" data-y="promedio_dias" data-color="lime"
+               data-labels="New" data-fmt-y="int"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="50" x2="540" y2="50"/>
-              <line x1="0" y1="110" x2="540" y2="110"/>
-              <line x1="0" y1="170" x2="540" y2="170"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
-            <path d="M0,80 C60,90 120,82 180,72 C240,76 300,68 360,60 C420,72 480,58 540,40"
-                  class="line line-lime" stroke-width="3.5"/>
-            <path d="M0,108 C60,116 120,110 180,118 C240,124 300,118 360,128 C420,116 480,124 540,140"
-                  class="line line-mag" stroke-width="3.5"/>
-            <circle cx="540" cy="40" r="6" fill="#fff" stroke="#c1ff72" stroke-width="3"/>
-            <circle cx="540" cy="140" r="6" fill="#fff" stroke="#ff1fdb" stroke-width="3"/>
           </svg>
-          <span class="series-pill sp-lime" style="position:absolute; top:8%; right:-6px;">New · 17.4d</span>
-          <span class="series-pill sp-mag" style="position:absolute; top:62%; right:-6px;">Repl · 22.6d</span>
+          <span class="series-pill sp-lime" style="position:absolute; top:12%; right:-6px;">New (d)</span>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_placement_time_detail" data-bind="month-detail"
+                 data-list-month="month" data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="avg_days" data-list-state="close_result"
+                 data-empty-text="No placements this month"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Batch delivery time -->
-      <div class="card s-8">
+      <!-- Replacement placement time -->
+      <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Batch delivery time</h3>
-            <p class="card__sub">Días promedio entre opportunity y batch presented</p>
+            <h3 class="card__title">Replacement placement time · monthly</h3>
+            <p class="card__sub">Días promedio · solo replacements</p>
           </div>
-          <div class="metric-row" style="gap:24px">
-            <div><span class="num">6.8d</span><span class="lab">30d window</span></div>
-            <div><span class="num">8.2d</span><span class="lab">12m avg</span></div>
-            <div><span class="num green">−1.4d</span><span class="lab">YoY</span></div>
-          </div>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_placement_time_30d_repl" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>
+            d · 30d
+          </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg viewBox="0 0 720 220" preserveAspectRatio="none">
+          <svg data-chart="op_line_placement_time_repl" data-bind="line"
+               data-x="mes_cierre" data-y="promedio_dias" data-color="rose"
+               data-labels="Repl (d)" data-fmt-y="int"
+               data-tooltip-extras="opps_cerradas|Opps cerradas|int,mediana_dias|Mediana d|int,p90_dias|P90 d|int"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
-              <line x1="0" y1="44" x2="720" y2="44"/>
-              <line x1="0" y1="110" x2="720" y2="110"/>
-              <line x1="0" y1="176" x2="720" y2="176"/>
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
-            <path d="M0,100 C60,108 120,98 180,86 C240,92 300,80 360,72 C420,84 480,72 540,66 C600,60 660,52 720,42 L720,220 L0,220 Z"
-                  class="area-cyan"/>
-            <path d="M0,100 C60,108 120,98 180,86 C240,92 300,80 360,72 C420,84 480,72 540,66 C600,60 660,52 720,42"
-                  class="line line-cyan" stroke-width="3.5"/>
-            <circle cx="720" cy="42" r="7" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
           </svg>
         </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_placement_time_detail_repl" data-bind="month-detail"
+                 data-list-month="month" data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="avg_days" data-list-state="close_result"
+                 data-empty-text="No replacements this month"></div>
+          </div>
+        </div>
       </div>
 
-      <!-- Per-batch list -->
-      <div class="card s-4">
+      <!-- Batch delivery time monthly -->
+      <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Per-batch · last 8</h3>
-            <p class="card__sub">Días de entrega individual</p>
+            <h3 class="card__title">Batch delivery time · monthly</h3>
+            <p class="card__sub">Días promedio entre opp creation y batch presented</p>
           </div>
-          <span class="card__menu">⋯</span>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_batch_delivery_time_30d" data-bind="text" data-field="avg_dias_entrega_30d" data-reduce="first" data-fmt="int">—</span>
+            d · 30d
+          </span>
         </div>
-        <div class="bars" style="margin-top:8px">
-          <div class="bars__row"><span class="bars__name">Batch 0223</span><span class="bars__val">6.0d</span><span class="bars__bar cyan"><span style="width:40%"></span></span></div>
-          <div class="bars__row"><span class="bars__name">Batch 0222</span><span class="bars__val">9.2d</span><span class="bars__bar mag"><span style="width:62%"></span></span></div>
-          <div class="bars__row"><span class="bars__name">Batch 0221</span><span class="bars__val">4.8d</span><span class="bars__bar lime"><span style="width:32%"></span></span></div>
-          <div class="bars__row"><span class="bars__name">Batch 0220</span><span class="bars__val">6.4d</span><span class="bars__bar cyan"><span style="width:42%"></span></span></div>
-          <div class="bars__row"><span class="bars__name">Batch 0219</span><span class="bars__val">7.1d</span><span class="bars__bar"><span style="width:48%"></span></span></div>
-          <div class="bars__row"><span class="bars__name">Batch 0218</span><span class="bars__val">5.2d</span><span class="bars__bar lime"><span style="width:35%"></span></span></div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="op_line_batch_delivery_time_month" data-bind="line"
+               data-x="mes_batch" data-y="avg_dias_entrega" data-color="cyan"
+               data-labels="Avg entrega" data-fmt-y="int"
+               data-tooltip-extras="total_batches|Batches|int,opps_con_batches|Opps|int"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
+            </g>
+          </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle por batch <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_batch_delivery_time_month_detail" data-bind="month-detail"
+                 data-list-month="mes_batch" data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="dias_entrega" data-list-state="opp_stage"
+                 data-empty-text="No batches this month"></div>
+          </div>
         </div>
       </div>
 
-      <!-- ============== Section: Conversion funnel -->
+      <!-- ============== Section: Conversion funnel ============== -->
       <div class="section s-12">
         <div>
-          <h2>Conversion funnel · 30d</h2>
-          <p>De candidato sourced a entrevistado a contratado.</p>
+          <h2>Conversion funnel</h2>
+          <p>De NDA a entrevista a hire.</p>
         </div>
       </div>
 
-      <!-- Sent vs Hired per opp -->
+      <!-- NDA → Close Win line -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">NDA → Close Win · monthly</h3>
+            <p class="card__sub">% de NDAs cerrados como Close Win por mes (todas las opps).</p>
+          </div>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_nda_close_win_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
+            · 30d
+          </span>
+        </div>
+        <div class="chart" style="position:relative">
+          <svg data-chart="op_line_nda_close_win" data-bind="line"
+               data-x="mes_close" data-y="conversion_pct" data-color="violet"
+               data-labels="Conversion %" data-fmt-y="percent"
+               data-tooltip-extras="total_closed|Total cerradas|int,close_win|Close Win|int,close_lost|Closed Lost|int"
+               viewBox="0 0 1100 200" preserveAspectRatio="none">
+            <g class="chart-grid">
+              <line x1="0" y1="50" x2="1100" y2="50"/>
+              <line x1="0" y1="100" x2="1100" y2="100"/>
+              <line x1="0" y1="150" x2="1100" y2="150"/>
+            </g>
+          </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_nda_close_win_detail" data-bind="month-detail"
+                 data-list-month="close_d" data-list-name="client_name" data-list-sub="opp_model"
+                 data-list-date="close_d" data-list-state="opp_stage"
+                 data-empty-text="No closings this month"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interview conversion · monthly history -->
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Enviados → Contratados</h3>
-            <p class="card__sub">Por opportunity Close Win — 30d</p>
+            <h3 class="card__title">Interview conversion · monthly</h3>
+            <p class="card__sub">% presentados sobre entrevistados, agrupado por mes.</p>
           </div>
-          <span class="callout"><span style="color:#fff;font-weight:600">43.0%</span> <span class="pos">▲ 1.6pp</span></span>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_interview_conversion_30d" data-bind="text" data-field="conversion_global_ponderada_pct" data-reduce="first" data-fmt="percent">—</span>
+            · 30d
+          </span>
         </div>
         <div class="chart" style="position:relative">
-          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+          <svg data-chart="op_line_interview_conversion" data-bind="line"
+               data-x="mes" data-y="pct_presentados_sobre_entrevistados" data-color="lime"
+               data-labels="Presentados/Entrevistados" data-fmt-y="percent"
+               data-tooltip-extras="opps|Opps|int,presentados_total|Presentados|int,entrevistados_total|Entrevistados|int,pct_entrevistados_sobre_presentados|Inverso %|percent"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="50" x2="540" y2="50"/>
               <line x1="0" y1="100" x2="540" y2="100"/>
               <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
-            <path d="M0,128 C50,150 100,138 150,82 C200,150 250,150 300,134 C350,16 400,180 450,180 C500,144 540,144 540,144"
-                  class="line line-lime" stroke-width="3.5"/>
-            <g>
-              <circle cx="0"   cy="128" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="60"  cy="160" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="120" cy="146" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="180" cy="82"  r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="240" cy="150" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="300" cy="134" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="360" cy="16"  r="6" fill="#c1ff72" stroke="#0e1117" stroke-width="2"/>
-              <circle cx="420" cy="180" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="480" cy="180" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-              <circle cx="540" cy="144" r="5" fill="#fff" stroke="#c1ff72" stroke-width="2.5"/>
-            </g>
-            <line x1="360" y1="0" x2="360" y2="200" stroke="#0e1117" stroke-dasharray="2 4" stroke-width="1"/>
           </svg>
-          <span class="callout" style="position:absolute; top:6%; left:60%;">100% · best opp</span>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_interview_conversion_detail" data-bind="month-detail"
+                 data-list-month="close_date" data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="close_date" data-list-state="opp_stage"
+                 data-empty-text="No closings this month"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Interviewed vs Sent -->
+      <!-- Interview conversion 30d · per opp -->
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Entrevistados → Enviados</h3>
-            <p class="card__sub">% de enviados que avanzaron a entrevista — por opp</p>
+            <h3 class="card__title">Interview conversion · 30d per opp</h3>
+            <p class="card__sub">Cada punto = una opp Close Win en la ventana 30d</p>
           </div>
-          <span class="callout"><span style="color:#fff;font-weight:600">44.2%</span> <span class="pos">▲ 1.2pp</span></span>
+          <span class="card__menu">⋯</span>
         </div>
         <div class="chart" style="position:relative">
-          <svg viewBox="0 0 540 200" preserveAspectRatio="none">
+          <svg data-chart="op_line_interview_conversion_30d" data-bind="line"
+               data-x="opportunity_id" data-y="conversion_pct" data-color="cyan"
+               data-labels="Conversion % (per opp)" data-fmt-y="percent"
+               data-tooltip-extras="cantidad_entrevistados|Entrevistados|int,candidatos_presentados|Presentados|int,client_name|Cliente|raw,opp_position_name|Posición|raw"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
               <line x1="0" y1="50" x2="540" y2="50"/>
               <line x1="0" y1="100" x2="540" y2="100"/>
               <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
-            <path d="M0,68 C50,80 100,108 150,108 C200,118 250,138 300,148 C350,154 400,154 450,150 C500,148 540,148 540,148"
-                  class="line line-violet" stroke-width="3.5"/>
-            <circle cx="0" cy="68" r="6" fill="#6c38ff" stroke="#0e1117" stroke-width="2"/>
-            <circle cx="540" cy="148" r="6" fill="#fff" stroke="#6c38ff" stroke-width="3"/>
           </svg>
-          <span class="callout" style="position:absolute; top:18%; left:6%;">67% · top</span>
         </div>
       </div>
 
-      <!-- Interview conversion -->
+      <!-- Sent → Hired per opp -->
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Interview conversion</h3>
-            <p class="card__sub">Tasa global ponderada · monthly</p>
+            <h3 class="card__title">Sent → Hired · 30d per opp</h3>
+            <p class="card__sub">Conversión de candidatos enviados a contratados, por opp Close Win.</p>
           </div>
-          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">52.4%</span> <span class="pos">▲ 4.1pp</span></span>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_sent_hired_30d" data-bind="text" data-field="conversion_pct_general" data-reduce="first" data-fmt="percent">—</span>
+            · weighted
+          </span>
         </div>
-        <div class="chart">
-          <svg viewBox="0 0 540 180" preserveAspectRatio="none">
+        <div class="chart" style="position:relative">
+          <svg data-chart="op_line_sent_hired_30d" data-bind="line"
+               data-x="opportunity_id" data-y="conversion_pct" data-color="lime"
+               data-labels="Conversion % (per opp)" data-fmt-y="percent"
+               data-tooltip-extras="enviados|Enviados|int,contratados|Contratados|int,client_name|Cliente|raw,opp_position_name|Posición|raw"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
-              <line x1="0" y1="40" x2="540" y2="40"/>
-              <line x1="0" y1="90" x2="540" y2="90"/>
-              <line x1="0" y1="140" x2="540" y2="140"/>
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
-            <path d="M0,108 C60,98 120,92 180,98 C240,86 300,82 360,72 C420,68 480,58 540,52"
-                  class="line line-cyan" stroke-width="3.5"/>
-            <circle cx="540" cy="52" r="6" fill="#fff" stroke="#4ba9ff" stroke-width="3"/>
           </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle por opp <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_sent_hired_30d_detail" data-bind="grouped-list"
+                 data-list-group="client_name" data-list-name="candidate_name"
+                 data-list-date="sent_date" data-list-state="contratado"
+                 data-empty-text="No candidates this window"></div>
+          </div>
         </div>
       </div>
 
-      <!-- NDA to Win -->
+      <!-- Interviewed → Sent per opp -->
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">All NDA → Close Win</h3>
-            <p class="card__sub">Tasa global incluyendo todos los NDAs</p>
+            <h3 class="card__title">Interviewed → Sent · 30d per opp</h3>
+            <p class="card__sub">% de candidatos enviados que avanzaron a entrevista con cliente.</p>
           </div>
-          <span class="callout callout--soft"><span style="color:#0e1117;font-weight:700">31.2%</span> <span class="pos">▲ 2.8pp</span></span>
+          <span class="callout callout--soft">
+            <span style="color:#0e1117;font-weight:700" data-chart="op_kpi_interviewed_sent_30d" data-bind="text" data-field="pct_ponderado_total" data-reduce="first" data-fmt="percent">—</span>
+            · weighted
+          </span>
         </div>
-        <div class="chart">
-          <svg viewBox="0 0 540 180" preserveAspectRatio="none">
+        <div class="chart" style="position:relative">
+          <svg data-chart="op_line_interviewed_sent_30d" data-bind="line"
+               data-x="opportunity_id" data-y="entrevistados_sobre_enviados_pct" data-color="violet"
+               data-labels="Interviewed % (per opp)" data-fmt-y="percent"
+               data-tooltip-extras="candidatos_enviados|Enviados|int,candidatos_entrevistados|Entrevistados|int,client_name|Cliente|raw,opp_position_name|Posición|raw,resultado|Resultado|raw"
+               viewBox="0 0 540 200" preserveAspectRatio="none">
             <g class="chart-grid">
-              <line x1="0" y1="40" x2="540" y2="40"/>
-              <line x1="0" y1="90" x2="540" y2="90"/>
-              <line x1="0" y1="140" x2="540" y2="140"/>
+              <line x1="0" y1="50" x2="540" y2="50"/>
+              <line x1="0" y1="100" x2="540" y2="100"/>
+              <line x1="0" y1="150" x2="540" y2="150"/>
             </g>
-            <path d="M0,128 C60,118 120,112 180,118 C240,108 300,112 360,98 C420,92 480,76 540,58"
-                  class="line line-mag" stroke-width="3.5"/>
-            <circle cx="540" cy="58" r="6" fill="#fff" stroke="#ff1fdb" stroke-width="3"/>
           </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle por opp <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="op_table_interviewed_sent_30d_detail" data-bind="grouped-list"
+                 data-list-group="client_name" data-list-name="candidate_name"
+                 data-list-date="opp_position_name" data-list-state="status_final"
+                 data-empty-text="No candidates this window"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Detail consolidated -->
+      <!-- ============== Detail roll-up ============== -->
       <div class="section s-12">
         <div>
           <h2>Detail · operations</h2>
-          <p>Consolidación de las 14 tablas drill-down operativas.</p>
+          <p>Snapshot mensual de las métricas clave.</p>
         </div>
       </div>
       <div class="card s-12">
@@ -1934,21 +2197,15 @@
                 <th>Mes</th>
                 <th class="num">Placements</th>
                 <th class="num">Avg time (d)</th>
-                <th class="num">Replacement (d)</th>
+                <th class="num">Repl time (d)</th>
                 <th class="num">Batch (d)</th>
-                <th class="num">Interview conv %</th>
-                <th class="num">Sent → Hired %</th>
-                <th class="num">Int → Sent %</th>
+                <th class="num">Batches</th>
                 <th class="num">NDA → Win %</th>
+                <th class="num">Interview conv %</th>
               </tr>
             </thead>
-            <tbody>
-              <tr><td class="ink">2025-12</td><td class="num">5</td><td class="num">22.4</td><td class="num">26.1</td><td class="num">9.1</td><td class="num">42.6</td><td class="num">38.2</td><td class="num">39.4</td><td class="num">23.8</td></tr>
-              <tr><td class="ink">2026-01</td><td class="num">7</td><td class="num">21.8</td><td class="num">24.4</td><td class="num">8.4</td><td class="num">44.0</td><td class="num">39.6</td><td class="num">40.1</td><td class="num">25.6</td></tr>
-              <tr><td class="ink">2026-02</td><td class="num">8</td><td class="num">20.2</td><td class="num">23.8</td><td class="num">8.0</td><td class="num">46.4</td><td class="num">40.8</td><td class="num">41.6</td><td class="num">26.4</td></tr>
-              <tr><td class="ink">2026-03</td><td class="num">10</td><td class="num">19.0</td><td class="num">22.6</td><td class="num">7.4</td><td class="num">48.6</td><td class="num">41.2</td><td class="num">42.8</td><td class="num">27.8</td></tr>
-              <tr><td class="ink">2026-04</td><td class="num">10</td><td class="num">18.4</td><td class="num">21.2</td><td class="num">7.0</td><td class="num">50.2</td><td class="num">42.0</td><td class="num">43.4</td><td class="num">28.4</td></tr>
-              <tr class="hl"><td class="ink">2026-05</td><td class="num ink">12</td><td class="num">17.4</td><td class="num">22.6</td><td class="num">6.8</td><td class="num">52.4</td><td class="num">43.0</td><td class="num">44.2</td><td class="num">31.2</td></tr>
+            <tbody data-detail-table="ops">
+              <tr><td colspan="8" class="muted" style="text-align:center;padding:18px">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1956,6 +2213,7 @@
 
     </div>
   </section>
+
 
   <!-- ============================================================
        FOOTER
@@ -1978,6 +2236,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=25" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=31" defer></script>
 </body>
 </html>

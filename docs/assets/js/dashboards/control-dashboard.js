@@ -15,7 +15,8 @@
 
   /* ---------- state ---------- */
   const FILTER_KEYS = ['modelo', 'desde', 'hasta', 'mes', 'corte', 'metric', 'opp_stage', 'meses', 'umbral'];
-  const state = Object.fromEntries(FILTER_KEYS.map(k => [k, '']));
+  const FILTER_DEFAULTS = { opp_stage: 'Close Win' };
+  const state = Object.fromEntries(FILTER_KEYS.map(k => [k, FILTER_DEFAULTS[k] || '']));
 
   /* ---------- format ---------- */
   const fmt = {
@@ -561,6 +562,8 @@
   /* ---------- helpers: read field with reducer ---------- */
   function reduce(rows, field, mode) {
     if (!rows || !rows.length) return null;
+    // count doesn't need a field — must be checked before the field-based path below
+    if (mode === 'count') return rows.length;
     if (mode === 'first') return rows[0][field];
     if (mode === 'last') return rows[rows.length - 1][field];
     const nums = rows.map(r => +r[field]).filter(v => isFinite(v));
@@ -573,7 +576,6 @@
       const tail = nums.slice(-12);
       return tail.reduce((a, b) => a + b, 0) / tail.length;
     }
-    if (mode === 'count') return rows.length;
     if (mode === 'delta-mom') {
       // Last - prev
       const last = +rows[rows.length - 1]?.[field];
@@ -649,6 +651,7 @@
         });
       }
       if (bind === 'list') return renderList(el, scopedRows);
+      if (bind === 'grouped-list') return renderGroupedList(el, scopedRows);
       if (bind === 'donut') return renderDonut(el, scopedRows);
       if (bind === 'donut-legend') return renderDonutLegend(el, scopedRows);
       if (bind === 'bar-list') return renderBarList(el, scopedRows);
@@ -998,6 +1001,58 @@
     }).join('');
   }
 
+  /* ---------- grouped list (no month filter — just groups by a field, with state badges) ---------- */
+  function renderGroupedList(el, rows) {
+    const nameField  = el.dataset.listName  || 'candidate_name';
+    const groupField = el.dataset.listGroup || 'client_name';
+    const dateField  = el.dataset.listDate  || '';
+    const stateField = el.dataset.listState;
+    const emptyText  = el.dataset.emptyText || 'No data';
+
+    if (!rows || !rows.length) {
+      el.innerHTML = `<div class="mdetail__empty">${esc(emptyText)}</div>`;
+      return;
+    }
+
+    const byGroup = {};
+    rows.forEach(r => {
+      const g = String(r[groupField] || '—');
+      (byGroup[g] = byGroup[g] || []).push(r);
+    });
+    const groupNames = Object.keys(byGroup).sort((a, b) => byGroup[b].length - byGroup[a].length);
+
+    const blocks = groupNames.map(g => {
+      const cands = byGroup[g]
+        .slice()
+        .sort((a, b) => String(a[nameField] || '').localeCompare(String(b[nameField] || '')))
+        .map(r => {
+          let badge = '';
+          if (stateField && r[stateField] != null && r[stateField] !== '') {
+            const rule = classifyState(r[stateField]) || { cls: '', label: String(r[stateField]) };
+            badge = `<span class="mdetail__cand-state mdetail__cand-state--${rule.cls}">${esc(rule.label)}</span>`;
+          }
+          const date = dateField ? esc(r[dateField] || '') : '';
+          return `
+            <div class="mdetail__cand">
+              <span class="mdetail__cand-name">${esc(r[nameField] || '—')}</span>
+              <span class="mdetail__cand-date">${badge}${date}</span>
+            </div>
+          `;
+        }).join('');
+      return `
+        <div class="mdetail__group">
+          <div class="mdetail__client">
+            <span class="mdetail__client-name">${esc(g)}</span>
+            <span class="mdetail__client-count">${byGroup[g].length}</span>
+          </div>
+          ${cands}
+        </div>
+      `;
+    }).join('');
+
+    el.innerHTML = `<div class="mdetail__body">${blocks}</div>`;
+  }
+
   /* ---------- selected month state (shared across detail panels + chart) ---------- */
   const monthState = { selected: null, listeners: [] };
   function setSelectedMonth(m) {
@@ -1040,6 +1095,10 @@
     { match: /retenido/i,                      cls: 'activo',      label: 'Retenido',  prio: 2, dateField: 'startField' },
     { match: /churn/i,                         cls: 'baja-real',   label: 'Churn',     prio: 5, dateField: 'endField' },
     { match: /Activo/i,                        cls: 'activo',      label: 'Activo',    prio: 1, dateField: 'startField' },
+    // Sent→Hired / Interviewed→Sent specific states
+    { match: /^Sí$|Hired|hired/i,              cls: 'alta',        label: 'Hired',     prio: 5, dateField: 'endField' },
+    { match: /^No$|rejected/i,                 cls: 'baja-real',   label: 'Rejected',  prio: 0, dateField: 'endField' },
+    { match: /interviewing|testing/i,          cls: 'baja-buyout', label: 'Interviewing', prio: 0, dateField: 'endField' },
   ];
   function classifyState(s) {
     if (s == null || s === '') return null;
@@ -1219,6 +1278,53 @@
         if (wrap) wrap.classList.toggle('is-open');
       });
     });
+  }
+
+  /* ---------- Ops detail table ---------- */
+  async function renderOpsDetailTable() {
+    const tbody = document.querySelector('[data-detail-table="ops"]');
+    if (!tbody) return;
+    try {
+      const [places, ptime, ptimeRepl, batchMonth, ndaWin, intConv] = await Promise.all([
+        fetchChart('op_bar_new_placements').catch(() => ({ rows: [] })),
+        fetchChart('op_line_placement_time').catch(() => ({ rows: [] })),
+        fetchChart('op_line_placement_time_repl').catch(() => ({ rows: [] })),
+        fetchChart('op_line_batch_delivery_time_month').catch(() => ({ rows: [] })),
+        fetchChart('op_line_nda_close_win').catch(() => ({ rows: [] })),
+        fetchChart('op_line_interview_conversion').catch(() => ({ rows: [] })),
+      ]);
+      const ym = (s) => String(s || '').slice(0, 7);
+      const byMes = {};
+      const upsert = (m, k, v) => { if (!m) return; (byMes[m] = byMes[m] || { mes: m })[k] = v; };
+      (places.rows || []).forEach(r => upsert(ym(r.mes), 'placements', r.total_starts));
+      (ptime.rows  || []).forEach(r => upsert(ym(r.mes_cierre), 'avg_time', r.promedio_dias));
+      (ptimeRepl.rows || []).forEach(r => upsert(ym(r.mes_cierre), 'repl_time', r.promedio_dias));
+      (batchMonth.rows || []).forEach(r => {
+        upsert(ym(r.mes_batch), 'batch_d', r.avg_dias_entrega);
+        upsert(ym(r.mes_batch), 'batches', r.total_batches);
+      });
+      (ndaWin.rows || []).forEach(r => upsert(ym(r.mes_close), 'nda_win', r.conversion_pct));
+      (intConv.rows || []).forEach(r => upsert(ym(r.mes), 'int_conv', r.pct_presentados_sobre_entrevistados));
+
+      const months = Object.keys(byMes).sort().slice(-6);
+      tbody.innerHTML = months.map((m, i) => {
+        const r = byMes[m];
+        const hl = i === months.length - 1 ? ' class="hl"' : '';
+        return `
+          <tr${hl}>
+            <td class="ink">${m}</td>
+            <td class="num">${fmt.int(r.placements)}</td>
+            <td class="num">${fmt.int(r.avg_time)}</td>
+            <td class="num">${fmt.int(r.repl_time)}</td>
+            <td class="num">${fmt.int(r.batch_d)}</td>
+            <td class="num">${fmt.int(r.batches)}</td>
+            <td class="num">${fmt.percent(r.nda_win)}</td>
+            <td class="num">${fmt.percent(r.int_conv)}</td>
+          </tr>`;
+      }).join('');
+    } catch (e) {
+      console.error('Ops detail table failed', e);
+    }
   }
 
   /* ---------- Sales detail table ---------- */
@@ -1409,6 +1515,7 @@
       renderDetailTable();
       renderAmDetailTable();
       renderSalesDetailTable();
+      renderOpsDetailTable();
       // Populate month-detail panels with the currently selected month
       if (monthState.selected) {
         refetchMonthDetails(monthState.selected);
@@ -1444,6 +1551,21 @@
       }
     });
 
+    // Sync slot/input visuals to the initial state (defaults like opp_stage='Close Win').
+    document.querySelectorAll('[data-filter-input]').forEach(input => {
+      const key = input.dataset.filterInput;
+      const v = state[key];
+      if (v != null && v !== '') {
+        input.value = v;
+        const wrap = input.closest('[data-filter-key]');
+        let display = v;
+        if (input.tagName === 'SELECT' && input.options[input.selectedIndex]) {
+          display = input.options[input.selectedIndex].text;
+        }
+        setFilterSlot(wrap, key, v, display);
+      }
+    });
+
     document.querySelectorAll('[data-filter-input]').forEach(input => {
       const key = input.dataset.filterInput;
       const wrap = input.closest('[data-filter-key]');
@@ -1463,13 +1585,19 @@
     if (reset) {
       reset.addEventListener('click', (e) => {
         e.preventDefault();
-        // 1) Clear filter state
-        FILTER_KEYS.forEach(k => state[k] = '');
-        // 2) Clear inputs + restore pill labels to their placeholders
+        // 1) Clear filter state to defaults (some filters like opp_stage have non-empty defaults)
+        FILTER_KEYS.forEach(k => state[k] = FILTER_DEFAULTS[k] || '');
+        // 2) Clear inputs + restore pill labels (using default values where applicable)
         document.querySelectorAll('[data-filter-input]').forEach(input => {
-          input.value = '';
+          const key = input.dataset.filterInput;
+          const def = FILTER_DEFAULTS[key] || '';
+          input.value = def;
           const wrap = input.closest('[data-filter-key]');
-          setFilterSlot(wrap, input.dataset.filterInput, '', '');
+          let display = def;
+          if (def && input.tagName === 'SELECT' && input.options[input.selectedIndex]) {
+            display = input.options[input.selectedIndex].text;
+          }
+          setFilterSlot(wrap, key, def, display);
         });
         // 3) Reset month-detail selection back to current month
         const d = new Date();
