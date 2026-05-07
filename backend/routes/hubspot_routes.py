@@ -19,6 +19,42 @@ from utils.hubspot import (
 
 bp = Blueprint("hubspot", __name__)
 
+PAIN_POINT_NORMALIZATION = {
+    'na': 'NA',
+    'n/a': 'NA',
+    'high salary': 'High salary',
+    'no real pain point': 'No real pain point',
+    'cultural': 'Cultural fit',
+    'cultural fit': 'Cultural fit',
+    'time zone': 'Time zone',
+    'knowledge': 'No Knowledge',
+    'no knowledge': 'No Knowledge',
+    'no time': 'No time to hire',
+    'no time to hire': 'No time to hire',
+    'slow hiring processes': 'Slow hiring processes',
+    'workload': 'Workload',
+}
+
+LEAD_SOURCE_NORMALIZATION = {
+    'seo': 'Website Organic',
+    'website organic': 'Website Organic',
+    'linkedin - agus': 'Social Media',
+    'linkedin': 'Social Media',
+    'social media': 'Social Media',
+    'events': 'Events',
+    'outbound': 'Outbound',
+    'other': 'Other',
+    'ai': 'AI',
+    'webinar': 'Webinar',
+    'paid media': 'Paid Media',
+    'referral': 'Referral',
+    'connected inbox': 'Connected Inbox',
+    'press action': 'Press Action',
+    'import': 'Import',
+    'na': 'NA',
+    'n/a': 'NA',
+}
+
 
 def _require_sync_secret():
     expected = os.environ.get("HUBSPOT_SYNC_SECRET")
@@ -51,6 +87,20 @@ def _normalize_bool(value):
     if raw in ("no", "false", "0"):
         return False
     return None
+
+
+def _normalize_pain_point(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    return PAIN_POINT_NORMALIZATION.get(raw.lower(), raw)
+
+
+def _normalize_lead_source(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    return LEAD_SOURCE_NORMALIZATION.get(raw.lower(), raw)
 
 
 def _account_name_candidates(value):
@@ -217,6 +267,8 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
         if value not in (None, ""):
             payload[payload_key] = value
     payload["outsource"] = _normalize_outsource_value(payload.get("outsource"))
+    payload["pain_points"] = _normalize_pain_point(payload.get("pain_points"))
+    payload["where_come_from"] = _normalize_lead_source(payload.get("where_come_from"))
 
     exact_size = _first_mapped_value(property_maps, "exact_size", contact=contact, company=company, deal=deal)
     if exact_size and not payload.get("size"):
@@ -969,7 +1021,7 @@ def _insert_or_update_account(cursor, payload):
         "linkedin": payload.get("linkedin"),
         "comments": payload.get("about"),
         "mail": payload.get("mail"),
-        "where_come_from": payload.get("where_come_from") or "HubSpot",
+        "where_come_from": _normalize_lead_source(payload.get("where_come_from")) or "HubSpot",
         "referal_source": payload.get("referal_source"),
         "industry": payload.get("industry"),
         "outsource": _normalize_bool(payload.get("outsource")),

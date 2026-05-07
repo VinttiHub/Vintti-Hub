@@ -29,6 +29,59 @@ from utils.storage_utils import (
 bp = Blueprint('accounts', __name__)
 
 
+PAIN_POINT_NORMALIZATION = {
+    'na': 'NA',
+    'n/a': 'NA',
+    'high salary': 'High salary',
+    'no real pain point': 'No real pain point',
+    'cultural': 'Cultural fit',
+    'cultural fit': 'Cultural fit',
+    'time zone': 'Time zone',
+    'knowledge': 'No Knowledge',
+    'no knowledge': 'No Knowledge',
+    'no time': 'No time to hire',
+    'no time to hire': 'No time to hire',
+    'slow hiring processes': 'Slow hiring processes',
+    'workload': 'Workload',
+}
+
+LEAD_SOURCE_NORMALIZATION = {
+    'seo': 'Website Organic',
+    'website organic': 'Website Organic',
+    'linkedin - agus': 'Social Media',
+    'linkedin': 'Social Media',
+    'social media': 'Social Media',
+    'events': 'Events',
+    'outbound': 'Outbound',
+    'other': 'Other',
+    'ai': 'AI',
+    'webinar': 'Webinar',
+    'paid media': 'Paid Media',
+    'referral': 'Referral',
+    'connected inbox': 'Connected Inbox',
+    'press action': 'Press Action',
+    'import': 'Import',
+    'na': 'NA',
+    'n/a': 'NA',
+}
+
+
+def normalize_pain_point(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    normalized = PAIN_POINT_NORMALIZATION.get(raw.lower())
+    return normalized or raw
+
+
+def normalize_lead_source(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    normalized = LEAD_SOURCE_NORMALIZATION.get(raw.lower())
+    return normalized or raw
+
+
 def normalize_overview_stage(value):
     stage = str(value or '').strip().lower()
     if stage == 'closed':
@@ -780,13 +833,13 @@ def accounts():
                 data.get("linkedin"),
                 data.get("about"),
                 data.get("mail"),
-                data.get("where_come_from"),
+                normalize_lead_source(data.get("where_come_from")),
                 data.get("referal_source"),
 
                 # 🆕 Nuevos campos
                 data.get("industry"),         # industry
                 outsource,                    # boolean
-                data.get("pain_points"),      # pain_points
+                normalize_pain_point(data.get("pain_points")),  # pain_points
                 data.get("position"),         # position
                 data.get("type"),             # type
                 data.get("contact_name"),     # name (en la tabla)
@@ -1166,7 +1219,12 @@ def update_account_fields(account_id):
     for field in allowed_fields:
         if field in data:
             updates.append(f"{field} = %s")
-            values.append(data[field])
+            if field == 'pain_points':
+                values.append(normalize_pain_point(data[field]))
+            elif field == 'where_come_from':
+                values.append(normalize_lead_source(data[field]))
+            else:
+                values.append(data[field])
 
     if not updates:
         return jsonify({'error': 'No valid fields provided'}), 400
