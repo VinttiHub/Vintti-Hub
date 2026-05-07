@@ -652,6 +652,11 @@
       if (bind === 'donut') return renderDonut(el, scopedRows);
       if (bind === 'donut-legend') return renderDonutLegend(el, scopedRows);
       if (bind === 'bar-list') return renderBarList(el, scopedRows);
+      if (bind === 'risk-table') return renderRiskTable(el, scopedRows);
+      if (bind === 'triple-retention') {
+        renderTripleRetention(el).catch(e => console.error('triple-retention', e));
+        return;
+      }
       // month-detail panels are NOT hydrated by the generic flow — they
       // refetch with mes= filter via refetchMonthDetails() instead.
       if (bind === 'month-detail') return;
@@ -785,6 +790,148 @@
     });
   }
 
+  /* ---------- triple retention (3 / 6 / 12m windows overlaid) ----------
+     Fetches `candidate_retention_rate` 3 times with umbral=3,6,12 and renders
+     3 lines on the same SVG. When state.umbral is set, only shows that line. */
+  async function renderTripleRetention(svg) {
+    const chartKey = svg.dataset.chart || 'am_line_candidate_retention';
+    const xKey = svg.dataset.x || 'cohorte_mes';
+    const yField = svg.dataset.y || 'retention';
+    const allUmbrals = (svg.dataset.umbrals || '3,6,12').split(',').map(s => parseInt(s.trim(), 10));
+    const allColors  = (svg.dataset.colors  || 'lime,cyan,violet').split(',').map(s => s.trim());
+
+    // If user picked a specific umbral via the global filter, only show that line.
+    let umbrals = allUmbrals;
+    let colors = allColors;
+    const sel = parseInt(state.umbral || '', 10);
+    if (allUmbrals.includes(sel)) {
+      const idx = allUmbrals.indexOf(sel);
+      umbrals = [allUmbrals[idx]];
+      colors  = [allColors[idx] || allColors[0]];
+    }
+    // Toggle the inline series-pill labels in the chart container based on
+    // which umbral lines are visible.
+    const wrap = svg.parentElement;
+    if (wrap) {
+      wrap.querySelectorAll('.series-pill[data-umbral]').forEach(pill => {
+        pill.style.display = umbrals.includes(parseInt(pill.dataset.umbral, 10)) ? '' : 'none';
+      });
+    }
+
+    const datasets = await Promise.all(
+      umbrals.map(u =>
+        fetchChart(chartKey, { umbral: u })
+          .then(r => r.rows || [])
+          .catch(() => [])
+      )
+    );
+
+    // Merge by cohorte_mes — produces rows with ret_X, stay_X (per umbral) + start (cohort size)
+    const byMonth = {};
+    datasets.forEach((rows, idx) => {
+      const u = umbrals[idx];
+      rows.forEach(r => {
+        const m = r[xKey];
+        if (m == null) return;
+        if (!byMonth[m]) byMonth[m] = { [xKey]: m };
+        byMonth[m][`ret_${u}`] = r[yField];
+        byMonth[m][`stay_${u}`] = r.stay_candidate;
+        // start_candidate_total is the same across umbrals (cohort size)
+        if (byMonth[m].start_candidate_total == null) {
+          byMonth[m].start_candidate_total = r.start_candidate_total;
+        }
+      });
+    });
+    const merged = Object.keys(byMonth).sort().map(m => byMonth[m]);
+
+    const yFields = umbrals.map(u => `ret_${u}`).join(',');
+    const labels = umbrals.map(u => `${u} meses`).join(',');
+    const fmts = umbrals.map(() => 'percent').join(',');
+    // Tooltip extras: cohort size + stay count per visible umbral
+    const tooltipExtras = [
+      'start_candidate_total|Cohort size|int',
+      ...umbrals.map(u => `stay_${u}|Stayed ${u}m|int`),
+    ].join(',');
+
+    renderLine(svg, merged, {
+      x: xKey,
+      y: yFields,
+      color: colors.join(','),
+      labels,
+      fmtY: fmts,
+      area: 'false',
+      tooltipExtras,
+    });
+  }
+
+  /* ---------- risk table (rich detail per account) ---------- */
+  function riskBadge(riesgo) {
+    const s = String(riesgo || '');
+    let cls = 'activo', label = s;
+    if (/Alto|🔴/.test(s)) { cls = 'baja-real'; label = 'Alto'; }
+    else if (/Medio|🟡/.test(s)) { cls = 'baja-buyout'; label = 'Medio'; }
+    else if (/Bajo|🟢/.test(s)) { cls = 'alta'; label = 'Bajo'; }
+    return `<span class="mdetail__cand-state mdetail__cand-state--${cls}">${esc(label)}</span>`;
+  }
+  function fmtDateLong(s) {
+    if (!s) return '—';
+    const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return String(s);
+    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    return `${parseInt(m[3], 10)} ${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
+  }
+  function cleanProcesses(s) {
+    if (!s) return '<span class="muted">—</span>';
+    const str = String(s);
+    if (/Sin procesos/i.test(str)) {
+      return `<span class="risk-status risk-status--warn">⚠ Sin procesos activos</span>`;
+    }
+    // "🟢 Tiene procesos abiertos (Interviewing)" — extract stages between parens
+    const stages = str.match(/\(([^)]+)\)/);
+    const inner = stages ? stages[1] : '';
+    return `<span class="risk-status risk-status--ok">● ${esc(inner || 'Activos')}</span>`;
+  }
+  function renderRiskTable(el, rows) {
+    if (!rows || !rows.length) {
+      el.innerHTML = '<div class="muted" style="padding:24px;text-align:center;font-size:13px">No data</div>';
+      return;
+    }
+    const sorted = rows.slice().sort((a, b) => {
+      const ra = +a.risk_score || 0, rb = +b.risk_score || 0;
+      if (ra !== rb) return rb - ra;
+      return String(a.client_name).localeCompare(String(b.client_name));
+    });
+    const body = sorted.map(r => `
+      <tr>
+        <td>${riskBadge(r.riesgo)}</td>
+        <td class="ink">${esc(r.client_name || '—')}</td>
+        <td>${cleanProcesses(r.estado_procesos)}</td>
+        <td class="num">${fmt.int(r.candidatos_activos)}</td>
+        <td class="num">${esc(fmtDateLong(r.last_hire_d))}</td>
+        <td class="num">${fmt.int(r.replacements)}</td>
+        <td class="num ink">${fmt.int(r.risk_score)}</td>
+      </tr>
+    `).join('');
+    el.innerHTML = `
+      <div class="risk-table-wrap">
+        <table class="dtable risk-table">
+          <thead>
+            <tr>
+              <th>Riesgo</th>
+              <th>Cliente</th>
+              <th>Estado de procesos</th>
+              <th class="num">Activos</th>
+              <th class="num">Último hire</th>
+              <th class="num">Repl.</th>
+              <th class="num">Score</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
   /* ---------- bar list (top N items by value) ---------- */
   function renderBarList(el, rows) {
     const nameField = el.dataset.barName || 'name';
@@ -887,18 +1034,24 @@
     { match: /Baja\s*[-–]\s*Buyout|Conversion/i, cls: 'baja-buyout', label: 'Buyout',    prio: 4, dateField: 'endField' },
     { match: /Baja/i,                          cls: 'baja-real',   label: 'Baja',      prio: 4, dateField: 'endField' },
     { match: /Alta/i,                          cls: 'alta',        label: 'Alta',      prio: 3, dateField: 'startField' },
-    { match: /Activo/i,                        cls: 'activo',      label: 'Activo',    prio: 1, dateField: 'startField' },
+    { match: /nuevo/i,                         cls: 'alta',        label: 'Nuevo',     prio: 3, dateField: 'startField' },
+    { match: /upsell/i,                        cls: 'alta',        label: 'Upsell',    prio: 3, dateField: 'startField' },
+    { match: /downgrade|recorte/i,             cls: 'baja-real',   label: 'Downgrade', prio: 4, dateField: 'endField' },
     { match: /retenido/i,                      cls: 'activo',      label: 'Retenido',  prio: 2, dateField: 'startField' },
     { match: /churn/i,                         cls: 'baja-real',   label: 'Churn',     prio: 5, dateField: 'endField' },
+    { match: /Activo/i,                        cls: 'activo',      label: 'Activo',    prio: 1, dateField: 'startField' },
   ];
   function classifyState(s) {
-    if (!s) return null;
+    if (s == null || s === '') return null;
     const str = String(s);
     for (const rule of STATE_RULES) {
       if (rule.match.test(str)) return rule;
     }
     return { cls: '', label: str, prio: 0, dateField: 'endField' };
   }
+  // When state field exists on the schema but the row's state is null,
+  // render as "Vigente" (still active in the cohort).
+  const VIGENTE_RULE = { cls: 'activo', label: 'Vigente', prio: 0, dateField: 'startField' };
 
   /* ---------- month detail (one month at a time, grouped by client) ----------
      Data is server-filtered to the selected month (passes mes=YYYY-MM).
@@ -949,12 +1102,19 @@
           .slice()
           .sort((a, b) => String(a[nameField] || '').localeCompare(String(b[nameField] || '')))
           .map(r => {
-            const rule = stateField ? classifyState(r[stateField]) : null;
-            // Pick the date field based on state (end for bajas, start for altas/activos)
+            // If schema declares a state field, always derive a rule
+            // (Vigente when the row's state is null/empty)
+            let rule = null;
+            if (stateField) {
+              rule = classifyState(r[stateField]) || VIGENTE_RULE;
+            }
+            // Pick the date field based on state (end for bajas, start for altas/activos),
+            // falling back to the other one if the chosen field is empty.
             let date = '';
             if (rule) {
-              const fieldName = rule.dateField === 'endField' ? endField : startField;
-              date = r[fieldName] || r[dateField] || '';
+              const primary = rule.dateField === 'endField' ? endField : startField;
+              const fallback = rule.dateField === 'endField' ? startField : endField;
+              date = r[primary] || r[fallback] || r[dateField] || '';
             } else {
               date = r[dateField] || '';
             }
@@ -981,6 +1141,7 @@
     }
 
     function buildNav(currMonth) {
+      if (el.dataset.noNav === 'true') return '';  // suppress nav (used when nav is shared across panels)
       const pills = monthKeys.map(m => `
         <button type="button" class="mdetail__pill ${m === currMonth ? 'is-selected' : ''}" data-mdetail-month="${esc(m)}">
           ${esc(formatMonthHuman(m))}
