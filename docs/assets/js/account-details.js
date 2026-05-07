@@ -557,7 +557,7 @@ function fillAccountDetails(data) {
   setFieldText('account-type', data.type);
 
   const outsourceDisplay = (() => {
-    if (data.outsource === true) return 'Yes';
+    if (data.outsource === true) return 'Yes - No info';
     if (data.outsource === false) return 'No';
     if (typeof data.outsource === 'string' && data.outsource.trim()) {
       return data.outsource;

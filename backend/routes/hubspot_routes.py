@@ -55,6 +55,30 @@ LEAD_SOURCE_NORMALIZATION = {
     'n/a': 'NA',
 }
 
+OUTSOURCE_NORMALIZATION = {
+    'yes': 'Yes - No info',
+    'true': 'Yes - No info',
+    '1': 'Yes - No info',
+    'y': 'Yes - No info',
+    'si': 'Yes - No info',
+    'sí': 'Yes - No info',
+    'outsourced': 'Yes - No info',
+    'outsourced before': 'Yes - No info',
+    'yes - no info': 'Yes - No info',
+    'no': 'No',
+    'false': 'No',
+    '0': 'No',
+    'n': 'No',
+    'not outsourced': 'No',
+    'never': 'No',
+    'na': 'NA',
+    'n/a': 'NA',
+    'philippines': 'Philippines',
+    'india': 'India',
+    'latam': 'LATAM',
+    'south africa': 'South Africa',
+}
+
 
 def _require_sync_secret():
     expected = os.environ.get("HUBSPOT_SYNC_SECRET")
@@ -80,15 +104,6 @@ def _ensure_hubspot_account_columns(cursor):
     )
 
 
-def _normalize_bool(value):
-    raw = str(value or "").strip().lower()
-    if raw in ("yes", "true", "1"):
-        return True
-    if raw in ("no", "false", "0"):
-        return False
-    return None
-
-
 def _normalize_pain_point(value):
     raw = str(value or "").strip()
     if not raw:
@@ -101,6 +116,13 @@ def _normalize_lead_source(value):
     if not raw:
         return None
     return LEAD_SOURCE_NORMALIZATION.get(raw.lower(), raw)
+
+
+def _normalize_outsource_value(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    return OUTSOURCE_NORMALIZATION.get(raw.lower(), raw)
 
 
 def _account_name_candidates(value):
@@ -236,17 +258,6 @@ def _preview_account_fields(payload):
         "hubspot_contact_id",
     ]
     return {key: payload.get(key) for key in keys}
-
-
-def _normalize_outsource_value(value):
-    raw = str(value or "").strip().lower()
-    if not raw:
-        return None
-    if raw in ("yes", "true", "1", "si", "sí", "y", "outsourced", "outsourced before"):
-        return "yes"
-    if raw in ("no", "false", "0", "n", "not outsourced", "never"):
-        return "no"
-    return raw
 
 
 def _apply_account_field_overrides(payload, contact=None, company=None, deal=None, property_maps=None):
@@ -1024,7 +1035,7 @@ def _insert_or_update_account(cursor, payload):
         "where_come_from": _normalize_lead_source(payload.get("where_come_from")) or "HubSpot",
         "referal_source": payload.get("referal_source"),
         "industry": payload.get("industry"),
-        "outsource": _normalize_bool(payload.get("outsource")),
+        "outsource": _normalize_outsource_value(payload.get("outsource")),
         "pain_points": payload.get("pain_points"),
         "position": payload.get("position"),
         "type": payload.get("type") or "NA",

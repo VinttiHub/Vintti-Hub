@@ -65,6 +65,26 @@ LEAD_SOURCE_NORMALIZATION = {
     'n/a': 'NA',
 }
 
+OUTSOURCE_NORMALIZATION = {
+    'yes': 'Yes - No info',
+    'true': 'Yes - No info',
+    '1': 'Yes - No info',
+    'y': 'Yes - No info',
+    'si': 'Yes - No info',
+    'sí': 'Yes - No info',
+    'yes - no info': 'Yes - No info',
+    'no': 'No',
+    'false': 'No',
+    '0': 'No',
+    'n': 'No',
+    'na': 'NA',
+    'n/a': 'NA',
+    'philippines': 'Philippines',
+    'india': 'India',
+    'latam': 'LATAM',
+    'south africa': 'South Africa',
+}
+
 
 def normalize_pain_point(value):
     raw = str(value or '').strip()
@@ -79,6 +99,14 @@ def normalize_lead_source(value):
     if not raw:
         return None
     normalized = LEAD_SOURCE_NORMALIZATION.get(raw.lower())
+    return normalized or raw
+
+
+def normalize_outsource(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    normalized = OUTSOURCE_NORMALIZATION.get(raw.lower())
     return normalized or raw
 
 
@@ -799,14 +827,7 @@ def accounts():
                     "matches": duplicate_matches,
                 }), 409
 
-            # 👉 Normalizar boolean de outsource (yes/no -> True/False/None)
-            raw_outsource = str(data.get("outsource") or "").strip().lower()
-            if raw_outsource in ("yes", "true", "1"):
-                outsource = True
-            elif raw_outsource in ("no", "false", "0"):
-                outsource = False
-            else:
-                outsource = None
+            outsource = normalize_outsource(data.get("outsource"))
 
             query = """
                 INSERT INTO account (
@@ -838,7 +859,7 @@ def accounts():
 
                 # 🆕 Nuevos campos
                 data.get("industry"),         # industry
-                outsource,                    # boolean
+                outsource,                    # categorical outsource source
                 normalize_pain_point(data.get("pain_points")),  # pain_points
                 data.get("position"),         # position
                 data.get("type"),             # type
@@ -1209,7 +1230,8 @@ def update_account_fields(account_id):
         'calculated_status',
         'account_manager',
         'account_status', 
-        'referal_source'  
+        'referal_source',
+        'outsource',
     ]
 
 
@@ -1223,6 +1245,8 @@ def update_account_fields(account_id):
                 values.append(normalize_pain_point(data[field]))
             elif field == 'where_come_from':
                 values.append(normalize_lead_source(data[field]))
+            elif field == 'outsource':
+                values.append(normalize_outsource(data[field]))
             else:
                 values.append(data[field])
 
