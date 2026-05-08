@@ -803,24 +803,17 @@
           </div>
         </div>
 
-        <div class="card s-12" data-grain-show="week" hidden>
+        <div class="card s-12">
           <div class="card__head">
             <div>
-              <h3 class="card__title">Staffing · weekly</h3>
-              <p class="card__sub">Phase C · weekly aggregations pendientes</p>
+              <h3 class="card__title">Staffing · history</h3>
+              <p class="card__sub">Snapshot por <span data-grain-label>mes</span> — controlado por el toggle de grain.</p>
             </div>
+            <span class="callout callout--soft" data-grain-callout>Monthly</span>
           </div>
-          <div class="muted" style="padding:24px;text-align:center">Tabla weekly · próximamente</div>
-        </div>
-
-        <div class="card s-12" data-grain-show="month">
-          <div class="card__head">
-            <div>
-              <h3 class="card__title">Staffing · monthly</h3>
-              <p class="card__sub">Phase C · monthly aggregations pendientes</p>
-            </div>
-          </div>
-          <div class="muted" style="padding:24px;text-align:center">Tabla monthly · próximamente</div>
+          <div class="scroll-x" data-chart="gr_table_staffing_history" data-bind="dtable"
+               data-cols="periodo|Período|raw,mrr|MRR|currency-k,active_clients|Clients|int,active_contractors|Contractors|int,new_clients|New|int,churn_clients|Churn|int,buyout_clients|Buyout|int,churn_contractors|Churn contractors|int"
+               data-empty-text="No data for this range"></div>
         </div>
 
       </div>
@@ -902,20 +895,24 @@
           </div>
         </div>
 
-        <div class="card s-12" data-grain-show="week" hidden>
+        <div class="card s-12">
           <div class="card__head">
             <div>
-              <h3 class="card__title">Recruiting · weekly</h3>
-              <p class="card__sub">Phase C · weekly aggregations pendientes</p>
+              <h3 class="card__title">Recruiting · history</h3>
+              <p class="card__sub">Revenue, FTEs y clientes por <span data-grain-label>mes</span>.</p>
             </div>
+            <span class="callout callout--soft" data-grain-callout>Monthly</span>
           </div>
-          <div class="muted" style="padding:24px;text-align:center">Tabla weekly · próximamente</div>
+          <div class="scroll-x" data-chart="gr_table_recruiting_history" data-bind="dtable"
+               data-cols="periodo|Período|raw,revenue|Revenue|currency-k,new_ftes|New FTEs|int,new_clients|New clients|int,active_clients|Active clients|int"
+               data-empty-text="No data for this range"></div>
         </div>
 
-        <div class="card s-12" data-grain-show="month">
+        <!-- Recruiting upfront context chart (legacy reference, monthly only) -->
+        <div class="card s-12">
           <div class="card__head">
             <div>
-              <h3 class="card__title">Recruiting upfront · monthly</h3>
+              <h3 class="card__title">Recruiting upfront · monthly chart</h3>
               <p class="card__sub">Revenue por close date · histórico mensual</p>
             </div>
             <span class="callout callout--soft">Live · gr_area_recruiting_upfront</span>
@@ -2555,6 +2552,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=34" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=35" defer></script>
 </body>
 </html>

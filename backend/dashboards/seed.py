@@ -190,6 +190,8 @@ RESET_CHART_KEYS = {
         "gr_kpi_revenue_ytd",
         "gr_kpi_staffing_window",
         "gr_kpi_recruiting_window",
+        "gr_table_staffing_history",
+        "gr_table_recruiting_history",
     ],
 }
 
@@ -2192,6 +2194,43 @@ MAIN_CHARTS = [
         },
         "position": {"x": 8, "y": 80, "w": 4, "h": 4},
         "sort_order": 370,
+    },
+    {
+        "chart_key": "gr_table_staffing_history",
+        "tab_key": "growth",
+        "title": "Staffing History — Weekly | Monthly",
+        "type": "table",
+        "dataset_key": "staffing_history",
+        "config": {
+            "mapping": {
+                "columns": [
+                    "periodo",
+                    "mrr",
+                    "active_clients",
+                    "active_contractors",
+                    "new_clients",
+                    "churn_clients",
+                    "buyout_clients",
+                    "churn_contractors",
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 84, "w": 12, "h": 6},
+        "sort_order": 380,
+    },
+    {
+        "chart_key": "gr_table_recruiting_history",
+        "tab_key": "growth",
+        "title": "Recruiting History — Weekly | Monthly",
+        "type": "table",
+        "dataset_key": "recruiting_history",
+        "config": {
+            "mapping": {
+                "columns": ["periodo", "revenue", "new_ftes", "new_clients", "active_clients"],
+            },
+        },
+        "position": {"x": 0, "y": 90, "w": 12, "h": 6},
+        "sort_order": 390,
     },
 ]
 

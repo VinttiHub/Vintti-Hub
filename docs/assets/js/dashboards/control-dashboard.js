@@ -651,6 +651,7 @@
         });
       }
       if (bind === 'list') return renderList(el, scopedRows);
+      if (bind === 'dtable') return renderDtable(el, scopedRows);
       if (bind === 'grouped-list') return renderGroupedList(el, scopedRows);
       if (bind === 'donut') return renderDonut(el, scopedRows);
       if (bind === 'donut-legend') return renderDonutLegend(el, scopedRows);
@@ -999,6 +1000,37 @@
       const date = dateField ? `<span class="dlist__date">${esc(r[dateField] || '')}</span>` : '';
       return `<div class="dlist__row"><div><span class="dlist__name">${name}</span>${sub}</div>${date}</div>`;
     }).join('');
+  }
+
+  /* ---------- dtable (generic data table from data-cols="field|Label|fmt,...") ---------- */
+  function renderDtable(el, rows) {
+    const cols = (el.dataset.cols || '').split(',').map(spec => {
+      const parts = spec.trim().split('|');
+      return { field: parts[0] || '', label: parts[1] || parts[0] || '', fmt: parts[2] || 'raw' };
+    }).filter(c => c.field);
+    const empty = el.dataset.emptyText || 'No data';
+    if (!cols.length) {
+      el.innerHTML = `<div class="muted" style="padding:18px;text-align:center">${esc(empty)}</div>`;
+      return;
+    }
+    if (!rows || !rows.length) {
+      el.innerHTML = `<table class="dtable"><thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>` +
+        `<tbody><tr><td colspan="${cols.length}" class="muted" style="text-align:center;padding:18px">${esc(empty)}</td></tr></tbody></table>`;
+      return;
+    }
+    const head = cols.map(c => {
+      const isNum = c.fmt && c.fmt !== 'raw' && c.fmt !== 'date';
+      return `<th${isNum ? ' class="num"' : ''}>${esc(c.label)}</th>`;
+    }).join('');
+    const body = rows.map(r => {
+      return '<tr>' + cols.map(c => {
+        const f = fmt.pick(c.fmt);
+        const isNum = c.fmt && c.fmt !== 'raw' && c.fmt !== 'date';
+        const cell = f(r[c.field]);
+        return `<td${isNum ? ' class="num"' : ''}>${esc(cell)}</td>`;
+      }).join('') + '</tr>';
+    }).join('');
+    el.innerHTML = `<table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   }
 
   /* ---------- grouped list (no month filter — just groups by a field, with state badges) ---------- */
@@ -1671,7 +1703,7 @@
             b.classList.toggle('is-active', b.dataset.viewValue === def);
           });
         });
-        applyGrainVisibility();
+        applyGrainLabels();
         // 5) Reset sub-tab radio to default
         const defaultSub = document.getElementById('gsub-' + (FILTER_DEFAULTS.subtab || 'staffing'));
         if (defaultSub) defaultSub.checked = true;
@@ -1682,11 +1714,11 @@
   }
 
   /* ---------- view-mode pills (Window / Grain) for Growth · New ---------- */
-  function applyGrainVisibility(scope) {
-    const root = scope || document;
-    root.querySelectorAll('[data-grain-show]').forEach(el => {
-      el.hidden = (el.dataset.grainShow !== state.grain);
-    });
+  function applyGrainLabels() {
+    const label = state.grain === 'week' ? 'semana' : 'mes';
+    const callout = state.grain === 'week' ? 'Weekly' : 'Monthly';
+    document.querySelectorAll('[data-grain-label]').forEach(el => { el.textContent = label; });
+    document.querySelectorAll('[data-grain-callout]').forEach(el => { el.textContent = callout; });
   }
 
   function bindViewModes() {
@@ -1697,19 +1729,15 @@
         btn.addEventListener('click', () => {
           const value = btn.dataset.viewValue;
           if (!value || state[key] === value) return;
-          // Update sibling active state across ALL groups with the same key
-          // (Recruiting and Staffing both render their own grain pills, keep them in sync)
+          // Sync active class across all groups with the same key
+          // (Staffing and Recruiting each render their own grain pills, keep them in sync)
           document.querySelectorAll(`.view-mode[data-view-key="${key}"] .view-mode__btn`).forEach(b => {
             b.classList.toggle('is-active', b.dataset.viewValue === value);
           });
           state[key] = value;
-          if (key === 'window') {
-            // Window changes the snapshot KPI data — refetch.
-            hydrate();
-          } else if (key === 'grain') {
-            // Grain just swaps which history card is visible. Datasets already in cache.
-            applyGrainVisibility();
-          }
+          if (key === 'grain') applyGrainLabels();
+          // Both window and grain change backend data → refetch
+          hydrate();
         });
       });
     });
@@ -1722,8 +1750,7 @@
       });
     });
 
-    // Initial visibility pass
-    applyGrainVisibility();
+    applyGrainLabels();
   }
 
   /* ---------- boot ---------- */

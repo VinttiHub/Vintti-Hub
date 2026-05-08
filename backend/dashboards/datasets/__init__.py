@@ -104,6 +104,8 @@ from . import (
     revenue_ytd_total,
     staffing_window_summary,
     recruiting_window_summary,
+    staffing_history,
+    recruiting_history,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -208,6 +210,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     revenue_ytd_total.DATASET["key"]: revenue_ytd_total.DATASET,
     staffing_window_summary.DATASET["key"]: staffing_window_summary.DATASET,
     recruiting_window_summary.DATASET["key"]: recruiting_window_summary.DATASET,
+    staffing_history.DATASET["key"]: staffing_history.DATASET,
+    recruiting_history.DATASET["key"]: recruiting_history.DATASET,
 }
 
 
