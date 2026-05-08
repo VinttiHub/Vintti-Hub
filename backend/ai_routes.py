@@ -286,6 +286,62 @@ def _summarize_long_resume_source(source_name: str, text: str, limit: int) -> st
     )
     return _truncate_preserving_edges(combined, limit)
 
+def _normalize_resume_date(value: Any, *, allow_year_only: bool = False) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", raw)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}-01"
+    if re.match(r"^\d{4}-\d{2}$", raw):
+        return f"{raw}-01"
+    if re.match(r"^\d{4}$", raw):
+        return f"{raw}-01-01" if allow_year_only else ""
+    return raw
+
+def _clean_generated_education_dates(entry: Dict[str, Any]) -> Dict[str, Any]:
+    start = str(entry.get("start_date") or "").strip()
+    end = str(entry.get("end_date") or "").strip()
+
+    # A single year in the source often becomes a fake Jan-Dec range. Keep it
+    # as a completion year instead of pretending we know a start/end range.
+    same_year_range = (
+        re.match(r"^\d{4}-0?1-(?:0?1|15)$", start)
+        and re.match(r"^\d{4}-12-(?:31|15|01)$", end)
+        and start[:4] == end[:4]
+    )
+    if same_year_range:
+        entry["start_date"] = ""
+        entry["end_date"] = ""
+        entry["current"] = False
+        return entry
+
+    entry["start_date"] = _normalize_resume_date(start, allow_year_only=False)
+    entry["end_date"] = _normalize_resume_date(end, allow_year_only=False)
+    if not entry["start_date"] and re.match(r"^\d{4}-01-(?:01|15)$", entry["end_date"] or ""):
+        entry["end_date"] = ""
+    if not entry["end_date"] and not entry["start_date"]:
+        entry["current"] = False
+    return entry
+
+def _clean_generated_work_dates(entry: Dict[str, Any], today: datetime.date) -> Dict[str, Any]:
+    start = _normalize_resume_date(entry.get("start_date"), allow_year_only=True)
+    raw_end = str(entry.get("end_date") or "").strip()
+    if raw_end.lower() in ("", "present", "current", "now", "actualidad"):
+        end = ""
+        current = True
+    else:
+        end = _normalize_resume_date(raw_end, allow_year_only=True)
+        current = False
+        try:
+            current = datetime.datetime.strptime(end, "%Y-%m-%d").date() > today if end else False
+        except Exception:
+            current = False
+    entry["start_date"] = start
+    entry["end_date"] = "" if current else end
+    entry["current"] = current
+    return entry
+
 def _strip_html_text(raw: str) -> str:
     text = re.sub(r"<[^>]+>", " ", raw or "")
     return re.sub(r"\s+", " ", text).strip()
@@ -1465,10 +1521,10 @@ Return STRICT JSON:
                 {{
                     "institution": "...", \\translate everything to english
                     "title": "...", \\translate everything to english
-                    "start_date": "YYYY-MM-DD",
-                    "end_date": "YYYY-MM-DD",
+                    "start_date": "YYYY-MM-DD or empty string",
+                    "end_date": "YYYY-MM-DD or empty string",
                     "current": true/false,
-                    "description": "- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n- Bullet 4\\n..."  // Use all available details. Each description must include at least 5-8 bullet points, written in professional tone. Bullets must cover responsibilities, methods, tools, skills applied, outcomes (if mentioned), and relevant context. Do not add or assume anything that is not clearly present in the input."
+                    "description": ""  // Leave empty unless the source gives concrete, education-specific details such as thesis topic, honors, coursework, or project details. Never write generic program descriptions.
                 }}
             ]
             - work_experience: [
@@ -1478,17 +1534,24 @@ Return STRICT JSON:
                     "start_date": "YYYY-MM-DD",
                     "end_date": "YYYY-MM-DD",
                     "current": true/false,
-                    "description": "In this role I did (short summary). \\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n..."  // Start with a simple summary sentence finished with dot, then detailed bullet points using all available data. No extra info.
+                    "description": "In this role I did (short summary). \\n- Bullet 1\\n- Bullet 2\\n- Bullet 3\\n..."  // Use the responsibilities, achievements, industries, tools, and metrics explicitly present for this exact role. No extra info.
                 }}
             ]
             - tools: [{{"tool":"Excel", "level":"Advanced"}}, ...]
 
             Rules:
             - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
+            - Include EVERY distinct work experience entry from the CV/PDF/LinkedIn source. Do not omit older, shorter, internship, consulting, RPO, or overlapping roles just to save space.
+            - Work experience completeness is more important than long descriptions. If needed, use fewer bullets per role, but keep all roles.
+            - For education dates: if the source only gives a single year or month/year, put it in end_date and leave start_date empty. Only fill both start_date and end_date when the source explicitly provides a date range.
+            - Never convert a single education year into a full year range. For example, "2024" must not become January 2024 to December 2024.
+            - Never write generic education bullets like "gained knowledge", "developed skills", "focused on leadership", or similar unless those exact concrete details are in the source.
+            - Education descriptions should usually be empty. Include thesis/project details only when explicitly present in the source.
+            - If a day is not present in the source, use the first day of the known month only as a storage placeholder. Do not imply the day is exact.
             - Use the available sources when present: LinkedIn, CV PDF, Intro Call transcript, Deep Dive transcript, and First Interview transcript.
             - The call transcripts may contain extra context about scope, achievements, tools, responsibilities, communication, leadership, domain experience, and interview examples. Use that information when it clearly refers to the candidate's real background.
-            - Use all possible details found in the source to make the descriptions **long, rich and specific**.
-            - The descriptions in both education and work experience must be **very detailed bullet points** using `- ` for each bullet.
+            - Use all possible details found in the source to make work descriptions specific.
+            - Work descriptions should use `- ` for each bullet.
             - If there is too little info, still write one or two bullets summarizing the available data — but do not fabricate anything.
             - If sources overlap, merge them carefully without duplicating the same point.
             - Prefer the most specific version of a fact when multiple sources mention it.
@@ -1506,8 +1569,8 @@ Return STRICT JSON:
                     {"role": "system", "content": "You are a resume generation assistant."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.7,
-                max_tokens=7000
+                temperature=0.2,
+                max_tokens=12000
             )
 
             if not completion.choices or not hasattr(completion.choices[0], "message"):
@@ -1553,58 +1616,6 @@ Return STRICT JSON:
                 for entry in json_data.get("work_experience", []):
                     entry["description"] = format_description_to_html(entry.get("description", ""))
 
-                today = datetime.date.today()
-
-                # Preprocesar fechas en work_experience
-                for entry in json_data.get("work_experience", []):
-                    # Formatear fechas incompletas
-                    start = entry.get("start_date", "")
-                    end = entry.get("end_date", "")
-
-                    if start and len(start) == 4:
-                        entry["start_date"] = f"{start}-01-01"
-                    elif start and len(start) == 7:
-                        entry["start_date"] = f"{start}-01"
-
-                    if end and len(end) == 4:
-                        entry["end_date"] = f"{end}-01-01"
-                    elif end and len(end) == 7:
-                        entry["end_date"] = f"{end}-01"
-
-                    # Evaluar si es actual
-                    if not entry.get("end_date"):
-                        entry["current"] = True
-                    else:
-                        try:
-                            end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
-                            entry["current"] = end_date_obj > today
-                        except:
-                            entry["current"] = False
-
-                # Preprocesar fechas en education
-                for entry in json_data.get("education", []):
-                    start = entry.get("start_date", "")
-                    end = entry.get("end_date", "")
-
-                    if start and len(start) == 4:
-                        entry["start_date"] = f"{start}-01-01"
-                    elif start and len(start) == 7:
-                        entry["start_date"] = f"{start}-01"
-
-                    if end and len(end) == 4:
-                        entry["end_date"] = f"{end}-01-01"
-                    elif end and len(end) == 7:
-                        entry["end_date"] = f"{end}-01"
-
-                    if not entry.get("end_date"):
-                        entry["current"] = True
-                    else:
-                        try:
-                            end_date_obj = datetime.datetime.strptime(entry["end_date"], "%Y-%m-%d").date()
-                            entry["current"] = end_date_obj > today
-                        except:
-                            entry["current"] = False
-
             except Exception as e1:
                 try:
                     cleaned = re.sub(r'```(?:json)?\s*([\s\S]*?)\s*```', r'\1', content.strip())
@@ -1639,6 +1650,12 @@ Return STRICT JSON:
 
                 except Exception as e2:
                     raise Exception(f"❌ Error parsing JSON. First attempt: {str(e1)} | Second attempt: {str(e2)} | Content: {content[:300]}")
+
+            today = datetime.date.today()
+            for entry in json_data.get("work_experience", []):
+                _clean_generated_work_dates(entry, today)
+            for entry in json_data.get("education", []):
+                _clean_generated_education_dates(entry)
 
             education = json.dumps(json_data.get('education', []))
             work_experience = json.dumps(json_data.get('work_experience', []))
