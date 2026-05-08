@@ -31,6 +31,12 @@ from utils.applicant_matching import score_candidate_against_job
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+RESUME_LINKEDIN_SOURCE_LIMIT = 30000
+RESUME_CV_SOURCE_LIMIT = 50000
+RESUME_NOTES_LIMIT = 8000
+RESUME_SOURCE_CHUNK_SIZE = 12000
+RESUME_SOURCE_MAX_CHUNKS = 8
+
 # arriba de tu archivo (imports)
 from openai import OpenAI
 from PyPDF2 import PdfReader  # fallback local
@@ -149,9 +155,16 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
         with io.BytesIO(pdf_bytes) as bio:
             reader = PdfReader(bio)
             raw = []
-            for page in reader.pages:
-                raw.append(page.extract_text() or "")
-            local_text = re.sub(r"\s+", " ", "\n".join(raw)).strip()
+            for idx, page in enumerate(reader.pages, start=1):
+                page_text = (page.extract_text() or "").strip()
+                if page_text:
+                    cleaned_lines = [
+                        re.sub(r"[ \t]+", " ", line).strip()
+                        for line in page_text.splitlines()
+                    ]
+                    cleaned_page = "\n".join(line for line in cleaned_lines if line)
+                    raw.append(f"--- PAGE {idx} ---\n{cleaned_page}")
+            local_text = "\n\n".join(raw).strip()
     except Exception as e:
         logging.error(f"❌ Local PDF read failed: {e}")
 
@@ -190,7 +203,7 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
                         {"type": "input_text", "text": base_prompt}
                     ]
                 }],
-                max_output_tokens=4000,
+                max_output_tokens=12000,
             )
 
             # Preferir .output_text cuando exista
@@ -214,6 +227,64 @@ def _extract_pdf_text_with_openai(pdf_bytes: bytes, prompt_hint: str = "") -> st
         extracted = local_text
 
     return extracted.strip()
+
+def _truncate_preserving_edges(text: str, limit: int) -> str:
+    text = str(text or "").strip()
+    if len(text) <= limit:
+        return text
+    head_size = int(limit * 0.7)
+    tail_size = limit - head_size
+    return (
+        text[:head_size].rstrip()
+        + "\n\n[...SOURCE TRUNCATED: middle omitted to fit model context...]\n\n"
+        + text[-tail_size:].lstrip()
+    )
+
+def _summarize_long_resume_source(source_name: str, text: str, limit: int) -> str:
+    text = str(text or "").strip()
+    if len(text) <= limit:
+        return text
+
+    chunks = [
+        text[i:i + RESUME_SOURCE_CHUNK_SIZE]
+        for i in range(0, len(text), RESUME_SOURCE_CHUNK_SIZE)
+    ][:RESUME_SOURCE_MAX_CHUNKS]
+    summaries = []
+    for idx, chunk in enumerate(chunks, start=1):
+        prompt = f"""
+        You are condensing source material for a resume generator.
+        Keep every factual resume signal from this {source_name} chunk: candidate name, roles, companies,
+        dates, responsibilities, achievements, tools, skills, education, certifications, and languages.
+        Do not invent or generalize. Preserve page/chunk order and date ranges.
+
+        SOURCE: {source_name}
+        CHUNK {idx} OF {len(chunks)}
+        ---
+        {chunk}
+        ---
+        Return clean English notes only.
+        """
+        try:
+            response = call_openai_with_retry(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You preserve resume facts from long sources."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.2,
+                max_tokens=1800,
+            )
+            summaries.append(response.choices[0].message.content.strip())
+        except Exception:
+            logging.exception("Failed to summarize %s chunk %s", source_name, idx)
+            summaries.append(chunk[:3000])
+
+    combined = "\n\n".join(
+        f"--- {source_name} SUMMARY CHUNK {idx} ---\n{summary}"
+        for idx, summary in enumerate(summaries, start=1)
+        if summary
+    )
+    return _truncate_preserving_edges(combined, limit)
 
 def _strip_html_text(raw: str) -> str:
     text = re.sub(r"<[^>]+>", " ", raw or "")
@@ -1317,15 +1388,23 @@ Return STRICT JSON:
         try:
             data = request.json
             candidate_id = data.get('candidate_id')
-            linkedin_scrapper = data.get('linkedin_scrapper', '')[:8000]
-            cv_pdf_scrapper = data.get('cv_pdf_scrapper', '')[:8000]
+            linkedin_scrapper = _summarize_long_resume_source(
+                "LINKEDIN SCRAPER",
+                data.get('linkedin_scrapper', ''),
+                RESUME_LINKEDIN_SOURCE_LIMIT,
+            )
+            cv_pdf_scrapper = _summarize_long_resume_source(
+                "CV PDF SCRAPER",
+                data.get('cv_pdf_scrapper', ''),
+                RESUME_CV_SOURCE_LIMIT,
+            )
             intro_call_link = data.get('intro_call_link', '')
             deep_dive_link = data.get('deep_dive_link', '')
             first_interview_link = data.get('first_interview_link', '')
             intro_call_transcript = data.get('intro_call_transcript', '')
             deep_dive_transcript = data.get('deep_dive_transcript', '')
             first_interview_transcript = data.get('first_interview_transcript', '')
-            notes = data.get('notes', '')[:4000]
+            notes = str(data.get('notes', '') or '')[:RESUME_NOTES_LIMIT]
 
             if intro_call_link:
                 logging.info("generate_resume_fields: fetching Intro Call transcript from Grain link")
@@ -1352,6 +1431,11 @@ Return STRICT JSON:
                 bool((first_interview_link or "").strip()),
                 len(first_interview_transcript or ""),
                 len(notes or ""),
+            )
+            logging.info(
+                "generate_resume_fields source lengths after preparation: linkedin_chars=%s cv_chars=%s",
+                len(linkedin_scrapper or ""),
+                len(cv_pdf_scrapper or ""),
             )
 
             prompt = f"""
@@ -1677,9 +1761,9 @@ Return STRICT JSON:
                 return jsonify({"error": "Candidate not found"}), 404
 
             affinda_now, cv_pdf_now = row
-            if (affinda_now or "").strip():
+            if (cv_pdf_now or "").strip():
                 cur.close(); conn.close()
-                return jsonify({"skipped": True, "reason": "affinda_scrapper already has content"}), 200
+                return jsonify({"skipped": True, "reason": "cv_pdf_scrapper already has content"}), 200
 
             if not pdf_url:
                 cur.close(); conn.close()
@@ -1699,11 +1783,18 @@ Return STRICT JSON:
                 return jsonify({"error": "Empty extraction from OpenAI"}), 500
 
             # 4) Guardar en ambas columnas
-            cur.execute("""
-                UPDATE candidates
-                SET affinda_scrapper = %s, cv_pdf_scrapper = %s
-                WHERE candidate_id = %s
-            """, (extracted, extracted, candidate_id))
+            if (affinda_now or "").strip():
+                cur.execute("""
+                    UPDATE candidates
+                    SET cv_pdf_scrapper = %s
+                    WHERE candidate_id = %s
+                """, (extracted, candidate_id))
+            else:
+                cur.execute("""
+                    UPDATE candidates
+                    SET affinda_scrapper = %s, cv_pdf_scrapper = %s
+                    WHERE candidate_id = %s
+                """, (extracted, extracted, candidate_id))
             conn.commit()
             cur.close(); conn.close()
 
