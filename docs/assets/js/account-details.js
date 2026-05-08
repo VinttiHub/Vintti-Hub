@@ -553,6 +553,7 @@ function fillAccountDetails(data) {
   setFieldText('account-industry', data.industry);
   setFieldText('account-lead-source', data.where_come_from);
   setFieldText('account-lead-source-detail', data.lead_source_detail);
+  setFieldText('account-conversion-channel', data.conversion_channel);
   setFieldText('account-referral-source', data.referal_source);
   setFieldText('account-position', data.position);
   setFieldText('account-type', data.type);
