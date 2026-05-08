@@ -1543,11 +1543,17 @@ Return STRICT JSON:
             - Do NOT invent or assume any data. Only use what is explicitly or implicitly present.
             - Include EVERY distinct work experience entry from the CV/PDF/LinkedIn source. Do not omit older, shorter, internship, consulting, RPO, or overlapping roles just to save space.
             - Work experience completeness is more important than long descriptions. If needed, use fewer bullets per role, but keep all roles.
+            - If a role has only title, company, and dates because the CV is visual/designed and sparse, do not invent company-specific responsibilities, clients, deliverables, metrics, or tools.
+            - For sparse roles, write 2-3 concise bullets using only CV-wide explicit context such as the headline/summary, key skills, and software list. Phrase that context carefully as "the CV presents..." or "CV-wide context includes...", not as a proven responsibility at that exact company unless the source links it to that role.
+            - For sparse roles, choose title-aligned CV-wide context: 3D roles can mention 3D generalist/design and listed software such as Cinema 4D, RedShift, and X Particles; motion/video roles can mention motion graphics, compositing, dynamic visual content, and listed software such as Adobe After Effects and Adobe Premiere; photography roles can mention photography/video and listed software such as Adobe Lightroom/Photoshop.
+            - Never say "expertise in", "proficient in", "advanced in", or "used at this company" for software unless the source explicitly says that. Prefer "listed software includes..." or "CV-wide tools listed include...".
+            - Example safe sparse-role bullets: "- The CV lists this role as Motion Designer." "- CV-wide context presents the candidate as a 3D designer specializing in Motion Design and dynamic visual content." "- Relevant CV-wide tools listed include Adobe After Effects and Adobe Premiere." Do not add achievements.
             - For education dates: if the source only gives a single year or month/year, put it in end_date and leave start_date empty. Only fill both start_date and end_date when the source explicitly provides a date range.
             - Never convert a single education year into a full year range. For example, "2024" must not become January 2024 to December 2024.
             - Never write generic education bullets like "gained knowledge", "developed skills", "focused on leadership", or similar unless those exact concrete details are in the source.
             - Education descriptions should usually be empty. Include thesis/project details only when explicitly present in the source.
             - If a day is not present in the source, use the first day of the known month only as a storage placeholder. Do not imply the day is exact.
+            - For tools: do not infer expertise from a simple software list. If no proficiency level is stated, use "Intermediate" as a neutral UI placeholder and do not describe it as proven advanced/basic proficiency.
             - Use the available sources when present: LinkedIn, CV PDF, Intro Call transcript, Deep Dive transcript, and First Interview transcript.
             - The call transcripts may contain extra context about scope, achievements, tools, responsibilities, communication, leadership, domain experience, and interview examples. Use that information when it clearly refers to the candidate's real background.
             - Use all possible details found in the source to make work descriptions specific.

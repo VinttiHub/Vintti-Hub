@@ -217,10 +217,11 @@ table { border-collapse: collapse; }
 
 /* Tab-aware filter visibility · pills with data-tabs are only shown when the
    active tab is in their list. Pills without data-tabs are always visible. */
-#tab-growth:checked ~ .shell .filter-bar [data-tabs]:not([data-tabs~="growth"]) { display: none; }
-#tab-am:checked     ~ .shell .filter-bar [data-tabs]:not([data-tabs~="am"])     { display: none; }
-#tab-sales:checked  ~ .shell .filter-bar [data-tabs]:not([data-tabs~="sales"])  { display: none; }
-#tab-ops:checked    ~ .shell .filter-bar [data-tabs]:not([data-tabs~="ops"])    { display: none; }
+#tab-growth:checked     ~ .shell .filter-bar [data-tabs]:not([data-tabs~="growth"])     { display: none; }
+#tab-growth-new:checked ~ .shell .filter-bar [data-tabs]:not([data-tabs~="growth-new"]) { display: none; }
+#tab-am:checked         ~ .shell .filter-bar [data-tabs]:not([data-tabs~="am"])         { display: none; }
+#tab-sales:checked      ~ .shell .filter-bar [data-tabs]:not([data-tabs~="sales"])      { display: none; }
+#tab-ops:checked        ~ .shell .filter-bar [data-tabs]:not([data-tabs~="ops"])        { display: none; }
 
 .filter-pill { position: relative; }
 .filter-pill__sel {
@@ -397,28 +398,101 @@ body.is-loading .kpi-card::after {
   border-radius: var(--radius-pill);
 }
 
-#tab-growth:checked ~ .shell .tabs label[for="tab-growth"],
-#tab-am:checked     ~ .shell .tabs label[for="tab-am"],
-#tab-sales:checked  ~ .shell .tabs label[for="tab-sales"],
-#tab-ops:checked    ~ .shell .tabs label[for="tab-ops"] {
+#tab-growth:checked     ~ .shell .tabs label[for="tab-growth"],
+#tab-growth-new:checked ~ .shell .tabs label[for="tab-growth-new"],
+#tab-am:checked         ~ .shell .tabs label[for="tab-am"],
+#tab-sales:checked      ~ .shell .tabs label[for="tab-sales"],
+#tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] {
   background: var(--ink);
   color: #fff;
 }
-#tab-growth:checked ~ .shell .tabs label[for="tab-growth"] .ct,
-#tab-am:checked     ~ .shell .tabs label[for="tab-am"] .ct,
-#tab-sales:checked  ~ .shell .tabs label[for="tab-sales"] .ct,
-#tab-ops:checked    ~ .shell .tabs label[for="tab-ops"] .ct {
+#tab-growth:checked     ~ .shell .tabs label[for="tab-growth"] .ct,
+#tab-growth-new:checked ~ .shell .tabs label[for="tab-growth-new"] .ct,
+#tab-am:checked         ~ .shell .tabs label[for="tab-am"] .ct,
+#tab-sales:checked      ~ .shell .tabs label[for="tab-sales"] .ct,
+#tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] .ct {
   background: rgba(255,255,255,0.16);
   color: rgba(255,255,255,0.78);
 }
 
 /* Tab content */
 .channel { display: none; }
-#tab-growth:checked ~ .shell .channel[data-channel="growth"],
-#tab-am:checked     ~ .shell .channel[data-channel="am"],
-#tab-sales:checked  ~ .shell .channel[data-channel="sales"],
-#tab-ops:checked    ~ .shell .channel[data-channel="ops"] {
+#tab-growth:checked     ~ .shell .channel[data-channel="growth"],
+#tab-growth-new:checked ~ .shell .channel[data-channel="growth-new"],
+#tab-am:checked         ~ .shell .channel[data-channel="am"],
+#tab-sales:checked      ~ .shell .channel[data-channel="sales"],
+#tab-ops:checked        ~ .shell .channel[data-channel="ops"] {
   display: block;
+}
+
+/* ---------- SUB-TABS (Growth · New: Staffing | Recruiting) ---------- */
+.subtab-radios { display: none; }
+
+.subtabs {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(13,18,30,0.04);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  margin: 0 0 16px;
+}
+.subtabs__btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  user-select: none;
+}
+.subtabs__btn:hover { color: var(--ink); }
+
+#gsub-staffing:checked   ~ .shell .channel[data-channel="growth-new"] .subtabs label[for="gsub-staffing"],
+#gsub-recruiting:checked ~ .shell .channel[data-channel="growth-new"] .subtabs label[for="gsub-recruiting"] {
+  background: var(--ink);
+  color: #fff;
+}
+
+.sub-channel { display: none; }
+#gsub-staffing:checked   ~ .shell .channel[data-channel="growth-new"] .sub-channel[data-sub-channel="staffing"],
+#gsub-recruiting:checked ~ .shell .channel[data-channel="growth-new"] .sub-channel[data-sub-channel="recruiting"] {
+  display: block;
+}
+
+/* ---------- VIEW MODE PILLS (Window / Grain) ---------- */
+.view-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 4px;
+  background: rgba(13,18,30,0.04);
+  border-radius: var(--radius-pill);
+}
+.view-mode__lab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  padding: 0 8px 0 10px;
+}
+.view-mode__btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  border: 0;
+  transition: background .15s, color .15s;
+}
+.view-mode__btn:hover { color: var(--ink); }
+.view-mode__btn.is-active {
+  background: var(--ink);
+  color: #fff;
 }
 
 /* ---------- GRID ---------- */

@@ -14,8 +14,8 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /* ---------- state ---------- */
-  const FILTER_KEYS = ['modelo', 'desde', 'hasta', 'mes', 'corte', 'metric', 'opp_stage', 'meses', 'umbral'];
-  const FILTER_DEFAULTS = { opp_stage: 'Close Win' };
+  const FILTER_KEYS = ['modelo', 'desde', 'hasta', 'mes', 'corte', 'metric', 'opp_stage', 'meses', 'umbral', 'window', 'grain', 'subtab'];
+  const FILTER_DEFAULTS = { opp_stage: 'Close Win', window: '30d', grain: 'month', subtab: 'staffing' };
   const state = Object.fromEntries(FILTER_KEYS.map(k => [k, FILTER_DEFAULTS[k] || '']));
 
   /* ---------- format ---------- */
@@ -1662,10 +1662,68 @@
         // 3) Reset month-detail selection back to current month
         const d = new Date();
         monthState.selected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        // 4) Refetch everything
+        // 4) Reset view-mode pills (Window / Grain) to defaults
+        document.querySelectorAll('.view-mode').forEach(group => {
+          const key = group.dataset.viewKey;
+          if (!key) return;
+          const def = FILTER_DEFAULTS[key] || '';
+          group.querySelectorAll('.view-mode__btn').forEach(b => {
+            b.classList.toggle('is-active', b.dataset.viewValue === def);
+          });
+        });
+        applyGrainVisibility();
+        // 5) Reset sub-tab radio to default
+        const defaultSub = document.getElementById('gsub-' + (FILTER_DEFAULTS.subtab || 'staffing'));
+        if (defaultSub) defaultSub.checked = true;
+        // 6) Refetch everything
         hydrate();
       });
     }
+  }
+
+  /* ---------- view-mode pills (Window / Grain) for Growth · New ---------- */
+  function applyGrainVisibility(scope) {
+    const root = scope || document;
+    root.querySelectorAll('[data-grain-show]').forEach(el => {
+      el.hidden = (el.dataset.grainShow !== state.grain);
+    });
+  }
+
+  function bindViewModes() {
+    document.querySelectorAll('.view-mode').forEach(group => {
+      const key = group.dataset.viewKey; // 'window' | 'grain'
+      if (!key) return;
+      group.querySelectorAll('.view-mode__btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const value = btn.dataset.viewValue;
+          if (!value || state[key] === value) return;
+          // Update sibling active state across ALL groups with the same key
+          // (Recruiting and Staffing both render their own grain pills, keep them in sync)
+          document.querySelectorAll(`.view-mode[data-view-key="${key}"] .view-mode__btn`).forEach(b => {
+            b.classList.toggle('is-active', b.dataset.viewValue === value);
+          });
+          state[key] = value;
+          if (key === 'window') {
+            // Window changes the snapshot KPI data — refetch.
+            hydrate();
+          } else if (key === 'grain') {
+            // Grain just swaps which history card is visible. Datasets already in cache.
+            applyGrainVisibility();
+          }
+        });
+      });
+    });
+
+    // Sub-tab radios → keep state.subtab in sync (CSS handles the toggle)
+    document.querySelectorAll('input[name="growth-sub"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        state.subtab = input.id.replace(/^gsub-/, '');
+      });
+    });
+
+    // Initial visibility pass
+    applyGrainVisibility();
   }
 
   /* ---------- boot ---------- */
@@ -1676,6 +1734,7 @@
     bindFilters();
     bindFlipCards();
     bindExpanders();
+    bindViewModes();
     hydrate();
   }
 

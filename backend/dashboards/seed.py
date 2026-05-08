@@ -186,6 +186,10 @@ RESET_CHART_KEYS = {
         "am_table_nrr_month_detail",
         "am_kpi_nrr_30d",
         "am_table_nrr_30d_detail",
+        # Growth & Revenue · NEW (Staffing | Recruiting subtabs)
+        "gr_kpi_revenue_ytd",
+        "gr_kpi_staffing_window",
+        "gr_kpi_recruiting_window",
     ],
 }
 
@@ -2137,6 +2141,57 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 75, "w": 6, "h": 5},
         "sort_order": 340,
+    },
+    # ----------------------------------------------------------------
+    # Growth & Revenue · NEW (Staffing | Recruiting subtabs)
+    # ----------------------------------------------------------------
+    {
+        "chart_key": "gr_kpi_revenue_ytd",
+        "tab_key": "growth",
+        "title": "Revenue YTD — Staffing + Recruiting",
+        "type": "kpi",
+        "dataset_key": "revenue_ytd_total",
+        "config": {
+            "mapping": {
+                "value": "revenue_total_ytd",
+                "label": "$",
+                "formatter": "currency",
+            },
+        },
+        "position": {"x": 0, "y": 80, "w": 4, "h": 4},
+        "sort_order": 350,
+    },
+    {
+        "chart_key": "gr_kpi_staffing_window",
+        "tab_key": "growth",
+        "title": "Staffing — Snapshot (GMRR + Fee Avg + actuals)",
+        "type": "kpi",
+        "dataset_key": "staffing_window_summary",
+        "config": {
+            "mapping": {
+                "value": "mrr_actual",
+                "label": "MRR",
+                "formatter": "currency",
+            },
+        },
+        "position": {"x": 4, "y": 80, "w": 4, "h": 4},
+        "sort_order": 360,
+    },
+    {
+        "chart_key": "gr_kpi_recruiting_window",
+        "tab_key": "growth",
+        "title": "Recruiting — Snapshot por ventana (week | 30d)",
+        "type": "kpi",
+        "dataset_key": "recruiting_window_summary",
+        "config": {
+            "mapping": {
+                "value": "revenue_window",
+                "label": "Revenue",
+                "formatter": "currency",
+            },
+        },
+        "position": {"x": 8, "y": 80, "w": 4, "h": 4},
+        "sort_order": 370,
     },
 ]
 
