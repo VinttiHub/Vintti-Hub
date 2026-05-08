@@ -833,13 +833,13 @@ def accounts():
                 INSERT INTO account (
                     client_name, Size, timezone, state,
                     website, linkedin, comments, mail,
-                    where_come_from, referal_source,
+                    where_come_from, lead_source_detail, referal_source,
                     industry, outsource, pain_points, position, type,
                     name, surname, account_manager
                 ) VALUES (
                     %s, %s, %s, %s,
                     %s, %s, %s, %s,
-                    %s, %s,
+                    %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s
                 )
@@ -855,6 +855,7 @@ def accounts():
                 data.get("about"),
                 data.get("mail"),
                 normalize_lead_source(data.get("where_come_from")),
+                data.get("lead_source_detail"),
                 data.get("referal_source"),
 
                 # 🆕 Nuevos campos
@@ -1227,6 +1228,7 @@ def update_account_fields(account_id):
         'priority',
         'contract',
         'where_come_from',
+        'lead_source_detail',
         'calculated_status',
         'account_manager',
         'account_status', 
