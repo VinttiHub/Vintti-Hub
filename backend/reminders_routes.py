@@ -483,12 +483,13 @@ def _is_stage_closed_lost(value) -> bool:
     return str(value or "").strip().lower() in {"closed lost", "close lost"}
 
 
-def _close_win_email_html(client_name: str, candidate_name: str, start_date, price_type=None, computer=None) -> str:
+def _close_win_email_html(client_name: str, candidate_name: str, start_date, price_type=None, computer=None, source_lead=None) -> str:
     return f"""
 <div style="font-family:Inter, Arial, sans-serif; font-size:14px; color:#222; line-height:1.5;">
   <p>Hey team — new <b>Close Win</b> 🎉</p>
   <p>
     <b>Client:</b> {html.escape(str(client_name or 'Client'))}<br>
+    <b>Source Lead:</b> {html.escape(str(source_lead or '—'))}<br>
     <b>Candidate:</b> {html.escape(str(candidate_name or 'the candidate'))}<br>
     <b>Start date:</b> {html.escape(str(start_date or '—'))}<br>
     <b>Price type:</b> {html.escape(_format_price_type(price_type))}<br>
@@ -505,6 +506,7 @@ def _closed_lost_email_html(ctx: Dict[str, Any]) -> str:
   <p>Hey team — opportunity marked as <b>Closed Lost</b>.</p>
   <p>
     <b>Client:</b> {html.escape(str(ctx.get("client_name") or "Client"))}<br>
+    <b>Source Lead:</b> {html.escape(str(ctx.get("where_come_from") or "—"))}<br>
     <b>Role:</b> {html.escape(str(ctx.get("opp_position_name") or "—"))}<br>
     <b>Model:</b> {html.escape(str(ctx.get("opp_model") or "—"))}<br>
     <b>Close date:</b> {html.escape(str(ctx.get("opp_close_date") or "—"))}<br>
@@ -526,6 +528,7 @@ def _fetch_close_win_context(cur, opportunity_id: int) -> Optional[Dict[str, Any
             o.opp_close_date::date AS opp_close_date,
             o.candidato_contratado AS candidate_id,
             a.client_name,
+            a.where_come_from,
             c.name AS candidate_name
         FROM opportunity o
         LEFT JOIN account a ON a.account_id = o.account_id
@@ -550,7 +553,8 @@ def _fetch_closed_lost_context(cur, opportunity_id: int) -> Optional[Dict[str, A
             o.opp_close_date::date AS opp_close_date,
             o.motive_close_lost,
             o.details_close_lost,
-            a.client_name
+            a.client_name,
+            a.where_come_from
         FROM opportunity o
         LEFT JOIN account a ON a.account_id = o.account_id
         WHERE o.opportunity_id = %s
@@ -593,6 +597,7 @@ def _send_close_win_email(cur, opportunity_id: int) -> Dict[str, Any]:
             start_date,
             price_type=price_type,
             computer=computer,
+            source_lead=ctx.get("where_come_from"),
         ),
         to=to_list,
     )
