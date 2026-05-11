@@ -605,11 +605,21 @@
     const fmtName = el.dataset.fmt || 'number';
     const v = reduce(rows, field, mode);
     el.textContent = fmt.pick(fmtName)(v);
-    if (el.dataset.classOnSign) {
+    if ('classOnSign' in el.dataset) {
       el.classList.remove('green', 'rose', 'lime');
       if (v != null && isFinite(+v)) {
         if (+v > 0) el.classList.add('green');
         else if (+v < 0) el.classList.add('rose');
+      }
+      // Also color the enclosing .skpi-tile__delta wrapper so accompanying
+      // copy (e.g. "vs PY") picks up the same hue, not just the number.
+      const deltaWrap = el.closest('.skpi-tile__delta');
+      if (deltaWrap) {
+        deltaWrap.classList.remove('skpi-tile__delta--pos', 'skpi-tile__delta--neg', 'skpi-tile__delta--muted');
+        if (v == null || !isFinite(+v))   deltaWrap.classList.add('skpi-tile__delta--muted');
+        else if (+v > 0)                  deltaWrap.classList.add('skpi-tile__delta--pos');
+        else if (+v < 0)                  deltaWrap.classList.add('skpi-tile__delta--neg');
+        else                              deltaWrap.classList.add('skpi-tile__delta--muted');
       }
     }
     if (el.dataset.deltaPill) {
@@ -1736,8 +1746,14 @@
 
   /* ---------- view-mode pills (Window / Grain) for Growth · New ---------- */
   function applyGrainLabels() {
-    const label = state.grain === 'week' ? 'semana' : 'mes';
-    const callout = state.grain === 'week' ? 'Weekly' : 'Monthly';
+    const label =
+      state.grain === 'week' ? 'semana'
+      : state.grain === 'year' ? 'año'
+      : 'mes';
+    const callout =
+      state.grain === 'week' ? 'Weekly'
+      : state.grain === 'year' ? 'Yearly'
+      : 'Monthly';
     document.querySelectorAll('[data-grain-label]').forEach(el => { el.textContent = label; });
     document.querySelectorAll('[data-grain-callout]').forEach(el => { el.textContent = callout; });
   }

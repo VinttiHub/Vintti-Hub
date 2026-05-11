@@ -23,16 +23,22 @@ def _parse_date(value: str | None) -> date | None:
 def _grain(filters: dict) -> str:
     raw = (filters.get("grain") or filters.get("granularity") or "month")
     raw = str(raw).strip().lower()
-    return "week" if raw in ("week", "weekly", "semana", "w") else "month"
+    if raw in ("week", "weekly", "semana", "w"):
+        return "week"
+    if raw in ("year", "yearly", "annual", "anual", "ano", "año", "y"):
+        return "year"
+    return "month"
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     today = datetime.utcnow().date()
     grain = _grain(filters)
 
-    # Defaults: weekly = last 12 ISO weeks, monthly = last 12 months
+    # Defaults: weekly = last 12 ISO weeks, monthly = last 12 months, yearly = last 5 years
     if grain == "week":
         default_from = today - timedelta(weeks=12)
+    elif grain == "year":
+        default_from = today.replace(month=1, day=1) - timedelta(days=365 * 5)
     else:
         default_from = today.replace(day=1) - timedelta(days=365)
 
@@ -54,6 +60,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         period_format = "'IYYY-\"W\"IW'"
         step = "INTERVAL '1 week'"
         period_end_expr = "(p.period_start + INTERVAL '6 days')::date"
+    elif grain == "year":
+        trunc = "year"
+        period_format = "'YYYY'"
+        step = "INTERVAL '1 year'"
+        period_end_expr = "(DATE_TRUNC('year', p.period_start) + INTERVAL '1 year - 1 day')::date"
     else:
         trunc = "month"
         period_format = "'YYYY-MM'"
@@ -207,7 +218,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "staffing_history",
-    "label": "Staffing History — Weekly | Monthly",
+    "label": "Staffing History — Weekly | Monthly | Yearly",
     "dimensions": [
         {"key": "periodo", "label": "Período", "type": "string"},
         {"key": "period_start", "label": "Inicio del período", "type": "date"},
