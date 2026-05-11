@@ -10,6 +10,7 @@ from psycopg2.extras import RealDictCursor
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 TEAM_EMAILS = [
     "agustin@vintti.com",
+    "jazmin@vintti.com",
     "lara@vintti.com",
     "pgonzales@vintti.com",
 ]
