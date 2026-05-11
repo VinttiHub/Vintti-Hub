@@ -55,10 +55,6 @@ _STRUCTURED_REFERENCE_NOTES_RE = re.compile(
 )
 
 
-def _normalize_name(value):
-    return (value or '').strip().lower()
-
-
 def _strip_structured_reference_notes(html_value):
     return _STRUCTURED_REFERENCE_NOTES_RE.sub('', html_value or '').strip()
 
@@ -587,6 +583,7 @@ def get_candidates_light():
             SELECT
               c.candidate_id,
               c.name,
+              c.email,
               c.country,
               c.phone,
               c.linkedin,
@@ -731,10 +728,9 @@ def create_candidate_without_opportunity():
         conflict_clauses = []
         params = []
 
-        normalized_name = _normalize_name(name)
-        if normalized_name:
-            conflict_clauses.append("LOWER(TRIM(COALESCE(name,''))) = %s")
-            params.append(normalized_name)
+        if email:
+            conflict_clauses.append("LOWER(TRIM(COALESCE(email,''))) = %s")
+            params.append(email)
         if phone_digits:
             conflict_clauses.append("regexp_replace(COALESCE(phone,''), '[^0-9]', '', 'g') = %s")
             params.append(phone_digits)
@@ -763,14 +759,14 @@ def create_candidate_without_opportunity():
                     "linkedin": existing[4],
                 }
                 conflict_fields = []
-                if normalized_name and _normalize_name(existing_candidate["name"]) == normalized_name:
-                    conflict_fields.append("name")
+                if email and (existing_candidate["email"] or "").strip().lower() == email:
+                    conflict_fields.append("email")
                 if phone_digits and _normalize_phone_digits(existing_candidate["phone"]) == phone_digits:
                     conflict_fields.append("phone")
                 if linkedin_normalized and _normalize_linkedin(existing_candidate["linkedin"]) == linkedin_normalized:
                     conflict_fields.append("linkedin")
                 label_map = {
-                    "name": "duplicate name",
+                    "email": "duplicate email",
                     "phone": "duplicate phone",
                     "linkedin": "duplicate LinkedIn",
                 }
@@ -2205,6 +2201,7 @@ def get_candidates_light_fast():
             SELECT
               c.candidate_id,
               c.name,
+              c.email,
               c.country,
               c.phone,
               c.linkedin,

@@ -1059,14 +1059,14 @@ function renderDuplicateFields(candidate, fieldsUsed = []) {
 
 function findDuplicateCandidate(values) {
   if (!Array.isArray(candidateState.data) || !candidateState.data.length) return null;
-  const normalizedName = normalizeName(values.name);
+  const normalizedEmail = normalizeEmail(values.email);
   const phoneDigits = values.phoneDigits;
   const linkedinNormalized = values.normalizedLinkedin;
 
   for (const candidate of candidateState.data) {
     const duplicates = [];
-    if (normalizedName && normalizeName(candidate.name) === normalizedName) {
-      duplicates.push('name');
+    if (normalizedEmail && normalizeEmail(candidate.email) === normalizedEmail) {
+      duplicates.push('email');
     }
 
     const existingPhone = normalizeStoredPhone(candidate.phone, candidate.country);
@@ -1086,8 +1086,8 @@ function findDuplicateCandidate(values) {
   return null;
 }
 
-function normalizeName(name) {
-  return (name || '').toString().trim().toLowerCase();
+function normalizeEmail(email) {
+  return (email || '').toString().trim().toLowerCase();
 }
 
 function normalizeLinkedin(url) {
