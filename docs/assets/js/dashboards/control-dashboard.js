@@ -3,7 +3,7 @@
    - Reads [data-chart="<key>"] elements, fetches data from backend,
      renders KPIs, smooth bezier lines, bars and donas matching the
      retro/light visual system in control-dashboard-retro.css.
-   - Wires the filter bar (modelo, desde, hasta, mes, corte, metric,
+   - Wires the filter bar (desde, hasta, mes, corte, metric,
      opp_stage, meses, umbral) and reset button.
    - Tabs are CSS-only (radio inputs); we hydrate ALL tabs once on load
      and re-fetch on filter change.
@@ -14,7 +14,7 @@
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /* ---------- state ---------- */
-  const FILTER_KEYS = ['modelo', 'desde', 'hasta', 'mes', 'corte', 'metric', 'opp_stage', 'meses', 'umbral', 'window', 'grain', 'subtab'];
+  const FILTER_KEYS = ['desde', 'hasta', 'mes', 'corte', 'metric', 'opp_stage', 'meses', 'umbral', 'window', 'grain', 'subtab'];
   const FILTER_DEFAULTS = { opp_stage: 'Close Win', window: '30d', grain: 'month', subtab: 'staffing' };
   const state = Object.fromEntries(FILTER_KEYS.map(k => [k, FILTER_DEFAULTS[k] || '']));
 

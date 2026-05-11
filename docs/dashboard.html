@@ -42,8 +42,8 @@
 </svg>
 
 <!-- Tab radios -->
-<input class="tab-radios" type="radio" name="tab" id="tab-growth" checked>
-<input class="tab-radios" type="radio" name="tab" id="tab-growth-new">
+<input class="tab-radios" type="radio" name="tab" id="tab-growth-new" checked>
+<input class="tab-radios" type="radio" name="tab" id="tab-growth">
 <input class="tab-radios" type="radio" name="tab" id="tab-am">
 <input class="tab-radios" type="radio" name="tab" id="tab-sales">
 <input class="tab-radios" type="radio" name="tab" id="tab-ops">
@@ -73,8 +73,8 @@
        TABS
        ============================================================ -->
   <nav class="tabs" role="tablist">
-    <label class="tabs__btn" for="tab-growth">Growth & Revenue <span class="ct">20</span></label>
     <label class="tabs__btn" for="tab-growth-new">Management Dashboard <span class="ct">16</span></label>
+    <label class="tabs__btn" for="tab-growth">Growth & Revenue <span class="ct">20</span></label>
     <label class="tabs__btn" for="tab-am">Account Management <span class="ct">44</span></label>
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">31</span></label>
@@ -116,17 +116,7 @@
 
     <span class="filter-bar__sep"></span>
 
-    <!-- Modelo / Metric / Stage -->
-    <label class="filter-pill filter-pill--lime" data-filter-key="modelo">
-      <span class="k">Modelo</span>
-      <span class="v" data-filter-slot data-filter-placeholder>Total</span>
-      <span class="chev">▾</span>
-      <select class="filter-pill__sel" data-filter-input="modelo">
-        <option value="">Total</option>
-        <option value="Staffing">Staffing</option>
-        <option value="Recruiting">Recruiting</option>
-      </select>
-    </label>
+    <!-- Metric / Stage -->
     <label class="filter-pill" data-filter-key="metric" data-tabs="growth">
       <span class="k">Metric</span>
       <span class="v" data-filter-slot data-filter-placeholder>All</span>
@@ -668,7 +658,9 @@
             <span class="skpi-tile__tag">YTD</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd" data-reduce="first" data-fmt="currency-k">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">vs PY</div>
+          <div class="skpi-tile__delta">
+            <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY
+          </div>
         </div>
 
         <div class="skpi-tile skpi-g-2 s-3">
@@ -871,7 +863,9 @@
             <span class="skpi-tile__tag">YTD</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">since Jan 1</div>
+          <div class="skpi-tile__delta">
+            <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY
+          </div>
         </div>
 
         <div class="skpi-tile skpi-g-2 s-3">
