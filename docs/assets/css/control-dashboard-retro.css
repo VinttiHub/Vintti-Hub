@@ -1770,6 +1770,177 @@ body.is-loading .kpi-card::after {
   scrollbar-width: thin;
 }
 
+/* ---------- STAFFING SUBTAB · minimal beige redesign ---------- */
+/* Hide the global Window pill on Staffing & Recruiting — each card now shows its own windows. */
+#gsub-staffing:checked ~ .shell .channel[data-channel="growth-new"] > .view-mode[data-view-key="window"],
+#gsub-recruiting:checked ~ .shell .channel[data-channel="growth-new"] > .view-mode[data-view-key="window"] {
+  display: none;
+}
+
+.skpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0 16px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--rule);
+}
+.skpi-header__lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+.skpi-header__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #ece6ff;
+  color: #6c38ff;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: var(--tracking-tight);
+}
+.skpi-header__avatar--rec {
+  background: #dbeefb;
+  color: #003bff;
+}
+.skpi-header__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+}
+.skpi-header__sub {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.skpi-grid {
+  gap: 16px;
+}
+
+.skpi-tile,
+.skpi-group {
+  background: #f4efe5;
+  border-radius: 14px;
+  padding: 20px 22px;
+  min-width: 0;
+}
+
+.skpi-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 140px;
+}
+.skpi-tile__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.skpi-tile__title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  letter-spacing: 0;
+}
+.skpi-tile__tag {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.skpi-tile__value {
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+.skpi-tile__delta {
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.skpi-tile__delta--pos { color: var(--pos); }
+.skpi-tile__delta--neg { color: var(--neg); }
+.skpi-tile__delta--muted { color: var(--ink-3); }
+
+.skpi-tile--big {
+  min-height: 160px;
+}
+.skpi-tile--big .skpi-tile__value {
+  font-size: 44px;
+  margin-top: auto;
+}
+
+.skpi-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.skpi-group__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.skpi-group__title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.skpi-group__tag {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.skpi-group__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.skpi-group__grid--two {
+  grid-template-columns: repeat(2, 1fr);
+}
+.skpi-sub {
+  background: #ffffff;
+  border: 1px solid #e5dfd2;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 76px;
+}
+.skpi-sub__label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.skpi-sub__value {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .skpi-group__grid { grid-template-columns: repeat(2, 1fr); }
+  .skpi-tile__value { font-size: 32px; }
+  .skpi-tile--big .skpi-tile__value { font-size: 36px; }
+}
+
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 1100px) {
   .s-3, .s-4, .s-5, .s-6, .s-7, .s-8, .s-9 { grid-column: span 12; }

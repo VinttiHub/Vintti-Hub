@@ -1536,24 +1536,45 @@
 
     try {
       const cards = document.querySelectorAll('[data-chart]');
-      const keys = new Set();
-      cards.forEach(el => keys.add(el.dataset.chart));
+      // Read per-element overrides from data-override-<key> (e.g. data-override-metric="Fee").
+      // Group requests by (chartKey + overrides) so cards with different overrides each get their own fetch.
+      function readOverrides(el) {
+        const out = {};
+        for (const attr of el.attributes) {
+          if (attr.name.startsWith('data-override-')) {
+            const key = attr.name.slice('data-override-'.length).replace(/-/g, '_');
+            if (key) out[key] = attr.value;
+          }
+        }
+        return out;
+      }
+      function fpr(chartKey, overrides) {
+        const keys = Object.keys(overrides).sort();
+        if (!keys.length) return chartKey;
+        return chartKey + '?' + keys.map(k => `${k}=${overrides[k]}`).join('&');
+      }
 
-      const cache = {};
-      await Promise.all([...keys].map(async (k) => {
+      const groups = new Map(); // compositeKey -> { chartKey, overrides, els: [] }
+      cards.forEach(el => {
+        const chartKey = el.dataset.chart;
+        const overrides = readOverrides(el);
+        const compKey = fpr(chartKey, overrides);
+        if (!groups.has(compKey)) {
+          groups.set(compKey, { chartKey, overrides, els: [] });
+        }
+        groups.get(compKey).els.push(el);
+      });
+
+      await Promise.all([...groups.values()].map(async ({ chartKey, overrides, els }) => {
         try {
-          const r = await fetchChart(k);
-          cache[k] = r.rows || [];
+          const r = await fetchChart(chartKey, overrides);
+          const rows = r.rows || [];
+          els.forEach(el => renderBinding(el, rows));
         } catch (e) {
-          console.error(`fetch ${k}`, e);
-          cache[k] = [];
+          console.error(`fetch ${chartKey}`, e);
+          els.forEach(el => renderBinding(el, []));
         }
       }));
-
-      cards.forEach(el => {
-        const rows = cache[el.dataset.chart] || [];
-        renderBinding(el, rows);
-      });
 
       renderDetailTable();
       renderAmDetailTable();

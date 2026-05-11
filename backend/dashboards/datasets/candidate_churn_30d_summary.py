@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -20,6 +20,21 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
+    """Resolve (win_ini, win_fin) from the `window` filter. Default: last 30d (30-day offset)."""
+    raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
+    if raw in ("week", "7d", "7", "semana"):
+        return corte - timedelta(days=6), corte
+    if raw == "mtd":
+        return corte.replace(day=1), corte
+    if raw in ("month", "last_month", "last-month", "prev_month"):
+        first_this = corte.replace(day=1)
+        last_prev = first_this - timedelta(days=1)
+        first_prev = last_prev.replace(day=1)
+        return first_prev, last_prev
+    return corte - timedelta(days=30), corte
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
@@ -27,13 +42,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("fecha_corte"))
         or datetime.utcnow().date()
     )
+    win_ini, win_fin = _window_bounds(filters, corte)
+    corte_d = win_fin
 
     sql = """
         WITH ventana AS (
           SELECT
-            %(corte)s::date AS corte_d,
-            (%(corte)s::date - INTERVAL '30 day')::date AS win_ini,
-            %(corte)s::date AS win_fin
+            %(corte_d)s::date AS corte_d,
+            %(win_ini)s::date AS win_ini,
+            %(win_fin)s::date AS win_fin
         ),
         candidatos AS (
           SELECT
@@ -113,7 +130,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM totals;
     """
 
-    return sql, {"corte": corte}
+    return sql, {"corte_d": corte_d, "win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -20,12 +20,19 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
-def _window_days(filters: dict) -> int:
-    raw = (filters.get("window") or filters.get("ventana") or "30d")
-    raw = str(raw).strip().lower()
+def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
+    """Resolve (win_ini, win_fin) from the `window` filter. Default: last 30d (29-day offset)."""
+    raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
     if raw in ("week", "7d", "7", "semana"):
-        return 7
-    return 30
+        return corte - timedelta(days=6), corte
+    if raw == "mtd":
+        return corte.replace(day=1), corte
+    if raw in ("month", "last_month", "last-month", "prev_month"):
+        first_this = corte.replace(day=1)
+        last_prev = first_this - timedelta(days=1)
+        first_prev = last_prev.replace(day=1)
+        return first_prev, last_prev
+    return corte - timedelta(days=29), corte
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
@@ -35,13 +42,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("hasta"))
         or datetime.utcnow().date()
     )
-    window_days = _window_days(filters)
+    win_ini, win_fin = _window_bounds(filters, corte)
+    window_days = (win_fin - win_ini).days + 1
 
     sql = """
         WITH params AS (
           SELECT
-            %(corte)s::date AS corte_d,
-            (%(corte)s::date - (%(window_days)s - 1) * INTERVAL '1 day')::date AS win_ini
+            %(win_ini)s::date AS win_ini,
+            %(win_fin)s::date AS win_fin
         ),
         recruiting_hires AS (
           SELECT
@@ -63,14 +71,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM recruiting_hires rh
           CROSS JOIN params p
           WHERE rh.close_d IS NOT NULL
-            AND rh.close_d BETWEEN p.win_ini AND p.corte_d
+            AND rh.close_d BETWEEN p.win_ini AND p.win_fin
         ),
         new_ftes_in_window AS (
           SELECT COUNT(*)::int AS new_ftes_window
           FROM recruiting_hires rh
           CROSS JOIN params p
           WHERE rh.close_d IS NOT NULL
-            AND rh.close_d BETWEEN p.win_ini AND p.corte_d
+            AND rh.close_d BETWEEN p.win_ini AND p.win_fin
         ),
         first_close AS (
           SELECT account_id, MIN(close_d) AS first_close_d
@@ -83,18 +91,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT COUNT(*)::int AS new_clients_window
           FROM first_close fc
           CROSS JOIN params p
-          WHERE fc.first_close_d BETWEEN p.win_ini AND p.corte_d
+          WHERE fc.first_close_d BETWEEN p.win_ini AND p.win_fin
         ),
         active_clients_in_window AS (
           SELECT COUNT(DISTINCT rh.account_id)::int AS active_clients_window
           FROM recruiting_hires rh
           CROSS JOIN params p
           WHERE rh.close_d IS NOT NULL
-            AND rh.close_d BETWEEN p.win_ini AND p.corte_d
+            AND rh.close_d BETWEEN p.win_ini AND p.win_fin
             AND rh.account_id IS NOT NULL
         )
         SELECT
-          (SELECT corte_d FROM params)               AS corte,
+          (SELECT win_fin FROM params)               AS corte,
           (SELECT win_ini FROM params)               AS win_ini,
           %(window_days)s::int                       AS window_days,
           rw.revenue_window::bigint                  AS revenue_window,
@@ -107,7 +115,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
              active_clients_in_window ac;
     """
 
-    return sql, {"corte": corte, "window_days": window_days}
+    return sql, {"win_ini": win_ini, "win_fin": win_fin, "window_days": window_days}
 
 
 DATASET = {
