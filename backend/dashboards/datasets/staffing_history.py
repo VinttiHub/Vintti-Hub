@@ -180,7 +180,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           to_char(pr.period_start, {period_format})::text AS periodo,
           pr.period_start,
-          ({period_end_expr})                             AS period_end,
+          pr.period_end,
           COALESCE(ae.mrr, 0)::bigint                     AS mrr,
           COALESCE(ae.mrr_fee_total, 0)::bigint           AS mrr_fee_total,
           ROUND(

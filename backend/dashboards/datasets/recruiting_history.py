@@ -117,7 +117,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           to_char(pr.period_start, {period_format})::text AS periodo,
           pr.period_start,
-          ({period_end_expr})                             AS period_end,
+          pr.period_end,
           COALESCE(ap.revenue, 0)::bigint                 AS revenue,
           COALESCE(ap.new_ftes, 0)::int                   AS new_ftes,
           COALESCE(nc.new_clients, 0)::int                AS new_clients,

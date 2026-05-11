@@ -859,19 +859,28 @@
           <div class="skpi-header__avatar skpi-header__avatar--rec">R</div>
           <h2 class="skpi-header__title">Recruiting</h2>
         </div>
-        <div class="skpi-header__sub">Non-recurring revenue line</div>
+        <div class="skpi-header__sub">One-time placements</div>
       </header>
 
       <div class="grid skpi-grid">
 
-        <!-- Row 1 · Hero KPIs -->
+        <!-- Row 1 · Revenue tiles (by window) -->
         <div class="skpi-tile s-3">
           <div class="skpi-tile__head">
-            <span class="skpi-tile__title">Revenue YTD</span>
+            <span class="skpi-tile__title">Revenue</span>
             <span class="skpi-tile__tag">YTD</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">vs PY</div>
+          <div class="skpi-tile__delta skpi-tile__delta--muted">since Jan 1</div>
+        </div>
+
+        <div class="skpi-tile s-3">
+          <div class="skpi-tile__head">
+            <span class="skpi-tile__title">Revenue</span>
+            <span class="skpi-tile__tag">MTD</span>
+          </div>
+          <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+          <div class="skpi-tile__delta skpi-tile__delta--muted">month to date</div>
         </div>
 
         <div class="skpi-tile s-3">
@@ -880,32 +889,22 @@
             <span class="skpi-tile__tag">Last 30d</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">close-date · upfront</div>
+          <div class="skpi-tile__delta skpi-tile__delta--muted">rolling 30 days</div>
         </div>
 
         <div class="skpi-tile s-3">
           <div class="skpi-tile__head">
-            <span class="skpi-tile__title">Avg deal size</span>
-            <span class="skpi-tile__tag">Actual</span>
+            <span class="skpi-tile__title">Revenue</span>
+            <span class="skpi-tile__tag">Last week</span>
           </div>
-          <div class="skpi-tile__value">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">per close</div>
+          <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+          <div class="skpi-tile__delta skpi-tile__delta--muted">last 7 days</div>
         </div>
 
-        <div class="skpi-tile s-3">
-          <div class="skpi-tile__head">
-            <span class="skpi-tile__title">Active clients</span>
-            <span class="skpi-tile__tag">Last 30d</span>
-          </div>
-          <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="active_clients_window" data-reduce="first" data-fmt="int">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">with recruiting activo</div>
-        </div>
-
-        <!-- Row 2 · New FTEs / New clients (by window) -->
+        <!-- Row 2 · New FTEs placed / New clients (by window) -->
         <div class="skpi-group s-6">
           <div class="skpi-group__head">
-            <span class="skpi-group__title">New FTEs</span>
-            <span class="skpi-group__tag">By window</span>
+            <span class="skpi-group__title">New FTEs placed</span>
           </div>
           <div class="skpi-group__grid">
             <div class="skpi-sub">
@@ -930,7 +929,6 @@
         <div class="skpi-group s-6">
           <div class="skpi-group__head">
             <span class="skpi-group__title">New clients</span>
-            <span class="skpi-group__tag">By window</span>
           </div>
           <div class="skpi-group__grid">
             <div class="skpi-sub">
@@ -950,6 +948,15 @@
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
+        </div>
+
+        <!-- Row 3 · Active clients (full-width big) -->
+        <div class="skpi-tile skpi-tile--big s-12">
+          <div class="skpi-tile__head">
+            <span class="skpi-tile__title">Active clients</span>
+            <span class="skpi-tile__tag">Last 30d</span>
+          </div>
+          <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="active_clients_window" data-reduce="first" data-fmt="int">—</div>
         </div>
 
         <!-- Existing Recruiting upfront context chart -->

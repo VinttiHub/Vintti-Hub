@@ -1804,8 +1804,8 @@ body.is-loading .kpi-card::after {
   letter-spacing: var(--tracking-tight);
 }
 .skpi-header__avatar--rec {
-  background: #dbeefb;
-  color: #003bff;
+  background: #d8ebde;
+  color: #2e9b5d;
 }
 .skpi-header__title {
   margin: 0;
