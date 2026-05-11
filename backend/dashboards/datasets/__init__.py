@@ -106,6 +106,11 @@ from . import (
     recruiting_window_summary,
     staffing_history,
     recruiting_history,
+    replacement_coverage_30d,
+    active_pipeline,
+    pipeline_cr_minus_churn,
+    sql_leads_windows,
+    new_opps_am_windows,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -212,6 +217,11 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     recruiting_window_summary.DATASET["key"]: recruiting_window_summary.DATASET,
     staffing_history.DATASET["key"]: staffing_history.DATASET,
     recruiting_history.DATASET["key"]: recruiting_history.DATASET,
+    replacement_coverage_30d.DATASET["key"]: replacement_coverage_30d.DATASET,
+    active_pipeline.DATASET["key"]: active_pipeline.DATASET,
+    pipeline_cr_minus_churn.DATASET["key"]: pipeline_cr_minus_churn.DATASET,
+    sql_leads_windows.DATASET["key"]: sql_leads_windows.DATASET,
+    new_opps_am_windows.DATASET["key"]: new_opps_am_windows.DATASET,
 }
 
 

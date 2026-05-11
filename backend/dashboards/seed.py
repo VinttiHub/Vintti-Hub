@@ -192,6 +192,13 @@ RESET_CHART_KEYS = {
         "gr_kpi_recruiting_window",
         "gr_table_staffing_history",
         "gr_table_recruiting_history",
+        # Management Dashboard · shared (C&C Success + Pipeline explosion)
+        "gr_kpi_replacement_coverage_30d",
+        "gr_kpi_clients_multi_actual",
+        "gr_kpi_active_pipeline",
+        "gr_kpi_pipeline_cr_minus_churn",
+        "gr_kpi_sql_leads_windows",
+        "gr_kpi_new_opps_am_windows",
     ],
 }
 
@@ -2231,6 +2238,69 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 90, "w": 12, "h": 6},
         "sort_order": 390,
+    },
+    # ----------------------------------------------------------------
+    # Management Dashboard · shared sections (C&C Success + Pipeline explosion)
+    # ----------------------------------------------------------------
+    {
+        "chart_key": "gr_kpi_replacement_coverage_30d",
+        "tab_key": "growth",
+        "title": "% Reemplazos colocados — ventana 30d",
+        "type": "kpi",
+        "dataset_key": "replacement_coverage_30d",
+        "config": {"mapping": {"value": "placed_pct", "label": "%", "formatter": "percent"}},
+        "position": {"x": 0, "y": 96, "w": 6, "h": 4},
+        "sort_order": 400,
+    },
+    {
+        "chart_key": "gr_kpi_clients_multi_actual",
+        "tab_key": "growth",
+        "title": "% Clientes con +1 candidato — actual",
+        "type": "kpi",
+        "dataset_key": "clients_multi_30d_summary",
+        "config": {"mapping": {"value": "pct_percent", "label": "%", "formatter": "percent"}},
+        "position": {"x": 6, "y": 96, "w": 6, "h": 4},
+        "sort_order": 410,
+    },
+    {
+        "chart_key": "gr_kpi_active_pipeline",
+        "tab_key": "growth",
+        "title": "Active Pipeline (count + weighted revenue)",
+        "type": "kpi",
+        "dataset_key": "active_pipeline",
+        "config": {"mapping": {"value": "pipeline_count", "label": "Opps", "formatter": "number"}},
+        "position": {"x": 0, "y": 100, "w": 4, "h": 4},
+        "sort_order": 420,
+    },
+    {
+        "chart_key": "gr_kpi_pipeline_cr_minus_churn",
+        "tab_key": "growth",
+        "title": "Pipeline × CR − Churn (Net adds 30d) por modelo",
+        "type": "kpi",
+        "dataset_key": "pipeline_cr_minus_churn",
+        "config": {"mapping": {"value": "net_adds_staffing", "label": "Net adds", "formatter": "number"}},
+        "position": {"x": 4, "y": 100, "w": 8, "h": 4},
+        "sort_order": 430,
+    },
+    {
+        "chart_key": "gr_kpi_sql_leads_windows",
+        "tab_key": "growth",
+        "title": "SQL Sales — Leads por ventana",
+        "type": "kpi",
+        "dataset_key": "sql_leads_windows",
+        "config": {"mapping": {"value": "sql_mtd", "label": "MTD", "formatter": "number"}},
+        "position": {"x": 0, "y": 104, "w": 6, "h": 4},
+        "sort_order": 440,
+    },
+    {
+        "chart_key": "gr_kpi_new_opps_am_windows",
+        "tab_key": "growth",
+        "title": "New opportunities by AM — por ventana",
+        "type": "kpi",
+        "dataset_key": "new_opps_am_windows",
+        "config": {"mapping": {"value": "opps_mtd", "label": "MTD", "formatter": "number"}},
+        "position": {"x": 6, "y": 104, "w": 6, "h": 4},
+        "sort_order": 450,
     },
 ]
 

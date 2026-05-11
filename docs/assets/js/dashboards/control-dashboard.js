@@ -635,6 +635,21 @@
     }
   }
 
+  /* ---------- render: progress bar fill (0-100 → width %) ---------- */
+  function renderProgressFill(el, rows) {
+    const field = el.dataset.field;
+    const mode = el.dataset.reduce || 'first';
+    const v = reduce(rows, field, mode);
+    const valid = (v != null && isFinite(+v));
+    el.style.width = valid ? Math.max(0, Math.min(100, +v)).toFixed(1) + '%' : '0%';
+    const target = +el.dataset.target;
+    if (target > 0) {
+      const tile = el.closest('.skpi-tile');
+      const targetEl = tile && tile.querySelector('.skpi-tile__progress-target');
+      if (targetEl) targetEl.classList.toggle('skpi-tile__progress-target--met', valid && (+v) >= target);
+    }
+  }
+
   /* ---------- render dispatcher ---------- */
   function renderBinding(el, rows) {
     const bind = el.dataset.bind;
@@ -674,6 +689,7 @@
       // month-detail panels are NOT hydrated by the generic flow — they
       // refetch with mes= filter via refetchMonthDetails() instead.
       if (bind === 'month-detail') return;
+      if (bind === 'progress-fill') return renderProgressFill(el, scopedRows);
       if (bind === 'bars') {
         return renderBars(el, scopedRows, {
           x: el.dataset.x,

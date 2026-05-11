@@ -1929,6 +1929,55 @@ body.is-loading .kpi-card::after {
 .skpi-tile__delta--neg { color: var(--neg); }
 .skpi-tile__delta--muted { color: var(--ink-3); }
 
+.skpi-tile__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.skpi-tile__progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(13, 18, 30, 0.06);
+  overflow: hidden;
+}
+.skpi-tile__progress-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--pos);
+  transition: width 0.4s ease;
+  border-radius: inherit;
+}
+.skpi-tile__progress-fill--violet { background: var(--c-violet); }
+.skpi-tile__progress-fill--cyan   { background: var(--c-cyan); }
+.skpi-tile__progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.skpi-tile__progress-target { white-space: nowrap; }
+.skpi-tile__progress-target--met { color: var(--pos); font-weight: 600; }
+
+.skpi-header--shared { margin-top: 18px; }
+.skpi-header__avatar--cc {
+  background: linear-gradient(135deg, #ffd9f3, #e5e0ff);
+  color: #5b2c8f;
+}
+.skpi-header__avatar--pp {
+  background: linear-gradient(135deg, #fff3cf, #ffe2c0);
+  color: #8a5a14;
+}
+.skpi-tile__sub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-top: 6px;
+}
+
 .skpi-tile--big {
   min-height: 160px;
 }

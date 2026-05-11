@@ -984,6 +984,187 @@
       </div>
     </div>
 
+    <!-- ============== SHARED SECTION · C&C Success (below both history tables) ============== -->
+    <header class="skpi-header skpi-header--shared">
+      <div class="skpi-header__lead">
+        <div class="skpi-header__avatar skpi-header__avatar--cc">C</div>
+        <h2 class="skpi-header__title">C&amp;C Success</h2>
+      </div>
+      <div class="skpi-header__sub">Replacement &amp; coverage health</div>
+    </header>
+
+    <div class="grid skpi-grid">
+      <!-- % Reemplazos colocados -->
+      <div class="skpi-tile s-6">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">% Reemplazos colocados</span>
+          <span class="skpi-tile__tag">Last 30d</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
+             data-field="placed_pct" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__progress">
+          <div class="skpi-tile__progress-bar">
+            <span class="skpi-tile__progress-fill"
+                  data-chart="gr_kpi_replacement_coverage_30d" data-bind="progress-fill"
+                  data-field="placed_pct" data-reduce="first" data-target="80"></span>
+          </div>
+          <div class="skpi-tile__progress-meta">
+            <span>
+              <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
+                    data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
+              /
+              <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
+                    data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
+              churns con replacement
+            </span>
+            <span class="skpi-tile__progress-target">Target: 80%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- % Clientes con +1 candidato -->
+      <div class="skpi-tile s-6">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">% Clientes con +1 candidato</span>
+          <span class="skpi-tile__tag">Actual</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_clients_multi_actual" data-bind="text"
+             data-field="pct_percent" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__progress">
+          <div class="skpi-tile__progress-bar">
+            <span class="skpi-tile__progress-fill skpi-tile__progress-fill--violet"
+                  data-chart="gr_kpi_clients_multi_actual" data-bind="progress-fill"
+                  data-field="pct_percent" data-reduce="first" data-target="70"></span>
+          </div>
+          <div class="skpi-tile__progress-meta">
+            <span>
+              <span data-chart="gr_kpi_clients_multi_actual" data-bind="text"
+                    data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span>
+              /
+              <span data-chart="gr_kpi_clients_multi_actual" data-bind="text"
+                    data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span>
+              clientes activos
+            </span>
+            <span class="skpi-tile__progress-target">Target: 70%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== SHARED SECTION · Pipeline explosion ============== -->
+    <header class="skpi-header skpi-header--shared">
+      <div class="skpi-header__lead">
+        <div class="skpi-header__avatar skpi-header__avatar--pp">P</div>
+        <h2 class="skpi-header__title">Pipeline explosion</h2>
+      </div>
+      <div class="skpi-header__sub">Forward-looking funnel</div>
+    </header>
+
+    <div class="grid skpi-grid">
+      <!-- Active Pipeline -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">Active pipeline</span>
+          <span class="skpi-tile__tag">Opps</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_active_pipeline" data-bind="text"
+             data-field="pipeline_count" data-reduce="first" data-fmt="int">—</div>
+        <div class="skpi-tile__sub">
+          Opps abiertas ·
+          <span data-chart="gr_kpi_active_pipeline" data-bind="text"
+                data-field="pipeline_revenue_weighted" data-reduce="first" data-fmt="currency-k">—</span>
+          weighted
+        </div>
+      </div>
+
+      <!-- Pipeline × CR − Churn · Staffing -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">Pipeline × CR − Churn</span>
+          <span class="skpi-tile__tag">Staffing</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
+             data-field="net_adds_staffing" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</div>
+        <div class="skpi-tile__sub">Net adds expected (30d)</div>
+      </div>
+
+      <!-- Pipeline × CR − Churn · Recruiting -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">Pipeline × CR − Churn</span>
+          <span class="skpi-tile__tag">Recruiting</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
+             data-field="net_adds_recruiting" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</div>
+        <div class="skpi-tile__sub">Net placements expected (30d)</div>
+      </div>
+
+      <!-- SQL Sales · multi-window -->
+      <div class="skpi-group s-6">
+        <div class="skpi-group__head">
+          <span class="skpi-group__title">SQL Sales</span>
+          <span class="skpi-group__tag">By window</span>
+        </div>
+        <div class="skpi-group__grid">
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">Last week</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
+                  data-field="sql_last_week" data-reduce="first" data-fmt="int">—</span>
+          </div>
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">WTD</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
+                  data-field="sql_wtd" data-reduce="first" data-fmt="int">—</span>
+          </div>
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">Last month</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
+                  data-field="sql_last_month" data-reduce="first" data-fmt="int">—</span>
+          </div>
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">MTD</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
+                  data-field="sql_mtd" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- New opportunities by AM · multi-window -->
+      <div class="skpi-group s-6">
+        <div class="skpi-group__head">
+          <span class="skpi-group__title">New opportunities by AM</span>
+          <span class="skpi-group__tag">By window</span>
+        </div>
+        <div class="skpi-group__grid">
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">Last week</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
+                  data-field="opps_last_week" data-reduce="first" data-fmt="int">—</span>
+          </div>
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">WTD</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
+                  data-field="opps_wtd" data-reduce="first" data-fmt="int">—</span>
+          </div>
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">Last month</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
+                  data-field="opps_last_month" data-reduce="first" data-fmt="int">—</span>
+          </div>
+          <div class="skpi-sub">
+            <span class="skpi-sub__label">MTD</span>
+            <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
+                  data-field="opps_mtd" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ============================================================
