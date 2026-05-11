@@ -1534,7 +1534,7 @@ def handle_candidate_hire_data(candidate_id):
                             buyout_daterange IS NOT NULL
                             AND NULLIF(TRIM(CAST(buyout_daterange AS TEXT)), '') IS NOT NULL
                         ) THEN 'active'
-                        WHEN end_date IS NULL THEN 'active'
+                        WHEN start_date IS NOT NULL AND end_date IS NULL THEN 'active'
                         ELSE 'unhired'
                     END AS effective_status,
                     carga_active,
@@ -1901,10 +1901,14 @@ def handle_candidate_hire_data(candidate_id):
                      WHERE candidate_id = %s AND opportunity_id = %s
                 """, (computed_end, candidate_id, opportunity_id))
 
-        # align status based on end_date
+        # align status based on dates; a row without start_date is not an active hire
         cur.execute("""
             UPDATE hire_opportunity
-               SET status = CASE WHEN end_date IS NULL THEN 'active' ELSE 'inactive' END
+               SET status = CASE
+                     WHEN start_date IS NOT NULL AND end_date IS NULL THEN 'active'
+                     WHEN end_date IS NOT NULL THEN 'inactive'
+                     ELSE NULL
+                   END
              WHERE candidate_id = %s AND opportunity_id = %s
         """, (candidate_id, opportunity_id))
 
@@ -2160,7 +2164,7 @@ def get_candidates_light_fast():
     """
     Devuelve candidatos + status (unhired/active) y opp_model del hire ACTIVO.
     Regla:
-      - Hay hire_opportunity con end_date IS NULL => status='active' y opp_model viene de opportunity.
+      - Hay hire_opportunity con start_date y sin end_date => status='active' y opp_model viene de opportunity.
       - Hay buyout abierto / marcado            => status='active'.
       - No hay hire/buyout activo               => status='unhired' y opp_model=NULL.
     """
@@ -2175,6 +2179,7 @@ def get_candidates_light_fast():
                      h.end_date,
                      h.start_date
               FROM hire_opportunity h
+              WHERE h.start_date IS NOT NULL
               ORDER BY h.candidate_id,
                        (h.end_date IS NULL) DESC,
                        h.start_date DESC NULLS LAST
