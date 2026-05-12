@@ -9,6 +9,7 @@ import traceback
 import logging
 import json
 import time
+import unicodedata
 from flask import Flask, jsonify, request
 import requests
 import re
@@ -36,6 +37,126 @@ RESUME_CV_SOURCE_LIMIT = 50000
 RESUME_NOTES_LIMIT = 8000
 RESUME_SOURCE_CHUNK_SIZE = 12000
 RESUME_SOURCE_MAX_CHUNKS = 8
+
+_COUNTRY_ALIASES = {
+    "Afghanistan": ["afghanistan"],
+    "Albania": ["albania"],
+    "Algeria": ["algeria"],
+    "Andorra": ["andorra"],
+    "Angola": ["angola"],
+    "Argentina": ["argentina"],
+    "Armenia": ["armenia"],
+    "Australia": ["australia"],
+    "Austria": ["austria"],
+    "Azerbaijan": ["azerbaijan"],
+    "Bahamas": ["bahamas"],
+    "Bahrain": ["bahrain"],
+    "Bangladesh": ["bangladesh"],
+    "Barbados": ["barbados"],
+    "Belarus": ["belarus"],
+    "Belgium": ["belgium"],
+    "Belize": ["belize"],
+    "Benin": ["benin"],
+    "Bhutan": ["bhutan"],
+    "Bolivia": ["bolivia"],
+    "Bosnia and Herzegovina": ["bosnia and herzegovina", "bosnia"],
+    "Brazil": ["brazil", "brasil"],
+    "Bulgaria": ["bulgaria"],
+    "Cambodia": ["cambodia"],
+    "Cameroon": ["cameroon"],
+    "Canada": ["canada"],
+    "Chile": ["chile"],
+    "China": ["china"],
+    "Colombia": ["colombia"],
+    "Costa Rica": ["costa rica"],
+    "Croatia": ["croatia"],
+    "Cuba": ["cuba"],
+    "Cyprus": ["cyprus"],
+    "Czech Republic": ["czech republic", "czechia"],
+    "Denmark": ["denmark"],
+    "Dominican Republic": ["dominican republic"],
+    "Ecuador": ["ecuador"],
+    "Egypt": ["egypt"],
+    "El Salvador": ["el salvador"],
+    "Estonia": ["estonia"],
+    "Ethiopia": ["ethiopia"],
+    "Finland": ["finland"],
+    "France": ["france"],
+    "Georgia": ["georgia"],
+    "Germany": ["germany", "deutschland"],
+    "Ghana": ["ghana"],
+    "Greece": ["greece"],
+    "Guatemala": ["guatemala"],
+    "Honduras": ["honduras"],
+    "Hungary": ["hungary"],
+    "Iceland": ["iceland"],
+    "India": ["india"],
+    "Indonesia": ["indonesia"],
+    "Ireland": ["ireland"],
+    "Israel": ["israel"],
+    "Italy": ["italy", "italia"],
+    "Jamaica": ["jamaica"],
+    "Japan": ["japan"],
+    "Jordan": ["jordan"],
+    "Kazakhstan": ["kazakhstan"],
+    "Kenya": ["kenya"],
+    "Kuwait": ["kuwait"],
+    "Latvia": ["latvia"],
+    "Lebanon": ["lebanon"],
+    "Lithuania": ["lithuania"],
+    "Luxembourg": ["luxembourg"],
+    "Malaysia": ["malaysia"],
+    "Malta": ["malta"],
+    "Mexico": ["mexico", "méxico"],
+    "Morocco": ["morocco"],
+    "Netherlands": ["netherlands", "holland"],
+    "New Zealand": ["new zealand"],
+    "Nicaragua": ["nicaragua"],
+    "Nigeria": ["nigeria"],
+    "Norway": ["norway"],
+    "Pakistan": ["pakistan"],
+    "Panama": ["panama"],
+    "Paraguay": ["paraguay"],
+    "Peru": ["peru", "perú"],
+    "Philippines": ["philippines"],
+    "Poland": ["poland"],
+    "Portugal": ["portugal"],
+    "Puerto Rico": ["puerto rico"],
+    "Qatar": ["qatar"],
+    "Romania": ["romania"],
+    "Russia": ["russia"],
+    "Saudi Arabia": ["saudi arabia"],
+    "Serbia": ["serbia"],
+    "Singapore": ["singapore"],
+    "Slovakia": ["slovakia"],
+    "Slovenia": ["slovenia"],
+    "South Africa": ["south africa"],
+    "South Korea": ["south korea", "korea"],
+    "Spain": ["spain", "espana", "españa"],
+    "Sweden": ["sweden"],
+    "Switzerland": ["switzerland"],
+    "Taiwan": ["taiwan"],
+    "Thailand": ["thailand"],
+    "Turkey": ["turkey", "turkiye", "türkiye"],
+    "Ukraine": ["ukraine"],
+    "United Arab Emirates": ["united arab emirates", "uae"],
+    "United Kingdom": ["united kingdom", "uk", "england", "scotland", "wales"],
+    "United States": ["united states", "usa", "u.s.", "u.s.a.", "united states of america"],
+    "Uruguay": ["uruguay"],
+    "Venezuela": ["venezuela"],
+    "Vietnam": ["vietnam"],
+}
+
+_EDUCATION_LOCATION_HINTS = [
+    ("Spain", ["barcelona", "madrid", "catalunya", "cataluna", "catalonia"]),
+    ("Ecuador", ["loja", "quito", "guayaquil"]),
+    ("Italy", ["rome", "roma", "milan", "milano"]),
+    ("Colombia", ["medellin", "bogota", "antioquia", "sena"]),
+    ("Australia", ["sydney", "melbourne"]),
+    ("Canada", ["vancouver", "toronto", "montreal"]),
+    ("Mexico", ["aguascalientes", "monterrey", "guadalajara"]),
+    ("United States", ["new york", "miami", "california", "texas"]),
+]
 
 # arriba de tu archivo (imports)
 from openai import OpenAI
@@ -298,6 +419,68 @@ def _normalize_resume_date(value: Any, *, allow_year_only: bool = False) -> str:
     if re.match(r"^\d{4}$", raw):
         return f"{raw}-01-01" if allow_year_only else ""
     return raw
+
+def _fold_location_text(value: Any) -> str:
+    text = unicodedata.normalize("NFD", str(value or ""))
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return re.sub(r"\s+", " ", text).lower().strip()
+
+def _contains_location_token(context: str, token: str) -> bool:
+    folded = _fold_location_text(token)
+    if not folded:
+        return False
+    return re.search(rf"(?<![a-z]){re.escape(folded)}(?![a-z])", context) is not None
+
+def _find_explicit_country(context: str) -> str:
+    for country, aliases in _COUNTRY_ALIASES.items():
+        if any(_contains_location_token(context, alias) for alias in aliases):
+            return country
+    return ""
+
+def _find_location_hint_country(context: str) -> str:
+    for country, hints in _EDUCATION_LOCATION_HINTS:
+        if any(_contains_location_token(context, hint) for hint in hints):
+            return country
+    return ""
+
+def _source_window_for_education(entry: Dict[str, Any], source_text: str, radius: int = 260) -> str:
+    folded_source = _fold_location_text(source_text)
+    if not folded_source:
+        return ""
+
+    candidates = [
+        entry.get("institution"),
+        entry.get("title"),
+    ]
+    for raw in candidates:
+        needle = _fold_location_text(raw)
+        if len(needle) < 5:
+            continue
+        idx = folded_source.find(needle)
+        if idx != -1:
+            return folded_source[idx: idx + len(needle) + radius]
+
+    return ""
+
+def _infer_education_country(entry: Dict[str, Any], source_text: str) -> str:
+    entry_context = " ".join([
+        _fold_location_text(entry.get("institution")),
+        _fold_location_text(entry.get("title")),
+        _fold_location_text(entry.get("description")),
+    ])
+    source_context = _source_window_for_education(entry, source_text)
+    if not entry_context and not source_context:
+        return str(entry.get("country") or "").strip()
+
+    for context in (entry_context, source_context):
+        country = _find_explicit_country(context)
+        if country:
+            return country
+        country = _find_location_hint_country(context)
+        if country:
+            return country
+
+    return str(entry.get("country") or "").strip()
 
 def _clean_generated_education_dates(entry: Dict[str, Any]) -> Dict[str, Any]:
     start = str(entry.get("start_date") or "").strip()
@@ -1548,7 +1731,8 @@ Return STRICT JSON:
             - Never say "expertise in", "proficient in", "advanced in", or "used at this company" for software unless the source explicitly says that. Prefer "listed software includes..." or "CV-wide tools listed include...".
             - Example safe sparse-role bullets: "- The CV lists this role as Motion Designer." "- CV-wide context presents the candidate as a 3D designer specializing in Motion Design and dynamic visual content." "- Relevant CV-wide tools listed include Adobe After Effects and Adobe Premiere." Do not add achievements.
             - For education dates: if the source gives a year range, keep the full range. If the source gives only one year, store it as that full year for UI display. If the source gives month/year, keep that month/year.
-            - For education country: fill "country" when the source explicitly includes a country or a clear city/country location for that education entry (for example "Barcelona, Spain" -> "Spain", "Loja, Ecuador" -> "Ecuador", "Sydney, Australia" -> "Australia"). If only a city, province, or institution name appears and the country is not explicit, leave country empty.
+            - For education country: fill "country" when the source explicitly includes a country or a clear city/country location for that education entry (for example "Barcelona, Spain" -> "Spain", "Loja, Ecuador" -> "Ecuador", "Sydney, Australia" -> "Australia").
+            - If the source only includes a well-known, unambiguous city/province/state for that education entry, infer the country when confidence is high, regardless of which country it is. If the location is ambiguous or could reasonably be multiple countries, leave country empty.
             - For education descriptions, include explicit education details first: honors, thesis, coursework, student organizations, language level, projects, certifications, and academic achievements if they appear in the source.
             - If an education entry has only a degree/title and institution, write 2-3 concise field-aligned bullets based on the title. Use cautious language such as "Academic background in...", "Foundation related to...", "Supports understanding of...", or "Relevant to...".
             - Do not invent specific courses, projects, grades, honors, memberships, tools, or achievements. For example, do not say "completed advanced financial management courses" unless coursework is stated; prefer "Academic background related to financial administration and management."
@@ -1659,10 +1843,19 @@ Return STRICT JSON:
                     raise Exception(f"❌ Error parsing JSON. First attempt: {str(e1)} | Second attempt: {str(e2)} | Content: {content[:300]}")
 
             today = datetime.date.today()
+            education_country_source = "\n".join([
+                linkedin_scrapper or "",
+                cv_pdf_scrapper or "",
+                intro_call_transcript or "",
+                deep_dive_transcript or "",
+                first_interview_transcript or "",
+                notes or "",
+            ])
             for entry in json_data.get("work_experience", []):
                 _clean_generated_work_dates(entry, today)
             for entry in json_data.get("education", []):
                 _clean_generated_education_dates(entry)
+                entry["country"] = _infer_education_country(entry, education_country_source)
 
             education = json.dumps(json_data.get('education', []))
             work_experience = json.dumps(json_data.get('work_experience', []))
