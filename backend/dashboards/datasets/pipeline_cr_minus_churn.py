@@ -40,14 +40,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or datetime.utcnow().date()
     )
 
-    # Net adds expected (30d) per model =
-    #   pipeline_count_<model> × win_rate_<model>_90d  −  avg_monthly_churn_<model>_90d
-    # Churn avg uses 3 month-buckets (~90 days) of last_baja_real entries by opp_model.
+    # Net adds (30d) per model = (pipeline_count × CR_30d) − Churn_30d (actual count)
+    # Both CR and Churn use the same 30d window so the values match the
+    # adjacent KPI tiles (NDA → Close Win 30d, Candidate churn 30d).
     sql = f"""
         WITH params AS (
           SELECT
             %(corte)s::date                                AS corte_d,
-            (%(corte)s::date - INTERVAL '90 days')::date   AS cr_ini
+            (%(corte)s::date - INTERVAL '29 days')::date   AS win_ini
         ),
         pipeline AS (
           SELECT o.opp_model
@@ -61,16 +61,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COUNT(*) FILTER (WHERE opp_model = 'Recruiting')::int AS pipe_recruiting
           FROM pipeline
         ),
-        closed AS (
+        closed_30d AS (
           SELECT o.opp_model, TRIM(o.opp_stage) AS stage
           FROM opportunity o
           CROSS JOIN params p
           WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost', 'Close Lost')
             AND o.opp_close_date IS NOT NULL
-            AND NULLIF(o.opp_close_date::text, '')::date >= p.cr_ini
+            AND NULLIF(o.opp_close_date::text, '')::date >= p.win_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
         ),
-        win_rates AS (
+        win_rates_30d AS (
           SELECT
             COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Staffing')::numeric
               / NULLIF(COUNT(*) FILTER (
@@ -82,10 +82,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                   WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
                     AND opp_model = 'Recruiting'
                 ), 0)                                                                AS wr_recruiting
-          FROM closed
+          FROM closed_30d
         ),
-        -- Churn (Staffing): reuse client_churn_30d_summary "bajas_real" logic,
-        -- but aggregate over the last 90 days to derive an avg per 30d window.
+        -- Churn (Staffing): same definition as client_churn_30d_summary "bajas_real"
+        -- (last_baja final, not buyout). Actual count over the 30d window.
         hires_staffing AS (
           SELECT
             ho.account_id,
@@ -132,26 +132,26 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE buyout_d IS NOT NULL
           GROUP BY account_id
         ),
-        churn_staffing_90d AS (
+        churn_staffing_30d AS (
           SELECT
             COUNT(*) FILTER (
               WHERE NOT (b.buyout_d IS NOT NULL AND b.buyout_d >= DATE_TRUNC('month', ub.fecha_baja))
-            )::numeric AS bajas_real_90d
+            )::numeric AS bajas_real_30d
           FROM ultima_baja ub
           LEFT JOIN buyout_por_cuenta b ON b.account_id = ub.account_id
           CROSS JOIN params p
-          WHERE ub.fecha_baja BETWEEN p.cr_ini AND p.corte_d
+          WHERE ub.fecha_baja BETWEEN p.win_ini AND p.corte_d
         ),
-        -- Churn (Recruiting): no recurring contract, so we approximate "churn" as
-        -- recruiting placements that ended (end_date) in the last 90 days.
-        churn_recruiting_90d AS (
-          SELECT COUNT(*)::numeric AS bajas_real_90d
+        -- Churn (Recruiting): one-time placements; we count Recruiting hires
+        -- that ended in the 30d window as the equivalent "churn".
+        churn_recruiting_30d AS (
+          SELECT COUNT(*)::numeric AS bajas_real_30d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           CROSS JOIN params p
           WHERE o.opp_model = 'Recruiting'
             AND NULLIF(ho.end_date::text, '') IS NOT NULL
-            AND NULLIF(ho.end_date::text, '')::date BETWEEN p.cr_ini AND p.corte_d
+            AND NULLIF(ho.end_date::text, '')::date BETWEEN p.win_ini AND p.corte_d
         )
         SELECT
           (SELECT corte_d FROM params)                                                       AS corte,
@@ -159,18 +159,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           pc.pipe_recruiting,
           ROUND(COALESCE(w.wr_staffing,   0) * 100, 2)::float                                AS wr_staffing_pct,
           ROUND(COALESCE(w.wr_recruiting, 0) * 100, 2)::float                                AS wr_recruiting_pct,
-          ROUND(cs.bajas_real_90d / 3.0, 1)::float                                           AS churn_staffing_avg_30d,
-          ROUND(cr.bajas_real_90d / 3.0, 1)::float                                           AS churn_recruiting_avg_30d,
+          cs.bajas_real_30d::int                                                             AS churn_staffing_30d,
+          cr.bajas_real_30d::int                                                             AS churn_recruiting_30d,
           ROUND(
-            (pc.pipe_staffing   * COALESCE(w.wr_staffing,   0)) - (cs.bajas_real_90d / 3.0)
+            (pc.pipe_staffing   * COALESCE(w.wr_staffing,   0)) - cs.bajas_real_30d
           )::int                                                                             AS net_adds_staffing,
           ROUND(
-            (pc.pipe_recruiting * COALESCE(w.wr_recruiting, 0)) - (cr.bajas_real_90d / 3.0)
+            (pc.pipe_recruiting * COALESCE(w.wr_recruiting, 0)) - cr.bajas_real_30d
           )::int                                                                             AS net_adds_recruiting
         FROM pipeline_counts pc
-        CROSS JOIN win_rates  w
-        CROSS JOIN churn_staffing_90d   cs
-        CROSS JOIN churn_recruiting_90d cr;
+        CROSS JOIN win_rates_30d  w
+        CROSS JOIN churn_staffing_30d   cs
+        CROSS JOIN churn_recruiting_30d cr;
     """
 
     return sql, {"corte": corte}
@@ -185,10 +185,10 @@ DATASET = {
     "measures": [
         {"key": "pipe_staffing", "label": "Pipeline Staffing", "type": "number"},
         {"key": "pipe_recruiting", "label": "Pipeline Recruiting", "type": "number"},
-        {"key": "wr_staffing_pct", "label": "CR Staffing 90d", "type": "percent"},
-        {"key": "wr_recruiting_pct", "label": "CR Recruiting 90d", "type": "percent"},
-        {"key": "churn_staffing_avg_30d", "label": "Churn Staffing (avg 30d, 90d hist)", "type": "number"},
-        {"key": "churn_recruiting_avg_30d", "label": "Churn Recruiting (avg 30d, 90d hist)", "type": "number"},
+        {"key": "wr_staffing_pct", "label": "CR Staffing 30d", "type": "percent"},
+        {"key": "wr_recruiting_pct", "label": "CR Recruiting 30d", "type": "percent"},
+        {"key": "churn_staffing_30d", "label": "Churn Staffing (30d, count)", "type": "number"},
+        {"key": "churn_recruiting_30d", "label": "Churn Recruiting (30d, count)", "type": "number"},
         {"key": "net_adds_staffing", "label": "Net adds Staffing (30d)", "type": "number"},
         {"key": "net_adds_recruiting", "label": "Net adds Recruiting (30d)", "type": "number"},
     ],
