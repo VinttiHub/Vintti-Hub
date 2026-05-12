@@ -1524,7 +1524,7 @@ Return STRICT JSON:
                     "start_date": "YYYY-MM-DD or empty string",
                     "end_date": "YYYY-MM-DD or empty string",
                     "current": true/false,
-                    "description": ""  // Leave empty unless the source gives concrete, education-specific details such as thesis topic, honors, coursework, or project details. Never write generic program descriptions.
+                    "description": "- Bullet 1\\n- Bullet 2\\n- Bullet 3"  // Write useful education bullets grounded in the degree title and explicit CV details. Use cautious wording for broad academic context.
                 }}
             ]
             - work_experience: [
@@ -1550,8 +1550,10 @@ Return STRICT JSON:
             - Example safe sparse-role bullets: "- The CV lists this role as Motion Designer." "- CV-wide context presents the candidate as a 3D designer specializing in Motion Design and dynamic visual content." "- Relevant CV-wide tools listed include Adobe After Effects and Adobe Premiere." Do not add achievements.
             - For education dates: if the source only gives a single year or month/year, put it in end_date and leave start_date empty. Only fill both start_date and end_date when the source explicitly provides a date range.
             - Never convert a single education year into a full year range. For example, "2024" must not become January 2024 to December 2024.
-            - Never write generic education bullets like "gained knowledge", "developed skills", "focused on leadership", or similar unless those exact concrete details are in the source.
-            - Education descriptions should usually be empty. Include thesis/project details only when explicitly present in the source.
+            - For education descriptions, include explicit education details first: honors, thesis, coursework, student organizations, language level, projects, certifications, and academic achievements if they appear in the source.
+            - If an education entry has only a degree/title and institution, write 2-3 concise field-aligned bullets based on the title. Use cautious language such as "Academic background in...", "Foundation related to...", "Supports understanding of...", or "Relevant to...".
+            - Do not invent specific courses, projects, grades, honors, memberships, tools, or achievements. For example, do not say "completed advanced financial management courses" unless coursework is stated; prefer "Academic background related to financial administration and management."
+            - Education bullets may be general, but they must be directly related to the degree/title or explicit CV details.
             - If a day is not present in the source, use the first day of the known month only as a storage placeholder. Do not imply the day is exact.
             - For tools: do not infer expertise from a simple software list. If no proficiency level is stated, use "Intermediate" as a neutral UI placeholder and do not describe it as proven advanced/basic proficiency.
             - Use the available sources when present: LinkedIn, CV PDF, Intro Call transcript, Deep Dive transcript, and First Interview transcript.
