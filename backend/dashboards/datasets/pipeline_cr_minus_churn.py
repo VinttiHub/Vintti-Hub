@@ -50,15 +50,22 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             (%(corte)s::date - INTERVAL '29 days')::date   AS win_ini
         ),
         pipeline AS (
-          SELECT o.opp_model
+          SELECT
+            o.opp_model,
+            COALESCE(o.expected_fee, 0)::numeric     AS exp_fee,
+            COALESCE(o.expected_revenue, 0)::numeric AS exp_rev
           FROM opportunity o
           WHERE TRUE
             {PIPELINE_EXCLUDE_STAGES_SQL}
         ),
         pipeline_counts AS (
           SELECT
-            COUNT(*) FILTER (WHERE opp_model = 'Staffing')::int   AS pipe_staffing,
-            COUNT(*) FILTER (WHERE opp_model = 'Recruiting')::int AS pipe_recruiting
+            COUNT(*) FILTER (WHERE opp_model = 'Staffing')::int          AS pipe_staffing,
+            COUNT(*) FILTER (WHERE opp_model = 'Recruiting')::int        AS pipe_recruiting,
+            COALESCE(SUM(exp_fee) FILTER (WHERE opp_model = 'Staffing'), 0)::numeric
+                                                                          AS pipe_fee_staffing,
+            COALESCE(SUM(exp_rev) FILTER (WHERE opp_model = 'Staffing'), 0)::numeric
+                                                                          AS pipe_revenue_staffing
           FROM pipeline
         ),
         closed_30d AS (
@@ -84,14 +91,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 ), 0)                                                                AS wr_recruiting
           FROM closed_30d
         ),
-        -- Churn (Staffing): same definition as client_churn_30d_summary "bajas_real"
-        -- (last_baja final, not buyout). Actual count over the 30d window.
-        hires_staffing AS (
+        -- Churn (Staffing): CANDIDATE-level bajas, same logic as
+        -- candidate_churn_30d_summary.py. Counts distinct candidates whose
+        -- end_d falls in the 30d window, excluding buyouts (same-month buyout).
+        candidatos_staffing AS (
           SELECT
-            ho.account_id,
+            ho.candidate_id,
+            COALESCE(ho.fee, 0)::numeric    AS fee,
+            COALESCE(ho.salary, 0)::numeric AS salary,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              ELSE NULLIF(ho.start_date::text,'')::date
+              WHEN NULLIF(ho.start_date::text,'') IS NOT NULL THEN ho.start_date::date
+              ELSE NULL
             END AS start_d,
             CASE
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
@@ -105,42 +116,109 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS buyout_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE ho.account_id IS NOT NULL
+          WHERE ho.candidate_id IS NOT NULL
             AND o.opp_model = 'Staffing'
         ),
-        ultima_baja_raw AS (
-          SELECT account_id, MAX(end_d) AS fecha_baja
-          FROM hires_staffing
-          WHERE end_d IS NOT NULL
-          GROUP BY account_id
+        activos_inicio AS (
+          SELECT DISTINCT c.candidate_id, c.end_d, c.buyout_d
+          FROM candidatos_staffing c
+          CROSS JOIN params p
+          WHERE c.start_d IS NOT NULL
+            AND c.start_d <= p.win_ini
+            AND (c.end_d IS NULL OR c.end_d >= p.win_ini)
         ),
-        cuentas_con_activos_posteriores AS (
-          SELECT DISTINCT ub.account_id
-          FROM ultima_baja_raw ub
-          JOIN hires_staffing h
-            ON h.account_id = ub.account_id
-           AND COALESCE(h.end_d, DATE '9999-12-31') > ub.fecha_baja
+        bajas_inicio AS (
+          SELECT COUNT(DISTINCT a.candidate_id) FILTER (
+            WHERE NOT (a.buyout_d IS NOT NULL AND a.buyout_d >= DATE_TRUNC('month', a.end_d))
+          )::int AS bajas_real
+          FROM activos_inicio a
+          CROSS JOIN params p
+          WHERE a.end_d IS NOT NULL
+            AND a.end_d BETWEEN p.win_ini AND p.corte_d
         ),
-        ultima_baja AS (
-          SELECT *
-          FROM ultima_baja_raw
-          WHERE account_id NOT IN (SELECT account_id FROM cuentas_con_activos_posteriores)
-        ),
-        buyout_por_cuenta AS (
-          SELECT account_id, MAX(buyout_d) AS buyout_d
-          FROM hires_staffing
-          WHERE buyout_d IS NOT NULL
-          GROUP BY account_id
+        bajas_starts AS (
+          SELECT COUNT(DISTINCT c.candidate_id) FILTER (
+            WHERE NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
+          )::int AS bajas_real
+          FROM candidatos_staffing c
+          CROSS JOIN params p
+          WHERE c.start_d IS NOT NULL
+            AND c.end_d   IS NOT NULL
+            AND c.start_d BETWEEN p.win_ini AND p.corte_d
+            AND c.end_d   BETWEEN p.win_ini AND p.corte_d
         ),
         churn_staffing_30d AS (
+          SELECT (
+            COALESCE((SELECT bajas_real FROM bajas_inicio), 0)
+            + COALESCE((SELECT bajas_real FROM bajas_starts), 0)
+          )::numeric AS bajas_real_30d
+        ),
+        -- Fee/revenue lost from Staffing candidates that ended in the 30d window.
+        -- Same buyout exclusion as the count above.
+        churn_fee_loss_30d AS (
           SELECT
-            COUNT(*) FILTER (
-              WHERE NOT (b.buyout_d IS NOT NULL AND b.buyout_d >= DATE_TRUNC('month', ub.fecha_baja))
-            )::numeric AS bajas_real_30d
-          FROM ultima_baja ub
-          LEFT JOIN buyout_por_cuenta b ON b.account_id = ub.account_id
+            COALESCE(SUM(c.fee), 0)::numeric              AS churn_fee_loss,
+            COALESCE(SUM(c.fee + c.salary), 0)::numeric   AS churn_revenue_loss
+          FROM candidatos_staffing c
           CROSS JOIN params p
-          WHERE ub.fecha_baja BETWEEN p.win_ini AND p.corte_d
+          WHERE c.end_d IS NOT NULL
+            AND c.end_d BETWEEN p.win_ini AND p.corte_d
+            AND NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
+        ),
+        -- LTV (avg months per Staffing client) — same logic as
+        -- backend/routes/metrics_routes.py:740-767 (`/management/dashboard`).
+        ltv_base AS (
+          SELECT
+            c.candidate_id,
+            c.start_d,
+            c.end_d,
+            c.account_id
+          FROM (
+            SELECT
+              ho.candidate_id,
+              ho.account_id,
+              CASE
+                WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+                WHEN NULLIF(ho.start_date::text,'') IS NOT NULL THEN ho.start_date::date
+                ELSE NULL
+              END AS start_d,
+              CASE
+                WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+                WHEN NULLIF(ho.end_date::text,'') IS NULL THEN NULL
+                ELSE ho.end_date::date
+              END AS end_d
+            FROM hire_opportunity ho
+            JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+            WHERE ho.account_id IS NOT NULL
+              AND o.opp_model = 'Staffing'
+          ) c
+          WHERE c.start_d IS NOT NULL
+        ),
+        ltv_meses AS (
+          SELECT DATE_TRUNC('month', gs)::date AS mes
+          FROM generate_series(
+            (SELECT MIN(start_d) FROM ltv_base),
+            (SELECT MAX(COALESCE(end_d, CURRENT_DATE)) FROM ltv_base),
+            INTERVAL '1 month'
+          ) gs
+        ),
+        ltv_activos_mes AS (
+          SELECT m.mes, b.account_id, COUNT(DISTINCT b.candidate_id) AS activos
+          FROM ltv_meses m
+          JOIN ltv_base b
+            ON b.start_d < (m.mes + INTERVAL '1 month')
+           AND (b.end_d IS NULL OR b.end_d >= m.mes)
+          GROUP BY 1, 2
+        ),
+        ltv_duracion AS (
+          SELECT account_id, COUNT(*) AS active_months
+          FROM ltv_activos_mes
+          WHERE activos > 0
+          GROUP BY account_id
+        ),
+        ltv_months AS (
+          SELECT COALESCE(AVG(active_months), 0)::numeric AS ltv
+          FROM ltv_duracion
         ),
         -- Churn (Recruiting): one-time placements; we count Recruiting hires
         -- that ended in the 30d window as the equivalent "churn".
@@ -166,11 +244,31 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           )::int                                                                             AS net_adds_staffing,
           ROUND(
             (pc.pipe_recruiting * COALESCE(w.wr_recruiting, 0)) - cr.bajas_real_30d
-          )::int                                                                             AS net_adds_recruiting
+          )::int                                                                             AS net_adds_recruiting,
+          -- Money-based metrics (Staffing only — fee/MRR concept doesn't apply to Recruiting)
+          pc.pipe_fee_staffing::bigint                                                       AS pipe_fee_staffing,
+          pc.pipe_revenue_staffing::bigint                                                   AS pipe_revenue_staffing,
+          cfl.churn_fee_loss::bigint                                                         AS churn_fee_loss_staffing_30d,
+          cfl.churn_revenue_loss::bigint                                                     AS churn_revenue_loss_staffing_30d,
+          ROUND(l.ltv, 1)::float                                                             AS ltv_months,
+          ROUND(
+            (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
+          )::bigint                                                                          AS net_mrr_fee_staffing_30d,
+          ROUND(
+            (pc.pipe_revenue_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_revenue_loss
+          )::bigint                                                                          AS net_mrr_revenue_staffing_30d,
+          -- Net LTV $ = net MRR fee × LTV (months) → total LTV impact in $
+          ROUND(
+            (
+              (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
+            ) * l.ltv
+          )::bigint                                                                          AS net_ltv_fee_staffing_30d
         FROM pipeline_counts pc
-        CROSS JOIN win_rates_30d  w
+        CROSS JOIN win_rates_30d        w
         CROSS JOIN churn_staffing_30d   cs
-        CROSS JOIN churn_recruiting_30d cr;
+        CROSS JOIN churn_recruiting_30d cr
+        CROSS JOIN churn_fee_loss_30d   cfl
+        CROSS JOIN ltv_months           l;
     """
 
     return sql, {"corte": corte}
@@ -191,6 +289,14 @@ DATASET = {
         {"key": "churn_recruiting_30d", "label": "Churn Recruiting (30d, count)", "type": "number"},
         {"key": "net_adds_staffing", "label": "Net adds Staffing (30d)", "type": "number"},
         {"key": "net_adds_recruiting", "label": "Net adds Recruiting (30d)", "type": "number"},
+        {"key": "pipe_fee_staffing", "label": "Pipeline Staffing fee ($)", "type": "currency"},
+        {"key": "pipe_revenue_staffing", "label": "Pipeline Staffing revenue ($)", "type": "currency"},
+        {"key": "churn_fee_loss_staffing_30d", "label": "Fee perdido por churn Staffing 30d", "type": "currency"},
+        {"key": "churn_revenue_loss_staffing_30d", "label": "Revenue perdido por churn Staffing 30d", "type": "currency"},
+        {"key": "ltv_months", "label": "LTV (avg months per client)", "type": "number"},
+        {"key": "net_mrr_fee_staffing_30d", "label": "Net MRR fee Staffing 30d ($/mes)", "type": "currency"},
+        {"key": "net_mrr_revenue_staffing_30d", "label": "Net MRR revenue Staffing 30d ($/mes)", "type": "currency"},
+        {"key": "net_ltv_fee_staffing_30d", "label": "Net LTV fee Staffing 30d ($)", "type": "currency"},
     ],
     "default_filters": {},
     "query": query,

@@ -1102,19 +1102,28 @@
         </div>
       </div>
 
-      <!-- Pipeline × CR − Churn · Recruiting -->
+      <!-- Pipeline × CR − Churn · Staffing ($, money-based) -->
       <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">Pipeline × CR − Churn</span>
-          <span class="skpi-tile__tag">Recruiting</span>
+          <span class="skpi-tile__tag">Staffing $</span>
         </div>
         <div class="skpi-tile__value"
              data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
-             data-field="net_adds_recruiting" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</div>
+             data-field="net_mrr_fee_staffing_30d" data-reduce="first" data-fmt="currency-k" data-class-on-sign>—</div>
         <div class="skpi-tile__sub">
-          Net placements expected (30d) ·
+          Net MRR fee expected (30d) ·
           <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
-                data-field="pipe_recruiting" data-reduce="first" data-fmt="int">—</span> opps
+                data-field="pipe_fee_staffing" data-reduce="first" data-fmt="currency-k">—</span> fee pipeline
+        </div>
+        <div class="skpi-tile__sub">
+          Net LTV ·
+          <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
+                data-field="net_ltv_fee_staffing_30d" data-reduce="first" data-fmt="currency-k">—</span>
+          (LTV
+          <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
+                data-field="ltv_months" data-reduce="first" data-fmt="decimal">—</span>
+          months)
         </div>
       </div>
 
