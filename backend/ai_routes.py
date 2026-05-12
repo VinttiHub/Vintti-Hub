@@ -303,23 +303,21 @@ def _clean_generated_education_dates(entry: Dict[str, Any]) -> Dict[str, Any]:
     start = str(entry.get("start_date") or "").strip()
     end = str(entry.get("end_date") or "").strip()
 
-    # A single year in the source often becomes a fake Jan-Dec range. Keep it
-    # as a completion year instead of pretending we know a start/end range.
+    # A single education year is stored as a full-year range so the existing
+    # resume UI can display the year instead of dropping the date entirely.
     same_year_range = (
         re.match(r"^\d{4}-0?1-(?:0?1|15)$", start)
         and re.match(r"^\d{4}-12-(?:31|15|01)$", end)
         and start[:4] == end[:4]
     )
     if same_year_range:
-        entry["start_date"] = ""
-        entry["end_date"] = ""
+        entry["start_date"] = f"{start[:4]}-01-01"
+        entry["end_date"] = f"{start[:4]}-12-31"
         entry["current"] = False
         return entry
 
-    entry["start_date"] = _normalize_resume_date(start, allow_year_only=False)
-    entry["end_date"] = _normalize_resume_date(end, allow_year_only=False)
-    if not entry["start_date"] and re.match(r"^\d{4}-01-(?:01|15)$", entry["end_date"] or ""):
-        entry["end_date"] = ""
+    entry["start_date"] = _normalize_resume_date(start, allow_year_only=True)
+    entry["end_date"] = _normalize_resume_date(end, allow_year_only=True)
     if not entry["end_date"] and not entry["start_date"]:
         entry["current"] = False
     return entry
@@ -1548,8 +1546,7 @@ Return STRICT JSON:
             - For sparse roles, choose title-aligned CV-wide context: 3D roles can mention 3D generalist/design and listed software such as Cinema 4D, RedShift, and X Particles; motion/video roles can mention motion graphics, compositing, dynamic visual content, and listed software such as Adobe After Effects and Adobe Premiere; photography roles can mention photography/video and listed software such as Adobe Lightroom/Photoshop.
             - Never say "expertise in", "proficient in", "advanced in", or "used at this company" for software unless the source explicitly says that. Prefer "listed software includes..." or "CV-wide tools listed include...".
             - Example safe sparse-role bullets: "- The CV lists this role as Motion Designer." "- CV-wide context presents the candidate as a 3D designer specializing in Motion Design and dynamic visual content." "- Relevant CV-wide tools listed include Adobe After Effects and Adobe Premiere." Do not add achievements.
-            - For education dates: if the source only gives a single year or month/year, put it in end_date and leave start_date empty. Only fill both start_date and end_date when the source explicitly provides a date range.
-            - Never convert a single education year into a full year range. For example, "2024" must not become January 2024 to December 2024.
+            - For education dates: if the source gives a year range, keep the full range. If the source gives only one year, store it as that full year for UI display. If the source gives month/year, keep that month/year.
             - For education descriptions, include explicit education details first: honors, thesis, coursework, student organizations, language level, projects, certifications, and academic achievements if they appear in the source.
             - If an education entry has only a degree/title and institution, write 2-3 concise field-aligned bullets based on the title. Use cautious language such as "Academic background in...", "Foundation related to...", "Supports understanding of...", or "Relevant to...".
             - Do not invent specific courses, projects, grades, honors, memberships, tools, or achievements. For example, do not say "completed advanced financial management courses" unless coursework is stated; prefer "Academic background related to financial administration and management."
