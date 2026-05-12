@@ -217,7 +217,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           GROUP BY account_id
         ),
         ltv_months AS (
-          SELECT COALESCE(AVG(active_months), 0)::numeric AS ltv
+          -- Round to integer to match the legacy /management/dashboard query
+          -- (`::numeric(10,0)`). Use the SAME integer for display and for the
+          -- net_ltv_* multiplier so they stay consistent.
+          SELECT COALESCE(ROUND(AVG(active_months)), 0)::int AS ltv
           FROM ltv_duracion
         ),
         -- Churn (Recruiting): one-time placements; we count Recruiting hires
@@ -250,7 +253,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           pc.pipe_revenue_staffing::bigint                                                   AS pipe_revenue_staffing,
           cfl.churn_fee_loss::bigint                                                         AS churn_fee_loss_staffing_30d,
           cfl.churn_revenue_loss::bigint                                                     AS churn_revenue_loss_staffing_30d,
-          ROUND(l.ltv, 1)::float                                                             AS ltv_months,
+          l.ltv::int                                                                         AS ltv_months,
           ROUND(
             (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
           )::bigint                                                                          AS net_mrr_fee_staffing_30d,
