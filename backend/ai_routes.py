@@ -1519,6 +1519,7 @@ Return STRICT JSON:
                 {{
                     "institution": "...", \\translate everything to english
                     "title": "...", \\translate everything to english
+                    "country": "Country name or empty string",
                     "start_date": "YYYY-MM-DD or empty string",
                     "end_date": "YYYY-MM-DD or empty string",
                     "current": true/false,
@@ -1547,6 +1548,7 @@ Return STRICT JSON:
             - Never say "expertise in", "proficient in", "advanced in", or "used at this company" for software unless the source explicitly says that. Prefer "listed software includes..." or "CV-wide tools listed include...".
             - Example safe sparse-role bullets: "- The CV lists this role as Motion Designer." "- CV-wide context presents the candidate as a 3D designer specializing in Motion Design and dynamic visual content." "- Relevant CV-wide tools listed include Adobe After Effects and Adobe Premiere." Do not add achievements.
             - For education dates: if the source gives a year range, keep the full range. If the source gives only one year, store it as that full year for UI display. If the source gives month/year, keep that month/year.
+            - For education country: fill "country" when the source explicitly includes a country or a clear city/country location for that education entry (for example "Barcelona, Spain" -> "Spain", "Loja, Ecuador" -> "Ecuador", "Sydney, Australia" -> "Australia"). If only a city, province, or institution name appears and the country is not explicit, leave country empty.
             - For education descriptions, include explicit education details first: honors, thesis, coursework, student organizations, language level, projects, certifications, and academic achievements if they appear in the source.
             - If an education entry has only a degree/title and institution, write 2-3 concise field-aligned bullets based on the title. Use cautious language such as "Academic background in...", "Foundation related to...", "Supports understanding of...", or "Relevant to...".
             - Do not invent specific courses, projects, grades, honors, memberships, tools, or achievements. For example, do not say "completed advanced financial management courses" unless coursework is stated; prefer "Academic background related to financial administration and management."
