@@ -439,7 +439,7 @@ function addEducationEntry(entry={ institution:'', title:'', country:'', start_d
         </div>
       </div>
     </div>
-    <div class="rich-toolbar"><button data-cmd="bold"><b>B</b></button><button data-cmd="italic"><i>I</i></button><button data-cmd="insertUnorderedList">• List</button></div>
+    <div class="rich-toolbar"><button type="button" data-cmd="bold"><b>B</b></button><button type="button" data-cmd="italic"><i>I</i></button><button type="button" data-cmd="insertUnorderedList">• List</button></div>
     <div class="edu-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:160px;">${sanitizeHTML(entry.description||'')}</div>
     <button class="remove-entry" title="Remove">🗑️</button>
   `;
@@ -447,12 +447,14 @@ function addEducationEntry(entry={ institution:'', title:'', country:'', start_d
   // Editor de descripción
   const desc = card.querySelector('.edu-desc');
   wireDescEditors(desc, 'education');
-  card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
-    desc.focus();
-    console.debug(`[current] ${checked ? 'ON' : 'OFF'}`);
-    document.execCommand(b.dataset.cmd,false,null);
-    touched.education = true; scheduleSave();
-  }));
+  card.querySelectorAll('.rich-toolbar button').forEach(b=>{
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', ()=>{
+      desc.focus();
+      document.execCommand(b.dataset.cmd,false,null);
+      touched.education = true; scheduleSave();
+    });
+  });
 
   // Botón borrar
   card.querySelector('.remove-entry').addEventListener('click', ()=>{
@@ -547,18 +549,21 @@ function addWorkExperienceEntry(entry={ title:'', company:'', start_date:'', end
         </div>
       </div>
     </div>
-    <div class="rich-toolbar"><button data-cmd="bold"><b>B</b></button><button data-cmd="italic"><i>I</i></button><button data-cmd="insertUnorderedList">• List</button></div>
+    <div class="rich-toolbar"><button type="button" data-cmd="bold"><b>B</b></button><button type="button" data-cmd="italic"><i>I</i></button><button type="button" data-cmd="insertUnorderedList">• List</button></div>
     <div class="work-desc rich-input" contenteditable="true" placeholder="Description" style="min-height:200px;">${sanitizeHTML(entry.description||'')}</div>
     <button class="remove-entry" title="Remove">🗑️</button>
   `;
 
   const desc = card.querySelector('.work-desc');
   wireDescEditors(desc, 'work_experience');
-  card.querySelectorAll('.rich-toolbar button').forEach(b=>b.addEventListener('click', ()=>{
-    desc.focus();
-    document.execCommand(b.dataset.cmd,false,null);
-    touched.work_experience = true; scheduleSave();
-  }));
+  card.querySelectorAll('.rich-toolbar button').forEach(b=>{
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', ()=>{
+      desc.focus();
+      document.execCommand(b.dataset.cmd,false,null);
+      touched.work_experience = true; scheduleSave();
+    });
+  });
 
   card.querySelector('.remove-entry').addEventListener('click', ()=>{
     card.remove(); touched.work_experience = true; scheduleSave();
