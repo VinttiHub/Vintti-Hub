@@ -750,7 +750,7 @@
           <div class="skpi-tile__head">
             <span class="skpi-tile__title">Active clients</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
         </div>
 
         <div class="skpi-tile skpi-tile--big s-5">
@@ -949,9 +949,9 @@
         <div class="skpi-tile skpi-tile--big s-12">
           <div class="skpi-tile__head">
             <span class="skpi-tile__title">Active clients</span>
-            <span class="skpi-tile__tag">Last 30d</span>
+            <span class="skpi-tile__tag">Actual</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="active_clients_window" data-reduce="first" data-fmt="int">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
         </div>
 
         <!-- Existing Recruiting upfront context chart -->
