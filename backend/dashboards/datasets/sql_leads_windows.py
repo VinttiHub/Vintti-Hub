@@ -60,14 +60,27 @@ def _parse_hubspot_date(raw: Any) -> date | None:
 
 
 def _windows(corte: date) -> dict[str, tuple[date, date]]:
-    # ISO week starts on Monday. Python date.weekday() returns 0..6 with Monday=0.
-    week_start = corte - timedelta(days=corte.weekday())
+    """Resolve the 4 named windows.
+
+    - `last_week`  : previous full calendar week (Mon-Sun) — NOT "last 7 days"
+    - `wtd`        : week-to-date (this week's Monday → today)
+    - `last_month` : previous full calendar month
+    - `mtd`        : month-to-date (1st of this month → today)
+    """
+    # ISO week: Monday=0, Sunday=6
+    this_week_monday = corte - timedelta(days=corte.weekday())
+    prev_week_sunday = this_week_monday - timedelta(days=1)
+    prev_week_monday = prev_week_sunday - timedelta(days=6)
+
     month_start = corte.replace(day=1)
+    last_month_end = month_start - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+
     return {
-        "last_week":  (corte - timedelta(days=6),  corte),
-        "wtd":        (week_start,                 corte),
-        "last_month": (corte - timedelta(days=29), corte),
-        "mtd":        (month_start,                corte),
+        "last_week":  (prev_week_monday,  prev_week_sunday),
+        "wtd":        (this_week_monday,  corte),
+        "last_month": (last_month_start,  last_month_end),
+        "mtd":        (month_start,       corte),
     }
 
 

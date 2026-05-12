@@ -21,10 +21,18 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
-    """Resolve (win_ini, win_fin) from the `window` filter. Default: last 30d (30-day offset)."""
+    """Resolve (win_ini, win_fin) from the `window` filter. Default: last 30d (30-day offset).
+
+    `week` means the previous full calendar week (Mon-Sun ending before today's
+    week). For a rolling 7-day window use `7d`.
+    """
     raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
-    if raw in ("week", "7d", "7", "semana"):
+    if raw in ("7d", "7"):
         return corte - timedelta(days=6), corte
+    if raw in ("week", "semana", "last_week", "last-week", "prev_week"):
+        prev_sunday = corte - timedelta(days=corte.weekday() + 1)
+        prev_monday = prev_sunday - timedelta(days=6)
+        return prev_monday, prev_sunday
     if raw == "mtd":
         return corte.replace(day=1), corte
     if raw in ("month", "last_month", "last-month", "prev_month"):

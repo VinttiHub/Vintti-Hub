@@ -49,13 +49,23 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or datetime.utcnow().date()
     )
 
-    week_start  = corte - timedelta(days=corte.weekday())  # ISO Monday
-    month_start = corte.replace(day=1)
+    # Windows (consistent with sql_leads_windows._windows):
+    #   last_week  = previous full calendar week (Mon-Sun)
+    #   wtd        = this week's Monday → today
+    #   last_month = previous full calendar month
+    #   mtd        = 1st of this month → today
+    this_week_monday = corte - timedelta(days=corte.weekday())
+    prev_week_sunday = this_week_monday - timedelta(days=1)
+    prev_week_monday = prev_week_sunday - timedelta(days=6)
 
-    lw_ini, lw_fin = corte - timedelta(days=6),  corte
-    wt_ini, wt_fin = week_start,                 corte
-    lm_ini, lm_fin = corte - timedelta(days=29), corte
-    mt_ini, mt_fin = month_start,                corte
+    month_start = corte.replace(day=1)
+    last_month_end = month_start - timedelta(days=1)
+    last_month_start = last_month_end.replace(day=1)
+
+    lw_ini, lw_fin = prev_week_monday, prev_week_sunday
+    wt_ini, wt_fin = this_week_monday, corte
+    lm_ini, lm_fin = last_month_start, last_month_end
+    mt_ini, mt_fin = month_start,      corte
 
     sql = """
         WITH opps AS (

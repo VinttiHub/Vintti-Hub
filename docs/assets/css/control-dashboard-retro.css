@@ -2038,6 +2038,14 @@ body.is-loading .kpi-card::after {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
+.skpi-sub__pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--neg);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
 
 @media (max-width: 900px) {
   .skpi-group__grid { grid-template-columns: repeat(2, 1fr); }

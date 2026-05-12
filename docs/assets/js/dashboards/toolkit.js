@@ -39,7 +39,7 @@
       if (v == null || v === '') return '—';
       const n = Number(v);
       if (!isFinite(n)) return String(v);
-      return n.toFixed(1) + '%';
+      return Math.round(n) + '%';
     },
     pick(name) { return fmt[name] || fmt.number; },
   };
@@ -329,13 +329,13 @@
     const option = (type === 'pie' || type === 'donut') ? {
       tooltip: {
         trigger: 'item',
-        formatter: (p) => `${p.marker} ${p.name}: <b>${formatter(p.value)}</b> (${(p.percent ?? 0).toFixed(2)}%)`,
+        formatter: (p) => `${p.marker} ${p.name}: <b>${formatter(p.value)}</b> (${Math.round(p.percent ?? 0)}%)`,
       },
       legend: {
         bottom: 0,
         formatter: (name) => {
           const v = pieByName.get(String(name)) || 0;
-          const pct = pieTotal ? ((v * 100) / pieTotal).toFixed(2) : '0.00';
+          const pct = pieTotal ? Math.round((v * 100) / pieTotal) : 0;
           return `${name}  ${pct}%`;
         },
       },
@@ -363,7 +363,7 @@
           const total = stacked ? params.reduce((s, p) => s + (Number(p.value) || 0), 0) : 0;
           const lines = params.map(p => {
             const fn = (twin && p.seriesIndex !== 0) ? formatter2 : formatter;
-            const pct = stacked && total ? ` (${((Number(p.value) || 0) * 100 / total).toFixed(2)}%)` : '';
+            const pct = stacked && total ? ` (${Math.round(((Number(p.value) || 0) * 100) / total)}%)` : '';
             return `${p.marker} ${p.seriesName}: <b>${fn(p.value)}</b>${pct}`;
           });
           if (stacked) lines.push(`Total: <b>${formatter(total)}</b>`);

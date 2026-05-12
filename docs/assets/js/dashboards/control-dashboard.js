@@ -37,16 +37,16 @@
       if (Math.abs(n) >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
       return '$' + n.toFixed(0);
     },
-    percent: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : (+v).toFixed(1) + '%',
+    percent: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : Math.round(+v) + '%',
     'percent-pp': (v) => {
       if (v == null || v === '' || isNaN(+v)) return '—';
-      const n = +v;
-      return (n > 0 ? '+' : '') + n.toFixed(1) + 'pp';
+      const n = Math.round(+v);
+      return (n > 0 ? '+' : '') + n + 'pp';
     },
     'delta-percent': (v) => {
       if (v == null || v === '' || isNaN(+v)) return '—';
-      const n = +v;
-      return (n > 0 ? '+' : '') + n.toFixed(1) + '%';
+      const n = Math.round(+v);
+      return (n > 0 ? '+' : '') + n + '%';
     },
     'delta-int': (v) => {
       if (v == null || v === '' || isNaN(+v)) return '—';
@@ -807,7 +807,7 @@
     const total = rows.reduce((a, r) => a + (+r[valueKey] || 0), 0) || 1;
     rows.forEach((row, i) => {
       const v = +row[valueKey] || 0;
-      const pct = ((v / total) * 100).toFixed(1) + '%';
+      const pct = Math.round((v / total) * 100) + '%';
       const color = colorForLabel(String(row[labelKey] || ''), i);
       const li = document.createElement('li');
       li.innerHTML = `
