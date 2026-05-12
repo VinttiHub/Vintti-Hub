@@ -2214,11 +2214,11 @@ MAIN_CHARTS = [
                     "periodo",
                     "mrr",
                     "active_clients",
-                    "active_contractors",
                     "new_clients",
                     "churn_clients",
-                    "buyout_clients",
+                    "active_contractors",
                     "churn_contractors",
+                    "buyout_contractors",
                 ],
             },
         },
@@ -2233,7 +2233,7 @@ MAIN_CHARTS = [
         "dataset_key": "recruiting_history",
         "config": {
             "mapping": {
-                "columns": ["periodo", "revenue", "new_ftes", "new_clients", "active_clients"],
+                "columns": ["periodo", "revenue", "active_clients", "new_clients", "new_ftes"],
             },
         },
         "position": {"x": 0, "y": 90, "w": 12, "h": 6},
