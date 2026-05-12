@@ -4,13 +4,15 @@ from datetime import date, datetime
 
 
 # Reuse the same stage exclusion as active_pipeline so both KPIs are consistent.
+# `%` doubled to `%%` so psycopg2's pyformat substitution leaves the SQL
+# ILIKE wildcards intact.
 PIPELINE_EXCLUDE_STAGES_SQL = """
   AND opp_stage IS NOT NULL
   AND TRIM(opp_stage) <> ''
-  AND opp_stage NOT ILIKE '%deep dive%'
-  AND opp_stage NOT ILIKE '%nda sent%'
-  AND opp_stage NOT ILIKE '%close%win%'
-  AND opp_stage NOT ILIKE '%close%lost%'
+  AND opp_stage NOT ILIKE '%%deep dive%%'
+  AND opp_stage NOT ILIKE '%%nda sent%%'
+  AND opp_stage NOT ILIKE '%%close%%win%%'
+  AND opp_stage NOT ILIKE '%%close%%lost%%'
 """
 
 

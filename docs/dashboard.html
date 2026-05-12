@@ -1073,7 +1073,13 @@
              data-chart="gr_kpi_active_pipeline" data-bind="text"
              data-field="pipeline_count" data-reduce="first" data-fmt="int">—</div>
         <div class="skpi-tile__sub">
-          Opps abiertas ·
+          <span data-chart="gr_kpi_active_pipeline" data-bind="text"
+                data-field="pipeline_count_staffing" data-reduce="first" data-fmt="int">—</span> Staffing
+          ·
+          <span data-chart="gr_kpi_active_pipeline" data-bind="text"
+                data-field="pipeline_count_recruiting" data-reduce="first" data-fmt="int">—</span> Recruiting
+        </div>
+        <div class="skpi-tile__sub">
           <span data-chart="gr_kpi_active_pipeline" data-bind="text"
                 data-field="pipeline_revenue_weighted" data-reduce="first" data-fmt="currency-k">—</span>
           weighted
@@ -1089,7 +1095,11 @@
         <div class="skpi-tile__value"
              data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
              data-field="net_adds_staffing" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</div>
-        <div class="skpi-tile__sub">Net adds expected (30d)</div>
+        <div class="skpi-tile__sub">
+          Net adds expected (30d) ·
+          <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
+                data-field="pipe_staffing" data-reduce="first" data-fmt="int">—</span> opps
+        </div>
       </div>
 
       <!-- Pipeline × CR − Churn · Recruiting -->
@@ -1101,7 +1111,11 @@
         <div class="skpi-tile__value"
              data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
              data-field="net_adds_recruiting" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</div>
-        <div class="skpi-tile__sub">Net placements expected (30d)</div>
+        <div class="skpi-tile__sub">
+          Net placements expected (30d) ·
+          <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
+                data-field="pipe_recruiting" data-reduce="first" data-fmt="int">—</span> opps
+        </div>
       </div>
 
       <!-- SQL Sales · multi-window -->

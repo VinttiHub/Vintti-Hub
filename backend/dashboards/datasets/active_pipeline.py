@@ -6,13 +6,15 @@ from datetime import date, datetime
 # Stages excluded from "pipeline" — must match the legacy filter in
 # docs/assets/js/dashboard.js:20-24 so this matches the existing
 # "Opportunities — Pipeline" table on Management Metrics.
+# NOTE: `%` doubled to `%%` so psycopg2's pyformat parameter substitution
+# doesn't interpret SQL ILIKE wildcards as format placeholders.
 PIPELINE_EXCLUDE_STAGES_SQL = """
   AND opp_stage IS NOT NULL
   AND TRIM(opp_stage) <> ''
-  AND opp_stage NOT ILIKE '%deep dive%'
-  AND opp_stage NOT ILIKE '%nda sent%'
-  AND opp_stage NOT ILIKE '%close%win%'
-  AND opp_stage NOT ILIKE '%close%lost%'
+  AND opp_stage NOT ILIKE '%%deep dive%%'
+  AND opp_stage NOT ILIKE '%%nda sent%%'
+  AND opp_stage NOT ILIKE '%%close%%win%%'
+  AND opp_stage NOT ILIKE '%%close%%lost%%'
 """
 
 
