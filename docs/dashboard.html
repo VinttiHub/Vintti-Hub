@@ -666,22 +666,22 @@
         <div class="skpi-tile skpi-g-2 s-3">
           <div class="skpi-tile__head">
             <span class="skpi-tile__title">GMRR</span>
-            <span class="skpi-tile__tag">Fee</span>
+            <span class="skpi-tile__tag">Revenue</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--pos">
-            <span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
+            <span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
           </div>
         </div>
 
         <div class="skpi-tile skpi-g-3 s-3">
           <div class="skpi-tile__head">
             <span class="skpi-tile__title">MRR</span>
-            <span class="skpi-tile__tag">Revenue</span>
+            <span class="skpi-tile__tag">Fee</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--pos">
-            <span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
+            <span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
           </div>
         </div>
 
@@ -909,7 +909,7 @@
           <div class="skpi-group__head">
             <span class="skpi-group__title">New FTEs placed</span>
           </div>
-          <div class="skpi-group__grid">
+          <div class="skpi-group__grid skpi-group__grid--five">
             <div class="skpi-sub">
               <span class="skpi-sub__label">Last week</span>
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
@@ -926,6 +926,10 @@
               <span class="skpi-sub__label">MTD</span>
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
             </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">YTD</span>
+              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+            </div>
           </div>
         </div>
 
@@ -933,7 +937,7 @@
           <div class="skpi-group__head">
             <span class="skpi-group__title">New clients</span>
           </div>
-          <div class="skpi-group__grid">
+          <div class="skpi-group__grid skpi-group__grid--five">
             <div class="skpi-sub">
               <span class="skpi-sub__label">Last week</span>
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
@@ -949,6 +953,10 @@
             <div class="skpi-sub">
               <span class="skpi-sub__label">MTD</span>
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">YTD</span>
+              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
         </div>

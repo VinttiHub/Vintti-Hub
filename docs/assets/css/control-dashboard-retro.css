@@ -2015,6 +2015,9 @@ body.is-loading .kpi-card::after {
 .skpi-group__grid--two {
   grid-template-columns: repeat(2, 1fr);
 }
+.skpi-group__grid--five {
+  grid-template-columns: repeat(5, 1fr);
+}
 .skpi-sub {
   background: #ffffff;
   border: 1px solid #b4c2d3;
