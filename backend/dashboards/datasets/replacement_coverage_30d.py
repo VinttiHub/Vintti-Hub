@@ -48,22 +48,36 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini, win_fin = _window_bounds(filters, corte)
 
-    # Numerator  : churned accounts in the window that ALSO have a Replacement Close Win
-    #              for the same account_id (no time-limit per user spec).
-    # Denominator: churned accounts in the window (same churn definition as
-    #              client_churn_30d_summary — Staffing real bajas, no buyouts).
+    # % Reemplazos colocados = (Replacement opps Close Win en 30d) / (candidate
+    # churn en 30d). Both metrics restricted to Staffing.
+    #   - Numerator   `placed_count`: opportunity_id where opp_type='Replacement'
+    #                                  AND opp_stage='Close Win'
+    #                                  AND opp_close_date in window.
+    #   - Denominator `churn_count` : distinct candidates whose end_d falls in the
+    #                                  window (excluding buyouts), same logic as
+    #                                  candidate_churn_30d_summary.bajas_real.
     sql = """
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
             %(win_fin)s::date AS win_fin
         ),
-        hires AS (
+        replacement_wins_in_window AS (
+          SELECT COUNT(*)::int AS placed_count
+          FROM opportunity o
+          CROSS JOIN ventana v
+          WHERE o.opp_type = 'Replacement'
+            AND TRIM(o.opp_stage) = 'Close Win'
+            AND o.opp_close_date IS NOT NULL
+            AND NULLIF(o.opp_close_date::text, '')::date BETWEEN v.win_ini AND v.win_fin
+        ),
+        candidatos AS (
           SELECT
-            ho.account_id,
+            ho.candidate_id,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              ELSE NULLIF(ho.start_date::text,'')::date
+              WHEN NULLIF(ho.start_date::text,'') IS NOT NULL THEN ho.start_date::date
+              ELSE NULL
             END AS start_d,
             CASE
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
@@ -77,70 +91,56 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END AS buyout_d
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE ho.account_id IS NOT NULL
+          WHERE ho.candidate_id IS NOT NULL
             AND o.opp_model = 'Staffing'
         ),
-        ultima_baja_raw AS (
-          SELECT account_id, MAX(end_d) AS fecha_baja
-          FROM hires
-          WHERE end_d IS NOT NULL
-          GROUP BY account_id
-        ),
-        cuentas_con_activos_posteriores AS (
-          SELECT DISTINCT ub.account_id
-          FROM ultima_baja_raw ub
-          JOIN hires h
-            ON h.account_id = ub.account_id
-           AND COALESCE(h.end_d, DATE '9999-12-31') > ub.fecha_baja
-        ),
-        ultima_baja AS (
-          SELECT *
-          FROM ultima_baja_raw
-          WHERE account_id NOT IN (SELECT account_id FROM cuentas_con_activos_posteriores)
-        ),
-        buyout_por_cuenta AS (
-          SELECT account_id, MAX(buyout_d) AS buyout_d
-          FROM hires
-          WHERE buyout_d IS NOT NULL
-          GROUP BY account_id
-        ),
-        churns_in_window AS (
-          SELECT ub.account_id
-          FROM ultima_baja ub
-          LEFT JOIN buyout_por_cuenta b ON b.account_id = ub.account_id
+        activos_inicio AS (
+          SELECT DISTINCT c.candidate_id, c.end_d, c.buyout_d
+          FROM candidatos c
           CROSS JOIN ventana v
-          WHERE ub.fecha_baja BETWEEN v.win_ini AND v.win_fin
-            AND NOT (
-              b.buyout_d IS NOT NULL
-              AND b.buyout_d >= DATE_TRUNC('month', ub.fecha_baja)
-            )
+          WHERE c.start_d IS NOT NULL
+            AND c.start_d <= v.win_ini
+            AND (c.end_d IS NULL OR c.end_d >= v.win_ini)
         ),
-        accounts_with_replacement_win AS (
-          SELECT DISTINCT o.account_id
-          FROM opportunity o
-          WHERE o.opp_type = 'Replacement'
-            AND TRIM(o.opp_stage) = 'Close Win'
-            AND o.account_id IS NOT NULL
+        bajas_inicio AS (
+          SELECT COUNT(DISTINCT a.candidate_id) FILTER (
+            WHERE NOT (a.buyout_d IS NOT NULL AND a.buyout_d >= DATE_TRUNC('month', a.end_d))
+          )::int AS bajas_real
+          FROM activos_inicio a
+          CROSS JOIN ventana v
+          WHERE a.end_d IS NOT NULL
+            AND a.end_d BETWEEN v.win_ini AND v.win_fin
+        ),
+        bajas_starts AS (
+          SELECT COUNT(DISTINCT c.candidate_id) FILTER (
+            WHERE NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
+          )::int AS bajas_real
+          FROM candidatos c
+          CROSS JOIN ventana v
+          WHERE c.start_d IS NOT NULL
+            AND c.end_d   IS NOT NULL
+            AND c.start_d BETWEEN v.win_ini AND v.win_fin
+            AND c.end_d   BETWEEN v.win_ini AND v.win_fin
+        ),
+        candidate_churn_in_window AS (
+          SELECT (
+            COALESCE((SELECT bajas_real FROM bajas_inicio), 0)
+            + COALESCE((SELECT bajas_real FROM bajas_starts), 0)
+          )::int AS churn_count
         )
         SELECT
-          (SELECT win_ini FROM ventana)                                AS ventana_desde,
-          (SELECT win_fin FROM ventana)                                AS ventana_hasta,
-          COALESCE((SELECT COUNT(*) FROM churns_in_window), 0)::int    AS churn_count,
-          COALESCE((
-            SELECT COUNT(*)
-            FROM churns_in_window c
-            WHERE c.account_id IN (SELECT account_id FROM accounts_with_replacement_win)
-          ), 0)::int                                                   AS placed_count,
+          (SELECT win_ini FROM ventana)              AS ventana_desde,
+          (SELECT win_fin FROM ventana)              AS ventana_hasta,
+          cc.churn_count                             AS churn_count,
+          rw.placed_count                            AS placed_count,
           ROUND(
             CASE
-              WHEN (SELECT COUNT(*) FROM churns_in_window) = 0 THEN NULL
-              ELSE 100.0 * (
-                SELECT COUNT(*)
-                FROM churns_in_window c
-                WHERE c.account_id IN (SELECT account_id FROM accounts_with_replacement_win)
-              )::numeric / (SELECT COUNT(*) FROM churns_in_window)
+              WHEN cc.churn_count = 0 THEN NULL
+              ELSE 100.0 * rw.placed_count::numeric / cc.churn_count
             END, 2
-          )::float                                                     AS placed_pct;
+          )::float                                   AS placed_pct
+        FROM replacement_wins_in_window rw
+        CROSS JOIN candidate_churn_in_window cc;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}
@@ -154,8 +154,8 @@ DATASET = {
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "churn_count", "label": "Churns en ventana", "type": "number"},
-        {"key": "placed_count", "label": "Churns con replacement Close Win", "type": "number"},
+        {"key": "churn_count", "label": "Candidate churn en ventana", "type": "number"},
+        {"key": "placed_count", "label": "Replacements Close Win en ventana", "type": "number"},
         {"key": "placed_pct", "label": "% Reemplazos colocados", "type": "percent"},
     ],
     "default_filters": {"window": "30d"},
