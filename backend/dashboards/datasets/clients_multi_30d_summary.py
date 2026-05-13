@@ -41,37 +41,82 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     modelo = _norm_modelo(filters.get("modelo") or filters.get("model") or filters.get("segmento"))
 
+    # Active-clients logic mirrors acpa_history.py so the denominator
+    # (`clientes_activos`) matches the "Active clients" tile exactly:
+    #   - Uses COALESCE(carga_active, start_date) and COALESCE(carga_inactive, end_date)
+    #   - Includes buyouts as Recruiting account rows (their candidate_id is NULL
+    #     so they don't add to "mayor_a_1" but DO count toward "clientes_activos")
+    #   - For the current month, falls back to ho.status='active' when dates fall short
     sql = """
-        WITH hires AS (
+        WITH hire_rows AS (
           SELECT
             ho.account_id,
             ho.candidate_id,
-            ho.start_date::date AS start_d,
+            LOWER(TRIM(COALESCE(ho.status, ''))) AS status,
             CASE
-              WHEN ho.end_date IS NULL OR ho.end_date::text = '' THEN NULL
-              ELSE ho.end_date::date
+              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+              WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS start_d,
+            CASE
+              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+              WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL THEN NULL
+              ELSE NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
             END AS end_d,
-            o.opp_model AS model
+            LOWER(TRIM(o.opp_model)) AS model
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE ho.account_id IS NOT NULL
-            AND ho.candidate_id IS NOT NULL
-            AND ho.start_date IS NOT NULL
-            AND o.opp_model IN ('Staffing', 'Recruiting')
+            AND LOWER(TRIM(o.opp_model)) IN ('staffing', 'recruiting')
+        ),
+        buyout_rows AS (
+          SELECT
+            b.account_id,
+            NULL::integer AS candidate_id,
+            '' AS status,
+            CASE
+              WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS start_d,
+            CASE
+              WHEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS end_d,
+            'recruiting' AS model
+          FROM buyouts b
+          WHERE b.account_id IS NOT NULL
+        ),
+        account_rows AS (
+          SELECT * FROM hire_rows
+          UNION ALL
+          SELECT * FROM buyout_rows
         ),
         corte AS (
-          SELECT %(corte)s::date AS fecha_corte
+          SELECT
+            %(corte)s::date AS fecha_corte,
+            DATE_TRUNC('month', %(corte)s::date)::date AS mes_ini,
+            (DATE_TRUNC('month', %(corte)s::date) + INTERVAL '1 month - 1 day')::date AS mes_fin
         ),
         activos_al_corte AS (
-          SELECT
+          SELECT DISTINCT
             c.fecha_corte,
-            h.account_id,
-            h.candidate_id
+            r.account_id,
+            r.candidate_id
           FROM corte c
-          JOIN hires h
-            ON h.start_d <= c.fecha_corte
-           AND COALESCE(h.end_d, DATE '9999-12-31') >= c.fecha_corte
-           AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
+          JOIN account_rows r
+            ON (
+                 (r.start_d IS NOT NULL
+                  AND r.start_d <= c.mes_fin
+                  AND COALESCE(r.end_d, DATE '9999-12-31') >= c.mes_fin)
+                 OR
+                 (c.mes_ini = DATE_TRUNC('month', CURRENT_DATE)
+                  AND r.status = 'active'
+                  AND (r.end_d IS NULL OR r.end_d >= CURRENT_DATE))
+               )
+           AND (%(modelo)s = 'Total' OR r.model = LOWER(%(modelo)s))
         ),
         candidatos_por_cliente AS (
           SELECT

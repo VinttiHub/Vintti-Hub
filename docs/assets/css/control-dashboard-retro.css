@@ -460,6 +460,12 @@ body.is-loading .kpi-card::after {
   display: block;
 }
 
+/* Shared section tiles tagged with data-subtab follow the active subtab. */
+#gsub-staffing:checked   ~ .shell .channel[data-channel="growth-new"] [data-subtab="recruiting"],
+#gsub-recruiting:checked ~ .shell .channel[data-channel="growth-new"] [data-subtab="staffing"] {
+  display: none;
+}
+
 /* ---------- VIEW MODE PILLS (Window / Grain) ---------- */
 .view-mode {
   display: inline-flex;

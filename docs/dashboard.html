@@ -1011,7 +1011,7 @@
 
     <div class="grid skpi-grid">
       <!-- % Reemplazos colocados -->
-      <div class="skpi-tile s-6">
+      <div class="skpi-tile s-4">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">% Reemplazos colocados</span>
           <span class="skpi-tile__tag">Last 30d</span>
@@ -1039,18 +1039,47 @@
         </div>
       </div>
 
-      <!-- % Clientes con +1 candidato -->
-      <div class="skpi-tile s-6">
+      <!-- % Clientes con +1 candidato · Staffing (visible only on Staffing subtab) -->
+      <div class="skpi-tile s-4" data-subtab="staffing">
         <div class="skpi-tile__head">
           <span class="skpi-tile__title">% Clientes con +1 candidato</span>
-          <span class="skpi-tile__tag">Actual</span>
+          <span class="skpi-tile__tag">Staffing</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text"
+             data-field="pct_percent" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__progress">
+          <div class="skpi-tile__progress-bar">
+            <span class="skpi-tile__progress-fill skpi-tile__progress-fill--violet"
+                  data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="progress-fill"
+                  data-field="pct_percent" data-reduce="first" data-target="70"></span>
+          </div>
+          <div class="skpi-tile__progress-meta">
+            <span>
+              <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text"
+                    data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span>
+              /
+              <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text"
+                    data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span>
+              clientes activos
+            </span>
+            <span class="skpi-tile__progress-target">Target: 70%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- % Clientes con +1 candidato · Total -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">% Clientes con +1 candidato</span>
+          <span class="skpi-tile__tag">Total</span>
         </div>
         <div class="skpi-tile__value"
              data-chart="gr_kpi_clients_multi_actual" data-bind="text"
              data-field="pct_percent" data-reduce="first" data-fmt="percent">—</div>
         <div class="skpi-tile__progress">
           <div class="skpi-tile__progress-bar">
-            <span class="skpi-tile__progress-fill skpi-tile__progress-fill--violet"
+            <span class="skpi-tile__progress-fill"
                   data-chart="gr_kpi_clients_multi_actual" data-bind="progress-fill"
                   data-field="pct_percent" data-reduce="first" data-target="70"></span>
           </div>
@@ -1060,6 +1089,35 @@
                     data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span>
               /
               <span data-chart="gr_kpi_clients_multi_actual" data-bind="text"
+                    data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span>
+              clientes activos
+            </span>
+            <span class="skpi-tile__progress-target">Target: 70%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- % Clientes con +1 candidato · Recruiting (visible only on Recruiting subtab) -->
+      <div class="skpi-tile s-4" data-subtab="recruiting">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">% Clientes con +1 candidato</span>
+          <span class="skpi-tile__tag">Recruiting</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text"
+             data-field="pct_percent" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__progress">
+          <div class="skpi-tile__progress-bar">
+            <span class="skpi-tile__progress-fill skpi-tile__progress-fill--cyan"
+                  data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="progress-fill"
+                  data-field="pct_percent" data-reduce="first" data-target="70"></span>
+          </div>
+          <div class="skpi-tile__progress-meta">
+            <span>
+              <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text"
+                    data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span>
+              /
+              <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text"
                     data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span>
               clientes activos
             </span>
