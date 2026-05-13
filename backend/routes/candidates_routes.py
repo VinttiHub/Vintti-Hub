@@ -36,6 +36,12 @@ _REJECTED_BATCH_STATUSES = {
 }
 _REJECTION_ALERT_THRESHOLD = 5
 _REJECTION_ALERT_EMAIL = 'pgonzales@vintti.com'
+CHURN_EMAIL_RECIPIENTS = [
+    'agustin@vintti.com',
+    'lara@vintti.com',
+    'agostina@vintti.com',
+    'pgonzales@vintti.com',
+]
 _REFERENCE_CANDIDATE_FIELDS = [
     'references_notes',
     'reference_1_name',
@@ -90,6 +96,77 @@ def _build_structured_reference_notes(reference_values):
     if not sections:
         return ''
     return f'<div data-structured-references="true">{"".join(sections)}</div>'
+
+
+def _send_hire_churn_email(cur, candidate_id, opportunity_id):
+    cur.execute(
+        """
+        SELECT
+            c.name AS candidate_name,
+            o.opp_position_name,
+            a.client_name,
+            h.end_date,
+            h.inactive_reason,
+            h.inactive_comments,
+            h.inactive_vinttierror
+        FROM hire_opportunity h
+        LEFT JOIN candidates c ON c.candidate_id = h.candidate_id
+        LEFT JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+        LEFT JOIN account a ON a.account_id = h.account_id
+        WHERE h.candidate_id = %s AND h.opportunity_id = %s
+        LIMIT 1
+        """,
+        (candidate_id, opportunity_id),
+    )
+    row = cur.fetchone() or {}
+    candidate_name = (row.get('candidate_name') or f'Candidate #{candidate_id}').strip()
+    detail_rows = [
+        ('Employee', candidate_name),
+        ('End date', row.get('end_date')),
+        ('Client', row.get('client_name')),
+        ('Role', row.get('opp_position_name')),
+        ('Reason', row.get('inactive_reason') or 'Not captured'),
+        ('Comments', row.get('inactive_comments')),
+        ('Vintti process error', 'Yes' if row.get('inactive_vinttierror') else 'No'),
+        ('Opportunity ID', opportunity_id),
+    ]
+    detail_html = ''.join(
+        f"""
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;font-weight:600;color:#111927;width:180px;">{html.escape(str(label))}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;color:#243B53;">{html.escape(str(value))}</td>
+        </tr>
+        """
+        for label, value in detail_rows
+        if value not in (None, '')
+    )
+    body = f"""
+    <div style="font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.65;color:#243B53;">
+      <p style="margin:0 0 18px;font-size:16px;">Hi team,</p>
+      <p style="margin:0 0 18px;">
+        A churn was just logged for <strong>{html.escape(candidate_name)}</strong>.
+      </p>
+      <table style="border-collapse:collapse;width:100%;max-width:680px;background:#f8fafc;border-radius:14px;overflow:hidden;margin:0 0 20px;">
+        <tbody>{detail_html}</tbody>
+      </table>
+      <p style="margin:0;font-size:14px;color:#52606d;">
+        Thanks,<br/>
+        <strong>Vintti Hub</strong>
+      </p>
+    </div>
+    """.strip()
+    response = requests.post(
+        'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email',
+        json={
+            'to': CHURN_EMAIL_RECIPIENTS,
+            'subject': f'Churn alert - {candidate_name}',
+            'body': body,
+        },
+        timeout=30,
+    )
+    if not response.ok:
+        logging.error('Churn email failed: %s %s', response.status_code, response.text)
+    return {'sent': response.ok, 'status_code': response.status_code}
 
 
 def _merge_structured_reference_notes(existing_notes, reference_values):
@@ -1682,12 +1759,17 @@ def handle_candidate_hire_data(candidate_id):
                 reference_2_position,
                 reference_2_phone,
                 reference_2_email,
-                reference_2_linkedin
+                reference_2_linkedin,
+                end_date,
+                inactive_reason,
+                inactive_comments,
+                inactive_vinttierror
             FROM hire_opportunity
             WHERE candidate_id = %s AND opportunity_id = %s
             LIMIT 1
         """, (candidate_id, opportunity_id))
         current_hire_reference_row = cur.fetchone() or {}
+        previous_end_date = current_hire_reference_row.get('end_date')
 
         candidate_seed_updates = {
             field: candidate_reference_row.get(field)
@@ -1761,7 +1843,10 @@ def handle_candidate_hire_data(candidate_id):
             'referral_dolar': 'referral_dolar',
             'referral_daterange': 'referral_daterange',
             'buyout_dolar': 'buyout_dolar',
-            'buyout_daterange': 'buyout_daterange'
+            'buyout_daterange': 'buyout_daterange',
+            'inactive_reason': 'inactive_reason',
+            'inactive_comments': 'inactive_comments',
+            'inactive_vinttierror': 'inactive_vinttierror'
         }
         ignored_fields = sorted(
             key for key in data.keys()
@@ -1917,14 +2002,27 @@ def handle_candidate_hire_data(candidate_id):
             opportunity_id=opportunity_id,
             candidate_id=candidate_id,
         )
+        should_send_churn_email = (
+            'end_date' in data
+            and previous_end_date in (None, '')
+            and _clean_date(data.get('end_date')) is not None
+        )
 
         conn.commit()
+        churn_email_notice = None
+        if should_send_churn_email:
+            try:
+                churn_email_notice = _send_hire_churn_email(cur, candidate_id, opportunity_id)
+            except Exception as email_error:
+                logging.exception('Failed to send churn email')
+                churn_email_notice = {'sent': False, 'error': str(email_error)}
         return jsonify({
             'success': True,
             'created': created,
             'updated': updated,
             'ignored_fields': ignored_fields,
-            'credit_loop_removed': credit_loop_removed
+            'credit_loop_removed': credit_loop_removed,
+            'churn_email_notice': churn_email_notice
         })
 
     except Exception as e:
