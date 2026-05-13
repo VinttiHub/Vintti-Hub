@@ -58,7 +58,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         ventana AS (
           SELECT
-            (c.cutoff_d - INTERVAL '30 day')::date AS win_ini,
+            (c.cutoff_d - INTERVAL '29 day')::date AS win_ini,
             c.cutoff_d::date                       AS win_fin
           FROM cutoff_sel c
         ),

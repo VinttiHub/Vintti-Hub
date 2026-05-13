@@ -52,10 +52,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ventanas AS (
           SELECT
             cf.cutoff,
-            (cf.cutoff - INTERVAL '30 day')::date AS win_ini,
+            (cf.cutoff - INTERVAL '29 day')::date AS win_ini,
             cf.cutoff::date                       AS win_fin,
             (cf.cutoff - INTERVAL '60 day')::date AS prev_ini,
-            (cf.cutoff - INTERVAL '30 day')::date AS prev_fin
+            (cf.cutoff - INTERVAL '29 day')::date AS prev_fin
           FROM cutoff_filtrado cf
         ),
         hires AS (

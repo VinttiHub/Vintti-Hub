@@ -55,7 +55,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH ventana AS (
           SELECT
             %(corte)s::date AS corte_d,
-            (%(corte)s::date - INTERVAL '30 day')::date AS win_ini,
+            (%(corte)s::date - INTERVAL '29 day')::date AS win_ini,
             %(corte)s::date AS win_fin
         ),
         base AS (

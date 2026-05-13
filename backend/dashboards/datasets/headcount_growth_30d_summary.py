@@ -69,10 +69,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ventanas AS (
           SELECT
             cf.cutoff,
-            (cf.cutoff - INTERVAL '30 day')::date AS win_ini,
+            (cf.cutoff - INTERVAL '29 day')::date AS win_ini,
             cf.cutoff::date                       AS win_fin,
             (cf.cutoff - INTERVAL '60 day')::date AS prev_ini,
-            (cf.cutoff - INTERVAL '30 day')::date AS prev_fin
+            (cf.cutoff - INTERVAL '29 day')::date AS prev_fin
           FROM cutoff_filtrado cf
         ),
         activos_win AS (
@@ -119,7 +119,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         )
         SELECT
           TO_CHAR(p.cutoff, 'YYYY-MM-DD')                                                   AS cutoff,
-          TO_CHAR((p.cutoff - INTERVAL '30 day')::date, 'YYYY-MM-DD')                       AS cutoff_prev,
+          TO_CHAR((p.cutoff - INTERVAL '29 day')::date, 'YYYY-MM-DD')                       AS cutoff_prev,
           COUNT(*) FILTER (WHERE p.candidatos_activos >= 1)::int                            AS clientes_activos,
           COUNT(*) FILTER (
             WHERE p.candidatos_activos >= 1
