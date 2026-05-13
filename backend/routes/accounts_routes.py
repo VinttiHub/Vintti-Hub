@@ -30,19 +30,18 @@ bp = Blueprint('accounts', __name__)
 
 
 PAIN_POINT_NORMALIZATION = {
-    'na': 'NA',
-    'n/a': 'NA',
     'high salary': 'High salary',
     'no real pain point': 'No real pain point',
     'cultural': 'Cultural fit',
     'cultural fit': 'Cultural fit',
     'time zone': 'Time zone',
-    'knowledge': 'No Knowledge',
-    'no knowledge': 'No Knowledge',
-    'no time': 'No time to hire',
-    'no time to hire': 'No time to hire',
-    'slow hiring processes': 'Slow hiring processes',
-    'workload': 'Workload',
+    'knowledge': 'No knowledge/time to search',
+    'no knowledge': 'No knowledge/time to search',
+    'no time': 'No knowledge/time to search',
+    'no time to hire': 'No knowledge/time to search',
+    'slow hiring processes': 'No knowledge/time to search',
+    'workload': 'No knowledge/time to search',
+    'no knowledge/time to search': 'No knowledge/time to search',
 }
 
 LEAD_SOURCE_NORMALIZATION = {
@@ -87,9 +86,29 @@ OUTSOURCE_NORMALIZATION = {
 
 
 def normalize_pain_point(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        items = []
+        seen = set()
+        for item in value:
+            normalized = normalize_pain_point(item)
+            if not normalized:
+                continue
+            for part in [segment.strip() for segment in str(normalized).split(',') if segment.strip()]:
+                key = part.lower()
+                if key not in seen:
+                    seen.add(key)
+                    items.append(part)
+        return ", ".join(items) if items else None
+
     raw = str(value or '').strip()
     if not raw:
         return None
+    if ',' in raw:
+        parts = [segment.strip() for segment in raw.split(',') if segment.strip()]
+        if len(parts) > 1:
+            return normalize_pain_point(parts)
     normalized = PAIN_POINT_NORMALIZATION.get(raw.lower())
     return normalized or raw
 
@@ -103,9 +122,29 @@ def normalize_lead_source(value):
 
 
 def normalize_outsource(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        items = []
+        seen = set()
+        for item in value:
+            normalized = normalize_outsource(item)
+            if not normalized:
+                continue
+            for part in [segment.strip() for segment in str(normalized).split(',') if segment.strip()]:
+                key = part.lower()
+                if key not in seen:
+                    seen.add(key)
+                    items.append(part)
+        return ", ".join(items) if items else None
+
     raw = str(value or '').strip()
     if not raw:
         return None
+    if ',' in raw:
+        parts = [segment.strip() for segment in raw.split(',') if segment.strip()]
+        if len(parts) > 1:
+            return normalize_outsource(parts)
     normalized = OUTSOURCE_NORMALIZATION.get(raw.lower())
     return normalized or raw
 

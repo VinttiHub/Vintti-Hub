@@ -456,8 +456,10 @@
               <option>LinkedIn Ads</option>
               <option>Instagram Ads</option>
               <option>Google Ads</option>
-              <option>Instagram Organic</option>
-              <option>LinkedIn Organic</option>
+              <option>Instagram</option>
+              <option>LinkedIn</option>
+              <option>TikTok</option>
+              <option>Facebook</option>
               <option>Lead Magnet</option>
               <option>Chatbot</option>
               <option>Live Chat</option>
@@ -528,32 +530,37 @@
           <!-- 🆕 Outsource before -->
           <div class="popup-field">
             <label>Outsource before</label>
-            <select name="outsource">
-              <option value="">Select…</option>
-              <option value="Yes - No info">Yes - No info</option>
-              <option value="No">No</option>
-              <option value="NA">NA</option>
-              <option value="Philippines">Philippines</option>
-              <option value="India">India</option>
-              <option value="LATAM">LATAM</option>
-              <option value="South Africa">South Africa</option>
-            </select>
+            <details class="popup-multiselect" data-multiselect="outsource">
+              <summary class="popup-multiselect__summary">
+                <span class="popup-multiselect__value" data-multiselect-label> Select… </span>
+              </summary>
+              <div class="popup-multiselect__menu" role="group" aria-label="Outsource before">
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="Yes - No info" /> <span>Yes - No info</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="No" /> <span>No</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="NA" /> <span>NA</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="Philippines" /> <span>Philippines</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="India" /> <span>India</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="LATAM" /> <span>LATAM</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="outsource" value="South Africa" /> <span>South Africa</span></label>
+              </div>
+            </details>
           </div>
 
           <!-- 🆕 Pain point -->
           <div class="popup-field">
             <label>Pain point</label>
-            <select name="pain_points">
-              <option value="NA">NA</option>
-              <option value="High salary">High salary</option>
-              <option value="No real pain point">No real pain point</option>
-              <option value="Cultural fit">Cultural fit</option>
-              <option value="Time zone">Time zone</option>
-              <option value="No Knowledge">No Knowledge</option>
-              <option value="No time to hire">No time to hire</option>
-              <option value="Slow hiring processes">Slow hiring processes</option>
-              <option value="Workload">Workload</option>
-            </select>
+            <details class="popup-multiselect" data-multiselect="pain_points">
+              <summary class="popup-multiselect__summary">
+                <span class="popup-multiselect__value is-placeholder" data-multiselect-label> Select… </span>
+              </summary>
+              <div class="popup-multiselect__menu" role="group" aria-label="Pain point">
+                <label class="popup-multiselect__option"><input type="checkbox" name="pain_points" value="No knowledge/time to search" /> <span>No knowledge/time to search</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="pain_points" value="Time zone" /> <span>Time zone</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="pain_points" value="High salary" /> <span>High salary</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="pain_points" value="No real pain point" /> <span>No real pain point</span></label>
+                <label class="popup-multiselect__option"><input type="checkbox" name="pain_points" value="Cultural fit" /> <span>Cultural fit</span></label>
+              </div>
+            </details>
           </div>
 
           <!-- 🆕 Position -->

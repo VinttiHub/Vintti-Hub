@@ -2405,6 +2405,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (form) {
     // Lead source + referral visibility
     const sourceSelect = form.querySelector('select[name="where_come_from"]');
+    const outsourceMultiselect = form.querySelector('[data-multiselect="outsource"]');
     loadReferralClients();
     if (sourceSelect) {
       updateReferralVisibility(sourceSelect);
@@ -2420,6 +2421,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
     }
+    if (outsourceMultiselect) {
+      const wirePopupMultiselect = (multiselectEl, fieldName) => {
+        const label = multiselectEl?.querySelector('[data-multiselect-label]');
+        const checkboxes = Array.from(multiselectEl?.querySelectorAll(`input[name="${fieldName}"]`) || []);
+        const renderSummary = () => {
+          const selected = checkboxes
+            .filter((input) => input.checked)
+            .map((input) => String(input.value || '').trim())
+            .filter(Boolean);
+          if (!label) return;
+          if (!selected.length) {
+            label.textContent = 'Select…';
+            label.classList.add('is-placeholder');
+            return;
+          }
+          label.classList.remove('is-placeholder');
+          if (selected.length <= 2) {
+            label.textContent = selected.join(', ');
+            return;
+          }
+          label.textContent = `${selected.length} selected`;
+        };
+        checkboxes.forEach((input) => input.addEventListener('change', renderSummary));
+        renderSummary();
+      };
+      wirePopupMultiselect(outsourceMultiselect, 'outsource');
+      wirePopupMultiselect(form.querySelector('[data-multiselect="pain_points"]'), 'pain_points');
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -2431,6 +2460,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const formData = new FormData(form);
       const data = Object.fromEntries(formData.entries());
+      const outsourceSelections = formData.getAll('outsource').map((value) => String(value || '').trim()).filter(Boolean);
+      data.outsource = outsourceSelections.length ? outsourceSelections : null;
+      const painPointSelections = formData.getAll('pain_points').map((value) => String(value || '').trim()).filter(Boolean);
+      data.pain_points = painPointSelections.length ? painPointSelections : null;
 
       // Normalize lead source + referral_source
       if (data.where_come_from != null) data.where_come_from = String(data.where_come_from).trim();
