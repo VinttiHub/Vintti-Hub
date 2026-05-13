@@ -61,7 +61,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH ventana AS (
           SELECT
             %(corte)s::date                              AS cutoff_d,
-            (%(corte)s::date - INTERVAL '30 days')::date AS window_start,
+            (%(corte)s::date - INTERVAL '29 days')::date AS window_start,
             %(corte)s::date                              AS window_end,
             (%(corte)s::date + INTERVAL '1 day')::date   AS window_end_excl
         ),

@@ -21,7 +21,12 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
-    """`week` = previous full calendar week (Mon-Sun); `7d` = rolling 7 days."""
+    """`week` = previous full calendar week (Mon-Sun); `7d` = rolling 7 days.
+
+    The default 30d window uses a 30-day offset to match the boundary used by
+    `candidate_churn_30d_summary` (the dataset that supplies the denominator's
+    raw count). Without this alignment the two tiles disagree by ±1.
+    """
     raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
     if raw in ("7d", "7"):
         return corte - timedelta(days=6), corte

@@ -8,7 +8,7 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
           FROM hire_opportunity h
           JOIN opportunity o ON o.opportunity_id = h.opportunity_id
           WHERE lower(o.opp_model) LIKE 'recruiting%%'
-            AND NULLIF(h.start_date, '')::date >= (CURRENT_DATE - INTERVAL '30 days')
+            AND NULLIF(h.start_date, '')::date >= (CURRENT_DATE - INTERVAL '29 days')
         ),
         active_staffing AS (
           SELECT COUNT(DISTINCT h.candidate_id) AS c

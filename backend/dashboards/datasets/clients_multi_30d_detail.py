@@ -65,7 +65,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         periodos AS (
           SELECT
-            (%(corte)s::date - INTERVAL '30 days')::date AS period_start,
+            (%(corte)s::date - INTERVAL '29 days')::date AS period_start,
             %(corte)s::date                              AS period_end,
             TO_CHAR(%(corte)s::date, 'YYYY-MM-DD')       AS etiqueta
         ),

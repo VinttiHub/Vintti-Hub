@@ -40,7 +40,7 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
         last_prev = first_this - timedelta(days=1)
         first_prev = last_prev.replace(day=1)
         return first_prev, last_prev
-    return corte - timedelta(days=30), corte
+    return corte - timedelta(days=29), corte
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
