@@ -966,8 +966,11 @@
   function renderBarList(el, rows) {
     const nameField = el.dataset.barName || 'name';
     const valField = el.dataset.barValue || 'value';
+    const winField  = el.dataset.barWinValue;   // optional: split bar (wins segment)
+    const lostField = el.dataset.barLostValue;  // optional: split bar (losses segment)
     const limit = parseInt(el.dataset.barLimit || '10', 10);
     const colorByValue = el.dataset.barColorByValue === 'true';
+    const splitMode = !!(winField && lostField);
 
     if (!rows.length) {
       el.innerHTML = '<div class="muted" style="padding:12px;font-size:13px;text-align:center">No data</div>';
@@ -982,6 +985,31 @@
     el.innerHTML = sorted.map(r => {
       const v = +r[valField] || 0;
       const pct = (v / max) * 100;
+
+      if (splitMode) {
+        const wins = +r[winField]  || 0;
+        const lost = +r[lostField] || 0;
+        const winPct  = (wins / max) * 100;
+        const lostPct = (lost / max) * 100;
+        return `
+          <div class="bars__row">
+            <span class="bars__name">${esc(r[nameField] || '—')}</span>
+            <span class="bars__val">
+              ${esc(v)}
+              <span class="bars__split-meta">
+                <span class="bars__win">${wins} win</span>
+                ·
+                <span class="bars__lost">${lost} lost</span>
+              </span>
+            </span>
+            <span class="bars__bar bars__bar--split">
+              <span class="bars__bar-seg bars__bar-seg--win"  style="width:${winPct.toFixed(1)}%"></span>
+              <span class="bars__bar-seg bars__bar-seg--lost" style="width:${lostPct.toFixed(1)}%"></span>
+            </span>
+          </div>
+        `;
+      }
+
       let cls = '';
       if (colorByValue) {
         if (v >= max * 0.7) cls = 'mag';
@@ -1462,6 +1490,10 @@
         upsert(ym(r.mes), 'cand_churn', r.churn_real_pct);
       });
       (crr.rows || []).forEach(r => {
+        // The am_line_crr dataset (crr_history) names its fields with the
+        // expected UI convention: crr_pct = retention, grr_pct = growth.
+        // (The 30d-summary KPI tile has them swapped; that one is fixed in
+        // the HTML bindings, not here.)
         upsert(ym(r.mes), 'crr', r.crr_pct);
         upsert(ym(r.mes), 'grr', r.grr_pct);
       });

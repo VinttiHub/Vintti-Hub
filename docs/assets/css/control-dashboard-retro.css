@@ -1513,6 +1513,33 @@ body.is-loading .kpi-card::after {
 .bars__bar.amber  > span { background: #f5b94a; }
 .bars__bar.rose   > span { background: #f590ad; }
 
+/* Split bar (Close Win + Closed Lost segments side-by-side) */
+.bars__bar--split { display: flex; align-items: stretch; }
+.bars__bar--split > .bars__bar-seg {
+  position: static;
+  inset: auto;
+  height: 100%;
+  border-radius: 0;
+}
+.bars__bar--split > .bars__bar-seg--win  { background: var(--pos); }
+.bars__bar--split > .bars__bar-seg--lost { background: var(--neg); }
+.bars__bar--split > .bars__bar-seg:first-child {
+  border-top-left-radius: var(--radius-pill);
+  border-bottom-left-radius: var(--radius-pill);
+}
+.bars__bar--split > .bars__bar-seg:last-child {
+  border-top-right-radius: var(--radius-pill);
+  border-bottom-right-radius: var(--radius-pill);
+}
+.bars__split-meta {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+  margin-left: 8px;
+}
+.bars__win  { color: var(--pos); font-weight: 700; }
+.bars__lost { color: var(--neg); font-weight: 700; }
+
 /* ---------- RISK TABLE (rich detail per account) ---------- */
 .risk-table-wrap {
   max-height: 460px;
