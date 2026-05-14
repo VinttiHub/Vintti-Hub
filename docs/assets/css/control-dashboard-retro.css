@@ -2004,6 +2004,10 @@ body.is-loading .kpi-card::after {
   background: linear-gradient(135deg, #fff3cf, #ffe2c0);
   color: #8a5a14;
 }
+.skpi-header__avatar--oe {
+  background: linear-gradient(135deg, #e0eaff, #d5f0ff);
+  color: #1f4a8a;
+}
 .skpi-tile__sub {
   font-size: 11.5px;
   color: var(--ink-3);

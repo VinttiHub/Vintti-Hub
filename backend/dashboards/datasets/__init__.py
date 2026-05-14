@@ -111,6 +111,7 @@ from . import (
     pipeline_cr_minus_churn,
     sql_leads_windows,
     new_opps_am_windows,
+    sql_to_nda_30d,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -222,6 +223,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     pipeline_cr_minus_churn.DATASET["key"]: pipeline_cr_minus_churn.DATASET,
     sql_leads_windows.DATASET["key"]: sql_leads_windows.DATASET,
     new_opps_am_windows.DATASET["key"]: new_opps_am_windows.DATASET,
+    sql_to_nda_30d.DATASET["key"]: sql_to_nda_30d.DATASET,
 }
 
 

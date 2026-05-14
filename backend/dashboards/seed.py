@@ -199,6 +199,7 @@ RESET_CHART_KEYS = {
         "gr_kpi_pipeline_cr_minus_churn",
         "gr_kpi_sql_leads_windows",
         "gr_kpi_new_opps_am_windows",
+        "gr_kpi_sql_to_nda_30d",
     ],
 }
 
@@ -2301,6 +2302,16 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "opps_mtd", "label": "MTD", "formatter": "number"}},
         "position": {"x": 6, "y": 104, "w": 6, "h": 4},
         "sort_order": 450,
+    },
+    {
+        "chart_key": "gr_kpi_sql_to_nda_30d",
+        "tab_key": "growth",
+        "title": "SQL → NDA signed (Staffing) — 30d",
+        "type": "kpi",
+        "dataset_key": "sql_to_nda_30d",
+        "config": {"mapping": {"value": "sql_to_nda_pct", "label": "%", "formatter": "percent"}},
+        "position": {"x": 0, "y": 108, "w": 4, "h": 4},
+        "sort_order": 460,
     },
 ]
 
