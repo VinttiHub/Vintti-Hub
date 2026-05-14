@@ -1209,15 +1209,7 @@ decorateCandidateAssociations(card, candidate);
       const candidateId = card.getAttribute("data-candidate-id");
       const opportunityId = document.getElementById('opportunity-id-text').textContent.trim();
 
-      const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`);
-      const linkedOpportunities = await res.json();
-
-      let message = "Are you sure you want to delete this candidate from the pipeline?";
-      if (linkedOpportunities.length === 1 && linkedOpportunities[0].opportunity_id == opportunityId) {
-        message += "\n⚠️ This candidate is only linked to this opportunity. Deleting will remove them from the database.";
-      }
-
-      if (confirm(message)) {
+      if (confirm("Are you sure you want to remove this candidate from this pipeline?")) {
         const deleteRes = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates/${candidateId}`, {
           method: 'DELETE'
         });

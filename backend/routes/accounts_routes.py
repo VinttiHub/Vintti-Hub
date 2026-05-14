@@ -47,6 +47,7 @@ PAIN_POINT_NORMALIZATION = {
 LEAD_SOURCE_NORMALIZATION = {
     'seo': 'Website Organic',
     'website organic': 'Website Organic',
+    'event': 'Event',
     'linkedin - agus': 'Social Media',
     'linkedin': 'Social Media',
     'social media': 'Social Media',
@@ -2010,27 +2011,16 @@ def delete_candidate_from_pipeline(opportunity_id, candidate_id):
         conn = get_connection()
         cur = conn.cursor()
 
-        # ¿cuántas oportunidades tiene este candidato?
         cur.execute("""
-            SELECT COUNT(*) FROM opportunity_candidates
-            WHERE candidate_id = %s
-        """, (candidate_id,))
-        count = cur.fetchone()[0]
-
-        if count == 1:
-            # Borrar completamente al candidato
-            cur.execute("DELETE FROM candidates WHERE candidate_id = %s", (candidate_id,))
-        else:
-            # Solo eliminar relación
-            cur.execute("""
-                DELETE FROM opportunity_candidates
-                WHERE opportunity_id = %s AND candidate_id = %s
-            """, (opportunity_id, candidate_id))
+            DELETE FROM opportunity_candidates
+            WHERE opportunity_id = %s AND candidate_id = %s
+        """, (opportunity_id, candidate_id))
+        deleted = cur.rowcount
 
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({"success": True})
+        return jsonify({"success": True, "deleted": deleted})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
