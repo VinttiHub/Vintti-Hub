@@ -20,24 +20,24 @@ from utils.hubspot import (
 bp = Blueprint("hubspot", __name__)
 
 PAIN_POINT_NORMALIZATION = {
-    'na': 'NA',
-    'n/a': 'NA',
     'high salary': 'High salary',
     'no real pain point': 'No real pain point',
     'cultural': 'Cultural fit',
     'cultural fit': 'Cultural fit',
     'time zone': 'Time zone',
-    'knowledge': 'No Knowledge',
-    'no knowledge': 'No Knowledge',
-    'no time': 'No time to hire',
-    'no time to hire': 'No time to hire',
-    'slow hiring processes': 'Slow hiring processes',
-    'workload': 'Workload',
+    'knowledge': 'No knowledge/time to search',
+    'no knowledge': 'No knowledge/time to search',
+    'no time': 'No knowledge/time to search',
+    'no time to hire': 'No knowledge/time to search',
+    'slow hiring processes': 'No knowledge/time to search',
+    'workload': 'No knowledge/time to search',
+    'no knowledge/time to search': 'No knowledge/time to search',
 }
 
 LEAD_SOURCE_NORMALIZATION = {
     'seo': 'Website Organic',
     'website organic': 'Website Organic',
+    'event': 'Event',
     'linkedin - agus': 'Social Media',
     'linkedin': 'Social Media',
     'social media': 'Social Media',
@@ -95,6 +95,8 @@ def _ensure_hubspot_account_columns(cursor):
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_contact_id TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_synced_at TIMESTAMPTZ")
+    cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS lead_source_detail TEXT")
+    cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS conversion_channel TEXT")
     cursor.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_account_hubspot_deal_id
@@ -105,9 +107,29 @@ def _ensure_hubspot_account_columns(cursor):
 
 
 def _normalize_pain_point(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple, set)):
+        items = []
+        seen = set()
+        for item in value:
+            normalized = _normalize_pain_point(item)
+            if not normalized:
+                continue
+            for part in [segment.strip() for segment in str(normalized).split(',') if segment.strip()]:
+                key = part.lower()
+                if key not in seen:
+                    seen.add(key)
+                    items.append(part)
+        return ", ".join(items) if items else None
+
     raw = str(value or "").strip()
     if not raw:
         return None
+    if "," in raw:
+        parts = [segment.strip() for segment in raw.split(",") if segment.strip()]
+        if len(parts) > 1:
+            return _normalize_pain_point(parts)
     return PAIN_POINT_NORMALIZATION.get(raw.lower(), raw)
 
 
@@ -153,42 +175,65 @@ def _normalize_hubspot_label(value):
 
 
 HUBSPOT_ACCOUNT_FIELD_ALIASES = {
-    "client_name": [
-        "Nombre de la empresa / Company name",
-        "Company name",
-        "company",
-        "name",
-    ],
-    "type": ["Company Type", "company type"],
-    "industry": ["Industria", "Industry"],
-    "state": ["State/ Region / Estado o región", "State/Region / Estado o región", "State", "Region"],
-    "outsource": ["Outsourced before", "Outsource before"],
-    "size": ["Company size / Tamaño de la empresa", "Company size"],
-    "exact_size": ["Exact Company Size"],
-    "where_come_from": ["Origin", "Lead Source", "Lead source"],
-    "linkedin": ["URL de LinkedIn", "LinkedIn URL", "Linkedin URL"],
-    "model": ["Model"],
-    "pain_points": ["Pain Point (Deal)", "Pain Point", "Pain Points"],
+    "client_name": ["company", "Company"],
+    "contract": ["model", "Model"],
+    "linkedin": ["hs_linkedin_url", "LinkedIn URL"],
+    "mail": ["email", "Correo", "Email"],
+    "size": ["headcount", "Headcount"],
+    "state": ["state", "State/Region"],
+    "website": ["website", "URL del sitio web"],
+    "pain_points": ["pain_point", "Pain Point"],
+    "where_come_from": ["origin", "Origin"],
+    "referal_source": ["referred_by", "Referred by"],
+    "contact_name": ["firstname", "Nombre", "First Name"],
+    "contact_surname": ["lastname", "Apellidos", "Last Name"],
+    "industry": ["sector", "Industria"],
+    "outsource": ["outsourced_before", "Outsourced before"],
+    "position": ["position", "Position"],
+    "type": ["company_type", "Company Type"],
+    "lead_source_detail": ["origin_detail", "Origin detail"],
+    "conversion_channel": ["conversion_channel", "Conversion Channel"],
 }
+
+MEETING_DATE_TIME_ALIASES = [
+    "Meeting date & time",
+    "Meeting Date & Time",
+    "Meeting date and time",
+    "Meeting Date and Time",
+]
 
 
 def _resolve_property_map_for_object(client, object_type):
     props = client.get_properties(object_type)
     by_alias = {}
-    normalized_aliases = {
-        field: {_normalize_hubspot_label(alias) for alias in aliases}
-        for field, aliases in HUBSPOT_ACCOUNT_FIELD_ALIASES.items()
-    }
+    normalized_props = []
     for prop in props:
         name = prop.get("name") or ""
         label = prop.get("label") or ""
-        keys = {
-            _normalize_hubspot_label(name),
-            _normalize_hubspot_label(label),
-        }
-        for field, aliases in normalized_aliases.items():
-            if keys & aliases and field not in by_alias:
-                by_alias[field] = name
+        normalized_props.append(
+            {
+                "name": name,
+                "keys": {
+                    _normalize_hubspot_label(name),
+                    _normalize_hubspot_label(label),
+                },
+            }
+        )
+
+    for field, aliases in HUBSPOT_ACCOUNT_FIELD_ALIASES.items():
+        for alias in aliases:
+            normalized_alias = _normalize_hubspot_label(alias)
+            match = next(
+                (
+                    prop["name"]
+                    for prop in normalized_props
+                    if normalized_alias in prop["keys"]
+                ),
+                None,
+            )
+            if match:
+                by_alias[field] = match
+                break
     return by_alias
 
 
@@ -198,6 +243,24 @@ def _resolve_account_property_maps(client):
         "companies": _resolve_property_map_for_object(client, "companies"),
         "deals": _resolve_property_map_for_object(client, "deals"),
     }
+
+
+def _resolve_named_property(client, object_type, aliases):
+    normalized_aliases = {_normalize_hubspot_label(alias) for alias in aliases}
+    for prop in client.get_properties(object_type):
+        name = prop.get("name") or ""
+        label = prop.get("label") or ""
+        keys = {
+            _normalize_hubspot_label(name),
+            _normalize_hubspot_label(label),
+        }
+        if keys & normalized_aliases:
+            return name
+    return None
+
+
+def _resolve_meeting_datetime_property(client):
+    return _resolve_named_property(client, "contacts", MEETING_DATE_TIME_ALIASES)
 
 
 def _mapped_property_names(property_maps, object_type):
@@ -215,15 +278,9 @@ def _record_prop(record, prop_name):
 
 
 def _first_mapped_value(property_maps, field, contact=None, company=None, deal=None):
-    contact_value = _record_prop(contact, property_maps.get("contacts", {}).get(field))
-    if contact_value not in (None, ""):
-        return contact_value
-    company_value = _record_prop(company, property_maps.get("companies", {}).get(field))
-    if company_value not in (None, ""):
-        return company_value
-    deal_value = _record_prop(deal, property_maps.get("deals", {}).get(field))
-    if deal_value not in (None, ""):
-        return deal_value
+    value = _record_prop(contact, property_maps.get("contacts", {}).get(field))
+    if value not in (None, ""):
+        return value
     return ""
 
 
@@ -243,7 +300,11 @@ def _preview_account_fields(payload):
         "contact_name",
         "contact_surname",
         "where_come_from",
+        "lead_source_detail",
+        "conversion_channel",
+        "website",
         "linkedin",
+        "contract",
         "type",
         "industry",
         "state",
@@ -264,14 +325,23 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
     property_maps = property_maps or {}
     field_to_payload = {
         "client_name": "name",
+        "contract": "contract",
+        "mail": "mail",
+        "website": "website",
         "type": "type",
         "industry": "industry",
         "state": "state",
         "outsource": "outsource",
         "size": "size",
         "where_come_from": "where_come_from",
+        "referal_source": "referal_source",
+        "contact_name": "contact_name",
+        "contact_surname": "contact_surname",
+        "lead_source_detail": "lead_source_detail",
+        "conversion_channel": "conversion_channel",
         "linkedin": "linkedin",
         "pain_points": "pain_points",
+        "position": "position",
     }
     for field, payload_key in field_to_payload.items():
         value = _first_mapped_value(property_maps, field, contact=contact, company=company, deal=deal)
@@ -281,12 +351,6 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
     payload["pain_points"] = _normalize_pain_point(payload.get("pain_points"))
     payload["where_come_from"] = _normalize_lead_source(payload.get("where_come_from"))
 
-    exact_size = _first_mapped_value(property_maps, "exact_size", contact=contact, company=company, deal=deal)
-    if exact_size and not payload.get("size"):
-        payload["size"] = str(exact_size)
-
-    model = _first_mapped_value(property_maps, "model", contact=contact, company=company, deal=deal)
-    _append_comment_line(payload, "HubSpot model", model)
     return payload
 
 
@@ -559,13 +623,53 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
     cursor.execute(
         """
         UPDATE account
-        SET hubspot_deal_id = COALESCE(NULLIF(hubspot_deal_id, ''), NULLIF(%s, '')),
+        SET size = COALESCE(size, %s),
+            timezone = COALESCE(NULLIF(timezone, ''), NULLIF(%s, '')),
+            state = COALESCE(NULLIF(state, ''), NULLIF(%s, '')),
+            website = COALESCE(NULLIF(website, ''), NULLIF(%s, '')),
+            linkedin = COALESCE(NULLIF(linkedin, ''), NULLIF(%s, '')),
+            comments = COALESCE(NULLIF(comments, ''), NULLIF(%s, '')),
+            mail = COALESCE(NULLIF(mail, ''), NULLIF(%s, '')),
+            where_come_from = COALESCE(NULLIF(where_come_from, ''), NULLIF(%s, '')),
+            lead_source_detail = COALESCE(NULLIF(lead_source_detail, ''), NULLIF(%s, '')),
+            conversion_channel = COALESCE(NULLIF(conversion_channel, ''), NULLIF(%s, '')),
+            referal_source = COALESCE(NULLIF(referal_source, ''), NULLIF(%s, '')),
+            industry = COALESCE(NULLIF(industry, ''), NULLIF(%s, '')),
+            outsource = COALESCE(NULLIF(outsource, ''), NULLIF(%s, '')),
+            pain_points = COALESCE(NULLIF(pain_points, ''), NULLIF(%s, '')),
+            contract = COALESCE(NULLIF(contract, ''), NULLIF(%s, '')),
+            position = COALESCE(NULLIF(position, ''), NULLIF(%s, '')),
+            type = COALESCE(NULLIF(type, ''), NULLIF(%s, '')),
+            name = COALESCE(NULLIF(name, ''), NULLIF(%s, '')),
+            surname = COALESCE(NULLIF(surname, ''), NULLIF(%s, '')),
+            account_manager = COALESCE(NULLIF(account_manager, ''), NULLIF(%s, '')),
+            hubspot_deal_id = COALESCE(NULLIF(hubspot_deal_id, ''), NULLIF(%s, '')),
             hubspot_company_id = COALESCE(NULLIF(hubspot_company_id, ''), NULLIF(%s, '')),
             hubspot_contact_id = COALESCE(NULLIF(hubspot_contact_id, ''), NULLIF(%s, '')),
             hubspot_synced_at = %s
         WHERE account_id = %s
         """,
         (
+            payload.get("size"),
+            payload.get("timezone"),
+            payload.get("state"),
+            payload.get("website"),
+            payload.get("linkedin"),
+            payload.get("about"),
+            payload.get("mail"),
+            _normalize_lead_source(payload.get("where_come_from")) or "HubSpot",
+            payload.get("lead_source_detail"),
+            payload.get("conversion_channel"),
+            payload.get("referal_source"),
+            payload.get("industry"),
+            _normalize_outsource_value(payload.get("outsource")),
+            payload.get("pain_points"),
+            payload.get("contract"),
+            payload.get("position"),
+            payload.get("type") or "NA",
+            payload.get("contact_name"),
+            payload.get("contact_surname"),
+            payload.get("account_manager") or DEFAULT_MARIANO_EMAIL,
             payload.get("hubspot_deal_id"),
             payload.get("hubspot_company_id"),
             payload.get("hubspot_contact_id"),
@@ -596,7 +700,7 @@ def _normalize_preview_row(deal, payload, existing, lead_life_property=None):
     }
 
 
-def _normalize_contact_preview_row(contact, deal, payload, existing, lead_life_property):
+def _normalize_contact_preview_row(contact, deal, payload, existing, lead_life_property, meeting_datetime_property=None):
     contact_props = contact.get("properties") or {}
     deal_props = (deal or {}).get("properties") or {}
     client_name = payload.get("name")
@@ -625,6 +729,8 @@ def _normalize_contact_preview_row(contact, deal, payload, existing, lead_life_p
         "dealname": deal_props.get("dealname"),
         "dealstage": deal_props.get("dealstage"),
         "pipeline": deal_props.get("pipeline"),
+        "meeting_datetime_property": meeting_datetime_property,
+        "meeting_datetime": contact_props.get(meeting_datetime_property) if meeting_datetime_property else None,
         "lead_life_property": lead_life_property,
         "lead_life": contact_props.get(lead_life_property),
         "existing_account": existing,
@@ -655,7 +761,16 @@ def preview_mariano_sql_contacts():
 
         client = HubSpotClient()
         property_maps = _resolve_account_property_maps(client)
-        contact_extra_properties = [lead_life_property] + _mapped_property_names(property_maps, "contacts")
+        meeting_datetime_property = (
+            request.args.get("meeting_datetime_property")
+            or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+            or _resolve_meeting_datetime_property(client)
+            or ""
+        ).strip()
+        if not meeting_datetime_property:
+            raise HubSpotError("Could not resolve HubSpot meeting date & time property on contacts")
+
+        contact_extra_properties = [lead_life_property, meeting_datetime_property] + _mapped_property_names(property_maps, "contacts")
         company_extra_properties = _mapped_property_names(property_maps, "companies")
         deal_extra_properties = _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
@@ -663,6 +778,7 @@ def preview_mariano_sql_contacts():
             [
                 {"propertyName": "hubspot_owner_id", "operator": "EQ", "value": str(owner_id)},
                 {"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value},
+                {"propertyName": meeting_datetime_property, "operator": "HAS_PROPERTY"},
             ],
             extra_properties=contact_extra_properties,
         )
@@ -704,6 +820,7 @@ def preview_mariano_sql_contacts():
                             payload,
                             existing,
                             lead_life_property,
+                            meeting_datetime_property,
                         ))
         finally:
             conn.close()
@@ -712,6 +829,7 @@ def preview_mariano_sql_contacts():
             "success": True,
             "owner_email": owner_email,
             "owner_id": owner_id,
+            "meeting_datetime_property": meeting_datetime_property,
             "lead_life_property": lead_life_property,
             "lead_life_value": lead_life_value,
             "property_maps": property_maps,
@@ -764,7 +882,16 @@ def sync_mariano_sql_contacts():
 
         client = HubSpotClient()
         property_maps = _resolve_account_property_maps(client)
-        contact_extra_properties = [lead_life_property] + _mapped_property_names(property_maps, "contacts")
+        meeting_datetime_property = (
+            body.get("meeting_datetime_property")
+            or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+            or _resolve_meeting_datetime_property(client)
+            or ""
+        ).strip()
+        if not meeting_datetime_property:
+            raise HubSpotError("Could not resolve HubSpot meeting date & time property on contacts")
+
+        contact_extra_properties = [lead_life_property, meeting_datetime_property] + _mapped_property_names(property_maps, "contacts")
         company_extra_properties = _mapped_property_names(property_maps, "companies")
         deal_extra_properties = _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
@@ -772,6 +899,7 @@ def sync_mariano_sql_contacts():
             [
                 {"propertyName": "hubspot_owner_id", "operator": "EQ", "value": str(owner_id)},
                 {"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value},
+                {"propertyName": meeting_datetime_property, "operator": "HAS_PROPERTY"},
             ],
             extra_properties=contact_extra_properties,
         )
@@ -826,6 +954,7 @@ def sync_mariano_sql_contacts():
                                 "action": action,
                                 "client_name": payload.get("name"),
                                 "contact_email": contact_props.get("email"),
+                                "meeting_datetime": contact_props.get(meeting_datetime_property),
                                 "lead_life": contact_props.get(lead_life_property),
                             })
                         except Exception as exc:
@@ -838,6 +967,7 @@ def sync_mariano_sql_contacts():
             "success": True,
             "owner_email": owner_email,
             "owner_id": owner_id,
+            "meeting_datetime_property": meeting_datetime_property,
             "lead_life_property": lead_life_property,
             "lead_life_value": lead_life_value,
             "property_maps": property_maps,
@@ -1033,10 +1163,13 @@ def _insert_or_update_account(cursor, payload):
         "comments": payload.get("about"),
         "mail": payload.get("mail"),
         "where_come_from": _normalize_lead_source(payload.get("where_come_from")) or "HubSpot",
+        "lead_source_detail": payload.get("lead_source_detail"),
+        "conversion_channel": payload.get("conversion_channel"),
         "referal_source": payload.get("referal_source"),
         "industry": payload.get("industry"),
         "outsource": _normalize_outsource_value(payload.get("outsource")),
         "pain_points": payload.get("pain_points"),
+        "contract": payload.get("contract"),
         "position": payload.get("position"),
         "type": payload.get("type") or "NA",
         "name": payload.get("contact_name"),
@@ -1061,10 +1194,13 @@ def _insert_or_update_account(cursor, payload):
                 comments = COALESCE(NULLIF(%(comments)s, ''), comments),
                 mail = COALESCE(NULLIF(%(mail)s, ''), mail),
                 where_come_from = COALESCE(NULLIF(%(where_come_from)s, ''), where_come_from),
+                lead_source_detail = COALESCE(NULLIF(%(lead_source_detail)s, ''), lead_source_detail),
+                conversion_channel = COALESCE(NULLIF(%(conversion_channel)s, ''), conversion_channel),
                 referal_source = COALESCE(NULLIF(%(referal_source)s, ''), referal_source),
                 industry = COALESCE(NULLIF(%(industry)s, ''), industry),
                 outsource = COALESCE(%(outsource)s, outsource),
                 pain_points = COALESCE(NULLIF(%(pain_points)s, ''), pain_points),
+                contract = COALESCE(NULLIF(%(contract)s, ''), contract),
                 position = COALESCE(NULLIF(%(position)s, ''), position),
                 type = COALESCE(NULLIF(%(type)s, ''), type),
                 name = COALESCE(NULLIF(%(name)s, ''), name),
@@ -1085,15 +1221,15 @@ def _insert_or_update_account(cursor, payload):
         INSERT INTO account (
             client_name, size, timezone, state,
             website, linkedin, comments, mail,
-            where_come_from, referal_source,
-            industry, outsource, pain_points, position, type,
+            where_come_from, lead_source_detail, conversion_channel, referal_source,
+            industry, outsource, pain_points, contract, position, type,
             name, surname, account_manager,
             hubspot_deal_id, hubspot_company_id, hubspot_contact_id, hubspot_synced_at
         ) VALUES (
             %(client_name)s, %(size)s, %(timezone)s, %(state)s,
             %(website)s, %(linkedin)s, %(comments)s, %(mail)s,
-            %(where_come_from)s, %(referal_source)s,
-            %(industry)s, %(outsource)s, %(pain_points)s, %(position)s, %(type)s,
+            %(where_come_from)s, %(lead_source_detail)s, %(conversion_channel)s, %(referal_source)s,
+            %(industry)s, %(outsource)s, %(pain_points)s, %(contract)s, %(position)s, %(type)s,
             %(name)s, %(surname)s, %(account_manager)s,
             %(hubspot_deal_id)s, %(hubspot_company_id)s, %(hubspot_contact_id)s, %(hubspot_synced_at)s
         )

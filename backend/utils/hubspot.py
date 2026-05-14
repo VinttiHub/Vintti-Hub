@@ -304,6 +304,8 @@ def build_account_payload(deal, company=None, contact=None, owner_email=DEFAULT_
         "about": "\n".join(notes),
         "mail": contact_props.get("email") or "",
         "where_come_from": "HubSpot",
+        "lead_source_detail": "",
+        "conversion_channel": "",
         "referal_source": None,
         "industry": company_props.get("industry") or "",
         "outsource": None,
