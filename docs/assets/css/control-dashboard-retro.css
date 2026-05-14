@@ -67,7 +67,7 @@ body {
   font-feature-settings: "ss01", "ss02";
   font-weight: 400;
   color: var(--ink);
-  background: var(--bg);
+  background: linear-gradient(135deg, #faecf5 0%, #f1eaf8 30%, #e8edf7 60%, #ebf3ec 100%) fixed;
   line-height: 1.4;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -1497,6 +1497,14 @@ body.is-loading .kpi-card::after {
   font-size: 13px;
 }
 .bars__name { color: var(--ink-2); font-weight: 500; }
+.bars__name-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
 .bars__val  { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .bars__bar {
   grid-column: 1 / -1;
@@ -2008,6 +2016,7 @@ body.is-loading .kpi-card::after {
   background: linear-gradient(135deg, #e0eaff, #d5f0ff);
   color: #1f4a8a;
 }
+
 .skpi-tile__sub {
   font-size: 11.5px;
   color: var(--ink-3);
