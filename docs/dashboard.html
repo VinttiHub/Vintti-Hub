@@ -2168,13 +2168,13 @@
           </div>
           <div>
             <div class="hero-kpi__value"
-                 data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                 data-chart="sa_kpi_nda_to_sourcing" data-bind="text"
                  data-field="nda_sent_to_sourcing_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
-              <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+              <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text"
                     data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> /
-              <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                    data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text"
+                    data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> opps (NDA signed last 30d)
             </div>
           </div>
         </div>
@@ -2229,7 +2229,9 @@
         <div class="chart" style="position:relative;height:200px">
           <svg data-chart="sa_line_sql_to_nda_overall" data-bind="line"
                data-x="mes" data-y="sql_to_nda_sent_pct" data-color="violet"
-               data-fmt-y="percent" viewBox="0 0 720 200" preserveAspectRatio="none"
+               data-fmt-y="percent"
+               data-tooltip-extras="sql_count|Accounts created|int,nda_sent_count|NDA signed|int"
+               viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="720" y2="40"/>
@@ -2255,13 +2257,15 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">NDA Sent → Sourcing · monthly</h3>
-            <p class="card__sub">Conversión mensual</p>
+            <p class="card__sub">Cohort por mes (NDA signed) — % de opps que pasaron a Sourcing</p>
           </div>
         </div>
         <div class="chart" style="position:relative;height:200px">
-          <svg data-chart="sa_line_sales_funnel" data-bind="line"
+          <svg data-chart="sa_line_nda_to_sourcing" data-bind="line"
                data-x="mes" data-y="nda_sent_to_sourcing_pct" data-color="lime"
-               data-fmt-y="percent" viewBox="0 0 720 200" preserveAspectRatio="none"
+               data-fmt-y="percent"
+               data-tooltip-extras="nda_sent_count|NDAs signed|int,sourcing_count|Moved to Sourcing|int"
+               viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="720" y2="40"/>

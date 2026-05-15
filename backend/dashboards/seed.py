@@ -79,6 +79,8 @@ RETIRED_CHART_KEYS = {
         "sa_table_sales_funnel_month_detail",
         "sa_kpi_sql_to_nda_overall",
         "sa_line_sql_to_nda_overall",
+        "sa_kpi_nda_to_sourcing",
+        "sa_line_nda_to_sourcing",
     ],
 }
 
@@ -2367,6 +2369,26 @@ MAIN_CHARTS = [
         "config": {"mapping": {"x": "mes", "y": ["sql_to_nda_sent_pct"], "formatter": "percent"}},
         "position": {"x": 0, "y": 22, "w": 6, "h": 6},
         "sort_order": 510,
+    },
+    {
+        "chart_key": "sa_kpi_nda_to_sourcing",
+        "tab_key": "sales",
+        "title": "NDA Sent → Sourcing · cohort (30d)",
+        "type": "kpi",
+        "dataset_key": "nda_to_sourcing_snapshot",
+        "config": {"mapping": {"value": "nda_sent_to_sourcing_pct", "label": "%", "formatter": "percent"}},
+        "position": {"x": 3, "y": 18, "w": 3, "h": 4},
+        "sort_order": 520,
+    },
+    {
+        "chart_key": "sa_line_nda_to_sourcing",
+        "tab_key": "sales",
+        "title": "NDA Sent → Sourcing · cohort monthly",
+        "type": "line",
+        "dataset_key": "nda_to_sourcing_history",
+        "config": {"mapping": {"x": "mes", "y": ["nda_sent_to_sourcing_pct"], "formatter": "percent"}},
+        "position": {"x": 6, "y": 22, "w": 6, "h": 6},
+        "sort_order": 530,
     },
 ]
 

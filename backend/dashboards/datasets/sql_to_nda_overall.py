@@ -1,17 +1,29 @@
-"""SQL → NDA Sent · cohort by account.creation_date.
+"""SQL → NDA Sent · cohort by account.creation_date, filtered to Mariano + Bahia.
 
 Definition (per user 2026-05-15):
-  - For each month M, cohort = accounts with `creation_date` in M.
-  - Of those cohort accounts, how many have an associated opportunity
-    with `nda_signature_or_start_date` populated (at any point in time).
+  - Cohort:    accounts whose `creation_date` falls in the period AND that
+               have at least one opportunity with `opp_sales_lead` in
+               (Mariano, Bahia). Accounts with no AE opp are excluded.
+  - Numerator: subset of the cohort whose AE opportunity has
+               `nda_signature_or_start_date` populated.
   - % = NDA-signed cohort / total cohort.
 
-Snapshot (30d): cohort = accounts with creation_date in last 30 days.
-Monthly history: each month is its own cohort (NOT cumulative).
+Snapshot: cohort = accounts created in the last 30 days.
+Monthly history: each month M is an independent cohort.
 """
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta
+
+
+SALES_LEADS_DEFAULT = ("mariano@vintti.com", "bahia@vintti.com")
+
+
+def _sales_leads() -> list[str]:
+    raw = os.environ.get("DASHBOARD_SALES_AES", "")
+    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    return parts or list(SALES_LEADS_DEFAULT)
 
 
 def _parse_date(value):
@@ -43,18 +55,26 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH ventana AS (
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
+        ae_accounts AS (
+          SELECT DISTINCT o.account_id
+          FROM opportunity o
+          WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
+            AND o.account_id IS NOT NULL
+        ),
         cohort AS (
           SELECT a.account_id
           FROM account a
           CROSS JOIN ventana v
           WHERE a.creation_date IS NOT NULL
             AND a.creation_date::date BETWEEN v.win_ini AND v.win_fin
+            AND a.account_id IN (SELECT account_id FROM ae_accounts)
         ),
         accounts_with_nda AS (
-          SELECT DISTINCT account_id
-          FROM opportunity
-          WHERE NULLIF(nda_signature_or_start_date::text, '') IS NOT NULL
-            AND account_id IS NOT NULL
+          SELECT DISTINCT o.account_id
+          FROM opportunity o
+          WHERE NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
+            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
+            AND o.account_id IS NOT NULL
         )
         SELECT
           (SELECT win_ini FROM ventana)                                  AS ventana_desde,
@@ -73,16 +93,23 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             END, 2
           )::float                                                       AS sql_to_nda_sent_pct;
     """
-    return sql, {"win_ini": win_ini, "win_fin": corte}
+    return sql, {"win_ini": win_ini, "win_fin": corte, "sales_leads": _sales_leads()}
 
 
 def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = """
-        WITH accounts_with_nda AS (
-          SELECT DISTINCT account_id
-          FROM opportunity
-          WHERE NULLIF(nda_signature_or_start_date::text, '') IS NOT NULL
-            AND account_id IS NOT NULL
+        WITH ae_accounts AS (
+          SELECT DISTINCT o.account_id
+          FROM opportunity o
+          WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
+            AND o.account_id IS NOT NULL
+        ),
+        accounts_with_nda AS (
+          SELECT DISTINCT o.account_id
+          FROM opportunity o
+          WHERE NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
+            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
+            AND o.account_id IS NOT NULL
         ),
         cohort AS (
           SELECT
@@ -90,6 +117,7 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             DATE_TRUNC('month', a.creation_date)::date AS mes
           FROM account a
           WHERE a.creation_date IS NOT NULL
+            AND a.account_id IN (SELECT account_id FROM ae_accounts)
         ),
         bounds AS (
           SELECT
@@ -121,18 +149,18 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM meses m
         ORDER BY m.mes;
     """
-    return sql, {}
+    return sql, {"sales_leads": _sales_leads()}
 
 
 SNAPSHOT_DATASET = {
     "key": "sql_to_nda_overall_snapshot",
-    "label": "SQL → NDA Sent · cohort (accounts created in last 30d)",
+    "label": "SQL → NDA Sent · cohort 30d (Mariano + Bahia)",
     "dimensions": [
         {"key": "ventana_desde", "label": "Inicio ventana", "type": "date"},
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "sql_count", "label": "Accounts created (30d)", "type": "number"},
+        {"key": "sql_count", "label": "Accounts created (30d, M+B)", "type": "number"},
         {"key": "nda_sent_count", "label": "Of those, signed NDA", "type": "number"},
         {"key": "sql_to_nda_sent_pct", "label": "% SQL → NDA Sent", "type": "percent"},
     ],
@@ -142,12 +170,12 @@ SNAPSHOT_DATASET = {
 
 HISTORY_DATASET = {
     "key": "sql_to_nda_overall_history",
-    "label": "SQL → NDA Sent · cohort by month (creation_date)",
+    "label": "SQL → NDA Sent · cohort by month (Mariano + Bahia)",
     "dimensions": [
         {"key": "mes", "label": "Mes (creation_date)", "type": "date"},
     ],
     "measures": [
-        {"key": "sql_count", "label": "Accounts created in month", "type": "number"},
+        {"key": "sql_count", "label": "Accounts created in month (M+B)", "type": "number"},
         {"key": "nda_sent_count", "label": "Of those, signed NDA", "type": "number"},
         {"key": "sql_to_nda_sent_pct", "label": "% SQL → NDA Sent", "type": "percent"},
     ],
