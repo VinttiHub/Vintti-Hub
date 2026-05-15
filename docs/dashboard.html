@@ -2191,9 +2191,9 @@
                  data-field="sourcing_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
               <span data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
+                    data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> /
               <span data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                    data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> opps (sourcing last 30d)
+                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> CW con sourcing (closed 30d)
             </div>
           </div>
         </div>
@@ -2291,14 +2291,14 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">Sourcing → Close Win · monthly</h3>
-            <p class="card__sub">Cohort por mes (since_sourcing) — % de opps que cerraron Win</p>
+            <p class="card__sub">Por mes de cierre (opp_close_date) — % de Close Wins que pasaron por sourcing</p>
           </div>
         </div>
         <div class="chart" style="position:relative;height:200px">
           <svg data-chart="sa_line_sourcing_to_close_win" data-bind="line"
                data-x="mes" data-y="sourcing_to_close_win_pct" data-color="cyan"
                data-fmt-y="percent"
-               data-tooltip-extras="sourcing_count|Sourcing entries|int,close_win_count|Close Win|int"
+               data-tooltip-extras="close_win_count|Close Wins (closed)|int,sourcing_count|Of those, with sourcing|int,closed_lost_count|Closed Lost|int"
                viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%">
             <g class="chart-grid">
