@@ -2133,84 +2133,166 @@
   <section class="channel" data-channel="sales">
     <div class="grid">
 
-      <!-- Sales funnel · Mariano + Bahia (snapshot) -->
-      <div class="card s-12">
-        <div class="card__head">
-          <div>
-            <h3 class="card__title">Sales funnel · Mariano + Bahia</h3>
-            <p class="card__sub">SQL → NDA Sent → Sourcing → Close Win (snapshot del pipeline actual)</p>
-          </div>
-          <span class="callout callout--soft">
-            <span style="color:#0e1117;font-weight:700"
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                  data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</span>
-            · SQL → CW
-          </span>
+      <!-- Sales funnel · Mariano + Bahia · 4 flippable cards (monthly chart + 30d + detail) -->
+      <div class="section s-12">
+        <div>
+          <h2>Sales funnel · Mariano + Bahia</h2>
+          <p>SQL → NDA Sent → Sourcing → Close Win. Cada card muestra la conversión mensual; voltear para ver el detalle del último mes.</p>
         </div>
-        <div class="bars" style="margin-top:14px">
-          <div class="bars__row">
-            <span class="bars__name">SQL → NDA Sent
-              <span class="bars__name-sub">
+      </div>
+
+      <!-- Card 1 · SQL → NDA Sent -->
+      <div class="hero-kpi is-flippable s-3" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">SQL → NDA Sent</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value"
+                   data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                   data-field="sql_to_nda_sent_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
                 <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> NDA sent ·
+                      data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> /
                 <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL
-              </span>
-            </span>
-            <span class="bars__val"
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                  data-field="sql_to_nda_sent_pct" data-reduce="first" data-fmt="percent">—</span>
-            <span class="bars__bar violet"><span
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="progress-fill"
-                  data-field="sql_to_nda_sent_pct" data-reduce="first"></span></span>
+                      data-field="sql_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              </div>
+            </div>
+            <div class="chart" style="height:60px;margin-top:auto">
+              <svg data-chart="sa_line_sales_funnel" data-bind="line"
+                   data-x="mes" data-y="sql_to_nda_sent_pct" data-color="violet"
+                   data-fmt-y="percent" viewBox="0 0 240 60" preserveAspectRatio="none"
+                   style="width:100%;height:100%"></svg>
+            </div>
           </div>
-          <div class="bars__row">
-            <span class="bars__name">NDA Sent → Sourcing
-              <span class="bars__name-sub">
-                <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> sourcing ·
-                <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> NDA sent
-              </span>
-            </span>
-            <span class="bars__val"
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                  data-field="nda_sent_to_sourcing_pct" data-reduce="first" data-fmt="percent">—</span>
-            <span class="bars__bar lime"><span
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="progress-fill"
-                  data-field="nda_sent_to_sourcing_pct" data-reduce="first"></span></span>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>SQL → NDA Sent · detail</h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist"
+                 data-chart="sa_table_sales_funnel_month_detail" data-override-stage_min="nda_sent" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="opp_date" data-limit="50"></div>
           </div>
-          <div class="bars__row">
-            <span class="bars__name">Sourcing → Close Win
-              <span class="bars__name-sub">
+        </div>
+      </div>
+
+      <!-- Card 2 · NDA Sent → Sourcing -->
+      <div class="hero-kpi is-flippable s-3" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">NDA Sent → Sourcing</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value"
+                   data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                   data-field="nda_sent_to_sourcing_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
                 <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> CW ·
+                      data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> /
                 <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> sourcing
-              </span>
-            </span>
-            <span class="bars__val"
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                  data-field="sourcing_to_close_win_pct" data-reduce="first" data-fmt="percent">—</span>
-            <span class="bars__bar cyan"><span
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="progress-fill"
-                  data-field="sourcing_to_close_win_pct" data-reduce="first"></span></span>
+                      data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              </div>
+            </div>
+            <div class="chart" style="height:60px;margin-top:auto">
+              <svg data-chart="sa_line_sales_funnel" data-bind="line"
+                   data-x="mes" data-y="nda_sent_to_sourcing_pct" data-color="lime"
+                   data-fmt-y="percent" viewBox="0 0 240 60" preserveAspectRatio="none"
+                   style="width:100%;height:100%"></svg>
+            </div>
           </div>
-          <div class="bars__row">
-            <span class="bars__name">SQL → Close Win
-              <span class="bars__name-sub">
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>NDA Sent → Sourcing · detail</h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist"
+                 data-chart="sa_table_sales_funnel_month_detail" data-override-stage_min="sourcing" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="opp_date" data-limit="50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 · Sourcing → Close Win -->
+      <div class="hero-kpi is-flippable s-3" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">Sourcing → Close Win</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value"
+                   data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                   data-field="sourcing_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
                 <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> CW ·
+                      data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
                 <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                      data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL
-              </span>
-            </span>
-            <span class="bars__val"
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                  data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</span>
-            <span class="bars__bar mag"><span
-                  data-chart="sa_kpi_sales_funnel_snapshot" data-bind="progress-fill"
-                  data-field="sql_to_close_win_pct" data-reduce="first"></span></span>
+                      data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              </div>
+            </div>
+            <div class="chart" style="height:60px;margin-top:auto">
+              <svg data-chart="sa_line_sales_funnel" data-bind="line"
+                   data-x="mes" data-y="sourcing_to_close_win_pct" data-color="cyan"
+                   data-fmt-y="percent" viewBox="0 0 240 60" preserveAspectRatio="none"
+                   style="width:100%;height:100%"></svg>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>Sourcing → Close Win · detail</h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist"
+                 data-chart="sa_table_sales_funnel_month_detail" data-override-stage_min="close_win" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="close_d" data-limit="50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4 · SQL → Close Win -->
+      <div class="hero-kpi is-flippable s-3" data-flip-card>
+        <div class="hero-kpi__inner">
+          <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
+            <div class="hero-kpi__head">
+              <div class="hero-kpi__title">SQL → Close Win</div>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+            </div>
+            <div>
+              <div class="hero-kpi__value"
+                   data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                   data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
+              <div class="hero-kpi__label">
+                <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                      data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
+                <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                      data-field="sql_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              </div>
+            </div>
+            <div class="chart" style="height:60px;margin-top:auto">
+              <svg data-chart="sa_line_sales_funnel" data-bind="line"
+                   data-x="mes" data-y="sql_to_close_win_pct" data-color="magenta"
+                   data-fmt-y="percent" viewBox="0 0 240 60" preserveAspectRatio="none"
+                   style="width:100%;height:100%"></svg>
+            </div>
+          </div>
+          <div class="hero-kpi__face hero-kpi__face--back">
+            <div class="hero-kpi__back-head">
+              <h4>SQL → Close Win · detail</h4>
+              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+            </div>
+            <div class="dlist"
+                 data-chart="sa_table_sales_funnel_month_detail" data-override-stage_min="close_win" data-bind="list"
+                 data-list-name="opp_position_name" data-list-sub="client_name"
+                 data-list-date="close_d" data-limit="50"></div>
           </div>
         </div>
       </div>

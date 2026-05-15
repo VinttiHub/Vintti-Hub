@@ -113,6 +113,8 @@ from . import (
     new_opps_am_windows,
     sql_to_nda_30d,
     sales_funnel_30d,
+    sales_funnel_history,
+    sales_funnel_month_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -226,6 +228,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     new_opps_am_windows.DATASET["key"]: new_opps_am_windows.DATASET,
     sql_to_nda_30d.DATASET["key"]: sql_to_nda_30d.DATASET,
     sales_funnel_30d.DATASET["key"]: sales_funnel_30d.DATASET,
+    sales_funnel_history.DATASET["key"]: sales_funnel_history.DATASET,
+    sales_funnel_month_detail.DATASET["key"]: sales_funnel_month_detail.DATASET,
 }
 
 

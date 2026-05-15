@@ -75,6 +75,8 @@ RETIRED_CHART_KEYS = {
         "sa_kpi_nda_close_win_30d_breakdown",
         "sa_table_nda_close_win_30d_detail",
         "sa_kpi_sales_funnel_snapshot",
+        "sa_line_sales_funnel",
+        "sa_table_sales_funnel_month_detail",
     ],
 }
 
@@ -2323,6 +2325,26 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "sql_to_close_win_pct", "label": "%", "formatter": "percent"}},
         "position": {"x": 0, "y": 0, "w": 6, "h": 6},
         "sort_order": 470,
+    },
+    {
+        "chart_key": "sa_line_sales_funnel",
+        "tab_key": "sales",
+        "title": "Sales funnel — monthly conversions (Mariano + Bahia)",
+        "type": "line",
+        "dataset_key": "sales_funnel_history",
+        "config": {"mapping": {"x": "mes", "y": ["sql_to_close_win_pct"], "formatter": "percent"}},
+        "position": {"x": 0, "y": 6, "w": 12, "h": 6},
+        "sort_order": 480,
+    },
+    {
+        "chart_key": "sa_table_sales_funnel_month_detail",
+        "tab_key": "sales",
+        "title": "Sales funnel — opps en el mes (detail)",
+        "type": "table",
+        "dataset_key": "sales_funnel_month_detail",
+        "config": {"mapping": {"columns": ["opp_position_name", "client_name", "opp_stage", "opp_date"]}},
+        "position": {"x": 0, "y": 12, "w": 12, "h": 6},
+        "sort_order": 490,
     },
 ]
 
