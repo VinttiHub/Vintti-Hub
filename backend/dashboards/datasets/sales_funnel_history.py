@@ -1,16 +1,43 @@
 """Sales funnel — monthly history of conversion rates (Mariano + Bahia).
 
-For each month in [min_opp_date, today], counts how many of the AEs' opps
-were active in that month (by `COALESCE(nda_signed, close_d)` proxy) and
-how many made it past each funnel stage. Returns the 4 conversion %s per
-month so the front of the flippable cards can render a line chart.
+Hybrid source per month:
+  - SQL:        HubSpot contacts with `lead_life='SQL (AE)'`, owned by
+                Mariano or Bahia, bucketed by `createdate` month.
+  - NDA Sent / Sourcing / Close Win: local `opportunity` table per month.
+
+Returns 4 conversion %s per month so each chart can render its own line.
 """
 from __future__ import annotations
 
+import logging
 import os
+import threading
+from datetime import date, datetime
+from typing import Any
 
+log = logging.getLogger(__name__)
 
 SALES_LEADS_DEFAULT = ("mariano@vintti.com", "bahia@vintti.com")
+
+_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
+_CACHE_LOCK = threading.Lock()
+_CACHE_TTL_SECONDS = 300
+
+
+def _parse_hubspot_date(raw: Any) -> date | None:
+    if raw in (None, ""):
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(s[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _sales_leads() -> list[str]:
@@ -19,7 +46,74 @@ def _sales_leads() -> list[str]:
     return parts or list(SALES_LEADS_DEFAULT)
 
 
+def _fetch_sql_by_month(owner_emails: list[str]) -> dict[str, int]:
+    """Returns {'YYYY-MM-01': count, ...} for the entire HubSpot SQL history
+    owned by the given emails, bucketed by createdate month."""
+    cache_key = f"hist__{'+'.join(owner_emails)}"
+    now = datetime.utcnow().timestamp()
+    with _CACHE_LOCK:
+        cached = _CACHE.get(cache_key)
+        if cached and (now - cached[0]) < _CACHE_TTL_SECONDS:
+            return cached[1]
+
+    counts: dict[str, int] = {}
+    try:
+        from backend.utils.hubspot import HubSpotClient  # type: ignore
+    except ImportError:
+        try:
+            from utils.hubspot import HubSpotClient  # type: ignore
+        except ImportError:
+            log.warning("HubSpotClient unavailable; SQL counts will be empty")
+            with _CACHE_LOCK:
+                _CACHE[cache_key] = (now, counts)
+            return counts
+
+    lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
+    lead_life_value = (os.environ.get("HUBSPOT_LEAD_LIFE_SQL_VALUE") or "SQL (AE)").strip()
+
+    try:
+        client = HubSpotClient()
+        owner_ids: list[str] = []
+        for email in owner_emails:
+            try:
+                oid = client.get_owner_id_by_email(email)
+                if oid:
+                    owner_ids.append(str(oid))
+            except Exception as exc:  # noqa: BLE001
+                log.warning("HubSpot owner lookup failed for %s: %s", email, exc)
+
+        filters = [
+            {"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value},
+        ]
+        if owner_ids:
+            filters.append(
+                {"propertyName": "hubspot_owner_id", "operator": "IN", "values": owner_ids}
+            )
+
+        contacts = client.search_contacts(filters, extra_properties=[lead_life_property])
+        for contact in contacts or []:
+            props = (contact or {}).get("properties", {}) or {}
+            d = _parse_hubspot_date(props.get("createdate"))
+            if d is None:
+                continue
+            key = d.replace(day=1).isoformat()  # 'YYYY-MM-01'
+            counts[key] = counts.get(key, 0) + 1
+    except Exception as exc:  # noqa: BLE001
+        log.warning("HubSpot SQL monthly fetch failed: %s", exc)
+
+    with _CACHE_LOCK:
+        _CACHE[cache_key] = (now, counts)
+    return counts
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+    sales_leads = _sales_leads()
+    sql_by_month = _fetch_sql_by_month(sales_leads)
+
+    # Flatten the dict for psycopg2: use parallel arrays so the SQL can JOIN.
+    months_list = sorted(sql_by_month.keys())
+    counts_list = [sql_by_month[m] for m in months_list]
+
     sql = """
         WITH base AS (
           SELECT
@@ -33,13 +127,18 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             AND o.opp_stage IS NOT NULL
         ),
+        hubspot_sql AS (
+          SELECT mes::date AS mes, count::int AS sql_count
+          FROM UNNEST(%(hs_months)s::date[], %(hs_counts)s::int[]) AS t(mes, count)
+        ),
         bounds AS (
           SELECT
-            COALESCE(DATE_TRUNC('month', MIN(opp_date))::date,
-                     DATE_TRUNC('month', CURRENT_DATE)::date) AS first_month,
-            DATE_TRUNC('month', CURRENT_DATE)::date          AS last_month
-          FROM base
-          WHERE opp_date IS NOT NULL
+            LEAST(
+              COALESCE((SELECT MIN(mes) FROM hubspot_sql), DATE_TRUNC('month', CURRENT_DATE)::date),
+              COALESCE(DATE_TRUNC('month', (SELECT MIN(opp_date) FROM base))::date,
+                       DATE_TRUNC('month', CURRENT_DATE)::date)
+            ) AS first_month,
+            DATE_TRUNC('month', CURRENT_DATE)::date AS last_month
         ),
         meses AS (
           SELECT
@@ -51,57 +150,62 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         per_month AS (
           SELECT
             m.mes,
-            COUNT(*) FILTER (WHERE b.opp_date IS NOT NULL)::int                            AS sql_count,
+            COALESCE((SELECT sql_count FROM hubspot_sql h WHERE h.mes = m.mes), 0)::int       AS sql_count,
             COUNT(*) FILTER (
               WHERE b.opp_date IS NOT NULL
                 AND b.opp_stage IN ('NDA Sent','Sourcing','Interviewing','Negotiating',
                                     'Close Win','Closed Lost')
-            )::int                                                                          AS nda_sent_count,
+            )::int                                                                              AS nda_sent_count,
             COUNT(*) FILTER (
               WHERE b.opp_date IS NOT NULL
                 AND b.opp_stage IN ('Sourcing','Interviewing','Negotiating',
                                     'Close Win','Closed Lost')
-            )::int                                                                          AS sourcing_count,
+            )::int                                                                              AS sourcing_count,
             COUNT(*) FILTER (
               WHERE b.opp_stage = 'Close Win'
                 AND b.close_d IS NOT NULL
                 AND b.close_d BETWEEN m.mes AND m.mes_fin
-            )::int                                                                          AS close_win_count
+            )::int                                                                              AS close_win_count
           FROM meses m
           LEFT JOIN base b ON b.opp_date BETWEEN m.mes AND m.mes_fin
           GROUP BY m.mes
         )
         SELECT
-          TO_CHAR(mes, 'YYYY-MM-DD')                                                       AS mes,
+          TO_CHAR(mes, 'YYYY-MM-DD')                                                            AS mes,
           sql_count,
           nda_sent_count,
           sourcing_count,
           close_win_count,
           ROUND(CASE WHEN sql_count = 0 THEN NULL
-                     ELSE 100.0 * nda_sent_count::numeric / sql_count END, 2)::float       AS sql_to_nda_sent_pct,
+                     ELSE 100.0 * nda_sent_count::numeric / sql_count END, 2)::float            AS sql_to_nda_sent_pct,
           ROUND(CASE WHEN nda_sent_count = 0 THEN NULL
-                     ELSE 100.0 * sourcing_count::numeric / nda_sent_count END, 2)::float  AS nda_sent_to_sourcing_pct,
+                     ELSE 100.0 * sourcing_count::numeric / nda_sent_count END, 2)::float       AS nda_sent_to_sourcing_pct,
           ROUND(CASE WHEN sourcing_count = 0 THEN NULL
-                     ELSE 100.0 * close_win_count::numeric / sourcing_count END, 2)::float AS sourcing_to_close_win_pct,
+                     ELSE 100.0 * close_win_count::numeric / sourcing_count END, 2)::float      AS sourcing_to_close_win_pct,
           ROUND(CASE WHEN sql_count = 0 THEN NULL
-                     ELSE 100.0 * close_win_count::numeric / sql_count END, 2)::float      AS sql_to_close_win_pct
+                     ELSE 100.0 * close_win_count::numeric / sql_count END, 2)::float           AS sql_to_close_win_pct
         FROM per_month
         ORDER BY mes;
     """
-    return sql, {"sales_leads": _sales_leads()}
+
+    return sql, {
+        "sales_leads": sales_leads,
+        "hs_months": months_list,
+        "hs_counts": counts_list,
+    }
 
 
 DATASET = {
     "key": "sales_funnel_history",
-    "label": "Sales funnel — monthly (Mariano + Bahia)",
+    "label": "Sales funnel — monthly (Mariano + Bahia · HubSpot SQL + CRM stages)",
     "dimensions": [
         {"key": "mes", "label": "Mes", "type": "date"},
     ],
     "measures": [
-        {"key": "sql_count", "label": "SQL", "type": "number"},
-        {"key": "nda_sent_count", "label": "NDA Sent", "type": "number"},
-        {"key": "sourcing_count", "label": "Sourcing", "type": "number"},
-        {"key": "close_win_count", "label": "Close Win", "type": "number"},
+        {"key": "sql_count", "label": "SQL (HubSpot)", "type": "number"},
+        {"key": "nda_sent_count", "label": "NDA Sent (CRM)", "type": "number"},
+        {"key": "sourcing_count", "label": "Sourcing (CRM)", "type": "number"},
+        {"key": "close_win_count", "label": "Close Win (CRM)", "type": "number"},
         {"key": "sql_to_nda_sent_pct", "label": "SQL → NDA Sent %", "type": "percent"},
         {"key": "nda_sent_to_sourcing_pct", "label": "NDA Sent → Sourcing %", "type": "percent"},
         {"key": "sourcing_to_close_win_pct", "label": "Sourcing → Close Win %", "type": "percent"},
