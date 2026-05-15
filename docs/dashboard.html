@@ -2141,7 +2141,7 @@
         </div>
       </div>
 
-      <!-- Row 1 · 4 small KPI cards · last 30d only -->
+      <!-- Row 1 · 4 small KPI cards -->
       <div class="hero-kpi s-3">
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
           <div class="hero-kpi__head">
@@ -2149,13 +2149,13 @@
           </div>
           <div>
             <div class="hero-kpi__value"
-                 data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                 data-chart="sa_kpi_sql_to_nda_overall" data-bind="text"
                  data-field="sql_to_nda_sent_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
-              <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+              <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text"
                     data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> /
-              <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text"
+                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> accounts · all-time
             </div>
           </div>
         </div>
@@ -2223,11 +2223,11 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">SQL → NDA Sent · monthly</h3>
-            <p class="card__sub">Conversión mensual</p>
+            <p class="card__sub">Acumulado mensual — % de accounts con NDA / total accounts</p>
           </div>
         </div>
         <div class="chart" style="position:relative;height:200px">
-          <svg data-chart="sa_line_sales_funnel" data-bind="line"
+          <svg data-chart="sa_line_sql_to_nda_overall" data-bind="line"
                data-x="mes" data-y="sql_to_nda_sent_pct" data-color="violet"
                data-fmt-y="percent" viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%">

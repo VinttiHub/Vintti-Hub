@@ -77,6 +77,8 @@ RETIRED_CHART_KEYS = {
         "sa_kpi_sales_funnel_snapshot",
         "sa_line_sales_funnel",
         "sa_table_sales_funnel_month_detail",
+        "sa_kpi_sql_to_nda_overall",
+        "sa_line_sql_to_nda_overall",
     ],
 }
 
@@ -2345,6 +2347,26 @@ MAIN_CHARTS = [
         "config": {"mapping": {"columns": ["opp_position_name", "client_name", "opp_stage", "opp_date"]}},
         "position": {"x": 0, "y": 12, "w": 12, "h": 6},
         "sort_order": 490,
+    },
+    {
+        "chart_key": "sa_kpi_sql_to_nda_overall",
+        "tab_key": "sales",
+        "title": "SQL → NDA Sent · global all-time (accounts CRM)",
+        "type": "kpi",
+        "dataset_key": "sql_to_nda_overall_snapshot",
+        "config": {"mapping": {"value": "sql_to_nda_sent_pct", "label": "%", "formatter": "percent"}},
+        "position": {"x": 0, "y": 18, "w": 3, "h": 4},
+        "sort_order": 500,
+    },
+    {
+        "chart_key": "sa_line_sql_to_nda_overall",
+        "tab_key": "sales",
+        "title": "SQL → NDA Sent · cumulative monthly",
+        "type": "line",
+        "dataset_key": "sql_to_nda_overall_history",
+        "config": {"mapping": {"x": "mes", "y": ["sql_to_nda_sent_pct"], "formatter": "percent"}},
+        "position": {"x": 0, "y": 22, "w": 6, "h": 6},
+        "sort_order": 510,
     },
 ]
 
