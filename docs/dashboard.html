@@ -2206,13 +2206,13 @@
           </div>
           <div>
             <div class="hero-kpi__value"
-                 data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+                 data-chart="sa_kpi_sql_to_close_win" data-bind="text"
                  data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
-              <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
+              <span data-chart="sa_kpi_sql_to_close_win" data-bind="text"
                     data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
-              <span data-chart="sa_kpi_sales_funnel_snapshot" data-bind="text"
-                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> · last 30d
+              <span data-chart="sa_kpi_sql_to_close_win" data-bind="text"
+                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> accounts (created last 30d)
             </div>
           </div>
         </div>
@@ -2325,13 +2325,15 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">SQL → Close Win · monthly</h3>
-            <p class="card__sub">Conversión mensual</p>
+            <p class="card__sub">Cohort por mes (creation_date) — % de accounts que llegaron a Close Win</p>
           </div>
         </div>
         <div class="chart" style="position:relative;height:200px">
-          <svg data-chart="sa_line_sales_funnel" data-bind="line"
+          <svg data-chart="sa_line_sql_to_close_win" data-bind="line"
                data-x="mes" data-y="sql_to_close_win_pct" data-color="magenta"
-               data-fmt-y="percent" viewBox="0 0 720 200" preserveAspectRatio="none"
+               data-fmt-y="percent"
+               data-tooltip-extras="sql_count|Accounts created|int,close_win_count|Reached Close Win|int"
+               viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%">
             <g class="chart-grid">
               <line x1="0" y1="40" x2="720" y2="40"/>

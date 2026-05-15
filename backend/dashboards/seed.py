@@ -83,6 +83,8 @@ RETIRED_CHART_KEYS = {
         "sa_line_nda_to_sourcing",
         "sa_kpi_sourcing_to_close_win",
         "sa_line_sourcing_to_close_win",
+        "sa_kpi_sql_to_close_win",
+        "sa_line_sql_to_close_win",
     ],
 }
 
@@ -2411,6 +2413,26 @@ MAIN_CHARTS = [
         "config": {"mapping": {"x": "mes", "y": ["sourcing_to_close_win_pct"], "formatter": "percent"}},
         "position": {"x": 0, "y": 28, "w": 6, "h": 6},
         "sort_order": 550,
+    },
+    {
+        "chart_key": "sa_kpi_sql_to_close_win",
+        "tab_key": "sales",
+        "title": "SQL → Close Win · cohort (30d)",
+        "type": "kpi",
+        "dataset_key": "sql_to_close_win_snapshot",
+        "config": {"mapping": {"value": "sql_to_close_win_pct", "label": "%", "formatter": "percent"}},
+        "position": {"x": 9, "y": 18, "w": 3, "h": 4},
+        "sort_order": 560,
+    },
+    {
+        "chart_key": "sa_line_sql_to_close_win",
+        "tab_key": "sales",
+        "title": "SQL → Close Win · cohort monthly",
+        "type": "line",
+        "dataset_key": "sql_to_close_win_history",
+        "config": {"mapping": {"x": "mes", "y": ["sql_to_close_win_pct"], "formatter": "percent"}},
+        "position": {"x": 6, "y": 28, "w": 6, "h": 6},
+        "sort_order": 570,
     },
 ]
 
