@@ -74,6 +74,7 @@ RETIRED_CHART_KEYS = {
         "sa_kpi_nda_close_win_30d",
         "sa_kpi_nda_close_win_30d_breakdown",
         "sa_table_nda_close_win_30d_detail",
+        "sa_kpi_sales_funnel_snapshot",
     ],
 }
 
@@ -2312,6 +2313,16 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "sql_to_nda_pct", "label": "%", "formatter": "percent"}},
         "position": {"x": 0, "y": 108, "w": 4, "h": 4},
         "sort_order": 460,
+    },
+    {
+        "chart_key": "sa_kpi_sales_funnel_snapshot",
+        "tab_key": "sales",
+        "title": "Sales funnel — SQL → NDA Sent → Sourcing → Close Win (Mariano + Bahia)",
+        "type": "kpi",
+        "dataset_key": "sales_funnel_snapshot",
+        "config": {"mapping": {"value": "sql_to_close_win_pct", "label": "%", "formatter": "percent"}},
+        "position": {"x": 0, "y": 0, "w": 6, "h": 6},
+        "sort_order": 470,
     },
 ]
 
