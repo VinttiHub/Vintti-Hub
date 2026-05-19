@@ -73,7 +73,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             NULLIF(o.opp_close_date::text,'')::date AS close_d,
             TRIM(o.opp_stage) AS opp_stage
           FROM opportunity o
-          JOIN cohort c ON c.account_id = o.account_id
+          LEFT JOIN cohort c ON c.account_id = o.account_id
           WHERE o.account_id IS NOT NULL
             AND TRIM(o.opp_stage) IN ('Close Win','Closed Lost')
             AND NULLIF(o.opp_close_date::text,'') IS NOT NULL

@@ -1,16 +1,19 @@
-"""NDA Sent → Sourcing · cohort by nda_signature_or_start_date month (M+B).
+"""NDA Sent → Sourcing · Metabase logic (Mariano + Bahia).
 
-Definition (per user 2026-05-15):
-  - Denominator: opportunities with `nda_signature_or_start_date` populated
-    AND `opp_sales_lead IN (mariano@vintti.com, bahia@vintti.com)`.
-  - Numerator:   subset of those opps that ALSO appear in the `sourcing`
-                 table (matched by `opportunity_id`).
+Definition (matches the user's Metabase query exactly):
+  - Universe (denominator):
+      opps with `opp_stage IN ('NDA Sent', 'Deep Dive', 'Sourcing',
+                              'Interviewing', 'Negotiating')`
+      (= still-active funnel — excludes Close Win and Closed Lost)
+      AND `nda_signature_or_start_date IS NOT NULL`
+      AND (`opp_hr_lead` OR `opp_sales_lead`) IN (Mariano, Bahia).
+  - Numerator (reached sourcing):
+      subset that has `MIN(sourcing.since_sourcing) >= nda_d`
+      (date ordering check — sourcing must happen on/after NDA signature).
+  - Bucket month: `DATE_TRUNC('month', nda_d)` (NDA signed date).
 
-Snapshot (30d): cohort = M+B opps whose `nda_signature_or_start_date`
-falls in the last 30 days.
-
-Monthly history: each month M is its own cohort (M+B opps with NDA signed
-in month M). NOT cumulative — each bar is independent.
+Snapshot (30d): cohort = opps whose `nda_signature_or_start_date` falls
+in the last 30 days. Monthly history: each month M is its own cohort.
 """
 from __future__ import annotations
 
@@ -44,6 +47,27 @@ def _parse_date(value):
     return None
 
 
+_BASE_CTE = """
+        WITH base AS (
+          SELECT
+            o.opportunity_id,
+            NULLIF(o.nda_signature_or_start_date::text, '')::date AS nda_d,
+            MIN(NULLIF(s.since_sourcing::text, '')::date)         AS sourcing_d
+          FROM opportunity o
+          LEFT JOIN sourcing s ON s.opportunity_id = o.opportunity_id
+          WHERE o.opportunity_id IS NOT NULL
+            AND TRIM(o.opp_stage) IN ('NDA Sent', 'Deep Dive', 'Sourcing',
+                                      'Interviewing', 'Negotiating')
+            AND NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
+            AND (
+              TRIM(LOWER(o.opp_hr_lead))    = ANY(%(sales_leads)s)
+              OR TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
+            )
+          GROUP BY o.opportunity_id, nda_d
+        )
+"""
+
+
 def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
@@ -52,103 +76,70 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini = corte - timedelta(days=29)
 
-    sql = """
-        WITH ventana AS (
-          SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
-        ),
-        cohort AS (
-          SELECT o.opportunity_id
-          FROM opportunity o
-          CROSS JOIN ventana v
-          WHERE NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
-            AND NULLIF(o.nda_signature_or_start_date::text, '')::date
-                BETWEEN v.win_ini AND v.win_fin
-            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
-        ),
-        sourced AS (
-          SELECT DISTINCT opportunity_id
-          FROM sourcing
-          WHERE opportunity_id IS NOT NULL
-        )
+    sql = _BASE_CTE + """
         SELECT
-          (SELECT win_ini FROM ventana)                                           AS ventana_desde,
-          (SELECT win_fin FROM ventana)                                           AS ventana_hasta,
-          (SELECT COUNT(*)::int FROM cohort)                                      AS nda_sent_count,
-          (SELECT COUNT(*)::int FROM cohort c
-           WHERE c.opportunity_id IN (SELECT opportunity_id FROM sourced))        AS sourcing_count,
+          %(win_ini)s::date                                                           AS ventana_desde,
+          %(win_fin)s::date                                                           AS ventana_hasta,
+          COUNT(*) FILTER (WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date)::int
+                                                                                      AS nda_sent_count,
+          COUNT(*) FILTER (
+            WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+              AND sourcing_d IS NOT NULL
+              AND sourcing_d >= nda_d
+          )::int                                                                      AS sourcing_count,
           ROUND(
             CASE
-              WHEN (SELECT COUNT(*) FROM cohort) = 0 THEN NULL
-              ELSE 100.0
-                * (SELECT COUNT(*) FROM cohort c
-                   WHERE c.opportunity_id IN (SELECT opportunity_id FROM sourced))::numeric
-                / (SELECT COUNT(*) FROM cohort)
+              WHEN COUNT(*) FILTER (WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date) = 0
+                THEN NULL
+              ELSE 100.0 * COUNT(*) FILTER (
+                WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+                  AND sourcing_d IS NOT NULL
+                  AND sourcing_d >= nda_d
+              )::numeric
+              / NULLIF(COUNT(*) FILTER (WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date), 0)
             END, 2
-          )::float                                                                AS nda_sent_to_sourcing_pct;
+          )::float                                                                    AS nda_sent_to_sourcing_pct
+        FROM base;
     """
     return sql, {"win_ini": win_ini, "win_fin": corte, "sales_leads": _sales_leads()}
 
 
 def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    sql = """
-        WITH cohort AS (
-          SELECT
-            o.opportunity_id,
-            DATE_TRUNC('month',
-              NULLIF(o.nda_signature_or_start_date::text, '')::date
-            )::date AS mes
-          FROM opportunity o
-          WHERE NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
-            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
-        ),
-        sourced AS (
-          SELECT DISTINCT opportunity_id
-          FROM sourcing
-          WHERE opportunity_id IS NOT NULL
-        ),
-        bounds AS (
-          SELECT
-            COALESCE(MIN(mes), DATE_TRUNC('month', CURRENT_DATE)::date) AS first_month,
-            DATE_TRUNC('month', CURRENT_DATE)::date                    AS last_month
-          FROM cohort
-        ),
-        meses AS (
-          SELECT DATE_TRUNC('month', gs)::date AS mes
-          FROM bounds b,
-               generate_series(b.first_month, b.last_month, INTERVAL '1 month') gs
-        )
+    sql = _BASE_CTE + """
         SELECT
-          TO_CHAR(m.mes, 'YYYY-MM-DD')                                            AS mes,
-          (SELECT COUNT(*)::int FROM cohort c WHERE c.mes = m.mes)                AS nda_sent_count,
-          (SELECT COUNT(*)::int FROM cohort c
-           WHERE c.mes = m.mes
-             AND c.opportunity_id IN (SELECT opportunity_id FROM sourced))        AS sourcing_count,
+          TO_CHAR(DATE_TRUNC('month', nda_d)::date, 'YYYY-MM-DD')                     AS mes,
+          COUNT(*)::int                                                                AS nda_sent_count,
+          COUNT(*) FILTER (
+            WHERE sourcing_d IS NOT NULL
+              AND sourcing_d >= nda_d
+          )::int                                                                       AS sourcing_count,
           ROUND(
             CASE
-              WHEN (SELECT COUNT(*) FROM cohort c WHERE c.mes = m.mes) = 0 THEN NULL
-              ELSE 100.0
-                * (SELECT COUNT(*) FROM cohort c
-                   WHERE c.mes = m.mes
-                     AND c.opportunity_id IN (SELECT opportunity_id FROM sourced))::numeric
-                / (SELECT COUNT(*) FROM cohort c WHERE c.mes = m.mes)
+              WHEN COUNT(*) = 0 THEN NULL
+              ELSE 100.0 * COUNT(*) FILTER (
+                WHERE sourcing_d IS NOT NULL
+                  AND sourcing_d >= nda_d
+              )::numeric
+              / NULLIF(COUNT(*), 0)
             END, 2
-          )::float                                                                AS nda_sent_to_sourcing_pct
-        FROM meses m
-        ORDER BY m.mes;
+          )::float                                                                     AS nda_sent_to_sourcing_pct
+        FROM base
+        GROUP BY DATE_TRUNC('month', nda_d)
+        ORDER BY DATE_TRUNC('month', nda_d);
     """
     return sql, {"sales_leads": _sales_leads()}
 
 
 SNAPSHOT_DATASET = {
     "key": "nda_to_sourcing_snapshot",
-    "label": "NDA Sent → Sourcing · cohort 30d (Mariano + Bahia)",
+    "label": "NDA Sent → Sourcing · 30d (Metabase logic · Mariano + Bahia)",
     "dimensions": [
         {"key": "ventana_desde", "label": "Inicio ventana", "type": "date"},
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "nda_sent_count", "label": "NDAs signed (M+B, 30d)", "type": "number"},
-        {"key": "sourcing_count", "label": "Of those, moved to Sourcing", "type": "number"},
+        {"key": "nda_sent_count", "label": "NDA signed (active funnel, M+B)", "type": "number"},
+        {"key": "sourcing_count", "label": "Of those, reached Sourcing", "type": "number"},
         {"key": "nda_sent_to_sourcing_pct", "label": "% NDA Sent → Sourcing", "type": "percent"},
     ],
     "default_filters": {},
@@ -157,13 +148,13 @@ SNAPSHOT_DATASET = {
 
 HISTORY_DATASET = {
     "key": "nda_to_sourcing_history",
-    "label": "NDA Sent → Sourcing · cohort by month (Mariano + Bahia)",
+    "label": "NDA Sent → Sourcing · monthly (Metabase logic · Mariano + Bahia)",
     "dimensions": [
         {"key": "mes", "label": "Mes (NDA signed)", "type": "date"},
     ],
     "measures": [
-        {"key": "nda_sent_count", "label": "NDAs signed in month (M+B)", "type": "number"},
-        {"key": "sourcing_count", "label": "Of those, moved to Sourcing", "type": "number"},
+        {"key": "nda_sent_count", "label": "NDA signed in month (active, M+B)", "type": "number"},
+        {"key": "sourcing_count", "label": "Of those, reached Sourcing", "type": "number"},
         {"key": "nda_sent_to_sourcing_pct", "label": "% NDA Sent → Sourcing", "type": "percent"},
     ],
     "default_filters": {},
