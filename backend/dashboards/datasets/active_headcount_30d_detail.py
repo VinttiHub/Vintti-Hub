@@ -20,6 +20,21 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+def _resolve_modelo(filters: dict) -> str:
+    raw = (
+        filters.get("modelo")
+        or filters.get("model")
+        or filters.get("opp_model")
+        or filters.get("segmento")
+        or ""
+    ).strip().lower()
+    if raw in {"recruiting", "recru"}:
+        return "Recruiting"
+    if raw in {"total", "all", "todos"}:
+        return "Total"
+    return "Staffing"
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
@@ -28,6 +43,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("fecha"))
         or datetime.utcnow().date()
     )
+    modelo = _resolve_modelo(filters)
 
     sql = """
         WITH ventana AS (
@@ -50,12 +66,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
               WHEN NULLIF(CAST(ho.end_date AS TEXT), '') IS NULL THEN NULL
               ELSE ho.end_date::date
-            END AS end_d
+            END AS end_d,
+            o.opp_model AS model
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           JOIN account a     ON a.account_id     = ho.account_id
           JOIN candidates c  ON c.candidate_id   = ho.candidate_id
-          WHERE o.opp_model = 'Staffing'
+          WHERE o.opp_model IN ('Staffing', 'Recruiting')
             AND ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
         )
@@ -63,26 +80,29 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           v.corte_d AS cutoff_date,
           h.client_name,
           h.candidate_name,
-          h.start_d AS start_date
+          h.start_d AS start_date,
+          h.model   AS opp_model
         FROM ventana v
         JOIN hires h
           ON h.start_d IS NOT NULL
          AND h.start_d <= v.win_fin
          AND COALESCE(h.end_d, DATE '9999-12-31') >= v.win_fin
+         AND (%(modelo)s = 'Total' OR h.model = %(modelo)s)
         ORDER BY h.client_name, h.candidate_name;
     """
 
-    return sql, {"corte": corte}
+    return sql, {"corte": corte, "modelo": modelo}
 
 
 DATASET = {
     "key": "active_headcount_30d_detail",
-    "label": "Active Headcount — 30d Rolling Detail (Staffing)",
+    "label": "Active Headcount — 30d Rolling Detail",
     "dimensions": [
         {"key": "cutoff_date", "label": "Cutoff Date", "type": "date"},
         {"key": "client_name", "label": "Client", "type": "string"},
         {"key": "candidate_name", "label": "Candidate", "type": "string"},
         {"key": "start_date", "label": "Start Date", "type": "date"},
+        {"key": "opp_model", "label": "Model", "type": "string"},
     ],
     "measures": [],
     "default_filters": {},

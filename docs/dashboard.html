@@ -898,6 +898,7 @@
           <div class="skpi-tile__delta">
             <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting YTD">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-2 s-3">
@@ -907,6 +908,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">month to date</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting MTD">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-3 s-3">
@@ -916,6 +918,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">rolling 30 days</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting 30d">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-4 s-3">
@@ -925,6 +928,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">last 7 days</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting week">Ver detalle</button>
         </div>
 
         <!-- Row 2 · New FTEs placed / New clients (by window) -->
@@ -954,6 +958,7 @@
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-ftes-recruiting" aria-label="Ver detalle New FTEs placed">Ver detalle</button>
         </div>
 
         <div class="skpi-group s-6">
@@ -982,6 +987,7 @@
               <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-clients-recruiting" aria-label="Ver detalle New clients Recruiting">Ver detalle</button>
         </div>
 
         <!-- Row 3 · Active clients (full-width big) -->
@@ -991,6 +997,7 @@
             <span class="skpi-tile__tag">Actual</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-clients-recruiting" aria-label="Ver detalle Active clients Recruiting">Ver detalle</button>
         </div>
 
         <!-- Existing Recruiting upfront context chart -->
@@ -2545,6 +2552,226 @@
               </div>
             </section>
             <p class="kpi-drawer__note">Time to CW menor = más velocidad de cierre. Hire rate más alto = mejor pre-filtro de candidatos antes de mandarlos al cliente. Para drill-down por candidato, ver la pestaña Operations.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Recruiting Revenue (multi-window) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="revenue-recruiting">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Recruiting · Revenue</span>
+            <h3 class="kpi-drawer__title">Revenue · Recruiting</h3>
+            <p class="kpi-drawer__sub">Fee one-time de Recruiting (close win) por ventana, con tendencia mensual de upfront.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">Revenue Recruiting · YTD</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY · Staffing+Recruiting Total: <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_total_ytd" data-reduce="first" data-fmt="currency-k">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Revenue por ventana</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">YTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia upfront mensual</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_area_recruiting_upfront" data-bind="line"
+                     data-x="mes_cierre" data-y="monto_recruiting" data-color="violet"
+                     data-labels="Upfront Recruiting" data-fmt-y="currency-k"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">Recruiting es revenue one-time (fee al cerrar la opp), no recurrente. Para Staffing recurrente abrí el drawer de GMRR o MRR Fee.</p>
+          </div>
+        </div>
+
+        <!-- Panel · New FTEs placed (Recruiting) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="new-ftes-recruiting">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Recruiting · Multi-window</span>
+            <h3 class="kpi-drawer__title">New FTEs placed</h3>
+            <p class="kpi-drawer__sub">FTEs colocados via Recruiting (close win con candidato asignado) en cada ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">FTEs colocados · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">colocaciones en los últimos 30 días</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="month" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">YTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Active</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="active_clients_window" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">clientes Recruiting</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · FTEs Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="start_date" data-limit="80"
+                   data-month-aware></div>
+            </section>
+            <p class="kpi-drawer__note">"Placed" = close win con candidato linkeado en la opp. Un FTE se cuenta una sola vez (el del close win). Si querés ver Staffing, abrí el drawer de Active contractors.</p>
+          </div>
+        </div>
+
+        <!-- Panel · New clients (Recruiting) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="new-clients-recruiting">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Recruiting · Multi-window</span>
+            <h3 class="kpi-drawer__title">New clients · Recruiting</h3>
+            <p class="kpi-drawer__sub">Cuentas que firmaron su primer close win de Recruiting en cada ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--mag">
+              <span class="kpi-drawer__hero__label">Nuevos clientes · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">primer Recruiting close win en los últimos 30 días</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="month" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">YTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">FTEs · 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">contexto</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-field="client_name" data-reduce="count-distinct" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="rollup-list"
+                   data-group-by="client_name" data-sub-template="{n} candidatos"
+                   data-list-date="start_date" data-limit="80"
+                   data-month-aware></div>
+            </section>
+            <p class="kpi-drawer__note">Es "nuevo cliente" en Recruiting si no había tenido ningún Recruiting close win antes. La lista de abajo muestra todos los clientes Recruiting activos en la ventana (no solo "nuevos") — si querés clientes nuevos estrictos (Staffing+Recruiting), abrí el drawer de New clients en Sales.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Active clients (Recruiting) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="active-clients-recruiting">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Recruiting · Cuentas</span>
+            <h3 class="kpi-drawer__title">Active clients · Recruiting</h3>
+            <p class="kpi-drawer__sub">Cuentas con al menos una colocación de Recruiting vigente, con la tendencia mensual.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">Cuentas Recruiting · último mes</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="delta-mom-abs" data-fmt="delta-int" data-class-on-sign>—</span> vs mes anterior</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Comparativa por modelo</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Recruiting</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Staffing</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses · Recruiting</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="line"
+                     data-x="mes" data-y="cuentas_activas" data-color="cyan"
+                     data-labels="Cuentas activas Recruiting" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes activos Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-field="client_name" data-reduce="count-distinct" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="rollup-list"
+                   data-group-by="client_name" data-sub-template="{n} candidatos"
+                   data-list-date="start_date" data-limit="80"
+                   data-month-aware></div>
+            </section>
           </div>
         </div>
 
@@ -4411,6 +4638,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=40" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=41" defer></script>
 </body>
 </html>

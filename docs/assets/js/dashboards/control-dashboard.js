@@ -614,6 +614,16 @@
     if (!rows || !rows.length) return null;
     // count doesn't need a field — must be checked before the field-based path below
     if (mode === 'count') return rows.length;
+    // count-distinct needs a field: unique non-empty values of that field
+    if (mode === 'count-distinct') {
+      if (!field) return rows.length;
+      const seen = new Set();
+      rows.forEach(r => {
+        const v = r[field];
+        if (v != null && String(v) !== '') seen.add(String(v));
+      });
+      return seen.size;
+    }
     if (mode === 'first') return rows[0][field];
     if (mode === 'last') return rows[rows.length - 1][field];
     const nums = rows.map(r => +r[field]).filter(v => isFinite(v));
