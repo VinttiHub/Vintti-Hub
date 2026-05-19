@@ -362,6 +362,80 @@ function stripHtmlToText(html) {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatJobDescriptionForHtml(raw) {
+  if (!raw) return '';
+  const source = String(raw).trim();
+  if (!source) return '';
+
+  const hasHtmlLayout = /<\/?(p|ul|ol|li|br|div|h[1-6]|strong|b)\b/i.test(source);
+  if (hasHtmlLayout) return source;
+
+  const headings = [
+    'Job Title',
+    'Role Summary',
+    'Key Responsibilities',
+    'Requirements',
+    'Nice to Haves',
+    'Additional Information'
+  ];
+  const headingPattern = headings.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+
+  let text = source
+    .replace(/\r\n?/g, '\n')
+    .replace(new RegExp(`\\s+(${headingPattern})\\s*:?`, 'gi'), '\n$1:')
+    .replace(/\s+-\s+(?=[A-Z0-9])/g, '\n- ')
+    .trim();
+
+  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+  const html = [];
+  let inList = false;
+
+  const closeList = () => {
+    if (inList) {
+      html.push('</ul>');
+      inList = false;
+    }
+  };
+
+  const inline = (value) => escapeHtml(value).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  lines.forEach((line) => {
+    const bullet = line.match(/^[-*•]\s+(.+)$/);
+    if (bullet) {
+      if (!inList) {
+        html.push('<ul>');
+        inList = true;
+      }
+      html.push(`<li>${inline(bullet[1])}</li>`);
+      return;
+    }
+
+    closeList();
+
+    const headingMatch = line.match(new RegExp(`^(${headingPattern})\\s*[:\\-]?\\s*(.*)$`, 'i'));
+    if (headingMatch) {
+      const canonicalHeading = headings.find(h => h.toLowerCase() === headingMatch[1].toLowerCase()) || headingMatch[1];
+      const rest = headingMatch[2] ? ` ${inline(headingMatch[2])}` : '';
+      html.push(`<p><strong>${escapeHtml(canonicalHeading)}${canonicalHeading === 'Job Title' ? ':' : ''}</strong>${rest}</p>`);
+      return;
+    }
+
+    html.push(`<p>${inline(line)}</p>`);
+  });
+
+  closeList();
+  return html.join('');
+}
+
 function parseToolsValue(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean).map(String);
@@ -1332,7 +1406,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   const positionName = document.getElementById('details-opportunity-name').value || '—';
 
   // 📩 Mensaje
-  const jdHtml = document.getElementById('job-description-textarea').innerHTML || '—';
+  const jdHtml = formatJobDescriptionForHtml(document.getElementById('job-description-textarea').innerHTML) || '—';
   const message = `Hi<br><br>Job description ready, please review:<br><br>${jdHtml}`;
   document.getElementById('email-message').innerHTML = message;
 
@@ -1766,7 +1840,7 @@ aiGo.addEventListener('click', async () => {
     console.log("📥 Respuesta de AI Assistant:", data);
 
     if (data.job_description) {
-      const jd = data.job_description;
+      const jd = formatJobDescriptionForHtml(data.job_description);
 
       // Mostrar y guardar en textarea
       document.getElementById('job-description-textarea').innerHTML = jd;
@@ -2972,7 +3046,7 @@ async function loadOpportunityData() {
     MODEL.setUI(data.opp_model);
     _applyFeeVisibilityFromData(data);
     // JOB DESCRIPTION
-    document.getElementById('job-description-textarea').innerHTML = data.hr_job_description || '';
+    document.getElementById('job-description-textarea').innerHTML = formatJobDescriptionForHtml(data.hr_job_description || '');
     updateJobDescriptionSummary();
 
     // FIRST MEETING INFO
