@@ -273,6 +273,8 @@ def accounts_status_summary():
                   OR lower(opp_stage) LIKE '%%interview%%'
                   OR lower(opp_stage) LIKE '%%negotiat%%'
                   OR lower(opp_stage) LIKE '%%deep%%'
+                  OR lower(opp_stage) LIKE '%%nda%%'
+                  OR lower(opp_stage) LIKE '%%signed%%'
                 ) AS has_pipeline
               FROM opportunity
               WHERE account_id = ANY(%s)
@@ -282,7 +284,13 @@ def accounts_status_summary():
               SELECT
                 o.account_id,
                 COUNT(*) > 0 AS has_candidates,
-                BOOL_OR(COALESCE(lower(h.status)='active', h.end_date IS NULL)) AS any_active,
+                BOOL_OR(
+                  TRIM(COALESCE(o.opp_stage, '')) = 'Close Win'
+                  AND (
+                    h.end_date IS NULL
+                    OR lower(COALESCE(h.status, '')) = 'active'
+                  )
+                ) AS any_active,
                 BOOL_OR(
                   (
                     h.buyout_dolar IS NOT NULL
@@ -320,14 +328,14 @@ def accounts_status_summary():
         def decide(has_candidates, any_active, has_buyout, has_opps, has_pipeline, all_lost):
             if any_active or has_buyout:
                 return 'Active Client'
+            if has_pipeline:
+                return 'Lead in Process'
             if has_candidates and not any_active:
                 return 'Inactive Client'
             if (not has_opps) and (not has_candidates):
                 return 'Lead'
             if all_lost and not has_candidates:
                 return 'Lead Lost'
-            if has_pipeline:
-                return 'Lead in Process'
             if (not has_opps) and has_candidates:
                 return 'Inactive Client'
             return 'Lead in Process'

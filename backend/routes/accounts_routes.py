@@ -164,11 +164,13 @@ def has_active_hire(cursor, opportunity_id):
     cursor.execute(
         """
             SELECT 1
-            FROM hire_opportunity
-            WHERE opportunity_id = %s
+            FROM hire_opportunity h
+            JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+            WHERE h.opportunity_id = %s
+              AND TRIM(COALESCE(o.opp_stage, '')) = 'Close Win'
               AND (
-                    end_date IS NULL
-                    OR LOWER(COALESCE(status, '')) = 'active'
+                    h.end_date IS NULL
+                    OR LOWER(COALESCE(h.status, '')) = 'active'
                   )
             LIMIT 1
         """,
@@ -358,10 +360,12 @@ def get_account_by_id(account_id):
         cursor.execute("""
             WITH h_active AS (
             SELECT DISTINCT ON (opportunity_id, candidate_id)
-                    opportunity_id, candidate_id, salary, fee, revenue, start_date
-            FROM hire_opportunity
-            WHERE end_date IS NULL          -- activos
-            ORDER BY opportunity_id, candidate_id, start_date DESC NULLS LAST
+                    h.opportunity_id, h.candidate_id, h.salary, h.fee, h.revenue, h.start_date
+            FROM hire_opportunity h
+            JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+            WHERE h.end_date IS NULL
+              AND TRIM(COALESCE(o.opp_stage, '')) = 'Close Win'
+            ORDER BY h.opportunity_id, h.candidate_id, h.start_date DESC NULLS LAST
             )
             SELECT
             COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting'
@@ -1514,6 +1518,7 @@ def get_candidates_by_account_opportunities(account_id):
             COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted,
             o.opportunity_id,
             o.opp_model,
+            o.opp_stage,
             o.opp_position_name,
             o.replacement_of,
             h.salary  AS employee_salary,
@@ -1521,7 +1526,11 @@ def get_candidates_by_account_opportunities(account_id):
             h.revenue AS employee_revenue,
             h.start_date,
             h.end_date,
-            COALESCE(h.status, CASE WHEN h.end_date IS NULL THEN 'active' ELSE 'inactive' END) AS status,
+            CASE
+                WHEN h.end_date IS NOT NULL THEN 'inactive'
+                WHEN TRIM(COALESCE(o.opp_stage, '')) = 'Close Win' THEN 'active'
+                ELSE 'unhired'
+            END AS status,
             h.inactive_reason,
             h.inactive_comments,
             h.inactive_vinttierror,

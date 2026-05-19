@@ -70,14 +70,16 @@ function normalizeStage(stage) {
   const val = norm(stage);
   if (/closed?[_\s-]?won|close[_\s-]?win/.test(val)) return 'won';
   if (/closed?[_\s-]?lost|close[_\s-]?lost/.test(val)) return 'lost';
-  if (/(sourc|interview|negotiat|deep\s?dive)/.test(val)) return 'pipeline';
+  if (/(sourc|interview|negotiat|deep\s?dive|nda|signed)/.test(val)) return 'pipeline';
   return 'other';
 }
 
 function isActiveHire(hire = {}) {
   const st = norm(hire.status);
-  if (st === 'active') return true;
+  const stage = normalizeStage(hire.opp_stage || hire.stage);
+  if (st === 'active') return stage ? stage === 'won' : true;
   if (st === 'inactive') return false;
+  if (stage !== 'won') return false;
   const ed = (hire.end_date ?? '').toString().trim().toLowerCase();
   if (!ed || ed === 'null' || ed === 'none' || ed === 'undefined' || ed === '0000-00-00') return true;
   return false;
@@ -143,10 +145,10 @@ function deriveAccountStatusFromData(opps = [], hires = []) {
   const allCandidatesInactive = hasCandidates && candidates.every(candidate => !isActiveHire(candidate));
 
   if (anyActiveCandidate || hasBuyoutCandidate) return 'Active Client';
+  if (hasPipeline) return 'Lead in Process';
   if (allCandidatesInactive) return 'Inactive Client';
   if (!hasOpps && !hasCandidates) return 'Lead';
   if (allLost && !hasCandidates) return 'Lead Lost';
-  if (hasPipeline) return 'Lead in Process';
   if (!hasOpps && hasCandidates) return 'Inactive Client';
   return 'Lead in Process';
 }
