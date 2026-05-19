@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=14">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=18">
 </head>
 <body>
 
@@ -673,6 +673,7 @@
           <div class="skpi-tile__delta">
             <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-ytd" aria-label="Ver detalle Revenue YTD">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-2 s-3">
@@ -684,6 +685,7 @@
           <div class="skpi-tile__delta skpi-tile__delta--pos">
             <span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="gmrr" aria-label="Ver detalle GMRR">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-3 s-3">
@@ -695,6 +697,7 @@
           <div class="skpi-tile__delta skpi-tile__delta--pos">
             <span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="mrr-fee" aria-label="Ver detalle MRR Fee">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-4 s-3">
@@ -704,6 +707,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="staffing_fee_avg" data-reduce="first" data-fmt="currency">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">Flat MoM</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="mrr-fee" aria-label="Ver detalle Staffing fee avg">Ver detalle</button>
         </div>
 
         <!-- Row 2 · New clients / Churn clients (by window) -->
@@ -730,6 +734,7 @@
               <span class="skpi-sub__value" data-chart="sa_kpi_new_clients_30d" data-override-window="mtd" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-clients" aria-label="Ver detalle New clients">Ver detalle</button>
         </div>
 
         <div class="skpi-group s-6">
@@ -759,6 +764,7 @@
               <span class="skpi-sub__pct" data-chart="am_kpi_client_churn_30d" data-override-window="mtd" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span>
             </div>
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-clients" aria-label="Ver detalle Churn clients">Ver detalle</button>
         </div>
 
         <!-- Row 3 · Active clients / Active contractors / Buyouts -->
@@ -767,6 +773,7 @@
             <span class="skpi-tile__title">Active clients</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-clients" aria-label="Ver detalle Active clients">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-tile--big s-5">
@@ -774,6 +781,7 @@
             <span class="skpi-tile__title">Active contractors</span>
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-contractors" aria-label="Ver detalle Active contractors">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-tile--big s-4">
@@ -785,6 +793,7 @@
           <div class="skpi-tile__delta skpi-tile__delta--muted">
             ≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="buyouts" aria-label="Ver detalle Buyouts">Ver detalle</button>
         </div>
 
         <!-- Row 4 · Churn contractors (by window) / Churn M3 -->
@@ -815,6 +824,7 @@
               <span class="skpi-sub__pct" data-chart="am_kpi_candidate_churn_30d" data-override-window="mtd" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span>
             </div>
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-contractors" aria-label="Ver detalle Churn contractors">Ver detalle</button>
         </div>
 
         <div class="skpi-group s-5">
@@ -832,6 +842,7 @@
               <span class="skpi-sub__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-m3" aria-label="Ver detalle Churn M3">Ver detalle</button>
         </div>
 
         <!-- Grain pill + history table (Phase C will fill the data) -->
@@ -1049,6 +1060,7 @@
             <span class="skpi-tile__progress-target">Target: 80%</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="replacement-coverage" aria-label="Ver detalle Reemplazos colocados">Ver detalle</button>
       </div>
 
       <!-- % Clientes con +1 candidato · Total -->
@@ -1078,6 +1090,7 @@
             <span class="skpi-tile__progress-target">Target: 70%</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="clients-multi" aria-label="Ver detalle % Clientes con +1 candidato">Ver detalle</button>
       </div>
 
       <!-- % Clientes con +1 candidato · Staffing (visible only on Staffing subtab) -->
@@ -1107,6 +1120,7 @@
             <span class="skpi-tile__progress-target">Target: 70%</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="clients-multi-staffing" aria-label="Ver detalle % Clientes con +1 candidato Staffing">Ver detalle</button>
       </div>
 
       <!-- % Clientes con +1 candidato · Recruiting (visible only on Recruiting subtab) -->
@@ -1136,6 +1150,7 @@
             <span class="skpi-tile__progress-target">Target: 70%</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="clients-multi-recruiting" aria-label="Ver detalle % Clientes con +1 candidato Recruiting">Ver detalle</button>
       </div>
     </div>
 
@@ -1170,6 +1185,7 @@
                 data-field="pipeline_revenue_weighted" data-reduce="first" data-fmt="currency-k">—</span>
           weighted
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-pipeline" aria-label="Ver detalle Active pipeline">Ver detalle</button>
       </div>
 
       <!-- Pipeline × CR − Churn · Staffing -->
@@ -1186,6 +1202,7 @@
           <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text"
                 data-field="pipe_staffing" data-reduce="first" data-fmt="int">—</span> opps
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="pipeline-cr-churn" aria-label="Ver detalle Pipeline × CR − Churn">Ver detalle</button>
       </div>
 
       <!-- Pipeline × CR − Churn · Staffing ($, money-based) -->
@@ -1211,6 +1228,7 @@
                 data-field="ltv_months" data-reduce="first" data-fmt="int">—</span>
           months)
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="pipeline-cr-churn" aria-label="Ver detalle Pipeline × CR − Churn $">Ver detalle</button>
       </div>
 
       <!-- SQL Sales · multi-window -->
@@ -1241,6 +1259,7 @@
                   data-field="sql_mtd" data-reduce="first" data-fmt="int">—</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="sql-sales" aria-label="Ver detalle SQL Sales">Ver detalle</button>
       </div>
 
       <!-- New opportunities by AM · multi-window -->
@@ -1271,6 +1290,7 @@
                   data-field="opps_mtd" data-reduce="first" data-fmt="int">—</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-opps-am" aria-label="Ver detalle New opportunities by AM">Ver detalle</button>
       </div>
     </div>
 
@@ -1356,6 +1376,7 @@
                   data-bind="progress-fill" data-field="conversion_pct" data-reduce="first"></span></span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="conversion-rates" aria-label="Ver detalle Conversion rates">Ver detalle</button>
       </div>
 
       <!-- Cycle & quality (2×2 mini-KPIs) -->
@@ -1398,7 +1419,1136 @@
                   data-bind="text" data-field="conversion_pct_general" data-reduce="first" data-fmt="percent">—</span>
           </div>
         </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="cycle-quality" aria-label="Ver detalle Cycle & quality">Ver detalle</button>
       </div>
+    </div>
+
+    <!-- ============== KPI Drawer (Management Dashboard hero tiles) ============== -->
+    <div class="kpi-drawer" data-kpi-drawer aria-hidden="true">
+      <div class="kpi-drawer__backdrop" data-kpi-drawer-close></div>
+      <aside class="kpi-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="kpi-drawer-title">
+
+        <!-- Panel · Revenue YTD -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="revenue-ytd">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Staffing · YTD</span>
+            <h3 class="kpi-drawer__title" id="kpi-drawer-title">Revenue YTD</h3>
+            <p class="kpi-drawer__sub">Acumulado del año en curso vs el mismo período del año anterior, separado por línea de negocio.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">Revenue Staffing · YTD</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd" data-reduce="first" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Revenue YTD por línea</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Staffing · YTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_staffing_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent">—</span> vs año anterior</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Recruiting · YTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent">—</span> vs año anterior</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Total · YTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_total_ytd" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_total_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent">—</span> vs año anterior</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia MRR · Revenue (12m)</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="line"
+                     data-x="mes" data-y="mrr_total" data-color="violet"
+                     data-labels="MRR Revenue" data-fmt-y="currency-k"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">YoY se compara contra el mismo día del año anterior, no contra fin de año. Staffing usa MRR acumulado al fin de cada mes; Recruiting usa fee de oportunidades Close Win por <code>opp_close_date</code>.</p>
+          </div>
+        </div>
+
+        <!-- Panel · GMRR -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="gmrr">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Recurring revenue</span>
+            <h3 class="kpi-drawer__title">Gross MRR</h3>
+            <p class="kpi-drawer__sub">MRR a precio de venta (salary + fee). Es el ingreso facturado bruto al cliente.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">GMRR · último mes</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent" data-class-on-sign>—</span> MoM</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Snapshot actual</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">GMRR actual</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="gmrr_actual" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">a corte de hoy</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Active contractors</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="active_contractors" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">colaboradores activos</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="line"
+                     data-x="mes" data-y="mrr_total" data-color="blue"
+                     data-labels="GMRR" data-fmt-y="currency-k"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">El delta MoM compara contra el cierre del mes anterior. GMRR es la top-line; para tracking de unit economics mirá MRR Fee.</p>
+          </div>
+        </div>
+
+        <!-- Panel · MRR Fee -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="mrr-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Recurring fee</span>
+            <h3 class="kpi-drawer__title">MRR Fee</h3>
+            <p class="kpi-drawer__sub">MRR neto al fee de Vintti (sin el componente salary). Es la métrica de unit economics.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">MRR Fee · último mes</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent" data-class-on-sign>—</span> MoM</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Snapshot · Staffing</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Fee avg</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="staffing_fee_avg" data-reduce="first" data-fmt="currency">—</span>
+                  <span class="kpi-drawer__stat__sub">por contractor activo</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MRR fee total</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="mrr_fee_total" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">a corte de hoy</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="line"
+                     data-x="mes" data-y="mrr_total" data-color="lime"
+                     data-labels="MRR Fee" data-fmt-y="currency-k"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Active clients (Staffing) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="active-clients">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Staffing · Cuentas</span>
+            <h3 class="kpi-drawer__title">Active clients</h3>
+            <p class="kpi-drawer__sub">Cuentas con al menos un contractor activo a la fecha. Mismo set que alimenta ARPA y CLV.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">Cuentas activas · último mes</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="delta-mom-abs" data-fmt="delta-int" data-class-on-sign>—</span> vs mes anterior</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Comparativa por modelo</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Staffing</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Recruiting</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="line"
+                     data-x="mes" data-y="cuentas_activas" data-color="cyan"
+                     data-labels="Cuentas activas" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes activos <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="gr_table_active_30d_detail"
+                   data-bind="rollup-list"
+                   data-group-by="client_name"
+                   data-sub-template="{n} contractors"
+                   data-list-date="start_date"
+                   data-limit="80"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Active contractors -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="active-contractors">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Headcount · Last 30d</span>
+            <h3 class="kpi-drawer__title">Active contractors</h3>
+            <p class="kpi-drawer__sub">Contractors activos a la fecha (Staffing). El listado está ordenado por start date más reciente.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--mag">
+              <span class="kpi-drawer__hero__label">Total activos</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">snapshot a corte de hoy</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="line"
+                     data-x="mes" data-y="candidatos_activos" data-color="mag"
+                     data-labels="Contractors activos" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="gr_table_active_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="gr_table_active_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="start_date" data-limit="60"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Buyouts -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="buyouts">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Last 30d · Staffing</span>
+            <h3 class="kpi-drawer__title">Buyouts</h3>
+            <p class="kpi-drawer__sub">Candidatos que migraron a buyout (compra directa por el cliente) en la ventana de 30 días.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Buyouts · 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Composición del churn (30d)</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Churn real</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyout</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Total</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_total_staffing" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">churn + buyout</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_candidate_churn" data-bind="line"
+                     data-x="mes" data-y="bajas_buyout" data-color="amber"
+                     data-labels="Buyouts" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_d" data-limit="60"
+                   data-month-aware></div>
+            </section>
+            <p class="kpi-drawer__note">Buyout = el cliente compra el contrato directo al candidato; Churn real = baja sin buyout. Ambos cuentan como "salida" de headcount pero tienen tratamiento distinto en NRR y replacement coverage.</p>
+          </div>
+        </div>
+
+        <!-- Panel · New clients -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="new-clients">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · Multi-window</span>
+            <h3 class="kpi-drawer__title">New clients</h3>
+            <p class="kpi-drawer__sub">Clientes que arrancaron su primer contrato en cada ventana, con la tendencia mensual y el detalle.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">Nuevos clientes · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="sa_kpi_new_clients_30d" data-override-window="30d" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">clientes que arrancaron en los últimos 30 días</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="week" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="month" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="mtd" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="30d" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="sa_area_new_clients_per_month" data-bind="line"
+                     data-x="mes" data-y="new_clients" data-color="lime"
+                     data-labels="Nuevos clientes" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="sa_table_new_clients_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="sa_table_new_clients_30d_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Churn clients -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="churn-clients">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Mgmt · Multi-window</span>
+            <h3 class="kpi-drawer__title">Churn clients</h3>
+            <p class="kpi-drawer__sub">Cuentas que dejaron de tener contractors activos (baja real, sin contar buyout) en cada ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Bajas · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_client_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_client_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn rate</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana · bajas (%)</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="week" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="week" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="month" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="month" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="mtd" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="mtd" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_client_churn" data-bind="line"
+                     data-x="mes" data-y="bajas_real" data-color="rose"
+                     data-labels="Bajas reales" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_client_churn_30d_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="estado_cliente_ventana" data-list-date="fecha_baja" data-limit="60"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Churn contractors -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="churn-contractors">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Headcount · Multi-window</span>
+            <h3 class="kpi-drawer__title">Churn contractors</h3>
+            <p class="kpi-drawer__sub">Contractors que salieron de Staffing (baja real, sin buyout) en cada ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--mag">
+              <span class="kpi-drawer__hero__label">Bajas · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn rate</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana · bajas (%)</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="week" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="week" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="month" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="month" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="mtd" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="mtd" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_candidate_churn" data-bind="line"
+                     data-x="mes" data-y="bajas_real" data-color="rose"
+                     data-labels="Bajas reales" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_d" data-limit="60"
+                   data-month-aware></div>
+            </section>
+            <p class="kpi-drawer__note">Esta vista cuenta sólo bajas reales (no buyouts). Para Buyouts mirá el tile separado en el dashboard.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Replacement coverage -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="replacement-coverage">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">C&amp;C Success · Last 30d</span>
+            <h3 class="kpi-drawer__title">% Reemplazos colocados</h3>
+            <p class="kpi-drawer__sub">De los candidate churns en los últimos 30 días, qué porcentaje ya tuvo replacement Close Win. Target: 80%.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">Coverage · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="placed_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">Target: 80%</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Numerador / denominador</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Replacements Close Win</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">numerador</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Candidate churns</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">denominador</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia · % reemplazos mensual</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_replacements_pct" data-bind="line"
+                     data-x="month" data-y="pct_replacements" data-color="lime"
+                     data-labels="% reemplazos" data-fmt-y="percent"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · eventos de reemplazo <span class="count" data-chart="am_table_replacements_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_replacements_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="opp_model" data-list-date="month" data-limit="60"></div>
+            </section>
+            <p class="kpi-drawer__note">Mide qué tan rápido el equipo cubre las bajas. El cálculo en la ventana de 30 días divide reemplazos Close Win por candidate churns del mismo período; la tendencia mensual usa un denominador distinto (total cerradas) y sirve como contexto histórico.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Clients > 1 candidate -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="clients-multi">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">C&amp;C Success · Total + Staffing + Recruiting</span>
+            <h3 class="kpi-drawer__title">% Clientes con +1 candidato</h3>
+            <p class="kpi-drawer__sub">Cuántos clientes activos tienen más de un contractor (señal de expansión y stickiness). Target: 70%.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">Total · clientes con +1</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_clients_multi_actual" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_kpi_clients_multi_actual" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> / <span data-chart="gr_kpi_clients_multi_actual" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes activos · target 70%</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose por modelo</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Staffing</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> / <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span></span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Recruiting</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> / <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span></span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_clients_multi" data-bind="line"
+                     data-x="mes" data-y="pct_percent" data-color="violet"
+                     data-labels="% > 1" data-fmt-y="percent"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes con +1 <span class="count" data-chart="am_table_clients_multi_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_clients_multi_30d_detail" data-bind="rollup-list"
+                   data-group-by="client_name" data-sub-template="{n} candidatos"
+                   data-list-date="periodo" data-limit="80"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Clients > 1 candidate · Staffing only -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="clients-multi-staffing">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">C&amp;C Success · Staffing</span>
+            <h3 class="kpi-drawer__title">% Clientes con +1 candidato · Staffing</h3>
+            <p class="kpi-drawer__sub">De los clientes activos de Staffing, qué porcentaje tiene más de un contractor en simultáneo.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">Staffing · clientes con +1</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> / <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Staffing" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes Staffing · target 70%</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses · Staffing</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_clients_multi" data-override-modelo="Staffing" data-bind="line"
+                     data-x="mes" data-y="pct_percent" data-color="violet"
+                     data-labels="% > 1 · Staffing" data-fmt-y="percent"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes Staffing con +1 <span class="count" data-chart="am_table_clients_multi_30d_detail" data-override-modelo="Staffing" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_clients_multi_30d_detail" data-override-modelo="Staffing" data-bind="rollup-list"
+                   data-group-by="client_name" data-sub-template="{n} candidatos"
+                   data-list-date="periodo" data-limit="80"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Clients > 1 candidate · Recruiting only -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="clients-multi-recruiting">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">C&amp;C Success · Recruiting</span>
+            <h3 class="kpi-drawer__title">% Clientes con +1 candidato · Recruiting</h3>
+            <p class="kpi-drawer__sub">De los clientes activos de Recruiting, qué porcentaje tiene más de un candidato en simultáneo.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">Recruiting · clientes con +1</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> / <span data-chart="gr_kpi_clients_multi_actual" data-override-modelo="Recruiting" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes Recruiting · target 70%</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses · Recruiting</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_clients_multi" data-override-modelo="Recruiting" data-bind="line"
+                     data-x="mes" data-y="pct_percent" data-color="cyan"
+                     data-labels="% > 1 · Recruiting" data-fmt-y="percent"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes Recruiting con +1 <span class="count" data-chart="am_table_clients_multi_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_clients_multi_30d_detail" data-override-modelo="Recruiting" data-bind="rollup-list"
+                   data-group-by="client_name" data-sub-template="{n} candidatos"
+                   data-list-date="periodo" data-limit="80"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Churn M3 -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="churn-m3">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Cohort · Last 90d</span>
+            <h3 class="kpi-drawer__title">Churn M3 (3-month survival)</h3>
+            <p class="kpi-drawer__sub">Churn medido sobre la cohorte que cumplió al menos 3 meses activos. Indicador de retención temprana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Bajas M3</span>
+              <span class="kpi-drawer__hero__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">≈ <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn rate</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Composición del churn M3</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Candidatos</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">cohorte con ≥3 meses</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Buyouts</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Activos al corte</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="activos_al_corte" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">que siguen activos</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="am_line_candidate_churn_window" data-bind="line"
+                     data-x="mes" data-y="bajas_real" data-color="rose"
+                     data-labels="Bajas M3" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_window_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="am_table_candidate_churn_window_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="account_name" data-list-date="end_d" data-limit="60"
+                   data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Active pipeline -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="active-pipeline">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Pipeline · snapshot</span>
+            <h3 class="kpi-drawer__title">Active pipeline</h3>
+            <p class="kpi-drawer__sub">Oportunidades abiertas a corte de hoy, con segmentación por modelo, tipo (new/replacement) y revenue weighted por win rate.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">Opps abiertas</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">Pipeline weighted: <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_revenue_weighted" data-reduce="first" data-fmt="currency-k">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por modelo</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Staffing</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count_staffing" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">win rate <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="win_rate_staffing_pct" data-reduce="first" data-fmt="percent">—</span> · 90d</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Recruiting</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count_recruiting" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">win rate <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="win_rate_recruiting_pct" data-reduce="first" data-fmt="percent">—</span> · 90d</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por tipo</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">New</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count_new" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">opps nuevas</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Replacement</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count_replacement" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">cubriendo churn</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Revenue del pipeline</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Bruto</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">si todo cierra</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Weighted</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_revenue_weighted" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">× win rate 90d</span>
+                </div>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">Pipeline weighted = pipeline revenue × win rate 90d. Es la expectativa razonable de revenue que va a aterrizar si las CRs históricas se mantienen.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Pipeline × CR − Churn -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="pipeline-cr-churn">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Pipeline · Net adds (30d)</span>
+            <h3 class="kpi-drawer__title">Pipeline × CR − Churn</h3>
+            <p class="kpi-drawer__sub">Estimación neta de cambio de headcount/MRR en los próximos 30 días: pipeline × CR menos churn esperado en la misma ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Net adds Staffing · 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_adds_staffing" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</span>
+              <span class="kpi-drawer__hero__delta">+ esperados − churn esperado</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Componentes · Staffing</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Pipeline</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_staffing" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">opps abiertas</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">CR 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="wr_staffing_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub">win rate ventana</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Churn 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_staffing_30d" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">salidas esperadas</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">En dinero · Staffing 30d</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Net MRR fee</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_mrr_fee_staffing_30d" data-reduce="first" data-fmt="currency-k" data-class-on-sign>—</span>
+                  <span class="kpi-drawer__stat__sub">$/mes neto</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Pipeline fee</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_fee_staffing" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">si todo cierra</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Net LTV</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_ltv_fee_staffing_30d" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">LTV <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="ltv_months" data-reduce="first" data-fmt="int">—</span>m</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Recruiting</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Pipeline</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_recruiting" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">CR 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="wr_recruiting_pct" data-reduce="first" data-fmt="percent">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Net adds</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_adds_recruiting" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</span>
+                </div>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">Fórmula: <code>net adds = pipeline × CR<sub>30d</sub> − churn<sub>30d</sub></code>. Si es negativo, el churn esperado supera a las wins esperadas — señal de presión sobre el headcount neto.</p>
+          </div>
+        </div>
+
+        <!-- Panel · SQL Sales -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sql-sales">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales pipeline · Multi-window</span>
+            <h3 class="kpi-drawer__title">SQL Sales</h3>
+            <p class="kpi-drawer__sub">Leads marcados como Sales Qualified Lead en cada ventana. Top de funnel del equipo de ventas.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--cool">
+              <span class="kpi-drawer__hero__label">SQL · Last week</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_last_week" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">leads SQL en los últimos 7 días</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_last_week" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">WTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_wtd" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_last_month" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_mtd" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia · SQL → NDA conversion (mensual)</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="sa_line_sql_to_nda_overall" data-bind="line"
+                     data-x="mes" data-y="sql_to_nda_pct" data-color="cyan"
+                     data-labels="SQL → NDA %" data-fmt-y="percent"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">SQL es la primera marca cualitativa del funnel comercial. La tendencia de SQL→NDA conversion (abajo) muestra qué % de esos leads termina firmando NDA.</p>
+          </div>
+        </div>
+
+        <!-- Panel · New opportunities by AM -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="new-opps-am">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">AM pipeline · Multi-window</span>
+            <h3 class="kpi-drawer__title">New opportunities by AM</h3>
+            <p class="kpi-drawer__sub">Nuevas oportunidades originadas por Account Management (re-engagements, upsells) en cada ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--mag">
+              <span class="kpi-drawer__hero__label">Opps AM · Last week</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_last_week" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">nuevas opps generadas por AM</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_last_week" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">WTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_wtd" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_last_month" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_mtd" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">Estas opps complementan las que entran por Sales (SQL). Indican qué tanto está expandiendo AM la base instalada con nuevos roles, replacements o upsells.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Conversion rates (funnel) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="conversion-rates">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations excellence · Funnel</span>
+            <h3 class="kpi-drawer__title">Conversion rates · 30d</h3>
+            <p class="kpi-drawer__sub">Las 4 conversiones del funnel comercial completo, todas en ventana de 30 días.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">1 · SQL → NDA signed</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Conversion</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="sql_to_nda_pct" data-reduce="first" data-fmt="percent">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">NDAs</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="nda_count" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">SQL</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">2 · NDA signed → CW</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Conversion</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">CW</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Closed</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="total_closed_opps" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">3 · Account Management Conversion Rate</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Conversion</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="conversion_30d_pct" data-reduce="first" data-fmt="percent">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">CW</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Closed</span>
+                  <span class="kpi-drawer__stat__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">4 · NDA → Client (operations view)</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Conversion</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">CW</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Closed</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span>
+                </div>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">El funnel se lee de arriba a abajo. Cada barra usa el dataset de su pestaña fuente — ojo que "NDA signed → CW" filtra a Mariano/Bahía y la versión "NDA → Client (ops)" abre el filtro a más AEs.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Cycle & quality -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="cycle-quality">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations excellence · Staffing</span>
+            <h3 class="kpi-drawer__title">Cycle &amp; quality</h3>
+            <p class="kpi-drawer__sub">Velocidad y calidad del fulfillment: cuántos días al CW, cuánto al reemplazo y qué tan eficiente es el filtrado de candidatos enviados.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Time to Close Win · Staffing</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="op_kpi_placement_time_30d" data-override-modelo="Staffing" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span> <span style="font-size:24px;color:var(--ink-2);font-weight:600">d</span></span>
+              <span class="kpi-drawer__hero__delta">promedio en ventana 30d</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Cycle time</h4>
+              <div class="kpi-drawer__stats">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Time to CW</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="op_kpi_placement_time_30d" data-override-modelo="Staffing" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+                  <span class="kpi-drawer__stat__sub">desde NDA hasta CW</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Time to replacement</span>
+                  <span class="kpi-drawer__stat__value"><span data-chart="op_kpi_placement_time_30d_repl" data-override-modelo="Staffing" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+                  <span class="kpi-drawer__stat__sub">desde churn hasta CW del replacement</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Quality · sent → hired</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Hired</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_sent_hired_30d" data-override-modelo="Staffing" data-bind="text" data-field="total_contratados" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Sent</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_sent_hired_30d" data-override-modelo="Staffing" data-bind="text" data-field="total_enviados" data-reduce="first" data-fmt="int">—</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Hire rate</span>
+                  <span class="kpi-drawer__stat__value" data-chart="op_kpi_sent_hired_30d" data-override-modelo="Staffing" data-bind="text" data-field="conversion_pct_general" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub">hired / sent</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia · Time to CW mensual</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="op_line_placement_time" data-override-modelo="Staffing" data-bind="line"
+                     data-x="mes_cierre" data-y="promedio_dias" data-color="violet"
+                     data-labels="Days to CW" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <p class="kpi-drawer__note">Time to CW menor = más velocidad de cierre. Hire rate más alto = mejor pre-filtro de candidatos antes de mandarlos al cliente. Para drill-down por candidato, ver la pestaña Operations.</p>
+          </div>
+        </div>
+
+      </aside>
     </div>
 
   </section>
@@ -3261,6 +4411,6 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=35" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=40" defer></script>
 </body>
 </html>

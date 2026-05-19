@@ -213,6 +213,54 @@
       });
     });
 
+    // Optional static axis labels (opt-in via data-axis="x" or "xy").
+    // X-axis: prints first / middle / last x-value at the bottom of the chart.
+    // Y-axis: prints min and max y-value at the right edge.
+    const axisMode = (svg.dataset.axis || '').toLowerCase();
+    if (axisMode && seriesInfo.length) {
+      const refProj = seriesInfo[0].proj;
+      const n = refProj.length;
+      if (axisMode.includes('x') && n) {
+        const ticks = n === 1 ? [0] : (n === 2 ? [0, 1] : [0, Math.floor((n - 1) / 2), n - 1]);
+        ticks.forEach((i, k) => {
+          const p = refProj[i];
+          if (!p || !p.raw) return;
+          const t = document.createElementNS(SVG_NS, 'text');
+          t.setAttribute('x', p.x);
+          t.setAttribute('y', h - 4);
+          const anchor = (k === 0) ? 'start' : (k === ticks.length - 1 ? 'end' : 'middle');
+          t.setAttribute('text-anchor', anchor);
+          t.setAttribute('font-size', '9');
+          t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+          t.setAttribute('font-weight', '600');
+          t.setAttribute('fill', '#8a90a0');
+          t.setAttribute('letter-spacing', '0.04em');
+          t.setAttribute('data-rendered', '');
+          t.textContent = formatXLabel(p.raw[xKey]).toUpperCase();
+          svg.appendChild(t);
+        });
+      }
+      if (axisMode.includes('y')) {
+        const minY = seriesInfo[0].proj.reduce((m, p) => p.valid && (m == null || p.val < m) ? p.val : m, null);
+        const maxY = seriesInfo[0].proj.reduce((m, p) => p.valid && (m == null || p.val > m) ? p.val : m, null);
+        const fmtFn = fmt.pick(seriesInfo[0].fmt);
+        [[maxY, padY + 2], [minY, h - padY - 2]].forEach(([v, y]) => {
+          if (v == null) return;
+          const t = document.createElementNS(SVG_NS, 'text');
+          t.setAttribute('x', w - 4);
+          t.setAttribute('y', y);
+          t.setAttribute('text-anchor', 'end');
+          t.setAttribute('font-size', '9');
+          t.setAttribute('font-family', 'Onest, system-ui, sans-serif');
+          t.setAttribute('font-weight', '600');
+          t.setAttribute('fill', '#8a90a0');
+          t.setAttribute('data-rendered', '');
+          t.textContent = fmtFn(v);
+          svg.appendChild(t);
+        });
+      }
+    }
+
     // Attach interactive hover (vertical guide + tracking dots + tooltip).
     // tooltipExtras = "field|Label|fmt,field|Label|fmt,..." renders extra rows
     // in the tooltip showing additional row-level fields.
@@ -678,6 +726,7 @@
         });
       }
       if (bind === 'list') return renderList(el, scopedRows);
+      if (bind === 'rollup-list') return renderRollupList(el, scopedRows);
       if (bind === 'dtable') return renderDtable(el, scopedRows);
       if (bind === 'grouped-list') return renderGroupedList(el, scopedRows);
       if (bind === 'donut') return renderDonut(el, scopedRows);
@@ -1058,6 +1107,42 @@
     }).join('');
   }
 
+  /* Group rows by data-group-by, count entries, render sorted by count desc.
+     data-sub-template: e.g. "{n} contractors" — {n} is replaced with the count.
+     data-list-date: optional field on the row to pick (earliest non-empty value per group). */
+  function renderRollupList(el, rows) {
+    const groupBy = el.dataset.groupBy;
+    if (!groupBy) { renderList(el, rows); return; }
+    const subTemplate = el.dataset.subTemplate || '';
+    const dateField   = el.dataset.listDate || '';
+    const limit       = parseInt(el.dataset.limit || '500', 10);
+    if (!rows.length) {
+      el.innerHTML = '<div class="dlist__empty">No data</div>';
+      return;
+    }
+    const map = new Map();
+    rows.forEach(r => {
+      const key = r[groupBy];
+      if (!key) return;
+      let g = map.get(key);
+      if (!g) { g = { name: key, count: 0, earliestDate: '' }; map.set(key, g); }
+      g.count++;
+      const d = String(r[dateField] || '');
+      if (d && (!g.earliestDate || d < g.earliestDate)) g.earliestDate = d;
+    });
+    const items = Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, limit);
+    if (!items.length) {
+      el.innerHTML = '<div class="dlist__empty">No data</div>';
+      return;
+    }
+    el.innerHTML = items.map(g => {
+      const sub = subTemplate ? subTemplate.replace('{n}', g.count) : '';
+      const subHtml  = sub ? `<span class="dlist__sub">${esc(sub)}</span>` : '';
+      const dateHtml = g.earliestDate ? `<span class="dlist__date">${esc(g.earliestDate)}</span>` : '';
+      return `<div class="dlist__row"><div><span class="dlist__name">${esc(g.name)}</span>${subHtml}</div>${dateHtml}</div>`;
+    }).join('');
+  }
+
   /* ---------- dtable (generic data table from data-cols="field|Label|fmt,...") ---------- */
   function renderDtable(el, rows) {
     const cols = (el.dataset.cols || '').split(',').map(spec => {
@@ -1160,8 +1245,50 @@
     monthState.listeners.forEach(fn => { try { fn(m); } catch (e) { console.error(e); } });
     // Refetch all month-detail panels with the new month
     refetchMonthDetails(m);
+    // Refetch [data-month-aware] elements (e.g. KPI drawer lists) with corte = end of month
+    refetchMonthAwareElements(document, m);
   }
   function onMonthChange(fn) { monthState.listeners.push(fn); }
+
+  /* ---------- month-aware refetch (cohort = end-of-month snapshot) ---------- */
+  function endOfMonth(yyyyMm) {
+    const m = String(yyyyMm || '').match(/^(\d{4})-(\d{2})/);
+    if (!m) return null;
+    const y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+    // Day-0 of next month = last day of this month
+    const d = new Date(Date.UTC(y, mo, 0));
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  }
+  async function refetchMonthAwareElements(scope, month) {
+    if (!scope) return;
+    const m = month || monthState.selected;
+    if (!m) return;
+    const corte = endOfMonth(m);
+    if (!corte) return;
+    const els = scope.querySelectorAll('[data-month-aware]');
+    // Group by (chartKey + overrides) so we make one fetch per dataset/filter combo.
+    const groups = new Map();
+    els.forEach(el => {
+      const chartKey = el.dataset.chart;
+      if (!chartKey) return;
+      const overrides = readOverridesFor(el);
+      overrides.corte = corte;
+      const compKey = compKeyFor(chartKey, overrides);
+      if (!groups.has(compKey)) groups.set(compKey, { chartKey, overrides, els: [] });
+      groups.get(compKey).els.push(el);
+    });
+    await Promise.all([...groups.values()].map(async ({ chartKey, overrides, els }) => {
+      try {
+        const r = await fetchChart(chartKey, overrides);
+        const rows = r.rows || [];
+        els.forEach(el => renderBinding(el, rows));
+      } catch (e) {
+        console.error(`month-aware fetch ${chartKey}`, e);
+        els.forEach(el => renderBinding(el, []));
+      }
+    }));
+  }
 
   function formatMonthHuman(m) {
     if (!m) return '—';
@@ -1379,6 +1506,65 @@
     });
   }
 
+  function syncMonthChips(month) {
+    const txt = month ? formatMonthHuman(month) : '';
+    document.querySelectorAll('[data-kpi-drawer-month-chip]').forEach(el => {
+      el.textContent = txt;
+    });
+  }
+
+  /* ---------- KPI detail drawer ---------- */
+  function bindKpiDrawers() {
+    const drawer = document.querySelector('[data-kpi-drawer]');
+    if (!drawer) return;
+    onMonthChange((m) => syncMonthChips(m));
+    syncMonthChips(monthState.selected);
+
+    const openDrawer = (panelKey) => {
+      const panels = drawer.querySelectorAll('[data-kpi-detail-panel]');
+      let activePanel = null;
+      panels.forEach(p => {
+        const isActive = p.getAttribute('data-kpi-detail-panel') === panelKey;
+        p.classList.toggle('is-active', isActive);
+        if (isActive) activePanel = p;
+      });
+      if (!activePanel) return;
+      drawer.classList.add('is-open');
+      drawer.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      // SVGs inside a panel that was display:none at hydrate-time often render
+      // with zero geometry. Re-paint them with cached rows now that the panel is visible.
+      requestAnimationFrame(() => {
+        rerenderChartsInScope(activePanel);
+        // Sync any [data-month-aware] elements in this panel to the currently-selected month
+        refetchMonthAwareElements(activePanel);
+      });
+    };
+    const closeDrawer = () => {
+      drawer.classList.remove('is-open');
+      drawer.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    };
+
+    document.querySelectorAll('[data-kpi-detail-open]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openDrawer(btn.getAttribute('data-kpi-detail-open'));
+      });
+    });
+
+    drawer.querySelectorAll('[data-kpi-drawer-close]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeDrawer();
+      });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawer.classList.contains('is-open')) closeDrawer();
+    });
+  }
+
   /* ---------- Ops detail table ---------- */
   async function renderOpsDetailTable() {
     const tbody = document.querySelector('[data-detail-table="ops"]');
@@ -1589,6 +1775,34 @@
 
   /* ---------- hydrate ---------- */
   let hydrateInflight = false;
+  const lastFetchedRows = new Map(); // compositeKey -> rows
+  function readOverridesFor(el) {
+    const out = {};
+    for (const attr of el.attributes) {
+      if (attr.name.startsWith('data-override-')) {
+        const key = attr.name.slice('data-override-'.length).replace(/-/g, '_');
+        if (key) out[key] = attr.value;
+      }
+    }
+    return out;
+  }
+  function compKeyFor(chartKey, overrides) {
+    const keys = Object.keys(overrides).sort();
+    if (!keys.length) return chartKey;
+    return chartKey + '?' + keys.map(k => `${k}=${overrides[k]}`).join('&');
+  }
+  // Re-render every [data-chart] element inside `scope` using cached rows.
+  // Used when a panel (e.g. KPI drawer) becomes visible after page-load hydrate.
+  function rerenderChartsInScope(scope) {
+    if (!scope) return;
+    scope.querySelectorAll('[data-chart]').forEach(el => {
+      const chartKey = el.dataset.chart;
+      if (!chartKey) return;
+      const compKey = compKeyFor(chartKey, readOverridesFor(el));
+      const rows = lastFetchedRows.get(compKey) || [];
+      renderBinding(el, rows);
+    });
+  }
   async function hydrate() {
     if (hydrateInflight) return;
     hydrateInflight = true;
@@ -1596,29 +1810,11 @@
 
     try {
       const cards = document.querySelectorAll('[data-chart]');
-      // Read per-element overrides from data-override-<key> (e.g. data-override-metric="Fee").
-      // Group requests by (chartKey + overrides) so cards with different overrides each get their own fetch.
-      function readOverrides(el) {
-        const out = {};
-        for (const attr of el.attributes) {
-          if (attr.name.startsWith('data-override-')) {
-            const key = attr.name.slice('data-override-'.length).replace(/-/g, '_');
-            if (key) out[key] = attr.value;
-          }
-        }
-        return out;
-      }
-      function fpr(chartKey, overrides) {
-        const keys = Object.keys(overrides).sort();
-        if (!keys.length) return chartKey;
-        return chartKey + '?' + keys.map(k => `${k}=${overrides[k]}`).join('&');
-      }
-
       const groups = new Map(); // compositeKey -> { chartKey, overrides, els: [] }
       cards.forEach(el => {
         const chartKey = el.dataset.chart;
-        const overrides = readOverrides(el);
-        const compKey = fpr(chartKey, overrides);
+        const overrides = readOverridesFor(el);
+        const compKey = compKeyFor(chartKey, overrides);
         if (!groups.has(compKey)) {
           groups.set(compKey, { chartKey, overrides, els: [] });
         }
@@ -1626,12 +1822,15 @@
       });
 
       await Promise.all([...groups.values()].map(async ({ chartKey, overrides, els }) => {
+        const compKey = compKeyFor(chartKey, overrides);
         try {
           const r = await fetchChart(chartKey, overrides);
           const rows = r.rows || [];
+          lastFetchedRows.set(compKey, rows);
           els.forEach(el => renderBinding(el, rows));
         } catch (e) {
           console.error(`fetch ${chartKey}`, e);
+          lastFetchedRows.set(compKey, []);
           els.forEach(el => renderBinding(el, []));
         }
       }));
@@ -1848,6 +2047,7 @@
     bindFilters();
     bindFlipCards();
     bindExpanders();
+    bindKpiDrawers();
     bindViewModes();
     hydrate();
   }
