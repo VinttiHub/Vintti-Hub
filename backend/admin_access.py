@@ -8,10 +8,12 @@ from db import get_connection
 ADMIN_ALLOWED_EMAILS: Set[str] = {
     "agustin@vintti.com",
     "lara@vintti.com",
-    "bahia@vintti.com",
-    "agostina@vintti.com",
-    "mia@vintti.com",
     "jazmin@vintti.com",
+    "agostina@vintti.com",
+    "bahia@vintti.com",
+    "lucia@vintti.com",
+    "camila@vintti.com",
+    "mia@vintti.com",
 }
 
 _TABLE_READY = False

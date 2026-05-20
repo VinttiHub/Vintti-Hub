@@ -12,6 +12,16 @@ from calendar import monthrange
 from urllib.parse import urlparse
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
+LEADER_ACCESS_EMAILS = {
+    "agustin@vintti.com",
+    "lara@vintti.com",
+    "jazmin@vintti.com",
+    "agostina@vintti.com",
+    "bahia@vintti.com",
+    "lucia@vintti.com",
+    "camila@vintti.com",
+    "mia@vintti.com",
+}
 
 # ✅ declarar UNA sola vez
 bp = Blueprint("profile", __name__, url_prefix="")
@@ -31,6 +41,11 @@ def _current_user_id() -> Optional[int]:
     h = _int_or_none(request.headers.get("X-User-Id") or request.headers.get("x-user-id"))
     if h: return h
     return None
+
+def _is_allowed_leader(cur, user_id: int) -> bool:
+    cur.execute("SELECT LOWER(TRIM(email_vintti)) AS email FROM users WHERE user_id = %s", (user_id,))
+    row = cur.fetchone()
+    return bool(row and row.get("email") in LEADER_ACCESS_EMAILS)
 
 # ----- US Federal Holidays (observed) helpers -----
 def _nth_weekday(year, month, weekday, n):
@@ -338,6 +353,9 @@ def leader_list_timeoff():
 
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        if not _is_allowed_leader(cur, leader_id):
+            return jsonify({"error":"forbidden"}), 403
+
         # Are you leader of anyone?
         cur.execute("""
             SELECT COUNT(*) AS cnt FROM users WHERE lider = %s
@@ -394,6 +412,9 @@ def leader_update_timeoff(req_id: int):
     rec = None
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if not _is_allowed_leader(cur, leader_id):
+                return jsonify({"error":"forbidden"}), 403
+
             # 1) Traer la request + usuario y chequear ownership
             cur.execute("""
                 SELECT

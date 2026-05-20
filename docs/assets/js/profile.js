@@ -664,19 +664,18 @@ async function loadOrgChart(){
   }
 }
 // ===== Team PTO (helpers) =====
-const TEAM_GLOBAL_EMAILS = new Set([
-  "agustin@vintti.com",
-  "jazmin@vintti.com",
-  "lara@vintti.com"
-]);
-const ADMIN_ALLOWED_EMAILS = new Set([
+const LEADER_ACCESS_EMAILS = new Set([
   "agustin@vintti.com",
   "lara@vintti.com",
-  "bahia@vintti.com",
+  "jazmin@vintti.com",
   "agostina@vintti.com",
+  "bahia@vintti.com",
+  "lucia@vintti.com",
+  "camila@vintti.com",
   "mia@vintti.com",
-  "jazmin@vintti.com"
 ]);
+const TEAM_GLOBAL_EMAILS = LEADER_ACCESS_EMAILS;
+const ADMIN_ALLOWED_EMAILS = LEADER_ACCESS_EMAILS;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 let ADMIN_STATUS_TIMER = null;
 const ADMIN_LEADER_LOOKUP = new Map();
@@ -696,6 +695,10 @@ function currentProfileEmail(){
 
 function canViewWholeCompanyPto(){
   return TEAM_GLOBAL_EMAILS.has(currentProfileEmail());
+}
+
+function hasLeaderOnlyAccess(){
+  return LEADER_ACCESS_EMAILS.has(currentProfileEmail());
 }
 
 function collectDirectReportIds(users, leaderId){
@@ -2656,17 +2659,17 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     loadOrgChart();
     loadTeamMoods();
 
-    const hasGlobalTeamPtoAccess = canViewWholeCompanyPto();
+    const hasLeaderAccess = hasLeaderOnlyAccess();
 
-    // Try to enable Approvals tab only if user is truly leader (API decides)
-    const isLeader = await loadLeaderApprovals(); // preloads too
+    // Try to enable Approvals tab only for the approved leader list.
+    const isLeader = hasLeaderAccess ? await loadLeaderApprovals() : false; // preloads too
 
-    if (hasGlobalTeamPtoAccess || isLeader) {
+    if (hasLeaderAccess) {
       enableTeamTab();
       loadTeamPto();
     }
 
-    if (isLeader) {
+    if (hasLeaderAccess && isLeader) {
       enableApprovalsTab();
       // re-load once tab exists (optional; we already preloaded)
       // await loadLeaderApprovals();
