@@ -251,9 +251,38 @@ function doesRowMatchCrmFilters(row) {
   }
   if (CRM_FILTER_STATE.contract) {
     const contractCode = ds.contractCode || '';
-    if (contractCode !== CRM_FILTER_STATE.contract) return false;
+    if (!doesContractMatchCrmFilter(contractCode, CRM_FILTER_STATE.contract)) return false;
   }
   return true;
+}
+
+function doesContractMatchCrmFilter(contractCode, filterCode) {
+  const normalizedContract = norm(contractCode);
+  const normalizedFilter = norm(filterCode);
+  if (!normalizedFilter) return true;
+  if (normalizedContract === normalizedFilter) return true;
+  if (normalizedContract === 'mix' && (normalizedFilter === 'staffing' || normalizedFilter === 'recruiting')) {
+    return true;
+  }
+  return false;
+}
+
+function getCrmExportContractFilterCode() {
+  return norm(CRM_FILTER_STATE.contract || '');
+}
+
+function filterCrmExportCandidatesByContract(candidates = [], contractFilterCode = '') {
+  const normalizedFilter = norm(contractFilterCode);
+  if (!normalizedFilter || normalizedFilter === 'mix') {
+    return Array.isArray(candidates) ? candidates : [];
+  }
+  if (normalizedFilter !== 'staffing' && normalizedFilter !== 'recruiting') {
+    return Array.isArray(candidates) ? candidates : [];
+  }
+  return (Array.isArray(candidates) ? candidates : []).filter((candidate = {}) => {
+    const model = norm(candidate?.opp_model || '');
+    return model === normalizedFilter;
+  });
 }
 
 function updateCrmEmptyState(table) {
@@ -754,6 +783,7 @@ async function downloadCrmCsv() {
     alert('No data available to export.');
     return;
   }
+  const contractFilterCode = getCrmExportContractFilterCode();
 
   const headers = [
     'Account ID',
@@ -798,9 +828,12 @@ async function downloadCrmCsv() {
       }
       row = await hydrateCrmExportAccountRow(id, row);
       const sheetData = await fetchCrmExportCandidateSheets(id);
-      buildCrmCandidateExportRows(row, sheetData.active, { includeEmptyAccountRow: true })
+      const filteredActive = filterCrmExportCandidatesByContract(sheetData.active, contractFilterCode);
+      const filteredInactive = filterCrmExportCandidatesByContract(sheetData.inactive, contractFilterCode);
+      const shouldIncludeEmptyActiveRow = !contractFilterCode || contractFilterCode === 'mix';
+      buildCrmCandidateExportRows(row, filteredActive, { includeEmptyAccountRow: shouldIncludeEmptyActiveRow })
         .forEach(values => activeRows.push(values));
-      buildCrmCandidateExportRows(row, sheetData.inactive, { includeEmptyAccountRow: false })
+      buildCrmCandidateExportRows(row, filteredInactive, { includeEmptyAccountRow: false })
         .forEach(values => inactiveRows.push(values));
       doneCount += 1;
       updateCrmLoadingProgress(doneCount, orderedIds.length);
