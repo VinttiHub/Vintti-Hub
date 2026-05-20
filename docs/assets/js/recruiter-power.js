@@ -464,13 +464,14 @@ function computeInterviewPipelineInsights(entries = []) {
     }
   });
   const totalEligible = eligibleEntries.length;
+  const totalSent = entries.length;
   return {
     items: eligibleEntries,
     totalEligible,
-    totalSent: entries.length,
+    totalSent,
     greenCount,
     redCount,
-    pct: totalEligible ? greenCount / totalEligible : null,
+    pct: totalSent ? totalEligible / totalSent : null,
   };
 }
 function computeHirePipelineInsights(entries = []) {
@@ -1073,7 +1074,7 @@ function buildDetailModalPayload(type, options = {}, state = metricsState) {
     case "churnRange": {
       const churnEntries = getLeadChurnDetails(effectiveLead);
       const lifetimeHires = Number(
-        selectedMetrics.closed_win_total ?? selectedMetrics.hire_total_lifetime ?? 0
+        selectedMetrics.hire_total_lifetime ?? selectedMetrics.closed_win_total ?? 0
       );
       const churnTotal = Number(selectedMetrics.churn_total ?? 0);
       let churnRate = null;
@@ -1206,12 +1207,13 @@ const TEAM_METRIC_DETAIL_CONFIG = {
       return {
         value: pct,
         meta: {
-          numerator: insights.greenCount,
-          denominator: insights.totalEligible,
+          numerator: insights.totalEligible,
+          denominator: insights.totalSent,
         },
       };
     },
-    getSummaryValue: (metrics) => safeNumber(metrics?.interview_rate?.pct),
+    getSummaryValue: (metrics, summary) =>
+      safeNumber(summary?.interviewInsights?.pct) ?? safeNumber(metrics?.interview_rate?.pct),
     formatValue: (value) => formatPercent(value),
     buildMeta: ({ metaContext, calcLabel }) => {
       const ratioText = formatRatioSubtext(metaContext?.numerator, metaContext?.denominator);
@@ -1267,7 +1269,7 @@ const TEAM_METRIC_DETAIL_CONFIG = {
     getValue: (row) => ({
       value: safeNumber(row?.churn_total),
       meta: {
-        hires: row?.closed_win_total ?? row?.hire_total_lifetime ?? 0,
+        hires: row?.hire_total_lifetime ?? row?.closed_win_total ?? 0,
         rate: typeof row?.churn_lifetime_rate === "number" ? row.churn_lifetime_rate : null,
       },
     }),
@@ -1764,8 +1766,8 @@ function updateCardsForLead(hrLeadEmail) {
       });
     }
     interviewHelperEl.textContent = formatRatioSubtext(
-      interviewInsights.greenCount,
-      interviewInsights.totalEligible
+      interviewInsights.totalEligible,
+      interviewInsights.totalSent
     );
     if (isAverageActive && interviewHelperEl.textContent) {
       interviewHelperEl.textContent = `${averageHelperPrefix}${interviewHelperEl.textContent}`;
@@ -1848,7 +1850,7 @@ function updateCardsForLead(hrLeadEmail) {
       formatter: sumFormatter,
     });
 
-    const totalHires = m.closed_win_total ?? m.hire_total_lifetime ?? 0;
+    const totalHires = m.hire_total_lifetime ?? m.closed_win_total ?? 0;
     const churnRate = typeof m.churn_lifetime_rate === "number" ? m.churn_lifetime_rate : null;
     if (totalHires > 0) {
       const helperParts = [];
