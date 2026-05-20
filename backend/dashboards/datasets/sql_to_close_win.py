@@ -1,31 +1,19 @@
-"""SQL → Close Win · cohort by account.creation_date (Mariano + Bahia).
+"""SQL → Close Win · cohort by account.creation_date (ALL accounts).
 
-Definition (following the user's Metabase patterns):
-  - Universe / SQL:   accounts with `creation_date` populated that have at
-                      least one opportunity assigned to Mariano or Bahia
-                      (via `opp_hr_lead` OR `opp_sales_lead`).
+Definition:
+  - Universe / SQL:   every account with `creation_date` populated.
+                      No AE / opp filter — all CRM accounts count.
   - Close Win reached: the account has at least one opp with
                       `opp_stage = 'Close Win'` AND `opp_close_date` is
                       populated AND `opp_close_date >= account.creation_date`
-                      (date ordering check, matches the `sourcing_d >= nda_d`
-                      pattern in the NDA → Sourcing query).
+                      (date ordering check).
 
 Snapshot (30d): cohort = accounts created in the last 30 days.
 Monthly history: each month M is its own cohort (accounts created in M).
 """
 from __future__ import annotations
 
-import os
 from datetime import date, datetime, timedelta
-
-
-SALES_LEADS_DEFAULT = ("mariano@vintti.com", "bahia@vintti.com")
-
-
-def _sales_leads() -> list[str]:
-    raw = os.environ.get("DASHBOARD_SALES_AES", "")
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or list(SALES_LEADS_DEFAULT)
 
 
 def _parse_date(value):
@@ -46,35 +34,19 @@ def _parse_date(value):
 
 
 _BASE_CTE = """
-        WITH ae_accounts AS (
-          -- Accounts that have at least one opp owned by Mariano or Bahia
-          -- (matched on opp_hr_lead OR opp_sales_lead — same as Metabase).
-          SELECT DISTINCT o.account_id
-          FROM opportunity o
-          WHERE o.account_id IS NOT NULL
-            AND (
-              TRIM(LOWER(o.opp_hr_lead))    = ANY(%(sales_leads)s)
-              OR TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
-            )
-        ),
-        base AS (
+        WITH base AS (
           SELECT
             a.account_id,
             a.creation_date::date AS sql_d,
-            -- Earliest Close Win date among this account's opps (M+B only)
+            -- Earliest Close Win date among this account's opps (any AE)
             (
               SELECT MIN(NULLIF(o.opp_close_date::text, '')::date)
               FROM opportunity o
               WHERE o.account_id = a.account_id
                 AND TRIM(o.opp_stage) = 'Close Win'
                 AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
-                AND (
-                  TRIM(LOWER(o.opp_hr_lead))    = ANY(%(sales_leads)s)
-                  OR TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
-                )
             ) AS close_win_d
           FROM account a
-          JOIN ae_accounts aa ON aa.account_id = a.account_id
           WHERE a.creation_date IS NOT NULL
         )
 """
@@ -113,7 +85,7 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           )::float                                                                      AS sql_to_close_win_pct
         FROM base;
     """
-    return sql, {"win_ini": win_ini, "win_fin": corte, "sales_leads": _sales_leads()}
+    return sql, {"win_ini": win_ini, "win_fin": corte}
 
 
 def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
@@ -139,18 +111,18 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY DATE_TRUNC('month', sql_d)
         ORDER BY DATE_TRUNC('month', sql_d);
     """
-    return sql, {"sales_leads": _sales_leads()}
+    return sql, {}
 
 
 SNAPSHOT_DATASET = {
     "key": "sql_to_close_win_snapshot",
-    "label": "SQL → Close Win · cohort 30d (Mariano + Bahia)",
+    "label": "SQL → Close Win · cohort 30d (all CRM accounts)",
     "dimensions": [
         {"key": "ventana_desde", "label": "Inicio ventana", "type": "date"},
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "sql_count", "label": "Accounts created (30d, M+B)", "type": "number"},
+        {"key": "sql_count", "label": "Accounts created (30d)", "type": "number"},
         {"key": "close_win_count", "label": "Of those, reached Close Win", "type": "number"},
         {"key": "sql_to_close_win_pct", "label": "% SQL → Close Win", "type": "percent"},
     ],
@@ -160,7 +132,7 @@ SNAPSHOT_DATASET = {
 
 HISTORY_DATASET = {
     "key": "sql_to_close_win_history",
-    "label": "SQL → Close Win · cohort by month (Mariano + Bahia)",
+    "label": "SQL → Close Win · cohort by month (all CRM accounts)",
     "dimensions": [
         {"key": "mes", "label": "Mes (creation_date)", "type": "date"},
     ],
