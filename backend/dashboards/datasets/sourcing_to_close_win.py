@@ -1,22 +1,16 @@
-"""Sourcing → Close Win · Metabase logic (M+B).
+"""Sourcing → Close Win · cohort by opp.nda_signature_or_start_date (M+B only).
 
-Metric (per Metabase query the user provided):
-  Of all closed opps (Close Win + Closed Lost) for Mariano/Bahia, the
-  % shown defaults to "Close Wins that ALSO had a `sourcing.since_sourcing`
-  entry" / "all Close Wins". In other words: ¿qué % de las opps ganadas
-  pasaron por sourcing antes de cerrar?
+Definition (per user 2026-05-20):
+  - Universe / cohort:  opps with `nda_signature_or_start_date` populated
+                        AND `opp_hr_lead` OR `opp_sales_lead` in
+                        (mariano@vintti.com, bahia@vintti.com).
+  - Close Win reached:  the opp has `opp_stage = 'Close Win'` AND
+                        `opp_close_date IS NOT NULL` AND
+                        `opp_close_date >= nda_signature_or_start_date`
+                        (date ordering check).
 
-Implementation notes (matching Metabase exactly):
-  - Universe: opps with `opp_stage IN ('Close Win', 'Closed Lost')` AND
-    `opp_close_date IS NOT NULL`.
-  - AE filter: `opp_hr_lead OR opp_sales_lead` IN (Mariano, Bahia).
-  - Bucket month by `opp_close_date` (when the opp closed, NOT when it
-    entered sourcing).
-  - Sourcing per opp: `MIN(since_sourcing)` (first entry into sourcing).
-
-Default conversion % focuses on Close Win (matches the ELSE branch in
-the Metabase query). The dataset also returns counts for Closed Lost in
-case you want to flip the breakdown.
+Snapshot (30d): cohort = opps whose NDA was signed in the last 30 days.
+Monthly history: each month M is its own cohort (opps with NDA signed in M).
 """
 from __future__ import annotations
 
@@ -54,19 +48,17 @@ _BASE_CTE = """
         WITH base AS (
           SELECT
             o.opportunity_id,
+            o.account_id,
             TRIM(o.opp_stage) AS opp_stage,
-            NULLIF(o.opp_close_date::text, '')::date AS close_d,
-            MIN(NULLIF(s.since_sourcing::text, '')::date) AS sourcing_d
+            NULLIF(o.nda_signature_or_start_date::text, '')::date AS nda_d,
+            NULLIF(o.opp_close_date::text, '')::date              AS close_d
           FROM opportunity o
-          LEFT JOIN sourcing s ON s.opportunity_id = o.opportunity_id
           WHERE o.opportunity_id IS NOT NULL
-            AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
-            AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
+            AND NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
             AND (
               TRIM(LOWER(o.opp_hr_lead))    = ANY(%(sales_leads)s)
               OR TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             )
-          GROUP BY o.opportunity_id, opp_stage, close_d
         )
 """
 
@@ -83,29 +75,38 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           %(win_ini)s::date                                                             AS ventana_desde,
           %(win_fin)s::date                                                             AS ventana_hasta,
-          COUNT(*) FILTER (WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-                             AND opp_stage = 'Close Win')::int                          AS close_win_count,
-          COUNT(*) FILTER (WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-                             AND opp_stage = 'Closed Lost')::int                        AS closed_lost_count,
-          COUNT(*) FILTER (WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-                             AND opp_stage = 'Close Win' AND sourcing_d IS NOT NULL)::int
-                                                                                        AS sourcing_count,
-          COUNT(*) FILTER (WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-                             AND opp_stage = 'Closed Lost' AND sourcing_d IS NOT NULL)::int
-                                                                                        AS closed_lost_with_sourcing,
+          COUNT(*) FILTER (WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date)::int
+                                                                                        AS nda_signed_count,
+          COUNT(*) FILTER (
+            WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+              AND opp_stage = 'Close Win'
+              AND close_d IS NOT NULL
+              AND close_d >= nda_d
+          )::int                                                                        AS close_win_count,
+          COUNT(*) FILTER (
+            WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+              AND opp_stage = 'Closed Lost'
+              AND close_d IS NOT NULL
+              AND close_d >= nda_d
+          )::int                                                                        AS closed_lost_count,
+          -- Kept for backward-compat with the old binding name `sourcing_count`.
+          COUNT(*) FILTER (
+            WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+              AND opp_stage = 'Close Win'
+              AND close_d IS NOT NULL
+              AND close_d >= nda_d
+          )::int                                                                        AS sourcing_count,
           ROUND(
             CASE
-              WHEN COUNT(*) FILTER (WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-                                      AND opp_stage = 'Close Win') = 0
+              WHEN COUNT(*) FILTER (WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date) = 0
                 THEN NULL
               ELSE 100.0 * COUNT(*) FILTER (
-                WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-                  AND opp_stage = 'Close Win' AND sourcing_d IS NOT NULL
-              )::numeric
-              / NULLIF(COUNT(*) FILTER (
-                WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+                WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
                   AND opp_stage = 'Close Win'
-              ), 0)
+                  AND close_d IS NOT NULL
+                  AND close_d >= nda_d
+              )::numeric
+              / NULLIF(COUNT(*) FILTER (WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date), 0)
             END, 2
           )::float                                                                      AS sourcing_to_close_win_pct
         FROM base;
@@ -116,42 +117,53 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = _BASE_CTE + """
         SELECT
-          TO_CHAR(DATE_TRUNC('month', close_d)::date, 'YYYY-MM-DD')                     AS mes,
-          COUNT(*) FILTER (WHERE opp_stage = 'Close Win')::int                          AS close_win_count,
-          COUNT(*) FILTER (WHERE opp_stage = 'Closed Lost')::int                        AS closed_lost_count,
-          COUNT(*) FILTER (WHERE opp_stage = 'Close Win'  AND sourcing_d IS NOT NULL)::int
-                                                                                        AS sourcing_count,
-          COUNT(*) FILTER (WHERE opp_stage = 'Closed Lost' AND sourcing_d IS NOT NULL)::int
-                                                                                        AS closed_lost_with_sourcing,
+          TO_CHAR(DATE_TRUNC('month', nda_d)::date, 'YYYY-MM-DD')                       AS mes,
+          COUNT(*)::int                                                                  AS nda_signed_count,
+          COUNT(*) FILTER (
+            WHERE opp_stage = 'Close Win'
+              AND close_d IS NOT NULL
+              AND close_d >= nda_d
+          )::int                                                                         AS close_win_count,
+          COUNT(*) FILTER (
+            WHERE opp_stage = 'Closed Lost'
+              AND close_d IS NOT NULL
+              AND close_d >= nda_d
+          )::int                                                                         AS closed_lost_count,
+          COUNT(*) FILTER (
+            WHERE opp_stage = 'Close Win'
+              AND close_d IS NOT NULL
+              AND close_d >= nda_d
+          )::int                                                                         AS sourcing_count,
           ROUND(
             CASE
-              WHEN COUNT(*) FILTER (WHERE opp_stage = 'Close Win') = 0 THEN NULL
+              WHEN COUNT(*) = 0 THEN NULL
               ELSE 100.0 * COUNT(*) FILTER (
-                WHERE opp_stage = 'Close Win' AND sourcing_d IS NOT NULL
+                WHERE opp_stage = 'Close Win'
+                  AND close_d IS NOT NULL
+                  AND close_d >= nda_d
               )::numeric
-              / NULLIF(COUNT(*) FILTER (WHERE opp_stage = 'Close Win'), 0)
+              / NULLIF(COUNT(*), 0)
             END, 2
-          )::float                                                                      AS sourcing_to_close_win_pct
+          )::float                                                                       AS sourcing_to_close_win_pct
         FROM base
-        GROUP BY DATE_TRUNC('month', close_d)
-        ORDER BY DATE_TRUNC('month', close_d);
+        GROUP BY DATE_TRUNC('month', nda_d)
+        ORDER BY DATE_TRUNC('month', nda_d);
     """
     return sql, {"sales_leads": _sales_leads()}
 
 
 SNAPSHOT_DATASET = {
     "key": "sourcing_to_close_win_snapshot",
-    "label": "Sourcing → Close Win · 30d (Metabase logic · Mariano + Bahia)",
+    "label": "Sourcing → Close Win · cohort 30d (M+B, NDA-signed opps)",
     "dimensions": [
         {"key": "ventana_desde", "label": "Inicio ventana", "type": "date"},
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "close_win_count", "label": "Close Wins (closed in 30d)", "type": "number"},
-        {"key": "closed_lost_count", "label": "Closed Lost (closed in 30d)", "type": "number"},
-        {"key": "sourcing_count", "label": "Close Wins with sourcing", "type": "number"},
-        {"key": "closed_lost_with_sourcing", "label": "Closed Lost with sourcing", "type": "number"},
-        {"key": "sourcing_to_close_win_pct", "label": "% of CW that had sourcing", "type": "percent"},
+        {"key": "nda_signed_count", "label": "NDA-signed opps (in window)", "type": "number"},
+        {"key": "close_win_count", "label": "Of those, reached Close Win", "type": "number"},
+        {"key": "closed_lost_count", "label": "Of those, Closed Lost", "type": "number"},
+        {"key": "sourcing_to_close_win_pct", "label": "% NDA-signed → Close Win", "type": "percent"},
     ],
     "default_filters": {},
     "query": _query_snapshot,
@@ -159,16 +171,15 @@ SNAPSHOT_DATASET = {
 
 HISTORY_DATASET = {
     "key": "sourcing_to_close_win_history",
-    "label": "Sourcing → Close Win · monthly (Metabase logic · Mariano + Bahia)",
+    "label": "Sourcing → Close Win · cohort by month (M+B, NDA-signed opps)",
     "dimensions": [
-        {"key": "mes", "label": "Mes (opp_close_date)", "type": "date"},
+        {"key": "mes", "label": "Mes (nda_signature_or_start_date)", "type": "date"},
     ],
     "measures": [
-        {"key": "close_win_count", "label": "Close Wins (closed in month)", "type": "number"},
-        {"key": "closed_lost_count", "label": "Closed Lost (closed in month)", "type": "number"},
-        {"key": "sourcing_count", "label": "Close Wins with sourcing", "type": "number"},
-        {"key": "closed_lost_with_sourcing", "label": "Closed Lost with sourcing", "type": "number"},
-        {"key": "sourcing_to_close_win_pct", "label": "% of CW that had sourcing", "type": "percent"},
+        {"key": "nda_signed_count", "label": "NDA-signed opps in month", "type": "number"},
+        {"key": "close_win_count", "label": "Of those, reached Close Win", "type": "number"},
+        {"key": "closed_lost_count", "label": "Of those, Closed Lost", "type": "number"},
+        {"key": "sourcing_to_close_win_pct", "label": "% NDA-signed → Close Win", "type": "percent"},
     ],
     "default_filters": {},
     "query": _query_history,

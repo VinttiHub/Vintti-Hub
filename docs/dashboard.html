@@ -3568,9 +3568,9 @@
                  data-field="sourcing_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
               <span data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                    data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> /
+                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
               <span data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> CW con sourcing (closed 30d)
+                    data-field="nda_signed_count" data-reduce="first" data-fmt="int">—</span> Close Win (NDA firmado en 30d)
             </div>
           </div>
         </div>
@@ -3675,7 +3675,7 @@
           <svg data-chart="sa_line_sourcing_to_close_win" data-bind="line"
                data-x="mes" data-y="sourcing_to_close_win_pct" data-color="cyan"
                data-fmt-y="percent"
-               data-tooltip-extras="close_win_count|Close Wins (closed)|int,sourcing_count|Of those, with sourcing|int,closed_lost_count|Closed Lost|int"
+               data-tooltip-extras="nda_signed_count|NDA firmados en mes|int,close_win_count|Llegaron a Close Win|int,closed_lost_count|Closed Lost|int"
                viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%">
             <g class="chart-grid">
