@@ -165,6 +165,27 @@ def _as_day_number(value: float):
         return value
     return int(n) if n.is_integer() else n
 
+def _prorated_vacation_days_for_year(start_value: Optional[Any], annual_days: float = 15) -> float:
+    if not start_value:
+        return annual_days
+    try:
+        start = start_value
+        if isinstance(start, str):
+            start = datetime.strptime(start[:10], "%Y-%m-%d").date()
+        elif hasattr(start, "date"):
+            start = start.date()
+    except Exception:
+        return annual_days
+
+    current_year = datetime.now(BOGOTA_TZ).year
+    if start.year < current_year:
+        return annual_days
+    if start.year > current_year:
+        return 0
+
+    months_worked = max(0, 12 - start.month + 1)
+    return int((months_worked * annual_days * 2) / 12) / 2
+
 def _normalize_avatar_url(raw: Optional[Any]) -> Optional[str]:
     if raw is None:
         return None
@@ -260,6 +281,10 @@ def update_user(user_id: int):
     for col, val in fields.items():
         if val is not None:
             sets.append(f"{col} = %s"); vals.append(val)
+
+    if fields.get("ingreso_vintti_date") is not None:
+        sets.append("vacaciones_habiles = %s")
+        vals.append(_prorated_vacation_days_for_year(fields["ingreso_vintti_date"]))
 
     if avatar_specified:
         if avatar_value is None:

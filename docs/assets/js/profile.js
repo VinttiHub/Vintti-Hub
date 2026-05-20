@@ -120,6 +120,26 @@ function daysForKind(kind, startISO, endISO){
   return Math.round((db - da)/86400000) + 1;
 }
 
+function floorToHalfDay(value){
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.floor(n * 2) / 2;
+}
+
+function proratedVacationDaysForYear(startDateValue, fallbackDays = 15){
+  const fallback = _toNum(fallbackDays) || 15;
+  const start = parseISODateLocal(startDateValue);
+  if (!start) return floorToHalfDay(fallback);
+
+  const currentYear = new Date().getFullYear();
+  const startYear = start.getFullYear();
+  if (startYear < currentYear) return floorToHalfDay(fallback);
+  if (startYear > currentYear) return 0;
+
+  const monthsWorked = Math.max(0, 12 - start.getMonth());
+  return Math.floor((monthsWorked * 15 * 2) / 12) / 2;
+}
+
 function showToast(el, text, ok=true){
   el.textContent = text;
   el.style.color = ok ? "#0f766e" : "#b91c1c";
@@ -704,10 +724,10 @@ function filterTeamPtoUsers(allUsers){
 
 function calcVacation(user){
   const acc  = _nz(user.vacaciones_acumuladas);
-  const work = _nz(user.vacaciones_habiles);
+  const work = proratedVacationDaysForYear(user.ingreso_vintti_date, user.vacaciones_habiles);
   const used = _nz(user.vacaciones_consumidas);
   const total = Math.max(0, acc + work);
-  const avail = Math.max(0, total - used);
+  const avail = total - used;
   return { acc, work, total, used, avail };
 }
 function calcVintti(user){
@@ -2396,6 +2416,7 @@ function _fmtDays(n){ const v = Math.max(0, n); return `${v} day${v===1?'':'s'}`
 function _toNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
 
 function renderBalances({
+  ingreso_vintti_date = PROFILE_CACHE?.ingreso_vintti_date,
   // VACATION
   vacaciones_acumuladas = 0,
   vacaciones_habiles = 0,
@@ -2410,10 +2431,10 @@ function renderBalances({
 
   // 🔹 Vacations
   const acc       = _toNum(vacaciones_acumuladas);
-  const work      = _toNum(vacaciones_habiles);
+  const work      = proratedVacationDaysForYear(ingreso_vintti_date, vacaciones_habiles);
   const usedVac   = _toNum(vacaciones_consumidas);
   const totalVac  = Math.max(0, acc + work);
-  const availVac  = Math.max(0, totalVac - usedVac);
+  const availVac  = totalVac - usedVac;
 
   // 🔹 Vintti Days (total fijo = 2)
   const totalVD   = 2;
@@ -2493,6 +2514,7 @@ async function loadBalances(uid){
     if (!r.ok) throw new Error(await r.text());
     const u = await r.json();
     renderBalances({
+      ingreso_vintti_date: u.ingreso_vintti_date,
       vacaciones_acumuladas: u.vacaciones_acumuladas,
       vacaciones_habiles: u.vacaciones_habiles,
       vacaciones_consumidas: u.vacaciones_consumidas,

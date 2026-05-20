@@ -34,6 +34,24 @@ DEFAULT_VINTTI_DAYS_CONSUMIDOS = 0
 DEFAULT_FERIADOS_CONSUMIDOS = 0
 
 
+def _prorated_vacation_days_for_year(start_value: Optional[str], annual_days: float = DEFAULT_VACACIONES_HABILES) -> float:
+    if not start_value:
+        return annual_days
+    try:
+        start = datetime.strptime(str(start_value)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return annual_days
+
+    current_year = datetime.now(BOGOTA_TZ).year
+    if start.year < current_year:
+        return annual_days
+    if start.year > current_year:
+        return 0
+
+    months_worked = max(0, 12 - start.month + 1)
+    return int((months_worked * annual_days * 2) / 12) / 2
+
+
 def _int_or_none(value: Optional[str]) -> Optional[int]:
     try:
         return int(value)
@@ -152,6 +170,7 @@ def create_hub_user():
     role_flags = _detect_user_roles(payload)
     send_invite = _as_bool(payload.get("send_invite"), True)
     is_active = _as_bool(payload.get("is_active"), True)
+    ingreso_vintti_date = payload.get("ingreso_vintti_date") or payload.get("start_date") or None
     leader_value = payload.get("leader_user_id") or payload.get("leader_id") or payload.get("lider")
     leader_user_id = _int_or_none(leader_value)
     raw_reports = (
@@ -239,6 +258,7 @@ def create_hub_user():
                     email_vintti,
                     role,
                     nickname,
+                    ingreso_vintti_date,
                     password,
                     updated_at,
                     lider,
@@ -250,6 +270,7 @@ def create_hub_user():
                 )
                 VALUES (
                     %s, %s, %s, %s, %s,
+                    %s,
                     NULL,
                     NOW()::date,
                     %s,
@@ -267,9 +288,10 @@ def create_hub_user():
                     candidate_email,
                     role,
                     nickname,
+                    ingreso_vintti_date,
                     leader_row["user_id"] if leader_row else None,
                     DEFAULT_VACACIONES_ACUMULADAS,
-                    DEFAULT_VACACIONES_HABILES,
+                    _prorated_vacation_days_for_year(ingreso_vintti_date),
                     DEFAULT_VACACIONES_CONSUMIDAS,
                     DEFAULT_VINTTI_DAYS_CONSUMIDOS,
                     DEFAULT_FERIADOS_CONSUMIDOS
