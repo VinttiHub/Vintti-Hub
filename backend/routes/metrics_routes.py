@@ -523,6 +523,219 @@ def ts_history():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route('/metrics/marketing_dashboard', methods=['GET'])
+def marketing_dashboard_metrics():
+    """
+    Aggregated data for the Marketing tab in the control dashboard:
+      - SQLs by conversion_channel (this month + last 30 days). SQL = any
+        account with creation_date populated within the window.
+      - Active clients by conversion_channel: distinct accounts that currently
+        have at least one active hire (no end date, or end date in the future)
+        OR an active buyout.
+      - Open opportunities by industry: opps whose stage is anything other than
+        Close Win / Close Lost, grouped by `account.industry`.
+    """
+    today = datetime.utcnow().date()
+    last30_start = today - timedelta(days=29)
+    current_month_start = today.replace(day=1)
+
+    UNKNOWN = '— No channel —'
+    UNKNOWN_INDUSTRY = '— No industry —'
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # --- SQLs by channel (this month + last 30 days) ---
+        cur.execute(
+            """
+            SELECT
+              NULLIF(TRIM(COALESCE(a.conversion_channel, '')), '') AS channel,
+              COUNT(*) FILTER (
+                WHERE a.creation_date::date BETWEEN %s AND %s
+              ) AS this_month,
+              COUNT(*) FILTER (
+                WHERE a.creation_date::date BETWEEN %s AND %s
+              ) AS last_30
+            FROM account a
+            WHERE a.creation_date IS NOT NULL
+              AND a.creation_date::date >= LEAST(%s, %s)
+            GROUP BY NULLIF(TRIM(COALESCE(a.conversion_channel, '')), '')
+            """,
+            (current_month_start, today, last30_start, today, current_month_start, last30_start),
+        )
+        sql_rows = cur.fetchall()
+
+        sqls_summary = {
+            'thisMonth': {
+                'from': str(current_month_start),
+                'to': str(today),
+                'total': 0,
+                'channels': [],
+            },
+            'last30': {
+                'from': str(last30_start),
+                'to': str(today),
+                'total': 0,
+                'channels': [],
+            },
+        }
+        this_month_acc = {}
+        last30_acc = {}
+        for row in sql_rows:
+            label = row.get('channel') or UNKNOWN
+            tm = int(row.get('this_month') or 0)
+            l30 = int(row.get('last_30') or 0)
+            if tm > 0:
+                this_month_acc[label] = this_month_acc.get(label, 0) + tm
+            if l30 > 0:
+                last30_acc[label] = last30_acc.get(label, 0) + l30
+
+        for label, count in this_month_acc.items():
+            sqls_summary['thisMonth']['channels'].append({'channel': label, 'count': count})
+            sqls_summary['thisMonth']['total'] += count
+        for label, count in last30_acc.items():
+            sqls_summary['last30']['channels'].append({'channel': label, 'count': count})
+            sqls_summary['last30']['total'] += count
+        for key in ('thisMonth', 'last30'):
+            sqls_summary[key]['channels'].sort(key=lambda it: it['count'], reverse=True)
+
+        # --- Active clients by channel ---
+        cur.execute(
+            """
+            WITH active_hire_accounts AS (
+              SELECT DISTINCT ho.account_id
+              FROM hire_opportunity ho
+              JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+              WHERE ho.account_id IS NOT NULL
+                AND (
+                  ho.end_date IS NULL
+                  OR NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL
+                  OR (
+                    NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NOT NULL
+                    AND NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date >= %s
+                  )
+                )
+            ),
+            active_buyout_accounts AS (
+              SELECT DISTINCT b.account_id
+              FROM buyouts b
+              WHERE b.account_id IS NOT NULL
+                AND (
+                  NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NULL
+                  OR NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date >= %s
+                )
+            ),
+            active_accounts AS (
+              SELECT account_id FROM active_hire_accounts
+              UNION
+              SELECT account_id FROM active_buyout_accounts
+            )
+            SELECT
+              NULLIF(TRIM(COALESCE(a.conversion_channel, '')), '') AS channel,
+              a.account_id,
+              a.client_name
+            FROM active_accounts act
+            JOIN account a ON a.account_id = act.account_id
+            """,
+            (today, today),
+        )
+        active_rows = cur.fetchall()
+
+        active_by_channel = {}
+        for row in active_rows:
+            label = row.get('channel') or UNKNOWN
+            bucket = active_by_channel.setdefault(label, {'channel': label, 'count': 0, 'accounts': []})
+            bucket['count'] += 1
+            bucket['accounts'].append({
+                'account_id': row.get('account_id'),
+                'client_name': row.get('client_name'),
+            })
+
+        active_clients_summary = {
+            'asOf': str(today),
+            'total': 0,
+            'channels': [],
+        }
+        for bucket in active_by_channel.values():
+            bucket['accounts'].sort(key=lambda it: (it.get('client_name') or '').lower())
+            active_clients_summary['channels'].append(bucket)
+            active_clients_summary['total'] += bucket['count']
+        active_clients_summary['channels'].sort(key=lambda it: it['count'], reverse=True)
+
+        # --- Open opportunities by industry ---
+        cur.execute(
+            """
+            SELECT
+              NULLIF(TRIM(COALESCE(a.industry, '')), '') AS industry,
+              o.opportunity_id,
+              o.opp_position_name,
+              o.opp_model,
+              o.opp_type,
+              o.opp_stage,
+              o.expected_fee,
+              o.expected_revenue,
+              a.account_id,
+              a.client_name
+            FROM opportunity o
+            LEFT JOIN account a ON a.account_id = o.account_id
+            WHERE TRIM(COALESCE(o.opp_stage, '')) NOT IN ('Close Win', 'Close Lost')
+            """
+        )
+        opp_rows = cur.fetchall()
+
+        opps_by_industry = {}
+        for row in opp_rows:
+            label = row.get('industry') or UNKNOWN_INDUSTRY
+            bucket = opps_by_industry.setdefault(label, {
+                'industry': label,
+                'count': 0,
+                'expected_fee': 0.0,
+                'expected_revenue': 0.0,
+                'opportunities': [],
+            })
+            bucket['count'] += 1
+            try:
+                bucket['expected_fee'] += float(row.get('expected_fee') or 0)
+            except (TypeError, ValueError):
+                pass
+            try:
+                bucket['expected_revenue'] += float(row.get('expected_revenue') or 0)
+            except (TypeError, ValueError):
+                pass
+            bucket['opportunities'].append({
+                'opportunity_id': row.get('opportunity_id'),
+                'opp_position_name': row.get('opp_position_name'),
+                'opp_model': row.get('opp_model'),
+                'opp_type': row.get('opp_type'),
+                'opp_stage': row.get('opp_stage'),
+                'account_id': row.get('account_id'),
+                'client_name': row.get('client_name'),
+            })
+
+        open_opps_summary = {
+            'total': 0,
+            'industries': [],
+        }
+        for bucket in opps_by_industry.values():
+            bucket['opportunities'].sort(key=lambda it: (it.get('client_name') or '').lower())
+            open_opps_summary['industries'].append(bucket)
+            open_opps_summary['total'] += bucket['count']
+        open_opps_summary['industries'].sort(key=lambda it: it['count'], reverse=True)
+
+        return jsonify({
+            'sqlsByChannel': sqls_summary,
+            'activeClientsByChannel': active_clients_summary,
+            'openOpportunitiesByIndustry': open_opps_summary,
+        })
+    except Exception as exc:
+        import traceback
+        logging.error("marketing_dashboard failed: %s\n%s", exc, traceback.format_exc())
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 @bp.route('/metrics/management_dashboard', methods=['GET'])
 def management_dashboard_metrics():
     """

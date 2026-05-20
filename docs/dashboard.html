@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=18">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=19">
 </head>
 <body>
 
@@ -47,6 +47,7 @@
 <input class="tab-radios" type="radio" name="tab" id="tab-am">
 <input class="tab-radios" type="radio" name="tab" id="tab-sales">
 <input class="tab-radios" type="radio" name="tab" id="tab-ops">
+<input class="tab-radios" type="radio" name="tab" id="tab-marketing">
 
 <!-- Sub-tab radios for Growth · New (Staffing | Recruiting) -->
 <input class="subtab-radios" type="radio" name="growth-sub" id="gsub-staffing" checked>
@@ -78,6 +79,7 @@
     <label class="tabs__btn" for="tab-am">Account Management <span class="ct">44</span></label>
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">31</span></label>
+    <label class="tabs__btn" for="tab-marketing">Marketing <span class="ct">3</span></label>
   </nav>
 
   <!-- ============================================================
@@ -4587,6 +4589,93 @@
 
 
   <!-- ============================================================
+       CHANNEL · MARKETING
+       ============================================================ -->
+  <section class="channel" data-channel="marketing">
+    <div class="grid">
+
+      <!-- ===== CARD: SQLs by Channel ===== -->
+      <div class="card s-12" id="mktSqlsCard">
+        <div class="card__head">
+          <div>
+            <div class="card__title">SQLs by Channel</div>
+            <div class="muted" style="font-size:12px;">Accounts that entered the CRM (creation date) grouped by conversion channel</div>
+          </div>
+          <div class="mkt-period" role="tablist" aria-label="SQLs period">
+            <button type="button" class="mkt-period__btn is-active" data-period="thisMonth" role="tab" aria-selected="true">This month</button>
+            <button type="button" class="mkt-period__btn" data-period="last30" role="tab" aria-selected="false">Last 30 days</button>
+          </div>
+        </div>
+        <div class="mkt-summary">
+          <div class="mkt-summary__label">Total SQLs</div>
+          <div class="mkt-summary__value" id="mktSqlsTotal">—</div>
+          <div class="mkt-summary__sub muted" id="mktSqlsRange">—</div>
+        </div>
+        <div class="mkt-table-wrap">
+          <table class="mkt-table">
+            <thead>
+              <tr><th>Channel</th><th>Count</th><th>Share</th></tr>
+            </thead>
+            <tbody id="mktSqlsTbody">
+              <tr><td colspan="3" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== CARD: Active Clients by Channel ===== -->
+      <div class="card s-6" id="mktActiveCard">
+        <div class="card__head">
+          <div>
+            <div class="card__title">New Active Clients by Channel</div>
+            <div class="muted" style="font-size:12px;" id="mktActiveAsOf">As of —</div>
+          </div>
+        </div>
+        <div class="mkt-summary">
+          <div class="mkt-summary__label">Total active clients</div>
+          <div class="mkt-summary__value" id="mktActiveTotal">—</div>
+        </div>
+        <div class="mkt-table-wrap">
+          <table class="mkt-table">
+            <thead>
+              <tr><th>Channel</th><th>Clients</th><th>Share</th></tr>
+            </thead>
+            <tbody id="mktActiveTbody">
+              <tr><td colspan="3" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== CARD: Open Opportunities by Industry ===== -->
+      <div class="card s-6" id="mktOppsCard">
+        <div class="card__head">
+          <div>
+            <div class="card__title">Open Opportunities by Industry</div>
+            <div class="muted" style="font-size:12px;">All opps excluding Close Win / Close Lost</div>
+          </div>
+        </div>
+        <div class="mkt-summary">
+          <div class="mkt-summary__label">Total open opps</div>
+          <div class="mkt-summary__value" id="mktOppsTotal">—</div>
+        </div>
+        <div class="mkt-table-wrap">
+          <table class="mkt-table">
+            <thead>
+              <tr><th>Industry</th><th>Open opps</th><th>Expected revenue</th></tr>
+            </thead>
+            <tbody id="mktOppsTbody">
+              <tr><td colspan="3" class="muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ============================================================
        FOOTER
        ============================================================ -->
   <footer class="footer">
@@ -4639,5 +4728,6 @@
 </div>
 
 <script src="./assets/js/dashboards/control-dashboard.js?v=41" defer></script>
+<script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>

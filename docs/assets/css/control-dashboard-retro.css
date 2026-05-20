@@ -222,6 +222,8 @@ table { border-collapse: collapse; }
 #tab-am:checked         ~ .shell .filter-bar [data-tabs]:not([data-tabs~="am"])         { display: none; }
 #tab-sales:checked      ~ .shell .filter-bar [data-tabs]:not([data-tabs~="sales"])      { display: none; }
 #tab-ops:checked        ~ .shell .filter-bar [data-tabs]:not([data-tabs~="ops"])        { display: none; }
+/* Marketing tab has its own data sources — hide the global filter bar */
+#tab-marketing:checked  ~ .shell .filter-bar { display: none; }
 
 .filter-pill { position: relative; }
 .filter-pill__sel {
@@ -402,7 +404,8 @@ body.is-loading .kpi-card::after {
 #tab-growth-new:checked ~ .shell .tabs label[for="tab-growth-new"],
 #tab-am:checked         ~ .shell .tabs label[for="tab-am"],
 #tab-sales:checked      ~ .shell .tabs label[for="tab-sales"],
-#tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] {
+#tab-ops:checked        ~ .shell .tabs label[for="tab-ops"],
+#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] {
   background: var(--ink);
   color: #fff;
 }
@@ -410,7 +413,8 @@ body.is-loading .kpi-card::after {
 #tab-growth-new:checked ~ .shell .tabs label[for="tab-growth-new"] .ct,
 #tab-am:checked         ~ .shell .tabs label[for="tab-am"] .ct,
 #tab-sales:checked      ~ .shell .tabs label[for="tab-sales"] .ct,
-#tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] .ct {
+#tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] .ct,
+#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] .ct {
   background: rgba(255,255,255,0.16);
   color: rgba(255,255,255,0.78);
 }
@@ -421,7 +425,8 @@ body.is-loading .kpi-card::after {
 #tab-growth-new:checked ~ .shell .channel[data-channel="growth-new"],
 #tab-am:checked         ~ .shell .channel[data-channel="am"],
 #tab-sales:checked      ~ .shell .channel[data-channel="sales"],
-#tab-ops:checked        ~ .shell .channel[data-channel="ops"] {
+#tab-ops:checked        ~ .shell .channel[data-channel="ops"],
+#tab-marketing:checked  ~ .shell .channel[data-channel="marketing"] {
   display: block;
 }
 
@@ -2391,4 +2396,116 @@ body.is-loading .kpi-card::after {
   .kpi-drawer__stats { grid-template-columns: 1fr 1fr; }
   .kpi-drawer__stats--three { grid-template-columns: 1fr; }
   .kpi-drawer__hero__value { font-size: 36px; }
+}
+
+/* ============================================================
+   MARKETING TAB
+   ============================================================ */
+.mkt-period {
+  display: inline-flex;
+  background: rgba(13,18,30,0.04);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  gap: 4px;
+}
+.mkt-period__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  transition: background .14s ease, color .14s ease;
+}
+.mkt-period__btn:hover { color: var(--ink); }
+.mkt-period__btn.is-active {
+  background: var(--ink);
+  color: #fff;
+}
+
+.mkt-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 0 18px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 14px;
+}
+.mkt-summary__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.mkt-summary__value {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.mkt-summary__sub {
+  font-size: 12px;
+}
+
+.mkt-table-wrap { overflow-x: auto; }
+.mkt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.mkt-table th,
+.mkt-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+}
+.mkt-table th {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: rgba(13,18,30,0.02);
+}
+.mkt-table tbody tr:hover { background: rgba(13,18,30,0.02); }
+.mkt-table td:nth-child(2),
+.mkt-table td:nth-child(3),
+.mkt-table th:nth-child(2),
+.mkt-table th:nth-child(3) { white-space: nowrap; }
+
+.mkt-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+}
+.mkt-share__bar {
+  position: relative;
+  height: 6px;
+  flex: 1;
+  min-width: 80px;
+  background: rgba(13,18,30,0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.mkt-share__bar::after {
+  content: '';
+  position: absolute; inset: 0;
+  width: var(--pct, 0%);
+  background: linear-gradient(90deg, #6366f1, #22c55e);
+  border-radius: 999px;
+  transition: width .3s ease;
+}
+.mkt-share__pct {
+  font-size: 12px;
+  color: var(--ink-3);
+  min-width: 42px;
+  text-align: right;
 }
