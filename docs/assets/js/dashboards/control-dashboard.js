@@ -1282,6 +1282,9 @@
     els.forEach(el => {
       const chartKey = el.dataset.chart;
       if (!chartKey) return;
+      // Skip elements that are currently locked to a por-ventana selection;
+      // their refetch happens via setDrawerWindow() instead.
+      if (el.dataset.activeWindow) return;
       const overrides = readOverridesFor(el);
       overrides.corte = corte;
       const compKey = compKeyFor(chartKey, overrides);
@@ -1298,6 +1301,98 @@
         els.forEach(el => renderBinding(el, []));
       }
     }));
+  }
+
+  /* ---------- drawer · per-window detail filter ---------- */
+  const WINDOW_LABELS = {
+    week: 'Last week',
+    month: 'Last month',
+    mtd: 'MTD',
+    '30d': 'Last 30d',
+    '7d': 'Last 7d',
+    ytd: 'YTD',
+  };
+
+  function windowLabel(key) {
+    return WINDOW_LABELS[String(key || '').toLowerCase()] || String(key || '').toUpperCase();
+  }
+
+  async function setDrawerWindow(target, windowKey) {
+    // Highlight the active stat in the same group
+    document.querySelectorAll(`[data-drawer-window-group="${target}"] [data-drawer-window]`).forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.drawerWindow === windowKey);
+    });
+    // Toggle chips
+    const monthChip = document.querySelector(`[data-drawer-window-target="${target}"][data-kpi-drawer-month-chip]`);
+    const winChip = document.querySelector(`[data-drawer-window-chip="${target}"]`);
+    if (monthChip) monthChip.hidden = true;
+    if (winChip) { winChip.hidden = false; winChip.textContent = windowLabel(windowKey); }
+
+    // Refetch every [data-month-aware] element bound to this target with the window override (no corte)
+    const els = document.querySelectorAll(`[data-month-aware][data-drawer-window-target="${target}"]`);
+    if (!els.length) return;
+    const groups = new Map();
+    els.forEach(el => {
+      el.dataset.activeWindow = windowKey;
+      const chartKey = el.dataset.chart;
+      if (!chartKey) return;
+      const overrides = readOverridesFor(el);
+      overrides.window = windowKey;
+      delete overrides.corte;
+      const compKey = compKeyFor(chartKey, overrides);
+      if (!groups.has(compKey)) groups.set(compKey, { chartKey, overrides, els: [] });
+      groups.get(compKey).els.push(el);
+    });
+    await Promise.all([...groups.values()].map(async ({ chartKey, overrides, els }) => {
+      try {
+        const r = await fetchChart(chartKey, overrides);
+        const rows = r.rows || [];
+        els.forEach(el => renderBinding(el, rows));
+      } catch (e) {
+        console.error(`window fetch ${chartKey}`, e);
+        els.forEach(el => renderBinding(el, []));
+      }
+    }));
+  }
+
+  function clearDrawerWindow(target) {
+    document.querySelectorAll(`[data-drawer-window-group="${target}"] [data-drawer-window]`).forEach(btn => {
+      btn.classList.remove('is-active');
+    });
+    const monthChip = document.querySelector(`[data-drawer-window-target="${target}"][data-kpi-drawer-month-chip]`);
+    const winChip = document.querySelector(`[data-drawer-window-chip="${target}"]`);
+    if (monthChip) monthChip.hidden = false;
+    if (winChip) { winChip.hidden = true; winChip.textContent = ''; }
+    document.querySelectorAll(`[data-month-aware][data-drawer-window-target="${target}"]`).forEach(el => {
+      delete el.dataset.activeWindow;
+    });
+    // Restore month-aware behavior using the currently selected month
+    refetchMonthAwareElements(document, monthState.selected);
+  }
+
+  function bindDrawerWindowControls() {
+    // Por-ventana stat clicks → switch detail to that window
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-drawer-window]');
+      if (!btn) return;
+      const group = btn.closest('[data-drawer-window-group]');
+      if (!group) return;
+      const target = group.dataset.drawerWindowGroup;
+      if (!target) return;
+      e.preventDefault();
+      setDrawerWindow(target, btn.dataset.drawerWindow);
+    });
+    // Month chip click → return to monthly mode
+    document.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-kpi-drawer-month-chip][data-drawer-window-target]');
+      if (!chip || chip.hidden) return;
+      // Only intercept when a window is active for that target
+      const target = chip.dataset.drawerWindowTarget;
+      const hasActive = !!document.querySelector(`[data-drawer-window-group="${target}"] [data-drawer-window].is-active`);
+      if (!hasActive) return;
+      e.preventDefault();
+      clearDrawerWindow(target);
+    });
   }
 
   function formatMonthHuman(m) {
@@ -1529,6 +1624,7 @@
     if (!drawer) return;
     onMonthChange((m) => syncMonthChips(m));
     syncMonthChips(monthState.selected);
+    bindDrawerWindowControls();
 
     const openDrawer = (panelKey) => {
       const panels = drawer.querySelectorAll('[data-kpi-detail-panel]');

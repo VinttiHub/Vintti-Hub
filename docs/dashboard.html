@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=19">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=20">
 </head>
 <body>
 
@@ -1758,23 +1758,23 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana</h4>
-              <div class="kpi-drawer__stats">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats" data-drawer-window-group="new-clients">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="week" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="month" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="mtd" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
                   <span class="kpi-drawer__stat__label">Last 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_clients_30d" data-override-window="30d" data-bind="text" data-field="new_clients_30d" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
               </div>
             </section>
             <section class="kpi-drawer__section">
@@ -1792,12 +1792,16 @@
                 </svg>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="sa_table_new_clients_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+            <section class="kpi-drawer__section" data-drawer-detail-section="new-clients">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="sa_table_new_clients_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="new-clients" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="new-clients" hidden></span>
+              </h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="sa_table_new_clients_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"
-                   data-month-aware></div>
+                   data-month-aware
+                   data-drawer-window-target="new-clients"></div>
             </section>
           </div>
         </div>
@@ -4727,7 +4731,7 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=41" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=42" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>

@@ -2312,6 +2312,32 @@ body.is-loading .kpi-card::after {
   padding: 3px 9px;
 }
 .kpi-drawer__month-chip:empty { display: none; }
+.kpi-drawer__month-chip.is-clickable {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background .14s ease, border-color .14s ease, color .14s ease;
+}
+.kpi-drawer__month-chip.is-clickable:hover {
+  background: rgba(108, 56, 255, 0.18);
+  color: var(--ink);
+}
+.kpi-drawer__window-chip {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.kpi-drawer__window-chip[hidden] { display: none; }
 
 .kpi-drawer__stats {
   display: grid;
@@ -2328,6 +2354,25 @@ body.is-loading .kpi-card::after {
   flex-direction: column;
   gap: 4px;
 }
+button.kpi-drawer__stat.is-clickable {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background .14s ease, border-color .14s ease, transform .12s ease, box-shadow .14s ease;
+}
+button.kpi-drawer__stat.is-clickable:hover {
+  background: #ffffff;
+  border-color: rgba(108, 56, 255, 0.30);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(13,18,30,0.06);
+}
+button.kpi-drawer__stat.is-clickable.is-active {
+  background: rgba(108, 56, 255, 0.08);
+  border-color: rgba(108, 56, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(108, 56, 255, 0.20);
+}
+button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color: var(--ink); }
 .kpi-drawer__stat__label {
   font-size: 10px;
   font-weight: 700;
