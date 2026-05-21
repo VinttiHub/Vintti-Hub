@@ -122,19 +122,21 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             c.name AS candidate_name,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              ELSE NULLIF(CAST(ho.start_date AS TEXT), '')::date
+              WHEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(ho.start_date AS TEXT)), '')::date
+              ELSE NULL
             END AS start_d,
             CASE
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-              WHEN NULLIF(CAST(ho.end_date AS TEXT), '') IS NULL THEN NULL
-              ELSE ho.end_date::date
+              WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL THEN NULL
+              ELSE NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
             END AS end_d,
             'Recruiting'::text AS model
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           JOIN account a     ON a.account_id     = ho.account_id
           LEFT JOIN candidates c  ON c.candidate_id = ho.candidate_id
-          WHERE o.opp_model = 'Recruiting'
+          WHERE LOWER(TRIM(o.opp_model)) = 'recruiting'
             AND ho.account_id IS NOT NULL
         ),
         recruiting_buyouts AS (
