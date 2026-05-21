@@ -56,7 +56,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # % Reemplazos colocados — per user definition:
     #   - Numerator   `placed_count`: Replacement opps OPENED in the window.
     #                                  "Opened" = nda_signature_or_start_date in window.
-    #   - Denominator `churn_count` : Replacement opps CLOSED (Close Win) in window.
+    #   - Denominator `churn_count` : Replacement opps CLOSED in the window (any
+    #                                  closing stage, not only Close Win).
     #                                  "Closed" = opp_close_date in window.
     sql = """
         WITH ventana AS (
@@ -80,7 +81,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             )::int AS placed_count,
             COUNT(*) FILTER (
               WHERE r.closed_d BETWEEN v.win_ini AND v.win_fin
-                AND r.stage = 'Close Win'
             )::int AS churn_count
           FROM replacement_opps r
           CROSS JOIN ventana v
@@ -110,9 +110,9 @@ DATASET = {
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "placed_count", "label": "Total Replacements abiertas en ventana", "type": "number"},
-        {"key": "churn_count", "label": "Replacements Close Win en ventana", "type": "number"},
-        {"key": "placed_pct", "label": "% Reemplazos colocados (total / close win)", "type": "percent"},
+        {"key": "placed_count", "label": "Replacements abiertas en ventana", "type": "number"},
+        {"key": "churn_count", "label": "Replacements cerradas en ventana", "type": "number"},
+        {"key": "placed_pct", "label": "% Reemplazos colocados (abiertas / cerradas)", "type": "percent"},
     ],
     "default_filters": {"window": "30d"},
     "query": query,
