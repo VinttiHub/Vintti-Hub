@@ -88,21 +88,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         win_rates_30d AS (
           SELECT
-            COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Staffing')::numeric
-              / NULLIF(COUNT(*) FILTER (
-                  WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                    AND opp_model = 'Staffing'
-                ), 0)                                                                AS wr_staffing,
-            COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Recruiting')::numeric
-              / NULLIF(COUNT(*) FILTER (
-                  WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                    AND opp_model = 'Recruiting'
-                ), 0)                                                                AS wr_recruiting,
-            -- Global CR (all models combined) — same number as the Ops card.
             COUNT(*) FILTER (WHERE stage = 'Close Win')::numeric
               / NULLIF(COUNT(*) FILTER (
                   WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                ), 0)                                                                AS wr_global
+                ), 0) AS wr_staffing,
+            COUNT(*) FILTER (WHERE stage = 'Close Win')::numeric
+              / NULLIF(COUNT(*) FILTER (
+                  WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
+                ), 0) AS wr_recruiting
           FROM closed_30d
         ),
         -- Churn (Staffing): CANDIDATE-level bajas, same logic as
@@ -255,15 +248,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           (SELECT corte_d FROM params)                                                       AS corte,
           pc.pipe_staffing,
           pc.pipe_recruiting,
-          ROUND(COALESCE(w.wr_global,     0) * 100, 2)::float                                AS wr_staffing_pct,
-          ROUND(COALESCE(w.wr_global,     0) * 100, 2)::float                                AS wr_recruiting_pct,
+          ROUND(COALESCE(w.wr_staffing, 0) * 100, 2)::float                                AS wr_staffing_pct,
+          ROUND(COALESCE(w.wr_staffing, 0) * 100, 2)::float                                AS wr_recruiting_pct,
           cs.bajas_real_30d::int                                                             AS churn_staffing_30d,
           cr.bajas_real_30d::int                                                             AS churn_recruiting_30d,
           ROUND(
-            (pc.pipe_staffing   * COALESCE(w.wr_global, 0)) - cs.bajas_real_30d
+            (pc.pipe_staffing   * COALESCE(w.wr_staffing, 0)) - cs.bajas_real_30d
           )::int                                                                             AS net_adds_staffing,
           ROUND(
-            (pc.pipe_recruiting * COALESCE(w.wr_global, 0)) - cr.bajas_real_30d
+            (pc.pipe_recruiting * COALESCE(w.wr_staffing, 0)) - cr.bajas_real_30d
           )::int                                                                             AS net_adds_recruiting,
           -- Money-based metrics (Staffing only — fee/MRR concept doesn't apply to Recruiting)
           pc.pipe_fee_staffing::bigint                                                       AS pipe_fee_staffing,
@@ -272,15 +265,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           cfl.churn_revenue_loss::bigint                                                     AS churn_revenue_loss_staffing_30d,
           l.ltv::int                                                                         AS ltv_months,
           ROUND(
-            (pc.pipe_fee_staffing * COALESCE(w.wr_global, 0)) - cfl.churn_fee_loss
+            (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
           )::bigint                                                                          AS net_mrr_fee_staffing_30d,
           ROUND(
-            (pc.pipe_revenue_staffing * COALESCE(w.wr_global, 0)) - cfl.churn_revenue_loss
+            (pc.pipe_revenue_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_revenue_loss
           )::bigint                                                                          AS net_mrr_revenue_staffing_30d,
           -- Net LTV $ = net MRR fee × LTV (months) → total LTV impact in $
           ROUND(
             (
-              (pc.pipe_fee_staffing * COALESCE(w.wr_global, 0)) - cfl.churn_fee_loss
+              (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
             ) * l.ltv
           )::bigint                                                                          AS net_ltv_fee_staffing_30d
         FROM pipeline_counts pc
