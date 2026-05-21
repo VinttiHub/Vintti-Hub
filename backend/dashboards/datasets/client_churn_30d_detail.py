@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -20,6 +20,27 @@ def _parse_date(value: str | None) -> date | None:
     return None
 
 
+def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
+    """Resolve (win_ini, win_fin) from the `window` filter. Default: rolling
+    last 30d (29-day offset). Mirrors client_churn_30d_summary.
+    """
+    raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
+    if raw in ("7d", "7"):
+        return corte - timedelta(days=6), corte
+    if raw in ("week", "semana", "last_week", "last-week", "prev_week"):
+        prev_sunday = corte - timedelta(days=corte.weekday() + 1)
+        prev_monday = prev_sunday - timedelta(days=6)
+        return prev_monday, prev_sunday
+    if raw == "mtd":
+        return corte.replace(day=1), corte
+    if raw in ("month", "last_month", "last-month", "prev_month"):
+        first_this = corte.replace(day=1)
+        last_prev = first_this - timedelta(days=1)
+        first_prev = last_prev.replace(day=1)
+        return first_prev, last_prev
+    return corte - timedelta(days=29), corte
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (
         _parse_date(filters.get("corte"))
@@ -27,13 +48,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("fecha_corte"))
         or datetime.utcnow().date()
     )
+    win_ini, win_fin = _window_bounds(filters, corte)
 
     sql = """
         WITH ventana AS (
           SELECT
-            %(corte)s::date AS corte_d,
-            (%(corte)s::date - INTERVAL '29 days')::date AS win_ini,
-            %(corte)s::date AS win_fin
+            %(win_fin)s::date AS corte_d,
+            %(win_ini)s::date AS win_ini,
+            %(win_fin)s::date AS win_fin
         ),
         hires AS (
           SELECT
@@ -132,7 +154,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY estado_cliente_ventana DESC, a.client_name;
     """
 
-    return sql, {"corte": corte}
+    return sql, {"win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

@@ -1822,27 +1822,27 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana · bajas (%)</h4>
-              <div class="kpi-drawer__stats">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats" data-drawer-window-group="churn-clients">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="week" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="week" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="month" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="month" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="mtd" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="mtd" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
                   <span class="kpi-drawer__stat__label">Last 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_client_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_client_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
+                </button>
               </div>
             </section>
             <section class="kpi-drawer__section">
@@ -1860,12 +1860,16 @@
                 </svg>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+            <section class="kpi-drawer__section" data-drawer-detail-section="churn-clients">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="churn-clients" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="churn-clients" hidden></span>
+              </h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="am_table_client_churn_30d_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="estado_cliente_ventana" data-list-date="fecha_baja" data-limit="60"
-                   data-month-aware></div>
+                   data-month-aware
+                   data-drawer-window-target="churn-clients"></div>
             </section>
           </div>
         </div>
@@ -1886,27 +1890,27 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana · bajas (%)</h4>
-              <div class="kpi-drawer__stats">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats" data-drawer-window-group="churn-contractors">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="week" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="week" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="month" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="month" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="mtd" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="mtd" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
                   <span class="kpi-drawer__stat__label">Last 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> rate</span>
-                </div>
+                </button>
               </div>
             </section>
             <section class="kpi-drawer__section">
@@ -1924,12 +1928,16 @@
                 </svg>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+            <section class="kpi-drawer__section" data-drawer-detail-section="churn-contractors">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="churn-contractors" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="churn-contractors" hidden></span>
+              </h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="end_d" data-limit="60"
-                   data-month-aware></div>
+                   data-month-aware
+                   data-drawer-window-target="churn-contractors"></div>
             </section>
             <p class="kpi-drawer__note">Esta vista cuenta sólo bajas reales (no buyouts). Para Buyouts mirá el tile separado en el dashboard.</p>
           </div>
@@ -2631,27 +2639,27 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana</h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats kpi-drawer__stats--three" data-drawer-window-group="new-ftes-recruiting">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
                   <span class="kpi-drawer__stat__label">Last 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="month" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="ytd">
                   <span class="kpi-drawer__stat__label">YTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Active</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="active_clients_window" data-reduce="first" data-fmt="int">—</span>
@@ -2659,12 +2667,17 @@
                 </div>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle · FTEs Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+            <section class="kpi-drawer__section" data-drawer-detail-section="new-ftes-recruiting">
+              <h4 class="kpi-drawer__section-title">Detalle · FTEs Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="new-ftes-recruiting" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="new-ftes-recruiting" hidden></span>
+              </h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="list"
                    data-list-name="candidate_name" data-list-sub="client_name" data-list-date="start_date" data-limit="80"
-                   data-month-aware></div>
+                   data-month-aware
+                   data-drawer-window-target="new-ftes-recruiting"
+                   data-window-mode="snapshot"></div>
             </section>
             <p class="kpi-drawer__note">"Placed" = close win con candidato linkeado en la opp. Un FTE se cuenta una sola vez (el del close win). Si querés ver Staffing, abrí el drawer de Active contractors.</p>
           </div>
@@ -2686,27 +2699,27 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana</h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats kpi-drawer__stats--three" data-drawer-window-group="new-clients-recruiting">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
                   <span class="kpi-drawer__stat__label">Last 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="month" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="ytd">
                   <span class="kpi-drawer__stat__label">YTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">FTEs · 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
@@ -2714,13 +2727,18 @@
                 </div>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle · clientes Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-field="client_name" data-reduce="count-distinct" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
+            <section class="kpi-drawer__section" data-drawer-detail-section="new-clients-recruiting">
+              <h4 class="kpi-drawer__section-title">Detalle · clientes Recruiting <span class="count" data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="text" data-field="client_name" data-reduce="count-distinct" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="new-clients-recruiting" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="new-clients-recruiting" hidden></span>
+              </h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="gr_table_active_30d_detail" data-override-modelo="Recruiting" data-bind="rollup-list"
                    data-group-by="client_name" data-sub-template="{n} candidatos"
                    data-list-date="start_date" data-limit="80"
-                   data-month-aware></div>
+                   data-month-aware
+                   data-drawer-window-target="new-clients-recruiting"
+                   data-window-mode="snapshot"></div>
             </section>
             <p class="kpi-drawer__note">Es "nuevo cliente" en Recruiting si no había tenido ningún Recruiting close win antes. La lista de abajo muestra todos los clientes Recruiting activos en la ventana (no solo "nuevos") — si querés clientes nuevos estrictos (Staffing+Recruiting), abrí el drawer de New clients en Sales.</p>
           </div>
@@ -4731,7 +4749,7 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=42" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=44" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>

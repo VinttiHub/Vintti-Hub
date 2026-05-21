@@ -1317,6 +1317,30 @@
     return WINDOW_LABELS[String(key || '').toLowerCase()] || String(key || '').toUpperCase();
   }
 
+  // For drawers whose detail dataset is a point-in-time snapshot (e.g. active
+  // headcount), use the end-of-window date as `corte` instead of the rolling
+  // `window` filter. Returns YYYY-MM-DD.
+  function endOfWindowYmd(windowKey) {
+    const today = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const k = String(windowKey || '').toLowerCase();
+    if (k === 'week' || k === 'last_week' || k === 'last-week') {
+      const day = today.getDay(); // 0=Sunday
+      const offset = day === 0 ? 7 : day;
+      const prevSun = new Date(today);
+      prevSun.setDate(today.getDate() - offset);
+      return ymd(prevSun);
+    }
+    if (k === 'month' || k === 'last_month' || k === 'last-month') {
+      const firstThis = new Date(today.getFullYear(), today.getMonth(), 1);
+      firstThis.setDate(0); // last day of previous month
+      return ymd(firstThis);
+    }
+    // mtd, 30d, 7d, ytd → today
+    return ymd(today);
+  }
+
   async function setDrawerWindow(target, windowKey) {
     // Highlight the active stat in the same group
     document.querySelectorAll(`[data-drawer-window-group="${target}"] [data-drawer-window]`).forEach(btn => {
@@ -1328,7 +1352,10 @@
     if (monthChip) monthChip.hidden = true;
     if (winChip) { winChip.hidden = false; winChip.textContent = windowLabel(windowKey); }
 
-    // Refetch every [data-month-aware] element bound to this target with the window override (no corte)
+    // Refetch every [data-month-aware] element bound to this target.
+    // Two modes:
+    //   default → send `window` filter (rolling event-in-window datasets)
+    //   snapshot → send `corte = endOfWindow(windowKey)` (point-in-time datasets)
     const els = document.querySelectorAll(`[data-month-aware][data-drawer-window-target="${target}"]`);
     if (!els.length) return;
     const groups = new Map();
@@ -1337,8 +1364,14 @@
       const chartKey = el.dataset.chart;
       if (!chartKey) return;
       const overrides = readOverridesFor(el);
-      overrides.window = windowKey;
-      delete overrides.corte;
+      const useSnapshot = el.dataset.windowMode === 'snapshot';
+      if (useSnapshot) {
+        overrides.corte = endOfWindowYmd(windowKey);
+        delete overrides.window;
+      } else {
+        overrides.window = windowKey;
+        delete overrides.corte;
+      }
       const compKey = compKeyFor(chartKey, overrides);
       if (!groups.has(compKey)) groups.set(compKey, { chartKey, overrides, els: [] });
       groups.get(compKey).els.push(el);
