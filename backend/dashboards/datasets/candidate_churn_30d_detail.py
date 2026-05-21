@@ -101,6 +101,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND c.start_d <= v.win_ini
             AND (c.end_d IS NULL OR c.end_d >= v.win_ini)
         ),
+        -- Only return "Baja - Real" rows so the detail count matches the
+        -- bajas_real card. Filters out Activo, Alta, and Buyout categories.
         bajas_inicio AS (
           SELECT
             d.win_ini,
@@ -108,14 +110,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             d.client_name,
             d.start_d,
             d.end_d,
-            CASE
-              WHEN d.buyout_d IS NOT NULL AND d.buyout_d >= DATE_TRUNC('month', d.end_d)
-                THEN 'Baja - Buyout (Conversion)'
-              ELSE 'Baja - Real'
-            END AS estado
+            'Baja - Real'::text AS estado
           FROM activos_inicio d
           WHERE d.end_d IS NOT NULL
             AND d.end_d BETWEEN d.win_ini AND d.win_fin
+            AND NOT (d.buyout_d IS NOT NULL AND d.buyout_d >= DATE_TRUNC('month', d.end_d))
         ),
         bajas_starts AS (
           SELECT
@@ -124,40 +123,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             c.client_name,
             c.start_d,
             c.end_d,
-            (CASE
-              WHEN c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d)
-                THEN 'Baja - Buyout (Conversion)'
-              ELSE 'Baja - Real'
-            END) || ' (Start+End en ventana)' AS estado
+            'Baja - Real'::text AS estado
           FROM candidatos c
           CROSS JOIN ventana v
           WHERE c.start_d IS NOT NULL
             AND c.end_d IS NOT NULL
             AND c.start_d BETWEEN v.win_ini AND v.win_fin
             AND c.end_d   BETWEEN v.win_ini AND v.win_fin
-        ),
-        altas_ventana AS (
-          SELECT
-            v.win_ini,
-            c.candidate_name,
-            c.client_name,
-            c.start_d,
-            c.end_d
-          FROM candidatos c
-          CROSS JOIN ventana v
-          WHERE c.start_d IS NOT NULL
-            AND c.start_d BETWEEN v.win_ini AND v.win_fin
+            AND NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
         ),
         all_rows AS (
-          SELECT
-            win_ini::date AS win_ini,
-            candidate_name::text AS candidate_name,
-            client_name::text AS client_name,
-            start_d::date AS start_d,
-            end_d::date AS end_d,
-            'Activo al inicio'::text AS estado
-          FROM activos_inicio
-          UNION ALL
           SELECT
             win_ini::date AS win_ini,
             candidate_name::text AS candidate_name,
@@ -175,15 +150,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             end_d::date AS end_d,
             estado::text AS estado
           FROM bajas_starts
-          UNION ALL
-          SELECT
-            win_ini::date AS win_ini,
-            candidate_name::text AS candidate_name,
-            client_name::text AS client_name,
-            start_d::date AS start_d,
-            end_d::date AS end_d,
-            'Alta en ventana'::text AS estado
-          FROM altas_ventana
         )
         SELECT
           TO_CHAR(win_ini, 'YYYY-MM-DD') AS win_ini,
@@ -193,16 +159,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           TO_CHAR(end_d,   'YYYY-MM-DD') AS end_d,
           estado
         FROM all_rows
-        ORDER BY
-          CASE
-            WHEN estado = 'Alta en ventana'                   THEN 3
-            WHEN estado = 'Activo al inicio'                  THEN 2
-            WHEN estado LIKE 'Baja%% (Start+End en ventana)'  THEN 1
-            WHEN estado LIKE 'Baja%%'                         THEN 0
-            ELSE -1
-          END DESC,
-          client_name,
-          candidate_name;
+        ORDER BY end_d DESC NULLS LAST, client_name, candidate_name;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}

@@ -141,17 +141,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE bc.fecha_baja >= v.win_ini
             AND bc.fecha_baja <= v.win_fin
         )
+        -- Return only "Churn – Real" rows so the detail list matches the
+        -- bajas_real card count. Other states (Activo, Buyout) are filtered out.
         SELECT
           TO_CHAR(v.win_ini, 'YYYY-MM-DD') AS win_ini,
           TO_CHAR(v.win_fin, 'YYYY-MM-DD') AS win_fin,
           a.client_name,
           TO_CHAR(bv.fecha_baja, 'YYYY-MM-DD') AS fecha_baja,
-          COALESCE(bv.tipo_churn, 'Activo') AS estado_cliente_ventana
+          bv.tipo_churn AS estado_cliente_ventana
         FROM ventana v
-        JOIN clientes_en_ventana cev ON TRUE
-        JOIN account a ON a.account_id = cev.account_id
-        LEFT JOIN bajas_ventana bv ON bv.account_id = cev.account_id
-        ORDER BY estado_cliente_ventana DESC, a.client_name;
+        JOIN bajas_ventana bv ON TRUE
+        JOIN account a ON a.account_id = bv.account_id
+        WHERE bv.tipo_churn = 'Churn – Real'
+        ORDER BY bv.fecha_baja DESC, a.client_name;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}
