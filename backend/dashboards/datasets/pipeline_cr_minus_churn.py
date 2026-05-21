@@ -75,9 +75,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                                                                           AS pipe_revenue_staffing
           FROM pipeline
         ),
-        -- Same definition as nda_close_win_30d_summary (Operations card):
-        -- only opps owned by the allow-listed sales leads, only Close Win /
-        -- Closed Lost, only close_d in last 30d. CR = wins / total closed.
+        -- Match the nda_close_win_30d_summary semantics (Operations card):
+        -- Close Win / Closed Lost opps closed within the 30d window.
         closed_30d AS (
           SELECT o.opp_model, TRIM(o.opp_stage) AS stage
           FROM opportunity o
@@ -86,11 +85,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.win_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
-            AND LOWER(COALESCE(TRIM(o.opp_sales_lead), '')) IN (
-              'bahia@vintti.com',
-              'mariano@vintti.com',
-              'lara@vintti.com'
-            )
         ),
         win_rates_30d AS (
           SELECT
