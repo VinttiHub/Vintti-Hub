@@ -17,8 +17,10 @@ PIPELINE_EXCLUDE_STAGES_SQL = """
 
 # Same sales-lead allowlist used by nda_close_win_30d_summary (the dataset that
 # powers the "NDA → Close Win · 30d" KPI in Operations). The pipeline tile
-# must apply the same CR so the two cards agree.
+# must apply the same CR so the two cards agree. Inlined as a SQL literal so
+# it composes safely with the surrounding f-string.
 SALES_LEADS_CR = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
+SALES_LEADS_CR_SQL = "(" + ", ".join(f"'{e}'" for e in SALES_LEADS_CR) + ")"
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -84,7 +86,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.win_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
-            AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads_cr)s
+            AND TRIM(LOWER(o.opp_sales_lead)) IN {SALES_LEADS_CR_SQL}
         ),
         win_rates_30d AS (
           SELECT
@@ -291,7 +293,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN ltv_months           l;
     """
 
-    return sql, {"corte": corte, "sales_leads_cr": SALES_LEADS_CR}
+    return sql, {"corte": corte}
 
 
 DATASET = {
