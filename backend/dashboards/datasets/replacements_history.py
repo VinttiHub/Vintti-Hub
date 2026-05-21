@@ -44,7 +44,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH replacement_opps AS (
           SELECT
             o.opportunity_id,
-            o.opp_model,
             NULLIF(o.nda_signature_or_start_date::text, '')::date AS opened_d,
             NULLIF(o.opp_close_date::text, '')::date              AS closed_d
           FROM opportunity o
@@ -54,33 +53,31 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         opens_per_month AS (
           SELECT
             DATE_TRUNC('month', r.opened_d)::date AS month,
-            r.opp_model,
             COUNT(*)::int AS replacements
           FROM replacement_opps r
           WHERE r.opened_d IS NOT NULL
             AND (%(desde)s::date IS NULL OR r.opened_d >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR r.opened_d <= %(hasta)s::date)
-          GROUP BY 1, 2
+          GROUP BY 1
         ),
         closes_per_month AS (
           SELECT
             DATE_TRUNC('month', r.closed_d)::date AS month,
-            r.opp_model,
             COUNT(*)::int AS total_closed
           FROM replacement_opps r
           WHERE r.closed_d IS NOT NULL
             AND (%(desde)s::date IS NULL OR r.closed_d >= %(desde)s::date)
             AND (%(hasta)s::date IS NULL OR r.closed_d <= %(hasta)s::date)
-          GROUP BY 1, 2
+          GROUP BY 1
         ),
         months AS (
-          SELECT month, opp_model FROM opens_per_month
+          SELECT month FROM opens_per_month
           UNION
-          SELECT month, opp_model FROM closes_per_month
+          SELECT month FROM closes_per_month
         )
         SELECT
           TO_CHAR(m.month, 'YYYY-MM-DD')                                          AS month,
-          m.opp_model,
+          NULL::text                                                              AS opp_model,
           COALESCE(o.replacements, 0)                                             AS replacements,
           COALESCE(c.total_closed, 0)                                             AS total_closed,
           ROUND(
@@ -89,9 +86,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           )::float                                                                AS pct_replacements,
           NULL::float                                                             AS avg_days_to_replace
         FROM months m
-        LEFT JOIN opens_per_month  o ON o.month = m.month AND o.opp_model = m.opp_model
-        LEFT JOIN closes_per_month c ON c.month = m.month AND c.opp_model = m.opp_model
-        ORDER BY m.month, m.opp_model;
+        LEFT JOIN opens_per_month  o ON o.month = m.month
+        LEFT JOIN closes_per_month c ON c.month = m.month
+        ORDER BY m.month;
     """
 
     return sql, {"modelo": modelo, "desde": desde, "hasta": hasta}
