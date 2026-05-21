@@ -15,13 +15,6 @@ PIPELINE_EXCLUDE_STAGES_SQL = """
   AND opp_stage NOT ILIKE '%%close%%lost%%'
 """
 
-# Same sales-lead allowlist used by nda_close_win_30d_summary (the dataset that
-# powers the "NDA → Close Win · 30d" KPI in Operations). The pipeline tile
-# must apply the same CR so the two cards agree. Inlined as a SQL literal so
-# it composes safely with the surrounding f-string.
-SALES_LEADS_CR = ("bahia@vintti.com", "mariano@vintti.com", "lara@vintti.com")
-SALES_LEADS_CR_SQL = "(" + ", ".join(f"'{e}'" for e in SALES_LEADS_CR) + ")"
-
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -75,8 +68,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                                                                           AS pipe_revenue_staffing
           FROM pipeline
         ),
-        -- Match the nda_close_win_30d_summary semantics (Operations card):
-        -- Close Win / Closed Lost opps closed within the 30d window.
         closed_30d AS (
           SELECT o.opp_model, TRIM(o.opp_stage) AS stage
           FROM opportunity o
@@ -88,14 +79,16 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         win_rates_30d AS (
           SELECT
-            COUNT(*) FILTER (WHERE stage = 'Close Win')::numeric
+            COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Staffing')::numeric
               / NULLIF(COUNT(*) FILTER (
                   WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                ), 0) AS wr_staffing,
-            COUNT(*) FILTER (WHERE stage = 'Close Win')::numeric
+                    AND opp_model = 'Staffing'
+                ), 0)                                                                AS wr_staffing,
+            COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Recruiting')::numeric
               / NULLIF(COUNT(*) FILTER (
                   WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                ), 0) AS wr_recruiting
+                    AND opp_model = 'Recruiting'
+                ), 0)                                                                AS wr_recruiting
           FROM closed_30d
         ),
         -- Churn (Staffing): CANDIDATE-level bajas, same logic as
@@ -241,22 +234,19 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND NULLIF(ho.end_date::text, '') IS NOT NULL
             AND NULLIF(ho.end_date::text, '')::date BETWEEN p.win_ini AND p.corte_d
         )
-        -- We apply the SAME global CR (NDA → Close Win 30d from the Ops card)
-        -- to both Staffing and Recruiting pipelines, so the value visible in
-        -- the tiles matches what the Operations KPI shows (e.g. 48%).
         SELECT
           (SELECT corte_d FROM params)                                                       AS corte,
           pc.pipe_staffing,
           pc.pipe_recruiting,
-          ROUND(COALESCE(w.wr_staffing, 0) * 100, 2)::float                                AS wr_staffing_pct,
-          ROUND(COALESCE(w.wr_staffing, 0) * 100, 2)::float                                AS wr_recruiting_pct,
+          ROUND(COALESCE(w.wr_staffing,   0) * 100, 2)::float                                AS wr_staffing_pct,
+          ROUND(COALESCE(w.wr_recruiting, 0) * 100, 2)::float                                AS wr_recruiting_pct,
           cs.bajas_real_30d::int                                                             AS churn_staffing_30d,
           cr.bajas_real_30d::int                                                             AS churn_recruiting_30d,
           ROUND(
-            (pc.pipe_staffing   * COALESCE(w.wr_staffing, 0)) - cs.bajas_real_30d
+            (pc.pipe_staffing   * COALESCE(w.wr_staffing,   0)) - cs.bajas_real_30d
           )::int                                                                             AS net_adds_staffing,
           ROUND(
-            (pc.pipe_recruiting * COALESCE(w.wr_staffing, 0)) - cr.bajas_real_30d
+            (pc.pipe_recruiting * COALESCE(w.wr_recruiting, 0)) - cr.bajas_real_30d
           )::int                                                                             AS net_adds_recruiting,
           -- Money-based metrics (Staffing only — fee/MRR concept doesn't apply to Recruiting)
           pc.pipe_fee_staffing::bigint                                                       AS pipe_fee_staffing,
