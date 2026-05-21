@@ -86,7 +86,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.win_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
-            AND TRIM(LOWER(o.opp_sales_lead)) IN {SALES_LEADS_CR_SQL}
+            AND LOWER(COALESCE(TRIM(o.opp_sales_lead), '')) IN (
+              'bahia@vintti.com',
+              'mariano@vintti.com',
+              'lara@vintti.com'
+            )
         ),
         win_rates_30d AS (
           SELECT
