@@ -24,7 +24,13 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
     """Resolve (win_ini, win_fin) from the `window` filter. Default: rolling
     last 30d (29-day offset). Mirrors candidate_churn_30d_summary.
     """
-    raw = str(filters.get("window") or filters.get("ventana") or "30d").strip().lower()
+    # event_window (drawer-tile click) takes priority over the global window.
+    raw = str(
+        filters.get("event_window")
+        or filters.get("window")
+        or filters.get("ventana")
+        or "30d"
+    ).strip().lower()
     if raw in ("7d", "7"):
         return corte - timedelta(days=6), corte
     if raw in ("week", "semana", "last_week", "last-week", "prev_week"):

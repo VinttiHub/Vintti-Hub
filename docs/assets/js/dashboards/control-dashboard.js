@@ -1354,7 +1354,9 @@
 
     // Refetch every [data-month-aware] element bound to this target.
     // Two modes:
-    //   default → send `window` filter (rolling event-in-window datasets)
+    //   default → send `event_window` filter (rolling event-in-window datasets).
+    //     Uses a NEW param name (not `window`) so the global state.window='30d'
+    //     does not accidentally trigger event-mode on snapshot datasets.
     //   snapshot → send `corte = endOfWindow(windowKey)` (point-in-time datasets)
     const els = document.querySelectorAll(`[data-month-aware][data-drawer-window-target="${target}"]`);
     if (!els.length) return;
@@ -1367,9 +1369,9 @@
       const useSnapshot = el.dataset.windowMode === 'snapshot';
       if (useSnapshot) {
         overrides.corte = endOfWindowYmd(windowKey);
-        delete overrides.window;
+        delete overrides.event_window;
       } else {
-        overrides.window = windowKey;
+        overrides.event_window = windowKey;
         delete overrides.corte;
       }
       const compKey = compKeyFor(chartKey, overrides);

@@ -133,10 +133,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or datetime.utcnow().date()
     )
     modelo = _resolve_modelo(filters)
-    # When a `window` filter is set, switch from snapshot mode (everyone active
-    # at corte) to event-in-window mode (only candidates whose entry-date falls
-    # in the window). Lets KPI count cards and detail lists agree.
-    window_raw = str(filters.get("window") or filters.get("ventana") or "").strip().lower()
+    # ONLY `event_window` triggers event-in-window mode here. The global state
+    # `window` filter (defaults to '30d') is intentionally ignored on this
+    # dataset so the snapshot used by Active Clients / Active Contractors keeps
+    # matching acpa_history.
+    window_raw = str(filters.get("event_window") or "").strip().lower()
     event_mode = bool(window_raw)
     # Narrow event-mode results to accounts whose FIRST-EVER Recruiting close
     # falls in the window. Matches "new clients · Recruiting" card semantics.
