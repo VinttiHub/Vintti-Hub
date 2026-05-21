@@ -1988,12 +1988,13 @@
               </div>
             </section>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle · eventos de reemplazo <span class="count" data-chart="am_table_replacements_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <h4 class="kpi-drawer__section-title">Detalle · Replacements Close Win <span class="count" data-chart="am_table_replacements_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span> <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h4>
               <div class="kpi-drawer__list dlist"
                    data-chart="am_table_replacements_detail" data-bind="list"
-                   data-list-name="client_name" data-list-sub="opp_model" data-list-date="month" data-limit="60"></div>
+                   data-list-name="client_name" data-list-sub="candidate_name" data-list-date="close_date" data-limit="60"
+                   data-month-aware></div>
             </section>
-            <p class="kpi-drawer__note">Numerador = Replacements abiertas en la ventana (`nda_signature_or_start_date` cae en el período). Denominador = Replacements cerradas en la ventana (cualquier stage de cierre — `opp_close_date` cae en el período). La tendencia mensual usa un denominador distinto y sirve como contexto histórico.</p>
+            <p class="kpi-drawer__note">Numerador = Replacements abiertas en la ventana (`nda_signature_or_start_date` cae en el período). Denominador = Replacements cerradas en la ventana (cualquier stage de cierre — `opp_close_date` cae en el período). La tendencia mensual usa la misma fórmula, agrupando por mes.</p>
           </div>
         </div>
 

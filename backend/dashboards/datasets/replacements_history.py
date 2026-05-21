@@ -34,86 +34,64 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
+    # Monthly trend aligned with the 30d coverage tile:
+    #   - replacements  = Replacement opps OPENED in the month
+    #                     (nda_signature_or_start_date in month)
+    #   - total_closed  = Replacement opps CLOSED in the month
+    #                     (opp_close_date in month, any closing stage)
+    #   - pct_replacements = replacements / total_closed * 100
     sql = """
-        WITH opp_replacements AS (
+        WITH replacement_opps AS (
           SELECT
             o.opportunity_id,
-            o.account_id,
-            a.client_name,
             o.opp_model,
-            o.opp_stage,
-            o.opp_type,
-            NULLIF(o.replacement_of::text, '')::text AS old_candidate_id
+            NULLIF(o.nda_signature_or_start_date::text, '')::date AS opened_d,
+            NULLIF(o.opp_close_date::text, '')::date              AS closed_d
           FROM opportunity o
-          JOIN account a ON a.account_id = o.account_id
           WHERE o.opp_type = 'Replacement'
-            AND o.opp_stage IN ('Close Win', 'Close Lost')
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
         ),
-        old_end AS (
+        opens_per_month AS (
           SELECT
-            ho.candidate_id::text AS old_candidate_id,
-            MAX(NULLIF(ho.end_date::text, '')::date) AS old_end_date
-          FROM hire_opportunity ho
-          GROUP BY ho.candidate_id::text
-        ),
-        new_start AS (
-          SELECT
-            ho.opportunity_id,
-            MIN(NULLIF(ho.start_date::text, '')::date) AS new_start_date,
-            MIN(ho.candidate_id)::text AS new_candidate_id
-          FROM hire_opportunity ho
-          GROUP BY ho.opportunity_id
-        ),
-        replacement_detail AS (
-          SELECT
-            r.opportunity_id,
+            DATE_TRUNC('month', r.opened_d)::date AS month,
             r.opp_model,
-            ns.new_start_date,
-            (ns.new_start_date - oe.old_end_date) AS days_to_replace
-          FROM opp_replacements r
-          LEFT JOIN old_end   oe ON oe.old_candidate_id = r.old_candidate_id
-          LEFT JOIN new_start ns ON ns.opportunity_id   = r.opportunity_id
-          WHERE ns.new_start_date IS NOT NULL
-            AND (%(desde)s::date IS NULL OR ns.new_start_date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR ns.new_start_date <= %(hasta)s::date)
-        ),
-        replacements AS (
-          SELECT
-            DATE_TRUNC('month', rd.new_start_date)::date AS month,
-            rd.opp_model,
-            COUNT(*)::int                AS replacements,
-            AVG(rd.days_to_replace)      AS avg_days_to_replace
-          FROM replacement_detail rd
+            COUNT(*)::int AS replacements
+          FROM replacement_opps r
+          WHERE r.opened_d IS NOT NULL
+            AND (%(desde)s::date IS NULL OR r.opened_d >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR r.opened_d <= %(hasta)s::date)
           GROUP BY 1, 2
         ),
-        closed_opps AS (
+        closes_per_month AS (
           SELECT
-            DATE_TRUNC('month', o.opp_close_date::date)::date AS month,
-            o.opp_model,
+            DATE_TRUNC('month', r.closed_d)::date AS month,
+            r.opp_model,
             COUNT(*)::int AS total_closed
-          FROM opportunity o
-          WHERE o.opp_stage IN ('Close Win', 'Close Lost')
-            AND o.opp_close_date IS NOT NULL
-            AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
-            AND (%(desde)s::date  IS NULL OR o.opp_close_date::date >= %(desde)s::date)
-            AND (%(hasta)s::date  IS NULL OR o.opp_close_date::date <= %(hasta)s::date)
+          FROM replacement_opps r
+          WHERE r.closed_d IS NOT NULL
+            AND (%(desde)s::date IS NULL OR r.closed_d >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR r.closed_d <= %(hasta)s::date)
           GROUP BY 1, 2
+        ),
+        months AS (
+          SELECT month, opp_model FROM opens_per_month
+          UNION
+          SELECT month, opp_model FROM closes_per_month
         )
         SELECT
-          TO_CHAR(r.month, 'YYYY-MM-DD')                                          AS month,
-          r.opp_model,
-          r.replacements,
-          c.total_closed,
+          TO_CHAR(m.month, 'YYYY-MM-DD')                                          AS month,
+          m.opp_model,
+          COALESCE(o.replacements, 0)                                             AS replacements,
+          COALESCE(c.total_closed, 0)                                             AS total_closed,
           ROUND(
-            (r.replacements::numeric / NULLIF(c.total_closed, 0)) * 100, 2
+            (COALESCE(o.replacements, 0)::numeric / NULLIF(c.total_closed, 0)) * 100,
+            2
           )::float                                                                AS pct_replacements,
-          ROUND(r.avg_days_to_replace, 1)::float                                  AS avg_days_to_replace
-        FROM replacements r
-        LEFT JOIN closed_opps c
-          ON c.month     = r.month
-         AND c.opp_model = r.opp_model
-        ORDER BY r.month, r.opp_model;
+          NULL::float                                                             AS avg_days_to_replace
+        FROM months m
+        LEFT JOIN opens_per_month  o ON o.month = m.month AND o.opp_model = m.opp_model
+        LEFT JOIN closes_per_month c ON c.month = m.month AND c.opp_model = m.opp_model
+        ORDER BY m.month, m.opp_model;
     """
 
     return sql, {"modelo": modelo, "desde": desde, "hasta": hasta}
