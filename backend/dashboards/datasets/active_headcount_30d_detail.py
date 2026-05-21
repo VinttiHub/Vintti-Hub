@@ -70,6 +70,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # the window). Lets KPI count cards and detail lists agree.
     window_raw = str(filters.get("window") or filters.get("ventana") or "").strip().lower()
     event_mode = bool(window_raw)
+    # Narrow event-mode results to accounts whose FIRST-EVER Recruiting close
+    # falls in the window. Matches "new clients · Recruiting" card semantics.
+    first_close_only = str(filters.get("first_close_only") or "").strip().lower() in ("1", "true", "yes")
     if event_mode:
         win_ini, win_fin = _window_bounds(window_raw, corte)
     else:
@@ -107,9 +110,90 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opp_model IN ('Staffing', 'Recruiting')
             AND ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
+        ),
+        -- Loose Recruiting rows (no candidate join) + buyouts. Mirrors the
+        -- account-activity set counted by acpa_history.cuentas_activas so the
+        -- "Active clients · Recruiting" detail aligns with the card.
+        recruiting_hires_loose AS (
+          SELECT
+            ho.account_id,
+            a.client_name,
+            ho.candidate_id,
+            c.name AS candidate_name,
+            CASE
+              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+              ELSE NULLIF(CAST(ho.start_date AS TEXT), '')::date
+            END AS start_d,
+            CASE
+              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+              WHEN NULLIF(CAST(ho.end_date AS TEXT), '') IS NULL THEN NULL
+              ELSE ho.end_date::date
+            END AS end_d,
+            'Recruiting'::text AS model
+          FROM hire_opportunity ho
+          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+          JOIN account a     ON a.account_id     = ho.account_id
+          LEFT JOIN candidates c  ON c.candidate_id = ho.candidate_id
+          WHERE o.opp_model = 'Recruiting'
+            AND ho.account_id IS NOT NULL
+        ),
+        recruiting_buyouts AS (
+          SELECT
+            b.account_id,
+            a.client_name,
+            NULL::int  AS candidate_id,
+            NULL::text AS candidate_name,
+            CASE
+              WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS start_d,
+            CASE
+              WHEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NOT NULL
+                THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date
+              ELSE NULL
+            END AS end_d,
+            'Recruiting'::text AS model
+          FROM buyouts b
+          JOIN account a ON a.account_id = b.account_id
+          WHERE b.account_id IS NOT NULL
+        ),
+        recruiting_all AS (
+          SELECT * FROM recruiting_hires_loose
+          UNION ALL
+          SELECT * FROM recruiting_buyouts
         )
     """
-    if event_mode:
+    if event_mode and first_close_only:
+        # New-client semantics: restrict to accounts whose FIRST Recruiting
+        # close_d falls in the window (the same set the card counts).
+        sql += """,
+        first_recruiting_close AS (
+          SELECT account_id, MIN(close_d) AS first_close_d
+          FROM hires
+          WHERE model = 'Recruiting' AND close_d IS NOT NULL
+          GROUP BY account_id
+        ),
+        new_recruiting_accounts AS (
+          SELECT fr.account_id
+          FROM first_recruiting_close fr
+          CROSS JOIN ventana v
+          WHERE fr.first_close_d BETWEEN v.win_ini AND v.win_fin
+        )
+        SELECT
+          v.corte_d AS cutoff_date,
+          h.client_name,
+          h.candidate_name,
+          h.start_d AS start_date,
+          h.model   AS opp_model
+        FROM ventana v
+        JOIN hires h
+          ON h.model = 'Recruiting'
+         AND h.close_d BETWEEN v.win_ini AND v.win_fin
+         AND h.account_id IN (SELECT account_id FROM new_recruiting_accounts)
+        ORDER BY h.client_name, h.candidate_name;
+        """
+    elif event_mode:
         # Event-in-window: rows whose entry-into-the-business date is in window.
         # For Recruiting we anchor on close_d (FTE placed); for Staffing on start_d.
         sql += """
@@ -127,6 +211,47 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            OR (h.model = 'Staffing'   AND h.start_d BETWEEN v.win_ini AND v.win_fin)
          )
         ORDER BY h.client_name, h.candidate_name;
+        """
+    elif modelo == 'Recruiting':
+        # Recruiting snapshot uses the loose hire set + buyouts so the row count
+        # matches acpa_history.cuentas_activas exactly.
+        sql += """
+        SELECT
+          v.corte_d AS cutoff_date,
+          r.client_name,
+          r.candidate_name,
+          r.start_d AS start_date,
+          r.model   AS opp_model
+        FROM ventana v
+        JOIN recruiting_all r
+          ON r.start_d IS NOT NULL
+         AND r.start_d <= v.win_fin
+         AND COALESCE(r.end_d, DATE '9999-12-31') >= v.win_fin
+        ORDER BY r.client_name, COALESCE(r.candidate_name, '');
+        """
+    elif modelo == 'Total':
+        # Total = Staffing hires (with candidate join) UNION Recruiting loose set + buyouts
+        sql += """
+        , combined_total AS (
+          SELECT account_id, client_name, candidate_id, candidate_name, start_d, end_d, model
+          FROM hires
+          WHERE model = 'Staffing'
+          UNION ALL
+          SELECT account_id, client_name, candidate_id, candidate_name, start_d, end_d, model
+          FROM recruiting_all
+        )
+        SELECT
+          v.corte_d AS cutoff_date,
+          ct.client_name,
+          ct.candidate_name,
+          ct.start_d AS start_date,
+          ct.model   AS opp_model
+        FROM ventana v
+        JOIN combined_total ct
+          ON ct.start_d IS NOT NULL
+         AND ct.start_d <= v.win_fin
+         AND COALESCE(ct.end_d, DATE '9999-12-31') >= v.win_fin
+        ORDER BY ct.client_name, COALESCE(ct.candidate_name, '');
         """
     else:
         sql += """
