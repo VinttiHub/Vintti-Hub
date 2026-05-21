@@ -1993,7 +1993,7 @@
                    data-chart="am_table_replacements_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="opp_model" data-list-date="month" data-limit="60"></div>
             </section>
-            <p class="kpi-drawer__note">El cálculo en la ventana de 30 días divide el total de Replacements abiertas (cualquier stage) por las que ya cerraron en Close Win. Una opp se considera "abierta" en la ventana según `COALESCE(nda_signature_or_start_date, opp_close_date)`. La tendencia mensual usa un denominador distinto y sirve como contexto histórico.</p>
+            <p class="kpi-drawer__note">Numerador = Replacements abiertas en la ventana (`nda_signature_or_start_date` cae en el período). Denominador = Replacements cerradas en Close Win en la ventana (`opp_close_date` cae en el período). La tendencia mensual usa un denominador distinto y sirve como contexto histórico.</p>
           </div>
         </div>
 

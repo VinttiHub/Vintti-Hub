@@ -54,27 +54,22 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     win_ini, win_fin = _window_bounds(filters, corte)
 
     # % Reemplazos colocados — per user definition:
-    #   - Numerator   `placed_count`: ALL Replacement opps (any stage) opened in
-    #                                  the window. "Opened" = COALESCE(
-    #                                  nda_signature_or_start_date, opp_close_date)
-    #                                  in window — same convention used by
-    #                                  recruiter_metrics_routes.opportunity_created_date.
-    #   - Denominator `churn_count` : Replacement opps with stage='Close Win',
-    #                                  same date proxy in window.
+    #   - Numerator   `placed_count`: Replacement opps OPENED in the window.
+    #                                  "Opened" = nda_signature_or_start_date in window.
+    #   - Denominator `churn_count` : Replacement opps CLOSED (Close Win) in window.
+    #                                  "Closed" = opp_close_date in window.
     sql = """
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
             %(win_fin)s::date AS win_fin
         ),
-        replacements_in_window AS (
+        replacement_opps AS (
           SELECT
             o.opportunity_id,
             TRIM(COALESCE(o.opp_stage, '')) AS stage,
-            COALESCE(
-              NULLIF(o.nda_signature_or_start_date::text, '')::date,
-              NULLIF(o.opp_close_date::text, '')::date
-            ) AS opened_d
+            NULLIF(o.nda_signature_or_start_date::text, '')::date AS opened_d,
+            NULLIF(o.opp_close_date::text, '')::date              AS closed_d
           FROM opportunity o
           WHERE o.opp_type = 'Replacement'
         ),
@@ -84,10 +79,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               WHERE r.opened_d BETWEEN v.win_ini AND v.win_fin
             )::int AS placed_count,
             COUNT(*) FILTER (
-              WHERE r.opened_d BETWEEN v.win_ini AND v.win_fin
+              WHERE r.closed_d BETWEEN v.win_ini AND v.win_fin
                 AND r.stage = 'Close Win'
             )::int AS churn_count
-          FROM replacements_in_window r
+          FROM replacement_opps r
           CROSS JOIN ventana v
         )
         SELECT
