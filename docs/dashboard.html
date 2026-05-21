@@ -1061,10 +1061,10 @@
             <span>
               <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
                     data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
-              replacements /
+              total /
               <span data-chart="gr_kpi_replacement_coverage_30d" data-bind="text"
                     data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
-              candidate churns
+              close win
             </span>
             <span class="skpi-tile__progress-target">Target: 80%</span>
           </div>
@@ -1948,7 +1948,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">C&amp;C Success · Last 30d</span>
             <h3 class="kpi-drawer__title">% Reemplazos colocados</h3>
-            <p class="kpi-drawer__sub">De los candidate churns en los últimos 30 días, qué porcentaje ya tuvo replacement Close Win. Target: 80%.</p>
+            <p class="kpi-drawer__sub">Cantidad total de Replacements abiertas sobre las que ya cerraron en Close Win. Target: 80%.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -1961,12 +1961,12 @@
               <h4 class="kpi-drawer__section-title">Numerador / denominador</h4>
               <div class="kpi-drawer__stats">
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Replacements Close Win</span>
+                  <span class="kpi-drawer__stat__label">Total Replacements</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="placed_count" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">numerador</span>
+                  <span class="kpi-drawer__stat__sub">numerador · cualquier stage</span>
                 </div>
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Candidate churns</span>
+                  <span class="kpi-drawer__stat__label">Replacements Close Win</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_replacement_coverage_30d" data-bind="text" data-field="churn_count" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub">denominador</span>
                 </div>
@@ -1993,7 +1993,7 @@
                    data-chart="am_table_replacements_detail" data-bind="list"
                    data-list-name="client_name" data-list-sub="opp_model" data-list-date="month" data-limit="60"></div>
             </section>
-            <p class="kpi-drawer__note">Mide qué tan rápido el equipo cubre las bajas. El cálculo en la ventana de 30 días divide reemplazos Close Win por candidate churns del mismo período; la tendencia mensual usa un denominador distinto (total cerradas) y sirve como contexto histórico.</p>
+            <p class="kpi-drawer__note">El cálculo en la ventana de 30 días divide el total de Replacements abiertas (cualquier stage) por las que ya cerraron en Close Win. Una opp se considera "abierta" en la ventana según `COALESCE(nda_signature_or_start_date, opp_close_date)`. La tendencia mensual usa un denominador distinto y sirve como contexto histórico.</p>
           </div>
         </div>
 

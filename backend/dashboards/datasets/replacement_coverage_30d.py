@@ -53,99 +53,55 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini, win_fin = _window_bounds(filters, corte)
 
-    # % Reemplazos colocados = (Replacement opps Close Win en 30d) / (candidate
-    # churn en 30d). Both metrics restricted to Staffing.
-    #   - Numerator   `placed_count`: opportunity_id where opp_type='Replacement'
-    #                                  AND opp_stage='Close Win'
-    #                                  AND opp_close_date in window.
-    #   - Denominator `churn_count` : distinct candidates whose end_d falls in the
-    #                                  window (excluding buyouts), same logic as
-    #                                  candidate_churn_30d_summary.bajas_real.
+    # % Reemplazos colocados — per user definition:
+    #   - Numerator   `placed_count`: ALL Replacement opps (any stage) opened in
+    #                                  the window. "Opened" = COALESCE(
+    #                                  nda_signature_or_start_date, opp_close_date)
+    #                                  in window — same convention used by
+    #                                  recruiter_metrics_routes.opportunity_created_date.
+    #   - Denominator `churn_count` : Replacement opps with stage='Close Win',
+    #                                  same date proxy in window.
     sql = """
         WITH ventana AS (
           SELECT
             %(win_ini)s::date AS win_ini,
             %(win_fin)s::date AS win_fin
         ),
-        replacement_wins_in_window AS (
-          SELECT COUNT(*)::int AS placed_count
-          FROM opportunity o
-          CROSS JOIN ventana v
-          WHERE o.opp_type = 'Replacement'
-            AND TRIM(o.opp_stage) = 'Close Win'
-            AND o.opp_close_date IS NOT NULL
-            AND NULLIF(o.opp_close_date::text, '')::date BETWEEN v.win_ini AND v.win_fin
-        ),
-        candidatos AS (
+        replacements_in_window AS (
           SELECT
-            ho.candidate_id,
-            CASE
-              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-              WHEN NULLIF(ho.start_date::text,'') IS NOT NULL THEN ho.start_date::date
-              ELSE NULL
-            END AS start_d,
-            CASE
-              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-              WHEN NULLIF(ho.end_date::text,'') IS NULL THEN NULL
-              ELSE ho.end_date::date
-            END AS end_d,
-            CASE
-              WHEN NULLIF(TRIM(ho.buyout_daterange::text), '') IS NOT NULL
-                THEN TO_DATE(NULLIF(TRIM(ho.buyout_daterange::text), '') || '-01', 'YYYY-MM-DD')
-              ELSE NULL
-            END AS buyout_d
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE ho.candidate_id IS NOT NULL
-            AND o.opp_model = 'Staffing'
+            o.opportunity_id,
+            TRIM(COALESCE(o.opp_stage, '')) AS stage,
+            COALESCE(
+              NULLIF(o.nda_signature_or_start_date::text, '')::date,
+              NULLIF(o.opp_close_date::text, '')::date
+            ) AS opened_d
+          FROM opportunity o
+          WHERE o.opp_type = 'Replacement'
         ),
-        activos_inicio AS (
-          SELECT DISTINCT c.candidate_id, c.end_d, c.buyout_d
-          FROM candidatos c
+        replacement_totals AS (
+          SELECT
+            COUNT(*) FILTER (
+              WHERE r.opened_d BETWEEN v.win_ini AND v.win_fin
+            )::int AS placed_count,
+            COUNT(*) FILTER (
+              WHERE r.opened_d BETWEEN v.win_ini AND v.win_fin
+                AND r.stage = 'Close Win'
+            )::int AS churn_count
+          FROM replacements_in_window r
           CROSS JOIN ventana v
-          WHERE c.start_d IS NOT NULL
-            AND c.start_d <= v.win_ini
-            AND (c.end_d IS NULL OR c.end_d >= v.win_ini)
-        ),
-        bajas_inicio AS (
-          SELECT COUNT(DISTINCT a.candidate_id) FILTER (
-            WHERE NOT (a.buyout_d IS NOT NULL AND a.buyout_d >= DATE_TRUNC('month', a.end_d))
-          )::int AS bajas_real
-          FROM activos_inicio a
-          CROSS JOIN ventana v
-          WHERE a.end_d IS NOT NULL
-            AND a.end_d BETWEEN v.win_ini AND v.win_fin
-        ),
-        bajas_starts AS (
-          SELECT COUNT(DISTINCT c.candidate_id) FILTER (
-            WHERE NOT (c.buyout_d IS NOT NULL AND c.buyout_d >= DATE_TRUNC('month', c.end_d))
-          )::int AS bajas_real
-          FROM candidatos c
-          CROSS JOIN ventana v
-          WHERE c.start_d IS NOT NULL
-            AND c.end_d   IS NOT NULL
-            AND c.start_d BETWEEN v.win_ini AND v.win_fin
-            AND c.end_d   BETWEEN v.win_ini AND v.win_fin
-        ),
-        candidate_churn_in_window AS (
-          SELECT (
-            COALESCE((SELECT bajas_real FROM bajas_inicio), 0)
-            + COALESCE((SELECT bajas_real FROM bajas_starts), 0)
-          )::int AS churn_count
         )
         SELECT
           (SELECT win_ini FROM ventana)              AS ventana_desde,
           (SELECT win_fin FROM ventana)              AS ventana_hasta,
-          cc.churn_count                             AS churn_count,
-          rw.placed_count                            AS placed_count,
+          rt.churn_count                             AS churn_count,
+          rt.placed_count                            AS placed_count,
           ROUND(
             CASE
-              WHEN cc.churn_count = 0 THEN NULL
-              ELSE 100.0 * rw.placed_count::numeric / cc.churn_count
+              WHEN rt.churn_count = 0 THEN NULL
+              ELSE 100.0 * rt.placed_count::numeric / rt.churn_count
             END, 2
           )::float                                   AS placed_pct
-        FROM replacement_wins_in_window rw
-        CROSS JOIN candidate_churn_in_window cc;
+        FROM replacement_totals rt;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}
@@ -159,9 +115,9 @@ DATASET = {
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "churn_count", "label": "Candidate churn en ventana", "type": "number"},
-        {"key": "placed_count", "label": "Replacements Close Win en ventana", "type": "number"},
-        {"key": "placed_pct", "label": "% Reemplazos colocados", "type": "percent"},
+        {"key": "placed_count", "label": "Total Replacements abiertas en ventana", "type": "number"},
+        {"key": "churn_count", "label": "Replacements Close Win en ventana", "type": "number"},
+        {"key": "placed_pct", "label": "% Reemplazos colocados (total / close win)", "type": "percent"},
     ],
     "default_filters": {"window": "30d"},
     "query": query,
