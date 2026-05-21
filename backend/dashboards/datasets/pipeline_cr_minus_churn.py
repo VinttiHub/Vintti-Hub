@@ -79,15 +79,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         win_rates_30d AS (
           SELECT
-            COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Staffing')::numeric
+            COUNT(*) FILTER (WHERE stage = 'Close Win')::numeric
               / NULLIF(COUNT(*) FILTER (
                   WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                    AND opp_model = 'Staffing'
                 ), 0)                                                                AS wr_staffing,
-            COUNT(*) FILTER (WHERE stage = 'Close Win' AND opp_model = 'Recruiting')::numeric
+            COUNT(*) FILTER (WHERE stage = 'Close Win')::numeric
               / NULLIF(COUNT(*) FILTER (
                   WHERE stage IN ('Close Win', 'Closed Lost', 'Close Lost')
-                    AND opp_model = 'Recruiting'
                 ), 0)                                                                AS wr_recruiting
           FROM closed_30d
         ),
