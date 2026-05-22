@@ -84,7 +84,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COALESCE(o.opp_position_name, '')                                        AS position_name,
           COALESCE(o.opp_model, '')                                                AS opp_model,
           COALESCE(o.opp_stage, '')                                                AS opp_stage,
-          COALESCE(LOWER(TRIM(o.opp_sales_lead)), LOWER(TRIM(o.opp_hr_lead)), '')  AS am_email,
+          COALESCE(LOWER(TRIM(o.opp_sales_lead)), '')                              AS am_email,
           TO_CHAR(
             COALESCE(
               NULLIF(o.nda_signature_or_start_date::text, '')::date,
@@ -96,10 +96,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM opportunity o
         LEFT JOIN account a ON a.account_id = o.account_id
         WHERE o.opp_type = 'New'
-          AND (
-            TRIM(LOWER(o.opp_sales_lead)) = ANY(%(am_emails)s)
-            OR TRIM(LOWER(o.opp_hr_lead)) = ANY(%(am_emails)s)
-          )
+          AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(am_emails)s)
           AND COALESCE(
             NULLIF(o.nda_signature_or_start_date::text, '')::date,
             NULLIF(o.opp_close_date::text, '')::date

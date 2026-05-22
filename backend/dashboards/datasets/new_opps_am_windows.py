@@ -76,10 +76,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ) AS opened_d
           FROM opportunity o
           WHERE o.opp_type = 'New'
-            AND (
-              TRIM(LOWER(o.opp_sales_lead)) = ANY(%(am_emails)s)
-              OR TRIM(LOWER(o.opp_hr_lead)) = ANY(%(am_emails)s)
-            )
+            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(am_emails)s)
         )
         SELECT
           %(corte)s::date AS corte,
