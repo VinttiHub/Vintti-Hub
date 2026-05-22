@@ -1573,11 +1573,6 @@
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="staffing_fee_avg" data-reduce="first" data-fmt="currency">—</span>
                   <span class="kpi-drawer__stat__sub">por contractor activo</span>
                 </div>
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">MRR fee total</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="mrr_fee_total" data-reduce="first" data-fmt="currency-k">—</span>
-                  <span class="kpi-drawer__stat__sub">a corte de hoy</span>
-                </div>
               </div>
             </section>
             <section class="kpi-drawer__section">
@@ -1593,6 +1588,24 @@
                     <line x1="0" y1="98" x2="480" y2="98"/>
                   </g>
                 </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Contractors activos
+                <span class="count" data-chart="gr_table_gmrr_contractors_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span>
+              </h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Cada contractor Staffing activo al cierre del mes seleccionado, con su aporte mensual de Fee a Vintti (sin el componente salary). La suma de la columna Fee equivale al total del mes en el chart.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="gr_table_gmrr_contractors_detail" data-bind="dtable"
+                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,fee|Fee mensual|currency"
+                   data-empty-text="Sin contractors activos en el mes seleccionado."
+                   data-month-aware></div>
+              <div class="churn-fee-total">
+                <span class="churn-fee-total__label">Total MRR Fee del mes</span>
+                <span class="churn-fee-total__value" data-chart="gr_table_gmrr_contractors_detail" data-bind="text" data-field="fee" data-reduce="sum" data-fmt="currency-k" data-month-aware>—</span>
               </div>
             </section>
           </div>
@@ -2671,23 +2684,23 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Revenue por ventana</h4>
-              <div class="kpi-drawer__stats">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats" data-drawer-window-group="revenue-recruiting">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
                   <span class="kpi-drawer__stat__label">Last 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="ytd">
                   <span class="kpi-drawer__stat__label">YTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</span>
-                </div>
+                </button>
               </div>
             </section>
             <section class="kpi-drawer__section">
@@ -2703,6 +2716,25 @@
                     <line x1="0" y1="98" x2="480" y2="98"/>
                   </g>
                 </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Close wins
+                <span class="count" data-chart="gr_table_recruiting_revenue_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-drawer-window-target="revenue-recruiting">—</span>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="revenue-recruiting">YTD</span>
+              </h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Cada Close Win de Recruiting en el período seleccionado, con el candidato, el cliente y el revenue. Click en los tiles de arriba para cambiar la ventana.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="gr_table_recruiting_revenue_detail" data-bind="dtable"
+                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,close_date|Close date|raw,revenue|Revenue|currency"
+                   data-empty-text="Sin Close Wins de Recruiting en el período."
+                   data-month-aware
+                   data-drawer-window-target="revenue-recruiting"></div>
+              <div class="churn-fee-total">
+                <span class="churn-fee-total__label">Total Revenue · período</span>
+                <span class="churn-fee-total__value" data-chart="gr_table_recruiting_revenue_detail" data-bind="text" data-field="revenue" data-reduce="sum" data-fmt="currency-k" data-month-aware data-drawer-window-target="revenue-recruiting">—</span>
               </div>
             </section>
             <p class="kpi-drawer__note">Recruiting es revenue one-time (fee al cerrar la opp), no recurrente. Para Staffing recurrente abrí el drawer de GMRR o MRR Fee.</p>

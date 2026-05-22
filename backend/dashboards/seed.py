@@ -202,6 +202,7 @@ RESET_CHART_KEYS = {
         "gr_kpi_staffing_window",
         "gr_table_gmrr_contractors_detail",
         "gr_kpi_recruiting_window",
+        "gr_table_recruiting_revenue_detail",
         "gr_table_staffing_history",
         "gr_table_recruiting_history",
         # Management Dashboard · shared (C&C Success + Pipeline explosion)
@@ -2228,6 +2229,20 @@ MAIN_CHARTS = [
         },
         "position": {"x": 8, "y": 80, "w": 4, "h": 4},
         "sort_order": 370,
+    },
+    {
+        "chart_key": "gr_table_recruiting_revenue_detail",
+        "tab_key": "growth",
+        "title": "Recruiting Revenue — Detalle por contractor",
+        "type": "table",
+        "dataset_key": "recruiting_revenue_detail",
+        "config": {
+            "mapping": {
+                "columns": ["candidate_name", "client_name", "close_date", "revenue"],
+            },
+        },
+        "position": {"x": 0, "y": 90, "w": 8, "h": 6},
+        "sort_order": 375,
     },
     {
         "chart_key": "gr_table_staffing_history",
