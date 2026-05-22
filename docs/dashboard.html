@@ -900,7 +900,7 @@
           <div class="skpi-tile__delta">
             <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY
           </div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting YTD">Ver detalle</button>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" data-initial-window="ytd" aria-label="Ver detalle Revenue Recruiting YTD">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-2 s-3">
@@ -910,7 +910,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="mtd" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">month to date</div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting MTD">Ver detalle</button>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" data-initial-window="mtd" aria-label="Ver detalle Revenue Recruiting MTD">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-3 s-3">
@@ -920,7 +920,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="30d" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">rolling 30 days</div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting 30d">Ver detalle</button>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" data-initial-window="30d" aria-label="Ver detalle Revenue Recruiting 30d">Ver detalle</button>
         </div>
 
         <div class="skpi-tile skpi-g-4 s-3">
@@ -930,7 +930,7 @@
           </div>
           <div class="skpi-tile__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--muted">last 7 days</div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" aria-label="Ver detalle Revenue Recruiting week">Ver detalle</button>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="revenue-recruiting" data-initial-window="week" aria-label="Ver detalle Revenue Recruiting week">Ver detalle</button>
         </div>
 
         <!-- Row 2 · New FTEs placed / New clients (by window) -->
@@ -2678,9 +2678,9 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--cool">
-              <span class="kpi-drawer__hero__label">Revenue Recruiting · YTD</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd" data-reduce="first" data-fmt="currency-k">—</span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs PY · Staffing+Recruiting Total: <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_total_ytd" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__label" data-drawer-window-label="revenue-recruiting">Revenue Recruiting · YTD</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_table_recruiting_revenue_detail" data-bind="text" data-field="revenue" data-reduce="sum" data-fmt="currency-k" data-month-aware data-drawer-window-target="revenue-recruiting">—</span>
+              <span class="kpi-drawer__hero__delta">YTD vs PY: <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_recruiting_ytd_yoy_pct" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> · Staffing+Recruiting YTD: <span data-chart="gr_kpi_revenue_ytd" data-bind="text" data-field="revenue_total_ytd" data-reduce="first" data-fmt="currency-k">—</span></span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Revenue por ventana</h4>
@@ -2733,7 +2733,7 @@
                    data-month-aware
                    data-drawer-window-target="revenue-recruiting"></div>
               <div class="churn-fee-total">
-                <span class="churn-fee-total__label">Total Revenue · período</span>
+                <span class="churn-fee-total__label" data-drawer-window-total-label="revenue-recruiting">Total Revenue · YTD</span>
                 <span class="churn-fee-total__value" data-chart="gr_table_recruiting_revenue_detail" data-bind="text" data-field="revenue" data-reduce="sum" data-fmt="currency-k" data-month-aware data-drawer-window-target="revenue-recruiting">—</span>
               </div>
             </section>
@@ -4865,7 +4865,7 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=48" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=49" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>

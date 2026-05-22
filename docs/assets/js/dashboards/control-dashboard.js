@@ -1351,6 +1351,19 @@
     const winChip = document.querySelector(`[data-drawer-window-chip="${target}"]`);
     if (monthChip) monthChip.hidden = true;
     if (winChip) { winChip.hidden = false; winChip.textContent = windowLabel(windowKey); }
+    // Update hero label + bottom-total label so the drawer header reflects the window
+    const heroLabel = document.querySelector(`[data-drawer-window-label="${target}"]`);
+    if (heroLabel) {
+      const baseLabel = heroLabel.dataset.drawerBaseLabel || heroLabel.textContent.replace(/\s*·\s*\S+$/, '');
+      heroLabel.dataset.drawerBaseLabel = baseLabel;
+      heroLabel.textContent = `${baseLabel} · ${windowLabel(windowKey)}`;
+    }
+    const totalLabel = document.querySelector(`[data-drawer-window-total-label="${target}"]`);
+    if (totalLabel) {
+      const baseLabel = totalLabel.dataset.drawerBaseLabel || totalLabel.textContent.replace(/\s*·\s*\S+$/, '');
+      totalLabel.dataset.drawerBaseLabel = baseLabel;
+      totalLabel.textContent = `${baseLabel} · ${windowLabel(windowKey)}`;
+    }
 
     // Refetch every [data-month-aware] element bound to this target.
     // Two modes:
@@ -1690,7 +1703,19 @@
     document.querySelectorAll('[data-kpi-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        openDrawer(btn.getAttribute('data-kpi-detail-open'));
+        const panelKey = btn.getAttribute('data-kpi-detail-open');
+        openDrawer(panelKey);
+        // If the tile declares which window the drawer should start on
+        // (e.g. clicking the "Last week" card opens the drawer with the
+        // Last week tile already highlighted + table filtered), trigger it
+        // after the drawer is visible so the hero, table and chip refresh.
+        const initialWindow = btn.dataset.initialWindow;
+        if (initialWindow) {
+          requestAnimationFrame(() => {
+            try { setDrawerWindow(panelKey, initialWindow); }
+            catch (err) { console.error('initial window apply failed', err); }
+          });
+        }
       });
     });
 
