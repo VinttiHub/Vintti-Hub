@@ -10,6 +10,7 @@ const API_BASE =
   const referenceCard2 = document.getElementById('referenceCard2');
   const addAnotherWrap = document.getElementById('referenceAddAnotherWrap');
   const addAnotherButton = document.getElementById('btnAddReference');
+  const submittedOverlay = document.getElementById('referenceRequestSubmittedOverlay');
 
   function getReferenceFieldNames(idx) {
     return [
@@ -92,6 +93,13 @@ const API_BASE =
     if (reviewRef2) reviewRef2.textContent = form.elements.reference_2_name.value || '—';
   }
 
+  function showSubmittedOverlay() {
+    if (submittedOverlay) submittedOverlay.classList.remove('hidden');
+    Array.from(form.elements || []).forEach((element) => {
+      element.disabled = true;
+    });
+  }
+
   async function loadContext() {
     const candidateId = getCandidateIdFromUrl();
     const opportunityId = getOpportunityIdFromUrl();
@@ -150,11 +158,7 @@ const API_BASE =
     form.reset();
     currentContext = await loadContext();
     updateReview({ candidate_name: currentContext?.candidate_name || context.candidate_name || candidateLabel.textContent || '' });
-    const successBox = document.querySelector('.success-box');
-    if (successBox) {
-      successBox.classList.remove('hidden');
-      setTimeout(() => successBox.classList.add('hidden'), 3500);
-    }
+    showSubmittedOverlay();
   }
 
   const successBox = document.createElement('div');

@@ -8,6 +8,7 @@ const API_BASE =
   const candidateLabel = document.getElementById('feedbackCandidateLabel');
   const referenceLabel = document.getElementById('feedbackReferenceLabel');
   const questionsHost = document.getElementById('referenceFeedbackQuestions');
+  const submittedOverlay = document.getElementById('referenceFeedbackSubmittedOverlay');
 
   function qs(name) {
     return new URLSearchParams(window.location.search).get(name);
@@ -97,6 +98,13 @@ const API_BASE =
     const baseNotes = stripFeedbackNotes(existingNotes);
     const feedbackHtml = feedbackRoot.innerHTML.trim() ? feedbackRoot.outerHTML : '';
     return [baseNotes, feedbackHtml].filter(Boolean).join('<br>');
+  }
+
+  function showSubmittedOverlay() {
+    if (submittedOverlay) submittedOverlay.classList.remove('hidden');
+    Array.from(form.elements || []).forEach((element) => {
+      element.disabled = true;
+    });
   }
 
   async function loadContext() {
@@ -201,11 +209,7 @@ const API_BASE =
       }
     }
 
-    const successBox = document.querySelector('.success-box');
-    if (successBox) {
-      successBox.classList.remove('hidden');
-      setTimeout(() => successBox.classList.add('hidden'), 3500);
-    }
+    showSubmittedOverlay();
 
     loadContext().then((fresh) => {
       currentContext = fresh || context;

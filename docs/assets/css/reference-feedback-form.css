@@ -23,3 +23,59 @@
 .feedback-question textarea {
   min-height: 120px;
 }
+
+.submitted-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(37, 99, 235, 0.18), transparent 34%),
+    rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.submitted-overlay.hidden {
+  display: none;
+}
+
+.submitted-card {
+  width: min(560px, 100%);
+  padding: 36px 32px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.24);
+  text-align: center;
+}
+
+.submitted-card h2 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.05;
+  color: #12213d;
+}
+
+.submitted-card p {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.55;
+  color: #4b5c7a;
+}
+
+.submitted-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  color: #0f766e;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
