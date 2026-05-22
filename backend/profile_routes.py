@@ -756,13 +756,16 @@ def create_time_off():
     html_parts.append("<p>Have a great day ☀️<br>— The Vintti HUB Team</p>")
     html = "\n".join(html_parts)
 
-    # Targets: leader (if any) + Jaz
+    # Targets: direct leader (if any) + PTO watchers
     to_list = []
     if leader_email:
         to_list.append(leader_email)
-    # Always add Jaz
-    to_list.append("jazmin@vintti.com")
-    to_list.append("angie@vintti.com")
+    to_list.extend([
+        "jazmin@vintti.com",
+        "pgonzales@vintti.com",
+        "lara@vintti.com",
+    ])
+    to_list = list(dict.fromkeys(email.strip().lower() for email in to_list if email))
 
     # ——— Send the email (SendGrid) ———
     try:
