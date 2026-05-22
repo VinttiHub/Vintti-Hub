@@ -46,7 +46,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH params AS (
           SELECT
             %(corte)s::date                                AS corte_d,
-            (%(corte)s::date - INTERVAL '90 days')::date   AS cr_ini
+            (%(corte)s::date - INTERVAL '29 days')::date   AS cr_ini
         ),
         pipeline AS (
           SELECT
@@ -67,6 +67,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= p.cr_ini
             AND NULLIF(o.opp_close_date::text, '')::date <= p.corte_d
+            AND LOWER(COALESCE(TRIM(o.opp_sales_lead), '')) IN (
+              'bahia@vintti.com',
+              'mariano@vintti.com',
+              'lara@vintti.com'
+            )
         ),
         win_rates AS (
           SELECT
@@ -129,10 +134,10 @@ DATASET = {
         {"key": "pipeline_count_new", "label": "Opps abiertas — New", "type": "number"},
         {"key": "pipeline_count_replacement", "label": "Opps abiertas — Replacement", "type": "number"},
         {"key": "pipeline_revenue", "label": "Pipeline revenue (bruto)", "type": "currency"},
-        {"key": "pipeline_revenue_weighted", "label": "Pipeline revenue (weighted CR 90d)", "type": "currency"},
-        {"key": "win_rate_total_pct", "label": "Win rate global 90d", "type": "percent"},
-        {"key": "win_rate_staffing_pct", "label": "Win rate Staffing 90d", "type": "percent"},
-        {"key": "win_rate_recruiting_pct", "label": "Win rate Recruiting 90d", "type": "percent"},
+        {"key": "pipeline_revenue_weighted", "label": "Pipeline revenue (weighted CR 30d)", "type": "currency"},
+        {"key": "win_rate_total_pct", "label": "Win rate global 30d", "type": "percent"},
+        {"key": "win_rate_staffing_pct", "label": "Win rate Staffing 30d", "type": "percent"},
+        {"key": "win_rate_recruiting_pct", "label": "Win rate Recruiting 30d", "type": "percent"},
     ],
     "default_filters": {},
     "query": query,

@@ -2239,12 +2239,12 @@
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Staffing</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count_staffing" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">win rate <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="win_rate_staffing_pct" data-reduce="first" data-fmt="percent">—</span> · 90d</span>
+                  <span class="kpi-drawer__stat__sub">win rate <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="win_rate_staffing_pct" data-reduce="first" data-fmt="percent">—</span> · 30d</span>
                 </div>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Recruiting</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_count_recruiting" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">win rate <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="win_rate_recruiting_pct" data-reduce="first" data-fmt="percent">—</span> · 90d</span>
+                  <span class="kpi-drawer__stat__sub">win rate <span data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="win_rate_recruiting_pct" data-reduce="first" data-fmt="percent">—</span> · 30d</span>
                 </div>
               </div>
             </section>
@@ -2274,11 +2274,19 @@
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Weighted</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_active_pipeline" data-bind="text" data-field="pipeline_revenue_weighted" data-reduce="first" data-fmt="currency-k">—</span>
-                  <span class="kpi-drawer__stat__sub">× win rate 90d</span>
+                  <span class="kpi-drawer__stat__sub">× win rate 30d</span>
                 </div>
               </div>
             </section>
-            <p class="kpi-drawer__note">Pipeline weighted = pipeline revenue × win rate 90d. Es la expectativa razonable de revenue que va a aterrizar si las CRs históricas se mantienen.</p>
+            <p class="kpi-drawer__note">
+              <strong>Bruto</strong> = SUMA de <code>expected_revenue</code> (salary + fee, el monto total facturado al cliente) de todas las opps abiertas en pipeline activo. Es el techo teórico si TODO cierra Close Win.
+            </p>
+            <p class="kpi-drawer__note">
+              <strong>Weighted</strong> = Bruto × win rate de los últimos 30 días. El win rate es el mismo que muestra el card de Operations (NDA → Close Win 30d), filtrado por los sales leads del equipo (bahia, mariano, lara). Es la expectativa realista: "del pipeline en $, esto es lo que históricamente termino ganando".
+            </p>
+            <p class="kpi-drawer__note">
+              La diferencia entre Bruto y Weighted = pérdida esperada por opps que probablemente no cerrarán Close Win.
+            </p>
           </div>
         </div>
 
