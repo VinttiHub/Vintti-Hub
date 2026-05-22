@@ -151,6 +151,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             + COALESCE((SELECT bajas_real FROM bajas_starts), 0)
           )::numeric AS bajas_real_30d
         ),
+        -- Churn rate = bajas / candidatos activos al inicio de la ventana.
+        -- Mismo cálculo que candidate_churn_30d_summary.churn_real_pct (la card
+        -- "Candidate churn · 30d" de Account Management).
+        churn_rate_30d AS (
+          SELECT
+            (SELECT bajas_real_30d FROM churn_staffing_30d)
+              / NULLIF((SELECT COUNT(*)::numeric FROM activos_inicio), 0)
+              AS churn_rate
+        ),
         -- Fee/revenue lost from Staffing candidates that ended in the 30d window.
         -- Same buyout exclusion as the count above.
         churn_fee_loss_30d AS (
@@ -240,12 +249,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           ROUND(COALESCE(w.wr_recruiting, 0) * 100, 2)::float                                AS wr_recruiting_pct,
           cs.bajas_real_30d::int                                                             AS churn_staffing_30d,
           cr.bajas_real_30d::int                                                             AS churn_recruiting_30d,
+          -- NEW formula: net = pipeline × (CR − churn_rate%)
+          -- Stakeholder-requested: subtract the churn RATE (e.g. 5%) instead
+          -- of the absolute baja count. Keeps the same multiplier across the
+          -- count, fee, revenue and LTV calculations.
           ROUND(
-            (pc.pipe_staffing   * COALESCE(w.wr_staffing,   0)) - cs.bajas_real_30d
+            pc.pipe_staffing   * (COALESCE(w.wr_staffing,   0) - COALESCE(crt.churn_rate, 0))
           )::int                                                                             AS net_adds_staffing,
           ROUND(
-            (pc.pipe_recruiting * COALESCE(w.wr_recruiting, 0)) - cr.bajas_real_30d
+            pc.pipe_recruiting * (COALESCE(w.wr_recruiting, 0) - COALESCE(crt.churn_rate, 0))
           )::int                                                                             AS net_adds_recruiting,
+          ROUND(COALESCE(crt.churn_rate, 0) * 100, 2)::float                                 AS churn_rate_pct,
           -- Money-based metrics (Staffing only — fee/MRR concept doesn't apply to Recruiting)
           pc.pipe_fee_staffing::bigint                                                       AS pipe_fee_staffing,
           pc.pipe_revenue_staffing::bigint                                                   AS pipe_revenue_staffing,
@@ -253,15 +267,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           cfl.churn_revenue_loss::bigint                                                     AS churn_revenue_loss_staffing_30d,
           l.ltv::int                                                                         AS ltv_months,
           ROUND(
-            (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
+            pc.pipe_fee_staffing * (COALESCE(w.wr_staffing, 0) - COALESCE(crt.churn_rate, 0))
           )::bigint                                                                          AS net_mrr_fee_staffing_30d,
           ROUND(
-            (pc.pipe_revenue_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_revenue_loss
+            pc.pipe_revenue_staffing * (COALESCE(w.wr_staffing, 0) - COALESCE(crt.churn_rate, 0))
           )::bigint                                                                          AS net_mrr_revenue_staffing_30d,
           -- Net LTV $ = net MRR fee × LTV (months) → total LTV impact in $
           ROUND(
             (
-              (pc.pipe_fee_staffing * COALESCE(w.wr_staffing, 0)) - cfl.churn_fee_loss
+              pc.pipe_fee_staffing * (COALESCE(w.wr_staffing, 0) - COALESCE(crt.churn_rate, 0))
             ) * l.ltv
           )::bigint                                                                          AS net_ltv_fee_staffing_30d
         FROM pipeline_counts pc
@@ -269,7 +283,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN churn_staffing_30d   cs
         CROSS JOIN churn_recruiting_30d cr
         CROSS JOIN churn_fee_loss_30d   cfl
-        CROSS JOIN ltv_months           l;
+        CROSS JOIN ltv_months           l
+        CROSS JOIN churn_rate_30d       crt;
     """
 
     return sql, {"corte": corte}
@@ -288,6 +303,7 @@ DATASET = {
         {"key": "wr_recruiting_pct", "label": "CR Recruiting 30d", "type": "percent"},
         {"key": "churn_staffing_30d", "label": "Churn Staffing (30d, count)", "type": "number"},
         {"key": "churn_recruiting_30d", "label": "Churn Recruiting (30d, count)", "type": "number"},
+        {"key": "churn_rate_pct", "label": "Churn rate Staffing 30d", "type": "percent"},
         {"key": "net_adds_staffing", "label": "Net adds Staffing (30d)", "type": "number"},
         {"key": "net_adds_recruiting", "label": "Net adds Recruiting (30d)", "type": "number"},
         {"key": "pipe_fee_staffing", "label": "Pipeline Staffing fee ($)", "type": "currency"},

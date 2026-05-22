@@ -1237,7 +1237,7 @@
                 data-field="ltv_months" data-reduce="first" data-fmt="int">—</span>
           months)
         </div>
-        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="pipeline-cr-churn" aria-label="Ver detalle Pipeline × CR − Churn $">Ver detalle</button>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="pipeline-cr-churn-money" aria-label="Ver detalle Pipeline × CR − Churn $">Ver detalle</button>
       </div>
 
       <!-- SQL Sales · multi-window -->
@@ -2284,9 +2284,9 @@
                   <span class="kpi-drawer__stat__sub">win rate ventana</span>
                 </div>
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Churn 30d</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_staffing_30d" data-reduce="first" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">salidas esperadas</span>
+                  <span class="kpi-drawer__stat__label">Churn rate 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_rate_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_staffing_30d" data-reduce="first" data-fmt="int">—</span> bajas / activos</span>
                 </div>
               </div>
             </section>
@@ -2326,10 +2326,78 @@
                 <span class="churn-fee-total__value" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-field="fee" data-reduce="sum" data-fmt="currency-k">—</span>
               </div>
             </section>
-            <p class="kpi-drawer__note">Fórmula: <code>net adds = pipeline × CR<sub>30d</sub> − churn<sub>30d</sub></code>. Si es negativo, el churn esperado supera a las wins esperadas — señal de presión sobre el headcount neto.</p>
+            <p class="kpi-drawer__note">Fórmula: <code>net = pipeline × (CR<sub>30d</sub> − churn_rate<sub>30d</sub>)</code>. Si es negativo, el % de churn supera al CR — señal de presión sobre el headcount neto.</p>
+          </div>
+        </div>
+
+        <!-- Panel · Pipeline × CR − Churn ($ flavor) — opens from the Staffing $ tile -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="pipeline-cr-churn-money">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Pipeline · Net MRR fee (30d)</span>
+            <h3 class="kpi-drawer__title">Pipeline × CR − Churn</h3>
+            <p class="kpi-drawer__sub">Estimación neta de MRR fee en los próximos 30 días: (pipeline fee × CR) menos el fee perdido por churn en la misma ventana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Net MRR fee Staffing · 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_mrr_fee_staffing_30d" data-reduce="first" data-fmt="currency-k" data-class-on-sign>—</span>
+              <span class="kpi-drawer__hero__delta">$ esperado de wins − $ perdido por churn</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">En dinero · Staffing 30d</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Net MRR fee</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_mrr_fee_staffing_30d" data-reduce="first" data-fmt="currency-k" data-class-on-sign>—</span>
+                  <span class="kpi-drawer__stat__sub">$/mes neto</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Pipeline fee</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_fee_staffing" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">si todo cierra</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Net LTV</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_ltv_fee_staffing_30d" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">LTV <span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="ltv_months" data-reduce="first" data-fmt="int">—</span>m</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Componentes · Staffing</h4>
+              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Pipeline</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_staffing" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">opps abiertas</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">CR 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="wr_staffing_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub">win rate ventana</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">Churn rate 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_rate_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_staffing_30d" data-reduce="first" data-fmt="int">—</span> bajas / activos</span>
+                </div>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle · Bajas Staffing (30d)</h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Los <span data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span>
+                contractors Staffing que se dieron de baja en los últimos 30 días. El churn rate se calcula como bajas / candidatos activos al inicio de la ventana.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="am_table_candidate_churn_30d_detail" data-bind="dtable"
+                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,end_d|Fecha baja|raw,fee|Fee mensual|currency"
+                   data-empty-text="Sin bajas en los últimos 30d."></div>
+            </section>
             <p class="kpi-drawer__note">
-              Net MRR fee = <code>(pipeline fee × CR) − Σ(fee de cada baja)</code>.
-              Por eso restamos dólares reales (no el %), porque dos meses con el mismo % de churn pueden perder cantidades muy distintas según quiénes se dieron de baja.
+              Net MRR fee = <code>pipeline fee × (CR<sub>30d</sub> − churn_rate<sub>30d</sub>)</code>.
+              Aplica el rate de churn directamente al pipeline fee — mismo enfoque que el tile de Net adds.
             </p>
           </div>
         </div>
