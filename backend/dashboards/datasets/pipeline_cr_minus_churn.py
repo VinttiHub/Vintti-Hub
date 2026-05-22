@@ -242,9 +242,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           ROUND(COALESCE(w.wr_recruiting, 0) * 100, 2)::float                                AS wr_recruiting_pct,
           cs.bajas_real_30d::int                                                             AS churn_staffing_30d,
           cr.bajas_real_30d::int                                                             AS churn_recruiting_30d,
-          -- NEW formula: net = pipeline × (CR − churn_rate%)
-          -- Stakeholder-requested: subtract the churn RATE (e.g. 5%) instead
-          -- of the absolute baja count. Same multiplier for count, fee, revenue and LTV.
+          -- Formula: net = pipeline x (CR - churn_rate). Same multiplier
+          -- across count, fee, revenue and LTV. NOTE: avoid literal "x percent"
+          -- text inside SQL comments because psycopg2 confuses unescaped
+          -- percent signs with parameter placeholders ("argument formats
+          -- can't be mixed"). Use "pct" or "rate" instead.
           ROUND(
             pc.pipe_staffing
             * (
@@ -261,8 +263,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           )::int                                                                             AS net_adds_recruiting,
           ROUND(
             (cs.bajas_real_30d / NULLIF(cs.activos_inicio_30d, 0)) * 100, 2
-          )::float                                                                            AS churn_rate_pct,
-          -- Money-based metrics (Staffing only — fee/MRR concept doesn't apply to Recruiting)
+          )::float                                                                           AS churn_rate_pct,
+          -- Money-based metrics (Staffing only - fee/MRR concept does not apply to Recruiting)
           pc.pipe_fee_staffing::bigint                                                       AS pipe_fee_staffing,
           pc.pipe_revenue_staffing::bigint                                                   AS pipe_revenue_staffing,
           cfl.churn_fee_loss::bigint                                                         AS churn_fee_loss_staffing_30d,
@@ -282,7 +284,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               - cs.bajas_real_30d / NULLIF(cs.activos_inicio_30d, 0)
             )
           )::bigint                                                                          AS net_mrr_revenue_staffing_30d,
-          -- Net LTV $ = net MRR fee × LTV (months) → total LTV impact in $
+          -- Net LTV $ = net MRR fee x LTV (months) -> total LTV impact in $
           ROUND(
             (
               pc.pipe_fee_staffing
