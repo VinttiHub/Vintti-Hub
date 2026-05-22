@@ -2441,7 +2441,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales pipeline · Multi-window</span>
             <h3 class="kpi-drawer__title">SQL Sales</h3>
-            <p class="kpi-drawer__sub">Leads marcados como Sales Qualified Lead en cada ventana. Top de funnel del equipo de ventas.</p>
+            <p class="kpi-drawer__sub">Cuentas creadas en el CRM (top de funnel = SQL). Cada account que entra al CRM cuenta como SQL en la ventana de su `creation_date`.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -2478,7 +2478,7 @@
               </h4>
               <div class="dtable-wrap"
                    data-chart="gr_table_sql_leads_detail" data-bind="dtable"
-                   data-cols="name|Lead|raw,email|Email|raw,company|Empresa|raw,createdate|Fecha|raw"
+                   data-cols="client_name|Cliente|raw,contact|Contacto|raw,channel|Channel|raw,account_manager|AM|raw,creation_date|Creación|raw"
                    data-empty-text="Sin leads SQL en el período."
                    data-month-aware
                    data-drawer-window-target="sql-sales"></div>
@@ -2498,7 +2498,7 @@
                 </svg>
               </div>
             </section>
-            <p class="kpi-drawer__note">SQL es la primera marca cualitativa del funnel comercial. La tendencia de SQL→NDA conversion (abajo) muestra qué % de esos leads termina firmando NDA.</p>
+            <p class="kpi-drawer__note">SQL = accounts creadas en el CRM (cada cuenta nueva cuenta como un SQL). La tendencia de SQL → NDA conversion (chart de arriba) muestra qué porcentaje de esos leads termina firmando NDA.</p>
           </div>
         </div>
 
