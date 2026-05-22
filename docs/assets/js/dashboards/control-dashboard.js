@@ -1306,8 +1306,11 @@
   /* ---------- drawer · per-window detail filter ---------- */
   const WINDOW_LABELS = {
     week: 'Last week',
+    last_week: 'Last week',
     month: 'Last month',
+    last_month: 'Last month',
     mtd: 'MTD',
+    wtd: 'WTD',
     '30d': 'Last 30d',
     '7d': 'Last 7d',
     ytd: 'YTD',

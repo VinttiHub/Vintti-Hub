@@ -211,7 +211,9 @@ RESET_CHART_KEYS = {
         "gr_kpi_active_pipeline",
         "gr_kpi_pipeline_cr_minus_churn",
         "gr_kpi_sql_leads_windows",
+        "gr_table_sql_leads_detail",
         "gr_kpi_new_opps_am_windows",
+        "gr_table_new_opps_am_detail",
         "gr_kpi_sql_to_nda_30d",
     ],
 }
@@ -2335,6 +2337,20 @@ MAIN_CHARTS = [
         "sort_order": 440,
     },
     {
+        "chart_key": "gr_table_sql_leads_detail",
+        "tab_key": "growth",
+        "title": "SQL Sales — Detalle por ventana",
+        "type": "table",
+        "dataset_key": "sql_leads_detail",
+        "config": {
+            "mapping": {
+                "columns": ["name", "email", "company", "createdate"],
+            },
+        },
+        "position": {"x": 0, "y": 108, "w": 6, "h": 6},
+        "sort_order": 445,
+    },
+    {
         "chart_key": "gr_kpi_new_opps_am_windows",
         "tab_key": "growth",
         "title": "New opportunities by AM — por ventana",
@@ -2343,6 +2359,20 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "opps_mtd", "label": "MTD", "formatter": "number"}},
         "position": {"x": 6, "y": 104, "w": 6, "h": 4},
         "sort_order": 450,
+    },
+    {
+        "chart_key": "gr_table_new_opps_am_detail",
+        "tab_key": "growth",
+        "title": "New opportunities by AM — Detalle por ventana",
+        "type": "table",
+        "dataset_key": "new_opps_am_detail",
+        "config": {
+            "mapping": {
+                "columns": ["client_name", "position_name", "opp_model", "opp_stage", "opened_date"],
+            },
+        },
+        "position": {"x": 6, "y": 108, "w": 6, "h": 6},
+        "sort_order": 455,
     },
     {
         "chart_key": "gr_kpi_sql_to_nda_30d",

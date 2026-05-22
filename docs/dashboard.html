@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=21">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=22">
 </head>
 <body>
 
@@ -1247,28 +1247,28 @@
           <span class="skpi-group__tag">By window</span>
         </div>
         <div class="skpi-group__grid">
-          <div class="skpi-sub">
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="sql-sales" data-initial-window="last_week" aria-label="Ver detalle SQL Sales Last week">
             <span class="skpi-sub__label">Last week</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
                   data-field="sql_last_week" data-reduce="first" data-fmt="int">—</span>
-          </div>
-          <div class="skpi-sub">
+          </button>
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="sql-sales" data-initial-window="wtd" aria-label="Ver detalle SQL Sales WTD">
             <span class="skpi-sub__label">WTD</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
                   data-field="sql_wtd" data-reduce="first" data-fmt="int">—</span>
-          </div>
-          <div class="skpi-sub">
+          </button>
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="sql-sales" data-initial-window="last_month" aria-label="Ver detalle SQL Sales Last month">
             <span class="skpi-sub__label">Last month</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
                   data-field="sql_last_month" data-reduce="first" data-fmt="int">—</span>
-          </div>
-          <div class="skpi-sub">
+          </button>
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="sql-sales" data-initial-window="mtd" aria-label="Ver detalle SQL Sales MTD">
             <span class="skpi-sub__label">MTD</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text"
                   data-field="sql_mtd" data-reduce="first" data-fmt="int">—</span>
-          </div>
+          </button>
         </div>
-        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="sql-sales" aria-label="Ver detalle SQL Sales">Ver detalle</button>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="sql-sales" data-initial-window="last_week" aria-label="Ver detalle SQL Sales">Ver detalle</button>
       </div>
 
       <!-- New opportunities by AM · multi-window -->
@@ -1278,28 +1278,28 @@
           <span class="skpi-group__tag">By window</span>
         </div>
         <div class="skpi-group__grid">
-          <div class="skpi-sub">
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="new-opps-am" data-initial-window="last_week" aria-label="Ver detalle Opps AM Last week">
             <span class="skpi-sub__label">Last week</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
                   data-field="opps_last_week" data-reduce="first" data-fmt="int">—</span>
-          </div>
-          <div class="skpi-sub">
+          </button>
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="new-opps-am" data-initial-window="wtd" aria-label="Ver detalle Opps AM WTD">
             <span class="skpi-sub__label">WTD</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
                   data-field="opps_wtd" data-reduce="first" data-fmt="int">—</span>
-          </div>
-          <div class="skpi-sub">
+          </button>
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="new-opps-am" data-initial-window="last_month" aria-label="Ver detalle Opps AM Last month">
             <span class="skpi-sub__label">Last month</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
                   data-field="opps_last_month" data-reduce="first" data-fmt="int">—</span>
-          </div>
-          <div class="skpi-sub">
+          </button>
+          <button type="button" class="skpi-sub skpi-sub--clickable" data-kpi-detail-open="new-opps-am" data-initial-window="mtd" aria-label="Ver detalle Opps AM MTD">
             <span class="skpi-sub__label">MTD</span>
             <span class="skpi-sub__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text"
                   data-field="opps_mtd" data-reduce="first" data-fmt="int">—</span>
-          </div>
+          </button>
         </div>
-        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-opps-am" aria-label="Ver detalle New opportunities by AM">Ver detalle</button>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-opps-am" data-initial-window="last_week" aria-label="Ver detalle New opportunities by AM">Ver detalle</button>
       </div>
     </div>
 
@@ -2446,30 +2446,42 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--cool">
-              <span class="kpi-drawer__hero__label">SQL · Last week</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_last_week" data-reduce="first" data-fmt="int">—</span>
-              <span class="kpi-drawer__hero__delta">leads SQL en los últimos 7 días</span>
+              <span class="kpi-drawer__hero__label" data-drawer-window-label="sql-sales">SQL · Last week</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_table_sql_leads_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-drawer-window-target="sql-sales">—</span>
+              <span class="kpi-drawer__hero__delta">leads marcados como SQL en la ventana</span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana</h4>
-              <div class="kpi-drawer__stats">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats" data-drawer-window-group="sql-sales">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="last_week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_last_week" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="wtd">
                   <span class="kpi-drawer__stat__label">WTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_wtd" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="last_month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_last_month" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_leads_windows" data-bind="text" data-field="sql_mtd" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
               </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Leads
+                <span class="count" data-chart="gr_table_sql_leads_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-drawer-window-target="sql-sales">—</span>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="sql-sales">LAST WEEK</span>
+              </h4>
+              <div class="dtable-wrap"
+                   data-chart="gr_table_sql_leads_detail" data-bind="dtable"
+                   data-cols="name|Lead|raw,email|Email|raw,company|Empresa|raw,createdate|Fecha|raw"
+                   data-empty-text="Sin leads SQL en el período."
+                   data-month-aware
+                   data-drawer-window-target="sql-sales"></div>
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Tendencia · SQL → NDA conversion (mensual)</h4>
@@ -2500,30 +2512,42 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--mag">
-              <span class="kpi-drawer__hero__label">Opps AM · Last week</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_last_week" data-reduce="first" data-fmt="int">—</span>
-              <span class="kpi-drawer__hero__delta">nuevas opps generadas por AM</span>
+              <span class="kpi-drawer__hero__label" data-drawer-window-label="new-opps-am">Opps AM · Last week</span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_table_new_opps_am_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-drawer-window-target="new-opps-am">—</span>
+              <span class="kpi-drawer__hero__delta">nuevas opps generadas por AM en la ventana</span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Por ventana</h4>
-              <div class="kpi-drawer__stats">
-                <div class="kpi-drawer__stat">
+              <div class="kpi-drawer__stats" data-drawer-window-group="new-opps-am">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="last_week">
                   <span class="kpi-drawer__stat__label">Last week</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_last_week" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="wtd">
                   <span class="kpi-drawer__stat__label">WTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_wtd" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="last_month">
                   <span class="kpi-drawer__stat__label">Last month</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_last_month" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
                   <span class="kpi-drawer__stat__label">MTD</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_new_opps_am_windows" data-bind="text" data-field="opps_mtd" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
               </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Opps
+                <span class="count" data-chart="gr_table_new_opps_am_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware data-drawer-window-target="new-opps-am">—</span>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="new-opps-am">LAST WEEK</span>
+              </h4>
+              <div class="dtable-wrap"
+                   data-chart="gr_table_new_opps_am_detail" data-bind="dtable"
+                   data-cols="client_name|Cliente|raw,position_name|Position|raw,opp_model|Modelo|raw,opp_stage|Stage|raw,opened_date|Opened|raw"
+                   data-empty-text="Sin opps AM en el período."
+                   data-month-aware
+                   data-drawer-window-target="new-opps-am"></div>
             </section>
             <p class="kpi-drawer__note">Estas opps complementan las que entran por Sales (SQL). Indican qué tanto está expandiendo AM la base instalada con nuevos roles, replacements o upsells.</p>
           </div>
@@ -4873,7 +4897,7 @@
 
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=49" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=50" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>
