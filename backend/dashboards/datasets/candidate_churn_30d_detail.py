@@ -69,6 +69,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COALESCE(c.name, '') AS candidate_name,
             ho.account_id,
             COALESCE(a.client_name, '') AS client_name,
+            COALESCE(ho.fee, 0)::numeric AS fee,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
               WHEN NULLIF(ho.start_date::text, '') IS NOT NULL THEN ho.start_date::date
@@ -98,6 +99,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             c.candidate_id,
             c.candidate_name,
             c.client_name,
+            c.fee,
             c.start_d,
             c.end_d,
             c.buyout_d
@@ -114,6 +116,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             d.win_ini,
             d.candidate_name,
             d.client_name,
+            d.fee,
             d.start_d,
             d.end_d,
             'Baja - Real'::text AS estado
@@ -127,6 +130,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             v.win_ini,
             c.candidate_name,
             c.client_name,
+            c.fee,
             c.start_d,
             c.end_d,
             'Baja - Real'::text AS estado
@@ -143,6 +147,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             win_ini::date AS win_ini,
             candidate_name::text AS candidate_name,
             client_name::text AS client_name,
+            fee::numeric AS fee,
             start_d::date AS start_d,
             end_d::date AS end_d,
             estado::text AS estado
@@ -152,6 +157,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             win_ini::date AS win_ini,
             candidate_name::text AS candidate_name,
             client_name::text AS client_name,
+            fee::numeric AS fee,
             start_d::date AS start_d,
             end_d::date AS end_d,
             estado::text AS estado
@@ -161,6 +167,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           TO_CHAR(win_ini, 'YYYY-MM-DD') AS win_ini,
           client_name,
           candidate_name,
+          fee::float AS fee,
           TO_CHAR(start_d, 'YYYY-MM-DD') AS start_d,
           TO_CHAR(end_d,   'YYYY-MM-DD') AS end_d,
           estado
@@ -182,7 +189,9 @@ DATASET = {
         {"key": "end_d", "label": "End", "type": "date"},
         {"key": "estado", "label": "Estado", "type": "string"},
     ],
-    "measures": [],
+    "measures": [
+        {"key": "fee", "label": "Fee mensual", "type": "currency"},
+    ],
     "default_filters": {},
     "query": query,
 }

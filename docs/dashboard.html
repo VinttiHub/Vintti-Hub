@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=20">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=21">
 </head>
 <body>
 
@@ -2311,23 +2311,26 @@
               </div>
             </section>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Recruiting</h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Pipeline</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_recruiting" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">CR 30d</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="wr_recruiting_pct" data-reduce="first" data-fmt="percent">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">Net adds</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="net_adds_recruiting" data-reduce="first" data-fmt="delta-int" data-class-on-sign>—</span>
-                </div>
+              <h4 class="kpi-drawer__section-title">Desglose · Churn fees (Staffing · 30d)</h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Cada uno de los <span data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span>
+                contractors que se dieron de baja en los últimos 30 días, con su fee mensual.
+                El total es lo que se resta al `pipeline × CR` para calcular el Net MRR fee.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="am_table_candidate_churn_30d_detail" data-bind="dtable"
+                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,end_d|Fecha baja|raw,fee|Fee mensual|currency"
+                   data-empty-text="Sin bajas en los últimos 30d."></div>
+              <div class="churn-fee-total">
+                <span class="churn-fee-total__label">Total Churn fee (lo que resta de Net MRR fee)</span>
+                <span class="churn-fee-total__value" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-field="fee" data-reduce="sum" data-fmt="currency-k">—</span>
               </div>
             </section>
             <p class="kpi-drawer__note">Fórmula: <code>net adds = pipeline × CR<sub>30d</sub> − churn<sub>30d</sub></code>. Si es negativo, el churn esperado supera a las wins esperadas — señal de presión sobre el headcount neto.</p>
+            <p class="kpi-drawer__note">
+              Net MRR fee = <code>(pipeline fee × CR) − Σ(fee de cada baja)</code>.
+              Por eso restamos dólares reales (no el %), porque dos meses con el mismo % de churn pueden perder cantidades muy distintas según quiénes se dieron de baja.
+            </p>
           </div>
         </div>
 
