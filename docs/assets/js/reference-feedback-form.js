@@ -9,6 +9,7 @@ const API_BASE =
   const referenceLabel = document.getElementById('feedbackReferenceLabel');
   const questionsHost = document.getElementById('referenceFeedbackQuestions');
   const submittedOverlay = document.getElementById('referenceFeedbackSubmittedOverlay');
+  document.querySelectorAll('.success-box').forEach((node) => node.remove());
 
   function qs(name) {
     return new URLSearchParams(window.location.search).get(name);
@@ -215,11 +216,6 @@ const API_BASE =
       currentContext = fresh || context;
     }).catch(console.error);
   }
-
-  const successBox = document.createElement('div');
-  successBox.className = 'success-box hidden';
-  successBox.textContent = 'Feedback submitted successfully.';
-  form.prepend(successBox);
 
   let currentContext = null;
   form.addEventListener('submit', (event) => {
