@@ -73,8 +73,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           (SELECT corte_d FROM params)                          AS corte,
           s.mrr_actual::bigint                                  AS mrr_actual,
-          NULL::bigint                                          AS gmrr_actual,
-          -- TODO(gmrr): replace NULL with real fórmula gross-MRR cuando se defina
+          -- GMRR (Gross MRR) a corte = SUM(salary + fee) de los hires Staffing
+          -- activos al corte. Es lo mismo que mrr_actual; se expone bajo el
+          -- alias gmrr_actual para que el card del drawer lo lea sin cambios.
+          s.mrr_actual::bigint                                  AS gmrr_actual,
           ROUND(
             s.mrr_fee_total / NULLIF(s.active_contractors, 0),
             2
