@@ -200,6 +200,7 @@ RESET_CHART_KEYS = {
         # Growth & Revenue · NEW (Staffing | Recruiting subtabs)
         "gr_kpi_revenue_ytd",
         "gr_kpi_staffing_window",
+        "gr_table_gmrr_contractors_detail",
         "gr_kpi_recruiting_window",
         "gr_table_staffing_history",
         "gr_table_recruiting_history",
@@ -2197,6 +2198,20 @@ MAIN_CHARTS = [
         },
         "position": {"x": 4, "y": 80, "w": 4, "h": 4},
         "sort_order": 360,
+    },
+    {
+        "chart_key": "gr_table_gmrr_contractors_detail",
+        "tab_key": "growth",
+        "title": "GMRR — Desglose por contractor",
+        "type": "table",
+        "dataset_key": "gmrr_contractors_detail",
+        "config": {
+            "mapping": {
+                "columns": ["candidate_name", "client_name", "salary", "fee", "gmrr"],
+            },
+        },
+        "position": {"x": 0, "y": 84, "w": 8, "h": 6},
+        "sort_order": 365,
     },
     {
         "chart_key": "gr_kpi_recruiting_window",

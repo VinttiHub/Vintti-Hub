@@ -1508,11 +1508,6 @@
               <h4 class="kpi-drawer__section-title">Snapshot actual</h4>
               <div class="kpi-drawer__stats">
                 <div class="kpi-drawer__stat">
-                  <span class="kpi-drawer__stat__label">GMRR actual</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="gmrr_actual" data-reduce="first" data-fmt="currency-k">—</span>
-                  <span class="kpi-drawer__stat__sub">a corte de hoy</span>
-                </div>
-                <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Active contractors</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_staffing_window" data-bind="text" data-field="active_contractors" data-reduce="first" data-fmt="int">—</span>
                   <span class="kpi-drawer__stat__sub">colaboradores activos</span>
@@ -1532,6 +1527,24 @@
                     <line x1="0" y1="98" x2="480" y2="98"/>
                   </g>
                 </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Desglose · Contractors activos
+                <span class="count" data-chart="gr_table_gmrr_contractors_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span>
+              </h4>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">
+                Cada contractor Staffing activo al cierre del mes seleccionado, con su aporte mensual al GMRR (salary + fee). La suma de la columna GMRR equivale al total del mes en el chart.
+              </p>
+              <div class="dtable-wrap"
+                   data-chart="gr_table_gmrr_contractors_detail" data-bind="dtable"
+                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,salary|Salary|currency,fee|Fee|currency,gmrr|GMRR|currency"
+                   data-empty-text="Sin contractors activos en el mes seleccionado."
+                   data-month-aware></div>
+              <div class="churn-fee-total">
+                <span class="churn-fee-total__label">Total GMRR del mes</span>
+                <span class="churn-fee-total__value" data-chart="gr_table_gmrr_contractors_detail" data-bind="text" data-field="gmrr" data-reduce="sum" data-fmt="currency-k" data-month-aware>—</span>
               </div>
             </section>
             <p class="kpi-drawer__note">El delta MoM compara contra el cierre del mes anterior. GMRR es la top-line; para tracking de unit economics mirá MRR Fee.</p>
