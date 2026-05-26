@@ -75,16 +75,18 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
           ORDER BY m.mes, h.candidate_id, h.account_id, h.start_d DESC NULLS LAST
         ),
-        -- For each (mes, candidate, account), pick the most recent salary_updates row
-        -- that took effect on/before the end of the month (and on/after the hire start,
-        -- so updates from a prior hire don't bleed into a later one).
+        -- Effective salary/fee per (mes, candidate, account):
+        --   1) most recent salary_updates row with date <= end of month,
+        --   2) else earliest salary_updates row (months before the first update
+        --      keep that first-update value as their baseline),
+        --   3) else hire_opportunity.salary/fee (candidate has no updates yet).
         effective_in_month AS (
           SELECT
             am.mes,
             am.candidate_id,
             am.account_id,
-            COALESCE(su.salary::numeric, am.hire_salary) AS salary,
-            COALESCE(su.fee::numeric,    am.hire_fee)    AS fee
+            COALESCE(su_recent.salary::numeric, su_earliest.salary::numeric, am.hire_salary) AS salary,
+            COALESCE(su_recent.fee::numeric,    su_earliest.fee::numeric,    am.hire_fee)    AS fee
           FROM active_month am
           LEFT JOIN LATERAL (
             SELECT s.salary, s.fee
@@ -92,10 +94,17 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             WHERE s.candidate_id = am.candidate_id
               AND s.date IS NOT NULL
               AND s.date::date <= am.fin_mes
-              AND s.date::date >= am.hire_start_d
             ORDER BY s.date::date DESC, s.update_id DESC
             LIMIT 1
-          ) su ON TRUE
+          ) su_recent ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = am.candidate_id
+              AND s.date IS NOT NULL
+            ORDER BY s.date::date ASC, s.update_id ASC
+            LIMIT 1
+          ) su_earliest ON TRUE
         ),
         first_seen AS (
           SELECT candidate_id, account_id, MIN(mes) AS first_mes
