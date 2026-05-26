@@ -63,48 +63,72 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         active_month AS (
           SELECT DISTINCT ON (m.mes, h.candidate_id, h.account_id)
             m.mes,
+            m.fin_mes,
             h.candidate_id,
             h.account_id,
-            h.salary,
-            h.fee
+            h.start_d                                       AS hire_start_d,
+            h.salary                                        AS hire_salary,
+            h.fee                                           AS hire_fee
           FROM meses m
           JOIN hires h
             ON h.start_d <= m.fin_mes
            AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
           ORDER BY m.mes, h.candidate_id, h.account_id, h.start_d DESC NULLS LAST
         ),
+        -- For each (mes, candidate, account), pick the most recent salary_updates row
+        -- that took effect on/before the end of the month (and on/after the hire start,
+        -- so updates from a prior hire don't bleed into a later one).
+        effective_in_month AS (
+          SELECT
+            am.mes,
+            am.candidate_id,
+            am.account_id,
+            COALESCE(su.salary::numeric, am.hire_salary) AS salary,
+            COALESCE(su.fee::numeric,    am.hire_fee)    AS fee
+          FROM active_month am
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = am.candidate_id
+              AND s.date IS NOT NULL
+              AND s.date::date <= am.fin_mes
+              AND s.date::date >= am.hire_start_d
+            ORDER BY s.date::date DESC, s.update_id DESC
+            LIMIT 1
+          ) su ON TRUE
+        ),
         first_seen AS (
           SELECT candidate_id, account_id, MIN(mes) AS first_mes
-          FROM active_month
+          FROM effective_in_month
           GROUP BY candidate_id, account_id
         ),
         last_seen AS (
           SELECT candidate_id, account_id, MAX(mes) AS last_mes
-          FROM active_month
+          FROM effective_in_month
           GROUP BY candidate_id, account_id
         )
         SELECT
-          TO_CHAR(am.mes, 'YYYY-MM')                      AS mes,
-          am.candidate_id::text                           AS candidate_id,
+          TO_CHAR(em.mes, 'YYYY-MM')                      AS mes,
+          em.candidate_id::text                           AS candidate_id,
           TRIM(COALESCE(c.name, ''))                      AS candidate_name,
-          am.account_id::text                             AS account_id,
+          em.account_id::text                             AS account_id,
           COALESCE(a.client_name, '')                     AS client_name,
-          am.salary::bigint                               AS salary,
-          am.fee::bigint                                  AS fee,
-          (am.salary + am.fee)::bigint                    AS client_payment,
-          am.fee::bigint                                  AS vintti_fee,
+          em.salary::bigint                               AS salary,
+          em.fee::bigint                                  AS fee,
+          (em.salary + em.fee)::bigint                    AS client_payment,
+          em.fee::bigint                                  AS vintti_fee,
           TO_CHAR(fs.first_mes, 'YYYY-MM')                AS first_mes,
           TO_CHAR(ls.last_mes, 'YYYY-MM')                 AS last_mes,
           CASE
             WHEN ls.last_mes < (SELECT now_month FROM bounds) THEN 'Churned'
             ELSE 'Active'
           END                                             AS status
-        FROM active_month am
-        LEFT JOIN candidates c ON c.candidate_id = am.candidate_id
-        LEFT JOIN account a    ON a.account_id   = am.account_id
-        JOIN first_seen fs ON fs.candidate_id = am.candidate_id AND fs.account_id = am.account_id
-        JOIN last_seen  ls ON ls.candidate_id = am.candidate_id AND ls.account_id = am.account_id
-        ORDER BY fs.first_mes, am.candidate_id, am.mes;
+        FROM effective_in_month em
+        LEFT JOIN candidates c ON c.candidate_id = em.candidate_id
+        LEFT JOIN account a    ON a.account_id   = em.account_id
+        JOIN first_seen fs ON fs.candidate_id = em.candidate_id AND fs.account_id = em.account_id
+        JOIN last_seen  ls ON ls.candidate_id = em.candidate_id AND ls.account_id = em.account_id
+        ORDER BY fs.first_mes, em.candidate_id, em.mes;
     """
     return sql, {}
 
