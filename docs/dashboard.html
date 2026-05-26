@@ -2462,6 +2462,116 @@
           </div>
         </div>
 
+        <!-- Panel · Sales · SQL → NDA Sent -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-to-nda-sent">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · funnel</span>
+            <h3 class="kpi-drawer__title">SQL → NDA Sent</h3>
+            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = Mariano o Bahía), cuántas ya tienen una opp con `nda_sent_date` poblado.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">% NDA sent</span>
+              <span class="kpi-drawer__hero__value" data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="sql_to_nda_sent_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, M+B)
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, M+B)</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_sql_funnel_30d_detail" data-bind="dtable"
+                   data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_nda_sent|NDA sent|raw,nda_sent_d|Fecha sent|raw,has_nda_signed|NDA signed|raw"
+                   data-empty-text="Sin accounts creadas en los últimos 30d."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · NDA Sent → Sourcing -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-nda-sent-to-sourcing">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · funnel</span>
+            <h3 class="kpi-drawer__title">NDA Sent → Sourcing</h3>
+            <p class="kpi-drawer__sub">De las opps con `nda_sent_date` en los últimos 30 días (account AM = M+B), cuántas ya firmaron (`nda_signature_or_start_date` no nulo).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">% NDA signed</span>
+              <span class="kpi-drawer__hero__value" data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="nda_sent_to_sourcing_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> opps (NDA sent 30d, M+B)
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle opps (NDA sent 30d, M+B)</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_nda_to_sourcing_detail" data-bind="dtable"
+                   data-cols="client_name|Cliente|raw,opp_position_name|Posición|raw,opp_model|Modelo|raw,nda_sent_d|NDA sent|raw,has_nda_signed|NDA signed|raw,nda_signed_d|Fecha sign|raw,opp_stage|Stage|raw"
+                   data-empty-text="Sin opps con NDA sent en los últimos 30d."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Sourcing → Close Win -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sourcing-to-cw">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · funnel</span>
+            <h3 class="kpi-drawer__title">Sourcing → Close Win</h3>
+            <p class="kpi-drawer__sub">De las opps cerradas (CW + Lost) en los últimos 30 días con NDA firmado (M+B), qué % fueron Close Win.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">% Close Win</span>
+              <span class="kpi-drawer__hero__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_nda_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+                <span data-chart="sa_kpi_nda_30d" data-bind="text" data-field="closed_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+                <span data-chart="sa_kpi_nda_30d" data-bind="text" data-field="total_closed_opps" data-reduce="first" data-fmt="int">—</span> closed
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle opps cerradas (30d, M+B)</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_nda_30d_detail" data-bind="dtable"
+                   data-override-opp_stage="Total"
+                   data-cols="client_name|Cliente|raw,opp_model|Modelo|raw,nda_d_first_time|Primer NDA|raw,close_d|Cierre|raw,opp_stage|Stage|raw"
+                   data-empty-text="Sin opps cerradas en los últimos 30d."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · SQL → Close Win -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-to-cw">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · funnel</span>
+            <h3 class="kpi-drawer__title">SQL → Close Win</h3>
+            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = M+B), cuántas ya cerraron Close Win en alguna opp (sin tope de fecha).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">% Close Win</span>
+              <span class="kpi-drawer__hero__value" data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> de
+                <span data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, M+B)
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, M+B)</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_sql_funnel_30d_detail" data-bind="dtable"
+                   data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_close_win|Close Win|raw,close_win_d|Fecha CW|raw,has_nda_signed|NDA signed|raw"
+                   data-empty-text="Sin accounts creadas en los últimos 30d."></div>
+            </section>
+          </div>
+        </div>
+
       </aside>
     </div>
 
@@ -3421,6 +3531,7 @@
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">SQL → NDA Sent</div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="sales-sql-to-nda-sent" aria-label="Ver detalle SQL → NDA Sent">⚐</button>
           </div>
           <div>
             <div class="hero-kpi__value"
@@ -3440,6 +3551,7 @@
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">NDA Sent → Sourcing</div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="sales-nda-sent-to-sourcing" aria-label="Ver detalle NDA Sent → Sourcing">⚐</button>
           </div>
           <div>
             <div class="hero-kpi__value"
@@ -3459,6 +3571,7 @@
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">Sourcing → Close Win</div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="sales-sourcing-to-cw" aria-label="Ver detalle Sourcing → Close Win">⚐</button>
           </div>
           <div>
             <div class="hero-kpi__value"
@@ -3480,6 +3593,7 @@
         <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
           <div class="hero-kpi__head">
             <div class="hero-kpi__title">SQL → Close Win</div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="sales-sql-to-cw" aria-label="Ver detalle SQL → Close Win">⚐</button>
           </div>
           <div>
             <div class="hero-kpi__value"

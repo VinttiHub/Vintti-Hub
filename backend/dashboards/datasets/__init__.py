@@ -123,8 +123,10 @@ from . import (
     sales_funnel_month_detail,
     sql_to_nda_overall,
     nda_to_sourcing,
+    nda_to_sourcing_detail,
     sourcing_to_close_win,
     sql_to_close_win,
+    sql_funnel_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -254,6 +256,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     sourcing_to_close_win.HISTORY_DATASET["key"]: sourcing_to_close_win.HISTORY_DATASET,
     sql_to_close_win.SNAPSHOT_DATASET["key"]: sql_to_close_win.SNAPSHOT_DATASET,
     sql_to_close_win.HISTORY_DATASET["key"]: sql_to_close_win.HISTORY_DATASET,
+    sql_funnel_30d_detail.DATASET["key"]: sql_funnel_30d_detail.DATASET,
+    nda_to_sourcing_detail.DATASET["key"]: nda_to_sourcing_detail.DATASET,
 }
 
 

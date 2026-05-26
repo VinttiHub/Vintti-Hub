@@ -85,6 +85,8 @@ RETIRED_CHART_KEYS = {
         "sa_line_sourcing_to_close_win",
         "sa_kpi_sql_to_close_win",
         "sa_line_sql_to_close_win",
+        "sa_table_sql_funnel_30d_detail",
+        "sa_table_nda_to_sourcing_detail",
     ],
 }
 
@@ -2523,6 +2525,34 @@ MAIN_CHARTS = [
         "config": {"mapping": {"x": "mes", "y": ["sql_to_close_win_pct"], "formatter": "percent"}},
         "position": {"x": 6, "y": 28, "w": 6, "h": 6},
         "sort_order": 570,
+    },
+    {
+        "chart_key": "sa_table_sql_funnel_30d_detail",
+        "tab_key": "sales",
+        "title": "SQL funnel — Detalle 30d (M+B)",
+        "type": "table",
+        "dataset_key": "sql_funnel_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["client_name", "creation_d", "has_nda_sent", "nda_sent_d", "has_nda_signed", "has_close_win"],
+            },
+        },
+        "position": {"x": 0, "y": 34, "w": 12, "h": 5},
+        "sort_order": 580,
+    },
+    {
+        "chart_key": "sa_table_nda_to_sourcing_detail",
+        "tab_key": "sales",
+        "title": "NDA Sent → Sourcing — Detalle 30d (M+B)",
+        "type": "table",
+        "dataset_key": "nda_to_sourcing_detail",
+        "config": {
+            "mapping": {
+                "columns": ["client_name", "opp_position_name", "opp_model", "nda_sent_d", "has_nda_signed", "nda_signed_d", "opp_stage"],
+            },
+        },
+        "position": {"x": 0, "y": 39, "w": 12, "h": 5},
+        "sort_order": 590,
     },
 ]
 
