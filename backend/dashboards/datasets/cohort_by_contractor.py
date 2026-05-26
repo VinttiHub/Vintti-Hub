@@ -102,8 +102,8 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM active_month am
         LEFT JOIN candidates c ON c.candidate_id = am.candidate_id
         LEFT JOIN account a    ON a.account_id   = am.account_id
-        JOIN first_seen fs USING (candidate_id, account_id)
-        JOIN last_seen  ls USING (candidate_id, account_id)
+        JOIN first_seen fs ON fs.candidate_id = am.candidate_id AND fs.account_id = am.account_id
+        JOIN last_seen  ls ON ls.candidate_id = am.candidate_id AND ls.account_id = am.account_id
         ORDER BY fs.first_mes, am.candidate_id, am.mes;
     """
     return sql, {}
