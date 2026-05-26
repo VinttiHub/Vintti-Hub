@@ -1883,7 +1883,7 @@ aiGo.addEventListener('click', async () => {
 
   document.getElementById('signOffPopup').classList.remove('hidden');
   isSpanish = false;
-  document.getElementById('signoff-subject').value = 'Update on your application';
+  document.getElementById('signoff-subject').value = buildSignoffSubject('en');
   document.getElementById('signoff-message').value = buildSignoffMessage('en');
 
   const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${opportunityId}/candidates`);
@@ -1910,38 +1910,20 @@ function getSignoffPositionName() {
   ).trim();
 }
 
-function buildSignoffMessage(lang = 'en') {
+function buildSignoffSubject(lang = 'en') {
+  const baseSubject = lang === 'es'
+    ? 'Actualización sobre tu aplicación'
+    : 'Update on your application';
   const positionName = getSignoffPositionName();
-  const positionLine = positionName
-    ? (lang === 'es'
-      ? `\nPosición a la que aplicaste: ${positionName}\n`
-      : `\nPosition applied for: ${positionName}\n`)
-    : '';
-
-  if (lang === 'es') {
-    return `Querido candidato,\n${positionLine}\nGracias por haber participado en nuestro proceso en Vintti. Tras una cuidadosa evaluación, hemos decidido continuar con otro candidato.\n\n¡Apreciamos mucho tu tiempo e interés!\nSi deseas compartir tu experiencia con el proceso de selección, aquí hay una encuesta anónima muy corta (menos de 3 minutos):\n🔗 https://tally.so/r/w7K859\n\n¡Te deseamos lo mejor en tu camino! ✨\nCon cariño,\nel equipo de Vintti`;
-  }
-
-  return `Dear applicant,\n${positionLine}\nThank you so much for being part of our process at Vintti. After careful consideration, we’ve decided to move forward with another candidate.\n\nWe truly appreciate your time and interest!\nIf you'd like to share your experience with the selection process, here’s a short anonymous survey (under 3 minutes):\n🔗 https://tally.so/r/w7K859\n\nWishing you all the best in your journey! ✨\nWarmly,\nthe Vintti team`;
+  return positionName ? `${baseSubject} - ${positionName}` : baseSubject;
 }
 
-function ensureSignoffPositionInBody(body) {
-  const positionName = getSignoffPositionName();
-  if (!positionName || /^(Position applied for|Posici[oó]n a la que aplicaste):/mi.test(body || '')) {
-    return body;
+function buildSignoffMessage(lang = 'en') {
+  if (lang === 'es') {
+    return `Querido candidato,\n\nGracias por haber participado en nuestro proceso en Vintti. Tras una cuidadosa evaluación, hemos decidido continuar con otro candidato.\n\n¡Apreciamos mucho tu tiempo e interés!\nSi deseas compartir tu experiencia con el proceso de selección, aquí hay una encuesta anónima muy corta (menos de 3 minutos):\n🔗 https://tally.so/r/w7K859\n\n¡Te deseamos lo mejor en tu camino! ✨\nCon cariño,\nel equipo de Vintti`;
   }
 
-  const positionLine = isSpanish
-    ? `Posición a la que aplicaste: ${positionName}`
-    : `Position applied for: ${positionName}`;
-
-  const normalizedBody = String(body || '').replace(/\r\n/g, '\n');
-  const firstBreak = normalizedBody.indexOf('\n');
-  if (firstBreak === -1) {
-    return `${positionLine}\n\n${normalizedBody}`;
-  }
-
-  return `${normalizedBody.slice(0, firstBreak + 1)}\n${positionLine}\n${normalizedBody.slice(firstBreak + 1)}`;
+  return `Dear applicant,\n\nThank you so much for being part of our process at Vintti. After careful consideration, we’ve decided to move forward with another candidate.\n\nWe truly appreciate your time and interest!\nIf you'd like to share your experience with the selection process, here’s a short anonymous survey (under 3 minutes):\n🔗 https://tally.so/r/w7K859\n\nWishing you all the best in your journey! ✨\nWarmly,\nthe Vintti team`;
 }
 
 document.getElementById('toggleLangBtn').addEventListener('click', () => {
@@ -1949,10 +1931,10 @@ document.getElementById('toggleLangBtn').addEventListener('click', () => {
   const message = document.getElementById('signoff-message');
 
   if (!isSpanish) {
-    subject.value = 'Actualización sobre tu aplicación';
+    subject.value = buildSignoffSubject('es');
     message.value = buildSignoffMessage('es');
   } else {
-    subject.value = 'Update on your application';
+    subject.value = buildSignoffSubject('en');
     message.value = buildSignoffMessage('en');
   }
   isSpanish = !isSpanish;
@@ -1960,7 +1942,7 @@ document.getElementById('toggleLangBtn').addEventListener('click', () => {
 document.getElementById('sendSignOffBtn').addEventListener('click', async () => {
   const to = signoffChoices.getValue().map(o => o.value);
   const subject = document.getElementById('signoff-subject').value;
-  const body = ensureSignoffPositionInBody(document.getElementById('signoff-message').value);
+  const body = document.getElementById('signoff-message').value;
 
   if (!to.length || !subject || !body) {
     alert("❌ Fill in all fields");
