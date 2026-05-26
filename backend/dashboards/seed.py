@@ -209,6 +209,7 @@ RESET_CHART_KEYS = {
         "gr_kpi_replacement_coverage_30d",
         "gr_kpi_clients_multi_actual",
         "gr_kpi_active_pipeline",
+        "gr_table_active_pipeline_detail",
         "gr_kpi_pipeline_cr_minus_churn",
         "gr_kpi_sql_leads_windows",
         "gr_table_sql_leads_detail",
@@ -2316,6 +2317,20 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "pipeline_count", "label": "Opps", "formatter": "number"}},
         "position": {"x": 0, "y": 100, "w": 4, "h": 4},
         "sort_order": 420,
+    },
+    {
+        "chart_key": "gr_table_active_pipeline_detail",
+        "tab_key": "growth",
+        "title": "Active Pipeline — Detalle opps abiertas",
+        "type": "table",
+        "dataset_key": "active_pipeline_detail",
+        "config": {
+            "mapping": {
+                "columns": ["client_name", "opp_position_name", "opp_model", "opp_type", "opp_stage", "expected_revenue"],
+            },
+        },
+        "position": {"x": 4, "y": 100, "w": 8, "h": 4},
+        "sort_order": 425,
     },
     {
         "chart_key": "gr_kpi_pipeline_cr_minus_churn",
