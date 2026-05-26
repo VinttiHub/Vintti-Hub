@@ -3462,13 +3462,15 @@
           </div>
           <div>
             <div class="hero-kpi__value"
-                 data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                 data-field="sourcing_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
+                 data-chart="sa_kpi_nda_30d" data-bind="text"
+                 data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
-              <span data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
-              <span data-chart="sa_kpi_sourcing_to_close_win" data-bind="text"
-                    data-field="nda_signed_count" data-reduce="first" data-fmt="int">—</span> Close Win (NDA firmado en 30d)
+              <span data-chart="sa_kpi_nda_30d" data-bind="text"
+                    data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+              <span data-chart="sa_kpi_nda_30d" data-bind="text"
+                    data-field="closed_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+              <span data-chart="sa_kpi_nda_30d" data-bind="text"
+                    data-field="total_closed_opps" data-reduce="first" data-fmt="int">—</span> closed
             </div>
           </div>
         </div>
@@ -3485,9 +3487,9 @@
                  data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</div>
             <div class="hero-kpi__label">
               <span data-chart="sa_kpi_sql_to_close_win" data-bind="text"
-                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
+                    data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> Close Win ·
               <span data-chart="sa_kpi_sql_to_close_win" data-bind="text"
-                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> accounts (created last 30d)
+                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, M+B)
             </div>
           </div>
         </div>

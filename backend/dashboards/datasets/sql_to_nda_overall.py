@@ -1,15 +1,19 @@
-"""SQL → NDA Sent · cohort by account.creation_date, filtered to Mariano + Bahia.
+"""SQL → NDA Sent · cohort by account.creation_date (Mariano + Bahia).
 
-Definition (per user 2026-05-15):
-  - Cohort:    accounts whose `creation_date` falls in the period AND that
-               have at least one opportunity with `opp_sales_lead` in
-               (Mariano, Bahia). Accounts with no AE opp are excluded.
-  - Numerator: subset of the cohort whose AE opportunity has
-               `nda_signature_or_start_date` populated.
-  - % = NDA-signed cohort / total cohort.
+Definition:
+  - Cohort (denominator): accounts whose `creation_date` falls in the period
+    AND that have at least one opportunity with `opp_sales_lead` in
+    (Mariano, Bahia). Accounts with no M+B opp are excluded — same rule as
+    the rest of the Sales tab.
+  - Numerator (NDA sent): subset whose M+B opportunity has `nda_sent_date`
+    populated.
+  - % = NDA-sent cohort / total cohort.
 
 Snapshot: cohort = accounts created in the last 30 days.
 Monthly history: each month M is an independent cohort.
+
+Field names (`sql_count`, `nda_sent_count`, `sql_to_nda_sent_pct`) are
+preserved so existing dashboard bindings keep working.
 """
 from __future__ import annotations
 
@@ -69,10 +73,10 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND a.creation_date::date BETWEEN v.win_ini AND v.win_fin
             AND a.account_id IN (SELECT account_id FROM ae_accounts)
         ),
-        accounts_with_nda AS (
+        accounts_with_nda_sent AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
-          WHERE NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
+          WHERE NULLIF(o.nda_sent_date::text, '') IS NOT NULL
             AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             AND o.account_id IS NOT NULL
         )
@@ -81,14 +85,14 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           (SELECT win_fin FROM ventana)                                  AS ventana_hasta,
           (SELECT COUNT(*)::int FROM cohort)                             AS sql_count,
           (SELECT COUNT(*)::int FROM cohort c
-           WHERE c.account_id IN (SELECT account_id FROM accounts_with_nda))
+           WHERE c.account_id IN (SELECT account_id FROM accounts_with_nda_sent))
                                                                          AS nda_sent_count,
           ROUND(
             CASE
               WHEN (SELECT COUNT(*) FROM cohort) = 0 THEN NULL
               ELSE 100.0
                 * (SELECT COUNT(*) FROM cohort c
-                   WHERE c.account_id IN (SELECT account_id FROM accounts_with_nda))::numeric
+                   WHERE c.account_id IN (SELECT account_id FROM accounts_with_nda_sent))::numeric
                 / (SELECT COUNT(*) FROM cohort)
             END, 2
           )::float                                                       AS sql_to_nda_sent_pct;
@@ -104,10 +108,10 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             AND o.account_id IS NOT NULL
         ),
-        accounts_with_nda AS (
+        accounts_with_nda_sent AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
-          WHERE NULLIF(o.nda_signature_or_start_date::text, '') IS NOT NULL
+          WHERE NULLIF(o.nda_sent_date::text, '') IS NOT NULL
             AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             AND o.account_id IS NOT NULL
         ),
@@ -135,14 +139,14 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           (SELECT COUNT(*)::int FROM cohort c WHERE c.mes = m.mes)                    AS sql_count,
           (SELECT COUNT(*)::int FROM cohort c
            WHERE c.mes = m.mes
-             AND c.account_id IN (SELECT account_id FROM accounts_with_nda))           AS nda_sent_count,
+             AND c.account_id IN (SELECT account_id FROM accounts_with_nda_sent))     AS nda_sent_count,
           ROUND(
             CASE
               WHEN (SELECT COUNT(*) FROM cohort c WHERE c.mes = m.mes) = 0 THEN NULL
               ELSE 100.0
                 * (SELECT COUNT(*) FROM cohort c
                    WHERE c.mes = m.mes
-                     AND c.account_id IN (SELECT account_id FROM accounts_with_nda))::numeric
+                     AND c.account_id IN (SELECT account_id FROM accounts_with_nda_sent))::numeric
                 / (SELECT COUNT(*) FROM cohort c WHERE c.mes = m.mes)
             END, 2
           )::float                                                                     AS sql_to_nda_sent_pct
@@ -160,8 +164,8 @@ SNAPSHOT_DATASET = {
         {"key": "ventana_hasta", "label": "Fin ventana", "type": "date"},
     ],
     "measures": [
-        {"key": "sql_count", "label": "Accounts created (30d, M+B)", "type": "number"},
-        {"key": "nda_sent_count", "label": "Of those, signed NDA", "type": "number"},
+        {"key": "sql_count", "label": "Accounts creadas (30d, M+B)", "type": "number"},
+        {"key": "nda_sent_count", "label": "Of those, NDA sent", "type": "number"},
         {"key": "sql_to_nda_sent_pct", "label": "% SQL → NDA Sent", "type": "percent"},
     ],
     "default_filters": {},
@@ -175,8 +179,8 @@ HISTORY_DATASET = {
         {"key": "mes", "label": "Mes (creation_date)", "type": "date"},
     ],
     "measures": [
-        {"key": "sql_count", "label": "Accounts created in month (M+B)", "type": "number"},
-        {"key": "nda_sent_count", "label": "Of those, signed NDA", "type": "number"},
+        {"key": "sql_count", "label": "Accounts creadas en mes (M+B)", "type": "number"},
+        {"key": "nda_sent_count", "label": "Of those, NDA sent", "type": "number"},
         {"key": "sql_to_nda_sent_pct", "label": "% SQL → NDA Sent", "type": "percent"},
     ],
     "default_filters": {},
