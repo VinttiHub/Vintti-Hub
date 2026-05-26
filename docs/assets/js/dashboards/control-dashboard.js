@@ -1421,6 +1421,47 @@
     refetchMonthAwareElements(document, monthState.selected);
   }
 
+  function bindFunnelDetailToggles() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-funnel-detail-toggle]');
+      if (!btn) return;
+      const key = btn.dataset.funnelDetailToggle;
+      if (!key) return;
+      const section = btn.closest('section');
+      if (!section) return;
+      const panel = section.querySelector(`[data-funnel-detail-panel="${key}"]`);
+      if (!panel) return;
+      e.preventDefault();
+
+      const wasOpen = !panel.hidden;
+      const wasActive = btn.classList.contains('is-active');
+      // Same active card → toggle close. Otherwise activate this card and (re)open.
+      const shouldClose = wasOpen && wasActive;
+
+      section.querySelectorAll(`[data-funnel-detail-toggle="${key}"]`).forEach(b => {
+        b.classList.toggle('is-active', !shouldClose && b === btn);
+      });
+      panel.hidden = shouldClose;
+      if (shouldClose) return;
+
+      const filterField = btn.dataset.detailFilterField || '';
+      const filterValue = btn.dataset.detailFilterValue || '';
+
+      requestAnimationFrame(() => {
+        panel.querySelectorAll('[data-chart]').forEach(el => {
+          const chartKey = el.dataset.chart;
+          if (!chartKey) return;
+          const compKey = compKeyFor(chartKey, readOverridesFor(el));
+          let rows = lastFetchedRows.get(compKey) || [];
+          if (filterField && filterValue) {
+            rows = rows.filter(r => String(r[filterField] ?? '').trim() === filterValue);
+          }
+          renderBinding(el, rows);
+        });
+      });
+    });
+  }
+
   function bindDrawerWindowControls() {
     // Por-ventana stat clicks → switch detail to that window
     document.addEventListener('click', (e) => {
@@ -1676,6 +1717,7 @@
     onMonthChange((m) => syncMonthChips(m));
     syncMonthChips(monthState.selected);
     bindDrawerWindowControls();
+    bindFunnelDetailToggles();
 
     const openDrawer = (panelKey) => {
       const panels = drawer.querySelectorAll('[data-kpi-detail-panel]');

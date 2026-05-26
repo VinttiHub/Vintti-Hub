@@ -215,6 +215,7 @@ RESET_CHART_KEYS = {
         "gr_kpi_new_opps_am_windows",
         "gr_table_new_opps_am_detail",
         "gr_kpi_sql_to_nda_30d",
+        "gr_table_sql_to_nda_30d_detail",
     ],
 }
 
@@ -2383,6 +2384,20 @@ MAIN_CHARTS = [
         "config": {"mapping": {"value": "sql_to_nda_pct", "label": "%", "formatter": "percent"}},
         "position": {"x": 0, "y": 108, "w": 4, "h": 4},
         "sort_order": 460,
+    },
+    {
+        "chart_key": "gr_table_sql_to_nda_30d_detail",
+        "tab_key": "growth",
+        "title": "SQL → NDA signed — Detalle accounts (30d)",
+        "type": "table",
+        "dataset_key": "sql_to_nda_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["client_name", "creation_d", "has_nda", "nda_d"],
+            },
+        },
+        "position": {"x": 4, "y": 108, "w": 8, "h": 4},
+        "sort_order": 465,
     },
     {
         "chart_key": "sa_kpi_sales_funnel_snapshot",

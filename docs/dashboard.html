@@ -2344,22 +2344,6 @@
                 </div>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Desglose · Churn fees (Staffing · 30d)</h4>
-              <p class="muted" style="margin:0 0 10px;font-size:12px;">
-                Cada uno de los <span data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span>
-                contractors que se dieron de baja en los últimos 30 días, con su fee mensual.
-                El total es lo que se resta al `pipeline × CR` para calcular el Net MRR fee.
-              </p>
-              <div class="dtable-wrap"
-                   data-chart="am_table_candidate_churn_30d_detail" data-bind="dtable"
-                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,end_d|Fecha baja|raw,fee|Fee mensual|currency"
-                   data-empty-text="Sin bajas en los últimos 30d."></div>
-              <div class="churn-fee-total">
-                <span class="churn-fee-total__label">Total Churn fee (lo que resta de Net MRR fee)</span>
-                <span class="churn-fee-total__value" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-field="fee" data-reduce="sum" data-fmt="currency-k">—</span>
-              </div>
-            </section>
             <p class="kpi-drawer__note">Fórmula: <code>net = pipeline × (CR<sub>30d</sub> − churn_rate<sub>30d</sub>)</code>. Si es negativo, el % de churn supera al CR — señal de presión sobre el headcount neto.</p>
           </div>
         </div>
@@ -2418,17 +2402,6 @@
                 </div>
               </div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle · Bajas Staffing (30d)</h4>
-              <p class="muted" style="margin:0 0 10px;font-size:12px;">
-                Los <span data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span>
-                contractors Staffing que se dieron de baja en los últimos 30 días. El churn rate se calcula como bajas / candidatos activos al inicio de la ventana.
-              </p>
-              <div class="dtable-wrap"
-                   data-chart="am_table_candidate_churn_30d_detail" data-bind="dtable"
-                   data-cols="candidate_name|Candidato|raw,client_name|Cliente|raw,end_d|Fecha baja|raw,fee|Fee mensual|currency"
-                   data-empty-text="Sin bajas en los últimos 30d."></div>
-            </section>
             <p class="kpi-drawer__note">
               Net MRR fee = <code>pipeline fee × (CR<sub>30d</sub> − churn_rate<sub>30d</sub>)</code>.
               Aplica el rate de churn directamente al pipeline fee — mismo enfoque que el tile de Net adds.
@@ -2483,22 +2456,7 @@
                    data-month-aware
                    data-drawer-window-target="sql-sales"></div>
             </section>
-            <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Tendencia · SQL → NDA conversion (mensual)</h4>
-              <div class="kpi-drawer__mini-chart">
-                <svg data-chart="sa_line_sql_to_nda_overall" data-bind="line"
-                     data-x="mes" data-y="sql_to_nda_pct" data-color="cyan"
-                     data-labels="SQL → NDA %" data-fmt-y="percent"
-                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
-                  <g class="chart-grid">
-                    <line x1="0" y1="32" x2="480" y2="32"/>
-                    <line x1="0" y1="65" x2="480" y2="65"/>
-                    <line x1="0" y1="98" x2="480" y2="98"/>
-                  </g>
-                </svg>
-              </div>
-            </section>
-            <p class="kpi-drawer__note">SQL = accounts creadas en el CRM (cada cuenta nueva cuenta como un SQL). La tendencia de SQL → NDA conversion (chart de arriba) muestra qué porcentaje de esos leads termina firmando NDA.</p>
+            <p class="kpi-drawer__note">SQL = accounts creadas en el CRM (cada cuenta nueva cuenta como un SQL).</p>
           </div>
         </div>
 
@@ -2561,73 +2519,100 @@
             <p class="kpi-drawer__sub">Las 4 conversiones del funnel comercial completo, todas en ventana de 30 días.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
-          <div class="kpi-drawer__body">
+          <div class="kpi-drawer__body" data-funnel-detail-root="conversion-rates">
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">1 · SQL → NDA signed</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1">
                   <span class="kpi-drawer__stat__label">Conversion</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="sql_to_nda_pct" data-reduce="first" data-fmt="percent">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1" data-detail-filter-field="has_nda" data-detail-filter-value="Sí">
                   <span class="kpi-drawer__stat__label">NDAs</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="nda_count" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-1">
                   <span class="kpi-drawer__stat__label">SQL</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_sql_to_nda_30d" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
+              </div>
+              <div class="funnel-detail" data-funnel-detail-panel="conv-block-1" hidden>
+                <div class="dtable-wrap"
+                     data-chart="gr_table_sql_to_nda_30d_detail" data-bind="dtable"
+                     data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_nda|Con NDA|raw,nda_d|Fecha NDA|raw"
+                     data-empty-text="Sin accounts creadas en los últimos 30d."></div>
               </div>
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">2 · NDA signed → CW</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-2">
                   <span class="kpi-drawer__stat__label">Conversion</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-2" data-detail-filter-field="opp_stage" data-detail-filter-value="Close Win">
                   <span class="kpi-drawer__stat__label">CW</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-2">
                   <span class="kpi-drawer__stat__label">Closed</span>
                   <span class="kpi-drawer__stat__value" data-chart="sa_kpi_nda_30d" data-bind="text" data-field="total_closed_opps" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
+              </div>
+              <div class="funnel-detail" data-funnel-detail-panel="conv-block-2" hidden>
+                <div class="dtable-wrap"
+                     data-chart="sa_table_nda_30d_detail" data-bind="dtable"
+                     data-override-opp_stage="Total"
+                     data-cols="client_name|Cliente|raw,opp_model|Modelo|raw,nda_d_first_time|Primer NDA|raw,close_d|Cierre|raw,opp_stage|Stage|raw"
+                     data-empty-text="Sin opps cerradas en los últimos 30d."></div>
               </div>
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">3 · Account Management Conversion Rate</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-3">
                   <span class="kpi-drawer__stat__label">Conversion</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="conversion_30d_pct" data-reduce="first" data-fmt="percent">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-3" data-detail-filter-field="opp_stage" data-detail-filter-value="Close Win">
                   <span class="kpi-drawer__stat__label">CW</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-3">
                   <span class="kpi-drawer__stat__label">Closed</span>
                   <span class="kpi-drawer__stat__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
+              </div>
+              <div class="funnel-detail" data-funnel-detail-panel="conv-block-3" hidden>
+                <div class="dtable-wrap"
+                     data-chart="am_table_lara_winrate_30d_detail" data-bind="dtable"
+                     data-override-opp_stage="Total"
+                     data-cols="client_name|Cliente|raw,opp_model|Modelo|raw,nda_d|NDA|raw,close_d|Cierre|raw,opp_stage|Stage|raw"
+                     data-empty-text="Sin opps cerradas por AM en los últimos 30d."></div>
               </div>
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">4 · NDA → Client (operations view)</h4>
               <div class="kpi-drawer__stats kpi-drawer__stats--three">
-                <div class="kpi-drawer__stat">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4">
                   <span class="kpi-drawer__stat__label">Conversion</span>
                   <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4" data-detail-filter-field="opp_stage" data-detail-filter-value="Close Win">
                   <span class="kpi-drawer__stat__label">CW</span>
                   <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span>
-                </div>
-                <div class="kpi-drawer__stat">
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-funnel-detail-toggle="conv-block-4">
                   <span class="kpi-drawer__stat__label">Closed</span>
                   <span class="kpi-drawer__stat__value" data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span>
-                </div>
+                </button>
+              </div>
+              <div class="funnel-detail" data-funnel-detail-panel="conv-block-4" hidden>
+                <div class="dtable-wrap"
+                     data-chart="op_table_nda_close_win_30d_detail" data-bind="dtable"
+                     data-override-resultado="Total"
+                     data-cols="client_name|Cliente|raw,opp_model|Modelo|raw,close_d|Cierre|raw,opp_stage|Stage|raw"
+                     data-empty-text="Sin opps cerradas en los últimos 30d."></div>
               </div>
             </section>
             <p class="kpi-drawer__note">El funnel se lee de arriba a abajo. Cada barra usa el dataset de su pestaña fuente — ojo que "NDA signed → CW" filtra a Mariano/Bahía y la versión "NDA → Client (ops)" abre el filtro a más AEs.</p>

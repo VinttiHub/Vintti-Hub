@@ -2404,6 +2404,14 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   font-size: 11px;
   color: var(--ink-3);
 }
+.funnel-detail {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--card-soft);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-chip);
+}
+.funnel-detail[hidden] { display: none; }
 
 .kpi-drawer__mini-chart {
   height: 150px;

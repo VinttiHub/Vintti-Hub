@@ -55,6 +55,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opportunity_id,
             a.client_name,
             o.opp_position_name,
+            o.opp_model,
             NULLIF(o.nda_signature_or_start_date::text, '')::date AS nda_d,
             NULLIF(o.opp_close_date::text, '')::date              AS close_d,
             TRIM(o.opp_stage)                                      AS opp_stage
@@ -73,6 +74,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         SELECT
           client_name,
           opp_position_name,
+          opp_model,
           TO_CHAR(nda_d,   'YYYY-MM-DD') AS nda_d,
           TO_CHAR(close_d, 'YYYY-MM-DD') AS close_d,
           opp_stage,
@@ -105,6 +107,7 @@ DATASET = {
     "dimensions": [
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "opp_position_name", "label": "Posición", "type": "string"},
+        {"key": "opp_model", "label": "Modelo", "type": "string"},
         {"key": "nda_d", "label": "NDA", "type": "date"},
         {"key": "close_d", "label": "Cierre", "type": "date"},
         {"key": "opp_stage", "label": "Stage", "type": "string"},
