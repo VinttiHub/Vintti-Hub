@@ -35,6 +35,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, tuple]:
           o.opp_model,
           o.opp_type,
           o.opp_position_name,
+          o.nda_sent_date,
           o.nda_signature_or_start_date,
           o.opp_close_date,
           o.expected_revenue,
@@ -60,6 +61,7 @@ DATASET = {
         {"key": "client_name", "label": "Client", "type": "categorical"},
         {"key": "lead_source", "label": "Lead Source", "type": "categorical"},
         {"key": "opp_close_date", "label": "Close Date", "type": "date"},
+        {"key": "nda_sent_date", "label": "NDA Sent Date", "type": "date"},
         {"key": "nda_signature_or_start_date", "label": "NDA / Start Date", "type": "date"},
     ],
     "measures": [

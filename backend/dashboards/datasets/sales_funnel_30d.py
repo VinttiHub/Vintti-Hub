@@ -4,8 +4,8 @@ Hybrid source:
   - SQL:        HubSpot contacts with `lead_life='SQL (AE)'`, owned by
                 Mariano or Bahia, `createdate` in 30d window.
   - NDA Sent:   Local `opportunity` table — opps with sales_lead in (M,B)
-                that progressed past `Deep Dive`, with activity (NDA signed
-                or close date) in 30d window.
+                that progressed past `Deep Dive`, with `nda_sent_date`
+                in 30d window (falls back to old NDA/close dates).
   - Sourcing:   subset above with `nda_signature_or_start_date` populated.
   - Close Win:  opps with `opp_close_date` in 30d AND `opp_stage='Close Win'`.
 
@@ -145,6 +145,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opportunity_id,
             TRIM(o.opp_stage) AS opp_stage,
             COALESCE(
+              NULLIF(o.nda_sent_date::text, '')::date,
               NULLIF(o.nda_signature_or_start_date::text, '')::date,
               NULLIF(o.opp_close_date::text, '')::date
             ) AS opp_date,

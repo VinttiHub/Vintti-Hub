@@ -89,6 +89,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             o.opp_model,
             o.opp_type,
             COALESCE(
+              NULLIF(o.nda_sent_date::text, '')::date,
               NULLIF(o.nda_signature_or_start_date::text, '')::date,
               NULLIF(o.opp_close_date::text, '')::date
             ) AS opp_date,

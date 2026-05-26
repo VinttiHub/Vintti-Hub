@@ -29,6 +29,14 @@ from utils.storage_utils import (
 bp = Blueprint('accounts', __name__)
 
 
+def _ensure_opportunity_nda_sent_date_column(cursor):
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
+
+
+def _is_nda_sent_stage(stage):
+    return str(stage or "").strip().lower() == "nda sent"
+
+
 PAIN_POINT_NORMALIZATION = {
     'high salary': 'High salary',
     'no real pain point': 'No real pain point',
@@ -952,17 +960,23 @@ def update_opportunity_stage(opportunity_id):
                     return jsonify({"error": "Opportunity not found"}), 404
                 previous_stage = row.get("opp_stage")
                 account_id = row.get("account_id")
+                stage_changed = (previous_stage or "").strip() != (new_stage or "").strip()
+
+                _ensure_opportunity_nda_sent_date_column(cursor)
 
                 cursor.execute(
                     """
                     UPDATE opportunity
-                    SET opp_stage = %s
+                    SET opp_stage = %s,
+                        nda_sent_date = CASE
+                            WHEN %s THEN COALESCE(nda_sent_date, CURRENT_DATE)
+                            ELSE nda_sent_date
+                        END
                     WHERE opportunity_id = %s
                     """,
-                    (new_stage, opportunity_id),
+                    (new_stage, stage_changed and _is_nda_sent_stage(new_stage), opportunity_id),
                 )
 
-                stage_changed = (previous_stage or "").strip() != (new_stage or "").strip()
                 if stage_changed:
                     create_stage_todos(cursor, opportunity_id, new_stage)
 
