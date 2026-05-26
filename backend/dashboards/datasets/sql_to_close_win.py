@@ -61,26 +61,19 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH ventana AS (
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
-        ae_accounts AS (
-          SELECT DISTINCT o.account_id
-          FROM opportunity o
-          WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
-            AND o.account_id IS NOT NULL
-        ),
         cohort AS (
           SELECT a.account_id
           FROM account a
           CROSS JOIN ventana v
           WHERE a.creation_date IS NOT NULL
             AND a.creation_date::date BETWEEN v.win_ini AND v.win_fin
-            AND a.account_id IN (SELECT account_id FROM ae_accounts)
+            AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         accounts_with_cw AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
           WHERE TRIM(o.opp_stage) = 'Close Win'
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
-            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             AND o.account_id IS NOT NULL
         )
         SELECT
@@ -104,18 +97,11 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     sql = """
-        WITH ae_accounts AS (
-          SELECT DISTINCT o.account_id
-          FROM opportunity o
-          WHERE TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
-            AND o.account_id IS NOT NULL
-        ),
-        accounts_with_cw AS (
+        WITH accounts_with_cw AS (
           SELECT DISTINCT o.account_id
           FROM opportunity o
           WHERE TRIM(o.opp_stage) = 'Close Win'
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
-            AND TRIM(LOWER(o.opp_sales_lead)) = ANY(%(sales_leads)s)
             AND o.account_id IS NOT NULL
         ),
         cohort AS (
@@ -124,7 +110,7 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             DATE_TRUNC('month', a.creation_date)::date AS mes
           FROM account a
           WHERE a.creation_date IS NOT NULL
-            AND a.account_id IN (SELECT account_id FROM ae_accounts)
+            AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         bounds AS (
           SELECT
