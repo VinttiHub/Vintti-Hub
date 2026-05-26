@@ -738,6 +738,7 @@
       if (bind === 'list') return renderList(el, scopedRows);
       if (bind === 'rollup-list') return renderRollupList(el, scopedRows);
       if (bind === 'dtable') return renderDtable(el, scopedRows);
+      if (bind === 'cohort') return renderCohort(el, scopedRows);
       if (bind === 'grouped-list') return renderGroupedList(el, scopedRows);
       if (bind === 'donut') return renderDonut(el, scopedRows);
       if (bind === 'donut-legend') return renderDonutLegend(el, scopedRows);
@@ -1184,6 +1185,129 @@
     el.innerHTML = `<table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   }
 
+  /* ---------- cohort by contractor (pivot long → wide month-by-month table) ---------- */
+  function renderCohort(el, rows) {
+    const metric = (el.dataset.metric || 'client_payment').trim();
+    const emptyText = el.dataset.emptyText || 'No data';
+    if (!rows || !rows.length) {
+      el.innerHTML = `<div class="muted" style="padding:18px;text-align:center">${esc(emptyText)}</div>`;
+      return;
+    }
+
+    // Collect unique months sorted ascending.
+    const monthSet = new Set();
+    rows.forEach(r => { if (r.mes) monthSet.add(r.mes); });
+    const months = [...monthSet].sort();
+
+    // Group rows by (candidate_id + '|' + account_id).
+    const groups = new Map();
+    rows.forEach(r => {
+      const key = `${r.candidate_id || ''}|${r.account_id || ''}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          key,
+          candidate_name: r.candidate_name || '—',
+          client_name: r.client_name || '—',
+          first_mes: r.first_mes || r.mes,
+          last_mes: r.last_mes || r.mes,
+          status: r.status || 'Active',
+          byMonth: {},
+        };
+        groups.set(key, g);
+      }
+      g.byMonth[r.mes] = Number(r[metric] || 0);
+      // keep latest seen values
+      if (r.first_mes) g.first_mes = r.first_mes;
+      if (r.last_mes) g.last_mes = r.last_mes;
+      if (r.status) g.status = r.status;
+    });
+
+    const groupArr = [...groups.values()].sort((a, b) => {
+      const fa = a.first_mes || '';
+      const fb = b.first_mes || '';
+      if (fa !== fb) return fa.localeCompare(fb);
+      return a.candidate_name.localeCompare(b.candidate_name);
+    });
+
+    // Compute "high volume" threshold = 80th percentile of all non-zero cells.
+    const allVals = [];
+    groupArr.forEach(g => months.forEach(m => {
+      const v = g.byMonth[m];
+      if (v != null && v > 0) allVals.push(v);
+    }));
+    allVals.sort((a, b) => a - b);
+    const p80 = allVals.length
+      ? allVals[Math.min(allVals.length - 1, Math.floor(allVals.length * 0.8))]
+      : Infinity;
+
+    // Month label: "MMM 'YY"
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fmtMonth = (ym) => {
+      const m = String(ym || '').match(/^(\d{4})-(\d{2})/);
+      if (!m) return ym || '';
+      return `${monthShort[+m[2]-1] || m[2]} '${m[1].slice(2)}`;
+    };
+    const fmtMoney = (v) => {
+      if (v == null || v === 0) return '—';
+      const k = v / 1000;
+      return `$${k >= 10 ? k.toFixed(1) : k.toFixed(1)}k`;
+    };
+    const fmtMoneyTotal = (v) => {
+      if (v == null || v === 0) return '$0';
+      return fmtMoney(v);
+    };
+
+    // Build header
+    const headCells = months.map(m => `<th class="cohort-th-month">${esc(fmtMonth(m))}</th>`).join('');
+    const head = `<thead><tr>
+      <th class="cohort-th-name">Contractor</th>
+      ${headCells}
+      <th class="cohort-th-total">Total</th>
+    </tr></thead>`;
+
+    // Build body
+    const colTotals = months.map(() => 0);
+    let grandTotal = 0;
+    const body = groupArr.map(g => {
+      let rowTotal = 0;
+      const cells = months.map((m, idx) => {
+        const v = g.byMonth[m];
+        if (v == null) {
+          // Was this contractor's month? if mes < first or > last → dash (churned/not-yet-started)
+          return `<td class="cohort-td cohort-td--empty">—</td>`;
+        }
+        rowTotal += v;
+        colTotals[idx] += v;
+        const isHigh = v >= p80;
+        const cls = isHigh ? 'cohort-td cohort-td--high' : 'cohort-td cohort-td--active';
+        return `<td class="${cls}"><span class="cohort-chip-val">${esc(fmtMoney(v))}</span></td>`;
+      }).join('');
+      grandTotal += rowTotal;
+      const subline = g.status === 'Churned'
+        ? `Churned ${esc(fmtMonth(g.last_mes))}`
+        : esc(fmtMonth(g.first_mes));
+      return `<tr>
+        <td class="cohort-td-name">
+          <div class="cohort-td-name__primary">${esc(g.candidate_name)}</div>
+          <div class="cohort-td-name__sub">${esc(g.client_name)} · ${subline}</div>
+        </td>
+        ${cells}
+        <td class="cohort-td-total">${esc(fmtMoneyTotal(rowTotal))}</td>
+      </tr>`;
+    }).join('');
+
+    // Totals row
+    const totalsCells = colTotals.map(v => `<td class="cohort-td-total cohort-td-total--col">${esc(fmtMoneyTotal(v))}</td>`).join('');
+    const tfoot = `<tfoot><tr>
+      <td class="cohort-td-name cohort-td-name--total">Total month</td>
+      ${totalsCells}
+      <td class="cohort-td-total cohort-td-total--grand">${esc(fmtMoneyTotal(grandTotal))}</td>
+    </tr></tfoot>`;
+
+    el.innerHTML = `<div class="cohort-scroll"><table class="cohort-table">${head}<tbody>${body}</tbody>${tfoot}</table></div>`;
+  }
+
   /* ---------- grouped list (no month filter — just groups by a field, with state badges) ---------- */
   function renderGroupedList(el, rows) {
     const nameField  = el.dataset.listName  || 'candidate_name';
@@ -1419,6 +1543,28 @@
     });
     // Restore month-aware behavior using the currently selected month
     refetchMonthAwareElements(document, monthState.selected);
+  }
+
+  function bindCohortMetricToggle() {
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cohort-metric]');
+      if (!btn) return;
+      const card = btn.closest('.cohort-card');
+      if (!card) return;
+      const metric = btn.dataset.cohortMetric;
+      if (!metric) return;
+      e.preventDefault();
+      card.querySelectorAll('[data-cohort-metric]').forEach(b => {
+        b.classList.toggle('is-active', b === btn);
+      });
+      card.querySelectorAll('[data-bind="cohort"]').forEach(el => {
+        el.dataset.metric = metric;
+        const chartKey = el.dataset.chart;
+        if (!chartKey) return;
+        const compKey = compKeyFor(chartKey, readOverridesFor(el));
+        renderCohort(el, lastFetchedRows.get(compKey) || []);
+      });
+    });
   }
 
   function bindFunnelDetailToggles() {
@@ -2260,6 +2406,7 @@
     bindExpanders();
     bindKpiDrawers();
     bindViewModes();
+    bindCohortMetricToggle();
     hydrate();
   }
 

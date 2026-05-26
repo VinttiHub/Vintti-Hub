@@ -87,6 +87,7 @@ RETIRED_CHART_KEYS = {
         "sa_line_sql_to_close_win",
         "sa_table_sql_funnel_30d_detail",
         "sa_table_nda_to_sourcing_detail",
+        "mg_table_cohort_by_contractor",
     ],
 }
 
@@ -2553,6 +2554,16 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 39, "w": 12, "h": 5},
         "sort_order": 590,
+    },
+    {
+        "chart_key": "mg_table_cohort_by_contractor",
+        "tab_key": "growth",
+        "title": "Cohort by contractor — Monthly client payment vs Vintti fee",
+        "type": "table",
+        "dataset_key": "cohort_by_contractor",
+        "config": {"mapping": {"columns": ["candidate_name", "client_name", "mes", "client_payment", "vintti_fee", "status"]}},
+        "position": {"x": 0, "y": 120, "w": 12, "h": 8},
+        "sort_order": 600,
     },
 ]
 
