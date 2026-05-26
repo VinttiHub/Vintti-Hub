@@ -1230,16 +1230,8 @@
       return a.candidate_name.localeCompare(b.candidate_name);
     });
 
-    // Compute "high volume" threshold = 80th percentile of all non-zero cells.
-    const allVals = [];
-    groupArr.forEach(g => months.forEach(m => {
-      const v = g.byMonth[m];
-      if (v != null && v > 0) allVals.push(v);
-    }));
-    allVals.sort((a, b) => a - b);
-    const p80 = allVals.length
-      ? allVals[Math.min(allVals.length - 1, Math.floor(allVals.length * 0.8))]
-      : Infinity;
+    // Color rule: contractors still active in the latest month → dark purple chips,
+    // churned contractors → light purple chips. (Drops the previous volume-based logic.)
 
     // Month label: "MMM 'YY"
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1271,17 +1263,15 @@
     let grandTotal = 0;
     const body = groupArr.map(g => {
       let rowTotal = 0;
+      const chipCls = g.status === 'Churned' ? 'cohort-td cohort-td--active' : 'cohort-td cohort-td--high';
       const cells = months.map((m, idx) => {
         const v = g.byMonth[m];
         if (v == null) {
-          // Was this contractor's month? if mes < first or > last → dash (churned/not-yet-started)
           return `<td class="cohort-td cohort-td--empty">—</td>`;
         }
         rowTotal += v;
         colTotals[idx] += v;
-        const isHigh = v >= p80;
-        const cls = isHigh ? 'cohort-td cohort-td--high' : 'cohort-td cohort-td--active';
-        return `<td class="${cls}"><span class="cohort-chip-val">${esc(fmtMoney(v))}</span></td>`;
+        return `<td class="${chipCls}"><span class="cohort-chip-val">${esc(fmtMoney(v))}</span></td>`;
       }).join('');
       grandTotal += rowTotal;
       const subline = g.status === 'Churned'

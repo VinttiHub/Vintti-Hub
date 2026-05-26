@@ -2684,7 +2684,8 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 }
 .cohort-scroll {
   width: 100%;
-  overflow-x: auto;
+  max-height: min(70vh, 720px);
+  overflow: auto;
   border: 1px solid var(--rule);
   border-radius: 14px;
 }
@@ -2708,14 +2709,41 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   font-size: 12px;
   color: var(--ink-3);
   text-transform: none;
-  background: transparent;
+  background: var(--card);
   position: sticky;
   top: 0;
+  z-index: 2;
+  box-shadow: inset 0 -1px 0 var(--rule);
 }
-.cohort-th-name { text-align: left; }
+.cohort-table thead .cohort-th-name {
+  z-index: 4;
+}
+.cohort-th-name {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--card);
+  box-shadow: 1px 0 0 var(--rule);
+}
 .cohort-th-total { text-align: right; }
 .cohort-table tbody tr:hover { background: rgba(108, 56, 255, 0.03); }
-.cohort-td-name { text-align: left; min-width: 200px; }
+.cohort-td-name {
+  text-align: left;
+  min-width: 220px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card);
+  box-shadow: 1px 0 0 var(--rule);
+}
+/* Keep the sticky name column fully opaque on hover so chips from the
+   scrollable area never bleed through. */
+.cohort-table tbody tr:hover .cohort-td-name { background: var(--card); }
+.cohort-table tfoot .cohort-td-name {
+  z-index: 2;
+  background: var(--card-soft);
+}
 .cohort-td-name__primary { font-weight: 600; color: var(--ink); font-size: 14px; }
 .cohort-td-name__sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 .cohort-td { text-align: right; }
