@@ -66,74 +66,20 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         opps_in_month AS (
           SELECT DISTINCT ON (m.mes, h.opportunity_id, h.candidate_id)
             m.mes,
-            m.fin_mes,
-            h.opportunity_id,
             h.candidate_id,
             h.account_id,
-            h.start_d                                       AS hire_start_d,
-            h.salary                                        AS hire_salary,
-            h.fee                                           AS hire_fee
+            h.salary,
+            h.fee
           FROM meses m
           JOIN hires h
             ON h.start_d <= m.fin_mes
            AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
           ORDER BY m.mes, h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
         ),
-        -- Tag the primary opp per (mes, candidate, account) = the one with the
-        -- latest start_d. salary_updates apply only to the primary, because
-        -- they're per-candidate (no opp_id) and would otherwise double-count
-        -- when a candidate has multiple parallel opps.
-        opps_marked AS (
-          SELECT
-            *,
-            ROW_NUMBER() OVER (
-              PARTITION BY mes, candidate_id, account_id
-              ORDER BY hire_start_d DESC NULLS LAST, opportunity_id DESC
-            ) AS rn_primary
-          FROM opps_in_month
-        ),
-        -- Effective salary/fee per (mes, opp, candidate):
-        --   primary opp → (1) most recent salary_updates ≤ fin_mes,
-        --                 (2) else earliest salary_updates,
-        --                 (3) else hire_opportunity.salary/fee
-        --   secondary opp → its stored hire_opportunity values
-        effective_per_opp AS (
-          SELECT
-            om.mes,
-            om.candidate_id,
-            om.account_id,
-            CASE
-              WHEN om.rn_primary = 1
-                THEN COALESCE(su_recent.salary::numeric, su_earliest.salary::numeric, om.hire_salary)
-              ELSE om.hire_salary
-            END AS salary,
-            CASE
-              WHEN om.rn_primary = 1
-                THEN COALESCE(su_recent.fee::numeric, su_earliest.fee::numeric, om.hire_fee)
-              ELSE om.hire_fee
-            END AS fee
-          FROM opps_marked om
-          LEFT JOIN LATERAL (
-            SELECT s.salary, s.fee
-            FROM salary_updates s
-            WHERE s.candidate_id = om.candidate_id
-              AND s.date IS NOT NULL
-              AND s.date::date <= om.fin_mes
-            ORDER BY s.date::date DESC, s.update_id DESC
-            LIMIT 1
-          ) su_recent ON TRUE
-          LEFT JOIN LATERAL (
-            SELECT s.salary, s.fee
-            FROM salary_updates s
-            WHERE s.candidate_id = om.candidate_id
-              AND s.date IS NOT NULL
-            ORDER BY s.date::date ASC, s.update_id ASC
-            LIMIT 1
-          ) su_earliest ON TRUE
-        ),
         -- Sum across multiple parallel opps for the same (mes, candidate, account)
-        -- so each row in the cohort table = one contractor at one client and
-        -- totals match MRR.
+        -- so each cohort row = one contractor at one client and column totals
+        -- match the MRR card exactly. Uses hire_opportunity.salary/fee directly
+        -- (no salary_updates overlay) — same source of truth as mrr_history.py.
         effective_in_month AS (
           SELECT
             mes,
@@ -141,7 +87,7 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             account_id,
             SUM(salary)::numeric AS salary,
             SUM(fee)::numeric    AS fee
-          FROM effective_per_opp
+          FROM opps_in_month
           GROUP BY mes, candidate_id, account_id
         ),
         first_seen AS (

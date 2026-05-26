@@ -2770,12 +2770,34 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   color: var(--ink);
 }
 .cohort-table tfoot td {
-  background: var(--card-soft);
-  font-weight: 600;
+  background: #0e1117;
+  font-weight: 700;
+  font-size: 14px;
+  color: #ffffff;
   border-bottom: 0;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
-.cohort-td-name--total { color: var(--ink-2); }
-.cohort-td-total--grand { color: var(--ink); }
+.cohort-table tfoot .cohort-td-name {
+  z-index: 4;
+  background: #0e1117;
+  color: #ffffff;
+}
+.cohort-td-name--total {
+  color: #ffffff !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+.cohort-td-total--grand {
+  color: #ffffff;
+  font-size: 15px;
+}
 .cohort-card__legend {
   display: flex;
   gap: 22px;
