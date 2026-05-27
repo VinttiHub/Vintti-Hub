@@ -48,6 +48,32 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND ho.candidate_id IS NOT NULL
             AND ho.account_id IS NOT NULL
         ),
+        -- Parallel CTE that mirrors `candidate_churn_window_history.py` EXACTLY:
+        -- uses raw `start_date`/`end_date` (no carga_active/carga_inactive
+        -- precedence) so the bajas counts in the cohort header line up 1:1
+        -- with the Candidate churn · monthly chart.
+        hires_churn_raw AS (
+          SELECT *
+          FROM (
+            SELECT
+              h.candidate_id,
+              h.account_id,
+              NULLIF(h.start_date::text, '')::date AS start_d,
+              CASE
+                WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
+                ELSE h.end_date::date
+              END AS end_d,
+              CASE
+                WHEN NULLIF(TRIM(h.buyout_daterange), '') IS NOT NULL
+                  THEN TO_DATE(TRIM(h.buyout_daterange) || '-01', 'YYYY-MM-DD')
+                ELSE NULL
+              END AS buyout_d
+            FROM hire_opportunity h
+            JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+            WHERE o.opp_model = 'Staffing'
+          ) x
+          WHERE start_d IS NOT NULL
+        ),
         bounds AS (
           SELECT
             MIN(start_d)                                  AS min_start,
@@ -135,7 +161,8 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         -- Bajas counts per month — IDENTICAL logic to candidate_churn_window_history
         -- with meses=3 (the default window of the chart): cohort = hires that
         -- started in the 3 months ending at m; bajas = cohort members whose
-        -- end_d <= m_fin. This way the cohort header stats match the chart.
+        -- end_d <= m_fin. Uses `hires_churn_raw` (raw start_date/end_date) so it
+        -- matches the chart 1:1 even when carga_active/carga_inactive differ.
         churn_window_per_month AS (
           SELECT
             m.mes,
@@ -151,9 +178,8 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 AND h.buyout_d >= DATE_TRUNC('month', h.end_d)
             )::int AS buyouts_count
           FROM meses m
-          JOIN hires h
-            ON h.start_d IS NOT NULL
-           AND h.start_d BETWEEN (m.mes - INTERVAL '2 months')::date AND m.fin_mes
+          JOIN hires_churn_raw h
+            ON h.start_d BETWEEN (m.mes - INTERVAL '2 months')::date AND m.fin_mes
           GROUP BY m.mes
         )
         SELECT
