@@ -98,30 +98,23 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ) AS rn_primary
           FROM opps_in_month
         ),
-        -- Effective salary/fee per opp:
-        --   current month   → ALWAYS hire_opportunity.salary/fee (matches MRR
-        --                     exactly even when salary_updates is out of sync
-        --                     with hire_opportunity).
-        --   past months,
-        --   primary opp     → (1) most recent salary_updates ≤ fin_mes,
-        --                     (2) else earliest salary_updates (months BEFORE
-        --                         the first update keep that first value as
-        --                         baseline),
-        --                     (3) else hire_opportunity.salary/fee
-        --   secondary opp   → its stored hire_opportunity values
+        -- Effective salary/fee per opp (applies to ALL months, current included):
+        --   primary opp   → (1) most recent salary_updates ≤ fin_mes,
+        --                   (2) else earliest salary_updates (months BEFORE the
+        --                       first update keep that first value as baseline),
+        --                   (3) else hire_opportunity.salary/fee
+        --   secondary opp → its stored hire_opportunity values
         effective_per_opp AS (
           SELECT
             om.mes,
             om.candidate_id,
             om.account_id,
             CASE
-              WHEN om.mes = (SELECT now_month FROM bounds) THEN om.hire_salary
               WHEN om.rn_primary = 1
                 THEN COALESCE(su_recent.salary::numeric, su_earliest.salary::numeric, om.hire_salary)
               ELSE om.hire_salary
             END AS salary,
             CASE
-              WHEN om.mes = (SELECT now_month FROM bounds) THEN om.hire_fee
               WHEN om.rn_primary = 1
                 THEN COALESCE(su_recent.fee::numeric, su_earliest.fee::numeric, om.hire_fee)
               ELSE om.hire_fee
