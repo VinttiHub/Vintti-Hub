@@ -1211,6 +1211,7 @@
           client_name: r.client_name || '—',
           first_mes: r.first_mes || r.mes,
           last_mes: r.last_mes || r.mes,
+          churn_month: r.churn_month || null,
           status: r.status || 'Active',
           byMonth: {},
         };
@@ -1220,25 +1221,83 @@
       // keep latest seen values
       if (r.first_mes) g.first_mes = r.first_mes;
       if (r.last_mes) g.last_mes = r.last_mes;
+      if (r.churn_month) g.churn_month = r.churn_month;
       if (r.status) g.status = r.status;
     });
 
-    const groupArr = [...groups.values()].sort((a, b) => {
+    let groupArr = [...groups.values()].sort((a, b) => {
       const fa = a.first_mes || '';
       const fb = b.first_mes || '';
       if (fa !== fb) return fa.localeCompare(fb);
       return a.candidate_name.localeCompare(b.candidate_name);
     });
 
+    // Populate filter <select>s (status uses fixed values from HTML; account &
+    // month come from data, only filled once per card) and apply current filters.
+    const card = el.closest('.cohort-card');
+    let statusFilter = '', accountFilter = '', monthFilter = '';
+    if (card) {
+      // Account options → datalist suggestions (input is free-text searchable).
+      const accountList = card.querySelector('#cohort-account-options')
+        || document.getElementById('cohort-account-options');
+      if (accountList && !accountList.childElementCount) {
+        const clients = [...new Set(groupArr.map(g => g.client_name).filter(Boolean))].sort();
+        clients.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          accountList.appendChild(opt);
+        });
+      }
+      // Month options: from `months` array (most recent first)
+      const monthSel = card.querySelector('[data-cohort-filter="month"]');
+      if (monthSel && monthSel.options.length <= 1) {
+        const monthShortFill = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+        [...months].reverse().forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          const mt = String(m).match(/^(\d{4})-(\d{2})/);
+          opt.textContent = mt ? `${monthShortFill[+mt[2]-1] || mt[2]} ${mt[1]}` : m;
+          monthSel.appendChild(opt);
+        });
+      }
+      statusFilter = (card.querySelector('[data-cohort-filter="status"]')?.value || '').trim();
+      accountFilter = (card.querySelector('[data-cohort-filter="account"]')?.value || '').trim();
+      monthFilter = (card.querySelector('[data-cohort-filter="month"]')?.value || '').trim();
+    }
+
+    if (statusFilter)  groupArr = groupArr.filter(g => g.status === statusFilter);
+    if (accountFilter) {
+      const needle = accountFilter.toLowerCase();
+      groupArr = groupArr.filter(g => (g.client_name || '').toLowerCase().includes(needle));
+    }
+    // Month filter: collapse the visible columns to just that month and keep
+    // only contractors that had activity in it (otherwise the row is empty).
+    let visibleMonths = months;
+    if (monthFilter) {
+      visibleMonths = months.includes(monthFilter) ? [monthFilter] : [];
+      groupArr = groupArr.filter(g => g.byMonth[monthFilter] != null);
+    }
+
+    if (!groupArr.length) {
+      el.innerHTML = `<div class="muted" style="padding:18px;text-align:center">Sin contractors que coincidan con los filtros.</div>`;
+      return;
+    }
+
     // Color rule: contractors still active in the latest month → dark purple chips,
     // churned contractors → light purple chips. (Drops the previous volume-based logic.)
 
     // Month label: "MMM 'YY"
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthLongMap = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const fmtMonth = (ym) => {
       const m = String(ym || '').match(/^(\d{4})-(\d{2})/);
       if (!m) return ym || '';
       return `${monthShort[+m[2]-1] || m[2]} '${m[1].slice(2)}`;
+    };
+    const fmtMonthLong = (ym) => {
+      const m = String(ym || '').match(/^(\d{4})-(\d{2})/);
+      if (!m) return ym || '';
+      return `${monthLongMap[+m[2]-1] || m[2]} ${m[1]}`;
     };
     const fmtMoney = (v) => {
       if (v == null || v === 0) return '—';
@@ -1250,21 +1309,89 @@
       return fmtMoney(v);
     };
 
-    // Build header
-    const headCells = months.map(m => `<th class="cohort-th-month">${esc(fmtMonth(m))}</th>`).join('');
+    // Single-month view: ranked list/leaderboard (no table).
+    if (visibleMonths.length === 1) {
+      const m = visibleMonths[0];
+      const ranked = groupArr
+        .map(g => ({ g, v: g.byMonth[m] || 0 }))
+        .filter(x => x.v > 0)
+        .sort((a, b) => b.v - a.v);
+      const total = ranked.reduce((acc, x) => acc + x.v, 0);
+      const count = ranked.length;
+      // Bajas reales DEL mes = contractors cuyo `end_d` cae en `m` (matchea la
+      // gráfica de Bajas reales, que bucketea por mes de end_d). El leaderboard
+      // muestra los que estuvieron full month (filtro MRR-strict); las bajas
+      // pueden haber salido a mitad de mes y no estar entre los `ranked`.
+      const churnedCount = [...groups.values()].filter(g => g.churn_month === m).length;
+      const activeCount = count;
+
+      const items = ranked.map((x, i) => {
+        const g = x.g;
+        // "Baja de este mes" = end_d cae en `m`. Matchea la gráfica de Bajas reales.
+        const churnedThisMonth = g.churn_month && g.churn_month === m;
+        const chipCls = churnedThisMonth ? 'cohort-rank__chip cohort-rank__chip--churned' : 'cohort-rank__chip cohort-rank__chip--active';
+        const statusDot = churnedThisMonth ? 'cohort-rank__dot--churned' : 'cohort-rank__dot--active';
+        const statusLabel = churnedThisMonth
+          ? `Baja ${esc(fmtMonth(g.churn_month))}`
+          : `desde ${esc(fmtMonth(g.first_mes))}`;
+        return `<li class="cohort-rank__row">
+          <span class="cohort-rank__num">${i + 1}</span>
+          <div class="cohort-rank__info">
+            <div class="cohort-rank__name">${esc(g.candidate_name)}</div>
+            <div class="cohort-rank__meta">
+              <span class="cohort-rank__dot ${statusDot}"></span>
+              <span>${esc(g.client_name)}</span>
+              <span class="cohort-rank__sep">·</span>
+              <span class="cohort-rank__status">${statusLabel}</span>
+            </div>
+          </div>
+          <span class="${chipCls}">${esc(fmtMoney(x.v))}</span>
+        </li>`;
+      }).join('');
+
+      const headHtml = `<header class="cohort-single__head">
+        <div class="cohort-single__title">
+          <span class="cohort-single__eyebrow">Snapshot del mes</span>
+          <h4 class="cohort-single__month">${esc(fmtMonthLong(m))}</h4>
+        </div>
+        <div class="cohort-single__stats">
+          <div class="cohort-single__stat">
+            <span class="cohort-single__stat-label">Total</span>
+            <span class="cohort-single__stat-value">${esc(fmtMoneyTotal(total))}</span>
+          </div>
+          <div class="cohort-single__stat">
+            <span class="cohort-single__stat-label">Contractors</span>
+            <span class="cohort-single__stat-value">${count}</span>
+          </div>
+          <div class="cohort-single__stat">
+            <span class="cohort-single__stat-label">Continuaron · Bajas</span>
+            <span class="cohort-single__stat-value">${activeCount} <span class="cohort-single__stat-muted">·</span> ${churnedCount}</span>
+          </div>
+        </div>
+      </header>`;
+
+      const bodyHtml = count
+        ? `<ol class="cohort-rank">${items}</ol>`
+        : `<div class="muted" style="padding:24px;text-align:center">Sin contractors con actividad en este mes.</div>`;
+
+      el.innerHTML = `<div class="cohort-single">${headHtml}${bodyHtml}</div>`;
+      return;
+    }
+
+    // Multi-month view: pivot table.
+    const headCells = visibleMonths.map(m => `<th class="cohort-th-month">${esc(fmtMonth(m))}</th>`).join('');
     const head = `<thead><tr>
       <th class="cohort-th-name">Contractor</th>
       ${headCells}
       <th class="cohort-th-total">Total</th>
     </tr></thead>`;
 
-    // Build body
-    const colTotals = months.map(() => 0);
+    const colTotals = visibleMonths.map(() => 0);
     let grandTotal = 0;
     const body = groupArr.map(g => {
       let rowTotal = 0;
       const chipCls = g.status === 'Churned' ? 'cohort-td cohort-td--active' : 'cohort-td cohort-td--high';
-      const cells = months.map((m, idx) => {
+      const cells = visibleMonths.map((m, idx) => {
         const v = g.byMonth[m];
         if (v == null) {
           return `<td class="cohort-td cohort-td--empty">—</td>`;
@@ -1287,7 +1414,6 @@
       </tr>`;
     }).join('');
 
-    // Totals row
     const totalsCells = colTotals.map(v => `<td class="cohort-td-total cohort-td-total--col">${esc(fmtMoneyTotal(v))}</td>`).join('');
     const tfoot = `<tfoot><tr>
       <td class="cohort-td-name cohort-td-name--total">Total month</td>
@@ -1536,25 +1662,49 @@
   }
 
   function bindCohortMetricToggle() {
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-cohort-metric]');
-      if (!btn) return;
-      const card = btn.closest('.cohort-card');
-      if (!card) return;
-      const metric = btn.dataset.cohortMetric;
-      if (!metric) return;
-      e.preventDefault();
-      card.querySelectorAll('[data-cohort-metric]').forEach(b => {
-        b.classList.toggle('is-active', b === btn);
-      });
+    const rerender = (card) => {
       card.querySelectorAll('[data-bind="cohort"]').forEach(el => {
-        el.dataset.metric = metric;
         const chartKey = el.dataset.chart;
         if (!chartKey) return;
         const compKey = compKeyFor(chartKey, readOverridesFor(el));
         renderCohort(el, lastFetchedRows.get(compKey) || []);
       });
+    };
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cohort-metric]');
+      if (btn) {
+        const card = btn.closest('.cohort-card');
+        if (!card) return;
+        const metric = btn.dataset.cohortMetric;
+        if (!metric) return;
+        e.preventDefault();
+        card.querySelectorAll('[data-cohort-metric]').forEach(b => {
+          b.classList.toggle('is-active', b === btn);
+        });
+        card.querySelectorAll('[data-bind="cohort"]').forEach(el => { el.dataset.metric = metric; });
+        rerender(card);
+        return;
+      }
+      const clearBtn = e.target.closest('[data-cohort-filter-clear]');
+      if (clearBtn) {
+        const card = clearBtn.closest('.cohort-card');
+        if (!card) return;
+        e.preventDefault();
+        card.querySelectorAll('[data-cohort-filter]').forEach(sel => { sel.value = ''; });
+        rerender(card);
+      }
     });
+
+    const onFilterEvent = (e) => {
+      const sel = e.target.closest('[data-cohort-filter]');
+      if (!sel) return;
+      const card = sel.closest('.cohort-card');
+      if (!card) return;
+      rerender(card);
+    };
+    document.addEventListener('change', onFilterEvent);
+    document.addEventListener('input', onFilterEvent);
   }
 
   function bindFunnelDetailToggles() {

@@ -997,6 +997,29 @@
             <span><span class="cohort-dash">—</span> Sin actividad</span>
           </div>
         </header>
+        <div class="cohort-card__filters">
+          <label class="cohort-filter">
+            <span class="cohort-filter__label">Status</span>
+            <select class="cohort-filter__select" data-cohort-filter="status">
+              <option value="">All</option>
+              <option value="Active">Active</option>
+              <option value="Churned">Churned</option>
+            </select>
+          </label>
+          <label class="cohort-filter">
+            <span class="cohort-filter__label">Account</span>
+            <input type="text" class="cohort-filter__input" data-cohort-filter="account"
+                   list="cohort-account-options" placeholder="Buscar cliente…" autocomplete="off">
+            <datalist id="cohort-account-options"></datalist>
+          </label>
+          <label class="cohort-filter">
+            <span class="cohort-filter__label">Mes</span>
+            <select class="cohort-filter__select" data-cohort-filter="month">
+              <option value="">Todos los meses</option>
+            </select>
+          </label>
+          <button type="button" class="cohort-filter__clear" data-cohort-filter-clear>Limpiar</button>
+        </div>
         <div class="cohort-table-wrap"
              data-chart="mg_table_cohort_by_contractor" data-bind="cohort"
              data-metric="client_payment"

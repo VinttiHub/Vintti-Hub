@@ -99,6 +99,21 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT candidate_id, account_id, MAX(mes) AS last_mes
           FROM effective_in_month
           GROUP BY candidate_id, account_id
+        ),
+        -- Actual churn month per (candidate, account) = month containing the
+        -- final `end_d`. NULL if any hire is still open (no churn yet). Matches
+        -- the "Bajas reales" chart that buckets by month of end_d.
+        churn_per_pair AS (
+          SELECT
+            candidate_id,
+            account_id,
+            CASE
+              WHEN SUM(CASE WHEN end_d IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
+              ELSE DATE_TRUNC('month', MAX(end_d))::date
+            END AS churn_month_d
+          FROM hires
+          WHERE candidate_id IS NOT NULL AND account_id IS NOT NULL
+          GROUP BY candidate_id, account_id
         )
         SELECT
           TO_CHAR(em.mes, 'YYYY-MM')                      AS mes,
@@ -112,15 +127,17 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           em.fee::bigint                                  AS vintti_fee,
           TO_CHAR(fs.first_mes, 'YYYY-MM')                AS first_mes,
           TO_CHAR(ls.last_mes, 'YYYY-MM')                 AS last_mes,
+          TO_CHAR(cpp.churn_month_d, 'YYYY-MM')           AS churn_month,
           CASE
-            WHEN ls.last_mes < (SELECT now_month FROM bounds) THEN 'Churned'
-            ELSE 'Active'
+            WHEN cpp.churn_month_d IS NULL THEN 'Active'
+            ELSE 'Churned'
           END                                             AS status
         FROM effective_in_month em
         LEFT JOIN candidates c ON c.candidate_id = em.candidate_id
         LEFT JOIN account a    ON a.account_id   = em.account_id
         JOIN first_seen fs ON fs.candidate_id = em.candidate_id AND fs.account_id = em.account_id
         JOIN last_seen  ls ON ls.candidate_id = em.candidate_id AND ls.account_id = em.account_id
+        LEFT JOIN churn_per_pair cpp ON cpp.candidate_id = em.candidate_id AND cpp.account_id = em.account_id
         ORDER BY fs.first_mes, em.candidate_id, em.mes;
     """
     return sql, {}
@@ -137,6 +154,7 @@ DATASET = {
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "first_mes", "label": "Primer mes", "type": "date"},
         {"key": "last_mes", "label": "Último mes activo", "type": "date"},
+        {"key": "churn_month", "label": "Mes de baja", "type": "date"},
         {"key": "status", "label": "Estado", "type": "string"},
     ],
     "measures": [
