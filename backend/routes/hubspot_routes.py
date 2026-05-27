@@ -53,6 +53,8 @@ LEAD_SOURCE_NORMALIZATION = {
     'social media': 'Social Media',
     'events': 'Events',
     'outbound': 'Outbound',
+    'outbound - linkedin': 'Outbound',
+    'outbound – linkedin': 'Outbound',
     'other': 'Other',
     'ai': 'AI',
     'webinar': 'Webinar',
@@ -265,6 +267,7 @@ def _parse_stage_ids(value, default):
 def _resolve_property_map_for_object(client, object_type):
     props = client.get_properties(object_type)
     by_alias = {}
+    option_labels = {}
     normalized_props = []
     for prop in props:
         name = prop.get("name") or ""
@@ -272,6 +275,11 @@ def _resolve_property_map_for_object(client, object_type):
         normalized_props.append(
             {
                 "name": name,
+                "options": {
+                    str(option.get("value") or ""): str(option.get("label") or "")
+                    for option in prop.get("options", [])
+                    if option.get("value") not in (None, "") and option.get("label") not in (None, "")
+                },
                 "keys": {
                     _normalize_hubspot_label(name),
                     _normalize_hubspot_label(label),
@@ -284,23 +292,33 @@ def _resolve_property_map_for_object(client, object_type):
             normalized_alias = _normalize_hubspot_label(alias)
             match = next(
                 (
-                    prop["name"]
+                    prop
                     for prop in normalized_props
                     if normalized_alias in prop["keys"]
                 ),
                 None,
             )
             if match:
-                by_alias[field] = match
+                by_alias[field] = match["name"]
+                if match["options"]:
+                    option_labels[field] = match["options"]
                 break
-    return by_alias
+    return by_alias, option_labels
 
 
 def _resolve_account_property_maps(client):
+    contacts, contact_options = _resolve_property_map_for_object(client, "contacts")
+    companies, company_options = _resolve_property_map_for_object(client, "companies")
+    deals, deal_options = _resolve_property_map_for_object(client, "deals")
     return {
-        "contacts": _resolve_property_map_for_object(client, "contacts"),
-        "companies": _resolve_property_map_for_object(client, "companies"),
-        "deals": _resolve_property_map_for_object(client, "deals"),
+        "contacts": contacts,
+        "companies": companies,
+        "deals": deals,
+        "_option_labels": {
+            "contacts": contact_options,
+            "companies": company_options,
+            "deals": deal_options,
+        },
     }
 
 
@@ -336,10 +354,22 @@ def _record_prop(record, prop_name):
     return ((record or {}).get("properties") or {}).get(prop_name) or ""
 
 
+def _hubspot_option_label(property_maps, object_type, field, value):
+    if value in (None, ""):
+        return value
+    labels = (
+        property_maps
+        .get("_option_labels", {})
+        .get(object_type, {})
+        .get(field, {})
+    )
+    return labels.get(str(value), value)
+
+
 def _first_mapped_value(property_maps, field, contact=None, company=None, deal=None):
     value = _record_prop(contact, property_maps.get("contacts", {}).get(field))
     if value not in (None, ""):
-        return value
+        return _hubspot_option_label(property_maps, "contacts", field, value)
     return ""
 
 
