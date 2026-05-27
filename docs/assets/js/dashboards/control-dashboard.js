@@ -1212,6 +1212,7 @@
           first_mes: r.first_mes || r.mes,
           last_mes: r.last_mes || r.mes,
           churn_month: r.churn_month || null,
+          is_buyout: !!r.is_buyout,
           status: r.status || 'Active',
           byMonth: {},
         };
@@ -1222,6 +1223,7 @@
       if (r.first_mes) g.first_mes = r.first_mes;
       if (r.last_mes) g.last_mes = r.last_mes;
       if (r.churn_month) g.churn_month = r.churn_month;
+      if (r.is_buyout != null) g.is_buyout = !!r.is_buyout;
       if (r.status) g.status = r.status;
     });
 
@@ -1318,22 +1320,32 @@
         .sort((a, b) => b.v - a.v);
       const total = ranked.reduce((acc, x) => acc + x.v, 0);
       const count = ranked.length;
-      // Bajas reales DEL mes = contractors cuyo `end_d` cae en `m` (matchea la
-      // gráfica de Bajas reales, que bucketea por mes de end_d). El leaderboard
-      // muestra los que estuvieron full month (filtro MRR-strict); las bajas
-      // pueden haber salido a mitad de mes y no estar entre los `ranked`.
-      const churnedCount = [...groups.values()].filter(g => g.churn_month === m).length;
-      const activeCount = count;
+      // Split bajas in two — matches the candidate_churn_window_history logic:
+      //   bajas reales = end_d ∈ m AND NOT buyout
+      //   buyouts      = end_d ∈ m AND buyout_daterange covers the churn month
+      const churnedThisMonth = [...groups.values()].filter(g => g.churn_month === m);
+      const buyoutCount = churnedThisMonth.filter(g => g.is_buyout).length;
+      const realChurnCount = churnedThisMonth.length - buyoutCount;
 
       const items = ranked.map((x, i) => {
         const g = x.g;
-        // "Baja de este mes" = end_d cae en `m`. Matchea la gráfica de Bajas reales.
+        // "Baja de este mes" = end_d cae en `m`. Distinguimos buyout vs real
+        // con la misma lógica que candidate_churn_window_history.
         const churnedThisMonth = g.churn_month && g.churn_month === m;
-        const chipCls = churnedThisMonth ? 'cohort-rank__chip cohort-rank__chip--churned' : 'cohort-rank__chip cohort-rank__chip--active';
-        const statusDot = churnedThisMonth ? 'cohort-rank__dot--churned' : 'cohort-rank__dot--active';
-        const statusLabel = churnedThisMonth
-          ? `Baja ${esc(fmtMonth(g.churn_month))}`
-          : `desde ${esc(fmtMonth(g.first_mes))}`;
+        let chipCls = 'cohort-rank__chip cohort-rank__chip--active';
+        let statusDot = 'cohort-rank__dot--active';
+        let statusLabel = `desde ${esc(fmtMonth(g.first_mes))}`;
+        if (churnedThisMonth) {
+          if (g.is_buyout) {
+            chipCls = 'cohort-rank__chip cohort-rank__chip--buyout';
+            statusDot = 'cohort-rank__dot--buyout';
+            statusLabel = `Buyout ${esc(fmtMonth(g.churn_month))}`;
+          } else {
+            chipCls = 'cohort-rank__chip cohort-rank__chip--churned';
+            statusDot = 'cohort-rank__dot--churned';
+            statusLabel = `Baja ${esc(fmtMonth(g.churn_month))}`;
+          }
+        }
         return `<li class="cohort-rank__row">
           <span class="cohort-rank__num">${i + 1}</span>
           <div class="cohort-rank__info">
@@ -1364,8 +1376,12 @@
             <span class="cohort-single__stat-value">${count}</span>
           </div>
           <div class="cohort-single__stat">
-            <span class="cohort-single__stat-label">Continuaron · Bajas</span>
-            <span class="cohort-single__stat-value">${activeCount} <span class="cohort-single__stat-muted">·</span> ${churnedCount}</span>
+            <span class="cohort-single__stat-label">Bajas reales</span>
+            <span class="cohort-single__stat-value">${realChurnCount}</span>
+          </div>
+          <div class="cohort-single__stat">
+            <span class="cohort-single__stat-label">Buyouts</span>
+            <span class="cohort-single__stat-value">${buyoutCount}</span>
           </div>
         </div>
       </header>`;

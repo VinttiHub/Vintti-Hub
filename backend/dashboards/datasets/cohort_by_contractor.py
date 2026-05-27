@@ -34,6 +34,12 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               WHEN NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '') IS NULL THEN NULL
               ELSE NULLIF(TRIM(CAST(ho.end_date AS TEXT)), '')::date
             END AS end_d,
+            -- buyout_daterange stored as 'YYYY-MM'; parse to date by appending '-01'.
+            CASE
+              WHEN NULLIF(TRIM(ho.buyout_daterange), '') IS NOT NULL
+                THEN TO_DATE(TRIM(ho.buyout_daterange) || '-01', 'YYYY-MM-DD')
+              ELSE NULL
+            END AS buyout_d,
             COALESCE(ho.salary, 0)::numeric AS salary,
             COALESCE(ho.fee, 0)::numeric    AS fee
           FROM hire_opportunity ho
@@ -100,9 +106,13 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM effective_in_month
           GROUP BY candidate_id, account_id
         ),
-        -- Actual churn month per (candidate, account) = month containing the
-        -- final `end_d`. NULL if any hire is still open (no churn yet). Matches
-        -- the "Bajas reales" chart that buckets by month of end_d.
+        -- Churn classification per (candidate, account):
+        --   churn_month_d = month containing the final `end_d`. NULL if any
+        --                   hire is still open (no churn yet).
+        --   is_buyout     = TRUE when there's a `buyout_daterange` whose month
+        --                   is on/after the churn month (matches the logic in
+        --                   candidate_churn_window_history.py). Real churn
+        --                   otherwise.
         churn_per_pair AS (
           SELECT
             candidate_id,
@@ -110,7 +120,14 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             CASE
               WHEN SUM(CASE WHEN end_d IS NULL THEN 1 ELSE 0 END) > 0 THEN NULL
               ELSE DATE_TRUNC('month', MAX(end_d))::date
-            END AS churn_month_d
+            END AS churn_month_d,
+            CASE
+              WHEN SUM(CASE WHEN end_d IS NULL THEN 1 ELSE 0 END) > 0 THEN FALSE
+              WHEN MAX(buyout_d) IS NOT NULL
+                   AND MAX(buyout_d) >= DATE_TRUNC('month', MAX(end_d))
+                THEN TRUE
+              ELSE FALSE
+            END AS is_buyout
           FROM hires
           WHERE candidate_id IS NOT NULL AND account_id IS NOT NULL
           GROUP BY candidate_id, account_id
@@ -128,8 +145,10 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           TO_CHAR(fs.first_mes, 'YYYY-MM')                AS first_mes,
           TO_CHAR(ls.last_mes, 'YYYY-MM')                 AS last_mes,
           TO_CHAR(cpp.churn_month_d, 'YYYY-MM')           AS churn_month,
+          COALESCE(cpp.is_buyout, FALSE)                  AS is_buyout,
           CASE
-            WHEN cpp.churn_month_d IS NULL THEN 'Active'
+            WHEN cpp.churn_month_d IS NULL          THEN 'Active'
+            WHEN COALESCE(cpp.is_buyout, FALSE)     THEN 'Buyout'
             ELSE 'Churned'
           END                                             AS status
         FROM effective_in_month em
@@ -155,6 +174,7 @@ DATASET = {
         {"key": "first_mes", "label": "Primer mes", "type": "date"},
         {"key": "last_mes", "label": "Último mes activo", "type": "date"},
         {"key": "churn_month", "label": "Mes de baja", "type": "date"},
+        {"key": "is_buyout", "label": "Buyout", "type": "boolean"},
         {"key": "status", "label": "Estado", "type": "string"},
     ],
     "measures": [
