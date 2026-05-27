@@ -72,20 +72,80 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         opps_in_month AS (
           SELECT DISTINCT ON (m.mes, h.opportunity_id, h.candidate_id)
             m.mes,
+            m.fin_mes,
+            h.opportunity_id,
             h.candidate_id,
             h.account_id,
-            h.salary,
-            h.fee
+            h.start_d,
+            h.salary AS hire_salary,
+            h.fee    AS hire_fee
           FROM meses m
           JOIN hires h
             ON h.start_d <= m.fin_mes
            AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
           ORDER BY m.mes, h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
         ),
-        -- Sum across multiple parallel opps for the same (mes, candidate, account)
-        -- so each cohort row = one contractor at one client and column totals
-        -- match the MRR card exactly. Uses hire_opportunity.salary/fee directly
-        -- (no salary_updates overlay) — same source of truth as mrr_history.py.
+        -- Mark the primary opp per (mes, candidate, account) = the one with the
+        -- latest start_d. salary_updates apply only to the primary opp because
+        -- the updates table is per-candidate (no opportunity_id) and applying
+        -- to several parallel opps would multi-count the raise.
+        opps_marked AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY mes, candidate_id, account_id
+              ORDER BY start_d DESC NULLS LAST, opportunity_id DESC
+            ) AS rn_primary
+          FROM opps_in_month
+        ),
+        -- Effective salary/fee per opp:
+        --   current month   → ALWAYS hire_opportunity.salary/fee (matches MRR
+        --                     exactly even when salary_updates is out of sync
+        --                     with hire_opportunity).
+        --   past months,
+        --   primary opp     → (1) most recent salary_updates ≤ fin_mes,
+        --                     (2) else earliest salary_updates (months BEFORE
+        --                         the first update keep that first value as
+        --                         baseline),
+        --                     (3) else hire_opportunity.salary/fee
+        --   secondary opp   → its stored hire_opportunity values
+        effective_per_opp AS (
+          SELECT
+            om.mes,
+            om.candidate_id,
+            om.account_id,
+            CASE
+              WHEN om.mes = (SELECT now_month FROM bounds) THEN om.hire_salary
+              WHEN om.rn_primary = 1
+                THEN COALESCE(su_recent.salary::numeric, su_earliest.salary::numeric, om.hire_salary)
+              ELSE om.hire_salary
+            END AS salary,
+            CASE
+              WHEN om.mes = (SELECT now_month FROM bounds) THEN om.hire_fee
+              WHEN om.rn_primary = 1
+                THEN COALESCE(su_recent.fee::numeric, su_earliest.fee::numeric, om.hire_fee)
+              ELSE om.hire_fee
+            END AS fee
+          FROM opps_marked om
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = om.candidate_id
+              AND s.date IS NOT NULL
+              AND s.date::date <= om.fin_mes
+            ORDER BY s.date::date DESC, s.update_id DESC
+            LIMIT 1
+          ) su_recent ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = om.candidate_id
+              AND s.date IS NOT NULL
+            ORDER BY s.date::date ASC, s.update_id ASC
+            LIMIT 1
+          ) su_earliest ON TRUE
+        ),
+        -- Sum across multiple parallel opps for the same (mes, candidate, account).
         effective_in_month AS (
           SELECT
             mes,
@@ -93,7 +153,7 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             account_id,
             SUM(salary)::numeric AS salary,
             SUM(fee)::numeric    AS fee
-          FROM opps_in_month
+          FROM effective_per_opp
           GROUP BY mes, candidate_id, account_id
         ),
         first_seen AS (

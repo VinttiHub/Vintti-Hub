@@ -2367,6 +2367,16 @@
       renderAmDetailTable();
       renderSalesDetailTable();
       renderOpsDetailTable();
+      // Re-render any cohort tables now that ALL charts (including the churn
+      // chart they depend on for bajas counts) are in lastFetchedRows. This
+      // fixes the race condition where the cohort rendered before the churn
+      // chart's data arrived.
+      document.querySelectorAll('[data-bind="cohort"]').forEach(el => {
+        const chartKey = el.dataset.chart;
+        if (!chartKey) return;
+        const compKey = compKeyFor(chartKey, readOverridesFor(el));
+        renderCohort(el, lastFetchedRows.get(compKey) || []);
+      });
       // Populate month-detail panels with the currently selected month
       if (monthState.selected) {
         refetchMonthDetails(monthState.selected);
