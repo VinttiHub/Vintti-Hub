@@ -1199,8 +1199,11 @@
     rows.forEach(r => { if (r.mes) monthSet.add(r.mes); });
     const months = [...monthSet].sort();
 
-    // Group rows by (candidate_id + '|' + account_id).
+    // Group rows by (candidate_id + '|' + account_id). Also capture per-month
+    // metadata (bajas counts from the 3-month rolling window) since those are
+    // global per month and identical on every row of the same `mes`.
     const groups = new Map();
+    const monthMeta = {};
     rows.forEach(r => {
       const key = `${r.candidate_id || ''}|${r.account_id || ''}`;
       let g = groups.get(key);
@@ -1225,6 +1228,12 @@
       if (r.churn_month) g.churn_month = r.churn_month;
       if (r.is_buyout != null) g.is_buyout = !!r.is_buyout;
       if (r.status) g.status = r.status;
+      if (r.mes && monthMeta[r.mes] == null) {
+        monthMeta[r.mes] = {
+          bajas_real: Number(r.bajas_real_count || 0),
+          buyouts: Number(r.buyouts_count || 0),
+        };
+      }
     });
 
     let groupArr = [...groups.values()].sort((a, b) => {
@@ -1320,12 +1329,11 @@
         .sort((a, b) => b.v - a.v);
       const total = ranked.reduce((acc, x) => acc + x.v, 0);
       const count = ranked.length;
-      // Split bajas in two — matches the candidate_churn_window_history logic:
-      //   bajas reales = end_d ∈ m AND NOT buyout
-      //   buyouts      = end_d ∈ m AND buyout_daterange covers the churn month
-      const churnedThisMonth = [...groups.values()].filter(g => g.churn_month === m);
-      const buyoutCount = churnedThisMonth.filter(g => g.is_buyout).length;
-      const realChurnCount = churnedThisMonth.length - buyoutCount;
+      // Bajas counts vienen del backend con la misma fórmula que la gráfica
+      // candidate_churn_window_history (cohort móvil de 3 meses terminando en m).
+      const meta = monthMeta[m] || { bajas_real: 0, buyouts: 0 };
+      const realChurnCount = meta.bajas_real;
+      const buyoutCount = meta.buyouts;
 
       const items = ranked.map((x, i) => {
         const g = x.g;

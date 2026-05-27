@@ -131,6 +131,30 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hires
           WHERE candidate_id IS NOT NULL AND account_id IS NOT NULL
           GROUP BY candidate_id, account_id
+        ),
+        -- Bajas counts per month — IDENTICAL logic to candidate_churn_window_history
+        -- with meses=3 (the default window of the chart): cohort = hires that
+        -- started in the 3 months ending at m; bajas = cohort members whose
+        -- end_d <= m_fin. This way the cohort header stats match the chart.
+        churn_window_per_month AS (
+          SELECT
+            m.mes,
+            COUNT(*) FILTER (
+              WHERE h.end_d IS NOT NULL
+                AND h.end_d <= m.fin_mes
+                AND (h.buyout_d IS NULL OR h.buyout_d < DATE_TRUNC('month', h.end_d))
+            )::int AS bajas_real_count,
+            COUNT(*) FILTER (
+              WHERE h.end_d IS NOT NULL
+                AND h.end_d <= m.fin_mes
+                AND h.buyout_d IS NOT NULL
+                AND h.buyout_d >= DATE_TRUNC('month', h.end_d)
+            )::int AS buyouts_count
+          FROM meses m
+          JOIN hires h
+            ON h.start_d IS NOT NULL
+           AND h.start_d BETWEEN (m.mes - INTERVAL '2 months')::date AND m.fin_mes
+          GROUP BY m.mes
         )
         SELECT
           TO_CHAR(em.mes, 'YYYY-MM')                      AS mes,
@@ -150,13 +174,16 @@ def query(_filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             WHEN cpp.churn_month_d IS NULL          THEN 'Active'
             WHEN COALESCE(cpp.is_buyout, FALSE)     THEN 'Buyout'
             ELSE 'Churned'
-          END                                             AS status
+          END                                             AS status,
+          COALESCE(cwpm.bajas_real_count, 0)              AS bajas_real_count,
+          COALESCE(cwpm.buyouts_count, 0)                 AS buyouts_count
         FROM effective_in_month em
         LEFT JOIN candidates c ON c.candidate_id = em.candidate_id
         LEFT JOIN account a    ON a.account_id   = em.account_id
         JOIN first_seen fs ON fs.candidate_id = em.candidate_id AND fs.account_id = em.account_id
         JOIN last_seen  ls ON ls.candidate_id = em.candidate_id AND ls.account_id = em.account_id
         LEFT JOIN churn_per_pair cpp ON cpp.candidate_id = em.candidate_id AND cpp.account_id = em.account_id
+        LEFT JOIN churn_window_per_month cwpm ON cwpm.mes = em.mes
         ORDER BY fs.first_mes, em.candidate_id, em.mes;
     """
     return sql, {}
@@ -182,6 +209,8 @@ DATASET = {
         {"key": "fee", "label": "Fee", "type": "currency"},
         {"key": "client_payment", "label": "Client payment", "type": "currency"},
         {"key": "vintti_fee", "label": "Vintti fee", "type": "currency"},
+        {"key": "bajas_real_count", "label": "Bajas reales (3m)", "type": "number"},
+        {"key": "buyouts_count", "label": "Buyouts (3m)", "type": "number"},
     ],
     "default_filters": {},
     "query": query,
