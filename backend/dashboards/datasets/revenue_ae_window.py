@@ -66,45 +66,58 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     window_days = (win_fin - win_ini).days + 1
     modelo = _modelo(filters)
 
-    # Revenue expression varies per model. Recruiting uses ho.revenue (one-time
-    # placement fee). Staffing uses salary + fee (first month of MRR booked at
-    # close). The window summary just sums whatever applies for the chosen model.
+    # Revenue per hire. Recruiting uses ho.revenue (one-time placement fee),
+    # Staffing uses salary + fee (first month of MRR booked at close).
     revenue_expr = (
         "COALESCE(ho.revenue, 0)::numeric"
         if modelo == "Recruiting"
         else "COALESCE(ho.salary, 0)::numeric + COALESCE(ho.fee, 0)::numeric"
     )
 
+    # NOTE: one close win = one row. An opp with N hire_opportunity rows would
+    # naively be counted N times — Theta has 1 win but 2 hires, so we aggregate
+    # per opportunity first. LEFT JOIN keeps close wins that have no
+    # hire_opportunity row yet (their revenue contribution is 0). Stage filter
+    # `Close Win` mirrors the rest of the codebase (sourcing_to_close_win.py,
+    # nda_close_win_30d_summary.py, …) and excludes `Closed Lost`.
     sql = f"""
         WITH params AS (
           SELECT
             %(win_ini)s::date AS win_ini,
             %(win_fin)s::date AS win_fin
         ),
-        ae_hires AS (
+        ae_wins AS (
           SELECT
-            ho.account_id,
-            ho.candidate_id,
-            ho.opportunity_id,
-            {revenue_expr}                       AS revenue_row,
-            o.opp_close_date::date               AS close_d
-          FROM hire_opportunity ho
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+            o.opportunity_id,
+            o.account_id,
+            NULLIF(o.opp_close_date::text, '')::date AS close_d
+          FROM opportunity o
           WHERE o.opp_model = %(modelo)s
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
+            AND TRIM(o.opp_stage) = 'Close Win'
+        ),
+        per_opp AS (
+          SELECT
+            w.opportunity_id,
+            w.account_id,
+            w.close_d,
+            COALESCE(SUM({revenue_expr}), 0)::numeric AS revenue
+          FROM ae_wins w
+          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
+          GROUP BY w.opportunity_id, w.account_id, w.close_d
         )
         SELECT
           (SELECT win_fin FROM params)                       AS corte,
           (SELECT win_ini FROM params)                       AS win_ini,
           %(window_days)s::int                               AS window_days,
           %(modelo)s::text                                   AS modelo,
-          COALESCE(SUM(rh.revenue_row), 0)::bigint           AS revenue_window,
+          COALESCE(SUM(po.revenue), 0)::bigint               AS revenue_window,
           COUNT(*)::int                                      AS closes_window,
-          COUNT(DISTINCT rh.account_id)::int                 AS clients_window
-        FROM ae_hires rh
+          COUNT(DISTINCT po.account_id)::int                 AS clients_window
+        FROM per_opp po
         CROSS JOIN params p
-        WHERE rh.close_d IS NOT NULL
-          AND rh.close_d BETWEEN p.win_ini AND p.win_fin;
+        WHERE po.close_d IS NOT NULL
+          AND po.close_d BETWEEN p.win_ini AND p.win_fin;
     """
 
     return sql, {

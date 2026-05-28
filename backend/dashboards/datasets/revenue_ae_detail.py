@@ -65,30 +65,59 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     modelo = _modelo(filters)
 
     revenue_expr = (
-        "COALESCE(ho.revenue, 0)::float"
+        "COALESCE(ho.revenue, 0)::numeric"
         if modelo == "Recruiting"
-        else "(COALESCE(ho.salary, 0) + COALESCE(ho.fee, 0))::float"
+        else "(COALESCE(ho.salary, 0) + COALESCE(ho.fee, 0))::numeric"
     )
 
+    # One row per close win (NOT per hire). An opp with 2 hires (e.g. Theta)
+    # would otherwise appear twice — we aggregate per opportunity, concatenating
+    # candidate names with `, ` so the row still has context. LEFT JOIN keeps
+    # wins that don't have a hire_opportunity row yet (revenue = 0).
     sql = f"""
+        WITH ae_wins AS (
+          SELECT
+            o.opportunity_id,
+            o.account_id,
+            COALESCE(o.opp_sales_lead, '')                                  AS opp_sales_lead,
+            COALESCE(o.opp_position_name, '')                               AS opp_position_name,
+            NULLIF(o.opp_close_date::text, '')::date                        AS close_d
+          FROM opportunity o
+          WHERE o.opp_model = %(modelo)s
+            AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
+            AND TRIM(o.opp_stage) = 'Close Win'
+        ),
+        per_opp AS (
+          SELECT
+            w.opportunity_id,
+            w.account_id,
+            w.opp_sales_lead,
+            w.opp_position_name,
+            w.close_d,
+            STRING_AGG(NULLIF(TRIM(c.name), ''), ', ' ORDER BY c.name)      AS candidate_name,
+            COUNT(ho.candidate_id)                                          AS hire_count,
+            COALESCE(SUM({revenue_expr}), 0)::float                         AS revenue
+          FROM ae_wins w
+          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = w.opportunity_id
+          LEFT JOIN candidates       c  ON c.candidate_id   = ho.candidate_id
+          GROUP BY w.opportunity_id, w.account_id, w.opp_sales_lead, w.opp_position_name, w.close_d
+        )
         SELECT
-          COALESCE(c.name, '')                                            AS candidate_name,
-          COALESCE(a.client_name, '')                                     AS client_name,
-          COALESCE(o.opp_sales_lead, '')                                  AS opp_sales_lead,
-          TO_CHAR(NULLIF(o.opp_close_date::text, '')::date, 'YYYY-MM-DD') AS close_date,
-          {revenue_expr}                                                  AS revenue
-        FROM hire_opportunity ho
-        JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-        LEFT JOIN candidates c ON c.candidate_id = ho.candidate_id
-        LEFT JOIN account a    ON a.account_id   = ho.account_id
-        WHERE o.opp_model = %(modelo)s
-          AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
-          AND o.opp_close_date IS NOT NULL
-          AND NULLIF(o.opp_close_date::text, '')::date >= %(win_ini)s::date
-          AND NULLIF(o.opp_close_date::text, '')::date <= %(win_fin)s::date
-        ORDER BY NULLIF(o.opp_close_date::text, '')::date DESC NULLS LAST,
-                 revenue DESC NULLS LAST,
-                 c.name;
+          COALESCE(po.candidate_name, '')                                   AS candidate_name,
+          COALESCE(a.client_name, '')                                       AS client_name,
+          po.opp_sales_lead                                                 AS opp_sales_lead,
+          po.opp_position_name                                              AS opp_position_name,
+          po.hire_count::int                                                AS hire_count,
+          TO_CHAR(po.close_d, 'YYYY-MM-DD')                                 AS close_date,
+          po.revenue                                                        AS revenue
+        FROM per_opp po
+        LEFT JOIN account a ON a.account_id = po.account_id
+        WHERE po.close_d IS NOT NULL
+          AND po.close_d >= %(win_ini)s::date
+          AND po.close_d <= %(win_fin)s::date
+        ORDER BY po.close_d DESC NULLS LAST,
+                 po.revenue DESC NULLS LAST,
+                 a.client_name;
     """
 
     return sql, {
@@ -103,12 +132,14 @@ DATASET = {
     "key": "revenue_ae_detail",
     "label": "Revenue Generated (AEs only) — Detalle por close en ventana",
     "dimensions": [
-        {"key": "candidate_name", "label": "Candidato", "type": "string"},
+        {"key": "candidate_name", "label": "Candidato(s)", "type": "string"},
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "opp_sales_lead", "label": "AE", "type": "string"},
+        {"key": "opp_position_name", "label": "Posición", "type": "string"},
         {"key": "close_date", "label": "Close date", "type": "date"},
     ],
     "measures": [
+        {"key": "hire_count", "label": "Candidatos en la opp", "type": "number"},
         {"key": "revenue", "label": "Revenue", "type": "currency"},
     ],
     "default_filters": {"window": "30d", "modelo": "Staffing"},

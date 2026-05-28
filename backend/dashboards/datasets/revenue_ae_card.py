@@ -62,7 +62,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
             AND o.opp_model IN ('Staffing', 'Recruiting')
-            AND o.opp_close_date IS NOT NULL
+            AND TRIM(o.opp_stage) = 'Close Win'
+            AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
             AND NULLIF(o.opp_close_date::text, '')::date <= %(period_end)s::date
           GROUP BY o.opp_model
