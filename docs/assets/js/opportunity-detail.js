@@ -371,29 +371,103 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function decodeHtmlEntities(value) {
+  if (typeof document === 'undefined') {
+    return String(value ?? '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;|&apos;/g, "'");
+  }
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = String(value ?? '');
+  return textarea.value;
+}
+
+function markdownizeInlineHtml(value) {
+  return decodeHtmlEntities(
+    String(value ?? '')
+      .replace(/\u00A0|&nbsp;/g, ' ')
+      .replace(/<strong\b[^>]*>([\s\S]*?)<\/strong>/gi, (_, content) => {
+        const text = String(content).replace(/<[^>]+>/g, '').trim();
+        return text ? `**${text}**` : '';
+      })
+      .replace(/<b\b[^>]*>([\s\S]*?)<\/b>/gi, (_, content) => {
+        const text = String(content).replace(/<[^>]+>/g, '').trim();
+        return text ? `**${text}**` : '';
+      })
+      .replace(/<em\b[^>]*>([\s\S]*?)<\/em>/gi, (_, content) => {
+        const text = String(content).replace(/<[^>]+>/g, '').trim();
+        return text ? `*${text}*` : '';
+      })
+      .replace(/<i\b[^>]*>([\s\S]*?)<\/i>/gi, (_, content) => {
+        const text = String(content).replace(/<[^>]+>/g, '').trim();
+        return text ? `*${text}*` : '';
+      })
+      .replace(/<li[^>]*>/gi, '\n- ')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/?(p|div|section|article|h[1-6])[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+  );
+}
+
 function formatJobDescriptionForHtml(raw) {
   if (!raw) return '';
   const source = String(raw).trim();
   if (!source) return '';
 
-  const hasHtmlLayout = /<\/?(p|ul|ol|li|br|div|h[1-6]|strong|b)\b/i.test(source);
-  if (hasHtmlLayout) return source;
-
   const headings = [
     'Job Title',
     'Role Summary',
+    'Summary',
+    'Overview',
+    'About the Role',
     'Key Responsibilities',
+    'Responsibilities',
     'Requirements',
+    'Qualifications',
+    'Required Skills',
     'Nice to Haves',
-    'Additional Information'
+    'Nice to Have',
+    'Must Haves',
+    'Preferred Qualifications',
+    'Additional Information',
+    "What you'll do",
+    'What you’ll do',
+    "What we're looking for",
+    'What we’re looking for',
+    'Who you are',
+    'Who you’ll work with',
+    'What you bring',
+    'Benefits',
+    'Compensation',
+    'Schedule',
+    'Tools',
+    'Location',
+    'Details'
   ];
   const headingPattern = headings.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
 
-  let text = source
+  let text = markdownizeInlineHtml(source)
     .replace(/\r\n?/g, '\n')
-    .replace(new RegExp(`\\s+(${headingPattern})\\s*:?`, 'gi'), '\n$1:')
-    .replace(/\s+-\s+(?=[A-Z0-9])/g, '\n- ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n')
+    .replace(/\s+(\*\*[^*]{2,90}\*\*)\s*[-:]\s*/g, '\n$1: ')
+    .replace(/^\s*(#{1,6})\s+/gm, '')
+    .replace(/^\s*(\d+)[.)]\s+/gm, '- ')
+    .replace(/\s+[-–—]\s+(?=[A-Za-z0-9])/g, '\n- ')
+    .replace(/\s+•\s+/g, '\n- ')
     .trim();
+
+  if (!/\*\*[^*]+\*\*/.test(text)) {
+    text = text.replace(new RegExp(`\\b(${headingPattern})\\b([ \\t]*:)?`, 'gi'), (match, heading, colon) => {
+      if (!colon && heading.charAt(0) !== heading.charAt(0).toUpperCase()) return match;
+      return `\n${heading}:`;
+    });
+  }
 
   const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
   const html = [];
@@ -406,26 +480,61 @@ function formatJobDescriptionForHtml(raw) {
     }
   };
 
-  const inline = (value) => escapeHtml(value).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  const inline = (value) => escapeHtml(value)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  const isListHeading = (value) => {
+    const lower = String(value || '').toLowerCase();
+    return lower.includes('responsibilities') ||
+      lower.includes('requirements') ||
+      lower.includes('qualifications') ||
+      lower.includes('required skills') ||
+      lower.includes('must have') ||
+      lower.includes('nice to have') ||
+      lower.includes('what you') ||
+      lower.includes('what we') ||
+      lower.includes('who you') ||
+      lower.includes('what you bring') ||
+      lower.includes('benefits') ||
+      lower.includes('compensation') ||
+      lower.includes('schedule') ||
+      lower.includes('tools') ||
+      lower.includes('location') ||
+      lower.includes('details');
+  };
+  const openList = () => {
+    if (!inList) {
+      html.push('<ul>');
+      inList = true;
+    }
+  };
 
   lines.forEach((line) => {
-    const bullet = line.match(/^[-*•]\s+(.+)$/);
+    const bullet = line.match(/^[-*•–—]\s+(.+)$/);
     if (bullet) {
-      if (!inList) {
-        html.push('<ul>');
-        inList = true;
-      }
-      html.push(`<li>${inline(bullet[1])}</li>`);
+      const item = bullet[1].replace(/^[-*•–—]\s+/, '');
+      openList();
+      html.push(`<li>${inline(item)}</li>`);
       return;
     }
 
     closeList();
 
-    const headingMatch = line.match(new RegExp(`^(${headingPattern})\\s*[:\\-]?\\s*(.*)$`, 'i'));
+    const boldHeadingMatch = line.match(/^\*\*([^*]+)\*\*\s*[:\-]?\s*(.*)$/);
+    const headingMatch = boldHeadingMatch || line.match(new RegExp(`^(${headingPattern})\\s*[:\\-]?\\s*(.*)$`, 'i'));
     if (headingMatch) {
       const canonicalHeading = headings.find(h => h.toLowerCase() === headingMatch[1].toLowerCase()) || headingMatch[1];
-      const rest = headingMatch[2] ? ` ${inline(headingMatch[2])}` : '';
-      html.push(`<p><strong>${escapeHtml(canonicalHeading)}${canonicalHeading === 'Job Title' ? ':' : ''}</strong>${rest}</p>`);
+      const headingLabel = escapeHtml(canonicalHeading);
+      const rest = headingMatch[2] ? inline(headingMatch[2]) : '';
+
+      if (rest && isListHeading(canonicalHeading)) {
+        html.push(`<p><strong>${headingLabel}</strong></p>`);
+        openList();
+        html.push(`<li>${rest}</li>`);
+        return;
+      }
+
+      html.push(`<p><strong>${headingLabel}${canonicalHeading === 'Job Title' ? ':' : ''}</strong>${rest ? ` ${rest}` : ''}</p>`);
       return;
     }
 
