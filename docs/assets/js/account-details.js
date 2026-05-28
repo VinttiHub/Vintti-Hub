@@ -2052,7 +2052,7 @@ function numberOrNull(value) {
   return Number.isFinite(num) ? num : null;
 }
 
-const INACTIVE_EMAIL_TO = ['angie@vintti.com', 'lara@vintti.com'];
+const INACTIVE_EMAIL_TO = ['pgonzales@vintti.com', 'lara@vintti.com'];
 const SEND_EMAIL_ENDPOINT = 'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email';
 
 function getCurrentAccountName() {

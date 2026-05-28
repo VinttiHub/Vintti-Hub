@@ -14,7 +14,7 @@ import { resolveAvatar } from '../../utils/avatars.js';
 const allowedPriorityEmails = new Set([
   'agustin@vintti.com',
   'bahia@vintti.com',
-  'angie@vintti.com',
+  'pgonzales@vintti.com',
   'lara@vintti.com',
   'agostina@vintti.com',
   'mariano@vintti.com',

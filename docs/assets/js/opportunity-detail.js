@@ -472,7 +472,7 @@ function toggleActiveButton(command, button) {
 const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 const TRACK_PAGE = 'opp details';
 const DELETE_OPPORTUNITY_ALLOWED_EMAILS = new Set([
-  'angie@vintti.com',
+  'pgonzales@vintti.com',
   'agustin@vintti.con',
   'lara@vintti.com'
 ]);
@@ -480,7 +480,7 @@ const APPLICANT_LINK_ALLOWED_EMAILS = new Set([
   'agustin@vintti.com',
   'agostina@vintti.com',
   'agustina@vintti.com',
-  'angie@vintti.com',
+  'pgonzales@vintti.com',
   'lara@vintti.com',
   'paz@vintti.com',
   'constanza@vintti.com',

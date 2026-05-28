@@ -30,7 +30,7 @@ const RESTRICTION_EXCEPTIONS = new Set([
   "agostina@vintti.com",
 ]);
 const RECRUITER_POWER_ALLOWED = new Set([
-  "angie@vintti.com",
+  "pgonzales@vintti.com",
   "agostina@vintti.com",
   "agustin@vintti.com",
   "lara@vintti.com",

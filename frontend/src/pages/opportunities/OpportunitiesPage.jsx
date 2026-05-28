@@ -407,7 +407,7 @@ function OpportunitiesPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          to: [hrEmail, 'angie@vintti.com'],
+          to: [hrEmail, 'pgonzales@vintti.com'],
           subject: `You’ve been assigned a new search – ${opportunity.client_name || 'Client'}`,
           body: `
             <div style="font-family: Inter, Arial, sans-serif;">

@@ -466,7 +466,7 @@ function normalizeDateForAPI(ymd) {
   return `${s}T12:00:00`;
 }
 
-const INACTIVE_EMAIL_TO = ['angie@vintti.com', 'lara@vintti.com'];
+const INACTIVE_EMAIL_TO = ['pgonzales@vintti.com', 'lara@vintti.com'];
 const SEND_EMAIL_ENDPOINT = 'https://7m6mw95m8y.us-east-2.awsapprunner.com/send_email';
 let candidateOverviewData = null;
 

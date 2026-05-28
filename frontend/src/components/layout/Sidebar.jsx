@@ -6,7 +6,7 @@ import { getCurrentUserId } from '../../services/userService.js';
 const SUMMARY_ALLOWED = new Set([
   'agustin@vintti.com',
   'bahia@vintti.com',
-  'angie@vintti.com',
+  'pgonzales@vintti.com',
   'lara@vintti.com',
   'agostina@vintti.com',
   'mariano@vintti.com',
@@ -19,13 +19,13 @@ const CANDIDATE_SEARCH_ALLOWED = new Set([
   'constanza@vintti.com',
   'pilar@vintti.com',
   'pilar.fernandez@vintti.com',
-  'angie@vintti.com',
+  'pgonzales@vintti.com',
   'agostina@vintti.com',
   'julieta@vintti.com',
 ]);
 
 const EQUIPMENTS_ALLOWED = new Set([
-  'angie@vintti.com',
+  'pgonzales@vintti.com',
   'jazmin@vintti.com',
   'agustin@vintti.com',
   'lara@vintti.com',

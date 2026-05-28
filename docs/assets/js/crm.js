@@ -11,7 +11,7 @@ const API_BASE = 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
 
 // Emails allowed for extra UI (priority col, summary link, etc.)
 const allowedEmails = [
-  'agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com',
+  'agustin@vintti.com', 'bahia@vintti.com', 'pgonzales@vintti.com',
   'lara@vintti.com','agostina@vintti.com', 'mariano@vintti.com',
   'mia@vintti.com', 'pgonzales@vintti.com'
 ];
@@ -2073,7 +2073,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
 
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const equipmentsAllowed = [
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'jazmin@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com'
@@ -2086,7 +2086,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const DASH_ALLOWED = new Set([
     'agustin@vintti.com',
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
     'agostina@vintti.com',
@@ -2114,7 +2114,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
   const RECRUITER_POWER_ALLOWED = new Set([
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'agostina@vintti.com',
     'agostin@vintti.com',
     'agustin@vintti.com',
@@ -2134,7 +2134,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const SALES_ALLOWED = new Set([
     'agustin@vintti.com',
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
     'mariano@vintti.com',
@@ -2162,7 +2162,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'lara@vintti.com',
     'constanza@vintti.com',
     'pilar@vintti.com',
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'agostina@vintti.com',
     'julieta@vintti.com',
     'paz@vintti.com'
@@ -2175,12 +2175,12 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
   const summaryAllowed = [
-    'agustin@vintti.com','bahia@vintti.com','angie@vintti.com',
+    'agustin@vintti.com','bahia@vintti.com','pgonzales@vintti.com',
     'lara@vintti.com','agostina@vintti.com','mariano@vintti.com',
     'mia@vintti.com','jazmin@vintti.com'
   ];
   const equipmentsAllowed = [
-    'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
+    'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
   ];
 
   const summaryLink = document.getElementById('summaryLink');

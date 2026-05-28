@@ -2596,7 +2596,7 @@ helloBtn.addEventListener('click', async () => {
   }
 const summaryLink = document.getElementById('summaryLink');
 const currentUserEmail = localStorage.getItem('user_email');
-const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'angie@vintti.com', 
+const allowedEmails = ['agustin@vintti.com', 'bahia@vintti.com', 'pgonzales@vintti.com', 
   'lara@vintti.com','agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com'];
 
 if (summaryLink && allowedEmails.includes(currentUserEmail)) {
@@ -2613,7 +2613,7 @@ if (candidateSearchLink) {
     'lara@vintti.com',
     'constanza@vintti.com',
     'pilar@vintti.com',
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'agostina@vintti.com',
     'julieta@vintti.com',
     'paz@vintti.com' 
@@ -3742,7 +3742,7 @@ async function patchOppFields(oppId, payload) {
 
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const equipmentsAllowed = [
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'jazmin@vintti.com',
     'agustin@vintti.com',
     'lara@vintti.com'
@@ -3755,7 +3755,7 @@ async function patchOppFields(oppId, payload) {
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const DASH_ALLOWED = new Set([
     'agustin@vintti.com',
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
     'agostina@vintti.com',
@@ -3780,7 +3780,7 @@ async function patchOppFields(oppId, payload) {
   const currentUserEmail = (localStorage.getItem('user_email') || '').toLowerCase();
   const SALES_ALLOWED = new Set([
     'agustin@vintti.com',
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
     'mariano@vintti.com',
@@ -3804,7 +3804,7 @@ async function patchOppFields(oppId, payload) {
   const email = (localStorage.getItem('user_email') || '').toLowerCase().trim();
 
   const RECRUITER_POWER_ALLOWED = new Set([
-    'angie@vintti.com',
+    'pgonzales@vintti.com',
     'agostina@vintti.com',
     'agostin@vintti.com',
     'agustin@vintti.com',
@@ -4089,7 +4089,7 @@ async function sendNegotiatingReminder(opportunityId){
     // 🔸 En muchos backends el campo se llama "body" y si huele a HTML lo mandan como HTML.
     // 🔸 Para mayor compatibilidad añadimos también "body_html" y una pista "content_type".
     const payload = {
-      to: [hrEmail, 'angie@vintti.com', 'pgonzales@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
+      to: [hrEmail, 'pgonzales@vintti.com'].filter((v, i, arr) => v && arr.indexOf(v) === i),
       subject,
       body: htmlBody,              // si tu /send_email usa esto, verá HTML
       body_html: htmlBody,         // alternativo común

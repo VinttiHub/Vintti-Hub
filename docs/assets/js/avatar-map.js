@@ -25,7 +25,6 @@
     'camila@vintti.com':           'camila.png',
     'felipe@vintti.com':           'felipe.png',
     'abril@vintti.com':            'abril.png',
-    'angie@vintti.com':            'angie.png',
     'juliana@vintti.com':          'juliana.png',
     'paz@vintti.com':              'paz.png',
     'vianney@vintti.com':          'vianney.png',

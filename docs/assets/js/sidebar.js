@@ -104,38 +104,37 @@
 
     setDisplay('candidateSearchLink', new Set([
       'agustin@vintti.com','lara@vintti.com','constanza@vintti.com',
-      'pilar@vintti.com','angie@vintti.com','agostina@vintti.com',
-      'julieta@vintti.com','paz@vintti.com', 'pgonzales@vintti.com'
+      'pilar@vintti.com','pgonzales@vintti.com','agostina@vintti.com',
+      'julieta@vintti.com','paz@vintti.com'
     ]).has(email));
 
     setDisplay('salesLink', new Set([
-      'agustin@vintti.com','angie@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com','mia@vintti.com', 'pgonzales@vintti.com'
+      'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com','mariano@vintti.com','mia@vintti.com'
     ]).has(email));
 
     const dashOk = new Set([
-      'agustin@vintti.com','angie@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com',
-      'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com','lucia@vintti.com',
-      'pgonzales@vintti.com'
+      'agustin@vintti.com','pgonzales@vintti.com','lara@vintti.com','bahia@vintti.com','manuela@vintti.com',
+      'agostina@vintti.com','mia@vintti.com','jazmin@vintti.com','lucia@vintti.com'
     ]).has(email);
     setDisplay('dashboardLink', dashOk);
     setDisplay('customDashboardLink', dashOk);
     setDisplay('managementMetricsLink', dashOk);
 
     setDisplay('recruiterPowerLink', new Set([
-      'angie@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
+      'pgonzales@vintti.com','agostina@vintti.com','agustin@vintti.com','lara@vintti.com',
       'constanza@vintti.com','pilar@vintti.com','julieta@vintti.com','paz@vintti.com',
-      'valentina@vintti.com', 'pgonzales@vintti.com'
+      'valentina@vintti.com'
     ]).has(email));
 
     setDisplay('equipmentsLink', new Set([
-      'angie@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com', 'pgonzales@vintti.com'
+      'pgonzales@vintti.com','jazmin@vintti.com','agustin@vintti.com','lara@vintti.com'
     ]).has(email));
 
     // Summary link
     const summaryLink = document.getElementById('summaryLink');
     const allowedEmails = new Set([
-      'agustin@vintti.com','bahia@vintti.com','manuela@vintti.com','angie@vintti.com','lara@vintti.com',
-      'agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com', 'pgonzales@vintti.com'
+      'agustin@vintti.com','bahia@vintti.com','manuela@vintti.com','pgonzales@vintti.com','lara@vintti.com',
+      'agostina@vintti.com','mariano@vintti.com','mia@vintti.com','jazmin@vintti.com'
     ]);
     if (summaryLink) summaryLink.style.display = allowedEmails.has(email) ? 'flex' : 'none';
   }
