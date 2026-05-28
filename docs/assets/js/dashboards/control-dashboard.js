@@ -1227,12 +1227,13 @@
       if (r.status) g.status = r.status;
     });
 
-    // Pull bajas counts straight from the chart that the user is comparing
-    // against (`am_line_candidate_churn_window` → dataset
-    // candidate_churn_window_history). This way the cohort header is
-    // ALWAYS identical to the chart tooltip, no second SQL to babysit.
+    // Pull bajas counts from the monthly churn chart (`am_line_candidate_churn`
+    // → dataset candidate_churn_history). That dataset already filters
+    // o.opp_model = 'Staffing' and its `bajas` column is bajas_real + bajas_buyout,
+    // so the cohort header lines up with the Staffing chart instead of the
+    // rolling 3/6m window metric, which was a different denominator.
     const monthMeta = {};
-    const churnRows = lastFetchedRows.get('am_line_candidate_churn_window') || [];
+    const churnRows = lastFetchedRows.get('am_line_candidate_churn') || [];
     churnRows.forEach(cr => {
       // The chart's `mes` is 'YYYY-MM-DD' (first of month). Normalize to YYYY-MM.
       const mm = String(cr.mes || '').slice(0, 7);
@@ -1432,12 +1433,23 @@
         return `<td class="${chipCls}"><span class="cohort-chip-val">${esc(fmtMoney(v))}</span></td>`;
       }).join('');
       grandTotal += rowTotal;
-      const subline = g.status === 'Churned'
-        ? `Churned ${esc(fmtMonth(g.last_mes))}`
-        : esc(fmtMonth(g.first_mes));
+      // Status dot + subline match the snapshot view: verde activo / rojo baja / ámbar buyout.
+      let dotCls, subline;
+      if (g.status === 'Churned') {
+        dotCls = 'cohort-rank__dot--churned';
+        subline = `Churned ${esc(fmtMonth(g.last_mes))}`;
+      } else if (g.status === 'Buyout') {
+        dotCls = 'cohort-rank__dot--buyout';
+        subline = `Buyout ${esc(fmtMonth(g.last_mes))}`;
+      } else {
+        dotCls = 'cohort-rank__dot--active';
+        subline = esc(fmtMonth(g.first_mes));
+      }
       return `<tr>
         <td class="cohort-td-name">
-          <div class="cohort-td-name__primary">${esc(g.candidate_name)}</div>
+          <div class="cohort-td-name__primary">
+            <span class="cohort-rank__dot ${dotCls}" style="display:inline-block;margin-right:8px;vertical-align:middle"></span>${esc(g.candidate_name)}
+          </div>
           <div class="cohort-td-name__sub">${esc(g.client_name)} · ${subline}</div>
         </td>
         ${cells}

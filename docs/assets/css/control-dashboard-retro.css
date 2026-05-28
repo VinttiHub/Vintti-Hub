@@ -2885,9 +2885,9 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   height: 7px;
   border-radius: 999px;
 }
-.cohort-rank__dot--active  { background: rgba(108, 56, 255, 0.85); }
-.cohort-rank__dot--churned { background: rgba(244, 114, 182, 0.95); }
-.cohort-rank__dot--buyout  { background: rgba(59, 130, 246, 0.95); }
+.cohort-rank__dot--active  { background: rgba(34, 197, 94, 0.95);  } /* verde */
+.cohort-rank__dot--churned { background: rgba(239, 68, 68, 0.95);  } /* rojo  */
+.cohort-rank__dot--buyout  { background: rgba(245, 158, 11, 0.95); } /* amarillo/ámbar */
 .cohort-rank__chip {
   display: inline-block;
   padding: 6px 14px;
