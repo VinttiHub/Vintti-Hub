@@ -695,13 +695,21 @@
     }
   }
 
-  /* ---------- render: progress bar fill (0-100 → width %) ---------- */
+  /* ---------- render: progress bar fill (0-100 → width or height %) ---------- */
   function renderProgressFill(el, rows) {
     const field = el.dataset.field;
     const mode = el.dataset.reduce || 'first';
     const v = reduce(rows, field, mode);
     const valid = (v != null && isFinite(+v));
-    el.style.width = valid ? Math.max(0, Math.min(100, +v)).toFixed(1) + '%' : '0%';
+    const pct = valid ? Math.max(0, Math.min(100, +v)).toFixed(1) + '%' : '0%';
+    // Default axis is horizontal (width). Pass data-axis="height" for vertical
+    // fills (e.g. the AE fuel-tank uses height-based stacking).
+    const axis = (el.dataset.axis || 'width').toLowerCase();
+    if (axis === 'height') {
+      el.style.height = pct;
+    } else {
+      el.style.width = pct;
+    }
     const target = +el.dataset.target;
     if (target > 0) {
       const tile = el.closest('.skpi-tile');

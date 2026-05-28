@@ -130,6 +130,7 @@ from . import (
     cohort_by_contractor,
     revenue_ae_window,
     revenue_ae_detail,
+    revenue_ae_card,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -264,6 +265,7 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     cohort_by_contractor.DATASET["key"]: cohort_by_contractor.DATASET,
     revenue_ae_window.DATASET["key"]: revenue_ae_window.DATASET,
     revenue_ae_detail.DATASET["key"]: revenue_ae_detail.DATASET,
+    revenue_ae_card.DATASET["key"]: revenue_ae_card.DATASET,
 }
 
 

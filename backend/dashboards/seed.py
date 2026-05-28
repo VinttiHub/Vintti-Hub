@@ -89,6 +89,10 @@ RETIRED_CHART_KEYS = {
         "sa_table_sql_funnel_30d_detail",
         "sa_table_nda_to_sourcing_detail",
         "mg_table_cohort_by_contractor",
+        # AE tab — earlier window-based scaffolding, retired in favor of the
+        # YTD fuel-tank card (`ae_kpi_revenue_card`).
+        "ae_kpi_revenue_window",
+        "ae_table_revenue_detail",
     ],
 }
 
@@ -222,8 +226,7 @@ RESET_CHART_KEYS = {
         "gr_kpi_sql_to_nda_30d",
         "gr_table_sql_to_nda_30d_detail",
         # AE Metrics tab (Mariano + Bahia)
-        "ae_kpi_revenue_window",
-        "ae_table_revenue_detail",
+        "ae_kpi_revenue_card",
     ],
 }
 
@@ -2570,40 +2573,27 @@ MAIN_CHARTS = [
         "sort_order": 600,
     },
 
-    # AE Metrics tab — Mariano + Bahia only. Frontend tiles pass `data-override-modelo`
-    # (Staffing | Recruiting) and `data-override-window` (30d | week) to fan one chart
-    # registration out into 4 KPI tiles / 2 detail tables.
+    # AE Metrics tab — one chart per AE card. Frontend passes `data-override-sales_lead`
+    # = mariano@vintti.com | bahia@vintti.com to fan this one registration out into
+    # two fuel-tank cards on the AE tab.
     {
-        "chart_key": "ae_kpi_revenue_window",
+        "chart_key": "ae_kpi_revenue_card",
         "tab_key": "ae",
-        "title": "Revenue Generated (AEs only) — Window",
+        "title": "Revenue Generated (per AE) — YTD vs goal",
         "type": "kpi",
-        "dataset_key": "revenue_ae_window",
+        "dataset_key": "revenue_ae_card",
         "config": {
             "mapping": {
                 "values": [
-                    {"key": "revenue_window", "label": "Revenue", "formatter": "currency"},
-                    {"key": "closes_window", "label": "Closes", "formatter": "number"},
-                    {"key": "clients_window", "label": "Clients", "formatter": "number"},
+                    {"key": "total_revenue_ytd", "label": "Total YTD", "formatter": "currency"},
+                    {"key": "annual_goal", "label": "Objetivo", "formatter": "currency"},
+                    {"key": "pct_of_goal", "label": "% objetivo", "formatter": "percent"},
+                    {"key": "remaining", "label": "Restante", "formatter": "currency"},
                 ],
             },
         },
-        "position": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "position": {"x": 0, "y": 0, "w": 6, "h": 6},
         "sort_order": 700,
-    },
-    {
-        "chart_key": "ae_table_revenue_detail",
-        "tab_key": "ae",
-        "title": "Revenue Generated (AEs only) — Detalle",
-        "type": "table",
-        "dataset_key": "revenue_ae_detail",
-        "config": {
-            "mapping": {
-                "columns": ["close_date", "client_name", "candidate_name", "opp_sales_lead", "revenue"],
-            },
-        },
-        "position": {"x": 0, "y": 5, "w": 12, "h": 6},
-        "sort_order": 710,
     },
 ]
 
