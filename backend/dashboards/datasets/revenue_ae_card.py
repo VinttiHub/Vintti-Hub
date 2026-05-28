@@ -16,19 +16,16 @@ from __future__ import annotations
 from datetime import date, datetime
 
 
-# AE roster + annual revenue goal. Sales lead emails are matched case-insensitive
-# against `opportunity.opp_sales_lead`. Change goals here, not in the SQL.
-ANNUAL_GOALS = {
-    "mariano@vintti.com": 8_000_000,
-    "bahia@vintti.com":   8_000_000,
-}
+# AE roster. The card aggregates ALL of these into a single fuel tank.
+# Add an email here to include another AE; nothing else changes.
+SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
 
-# Human-friendly name shown in the card title. Optional; falls back to the
-# email local-part capitalized if absent.
-AE_NAMES = {
-    "mariano@vintti.com": "Mariano",
-    "bahia@vintti.com":   "Bahia",
-}
+# Combined annual revenue goal across the AEs above (USD).
+# Change here, not in SQL.
+ANNUAL_GOAL = 1_000_000
+
+# Human-friendly title shown in the card.
+AE_NAME = "Mariano + Bahia"
 
 
 def _parse_int(value, default: int) -> int:
@@ -50,10 +47,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # Months left in the calendar year *after* the current month, e.g. May → Jun-Dec = 7.
     months_remaining = max(0, 12 - period_end.month)
 
-    sales_lead = str(filters.get("sales_lead") or "mariano@vintti.com").strip().lower()
-    annual_goal = ANNUAL_GOALS.get(sales_lead, 0)
-    ae_name = AE_NAMES.get(sales_lead) or sales_lead.split("@", 1)[0].capitalize()
-
     sql = """
         WITH per_model AS (
           SELECT
@@ -67,7 +60,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             )::numeric AS revenue
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE TRIM(LOWER(o.opp_sales_lead)) = %(sales_lead)s
+          WHERE TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
             AND o.opp_model IN ('Staffing', 'Recruiting')
             AND o.opp_close_date IS NOT NULL
             AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
@@ -81,7 +74,6 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM per_model
         )
         SELECT
-          %(sales_lead)s::text                                              AS sales_lead,
           %(ae_name)s::text                                                 AS ae_name,
           %(year)s::int                                                     AS year,
           %(months_remaining)s::int                                         AS months_remaining,
@@ -107,10 +99,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
-        "sales_lead": sales_lead,
-        "ae_name": ae_name,
+        "sales_leads": SALES_LEADS,
+        "ae_name": AE_NAME,
         "year": year,
-        "annual_goal": annual_goal,
+        "annual_goal": ANNUAL_GOAL,
         "months_remaining": months_remaining,
         "year_start": year_start,
         "period_end": period_end,
@@ -119,9 +111,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "revenue_ae_card",
-    "label": "Revenue Generated (per AE) — YTD vs anual goal",
+    "label": "Revenue Generated (Mariano + Bahia) — YTD vs anual goal",
     "dimensions": [
-        {"key": "sales_lead", "label": "AE", "type": "string"},
         {"key": "ae_name", "label": "AE name", "type": "string"},
         {"key": "year", "label": "Year", "type": "number"},
         {"key": "months_remaining", "label": "Meses restantes", "type": "number"},
@@ -138,6 +129,6 @@ DATASET = {
         {"key": "recruiting_pct_of_total", "label": "Recruiting % del total", "type": "percent"},
         {"key": "recruiting_pct_of_goal", "label": "Recruiting % del objetivo", "type": "percent"},
     ],
-    "default_filters": {"sales_lead": "mariano@vintti.com"},
+    "default_filters": {},
     "query": query,
 }

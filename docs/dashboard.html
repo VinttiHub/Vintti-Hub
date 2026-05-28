@@ -79,7 +79,7 @@
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">31</span></label>
     <label class="tabs__btn" for="tab-marketing">Marketing <span class="ct">3</span></label>
-    <label class="tabs__btn" for="tab-ae">AE Metrics <span class="ct">2</span></label>
+    <label class="tabs__btn" for="tab-ae">AE Metrics <span class="ct">1</span></label>
   </nav>
 
   <!-- ============================================================
@@ -3115,51 +3115,47 @@
 
 
   <!-- ============================================================
-       CHANNEL · AE Metrics (one fuel-tank card per AE)
+       CHANNEL · AE Metrics (Mariano + Bahia combined)
        ============================================================ -->
   <section class="channel" data-channel="ae">
     <div class="grid">
 
-      <!-- One card per AE. Each card fetches `ae_kpi_revenue_card` with its own
-           `data-override-sales_lead`. To add a 3rd AE: dupe a card block and
-           change every occurrence of the email + the `bg-grad-*` accent. -->
-
-      <!-- ===== Mariano ===== -->
-      <div class="ae-card s-6" data-ae-card>
+      <!-- ===== Combined card · M+B ===== -->
+      <div class="ae-card s-12" data-ae-card>
         <header class="ae-card__head">
           <div>
             <h2 class="ae-card__title">Revenue Generated · <span
-                data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
-                data-bind="text" data-field="ae_name" data-reduce="first" data-fmt="raw">Mariano</span></h2>
+                data-chart="ae_kpi_revenue_card"
+                data-bind="text" data-field="ae_name" data-reduce="first" data-fmt="raw">Mariano + Bahia</span></h2>
             <p class="ae-card__sub">Staffing + Recruiting · vs objetivo anual <span
-                data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
-                data-bind="text" data-field="annual_goal" data-reduce="first" data-fmt="currency-k">$8M</span></p>
+                data-chart="ae_kpi_revenue_card"
+                data-bind="text" data-field="annual_goal" data-reduce="first" data-fmt="currency-k">$1M</span></p>
           </div>
           <span class="ae-card__chip">YTD <span
-              data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
-              data-bind="text" data-field="year" data-reduce="first" data-fmt="int">2026</span></span>
+              data-chart="ae_kpi_revenue_card"
+              data-bind="text" data-field="year" data-reduce="first" data-fmt="raw">2026</span></span>
         </header>
 
         <div class="ae-card__body">
-          <!-- Fuel tank -->
+          <!-- Fuel tank: vertical = 0 → annual goal ($1M). Ticks at 250K/500K/750K. -->
           <div class="ae-tank">
             <div class="ae-tank__ticks">
-              <span class="ae-tank__tick" style="bottom:75%">6M</span>
-              <span class="ae-tank__tick" style="bottom:50%">4M</span>
-              <span class="ae-tank__tick" style="bottom:25%">2M</span>
+              <span class="ae-tank__tick" style="bottom:75%">750K</span>
+              <span class="ae-tank__tick" style="bottom:50%">500K</span>
+              <span class="ae-tank__tick" style="bottom:25%">250K</span>
             </div>
             <div class="ae-tank__shell">
               <div class="ae-tank__goal" aria-hidden="true">
-                <span class="ae-tank__goal-label">8M</span>
+                <span class="ae-tank__goal-label">1M</span>
               </div>
               <div class="ae-tank__fills">
-                <!-- column-reverse: first child sits at the BOTTOM. -->
+                <!-- column-reverse: first child renders at the BOTTOM. -->
                 <div class="ae-tank__fill ae-tank__fill--recruiting"
-                     data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                     data-chart="ae_kpi_revenue_card"
                      data-bind="progress-fill" data-axis="height"
                      data-field="recruiting_pct_of_goal" data-reduce="first"></div>
                 <div class="ae-tank__fill ae-tank__fill--staffing"
-                     data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                     data-chart="ae_kpi_revenue_card"
                      data-bind="progress-fill" data-axis="height"
                      data-field="staffing_pct_of_goal" data-reduce="first"></div>
               </div>
@@ -3172,11 +3168,11 @@
             <div class="ae-card__total">
               <span class="ae-card__total-label">REVENUE TOTAL YTD</span>
               <span class="ae-card__total-value"
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                    data-chart="ae_kpi_revenue_card"
                     data-bind="text" data-field="total_revenue_ytd" data-reduce="first" data-fmt="currency-k">—</span>
               <span class="ae-card__pace">
                 <span class="ae-card__pace-arrow">↑</span>
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                <span data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
                 del objetivo
               </span>
@@ -3186,20 +3182,20 @@
               <div class="ae-row__head">
                 <span class="ae-row__label"><span class="ae-row__dot ae-row__dot--staffing"></span> Staffing</span>
                 <span class="ae-row__value"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                      data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="staffing_revenue_ytd" data-reduce="first" data-fmt="currency-k">—</span>
               </div>
               <div class="ae-row__bar">
                 <span class="ae-row__bar-fill ae-row__bar-fill--staffing"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                      data-chart="ae_kpi_revenue_card"
                       data-bind="progress-fill"
                       data-field="staffing_pct_of_goal" data-reduce="first"></span>
               </div>
               <div class="ae-row__legend">
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                <span data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span>
                 del total ·
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                <span data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="staffing_pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
                 del objetivo
               </div>
@@ -3209,20 +3205,20 @@
               <div class="ae-row__head">
                 <span class="ae-row__label"><span class="ae-row__dot ae-row__dot--recruiting"></span> Recruiting</span>
                 <span class="ae-row__value"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                      data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="recruiting_revenue_ytd" data-reduce="first" data-fmt="currency-k">—</span>
               </div>
               <div class="ae-row__bar">
                 <span class="ae-row__bar-fill ae-row__bar-fill--recruiting"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                      data-chart="ae_kpi_revenue_card"
                       data-bind="progress-fill"
                       data-field="recruiting_pct_of_goal" data-reduce="first"></span>
               </div>
               <div class="ae-row__legend">
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                <span data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span>
                 del total ·
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                <span data-chart="ae_kpi_revenue_card"
                       data-bind="text" data-field="recruiting_pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
                 del objetivo
               </div>
@@ -3231,142 +3227,129 @@
             <footer class="ae-card__foot">
               <div>
                 <div class="ae-card__goal">Objetivo anual <span class="ae-card__goal-amount"
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                    data-chart="ae_kpi_revenue_card"
                     data-bind="text" data-field="annual_goal" data-reduce="first" data-fmt="currency">—</span></div>
                 <div class="ae-card__months"><span
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                    data-chart="ae_kpi_revenue_card"
                     data-bind="text" data-field="months_remaining" data-reduce="first" data-fmt="int">—</span>
                   meses restantes en <span
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
-                    data-bind="text" data-field="year" data-reduce="first" data-fmt="int">—</span></div>
+                    data-chart="ae_kpi_revenue_card"
+                    data-bind="text" data-field="year" data-reduce="first" data-fmt="raw">—</span></div>
               </div>
               <span class="ae-card__remaining"><span
-                  data-chart="ae_kpi_revenue_card" data-override-sales_lead="mariano@vintti.com"
+                  data-chart="ae_kpi_revenue_card"
                   data-bind="text" data-field="remaining" data-reduce="first" data-fmt="currency-k">—</span> restantes</span>
             </footer>
           </div>
         </div>
       </div>
 
-      <!-- ===== Bahia ===== -->
-      <div class="ae-card s-6" data-ae-card>
-        <header class="ae-card__head">
+      <!-- ============================================================
+           Detalle por ventana — same datasets as before, M+B filter is
+           hardcoded inside `revenue_ae_window` / `revenue_ae_detail`.
+           ============================================================ -->
+      <div class="section s-12">
+        <div>
+          <h3>Detalle por ventana</h3>
+          <p class="muted">Closes de M+B en las últimas dos ventanas — sumá el Revenue de la tabla y te tiene que dar la box de arriba.</p>
+        </div>
+      </div>
+
+      <!-- Row · Staffing -->
+      <div class="hero-kpi s-3">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Staffing · 30d</div>
+          </div>
           <div>
-            <h2 class="ae-card__title">Revenue Generated · <span
-                data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                data-bind="text" data-field="ae_name" data-reduce="first" data-fmt="raw">Bahia</span></h2>
-            <p class="ae-card__sub">Staffing + Recruiting · vs objetivo anual <span
-                data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                data-bind="text" data-field="annual_goal" data-reduce="first" data-fmt="currency-k">$8M</span></p>
-          </div>
-          <span class="ae-card__chip">YTD <span
-              data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-              data-bind="text" data-field="year" data-reduce="first" data-fmt="int">2026</span></span>
-        </header>
-
-        <div class="ae-card__body">
-          <div class="ae-tank">
-            <div class="ae-tank__ticks">
-              <span class="ae-tank__tick" style="bottom:75%">6M</span>
-              <span class="ae-tank__tick" style="bottom:50%">4M</span>
-              <span class="ae-tank__tick" style="bottom:25%">2M</span>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="30d"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="30d"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes
             </div>
-            <div class="ae-tank__shell">
-              <div class="ae-tank__goal" aria-hidden="true">
-                <span class="ae-tank__goal-label">8M</span>
-              </div>
-              <div class="ae-tank__fills">
-                <div class="ae-tank__fill ae-tank__fill--recruiting"
-                     data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                     data-bind="progress-fill" data-axis="height"
-                     data-field="recruiting_pct_of_goal" data-reduce="first"></div>
-                <div class="ae-tank__fill ae-tank__fill--staffing"
-                     data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                     data-bind="progress-fill" data-axis="height"
-                     data-field="staffing_pct_of_goal" data-reduce="first"></div>
-              </div>
-            </div>
-            <div class="ae-tank__cap" aria-hidden="true"></div>
-          </div>
-
-          <div class="ae-card__metrics">
-            <div class="ae-card__total">
-              <span class="ae-card__total-label">REVENUE TOTAL YTD</span>
-              <span class="ae-card__total-value"
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                    data-bind="text" data-field="total_revenue_ytd" data-reduce="first" data-fmt="currency-k">—</span>
-              <span class="ae-card__pace">
-                <span class="ae-card__pace-arrow">↑</span>
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
-                del objetivo
-              </span>
-            </div>
-
-            <div class="ae-row">
-              <div class="ae-row__head">
-                <span class="ae-row__label"><span class="ae-row__dot ae-row__dot--staffing"></span> Staffing</span>
-                <span class="ae-row__value"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="staffing_revenue_ytd" data-reduce="first" data-fmt="currency-k">—</span>
-              </div>
-              <div class="ae-row__bar">
-                <span class="ae-row__bar-fill ae-row__bar-fill--staffing"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="progress-fill"
-                      data-field="staffing_pct_of_goal" data-reduce="first"></span>
-              </div>
-              <div class="ae-row__legend">
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span>
-                del total ·
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="staffing_pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
-                del objetivo
-              </div>
-            </div>
-
-            <div class="ae-row">
-              <div class="ae-row__head">
-                <span class="ae-row__label"><span class="ae-row__dot ae-row__dot--recruiting"></span> Recruiting</span>
-                <span class="ae-row__value"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="recruiting_revenue_ytd" data-reduce="first" data-fmt="currency-k">—</span>
-              </div>
-              <div class="ae-row__bar">
-                <span class="ae-row__bar-fill ae-row__bar-fill--recruiting"
-                      data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="progress-fill"
-                      data-field="recruiting_pct_of_goal" data-reduce="first"></span>
-              </div>
-              <div class="ae-row__legend">
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span>
-                del total ·
-                <span data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                      data-bind="text" data-field="recruiting_pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
-                del objetivo
-              </div>
-            </div>
-
-            <footer class="ae-card__foot">
-              <div>
-                <div class="ae-card__goal">Objetivo anual <span class="ae-card__goal-amount"
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                    data-bind="text" data-field="annual_goal" data-reduce="first" data-fmt="currency">—</span></div>
-                <div class="ae-card__months"><span
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                    data-bind="text" data-field="months_remaining" data-reduce="first" data-fmt="int">—</span>
-                  meses restantes en <span
-                    data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                    data-bind="text" data-field="year" data-reduce="first" data-fmt="int">—</span></div>
-              </div>
-              <span class="ae-card__remaining"><span
-                  data-chart="ae_kpi_revenue_card" data-override-sales_lead="bahia@vintti.com"
-                  data-bind="text" data-field="remaining" data-reduce="first" data-fmt="currency-k">—</span> restantes</span>
-            </footer>
           </div>
         </div>
+      </div>
+      <div class="hero-kpi s-3">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Staffing · semana</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="week"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="week"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Row · Recruiting -->
+      <div class="hero-kpi s-3">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Recruiting · 30d</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="30d"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="30d"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-kpi s-3">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Recruiting · semana</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="week"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="week"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Staffing detail table (30d) -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Staffing · Detalle de closes (30d)</h3>
+            <p class="card__sub">Suma de revenue = box de Staffing · 30d.</p>
+          </div>
+        </div>
+        <div class="scroll-x" data-chart="ae_table_revenue_detail"
+             data-override-modelo="Staffing" data-override-window="30d"
+             data-bind="dtable"
+             data-cols="close_date|Close date|raw,client_name|Cliente|raw,candidate_name|Candidato|raw,opp_sales_lead|AE|raw,revenue|Revenue|currency-k"
+             data-empty-text="Sin closes Staffing de M+B en los últimos 30 días."></div>
+      </div>
+
+      <!-- Recruiting detail table (30d) -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Recruiting · Detalle de closes (30d)</h3>
+            <p class="card__sub">Suma de revenue = box de Recruiting · 30d.</p>
+          </div>
+        </div>
+        <div class="scroll-x" data-chart="ae_table_revenue_detail"
+             data-override-modelo="Recruiting" data-override-window="30d"
+             data-bind="dtable"
+             data-cols="close_date|Close date|raw,client_name|Cliente|raw,candidate_name|Candidato|raw,opp_sales_lead|AE|raw,revenue|Revenue|currency-k"
+             data-empty-text="Sin closes Recruiting de M+B en los últimos 30 días."></div>
       </div>
 
     </div>

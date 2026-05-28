@@ -89,10 +89,6 @@ RETIRED_CHART_KEYS = {
         "sa_table_sql_funnel_30d_detail",
         "sa_table_nda_to_sourcing_detail",
         "mg_table_cohort_by_contractor",
-        # AE tab — earlier window-based scaffolding, retired in favor of the
-        # YTD fuel-tank card (`ae_kpi_revenue_card`).
-        "ae_kpi_revenue_window",
-        "ae_table_revenue_detail",
     ],
 }
 
@@ -227,6 +223,8 @@ RESET_CHART_KEYS = {
         "gr_table_sql_to_nda_30d_detail",
         # AE Metrics tab (Mariano + Bahia)
         "ae_kpi_revenue_card",
+        "ae_kpi_revenue_window",
+        "ae_table_revenue_detail",
     ],
 }
 
@@ -2573,13 +2571,13 @@ MAIN_CHARTS = [
         "sort_order": 600,
     },
 
-    # AE Metrics tab — one chart per AE card. Frontend passes `data-override-sales_lead`
-    # = mariano@vintti.com | bahia@vintti.com to fan this one registration out into
-    # two fuel-tank cards on the AE tab.
+    # AE Metrics tab — combined M+B fuel-tank card (YTD vs annual goal) plus
+    # window-based detail (30d/week) tables below. The card has no sales_lead
+    # override — the dataset always sums across Mariano + Bahia.
     {
         "chart_key": "ae_kpi_revenue_card",
         "tab_key": "ae",
-        "title": "Revenue Generated (per AE) — YTD vs goal",
+        "title": "Revenue Generated (M+B) — YTD vs goal",
         "type": "kpi",
         "dataset_key": "revenue_ae_card",
         "config": {
@@ -2592,8 +2590,40 @@ MAIN_CHARTS = [
                 ],
             },
         },
-        "position": {"x": 0, "y": 0, "w": 6, "h": 6},
+        "position": {"x": 0, "y": 0, "w": 12, "h": 6},
         "sort_order": 700,
+    },
+    {
+        "chart_key": "ae_kpi_revenue_window",
+        "tab_key": "ae",
+        "title": "Revenue Generated (AEs only) — Window",
+        "type": "kpi",
+        "dataset_key": "revenue_ae_window",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "revenue_window", "label": "Revenue", "formatter": "currency"},
+                    {"key": "closes_window", "label": "Closes", "formatter": "number"},
+                    {"key": "clients_window", "label": "Clients", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 7, "w": 6, "h": 3},
+        "sort_order": 710,
+    },
+    {
+        "chart_key": "ae_table_revenue_detail",
+        "tab_key": "ae",
+        "title": "Revenue Generated (AEs only) — Detalle",
+        "type": "table",
+        "dataset_key": "revenue_ae_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "client_name", "candidate_name", "opp_sales_lead", "revenue"],
+            },
+        },
+        "position": {"x": 0, "y": 11, "w": 12, "h": 6},
+        "sort_order": 720,
     },
 ]
 
