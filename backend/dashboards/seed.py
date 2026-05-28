@@ -33,6 +33,7 @@ DASHBOARDS = [
                 {"key": "account-management", "label": "Account Management"},
                 {"key": "sales", "label": "Sales"},
                 {"key": "operations", "label": "Operations"},
+                {"key": "ae", "label": "AE Metrics"},
             ],
         },
     },
@@ -220,6 +221,9 @@ RESET_CHART_KEYS = {
         "gr_table_new_opps_am_detail",
         "gr_kpi_sql_to_nda_30d",
         "gr_table_sql_to_nda_30d_detail",
+        # AE Metrics tab (Mariano + Bahia)
+        "ae_kpi_revenue_window",
+        "ae_table_revenue_detail",
     ],
 }
 
@@ -2564,6 +2568,42 @@ MAIN_CHARTS = [
         "config": {"mapping": {"columns": ["candidate_name", "client_name", "mes", "client_payment", "vintti_fee", "status"]}},
         "position": {"x": 0, "y": 120, "w": 12, "h": 8},
         "sort_order": 600,
+    },
+
+    # AE Metrics tab — Mariano + Bahia only. Frontend tiles pass `data-override-modelo`
+    # (Staffing | Recruiting) and `data-override-window` (30d | week) to fan one chart
+    # registration out into 4 KPI tiles / 2 detail tables.
+    {
+        "chart_key": "ae_kpi_revenue_window",
+        "tab_key": "ae",
+        "title": "Revenue Generated (AEs only) — Window",
+        "type": "kpi",
+        "dataset_key": "revenue_ae_window",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "revenue_window", "label": "Revenue", "formatter": "currency"},
+                    {"key": "closes_window", "label": "Closes", "formatter": "number"},
+                    {"key": "clients_window", "label": "Clients", "formatter": "number"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "sort_order": 700,
+    },
+    {
+        "chart_key": "ae_table_revenue_detail",
+        "tab_key": "ae",
+        "title": "Revenue Generated (AEs only) — Detalle",
+        "type": "table",
+        "dataset_key": "revenue_ae_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "client_name", "candidate_name", "opp_sales_lead", "revenue"],
+            },
+        },
+        "position": {"x": 0, "y": 5, "w": 12, "h": 6},
+        "sort_order": 710,
     },
 ]
 

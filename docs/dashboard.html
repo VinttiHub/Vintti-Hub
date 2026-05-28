@@ -47,6 +47,7 @@
 <input class="tab-radios" type="radio" name="tab" id="tab-sales">
 <input class="tab-radios" type="radio" name="tab" id="tab-ops">
 <input class="tab-radios" type="radio" name="tab" id="tab-marketing">
+<input class="tab-radios" type="radio" name="tab" id="tab-ae">
 
 <!-- Sub-tab radios for Growth · New (Staffing | Recruiting) -->
 <input class="subtab-radios" type="radio" name="growth-sub" id="gsub-staffing" checked>
@@ -78,6 +79,7 @@
     <label class="tabs__btn" for="tab-sales">Sales <span class="ct">12</span></label>
     <label class="tabs__btn" for="tab-ops">Operations <span class="ct">31</span></label>
     <label class="tabs__btn" for="tab-marketing">Marketing <span class="ct">3</span></label>
+    <label class="tabs__btn" for="tab-ae">AE Metrics <span class="ct">4</span></label>
   </nav>
 
   <!-- ============================================================
@@ -3106,6 +3108,150 @@
             </tbody>
           </table>
         </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ============================================================
+       CHANNEL · AE Metrics (Mariano + Bahia only)
+       ============================================================ -->
+  <section class="channel" data-channel="ae">
+    <div class="grid">
+
+      <!-- Section header -->
+      <div class="section s-12">
+        <div>
+          <h2>AE Metrics · Mariano + Bahia</h2>
+          <p>Revenue generado por close win en ventana — solo opps con <code>opp_sales_lead</code> ∈ {mariano@vintti.com, bahia@vintti.com}.</p>
+        </div>
+      </div>
+
+      <!-- ===== Staffing block ===== -->
+      <div class="section s-12">
+        <div>
+          <h3>Revenue Generated (AEs only) · Staffing</h3>
+          <p class="muted">Suma de <code>salary + fee</code> de los Staffing cuyo <code>opp_close_date</code> cae en la ventana.</p>
+        </div>
+      </div>
+
+      <!-- Staffing — Last 30d tile -->
+      <div class="hero-kpi s-6">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Staffing · Last 30 days</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="30d"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="30d"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes ·
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="30d"
+                    data-bind="text" data-field="clients_window" data-reduce="first" data-fmt="int">—</span> clientes
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Staffing — Last week tile -->
+      <div class="hero-kpi s-6">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Staffing · Last week</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="week"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="week"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes ·
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Staffing" data-override-window="week"
+                    data-bind="text" data-field="clients_window" data-reduce="first" data-fmt="int">—</span> clientes
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Staffing — detail table (30d) -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Staffing · Detalle de closes (30d)</h3>
+            <p class="card__sub">Cliente, candidato, AE y fecha de cierre — la suma del Revenue = la box de Last 30 days.</p>
+          </div>
+        </div>
+        <div class="scroll-x" data-chart="ae_table_revenue_detail"
+             data-override-modelo="Staffing" data-override-window="30d"
+             data-bind="dtable"
+             data-cols="close_date|Close date|raw,client_name|Cliente|raw,candidate_name|Candidato|raw,opp_sales_lead|AE|raw,revenue|Revenue|currency-k"
+             data-empty-text="Sin closes Staffing de M+B en los últimos 30 días."></div>
+      </div>
+
+      <!-- ===== Recruiting block ===== -->
+      <div class="section s-12">
+        <div>
+          <h3>Revenue Generated (AEs only) · Recruiting</h3>
+          <p class="muted">Suma de <code>ho.revenue</code> (placement fee) de los Recruiting cuyo <code>opp_close_date</code> cae en la ventana.</p>
+        </div>
+      </div>
+
+      <!-- Recruiting — Last 30d tile -->
+      <div class="hero-kpi s-6">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Recruiting · Last 30 days</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="30d"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="30d"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes ·
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="30d"
+                    data-bind="text" data-field="clients_window" data-reduce="first" data-fmt="int">—</span> clientes
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recruiting — Last week tile -->
+      <div class="hero-kpi s-6">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Recruiting · Last week</div>
+          </div>
+          <div>
+            <div class="hero-kpi__value"
+                 data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="week"
+                 data-bind="text" data-field="revenue_window" data-reduce="first" data-fmt="currency-k">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="week"
+                    data-bind="text" data-field="closes_window" data-reduce="first" data-fmt="int">—</span> closes ·
+              <span data-chart="ae_kpi_revenue_window" data-override-modelo="Recruiting" data-override-window="week"
+                    data-bind="text" data-field="clients_window" data-reduce="first" data-fmt="int">—</span> clientes
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recruiting — detail table (30d) -->
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Recruiting · Detalle de closes (30d)</h3>
+            <p class="card__sub">Cliente, candidato, AE y fecha de cierre — la suma del Revenue = la box de Last 30 days.</p>
+          </div>
+        </div>
+        <div class="scroll-x" data-chart="ae_table_revenue_detail"
+             data-override-modelo="Recruiting" data-override-window="30d"
+             data-bind="dtable"
+             data-cols="close_date|Close date|raw,client_name|Cliente|raw,candidate_name|Candidato|raw,opp_sales_lead|AE|raw,revenue|Revenue|currency-k"
+             data-empty-text="Sin closes Recruiting de M+B en los últimos 30 días."></div>
       </div>
 
     </div>

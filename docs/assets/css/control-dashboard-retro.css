@@ -224,6 +224,8 @@ table { border-collapse: collapse; }
 #tab-ops:checked        ~ .shell .filter-bar [data-tabs]:not([data-tabs~="ops"])        { display: none; }
 /* Marketing tab has its own data sources — hide the global filter bar */
 #tab-marketing:checked  ~ .shell .filter-bar { display: none; }
+/* AE Metrics tab uses fixed windows (30d/week) — hide the global filter bar */
+#tab-ae:checked         ~ .shell .filter-bar { display: none; }
 
 .filter-pill { position: relative; }
 .filter-pill__sel {
@@ -405,7 +407,8 @@ body.is-loading .kpi-card::after {
 #tab-am:checked         ~ .shell .tabs label[for="tab-am"],
 #tab-sales:checked      ~ .shell .tabs label[for="tab-sales"],
 #tab-ops:checked        ~ .shell .tabs label[for="tab-ops"],
-#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] {
+#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"],
+#tab-ae:checked         ~ .shell .tabs label[for="tab-ae"] {
   background: var(--ink);
   color: #fff;
 }
@@ -414,7 +417,8 @@ body.is-loading .kpi-card::after {
 #tab-am:checked         ~ .shell .tabs label[for="tab-am"] .ct,
 #tab-sales:checked      ~ .shell .tabs label[for="tab-sales"] .ct,
 #tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] .ct,
-#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] .ct {
+#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] .ct,
+#tab-ae:checked         ~ .shell .tabs label[for="tab-ae"] .ct {
   background: rgba(255,255,255,0.16);
   color: rgba(255,255,255,0.78);
 }
@@ -426,7 +430,8 @@ body.is-loading .kpi-card::after {
 #tab-am:checked         ~ .shell .channel[data-channel="am"],
 #tab-sales:checked      ~ .shell .channel[data-channel="sales"],
 #tab-ops:checked        ~ .shell .channel[data-channel="ops"],
-#tab-marketing:checked  ~ .shell .channel[data-channel="marketing"] {
+#tab-marketing:checked  ~ .shell .channel[data-channel="marketing"],
+#tab-ae:checked         ~ .shell .channel[data-channel="ae"] {
   display: block;
 }
 

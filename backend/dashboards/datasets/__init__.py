@@ -128,6 +128,8 @@ from . import (
     sql_to_close_win,
     sql_funnel_30d_detail,
     cohort_by_contractor,
+    revenue_ae_window,
+    revenue_ae_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -260,6 +262,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     sql_funnel_30d_detail.DATASET["key"]: sql_funnel_30d_detail.DATASET,
     nda_to_sourcing_detail.DATASET["key"]: nda_to_sourcing_detail.DATASET,
     cohort_by_contractor.DATASET["key"]: cohort_by_contractor.DATASET,
+    revenue_ae_window.DATASET["key"]: revenue_ae_window.DATASET,
+    revenue_ae_detail.DATASET["key"]: revenue_ae_detail.DATASET,
 }
 
 
