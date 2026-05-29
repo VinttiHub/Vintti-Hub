@@ -135,6 +135,10 @@ from . import (
     gmrr_ae_detail,
     mrr_fee_ae_history,
     mrr_fee_ae_detail,
+    avg_recruiting_fee_30d,
+    avg_recruiting_fee_30d_detail,
+    avg_staffing_fee_30d,
+    avg_staffing_fee_30d_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -274,6 +278,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     gmrr_ae_detail.DATASET["key"]: gmrr_ae_detail.DATASET,
     mrr_fee_ae_history.DATASET["key"]: mrr_fee_ae_history.DATASET,
     mrr_fee_ae_detail.DATASET["key"]: mrr_fee_ae_detail.DATASET,
+    avg_recruiting_fee_30d.DATASET["key"]: avg_recruiting_fee_30d.DATASET,
+    avg_recruiting_fee_30d_detail.DATASET["key"]: avg_recruiting_fee_30d_detail.DATASET,
+    avg_staffing_fee_30d.DATASET["key"]: avg_staffing_fee_30d.DATASET,
+    avg_staffing_fee_30d_detail.DATASET["key"]: avg_staffing_fee_30d_detail.DATASET,
 }
 
 

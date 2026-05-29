@@ -2393,6 +2393,64 @@
         </div>
       </div>
 
+      <!-- ============================================================
+           Avg Recruiting Fee · últimos 30 días (M+B) · LEFT
+           ============================================================ -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Avg Recruiting Fee</h3>
+            <p class="card__sub">Promedio del fee cobrado en deals Recruiting · últimos 30 días.</p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-avg-recruiting-fee"
+                  aria-label="Ver detalle Avg Recruiting Fee">Ver detalle</button>
+        </div>
+        <div class="ae-gmrr-stats ae-gmrr-stats--two">
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Avg fee · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="ae_kpi_avg_recruiting_fee_30d" data-bind="text"
+                  data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span>
+          </div>
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Deals · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="ae_kpi_avg_recruiting_fee_30d" data-bind="text"
+                  data-field="deal_count" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Avg Staffing Fee · últimos 30 días (M+B) · RIGHT
+           ============================================================ -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Avg Staffing Fee</h3>
+            <p class="card__sub">Promedio del fee mensual cobrado en deals Staffing · últimos 30 días.</p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-avg-staffing-fee"
+                  aria-label="Ver detalle Avg Staffing Fee">Ver detalle</button>
+        </div>
+        <div class="ae-gmrr-stats ae-gmrr-stats--two">
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Avg fee mensual · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
+                  data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span>
+          </div>
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Deals · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
+                  data-field="deal_count" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Click-to-open-drawer for the two YTD line charts.
            Two perf optimizations vs. the naive `btn.click()` approach:
            1. We open the drawer MANUALLY (no btn.click) — the standard
@@ -5410,6 +5468,72 @@
                    data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,start_date|Start|raw,fee|Fee Vintti|currency-k"
                    data-empty-text="Sin contractors Staffing M+B activos en el mes seleccionado."
                    data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Avg Recruiting Fee · 30d (M+B) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-recruiting-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · Mariano + Bahia</span>
+            <h3 class="kpi-drawer__title">Avg Recruiting Fee · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Deals Recruiting <code>Close Win</code> con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} cuya <code>opp_close_date</code> cae en los últimos 30 días. La columna "Fee del deal" promediada = la box "Avg fee".</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Avg fee · Recruiting · 30d</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="ae_kpi_avg_recruiting_fee_30d" data-bind="text"
+                    data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="ae_kpi_avg_recruiting_fee_30d" data-bind="text"
+                      data-field="deal_count" data-reduce="first" data-fmt="int">—</span> deals ·
+                <span data-chart="ae_kpi_avg_recruiting_fee_30d" data-bind="text"
+                      data-field="client_count" data-reduce="first" data-fmt="int">—</span> clientes ·
+                <span data-chart="ae_kpi_avg_recruiting_fee_30d" data-bind="text"
+                      data-field="total_fee" data-reduce="first" data-fmt="currency-k">—</span> total
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deals</h4>
+              <div class="dtable-wrap"
+                   data-chart="ae_table_avg_recruiting_fee_30d_detail" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,deal_fee|Fee del deal|currency-k"
+                   data-empty-text="Sin closes Recruiting de M+B en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Avg Staffing Fee · 30d (M+B) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-staffing-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · Mariano + Bahia</span>
+            <h3 class="kpi-drawer__title">Avg Staffing Fee · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Deals Staffing <code>Close Win</code> con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} cuya <code>opp_close_date</code> cae en los últimos 30 días. La columna "Fee mensual Vintti" promediada = la box "Avg fee mensual".</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Avg fee mensual · Staffing · 30d</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
+                    data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
+                      data-field="deal_count" data-reduce="first" data-fmt="int">—</span> deals ·
+                <span data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
+                      data-field="client_count" data-reduce="first" data-fmt="int">—</span> clientes ·
+                <span data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
+                      data-field="total_fee" data-reduce="first" data-fmt="currency-k">—</span> total
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deals</h4>
+              <div class="dtable-wrap"
+                   data-chart="ae_table_avg_staffing_fee_30d_detail" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,deal_fee|Fee mensual Vintti|currency-k"
+                   data-empty-text="Sin closes Staffing de M+B en los últimos 30 días."></div>
             </section>
           </div>
         </div>

@@ -2695,6 +2695,72 @@ MAIN_CHARTS = [
         "position": {"x": 0, "y": 30, "w": 12, "h": 6},
         "sort_order": 760,
     },
+    # --- Avg Recruiting Fee · últimos 30 días (M+B) ---
+    {
+        "chart_key": "ae_kpi_avg_recruiting_fee_30d",
+        "tab_key": "sales",
+        "title": "Avg Recruiting Fee — últimos 30 días (M+B)",
+        "type": "kpi",
+        "dataset_key": "avg_recruiting_fee_30d",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "avg_fee", "label": "Avg fee por deal", "formatter": "currency"},
+                    {"key": "deal_count", "label": "Deals", "formatter": "number"},
+                    {"key": "total_fee", "label": "Total fee", "formatter": "currency"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 36, "w": 3, "h": 3},
+        "sort_order": 770,
+    },
+    {
+        "chart_key": "ae_table_avg_recruiting_fee_30d_detail",
+        "tab_key": "sales",
+        "title": "Avg Recruiting Fee — Detalle deals (30d, M+B)",
+        "type": "table",
+        "dataset_key": "avg_recruiting_fee_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "client_name", "opp_position_name", "candidate_name", "hire_count", "deal_fee"],
+            },
+        },
+        "position": {"x": 0, "y": 39, "w": 12, "h": 6},
+        "sort_order": 775,
+    },
+    # --- Avg Staffing Fee · últimos 30 días (M+B) ---
+    {
+        "chart_key": "ae_kpi_avg_staffing_fee_30d",
+        "tab_key": "sales",
+        "title": "Avg Staffing Fee — últimos 30 días (M+B)",
+        "type": "kpi",
+        "dataset_key": "avg_staffing_fee_30d",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "avg_fee", "label": "Avg fee mensual por deal", "formatter": "currency"},
+                    {"key": "deal_count", "label": "Deals", "formatter": "number"},
+                    {"key": "total_fee", "label": "Total fee mensual", "formatter": "currency"},
+                ],
+            },
+        },
+        "position": {"x": 3, "y": 36, "w": 3, "h": 3},
+        "sort_order": 780,
+    },
+    {
+        "chart_key": "ae_table_avg_staffing_fee_30d_detail",
+        "tab_key": "sales",
+        "title": "Avg Staffing Fee — Detalle deals (30d, M+B)",
+        "type": "table",
+        "dataset_key": "avg_staffing_fee_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "client_name", "opp_position_name", "candidate_name", "hire_count", "deal_salary", "deal_fee"],
+            },
+        },
+        "position": {"x": 0, "y": 45, "w": 12, "h": 6},
+        "sort_order": 785,
+    },
 ]
 
 
