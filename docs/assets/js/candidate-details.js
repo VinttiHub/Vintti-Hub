@@ -2389,11 +2389,13 @@ const referencesDiv = document.getElementById('hire-references');
 const hireReferenceFields = [
   ['hire-reference-1-name', 'reference_1_name'],
   ['hire-reference-1-position', 'reference_1_position'],
+  ['hire-reference-1-company', 'reference_1_company'],
   ['hire-reference-1-phone', 'reference_1_phone'],
   ['hire-reference-1-email', 'reference_1_email'],
   ['hire-reference-1-linkedin', 'reference_1_linkedin'],
   ['hire-reference-2-name', 'reference_2_name'],
   ['hire-reference-2-position', 'reference_2_position'],
+  ['hire-reference-2-company', 'reference_2_company'],
   ['hire-reference-2-phone', 'reference_2_phone'],
   ['hire-reference-2-email', 'reference_2_email'],
   ['hire-reference-2-linkedin', 'reference_2_linkedin'],
@@ -2429,6 +2431,7 @@ function buildStructuredReferencesHtml() {
     const fields = [
       ['Name', `${prefix}_name`],
       ['Position', `${prefix}_position`],
+      ['Company', `${prefix}_company`],
       ['Phone', `${prefix}_phone`],
       ['Email', `${prefix}_email`],
       ['LinkedIn', `${prefix}_linkedin`],
@@ -2533,11 +2536,13 @@ function extractReferenceOverviewValues(source = {}) {
   return {
     reference_1_name: source.reference_1_name || '',
     reference_1_position: source.reference_1_position || '',
+    reference_1_company: source.reference_1_company || '',
     reference_1_phone: source.reference_1_phone || '',
     reference_1_email: source.reference_1_email || '',
     reference_1_linkedin: source.reference_1_linkedin || '',
     reference_2_name: source.reference_2_name || '',
     reference_2_position: source.reference_2_position || '',
+    reference_2_company: source.reference_2_company || '',
     reference_2_phone: source.reference_2_phone || '',
     reference_2_email: source.reference_2_email || '',
     reference_2_linkedin: source.reference_2_linkedin || '',
@@ -2586,6 +2591,7 @@ function getReferenceValuesFromForm(idx) {
     reference_number: idx,
     reference_name: document.getElementById(`${prefix}-name`)?.value?.trim() || '',
     reference_position: document.getElementById(`${prefix}-position`)?.value?.trim() || '',
+    reference_company: document.getElementById(`${prefix}-company`)?.value?.trim() || '',
     reference_phone: document.getElementById(`${prefix}-phone`)?.value?.trim() || '',
     reference_email: document.getElementById(`${prefix}-email`)?.value?.trim() || '',
     reference_linkedin: document.getElementById(`${prefix}-linkedin`)?.value?.trim() || '',
@@ -2876,10 +2882,11 @@ function buildReferenceOverviewMarkup(idx, values = {}) {
   const prefix = `reference_${idx}_`;
   const name = values[`${prefix}name`] || '';
   const position = values[`${prefix}position`] || '';
+  const company = values[`${prefix}company`] || '';
   const phone = values[`${prefix}phone`] || '';
   const email = values[`${prefix}email`] || '';
   const linkedin = values[`${prefix}linkedin`] || '';
-  const hasAny = [name, position, phone, email, linkedin].some(Boolean);
+  const hasAny = [name, position, company, phone, email, linkedin].some(Boolean);
 
   body.classList.toggle('is-empty', !hasAny);
   if (!hasAny) {
@@ -2891,6 +2898,7 @@ function buildReferenceOverviewMarkup(idx, values = {}) {
   const lines = [];
   if (name) lines.push(`<div><strong>Name:</strong> ${escapeReferenceHtml(name)}</div>`);
   if (position) lines.push(`<div><strong>Position:</strong> ${escapeReferenceHtml(position)}</div>`);
+  if (company) lines.push(`<div><strong>Company:</strong> ${escapeReferenceHtml(company)}</div>`);
   if (phone) lines.push(`<div><strong>Phone:</strong> ${escapeReferenceHtml(phone)}</div>`);
   if (email) lines.push(`<div><strong>Email:</strong> <a href="mailto:${escapeReferenceHtml(email)}">${escapeReferenceHtml(email)}</a></div>`);
   if (linkedin) {
@@ -2910,7 +2918,7 @@ function renderReferenceOverview(values = {}) {
   if (!statusEl) return;
 
   const isComplete = [1, 2].every((idx) => (
-    ['name', 'position', 'phone', 'email', 'linkedin'].every((field) => values[`reference_${idx}_${field}`])
+    ['name', 'position', 'company', 'phone', 'email', 'linkedin'].every((field) => values[`reference_${idx}_${field}`])
   ));
   statusEl.textContent = isComplete ? 'References received' : 'Waiting for references';
   statusEl.classList.toggle('is-complete', isComplete);
@@ -3076,11 +3084,13 @@ if (hireRevenue){
         renderReferenceOverview({
           reference_1_name: data.reference_1_name || fallbackReferenceValues.reference_1_name || existingOverviewValues.reference_1_name || '',
           reference_1_position: data.reference_1_position || fallbackReferenceValues.reference_1_position || existingOverviewValues.reference_1_position || '',
+          reference_1_company: data.reference_1_company || fallbackReferenceValues.reference_1_company || existingOverviewValues.reference_1_company || '',
           reference_1_phone: data.reference_1_phone || fallbackReferenceValues.reference_1_phone || existingOverviewValues.reference_1_phone || '',
           reference_1_email: data.reference_1_email || fallbackReferenceValues.reference_1_email || existingOverviewValues.reference_1_email || '',
           reference_1_linkedin: data.reference_1_linkedin || fallbackReferenceValues.reference_1_linkedin || existingOverviewValues.reference_1_linkedin || '',
           reference_2_name: data.reference_2_name || fallbackReferenceValues.reference_2_name || existingOverviewValues.reference_2_name || '',
           reference_2_position: data.reference_2_position || fallbackReferenceValues.reference_2_position || existingOverviewValues.reference_2_position || '',
+          reference_2_company: data.reference_2_company || fallbackReferenceValues.reference_2_company || existingOverviewValues.reference_2_company || '',
           reference_2_phone: data.reference_2_phone || fallbackReferenceValues.reference_2_phone || existingOverviewValues.reference_2_phone || '',
           reference_2_email: data.reference_2_email || fallbackReferenceValues.reference_2_email || existingOverviewValues.reference_2_email || '',
           reference_2_linkedin: data.reference_2_linkedin || fallbackReferenceValues.reference_2_linkedin || existingOverviewValues.reference_2_linkedin || '',

@@ -115,6 +115,7 @@ def _build_structured_references_html(data):
         fields = [
             ('Name', f'reference_{idx}_name'),
             ('Position', f'reference_{idx}_position'),
+            ('Company', f'reference_{idx}_company'),
             ('Phone', f'reference_{idx}_phone'),
             ('Email', f'reference_{idx}_email'),
             ('LinkedIn', f'reference_{idx}_linkedin'),
@@ -135,6 +136,7 @@ def _is_reference_complete(data, idx):
     fields = [
         f'reference_{idx}_name',
         f'reference_{idx}_position',
+        f'reference_{idx}_company',
         f'reference_{idx}_phone',
         f'reference_{idx}_email',
         f'reference_{idx}_linkedin',
@@ -149,6 +151,7 @@ def _merge_reference_payload(existing, incoming):
         fields = [
             f'reference_{idx}_name',
             f'reference_{idx}_position',
+            f'reference_{idx}_company',
             f'reference_{idx}_phone',
             f'reference_{idx}_email',
             f'reference_{idx}_linkedin',
@@ -267,6 +270,7 @@ def _reference_email_html(ctx, merged, refs_to_include):
               <div style="font-weight:700;font-size:16px;margin-bottom:10px;">Reference {idx}</div>
               <div><b>Name:</b> {_escape_html(merged.get(f'reference_{idx}_name') or '—')}</div>
               <div><b>Position:</b> {_escape_html(merged.get(f'reference_{idx}_position') or '—')}</div>
+              <div><b>Company:</b> {_escape_html(merged.get(f'reference_{idx}_company') or '—')}</div>
               <div><b>Phone:</b> {_escape_html(merged.get(f'reference_{idx}_phone') or '—')}</div>
               <div><b>Email:</b> {_escape_html(merged.get(f'reference_{idx}_email') or '—')}</div>
               <div><b>LinkedIn:</b> {_escape_html(merged.get(f'reference_{idx}_linkedin') or '—')}</div>
@@ -448,11 +452,13 @@ def public_candidate_references_context():
             SELECT
                 references_notes,
                 reference_1_name,
+                reference_1_company,
                 reference_1_phone,
                 reference_1_email,
                 reference_1_linkedin,
                 reference_1_position,
                 reference_2_name,
+                reference_2_company,
                 reference_2_phone,
                 reference_2_email,
                 reference_2_linkedin,
@@ -514,11 +520,13 @@ def submit_candidate_references():
                 references_notes,
                 reference_1_name,
                 reference_1_position,
+                reference_1_company,
                 reference_1_phone,
                 reference_1_email,
                 reference_1_linkedin,
                 reference_2_name,
                 reference_2_position,
+                reference_2_company,
                 reference_2_phone,
                 reference_2_email,
                 reference_2_linkedin
@@ -551,11 +559,13 @@ def submit_candidate_references():
             SET
                 reference_1_name = %s,
                 reference_1_position = %s,
+                reference_1_company = %s,
                 reference_1_phone = %s,
                 reference_1_email = %s,
                 reference_1_linkedin = %s,
                 reference_2_name = %s,
                 reference_2_position = %s,
+                reference_2_company = %s,
                 reference_2_phone = %s,
                 reference_2_email = %s,
                 reference_2_linkedin = %s,
@@ -565,11 +575,13 @@ def submit_candidate_references():
             (
                 merged['reference_1_name'],
                 merged['reference_1_position'],
+                merged['reference_1_company'],
                 merged['reference_1_phone'],
                 merged['reference_1_email'],
                 merged['reference_1_linkedin'],
                 merged['reference_2_name'],
                 merged['reference_2_position'],
+                merged['reference_2_company'],
                 merged['reference_2_phone'],
                 merged['reference_2_email'],
                 merged['reference_2_linkedin'],
@@ -593,11 +605,13 @@ def submit_candidate_references():
                 SET
                     reference_1_name = %s,
                     reference_1_position = %s,
+                    reference_1_company = %s,
                     reference_1_phone = %s,
                     reference_1_email = %s,
                     reference_1_linkedin = %s,
                     reference_2_name = %s,
                     reference_2_position = %s,
+                    reference_2_company = %s,
                     reference_2_phone = %s,
                     reference_2_email = %s,
                     reference_2_linkedin = %s,
@@ -608,11 +622,13 @@ def submit_candidate_references():
                 (
                     merged['reference_1_name'],
                     merged['reference_1_position'],
+                    merged['reference_1_company'],
                     merged['reference_1_phone'],
                     merged['reference_1_email'],
                     merged['reference_1_linkedin'],
                     merged['reference_2_name'],
                     merged['reference_2_position'],
+                    merged['reference_2_company'],
                     merged['reference_2_phone'],
                     merged['reference_2_email'],
                     merged['reference_2_linkedin'],
@@ -683,11 +699,13 @@ def delete_candidate_reference():
                 references_notes,
                 reference_1_name,
                 reference_1_position,
+                reference_1_company,
                 reference_1_phone,
                 reference_1_email,
                 reference_1_linkedin,
                 reference_2_name,
                 reference_2_position,
+                reference_2_company,
                 reference_2_phone,
                 reference_2_email,
                 reference_2_linkedin
@@ -702,6 +720,7 @@ def delete_candidate_reference():
         for field in (
             f'reference_{reference_number}_name',
             f'reference_{reference_number}_position',
+            f'reference_{reference_number}_company',
             f'reference_{reference_number}_phone',
             f'reference_{reference_number}_email',
             f'reference_{reference_number}_linkedin',
@@ -738,6 +757,7 @@ def delete_candidate_reference():
             SET
                 reference_{reference_number}_name = NULL,
                 reference_{reference_number}_position = NULL,
+                reference_{reference_number}_company = NULL,
                 reference_{reference_number}_phone = NULL,
                 reference_{reference_number}_email = NULL,
                 reference_{reference_number}_linkedin = NULL,
@@ -754,6 +774,7 @@ def delete_candidate_reference():
                 SET
                     reference_{reference_number}_name = NULL,
                     reference_{reference_number}_position = NULL,
+                    reference_{reference_number}_company = NULL,
                     reference_{reference_number}_phone = NULL,
                     reference_{reference_number}_email = NULL,
                     reference_{reference_number}_linkedin = NULL,

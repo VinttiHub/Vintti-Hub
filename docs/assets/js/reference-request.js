@@ -16,6 +16,7 @@ const API_BASE =
     return [
       `reference_${idx}_name`,
       `reference_${idx}_position`,
+      `reference_${idx}_company`,
       `reference_${idx}_phone`,
       `reference_${idx}_email`,
       `reference_${idx}_linkedin`,
