@@ -52,6 +52,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         staffing_hires AS (
           SELECT
             ho.candidate_id,
+            ho.account_id,
             ho.opportunity_id,
             CASE
               WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
@@ -67,10 +68,17 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE o.opp_model = 'Staffing'
+            AND ho.candidate_id IS NOT NULL
+            AND ho.account_id IS NOT NULL
         ),
-        activos_fin AS (
+        -- Same salary_updates logic as cohort_by_contractor: primary opp per
+        -- (period, mes, candidate, account) gets the salary_updates override,
+        -- secondaries keep their stored hire_opportunity values.
+        opps_in_month AS (
           SELECT DISTINCT ON (m.period, m.mes, h.opportunity_id, h.candidate_id)
-                 m.period, m.mes, h.salary, h.fee
+            m.period, m.mes, m.fin_mes,
+            h.opportunity_id, h.candidate_id, h.account_id,
+            h.start_d, h.salary AS hire_salary, h.fee AS hire_fee
           FROM meses m
           JOIN staffing_hires h
             ON h.start_d IS NOT NULL
@@ -78,9 +86,57 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
            AND (h.end_d IS NULL OR h.end_d >= m.fin_mes)
           ORDER BY m.period, m.mes, h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
         ),
+        opps_marked AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY period, mes, candidate_id, account_id
+              ORDER BY start_d DESC NULLS LAST, opportunity_id DESC
+            ) AS rn_primary
+          FROM opps_in_month
+        ),
+        effective_per_opp AS (
+          SELECT
+            om.period, om.mes, om.candidate_id, om.account_id,
+            CASE
+              WHEN om.rn_primary = 1
+                THEN COALESCE(su_recent.salary::numeric, su_earliest.salary::numeric, om.hire_salary)
+              ELSE om.hire_salary
+            END AS salary,
+            CASE
+              WHEN om.rn_primary = 1
+                THEN COALESCE(su_recent.fee::numeric, su_earliest.fee::numeric, om.hire_fee)
+              ELSE om.hire_fee
+            END AS fee
+          FROM opps_marked om
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = om.candidate_id
+              AND s.date IS NOT NULL
+              AND s.date::date <= om.fin_mes
+            ORDER BY s.date::date DESC, s.update_id DESC
+            LIMIT 1
+          ) su_recent ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = om.candidate_id
+              AND s.date IS NOT NULL
+            ORDER BY s.date::date ASC, s.update_id ASC
+            LIMIT 1
+          ) su_earliest ON TRUE
+        ),
+        effective_in_month AS (
+          SELECT period, mes, candidate_id, account_id,
+                 SUM(salary)::numeric AS salary,
+                 SUM(fee)::numeric    AS fee
+          FROM effective_per_opp
+          GROUP BY period, mes, candidate_id, account_id
+        ),
         staffing_mrr AS (
           SELECT period, mes, SUM(salary + fee)::numeric AS mrr_mes
-          FROM activos_fin
+          FROM effective_in_month
           GROUP BY period, mes
         ),
         staffing_ytd AS (

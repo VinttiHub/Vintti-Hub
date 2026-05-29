@@ -31,12 +31,22 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # `window` is accepted for symmetry with recruiting_window_summary but
     # all metrics here are point-in-time snapshots at `corte`, so it is unused.
 
+    # NOTE: mirrors cohort_by_contractor logic at a single corte_d so the
+    # GMRR / MRR / Staffing fee avg tiles reconcile with the cohort table:
+    #   - Pick all opps active at corte
+    #   - Mark "primary" opp per (candidate, account) = latest start_d
+    #   - Override primary's salary/fee with salary_updates ≤ corte
+    #     (or earliest update as baseline before any update exists)
+    #   - Sum across parallel opps per (candidate, account)
+    # Secondary opps keep hire_opportunity values (salary_updates is per
+    # candidate, not per opp, so applying to N parallel opps would multi-count).
     sql = """
         WITH params AS (
           SELECT %(corte)s::date AS corte_d
         ),
         hires AS (
           SELECT
+            ho.opportunity_id,
             ho.account_id,
             ho.candidate_id,
             CASE
@@ -53,14 +63,69 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE o.opp_model = 'Staffing'
+            AND ho.candidate_id IS NOT NULL
+            AND ho.account_id IS NOT NULL
         ),
-        active_now AS (
-          SELECT h.*
+        opps_active AS (
+          SELECT DISTINCT ON (h.opportunity_id, h.candidate_id)
+            h.opportunity_id, h.candidate_id, h.account_id, h.start_d,
+            h.salary AS hire_salary, h.fee AS hire_fee
           FROM hires h
           CROSS JOIN params p
           WHERE h.start_d IS NOT NULL
             AND h.start_d <= p.corte_d
             AND (h.end_d IS NULL OR h.end_d >= p.corte_d)
+          ORDER BY h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
+        ),
+        opps_marked AS (
+          SELECT
+            *,
+            ROW_NUMBER() OVER (
+              PARTITION BY candidate_id, account_id
+              ORDER BY start_d DESC NULLS LAST, opportunity_id DESC
+            ) AS rn_primary
+          FROM opps_active
+        ),
+        effective_per_opp AS (
+          SELECT
+            om.candidate_id, om.account_id,
+            CASE
+              WHEN om.rn_primary = 1
+                THEN COALESCE(su_recent.salary::numeric, su_earliest.salary::numeric, om.hire_salary)
+              ELSE om.hire_salary
+            END AS salary,
+            CASE
+              WHEN om.rn_primary = 1
+                THEN COALESCE(su_recent.fee::numeric, su_earliest.fee::numeric, om.hire_fee)
+              ELSE om.hire_fee
+            END AS fee
+          FROM opps_marked om
+          CROSS JOIN params p
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = om.candidate_id
+              AND s.date IS NOT NULL
+              AND s.date::date <= p.corte_d
+            ORDER BY s.date::date DESC, s.update_id DESC
+            LIMIT 1
+          ) su_recent ON TRUE
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee
+            FROM salary_updates s
+            WHERE s.candidate_id = om.candidate_id
+              AND s.date IS NOT NULL
+            ORDER BY s.date::date ASC, s.update_id ASC
+            LIMIT 1
+          ) su_earliest ON TRUE
+        ),
+        effective_per_pair AS (
+          SELECT
+            candidate_id, account_id,
+            SUM(salary)::numeric AS salary,
+            SUM(fee)::numeric    AS fee
+          FROM effective_per_opp
+          GROUP BY candidate_id, account_id
         ),
         snapshot AS (
           SELECT
@@ -68,7 +133,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COUNT(DISTINCT account_id)::int             AS active_clients,
             COALESCE(SUM(salary + fee), 0)::numeric     AS mrr_actual,
             COALESCE(SUM(fee), 0)::numeric              AS mrr_fee_total
-          FROM active_now
+          FROM effective_per_pair
         )
         SELECT
           (SELECT corte_d FROM params)                          AS corte,
