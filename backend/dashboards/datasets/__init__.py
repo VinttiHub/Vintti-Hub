@@ -131,6 +131,10 @@ from . import (
     revenue_ae_window,
     revenue_ae_detail,
     revenue_ae_card,
+    gmrr_ae_history,
+    gmrr_ae_detail,
+    mrr_fee_ae_history,
+    mrr_fee_ae_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -266,6 +270,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     revenue_ae_window.DATASET["key"]: revenue_ae_window.DATASET,
     revenue_ae_detail.DATASET["key"]: revenue_ae_detail.DATASET,
     revenue_ae_card.DATASET["key"]: revenue_ae_card.DATASET,
+    gmrr_ae_history.DATASET["key"]: gmrr_ae_history.DATASET,
+    gmrr_ae_detail.DATASET["key"]: gmrr_ae_detail.DATASET,
+    mrr_fee_ae_history.DATASET["key"]: mrr_fee_ae_history.DATASET,
+    mrr_fee_ae_detail.DATASET["key"]: mrr_fee_ae_detail.DATASET,
 }
 
 

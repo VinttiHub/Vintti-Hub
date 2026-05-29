@@ -12,7 +12,15 @@
    ===================================================================== */
 (function () {
   const SLUG = 'main';
-  const API_BASE = (window.API_BASE || 'https://7m6mw95m8y.us-east-2.awsapprunner.com').replace(/\/$/, '');
+  // Local-dev convenience: when opened from localhost (e.g. `python -m http.server 5500`
+  // against `docs/`), point at the Flask app running on :5000 instead of App Runner.
+  // Production (vinttihub.vintti.com) takes the App Runner default. Override either with
+  // `window.API_BASE = '...'` before this script loads.
+  const _isLocal = ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname);
+  const _defaultApi = _isLocal
+    ? `http://${location.hostname}:5000`
+    : 'https://7m6mw95m8y.us-east-2.awsapprunner.com';
+  const API_BASE = (window.API_BASE || _defaultApi).replace(/\/$/, '');
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
   /* ---------- state ---------- */
@@ -423,16 +431,19 @@
       tip.style.top  = pos.y + 'px';
       tip.classList.add('show');
 
-      // Clamp horizontally to the viewport so it never escapes off-edge
+      // Clamp horizontally to the viewport so the tooltip never escapes off
+      // the right/left edge. When it gets clamped, keep the arrow pointing at
+      // the actual data point by offsetting it via --tip-arrow-shift.
       const tRect = tip.getBoundingClientRect();
-      const margin = 8;
-      let leftPx = pos.x;
+      const margin = 16;
       const halfW = tRect.width / 2;
       const minLeft = window.scrollX + margin + halfW;
       const maxLeft = window.scrollX + window.innerWidth - margin - halfW;
+      let leftPx = pos.x;
       if (leftPx < minLeft) leftPx = minLeft;
       if (leftPx > maxLeft) leftPx = maxLeft;
       tip.style.left = leftPx + 'px';
+      tip.style.setProperty('--tip-arrow-shift', (pos.x - leftPx).toFixed(1) + 'px');
     }
 
     overlay.addEventListener('mousemove', (e) => {
@@ -1593,6 +1604,12 @@
       }
     }));
   }
+
+  // Exposed so inline drill-to-drawer handlers (AE tab line charts) can
+  // await the month-aware refetch before opening the drawer — prevents
+  // showing stale data during the swap.
+  window.__dashRefetchMonthAware = refetchMonthAwareElements;
+  window.__dashMonthState = monthState;
 
   /* ---------- drawer · per-window detail filter ---------- */
   const WINDOW_LABELS = {

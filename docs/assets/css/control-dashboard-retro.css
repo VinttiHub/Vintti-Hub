@@ -224,8 +224,6 @@ table { border-collapse: collapse; }
 #tab-ops:checked        ~ .shell .filter-bar [data-tabs]:not([data-tabs~="ops"])        { display: none; }
 /* Marketing tab has its own data sources — hide the global filter bar */
 #tab-marketing:checked  ~ .shell .filter-bar { display: none; }
-/* AE Metrics tab uses fixed windows (30d/week) — hide the global filter bar */
-#tab-ae:checked         ~ .shell .filter-bar { display: none; }
 
 .filter-pill { position: relative; }
 .filter-pill__sel {
@@ -282,7 +280,11 @@ table { border-collapse: collapse; }
 .chart-tip::after {
   content: "";
   position: absolute;
-  bottom: -5px; left: 50%;
+  bottom: -5px;
+  /* Arrow follows the data point even when the tooltip is clamped at the
+     viewport edge. JS sets --tip-arrow-shift to the offset between original
+     vs. clamped tooltip center; the arrow stays pointing at the real point. */
+  left: calc(50% + var(--tip-arrow-shift, 0px));
   transform: translateX(-50%) rotate(45deg);
   width: 10px; height: 10px;
   background: var(--ink);
@@ -407,8 +409,7 @@ body.is-loading .kpi-card::after {
 #tab-am:checked         ~ .shell .tabs label[for="tab-am"],
 #tab-sales:checked      ~ .shell .tabs label[for="tab-sales"],
 #tab-ops:checked        ~ .shell .tabs label[for="tab-ops"],
-#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"],
-#tab-ae:checked         ~ .shell .tabs label[for="tab-ae"] {
+#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] {
   background: var(--ink);
   color: #fff;
 }
@@ -417,8 +418,7 @@ body.is-loading .kpi-card::after {
 #tab-am:checked         ~ .shell .tabs label[for="tab-am"] .ct,
 #tab-sales:checked      ~ .shell .tabs label[for="tab-sales"] .ct,
 #tab-ops:checked        ~ .shell .tabs label[for="tab-ops"] .ct,
-#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] .ct,
-#tab-ae:checked         ~ .shell .tabs label[for="tab-ae"] .ct {
+#tab-marketing:checked  ~ .shell .tabs label[for="tab-marketing"] .ct {
   background: rgba(255,255,255,0.16);
   color: rgba(255,255,255,0.78);
 }
@@ -430,8 +430,7 @@ body.is-loading .kpi-card::after {
 #tab-am:checked         ~ .shell .channel[data-channel="am"],
 #tab-sales:checked      ~ .shell .channel[data-channel="sales"],
 #tab-ops:checked        ~ .shell .channel[data-channel="ops"],
-#tab-marketing:checked  ~ .shell .channel[data-channel="marketing"],
-#tab-ae:checked         ~ .shell .channel[data-channel="ae"] {
+#tab-marketing:checked  ~ .shell .channel[data-channel="marketing"] {
   display: block;
 }
 
@@ -3035,272 +3034,530 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .cohort-dash { color: var(--ink-3); }
 
 /* ============================================================
-   AE METRICS · per-AE fuel-tank card (tab "ae")
-   Two cards (Mariano + Bahia) inside `<section data-channel="ae">`.
-   Layout: left tank visualization, right metrics column.
+   AE METRICS · Carafe / Jarra
+   A curved pitcher silhouette fills with two pastel liquids.
+   Uses the dashboard's existing Onest sans + the same pastel
+   gradient family as `bg-grad-lime` / `bg-grad-violet`.
    ============================================================ */
+
 .ae-card {
-  background: #fff;
-  border: 1px solid var(--rule);
+  /* Battery palette — amber (Staffing, top) + coral (Recruiting, bottom).
+     Legacy var names kept; values updated to match the reference. */
+  --ae-amber:     #e89a2b;     /* Staffing fill */
+  --ae-amber-2:   #c47e1a;     /* Staffing accent (dot / bar end) */
+  --ae-coral:     #d9685c;     /* Recruiting fill */
+  --ae-coral-2:   #b54a3e;     /* Recruiting accent */
+  /* Legacy aliases used by older selectors — keep them in sync. */
+  --ae-lime-soft: #f5cf85;
+  --ae-lime:      #ecaf45;
+  --ae-lime-deep: var(--ae-amber);
+  --ae-lav-soft:  #ee9c91;
+  --ae-lav:       #e07e72;
+  --ae-lav-deep:  var(--ae-coral);
+
+  background: var(--card, #fff);
   border-radius: var(--radius-card);
   padding: 28px 32px 26px;
-  box-shadow: 0 1px 0 rgba(13,18,30,0.02);
+  box-shadow: var(--shadow-md);
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  overflow: hidden;
 }
+
+/* Soft pastel wash bottom-left — a quiet ambient glow that ties the
+   liquid colours into the surrounding surface without dominating. */
+.ae-card::before {
+  content: "";
+  position: absolute;
+  inset: auto auto -40% -20%;
+  width: 60%;
+  height: 80%;
+  background: radial-gradient(closest-side, rgba(232,154,43,0.10) 0%, transparent 70%);
+  pointer-events: none;
+}
+.ae-card > * { position: relative; }
+
+/* ---------- Header ---------- */
 .ae-card__head {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 16px;
 }
 .ae-card__title {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight, -0.012em);
   color: var(--ink);
   margin: 0;
-  line-height: 1.1;
+  line-height: 1.25;
 }
 .ae-card__sub {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   font-size: 13px;
   color: var(--ink-3);
 }
-.ae-card__chip {
+.ae-card__window-toggle {
   display: inline-flex;
-  align-items: center;
-  background: rgba(13,18,30,0.05);
+  gap: 4px;
+  background: rgba(13,18,30,0.04);
+  padding: 4px;
   border-radius: var(--radius-pill);
-  padding: 8px 16px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-2);
-  white-space: nowrap;
   flex-shrink: 0;
 }
+.ae-card__window-toggle button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+  white-space: nowrap;
+}
+.ae-card__window-toggle button:hover { color: var(--ink); }
+.ae-card__window-toggle button.is-active {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* ---------- Body grid ---------- */
 .ae-card__body {
   display: grid;
   grid-template-columns: 220px 1fr;
-  gap: 28px;
-  align-items: stretch;
+  gap: 36px;
+  align-items: center;
 }
 
-/* ---------- Fuel tank ---------- */
-.ae-tank {
-  position: relative;
-  width: 100%;
-  min-height: 360px;
-  padding-left: 28px; /* room for Y-axis tick labels */
-  padding-right: 22px; /* room for the 8M dashed label */
-  padding-bottom: 14px; /* room for the bottom cap */
-}
-.ae-tank__shell {
-  position: relative;
-  height: 100%;
-  min-height: 320px;
-  border-radius: 36px;
-  background: #f4f3ee;
-  overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(13,18,30,0.04);
-}
-.ae-tank__fills {
-  position: absolute;
-  inset: 0;
+/* ---------- Pane visibility ---------- */
+.ae-card [data-window-pane] { display: none; }
+.ae-card[data-window-active="30d"]  [data-window-pane="30d"]  { display: block; }
+.ae-card[data-window-active="week"] [data-window-pane="week"] { display: block; }
+
+.ae-pane { display: flex; flex-direction: column; gap: 18px; }
+
+/* =====================================================================
+   Battery vertical · cap on top, meta line, fills with $ labels inside,
+   "X% de la meta" caption below.
+   Layout: 140×360 shell + 32×8 cap above. Two fills stacked column-reverse
+   so the first child (Recruiting, coral) sits at the bottom. Heights are
+   driven by `pct_of_goal` so the dashed meta line marks the 100% mark.
+   ===================================================================== */
+.ae-battery-wrap {
   display: flex;
-  flex-direction: column-reverse; /* first child renders at the bottom */
-  align-items: stretch;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  min-height: 380px;
+  gap: 10px;
 }
-.ae-tank__fill {
-  width: 100%;
-  height: 0; /* set by data-bind="progress-fill" data-axis="height" */
-  transition: height 0.4s ease;
+.ae-battery {
+  position: relative;
+  width: 140px;
+  padding-top: 10px;             /* room for the absolutely-positioned cap */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-.ae-tank__fill--recruiting {
-  background: linear-gradient(180deg, #4b8fd9 0%, #1f4f8b 100%);
-}
-.ae-tank__fill--staffing {
-  background: linear-gradient(180deg, #b8dec4 0%, #4ea876 100%);
-}
-.ae-tank__cap {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 32px;
-  height: 12px;
-  background: #f4f3ee;
-  border: 1px solid rgba(13,18,30,0.06);
-  border-radius: 4px;
-}
-.ae-tank__goal {
+/* The cap — battery terminal nub on top, absolutely centered above the
+   shell so it's pixel-perfect regardless of flex layout. */
+.ae-battery__cap {
   position: absolute;
   top: 0;
-  left: -4px;
-  right: -4px;
-  height: 0;
-  border-top: 1.5px dashed #ef4444;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 56px;
+  height: 10px;
+  border-radius: 5px 5px 0 0;
+  background: rgba(13,18,30,0.35);
   z-index: 2;
 }
-.ae-tank__goal-label {
+/* The shell — battery body */
+.ae-battery__shell {
+  position: relative;
+  width: 100%;
+  height: 340px;
+  border-radius: 22px;
+  background: rgba(13,18,30,0.04);
+  box-shadow:
+    inset 0 0 0 2px rgba(13,18,30,0.18),
+    inset 0 0 0 5px rgba(255,255,255,0.6);
+  overflow: hidden;
+}
+/* Empty-state placeholder centered in the shell — visible when both fills
+   are 0 (revealed because there's nothing covering it). As fills grow,
+   they layer on top and gradually hide it. */
+.ae-battery__shell::after {
+  content: "$0";
   position: absolute;
-  top: -8px;
-  right: -32px;
-  font-size: 11px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
   font-weight: 600;
-  color: #ef4444;
-  letter-spacing: -0.01em;
+  color: var(--ink-3);
+  opacity: 0.45;
+  z-index: 0;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+/* Meta dashed line — sits at the very top of the shell interior (offset
+   from the top by a small padding so the dashed line is visible). The
+   fills below scale relative to this line (pct_of_goal = 100% reaches it). */
+.ae-battery__goal {
+  position: absolute;
+  top: 10px;
+  left: 8px;
+  right: 8px;
+  border-top: 1.5px dashed var(--ink-3, #8a90a0);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 2;
+}
+.ae-battery__goal-label {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+/* Fills sit BELOW the dashed line — reserve the top 32px (10 padding + line + label) */
+.ae-battery__fills {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column-reverse;        /* first child = bottom */
+  overflow: hidden;
+  z-index: 1;                            /* stack above .ae-battery__shell::after placeholder */
+}
+.ae-battery__fill {
+  position: relative;
+  width: 100%;
+  height: 0;                              /* driven by progress-fill */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;                       /* clip the $ label + bubbles when fill is too short */
+  transition: height 0.7s cubic-bezier(0.32, 0.72, 0.18, 1);
+}
+/* Staffing — amber background masked with a wavy SVG that repeats
+   horizontally. The mask SVG contains ONE sine period (200 viewBox units);
+   `mask-repeat: repeat-x` tiles it across the fill, and animating
+   `mask-position-x` by exactly one tile width (200px) gives a seamless
+   loop of flowing water. */
+.ae-battery__fill--staffing {
+  background: var(--ae-amber);
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path fill='%23000' d='M 0,30 C 25,16 75,16 100,30 C 125,44 175,44 200,30 L 200,200 L 0,200 Z'/></svg>");
+          mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path fill='%23000' d='M 0,30 C 25,16 75,16 100,30 C 125,44 175,44 200,30 L 200,200 L 0,200 Z'/></svg>");
+  -webkit-mask-size: 200px 100%;
+          mask-size: 200px 100%;
+  -webkit-mask-repeat: repeat-x;
+          mask-repeat: repeat-x;
+  -webkit-mask-position-y: 0;
+          mask-position-y: 0;
+  animation: ae-wave-mask 5s linear infinite;
+}
+.ae-battery__fill--recruiting { background: var(--ae-coral); }
+@keyframes ae-wave-mask {
+  0%   { -webkit-mask-position-x: 0;      mask-position-x: 0; }
+  100% { -webkit-mask-position-x: -200px; mask-position-x: -200px; }
 }
 
-/* Y-axis ticks (fixed at 2M/4M/6M because goal is $8M) */
-.ae-tank__ticks {
+/* $ amount label centered inside each fill (only visible when fill is tall
+   enough). Subtle dark ink with low opacity so it doesn't fight the color. */
+.ae-battery__amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(13,18,30,0.55);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  user-select: none;
+  z-index: 3;
+  position: relative;
+}
+
+/* Old wave SVG (kept only for any stragglers — hidden so it doesn't render) */
+.ae-battery__wave { display: none; }
+
+/* Bubbles — slow upward float, lava-lamp pace. Each bubble has its own
+   --bubble-left / --bubble-delay / --bubble-dur via inline style. */
+.ae-battery__bubble {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 14px; /* match the cap reserve so 0% lines up with the shell bottom */
-  width: 24px;
+  left: var(--bubble-left, 50%);
+  bottom: -8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.45);
+  box-shadow: 0 0 4px rgba(255,255,255,0.25);
+  opacity: 0;
+  z-index: 2;
+  animation: ae-bubble-rise var(--bubble-dur, 7s) ease-in infinite;
+  animation-delay: var(--bubble-delay, 0s);
   pointer-events: none;
 }
-.ae-tank__tick {
-  position: absolute;
-  left: 0;
-  transform: translateY(50%);
-  font-size: 11px;
+@keyframes ae-bubble-rise {
+  0%   { transform: translateY(0) scale(0.85);   opacity: 0; }
+  15%  { opacity: 0.7; }
+  60%  { opacity: 0.5; }
+  85%  { opacity: 0.2; }
+  100% { transform: translateY(-260px) scale(1.05); opacity: 0; }
+}
+
+/* "X% de la meta" caption below the battery */
+.ae-battery__caption {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--ink-3);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Metrics column ---------- */
+.ae-card__metrics { min-width: 0; }
+
+.ae-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 8px;
+}
+.ae-hero__period {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ae-hero__amount {
+  font-size: clamp(48px, 5.5vw, 68px);
+  font-weight: 700;
+  letter-spacing: var(--tracking-display, -0.025em);
+  color: var(--ink);
+  line-height: 0.98;
+  font-variant-numeric: tabular-nums;
+}
+.ae-hero__meta {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+/* Hero inline row: "10 close wins" + green "↑ X% de la meta" pill */
+.ae-hero__inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.ae-hero__goal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: rgba(34,197,94,0.14);
+  color: #15803d;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ae-hero__goal-arrow {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Footer · Meta + restantes (sits at the bottom of the metrics column) */
+.ae-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 18px;
+  margin-top: auto;
+  border-top: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.ae-foot__meta { color: var(--ink-2); }
+.ae-foot__meta strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ae-foot__restantes {
+  display: inline-flex;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(217,104,92,0.13);
+  color: #a23a2d;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Right metrics column ---------- */
-.ae-card__metrics {
+/* ---------- Breakdown rows ---------- */
+.ae-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 22px;
 }
-.ae-card__total {
+.ae-rows__row {
+  padding: 16px 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 10px;
+  border-top: 1px solid var(--rule);
 }
-.ae-card__total-label {
+.ae-rows__row:first-child { border-top: 0; padding-top: 4px; }
+
+.ae-rows__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ae-rows__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ae-rows__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.ae-rows__dot--staffing   { background: var(--ae-amber); }
+.ae-rows__dot--recruiting { background: var(--ae-coral); }
+
+.ae-rows__amount {
+  margin-left: auto;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight, -0.012em);
+  color: var(--ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Soft progress bar — rounded ends, matches the dashboard's bar style. */
+.ae-rows__bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(13,18,30,0.06);
+  overflow: hidden;
+}
+.ae-rows__bar-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  transition: width 0.7s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.ae-rows__bar-fill--staffing   { background: var(--ae-amber); }
+.ae-rows__bar-fill--recruiting { background: var(--ae-coral); }
+
+.ae-rows__legend {
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Detail arrow button ---------- */
+.ae-rows__action {
+  border: 0;
+  background: rgba(13,18,30,0.05);
+  color: var(--ink-2);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .16s ease, color .16s ease, transform .16s ease;
+  flex-shrink: 0;
+}
+.ae-rows__action svg { display: block; }
+.ae-rows__action:hover {
+  background: var(--ink);
+  color: #fff;
+  transform: translateX(2px);
+}
+.ae-rows__action:focus-visible {
+  outline: 1.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 880px) {
+  .ae-card__body { grid-template-columns: 1fr; gap: 24px; }
+  .ae-meter-wrap { min-height: 280px; }
+  .ae-card__head { flex-wrap: wrap; }
+}
+@media (max-width: 540px) {
+  .ae-card { padding: 22px 20px 18px; }
+  .ae-meter { width: 80px; height: 260px; }
+  .ae-meter-wrap { min-height: 260px; }
+  .ae-hero__amount { font-size: 44px; }
+}
+
+/* ============================================================
+   GMRR Staffing YTD card (AE tab) — header stats strip
+   ============================================================ */
+.ae-gmrr-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding: 18px 0 20px;
+  border-bottom: 1px solid var(--rule);
+}
+/* Half-width card variant: only 2 stats so they breathe. */
+.ae-gmrr-stats--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ae-gmrr-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ae-gmrr-stat__label {
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.ae-card__total-value {
-  font-size: 44px;
-  font-weight: 800;
-  letter-spacing: -0.025em;
+.ae-gmrr-stat__value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight, -0.012em);
   color: var(--ink);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.ae-card__pace {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
-  padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  font-size: 13px;
-  font-weight: 600;
-}
-.ae-card__pace-arrow { font-weight: 700; }
-
-/* Per-model row */
-.ae-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ae-row__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.ae-row__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink-2);
-}
-.ae-row__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  display: inline-block;
-}
-.ae-row__dot--staffing   { background: #4ea876; }
-.ae-row__dot--recruiting { background: #2c6ec9; }
-.ae-row__value {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.ae-row__bar {
-  width: 100%;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(13,18,30,0.06);
-  overflow: hidden;
-}
-.ae-row__bar-fill {
-  display: block;
-  height: 100%;
-  width: 0%; /* set by data-bind="progress-fill" */
-  border-radius: inherit;
-  transition: width 0.4s ease;
-}
-.ae-row__bar-fill--staffing   { background: linear-gradient(90deg, #b8dec4, #4ea876); }
-.ae-row__bar-fill--recruiting { background: linear-gradient(90deg, #6e9fda, #1f4f8b); }
-.ae-row__legend {
-  font-size: 12.5px;
-  color: var(--ink-3);
-  text-align: right;
-}
-
-/* Footer */
-.ae-card__foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
-  font-size: 13px;
-  color: var(--ink-2);
-}
-.ae-card__goal-amount {
-  font-weight: 700;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.ae-card__months {
-  margin-top: 2px;
-  font-size: 12.5px;
-  color: var(--ink-3);
-}
-.ae-card__remaining {
-  background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* Responsive: stack tank above metrics on narrow viewports */
 @media (max-width: 720px) {
-  .ae-card__body { grid-template-columns: 1fr; }
-  .ae-tank { min-height: 280px; }
-  .ae-tank__shell { min-height: 260px; }
+  .ae-gmrr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .ae-gmrr-stat__value { font-size: 22px; }
 }

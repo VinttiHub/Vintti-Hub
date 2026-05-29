@@ -33,7 +33,6 @@ DASHBOARDS = [
                 {"key": "account-management", "label": "Account Management"},
                 {"key": "sales", "label": "Sales"},
                 {"key": "operations", "label": "Operations"},
-                {"key": "ae", "label": "AE Metrics"},
             ],
         },
     },
@@ -225,6 +224,10 @@ RESET_CHART_KEYS = {
         "ae_kpi_revenue_card",
         "ae_kpi_revenue_window",
         "ae_table_revenue_detail",
+        "ae_line_gmrr_ytd",
+        "ae_table_gmrr_detail",
+        "ae_line_mrr_fee_ytd",
+        "ae_table_mrr_fee_detail",
     ],
 }
 
@@ -2576,7 +2579,7 @@ MAIN_CHARTS = [
     # override — the dataset always sums across Mariano + Bahia.
     {
         "chart_key": "ae_kpi_revenue_card",
-        "tab_key": "ae",
+        "tab_key": "sales",
         "title": "Revenue Generated (M+B) — YTD vs goal",
         "type": "kpi",
         "dataset_key": "revenue_ae_card",
@@ -2595,7 +2598,7 @@ MAIN_CHARTS = [
     },
     {
         "chart_key": "ae_kpi_revenue_window",
-        "tab_key": "ae",
+        "tab_key": "sales",
         "title": "Revenue Generated (AEs only) — Window",
         "type": "kpi",
         "dataset_key": "revenue_ae_window",
@@ -2613,7 +2616,7 @@ MAIN_CHARTS = [
     },
     {
         "chart_key": "ae_table_revenue_detail",
-        "tab_key": "ae",
+        "tab_key": "sales",
         "title": "Revenue Generated (AEs only) — Detalle",
         "type": "table",
         "dataset_key": "revenue_ae_detail",
@@ -2624,6 +2627,73 @@ MAIN_CHARTS = [
         },
         "position": {"x": 0, "y": 11, "w": 12, "h": 6},
         "sort_order": 720,
+    },
+    # --- Gross MRR Staffing YTD (M+B) ---
+    # Line chart of cumulative GMRR per month + drawer drill-down to the
+    # contractors currently active that compose the current-month MRR.
+    {
+        "chart_key": "ae_line_gmrr_ytd",
+        "tab_key": "sales",
+        "title": "Gross MRR Staffing YTD (M+B)",
+        "type": "line",
+        "dataset_key": "gmrr_ae_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["cumulative_gmrr"],
+                "formatter": "currency",
+                "tooltipExtras": ["monthly_gmrr", "active_contractors", "active_accounts"],
+            },
+        },
+        "position": {"x": 0, "y": 18, "w": 12, "h": 5},
+        "sort_order": 730,
+    },
+    {
+        "chart_key": "ae_table_gmrr_detail",
+        "tab_key": "sales",
+        "title": "Gross MRR Staffing — Detalle contractors activos (M+B)",
+        "type": "table",
+        "dataset_key": "gmrr_ae_detail",
+        "config": {
+            "mapping": {
+                "columns": ["candidate_name", "client_name", "opp_sales_lead", "start_date", "salary", "fee", "gmrr"],
+            },
+        },
+        "position": {"x": 0, "y": 24, "w": 12, "h": 6},
+        "sort_order": 740,
+    },
+    # --- MRR Staffing · Vintti fee only · YTD (M+B) ---
+    # Sibling of ae_line_gmrr_ytd, summing fee only (excludes candidate salary).
+    {
+        "chart_key": "ae_line_mrr_fee_ytd",
+        "tab_key": "sales",
+        "title": "MRR Staffing · Vintti fee · YTD (M+B)",
+        "type": "line",
+        "dataset_key": "mrr_fee_ae_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["cumulative_fee"],
+                "formatter": "currency",
+                "tooltipExtras": ["monthly_fee", "active_contractors", "active_accounts"],
+            },
+        },
+        "position": {"x": 6, "y": 18, "w": 6, "h": 5},
+        "sort_order": 750,
+    },
+    {
+        "chart_key": "ae_table_mrr_fee_detail",
+        "tab_key": "sales",
+        "title": "MRR Staffing · Vintti fee — Detalle contractors (M+B)",
+        "type": "table",
+        "dataset_key": "mrr_fee_ae_detail",
+        "config": {
+            "mapping": {
+                "columns": ["candidate_name", "client_name", "opp_sales_lead", "start_date", "salary", "fee"],
+            },
+        },
+        "position": {"x": 0, "y": 30, "w": 12, "h": 6},
+        "sort_order": 760,
     },
 ]
 
