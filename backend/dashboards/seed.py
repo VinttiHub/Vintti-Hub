@@ -2761,6 +2761,70 @@ MAIN_CHARTS = [
         "position": {"x": 0, "y": 45, "w": 12, "h": 6},
         "sort_order": 785,
     },
+    # --- Avg Setup Fee · Breakdown · últimos 30 días (M+B) ---
+    {
+        "chart_key": "ae_kpi_avg_setup_fee_30d",
+        "tab_key": "sales",
+        "title": "Avg Setup Fee · Breakdown — últimos 30 días (M+B)",
+        "type": "kpi",
+        "dataset_key": "avg_setup_fee_30d",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "avg_total", "label": "Avg total", "formatter": "currency"},
+                    {"key": "avg_with_pc", "label": "Avg CON PC", "formatter": "currency"},
+                    {"key": "avg_without_pc", "label": "Avg SIN PC", "formatter": "currency"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 51, "w": 12, "h": 4},
+        "sort_order": 790,
+    },
+    {
+        "chart_key": "ae_kpi_equipment_ytd",
+        "tab_key": "sales",
+        "title": "Equipment YTD — % con PC vs sin PC (AE)",
+        "type": "kpi",
+        "dataset_key": "equipment_ytd",
+        "config": {
+            "mapping": {
+                "values": [
+                    {"key": "pct_with_pc", "label": "% CON PC YTD", "formatter": "percent"},
+                    {"key": "pct_without_pc", "label": "% SIN PC YTD", "formatter": "percent"},
+                ],
+            },
+        },
+        "position": {"x": 0, "y": 51, "w": 3, "h": 4},
+        "sort_order": 792,
+    },
+    {
+        "chart_key": "ae_table_equipment_ytd_detail",
+        "tab_key": "sales",
+        "title": "Equipment YTD — Detalle hires (Staffing · AE)",
+        "type": "table",
+        "dataset_key": "equipment_ytd_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "client_name", "opp_position_name", "candidate_name", "has_pc", "setup_fee"],
+            },
+        },
+        "position": {"x": 0, "y": 61, "w": 12, "h": 6},
+        "sort_order": 794,
+    },
+    {
+        "chart_key": "ae_table_avg_setup_fee_30d_detail",
+        "tab_key": "sales",
+        "title": "Avg Setup Fee — Detalle hires (Staffing · 30d · M+B)",
+        "type": "table",
+        "dataset_key": "avg_setup_fee_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["close_date", "client_name", "opp_position_name", "has_pc", "setup_fee"],
+            },
+        },
+        "position": {"x": 0, "y": 55, "w": 12, "h": 6},
+        "sort_order": 795,
+    },
 ]
 
 

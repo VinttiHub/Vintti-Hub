@@ -1970,7 +1970,7 @@
        ============================================================ -->
   <section class="channel" data-channel="sales">
     <div class="grid">
-      <!-- ===== Pitcher card · M+B (window toggle 30d/semana) =====
+      <!-- ===== Pitcher card · AE (window toggle 30d/semana) =====
            A curved SVG carafe silhouette fills with two pastel liquids — lime
            for Staffing, lavender for Recruiting — using clip-path on the
            liquid layer. Two panes pre-hydrated; toggle just swaps via CSS. -->
@@ -1980,7 +1980,7 @@
           <div>
             <h2 class="ae-card__title">Revenue Generated · <span
                 data-chart="ae_kpi_revenue_card" data-override-window="30d"
-                data-bind="text" data-field="ae_name" data-reduce="first" data-fmt="raw">Mariano + Bahia</span></h2>
+                data-bind="text" data-field="ae_name" data-reduce="first" data-fmt="raw">AE</span></h2>
             <p class="ae-card__sub">Staffing + Recruiting · close wins en la ventana seleccionada</p>
           </div>
           <div class="ae-card__window-toggle" role="tablist" aria-label="Ventana">
@@ -1998,12 +1998,6 @@
             <div class="ae-battery" data-window-pane="30d">
               <span class="ae-battery__cap" aria-hidden="true"></span>
               <div class="ae-battery__shell">
-                <!-- Meta line at the top (inside the shell) -->
-                <div class="ae-battery__goal" aria-hidden="true">
-                  <span class="ae-battery__goal-label">meta <span
-                      data-chart="ae_kpi_revenue_card" data-override-window="30d"
-                      data-bind="text" data-field="goal" data-reduce="first" data-fmt="currency-k">$50K</span></span>
-                </div>
                 <div class="ae-battery__fills">
                   <!-- Bottom (Recruiting / coral) -->
                   <div class="ae-battery__fill ae-battery__fill--recruiting"
@@ -2030,21 +2024,12 @@
                   </div>
                 </div>
               </div>
-              <p class="ae-battery__caption">
-                <span data-chart="ae_kpi_revenue_card" data-override-window="30d"
-                      data-bind="text" data-field="pct_of_goal" data-reduce="first" data-fmt="percent">—</span> de la meta
-              </p>
             </div>
 
             <!-- Pane semana (mirror with data-override-window="week") -->
             <div class="ae-battery" data-window-pane="week">
               <span class="ae-battery__cap" aria-hidden="true"></span>
               <div class="ae-battery__shell">
-                <div class="ae-battery__goal" aria-hidden="true">
-                  <span class="ae-battery__goal-label">meta <span
-                      data-chart="ae_kpi_revenue_card" data-override-window="week"
-                      data-bind="text" data-field="goal" data-reduce="first" data-fmt="currency-k">$12K</span></span>
-                </div>
                 <div class="ae-battery__fills">
                   <div class="ae-battery__fill ae-battery__fill--recruiting"
                        data-chart="ae_kpi_revenue_card" data-override-window="week"
@@ -2069,10 +2054,6 @@
                   </div>
                 </div>
               </div>
-              <p class="ae-battery__caption">
-                <span data-chart="ae_kpi_revenue_card" data-override-window="week"
-                      data-bind="text" data-field="pct_of_goal" data-reduce="first" data-fmt="percent">—</span> de la meta
-              </p>
             </div>
           </div>
 
@@ -2092,12 +2073,6 @@
                   <span class="ae-hero__meta">
                     <span data-chart="ae_kpi_revenue_card" data-override-window="30d"
                           data-bind="text" data-field="total_closes" data-reduce="first" data-fmt="int">—</span> close wins
-                  </span>
-                  <span class="ae-hero__goal-pill">
-                    <span class="ae-hero__goal-arrow" aria-hidden="true">↑</span>
-                    <span data-chart="ae_kpi_revenue_card" data-override-window="30d"
-                          data-bind="text" data-field="pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
-                    de la meta
                   </span>
                 </div>
               </div>
@@ -2166,17 +2141,6 @@
                 </li>
               </ul>
 
-              <footer class="ae-foot">
-                <div class="ae-foot__meta">
-                  Meta <strong data-chart="ae_kpi_revenue_card" data-override-window="30d"
-                               data-bind="text" data-field="goal" data-reduce="first" data-fmt="currency-k">—</strong>
-                  · ventana 30d
-                </div>
-                <span class="ae-foot__restantes">
-                  <span data-chart="ae_kpi_revenue_card" data-override-window="30d"
-                        data-bind="text" data-field="remaining" data-reduce="first" data-fmt="currency-k">—</span> restantes
-                </span>
-              </footer>
             </div>
 
             <!-- Pane: semana -->
@@ -2192,12 +2156,6 @@
                   <span class="ae-hero__meta">
                     <span data-chart="ae_kpi_revenue_card" data-override-window="week"
                           data-bind="text" data-field="total_closes" data-reduce="first" data-fmt="int">—</span> close wins
-                  </span>
-                  <span class="ae-hero__goal-pill">
-                    <span class="ae-hero__goal-arrow" aria-hidden="true">↑</span>
-                    <span data-chart="ae_kpi_revenue_card" data-override-window="week"
-                          data-bind="text" data-field="pct_of_goal" data-reduce="first" data-fmt="percent">—</span>
-                    de la meta
                   </span>
                 </div>
               </div>
@@ -2266,17 +2224,6 @@
                 </li>
               </ul>
 
-              <footer class="ae-foot">
-                <div class="ae-foot__meta">
-                  Meta <strong data-chart="ae_kpi_revenue_card" data-override-window="week"
-                               data-bind="text" data-field="goal" data-reduce="first" data-fmt="currency-k">—</strong>
-                  · ventana semana
-                </div>
-                <span class="ae-foot__restantes">
-                  <span data-chart="ae_kpi_revenue_card" data-override-window="week"
-                        data-bind="text" data-field="remaining" data-reduce="first" data-fmt="currency-k">—</span> restantes
-                </span>
-              </footer>
             </div>
 
           </div>
@@ -2302,7 +2249,7 @@
       </div>
 
       <!-- ============================================================
-           Gross MRR Staffing YTD (M+B) — line + drawer detail · LEFT
+           Gross MRR Staffing YTD (AE) — line + drawer detail · LEFT
            ============================================================ -->
       <div class="card s-6">
         <div class="card__head">
@@ -2349,7 +2296,7 @@
       </div>
 
       <!-- ============================================================
-           MRR Staffing · Vintti fee only · YTD (M+B) · RIGHT
+           MRR Staffing · Vintti fee only · YTD (AE) · RIGHT
            ============================================================ -->
       <div class="card s-6">
         <div class="card__head">
@@ -2394,7 +2341,7 @@
       </div>
 
       <!-- ============================================================
-           Avg Recruiting Fee · últimos 30 días (M+B) · LEFT
+           Avg Recruiting Fee · últimos 30 días (AE) · LEFT
            ============================================================ -->
       <div class="card s-6">
         <div class="card__head">
@@ -2423,7 +2370,7 @@
       </div>
 
       <!-- ============================================================
-           Avg Staffing Fee · últimos 30 días (M+B) · RIGHT
+           Avg Staffing Fee · últimos 30 días (AE) · RIGHT
            ============================================================ -->
       <div class="card s-6">
         <div class="card__head">
@@ -2447,6 +2394,95 @@
             <span class="ae-gmrr-stat__value"
                   data-chart="ae_kpi_avg_staffing_fee_30d" data-bind="text"
                   data-field="deal_count" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Avg Setup Fee · Breakdown (AE · last 30 days)
+           Layout: total avg + YTD donut (top) · distribution bar ·
+           two sub-tiles (con / sin computadora) with delta vs prior 30d
+           ============================================================ -->
+      <div class="card s-12 setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Avg Setup Fee · Breakdown</h3>
+            <p class="card__sub">Con computadora vs sin computadora · Staffing · last 30 days · AE</p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-avg-setup-fee"
+                  aria-label="Ver detalle Avg Setup Fee">Ver detalle</button>
+        </div>
+
+        <!-- Top hero · total avg + YTD donut -->
+        <div class="setupfee-top">
+          <div class="setupfee-total">
+            <span class="setupfee-total__label">Setup fee · total avg</span>
+            <span class="setupfee-total__value"
+                  data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                  data-field="avg_total" data-reduce="first" data-fmt="currency">—</span>
+            <span class="setupfee-total__sub">
+              promedio · todos los placements ·
+              <span data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                    data-field="count_total" data-reduce="first" data-fmt="int">—</span> deals
+            </span>
+          </div>
+          <div class="setupfee-donut setupfee-donut--clickable"
+               data-chart="ae_kpi_equipment_ytd" data-bind="progress-fill"
+               data-field="pct_with_pc" data-reduce="first"
+               data-axis="css-var" data-css-var="--pct"
+               data-kpi-detail-open="sales-equipment-ytd"
+               role="button" tabindex="0"
+               aria-label="Ver detalle Equipment YTD">
+            <div class="setupfee-donut__center">
+              <span class="setupfee-donut__pct"
+                    data-chart="ae_kpi_equipment_ytd" data-bind="text"
+                    data-field="pct_with_pc" data-reduce="first" data-fmt="percent">—</span>
+              <span class="setupfee-donut__caption">con PC · YTD</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Distribution bar -->
+        <div class="setupfee-dist">
+          <span class="setupfee-dist__label">Distribución del avg fee</span>
+          <div class="setupfee-dist__bar">
+            <span class="setupfee-dist__seg setupfee-dist__seg--with"
+                  data-chart="ae_kpi_avg_setup_fee_30d" data-bind="progress-fill"
+                  data-field="pct_dist_with_pc" data-reduce="first">
+              <span class="setupfee-dist__seg-val"
+                    data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                    data-field="avg_with_pc" data-reduce="first" data-fmt="currency-k">—</span>
+            </span>
+            <span class="setupfee-dist__seg setupfee-dist__seg--without"
+                  data-chart="ae_kpi_avg_setup_fee_30d" data-bind="progress-fill"
+                  data-field="pct_dist_without_pc" data-reduce="first">
+              <span class="setupfee-dist__seg-val"
+                    data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                    data-field="avg_without_pc" data-reduce="first" data-fmt="currency-k">—</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Two sub-tiles · con / sin computadora -->
+        <div class="setupfee-sub">
+          <div class="setupfee-sub__tile setupfee-sub__tile--with">
+            <span class="setupfee-sub__label">
+              <span class="setupfee-sub__ic" aria-hidden="true">▮</span>
+              Con computadora
+            </span>
+            <span class="setupfee-sub__value"
+                  data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                  data-field="avg_with_pc" data-reduce="first" data-fmt="currency">—</span>
+          </div>
+          <div class="setupfee-sub__tile setupfee-sub__tile--without">
+            <span class="setupfee-sub__label">
+              <span class="setupfee-sub__ic" aria-hidden="true">▭</span>
+              Sin computadora
+            </span>
+            <span class="setupfee-sub__value"
+                  data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                  data-field="avg_without_pc" data-reduce="first" data-fmt="currency">—</span>
           </div>
         </div>
       </div>
@@ -2515,10 +2551,10 @@
         })();
       </script>
 
-      <!-- Sales funnel · Mariano + Bahia -->
+      <!-- Sales funnel · AE -->
       <div class="section s-12">
         <div>
-          <h2>Sales funnel · Mariano + Bahia</h2>
+          <h2>Sales funnel · AE</h2>
           <p>30 días en window arriba · evolución mensual abajo (voltear para ver el detalle de cada mes).</p>
         </div>
       </div>
@@ -2600,7 +2636,7 @@
               <span data-chart="sa_kpi_sql_to_close_win" data-bind="text"
                     data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> /
               <span data-chart="sa_kpi_sql_to_close_win" data-bind="text"
-                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, M+B)
+                    data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, AE)
             </div>
           </div>
         </div>
@@ -4877,7 +4913,7 @@
                      data-empty-text="Sin opps cerradas en los últimos 30d."></div>
               </div>
             </section>
-            <p class="kpi-drawer__note">El funnel se lee de arriba a abajo. Cada barra usa el dataset de su pestaña fuente — ojo que "NDA signed → CW" filtra a Mariano/Bahía y la versión "NDA → Client (ops)" abre el filtro a más AEs.</p>
+            <p class="kpi-drawer__note">El funnel se lee de arriba a abajo. Cada barra usa el dataset de su pestaña fuente — ojo que "NDA signed → CW" filtra a AE y la versión "NDA → Client (ops)" abre el filtro a más AEs.</p>
           </div>
         </div>
 
@@ -5199,7 +5235,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">SQL → NDA Sent</h3>
-            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = Mariano o Bahía), cuántas ya tienen una opp con `nda_sent_date` poblado.</p>
+            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = AE), cuántas ya tienen una opp con `nda_sent_date` poblado.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5208,11 +5244,11 @@
               <span class="kpi-drawer__hero__value" data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="sql_to_nda_sent_pct" data-reduce="first" data-fmt="percent">—</span>
               <span class="kpi-drawer__hero__delta">
                 <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> de
-                <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, M+B)
+                <span data-chart="sa_kpi_sql_to_nda_overall" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, AE)
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, M+B)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, AE)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_funnel_30d_detail" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_nda_sent|NDA sent|raw,nda_sent_d|Fecha sent|raw,has_nda_signed|NDA signed|raw"
@@ -5226,7 +5262,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">NDA Sent → Sourcing</h3>
-            <p class="kpi-drawer__sub">De las opps con `nda_sent_date` en los últimos 30 días (account AM = M+B), cuántas ya firmaron (`nda_signature_or_start_date` no nulo).</p>
+            <p class="kpi-drawer__sub">De las opps con `nda_sent_date` en los últimos 30 días (account AM = AE), cuántas ya firmaron (`nda_signature_or_start_date` no nulo).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5235,11 +5271,11 @@
               <span class="kpi-drawer__hero__value" data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="nda_sent_to_sourcing_pct" data-reduce="first" data-fmt="percent">—</span>
               <span class="kpi-drawer__hero__delta">
                 <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="sourcing_count" data-reduce="first" data-fmt="int">—</span> de
-                <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> opps (NDA sent 30d, M+B)
+                <span data-chart="sa_kpi_nda_to_sourcing" data-bind="text" data-field="nda_sent_count" data-reduce="first" data-fmt="int">—</span> opps (NDA sent 30d, AE)
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle opps (NDA sent 30d, M+B)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle opps (NDA sent 30d, AE)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_nda_to_sourcing_detail" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,opp_position_name|Posición|raw,opp_model|Modelo|raw,nda_sent_d|NDA sent|raw,has_nda_signed|NDA signed|raw,nda_signed_d|Fecha sign|raw,opp_stage|Stage|raw"
@@ -5253,7 +5289,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">Sourcing → Close Win</h3>
-            <p class="kpi-drawer__sub">De las opps cerradas (CW + Lost) en los últimos 30 días con NDA firmado (M+B), qué % fueron Close Win.</p>
+            <p class="kpi-drawer__sub">De las opps cerradas (CW + Lost) en los últimos 30 días con NDA firmado (AE), qué % fueron Close Win.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5267,7 +5303,7 @@
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle opps cerradas (30d, M+B)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle opps cerradas (30d, AE)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_nda_30d_detail" data-bind="dtable"
                    data-override-opp_stage="Total"
@@ -5282,7 +5318,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · funnel</span>
             <h3 class="kpi-drawer__title">SQL → Close Win</h3>
-            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = M+B), cuántas ya cerraron Close Win en alguna opp (sin tope de fecha).</p>
+            <p class="kpi-drawer__sub">De las accounts creadas en los últimos 30 días (AM = AE), cuántas ya cerraron Close Win en alguna opp (sin tope de fecha).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5291,11 +5327,11 @@
               <span class="kpi-drawer__hero__value" data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="sql_to_close_win_pct" data-reduce="first" data-fmt="percent">—</span>
               <span class="kpi-drawer__hero__delta">
                 <span data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="close_win_count" data-reduce="first" data-fmt="int">—</span> de
-                <span data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, M+B)
+                <span data-chart="sa_kpi_sql_to_close_win" data-bind="text" data-field="sql_count" data-reduce="first" data-fmt="int">—</span> SQL (30d, AE)
               </span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, M+B)</h4>
+              <h4 class="kpi-drawer__section-title">Detalle SQL (30d, AE)</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_funnel_30d_detail" data-bind="dtable"
                    data-cols="client_name|Cliente|raw,creation_d|Creación|raw,has_close_win|Close Win|raw,close_win_d|Fecha CW|raw,has_nda_signed|NDA signed|raw"
@@ -5305,7 +5341,7 @@
         </div>
 
         <!-- ============================================================
-             Panels · AE Metrics (M+B) detail · 4 combos (modelo × window)
+             Panels · AE Metrics (AE) detail · 4 combos (modelo × window)
              Opened from `data-kpi-detail-open` buttons inside each model row
              of the AE card. Each panel hits `ae_table_revenue_detail` with
              the matching modelo + window overrides.
@@ -5314,9 +5350,8 @@
         <!-- Panel · AE · Staffing · 30d -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-staffing-30d">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">AE Metrics · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">AE Metrics</span>
             <h3 class="kpi-drawer__title">Staffing · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Close wins de Staffing con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} cuya <code>opp_close_date</code> cae en los últimos 30 días. La suma de la columna Revenue = la box "Staffing" de la card.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5338,7 +5373,7 @@
                    data-chart="ae_table_revenue_detail" data-override-modelo="Staffing" data-override-window="30d"
                    data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
-                   data-empty-text="Sin closes Staffing de M+B en los últimos 30 días."></div>
+                   data-empty-text="Sin closes Staffing de AE en los últimos 30 días."></div>
             </section>
           </div>
         </div>
@@ -5346,9 +5381,8 @@
         <!-- Panel · AE · Recruiting · 30d -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-recruiting-30d">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">AE Metrics · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">AE Metrics</span>
             <h3 class="kpi-drawer__title">Recruiting · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Close wins de Recruiting con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} cuya <code>opp_close_date</code> cae en los últimos 30 días. La suma de la columna Revenue = la box "Recruiting" de la card.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5370,7 +5404,7 @@
                    data-chart="ae_table_revenue_detail" data-override-modelo="Recruiting" data-override-window="30d"
                    data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
-                   data-empty-text="Sin closes Recruiting de M+B en los últimos 30 días."></div>
+                   data-empty-text="Sin closes Recruiting de AE en los últimos 30 días."></div>
             </section>
           </div>
         </div>
@@ -5378,9 +5412,8 @@
         <!-- Panel · AE · Staffing · semana -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-staffing-week">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">AE Metrics · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">AE Metrics</span>
             <h3 class="kpi-drawer__title">Staffing · semana</h3>
-            <p class="kpi-drawer__sub">Close wins de Staffing con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} de la semana previa (lunes a domingo).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5402,7 +5435,7 @@
                    data-chart="ae_table_revenue_detail" data-override-modelo="Staffing" data-override-window="week"
                    data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
-                   data-empty-text="Sin closes Staffing de M+B en la semana previa."></div>
+                   data-empty-text="Sin closes Staffing de AE en la semana previa."></div>
             </section>
           </div>
         </div>
@@ -5410,9 +5443,8 @@
         <!-- Panel · AE · Recruiting · semana -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-recruiting-week">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">AE Metrics · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">AE Metrics</span>
             <h3 class="kpi-drawer__title">Recruiting · semana</h3>
-            <p class="kpi-drawer__sub">Close wins de Recruiting con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} de la semana previa (lunes a domingo).</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5434,7 +5466,7 @@
                    data-chart="ae_table_revenue_detail" data-override-modelo="Recruiting" data-override-window="week"
                    data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
-                   data-empty-text="Sin closes Recruiting de M+B en la semana previa."></div>
+                   data-empty-text="Sin closes Recruiting de AE en la semana previa."></div>
             </section>
           </div>
         </div>
@@ -5442,9 +5474,9 @@
         <!-- Panel · AE · MRR Staffing · Vintti fee detail (month-aware) -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-mrr-fee-detail">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">AE Metrics · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">AE Metrics</span>
             <h3 class="kpi-drawer__title">MRR Vintti fee · Detalle <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h3>
-            <p class="kpi-drawer__sub">Solo el <strong>fee de Vintti</strong> (sin salario del candidato) de cada contractor Staffing M+B activo al cierre del mes. Cliquéa otro punto del chart YTD para cambiar de mes.</p>
+            <p class="kpi-drawer__sub">Solo el <strong>fee de Vintti</strong> (sin salario del candidato) de cada contractor Staffing AE activo al cierre del mes. Cliquéa otro punto del chart YTD para cambiar de mes.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5466,18 +5498,17 @@
               <div class="dtable-wrap"
                    data-chart="ae_table_mrr_fee_detail" data-bind="dtable"
                    data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,start_date|Start|raw,fee|Fee Vintti|currency-k"
-                   data-empty-text="Sin contractors Staffing M+B activos en el mes seleccionado."
+                   data-empty-text="Sin contractors Staffing AE activos en el mes seleccionado."
                    data-month-aware></div>
             </section>
           </div>
         </div>
 
-        <!-- Panel · Sales · Avg Recruiting Fee · 30d (M+B) -->
+        <!-- Panel · Sales · Avg Recruiting Fee · 30d (AE) -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-recruiting-fee">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">Sales · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
             <h3 class="kpi-drawer__title">Avg Recruiting Fee · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Deals Recruiting <code>Close Win</code> con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} cuya <code>opp_close_date</code> cae en los últimos 30 días. La columna "Fee del deal" promediada = la box "Avg fee".</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5500,17 +5531,16 @@
               <div class="dtable-wrap"
                    data-chart="ae_table_avg_recruiting_fee_30d_detail" data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,deal_fee|Fee del deal|currency-k"
-                   data-empty-text="Sin closes Recruiting de M+B en los últimos 30 días."></div>
+                   data-empty-text="Sin closes Recruiting de AE en los últimos 30 días."></div>
             </section>
           </div>
         </div>
 
-        <!-- Panel · Sales · Avg Staffing Fee · 30d (M+B) -->
+        <!-- Panel · Sales · Avg Staffing Fee · 30d (AE) -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-staffing-fee">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">Sales · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
             <h3 class="kpi-drawer__title">Avg Staffing Fee · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Deals Staffing <code>Close Win</code> con <code>opp_sales_lead</code> ∈ {Mariano, Bahia} cuya <code>opp_close_date</code> cae en los últimos 30 días. La columna "Fee mensual Vintti" promediada = la box "Avg fee mensual".</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5533,7 +5563,71 @@
               <div class="dtable-wrap"
                    data-chart="ae_table_avg_staffing_fee_30d_detail" data-bind="dtable"
                    data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,deal_fee|Fee mensual Vintti|currency-k"
-                   data-empty-text="Sin closes Staffing de M+B en los últimos 30 días."></div>
+                   data-empty-text="Sin closes Staffing de AE en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Equipment YTD (AE) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-equipment-ytd">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">Equipment YTD · Detalle hires</h3>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">% con PC · YTD</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="ae_kpi_equipment_ytd" data-bind="text"
+                    data-field="pct_with_pc" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="ae_kpi_equipment_ytd" data-bind="text"
+                      data-field="count_with_pc" data-reduce="first" data-fmt="int">—</span> con PC ·
+                <span data-chart="ae_kpi_equipment_ytd" data-bind="text"
+                      data-field="count_without_pc" data-reduce="first" data-fmt="int">—</span> sin PC ·
+                <span data-chart="ae_kpi_equipment_ytd" data-bind="text"
+                      data-field="count_total" data-reduce="first" data-fmt="int">—</span> total hires
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle hires</h4>
+              <div class="dtable-wrap"
+                   data-chart="ae_table_equipment_ytd_detail" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,has_pc|Con PC|raw,setup_fee|Setup fee|currency-k"
+                   data-empty-text="Sin hires Staffing AE en YTD."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Avg Setup Fee · Breakdown (AE, 30d) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-setup-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">Avg Setup Fee · últimos 30 días</h3>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Setup fee total avg · 30d</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                    data-field="avg_total" data-reduce="first" data-fmt="currency">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                      data-field="count_with_pc" data-reduce="first" data-fmt="int">—</span> con PC ·
+                <span data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                      data-field="count_without_pc" data-reduce="first" data-fmt="int">—</span> sin PC ·
+                <span data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
+                      data-field="count_total" data-reduce="first" data-fmt="int">—</span> total
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de hires</h4>
+              <div class="dtable-wrap"
+                   data-chart="ae_table_avg_setup_fee_30d_detail" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,has_pc|Con PC|raw,setup_fee|Setup fee del deal|currency-k"
+                   data-empty-text="Sin deals Staffing de AE en los últimos 30 días."></div>
             </section>
           </div>
         </div>
@@ -5541,9 +5635,9 @@
         <!-- Panel · AE · Gross MRR Staffing detail (month-aware) -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="ae-gmrr-detail">
           <header class="kpi-drawer__head">
-            <span class="kpi-drawer__eyebrow">AE Metrics · Mariano + Bahia</span>
+            <span class="kpi-drawer__eyebrow">AE Metrics</span>
             <h3 class="kpi-drawer__title">Gross MRR Staffing · Detalle <span class="kpi-drawer__month-chip" data-kpi-drawer-month-chip>—</span></h3>
-            <p class="kpi-drawer__sub">Contractors Staffing M+B activos al cierre del mes seleccionado, con su aporte mensual al GMRR (salary + fee). Cliquéa otro punto del chart YTD para cambiar de mes.</p>
+            <p class="kpi-drawer__sub">Contractors Staffing AE activos al cierre del mes seleccionado, con su aporte mensual al GMRR (salary + fee). Cliquéa otro punto del chart YTD para cambiar de mes.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -5565,7 +5659,7 @@
               <div class="dtable-wrap"
                    data-chart="ae_table_gmrr_detail" data-bind="dtable"
                    data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,start_date|Start|raw,salary|Salary|currency-k,fee|Fee|currency-k,gmrr|GMRR mensual|currency-k"
-                   data-empty-text="Sin contractors Staffing M+B activos en el mes seleccionado."
+                   data-empty-text="Sin contractors Staffing AE activos en el mes seleccionado."
                    data-month-aware></div>
             </section>
           </div>
@@ -5575,7 +5669,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=52" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=53" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>

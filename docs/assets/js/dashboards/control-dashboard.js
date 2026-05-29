@@ -63,6 +63,17 @@
       const n = Math.round(+v);
       return (n > 0 ? '+' : '') + n;
     },
+    'delta-currency-k': (v) => {
+      if (v == null || v === '' || isNaN(+v)) return '—';
+      const n = +v;
+      const sign = n > 0 ? '+' : (n < 0 ? '−' : '');
+      const abs = Math.abs(n);
+      let body;
+      if (abs >= 1e6)      body = '$' + (abs / 1e6).toFixed(2) + 'M';
+      else if (abs >= 1e3) body = '$' + (abs / 1e3).toFixed(1) + 'K';
+      else                 body = '$' + Math.round(abs).toLocaleString('en-US');
+      return n === 0 ? 'Sin cambio' : sign + body;
+    },
     months: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : (+v).toFixed(1) + ' mo',
     raw: (v) => (v == null || v === '') ? '—' : String(v),
     pick(name) { return this[name] || this.raw; }
@@ -718,6 +729,9 @@
     const axis = (el.dataset.axis || 'width').toLowerCase();
     if (axis === 'height') {
       el.style.height = pct;
+    } else if (axis === 'css-var') {
+      // For conic-gradient donuts and similar: drive a CSS var instead of width/height.
+      el.style.setProperty(el.dataset.cssVar || '--pct', pct);
     } else {
       el.style.width = pct;
     }

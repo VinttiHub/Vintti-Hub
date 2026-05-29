@@ -139,6 +139,10 @@ from . import (
     avg_recruiting_fee_30d_detail,
     avg_staffing_fee_30d,
     avg_staffing_fee_30d_detail,
+    avg_setup_fee_30d,
+    avg_setup_fee_30d_detail,
+    equipment_ytd,
+    equipment_ytd_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -282,6 +286,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     avg_recruiting_fee_30d_detail.DATASET["key"]: avg_recruiting_fee_30d_detail.DATASET,
     avg_staffing_fee_30d.DATASET["key"]: avg_staffing_fee_30d.DATASET,
     avg_staffing_fee_30d_detail.DATASET["key"]: avg_staffing_fee_30d_detail.DATASET,
+    avg_setup_fee_30d.DATASET["key"]: avg_setup_fee_30d.DATASET,
+    avg_setup_fee_30d_detail.DATASET["key"]: avg_setup_fee_30d_detail.DATASET,
+    equipment_ytd.DATASET["key"]: equipment_ytd.DATASET,
+    equipment_ytd_detail.DATASET["key"]: equipment_ytd_detail.DATASET,
 }
 
 

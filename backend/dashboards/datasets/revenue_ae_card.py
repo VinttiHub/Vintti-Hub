@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
 
 # Human-friendly title shown in the card.
-AE_NAME = "Mariano + Bahia"
+AE_NAME = "AE"
 
 # Goal per window (USD). The battery's dashed "meta" line and the
 # "$X restantes" badge derive from these.
