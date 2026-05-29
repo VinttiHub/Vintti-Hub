@@ -475,6 +475,42 @@ a, .accordion-header, .edit-btn {
   box-shadow: 0 4px 16px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.02);
 }
 
+.grid-two-cols p.credit-loop-property-card {
+  font-weight: 500;
+}
+
+.grid-two-cols p.credit-loop-property-card.is-yes {
+  border: 1px solid rgba(38, 137, 92, 0.28);
+  background: #eefaf3;
+  color: #0b5f3d;
+  font-weight: 700;
+}
+
+.grid-two-cols p.credit-loop-property-card.is-no {
+  border: 1px solid rgba(190, 72, 72, 0.28);
+  background: #fff1f1;
+  color: #9b1c1c;
+  font-weight: 700;
+}
+
+.grid-two-cols p.credit-loop-property-card.is-yes strong,
+.credit-loop-property-value.is-yes {
+  color: #0b5f3d;
+  font-weight: 800;
+}
+
+.grid-two-cols p.credit-loop-property-card.is-no strong,
+.credit-loop-property-value.is-no {
+  color: #9b1c1c;
+  font-weight: 800;
+}
+
+.credit-loop-property-value.placeholder {
+  color: #b3b3b3;
+  font-style: italic;
+  font-weight: 500;
+}
+
 .no-hire {
   color: #b3b3b3;
   font-style: italic;

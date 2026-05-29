@@ -54,7 +54,7 @@ class HubSpotClient:
         payload = self._request("GET", f"/crm/v3/properties/{object_type}")
         return payload.get("results", [])
 
-    def search_closed_deals(self, owner_id, stage_ids=None, pipeline_id=None, modified_after_ms=None):
+    def search_closed_deals(self, owner_id, stage_ids=None, pipeline_id=None, modified_after_ms=None, extra_properties=None):
         filters = [
             {"propertyName": "hubspot_owner_id", "operator": "EQ", "value": str(owner_id)},
         ]
@@ -73,7 +73,7 @@ class HubSpotClient:
                 "operator": "GTE",
                 "value": str(modified_after_ms),
             })
-        return self.search_deals(filters)
+        return self.search_deals(filters, extra_properties=extra_properties)
 
     def search_deals(self, filters, extra_properties=None):
         properties = [

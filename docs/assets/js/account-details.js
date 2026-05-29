@@ -556,6 +556,8 @@ function fillAccountDetails(data) {
   setFieldText('account-lead-source', data.where_come_from);
   setFieldText('account-lead-source-detail', data.lead_source_detail);
   setFieldText('account-conversion-channel', data.conversion_channel);
+  setFieldText('account-credit-loop', data.credit_loop);
+  updateCreditLoopPropertyState(data.credit_loop);
   setFieldText('account-referral-source', data.referal_source);
   setFieldText('account-position', data.position);
   setFieldText('account-type', data.type);
@@ -612,6 +614,21 @@ function fillAccountDetails(data) {
   document.getElementById('account-tsf').textContent = `$${data.tsf ?? 0}`;
   document.getElementById('account-tsr').textContent = `$${data.tsr ?? 0}`;
   document.getElementById('account-trr').textContent = `$${data.trr ?? 0}`;
+}
+
+function updateCreditLoopPropertyState(value) {
+  const valueEl = document.getElementById('account-credit-loop');
+  const card = valueEl?.closest('.credit-loop-property-card');
+  if (!card || !valueEl) return;
+
+  const normalized = String(value || '').trim().toLowerCase();
+  const isYes = ['sí', 'si', 'yes', 'true', '1', 'y'].includes(normalized);
+  const isNo = ['no', 'false', '0', 'n'].includes(normalized);
+
+  card.classList.toggle('is-yes', isYes);
+  card.classList.toggle('is-no', isNo);
+  valueEl.classList.toggle('is-yes', isYes);
+  valueEl.classList.toggle('is-no', isNo);
 }
 
 function fillOpportunitiesTable(opportunities) {

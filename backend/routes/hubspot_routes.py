@@ -109,6 +109,7 @@ def _ensure_hubspot_account_columns(cursor):
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_synced_at TIMESTAMPTZ")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS lead_source_detail TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS conversion_channel TEXT")
+    cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS credit_loop TEXT")
     cursor.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_account_hubspot_deal_id
@@ -195,6 +196,18 @@ def _normalize_outsource_value(value):
     return OUTSOURCE_NORMALIZATION.get(raw.lower(), raw)
 
 
+def _normalize_credit_loop_value(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    normalized = raw.lower()
+    if normalized in ("sí", "si", "yes", "true", "1", "y"):
+        return "Sí"
+    if normalized in ("no", "false", "0", "n"):
+        return "No"
+    return raw
+
+
 def _account_name_candidates(value):
     raw = str(value or "").strip()
     if not raw:
@@ -217,7 +230,7 @@ def _account_name_candidates(value):
 
 def _normalize_hubspot_label(value):
     text = str(value or "").lower().replace("_", " ")
-    for char in ("/", "-", "–", "—", "(", ")", ":"):
+    for char in ("/", "-", "–", "—", "(", ")", ":", "?"):
         text = text.replace(char, " ")
     return " ".join(text.split())
 
@@ -241,6 +254,7 @@ HUBSPOT_ACCOUNT_FIELD_ALIASES = {
     "type": ["company_type", "Company Type"],
     "lead_source_detail": ["origin_detail", "Origin detail"],
     "conversion_channel": ["conversion_channel", "Conversion Channel"],
+    "credit_loop": ["credit_loop", "Credit Loop?", "Credit Loop"],
 }
 
 MEETING_DATE_TIME_ALIASES = [
@@ -367,9 +381,14 @@ def _hubspot_option_label(property_maps, object_type, field, value):
 
 
 def _first_mapped_value(property_maps, field, contact=None, company=None, deal=None):
-    value = _record_prop(contact, property_maps.get("contacts", {}).get(field))
-    if value not in (None, ""):
-        return _hubspot_option_label(property_maps, "contacts", field, value)
+    for object_type, record in (
+        ("contacts", contact),
+        ("companies", company),
+        ("deals", deal),
+    ):
+        value = _record_prop(record, property_maps.get(object_type, {}).get(field))
+        if value not in (None, ""):
+            return _hubspot_option_label(property_maps, object_type, field, value)
     return ""
 
 
@@ -406,6 +425,7 @@ def _preview_account_fields(payload):
         "hubspot_deal_id",
         "hubspot_company_id",
         "hubspot_contact_id",
+        "credit_loop",
     ]
     return {key: payload.get(key) for key in keys}
 
@@ -431,6 +451,7 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
         "linkedin": "linkedin",
         "pain_points": "pain_points",
         "position": "position",
+        "credit_loop": "credit_loop",
     }
     for field, payload_key in field_to_payload.items():
         value = _first_mapped_value(property_maps, field, contact=contact, company=company, deal=deal)
@@ -439,6 +460,7 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
     payload["outsource"] = _normalize_outsource_value(payload.get("outsource"))
     payload["pain_points"] = _normalize_pain_point(payload.get("pain_points"))
     payload["where_come_from"] = _normalize_lead_source(payload.get("where_come_from"))
+    payload["credit_loop"] = _normalize_credit_loop_value(payload.get("credit_loop"))
 
     return payload
 
@@ -734,6 +756,7 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
             name = COALESCE(NULLIF(%s, ''), name),
             surname = COALESCE(NULLIF(%s, ''), surname),
             account_manager = COALESCE(NULLIF(%s, ''), account_manager),
+            credit_loop = COALESCE(NULLIF(%s, ''), credit_loop),
             hubspot_deal_id = COALESCE(NULLIF(hubspot_deal_id, ''), NULLIF(%s, '')),
             hubspot_company_id = COALESCE(NULLIF(hubspot_company_id, ''), NULLIF(%s, '')),
             hubspot_contact_id = COALESCE(NULLIF(hubspot_contact_id, ''), NULLIF(%s, '')),
@@ -761,6 +784,7 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
             payload.get("contact_name"),
             payload.get("contact_surname"),
             payload.get("account_manager"),
+            _normalize_credit_loop_value(payload.get("credit_loop")),
             payload.get("hubspot_deal_id"),
             payload.get("hubspot_company_id"),
             payload.get("hubspot_contact_id"),
@@ -1093,11 +1117,16 @@ def preview_mariano_closed_leads():
         pipeline_id = request.args.get("pipeline_id") or os.environ.get("HUBSPOT_PIPELINE_ID")
 
         client = HubSpotClient()
+        property_maps = _resolve_account_property_maps(client)
+        contact_extra_properties = _mapped_property_names(property_maps, "contacts")
+        company_extra_properties = _mapped_property_names(property_maps, "companies")
+        deal_extra_properties = _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
         deals = client.search_closed_deals(
             owner_id,
             stage_ids=stage_ids,
             pipeline_id=pipeline_id,
+            extra_properties=deal_extra_properties,
         )
 
         rows = []
@@ -1108,16 +1137,23 @@ def preview_mariano_closed_leads():
                     _ensure_hubspot_account_columns(cursor)
                     for deal_summary in deals:
                         deal_id = str(deal_summary.get("id") or "")
-                        deal = client.get_deal_with_associations(deal_id)
+                        deal = client.get_deal_with_associations(deal_id, extra_properties=deal_extra_properties)
                         company_ids = association_ids(deal, "companies")
                         contact_ids = association_ids(deal, "contacts")
-                        company = client.get_company(company_ids[0]) if company_ids else None
-                        contact = client.get_contact(contact_ids[0]) if contact_ids else None
+                        company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
+                        contact = client.get_contact(contact_ids[0], extra_properties=contact_extra_properties) if contact_ids else None
                         payload = build_account_payload(
                             deal,
                             company=company,
                             contact=contact,
                             owner_email=owner_email,
+                        )
+                        payload = _apply_account_field_overrides(
+                            payload,
+                            contact=contact,
+                            company=company,
+                            deal=deal,
+                            property_maps=property_maps,
                         )
                         existing = _preview_existing_account(cursor, payload)
                         rows.append(_normalize_preview_row(deal, payload, existing))
@@ -1174,6 +1210,10 @@ def preview_mariano_sql_leads():
         pipeline_id = request.args.get("pipeline_id") or os.environ.get("HUBSPOT_PIPELINE_ID")
 
         client = HubSpotClient()
+        property_maps = _resolve_account_property_maps(client)
+        contact_extra_properties = _mapped_property_names(property_maps, "contacts")
+        company_extra_properties = _mapped_property_names(property_maps, "companies")
+        deal_extra_properties = [lead_life_property] + _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
         filters = [
             {"propertyName": "hubspot_owner_id", "operator": "EQ", "value": str(owner_id)},
@@ -1181,7 +1221,7 @@ def preview_mariano_sql_leads():
         ]
         if pipeline_id:
             filters.append({"propertyName": "pipeline", "operator": "EQ", "value": str(pipeline_id)})
-        deals = client.search_deals(filters, extra_properties=[lead_life_property])
+        deals = client.search_deals(filters, extra_properties=deal_extra_properties)
 
         rows = []
         conn = get_connection()
@@ -1193,17 +1233,24 @@ def preview_mariano_sql_leads():
                         deal_id = str(deal_summary.get("id") or "")
                         deal = client.get_deal_with_associations(
                             deal_id,
-                            extra_properties=[lead_life_property],
+                            extra_properties=deal_extra_properties,
                         )
                         company_ids = association_ids(deal, "companies")
                         contact_ids = association_ids(deal, "contacts")
-                        company = client.get_company(company_ids[0]) if company_ids else None
-                        contact = client.get_contact(contact_ids[0]) if contact_ids else None
+                        company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
+                        contact = client.get_contact(contact_ids[0], extra_properties=contact_extra_properties) if contact_ids else None
                         payload = build_account_payload(
                             deal,
                             company=company,
                             contact=contact,
                             owner_email=owner_email,
+                        )
+                        payload = _apply_account_field_overrides(
+                            payload,
+                            contact=contact,
+                            company=company,
+                            deal=deal,
+                            property_maps=property_maps,
                         )
                         existing = _preview_existing_account(cursor, payload)
                         rows.append(_normalize_preview_row(
@@ -1271,6 +1318,7 @@ def _insert_or_update_account(cursor, payload):
         "hubspot_deal_id": payload.get("hubspot_deal_id"),
         "hubspot_company_id": payload.get("hubspot_company_id"),
         "hubspot_contact_id": payload.get("hubspot_contact_id"),
+        "credit_loop": _normalize_credit_loop_value(payload.get("credit_loop")),
         "hubspot_synced_at": now,
     }
 
@@ -1299,6 +1347,7 @@ def _insert_or_update_account(cursor, payload):
                 name = COALESCE(NULLIF(%(name)s, ''), name),
                 surname = COALESCE(NULLIF(%(surname)s, ''), surname),
                 account_manager = COALESCE(NULLIF(%(account_manager)s, ''), account_manager),
+                credit_loop = COALESCE(NULLIF(%(credit_loop)s, ''), credit_loop),
                 hubspot_deal_id = COALESCE(NULLIF(%(hubspot_deal_id)s, ''), hubspot_deal_id),
                 hubspot_company_id = COALESCE(NULLIF(%(hubspot_company_id)s, ''), hubspot_company_id),
                 hubspot_contact_id = COALESCE(NULLIF(%(hubspot_contact_id)s, ''), hubspot_contact_id),
@@ -1316,14 +1365,14 @@ def _insert_or_update_account(cursor, payload):
             website, linkedin, comments, mail,
             where_come_from, lead_source_detail, conversion_channel, referal_source,
             industry, outsource, pain_points, contract, position, type,
-            name, surname, account_manager,
+            name, surname, account_manager, credit_loop,
             hubspot_deal_id, hubspot_company_id, hubspot_contact_id, hubspot_synced_at
         ) VALUES (
             %(client_name)s, %(size)s, %(timezone)s, %(state)s,
             %(website)s, %(linkedin)s, %(comments)s, %(mail)s,
             COALESCE(%(where_come_from)s, 'HubSpot'), %(lead_source_detail)s, %(conversion_channel)s, %(referal_source)s,
             %(industry)s, %(outsource)s, %(pain_points)s, %(contract)s, %(position)s, COALESCE(%(type)s, 'NA'),
-            %(name)s, %(surname)s, COALESCE(%(account_manager)s, %(default_account_manager)s),
+            %(name)s, %(surname)s, COALESCE(%(account_manager)s, %(default_account_manager)s), %(credit_loop)s,
             %(hubspot_deal_id)s, %(hubspot_company_id)s, %(hubspot_contact_id)s, %(hubspot_synced_at)s
         )
         RETURNING account_id
@@ -1361,12 +1410,17 @@ def sync_mariano_closed_leads():
         )
 
         client = HubSpotClient()
+        property_maps = _resolve_account_property_maps(client)
+        contact_extra_properties = _mapped_property_names(property_maps, "contacts")
+        company_extra_properties = _mapped_property_names(property_maps, "companies")
+        deal_extra_properties = _mapped_property_names(property_maps, "deals")
         owner_id = client.get_owner_id_by_email(owner_email)
         deals = client.search_closed_deals(
             owner_id,
             stage_ids=stage_ids,
             pipeline_id=pipeline_id,
             modified_after_ms=modified_after_ms,
+            extra_properties=deal_extra_properties,
         )
 
         synced = []
@@ -1379,16 +1433,23 @@ def sync_mariano_closed_leads():
                     for deal_summary in deals:
                         deal_id = str(deal_summary.get("id") or "")
                         try:
-                            deal = client.get_deal_with_associations(deal_id)
+                            deal = client.get_deal_with_associations(deal_id, extra_properties=deal_extra_properties)
                             company_ids = association_ids(deal, "companies")
                             contact_ids = association_ids(deal, "contacts")
-                            company = client.get_company(company_ids[0]) if company_ids else None
-                            contact = client.get_contact(contact_ids[0]) if contact_ids else None
+                            company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
+                            contact = client.get_contact(contact_ids[0], extra_properties=contact_extra_properties) if contact_ids else None
                             payload = build_account_payload(
                                 deal,
                                 company=company,
                                 contact=contact,
                                 owner_email=owner_email,
+                            )
+                            payload = _apply_account_field_overrides(
+                                payload,
+                                contact=contact,
+                                company=company,
+                                deal=deal,
+                                property_maps=property_maps,
                             )
                             result = _insert_or_update_account(cursor, payload)
                             synced.append({
