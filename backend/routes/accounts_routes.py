@@ -29,8 +29,13 @@ from utils.storage_utils import (
 bp = Blueprint('accounts', __name__)
 
 
-def _ensure_opportunity_nda_sent_date_column(cursor):
+def _ensure_opportunity_stage_date_columns(cursor):
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
+
+
+def _is_deep_dive_stage(stage):
+    return str(stage or "").strip().lower() == "deep dive"
 
 
 def _is_nda_sent_stage(stage):
@@ -761,10 +766,14 @@ def create_opportunity():
         new_opportunity_id = cursor.fetchone()["next_opportunity_id"]
 
         cursor.execute("""
+            ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE
+        """)
+
+        cursor.execute("""
             INSERT INTO opportunity (
                 opportunity_id, account_id, opp_model, opp_position_name, opp_sales_lead,
-                opp_type, opp_stage, replacement_of, replacement_end_date
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                opp_type, opp_stage, deep_dive_date, replacement_of, replacement_end_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_DATE, %s, %s)
         """, (
             new_opportunity_id, account_id, opp_model, position_name, sales_lead,
             opp_type, 'Deep Dive', replacement_of, replacement_end_date
@@ -964,19 +973,28 @@ def update_opportunity_stage(opportunity_id):
                 account_id = row.get("account_id")
                 stage_changed = (previous_stage or "").strip() != (new_stage or "").strip()
 
-                _ensure_opportunity_nda_sent_date_column(cursor)
+                _ensure_opportunity_stage_date_columns(cursor)
 
                 cursor.execute(
                     """
                     UPDATE opportunity
                     SET opp_stage = %s,
+                        deep_dive_date = CASE
+                            WHEN %s THEN COALESCE(deep_dive_date, CURRENT_DATE)
+                            ELSE deep_dive_date
+                        END,
                         nda_sent_date = CASE
                             WHEN %s THEN COALESCE(nda_sent_date, CURRENT_DATE)
                             ELSE nda_sent_date
                         END
                     WHERE opportunity_id = %s
                     """,
-                    (new_stage, stage_changed and _is_nda_sent_stage(new_stage), opportunity_id),
+                    (
+                        new_stage,
+                        stage_changed and _is_deep_dive_stage(new_stage),
+                        stage_changed and _is_nda_sent_stage(new_stage),
+                        opportunity_id,
+                    ),
                 )
 
                 if stage_changed:

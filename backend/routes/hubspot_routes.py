@@ -20,6 +20,16 @@ from utils.hubspot import (
 bp = Blueprint("hubspot", __name__)
 
 HUBSPOT_NDA_SENT_DATE_PROPERTY = "hs_v2_date_entered_1226596718"
+HUBSPOT_DEEP_DIVE_DATE_PROPERTY = "hs_v2_date_entered_1226596717"
+DEEP_DIVE_OR_LATER_STAGES = (
+    "Deep Dive",
+    "NDA Sent",
+    "Sourcing",
+    "Interviewing",
+    "Negotiating",
+    "Close Win",
+    "Closed Lost",
+)
 NDA_SENT_OR_LATER_STAGES = (
     "NDA Sent",
     "Sourcing",
@@ -119,7 +129,8 @@ def _ensure_hubspot_account_columns(cursor):
     )
 
 
-def _ensure_opportunity_nda_sent_date_column(cursor):
+def _ensure_opportunity_stage_date_columns(cursor):
+    cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS deep_dive_date DATE")
     cursor.execute("ALTER TABLE opportunity ADD COLUMN IF NOT EXISTS nda_sent_date DATE")
 
 
@@ -1515,7 +1526,7 @@ def backfill_opportunity_nda_sent_dates():
         try:
             with conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                    _ensure_opportunity_nda_sent_date_column(cursor)
+                    _ensure_opportunity_stage_date_columns(cursor)
                     _ensure_hubspot_account_columns(cursor)
 
                     query = """
@@ -1622,4 +1633,148 @@ def backfill_opportunity_nda_sent_dates():
         return jsonify({"success": False, "error": str(exc)}), 502
     except Exception as exc:
         logging.exception("HubSpot opportunity NDA sent date backfill failed")
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@bp.route("/hubspot/backfill/opportunity-deep-dive-dates", methods=["POST", "OPTIONS"])
+def backfill_opportunity_deep_dive_dates():
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    unauthorized = _require_sync_secret()
+    if unauthorized:
+        return unauthorized
+
+    body = request.get_json(silent=True) or {}
+    property_name = (
+        body.get("property_name")
+        or os.environ.get("HUBSPOT_DEEP_DIVE_DATE_PROPERTY")
+        or HUBSPOT_DEEP_DIVE_DATE_PROPERTY
+    ).strip()
+    limit = body.get("limit")
+    dry_run = bool(body.get("dry_run", False))
+    allow_ambiguous = bool(body.get("allow_ambiguous", False))
+
+    try:
+        limit = int(limit) if limit not in (None, "") else None
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "limit must be an integer"}), 400
+
+    try:
+        client = HubSpotClient()
+        conn = get_connection()
+        updated = []
+        skipped = []
+        errors = []
+
+        try:
+            with conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    _ensure_opportunity_stage_date_columns(cursor)
+                    _ensure_hubspot_account_columns(cursor)
+
+                    query = """
+                        WITH candidates AS (
+                            SELECT
+                                o.opportunity_id,
+                                o.opp_stage,
+                                a.account_id,
+                                a.client_name,
+                                a.hubspot_deal_id,
+                                COUNT(*) OVER (PARTITION BY a.hubspot_deal_id) AS deal_candidate_count
+                            FROM opportunity o
+                            JOIN account a ON a.account_id = o.account_id
+                            WHERE o.deep_dive_date IS NULL
+                              AND NULLIF(a.hubspot_deal_id, '') IS NOT NULL
+                              AND TRIM(COALESCE(o.opp_stage, '')) = ANY(%s)
+                        )
+                        SELECT *
+                        FROM candidates
+                        ORDER BY hubspot_deal_id, opportunity_id
+                    """
+                    params = [list(DEEP_DIVE_OR_LATER_STAGES)]
+                    if limit:
+                        query += " LIMIT %s"
+                        params.append(limit)
+
+                    cursor.execute(query, params)
+                    rows = cursor.fetchall()
+                    date_by_deal = {}
+
+                    for row in rows:
+                        deal_id = str(row.get("hubspot_deal_id") or "").strip()
+                        if not deal_id:
+                            continue
+                        if not allow_ambiguous and int(row.get("deal_candidate_count") or 0) > 1:
+                            skipped.append({
+                                "opportunity_id": row.get("opportunity_id"),
+                                "account_id": row.get("account_id"),
+                                "client_name": row.get("client_name"),
+                                "deal_id": deal_id,
+                                "reason": "ambiguous_hubspot_deal_maps_to_multiple_opportunities",
+                                "deal_candidate_count": row.get("deal_candidate_count"),
+                            })
+                            continue
+                        try:
+                            if deal_id not in date_by_deal:
+                                deal = client.get_deal_with_associations(
+                                    deal_id,
+                                    extra_properties=[property_name],
+                                )
+                                props = deal.get("properties") or {}
+                                date_by_deal[deal_id] = _parse_hubspot_date(props.get(property_name))
+
+                            deep_dive_date = date_by_deal[deal_id]
+                            if not deep_dive_date:
+                                skipped.append({
+                                    "opportunity_id": row.get("opportunity_id"),
+                                    "deal_id": deal_id,
+                                    "reason": "missing_hubspot_date",
+                                })
+                                continue
+
+                            if not dry_run:
+                                cursor.execute(
+                                    """
+                                    UPDATE opportunity
+                                    SET deep_dive_date = %s
+                                    WHERE opportunity_id = %s
+                                      AND deep_dive_date IS NULL
+                                    """,
+                                    (deep_dive_date, row.get("opportunity_id")),
+                                )
+
+                            updated.append({
+                                "opportunity_id": row.get("opportunity_id"),
+                                "deal_id": deal_id,
+                                "deep_dive_date": deep_dive_date.isoformat(),
+                            })
+                        except Exception as exc:  # noqa: BLE001
+                            logging.exception(
+                                "HubSpot Deep Dive date backfill failed for deal %s",
+                                deal_id,
+                            )
+                            errors.append({
+                                "opportunity_id": row.get("opportunity_id"),
+                                "deal_id": deal_id,
+                                "error": str(exc),
+                            })
+        finally:
+            conn.close()
+
+        return jsonify({
+            "success": True,
+            "dry_run": dry_run,
+            "allow_ambiguous": allow_ambiguous,
+            "property_name": property_name,
+            "checked": len(updated) + len(skipped) + len(errors),
+            "updated": len(updated),
+            "skipped": skipped,
+            "errors": errors,
+            "items": updated,
+        })
+    except HubSpotError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+    except Exception as exc:
+        logging.exception("HubSpot opportunity Deep Dive date backfill failed")
         return jsonify({"success": False, "error": str(exc)}), 500
