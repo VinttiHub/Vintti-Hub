@@ -3765,10 +3765,223 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 .setupfee-sub__delta .green { color: var(--pos); }
 .setupfee-sub__delta .rose  { color: var(--neg); }
 
+/* Win rate por canal — total gauge (semicírculo) + 3 barras Sales/Mkt/Ref.
+   Layout vertical (gauge arriba, barras abajo) para cards angostas en fila. */
+.wrchan {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: stretch;
+}
+.wrchan-total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.wrchan-gauge {
+  --pct: 0%;
+  position: relative;
+  width: 168px;
+  height: 84px;
+  overflow: hidden;
+}
+.wrchan-gauge::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  background: conic-gradient(from 270deg,
+    var(--wr, var(--c-violet)) 0 calc(var(--pct) / 2),
+    var(--rule)     calc(var(--pct) / 2) 50%,
+    transparent     50% 100%);
+}
+.wrchan-gauge::after {
+  content: "";
+  position: absolute;
+  left: 24px;
+  top: 24px;
+  width: 120px;
+  height: 120px;
+  background: #fff;
+  border-radius: 50%;
+}
+.wrchan-total__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.wrchan-total__pct {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.wr-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 9px;
+  background: rgba(120, 120, 120, 0.12);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.wr-badge.green { background: rgba(108, 211, 145, 0.18); color: #1f9d57; }
+.wr-badge.rose  { background: rgba(245, 144, 173, 0.20); color: var(--neg); }
+.wrchan-total__cap {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.wrchan-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+.wrchan-bar {
+  display: grid;
+  grid-template-columns: 10px 56px 1fr 58px;
+  align-items: center;
+  gap: 12px;
+}
+.wrchan-bar__dot { width: 9px; height: 9px; border-radius: 50%; }
+.wrchan-bar__dot--sales { background: var(--wr, var(--c-violet)); }
+.wrchan-bar__dot--mkt   { background: color-mix(in srgb, var(--wr, var(--c-violet)) 62%, #fff); }
+.wrchan-bar__dot--ref   { background: color-mix(in srgb, var(--wr, var(--c-violet)) 38%, #fff); }
+.wrchan-bar__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.wrchan-bar__track {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--rule);
+  overflow: hidden;
+}
+.wrchan-bar__fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+}
+.wrchan-bar__fill--sales { background: var(--wr, var(--c-violet)); }
+.wrchan-bar__fill--mkt   { background: color-mix(in srgb, var(--wr, var(--c-violet)) 62%, #fff); }
+.wrchan-bar__fill--ref   { background: color-mix(in srgb, var(--wr, var(--c-violet)) 38%, #fff); }
+
+/* Color por card del funnel (gauge + barras monocromáticas) */
+.wr-violet  { --wr: #6c38ff; }
+.wr-lime    { --wr: #c1ff72; }
+.wr-cyan    { --wr: #4ba9ff; }
+.wr-magenta { --wr: #ff1fdb; }
+.wrchan-bar__val {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.wrchan-bar__pct {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.wrchan-bar__xy {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Days to Close Win — banda horizontal (modo claro) */
+.dcard {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 22px;
+  padding: 22px 28px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.dcard--clickable { cursor: pointer; transition: box-shadow 160ms ease, transform 160ms ease; }
+.dcard--clickable:hover,
+.dcard--clickable:focus-visible {
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.10);
+  transform: translateY(-1px);
+  outline: none;
+}
+.dcard__num {
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.dcard__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dcard__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: var(--tracking-tight);
+}
+.dcard__sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.dcard__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+.dcard__pill {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 13px;
+  border-radius: 9px;
+  border: none;
+  background: rgba(120, 120, 120, 0.10);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+button.dcard__pill {
+  cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+button.dcard__pill:hover { filter: brightness(0.96); transform: translateY(-1px); }
+.dcard__pill--fast  { background: rgba(245, 176, 74, 0.20);  color: #b3741a; }
+.dcard__pill--sales { background: rgba(108, 56, 255, 0.14);  color: #5a2fd0; }
+.dcard__pill--mkt   { background: rgba(51, 178, 119, 0.16);  color: #1f8f57; }
+.dcard__pill--ref   { background: rgba(245, 147, 74, 0.18);  color: #c56a1f; }
+
 @media (max-width: 720px) {
+  .dcard { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .dcard__num { font-size: 52px; }
   .setupfee-top  { grid-template-columns: 1fr; }
   .setupfee-donut { justify-self: start; }
   .setupfee-total__value { font-size: 40px; }
   .setupfee-sub { grid-template-columns: 1fr; }
   .setupfee-sub__value { font-size: 32px; }
+  .wrchan { gap: 24px; }
 }

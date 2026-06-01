@@ -2116,6 +2116,10 @@
     document.querySelectorAll('[data-kpi-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
+        // Stop bubbling so a clickable element nested inside another
+        // [data-kpi-detail-open] (e.g. channel pills inside a clickable card)
+        // doesn't also trigger the ancestor's drawer.
+        e.stopPropagation();
         const panelKey = btn.getAttribute('data-kpi-detail-open');
         openDrawer(panelKey);
         // If the tile declares which window the drawer should start on

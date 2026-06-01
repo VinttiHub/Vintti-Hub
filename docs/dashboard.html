@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=33">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=40">
 </head>
 <body>
 
@@ -1997,6 +1997,13 @@
        ============================================================ -->
   <section class="channel" data-channel="sales">
     <div class="grid">
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar">R</div>
+          <h2 class="skpi-header__title">Revenue</h2>
+        </div>
+      </header>
+
       <!-- ===== Pitcher card · AE (window toggle 30d/semana) =====
            A curved SVG carafe silhouette fills with two pastel liquids — lime
            for Staffing, lavender for Recruiting — using clip-path on the
@@ -2510,6 +2517,290 @@
             <span class="setupfee-sub__value"
                   data-chart="ae_kpi_avg_setup_fee_30d" data-bind="text"
                   data-field="avg_without_pc" data-reduce="first" data-fmt="currency">—</span>
+          </div>
+        </div>
+      </div>
+
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar skpi-header__avatar--rec">C</div>
+          <h2 class="skpi-header__title">Conversion Rate</h2>
+        </div>
+      </header>
+
+      <!-- ============================================================
+           SQL → Deep Dive por canal (AE · last 30 days)
+           "SQL generada" = account creada (creation_date) · canal por where_come_from.
+           Avanzó = la account tiene una opp con deep_dive_date. Total gauge + 3 barras.
+           ============================================================ -->
+      <div class="card s-4 wrchan-card wr-violet setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">SQL → Deep Dive</h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-sql-deepdive"
+                  aria-label="Ver detalle SQL a Deep Dive">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <!-- Total · gauge + detalle -->
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                    data-field="total_dd" data-reduce="first" data-fmt="int">—</span> /
+              <span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                    data-field="total_sqls" data-reduce="first" data-fmt="int">—</span>
+            </span>
+          </div>
+
+          <!-- Desglose por origen -->
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="progress-fill"
+                      data-field="sales_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                      data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text" data-field="sales_dd" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text" data-field="sales_sqls" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="progress-fill"
+                      data-field="mkt_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text" data-field="mkt_dd" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text" data-field="mkt_sqls" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="progress-fill"
+                      data-field="ref_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                      data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text" data-field="ref_dd" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text" data-field="ref_sqls" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Deep Dive → NDA Signed por canal (AE · last 30 days)
+           % de deep dives (opp con deep_dive_date) que firman NDA
+           (nda_signature_or_start_date). M+B vía account_manager.
+           ============================================================ -->
+      <div class="card s-4 wrchan-card wr-lime setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Deep Dive → NDA Signed</h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-deepdive-nda"
+                  aria-label="Ver detalle Deep Dive a NDA">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                    data-field="total_nda" data-reduce="first" data-fmt="int">—</span> /
+              <span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                    data-field="total_dd" data-reduce="first" data-fmt="int">—</span>
+            </span>
+          </div>
+
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="progress-fill"
+                      data-field="sales_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                      data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="sales_nda" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="sales_dd" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="progress-fill"
+                      data-field="mkt_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="mkt_nda" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="mkt_dd" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="progress-fill"
+                      data-field="ref_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                      data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="ref_nda" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text" data-field="ref_dd" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Win rate por canal · Sales / Referrals / Marketing (AE · last 30 days)
+           Total gauge + delta vs 30d previos · 3 barras por origen.
+           Agrupa account.where_come_from: Sales=Outbound · Referrals=Referral ·
+           Marketing=resto. Win rate = Close Win / (Win + Lost). M+B only.
+           ============================================================ -->
+      <div class="card s-4 wrchan-card wr-magenta setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">SQL → Client Win</h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-lead-channel-winrate"
+                  aria-label="Ver detalle Win rate por canal">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <!-- Total · gauge + detalle -->
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="progress-fill"
+                 data-field="total_win_rate" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                    data-field="total_win_rate" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                    data-field="total_win" data-reduce="first" data-fmt="int">—</span> /
+              <span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                    data-field="total_total" data-reduce="first" data-fmt="int">—</span>
+            </span>
+          </div>
+
+          <!-- Desglose por origen -->
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="progress-fill"
+                      data-field="sales_win_rate" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                      data-field="sales_win_rate" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="sales_total" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="progress-fill"
+                      data-field="mkt_win_rate" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                      data-field="mkt_win_rate" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="mkt_total" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="progress-fill"
+                      data-field="ref_win_rate" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                      data-field="ref_win_rate" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="ref_total" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Days to Close Win · NDA Signed → Close Win (AE · 30d) · banda clara.
+           La card entera abre el detalle TOTAL; cada pill de canal abre su canal. -->
+      <div class="dcard dcard--clickable s-12" data-kpi-detail-open="days-close-all"
+           role="button" tabindex="0" aria-label="Ver detalle Days to Close Win (total)">
+        <span class="dcard__num"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+        <div class="dcard__body">
+          <h3 class="dcard__title">Days to Close Win · NDA Signed → Closed Win</h3>
+          <p class="dcard__sub">Velocidad promedio del sales desde NDA hasta cierre · solo AE · 30d</p>
+          <div class="dcard__pills">
+            <span class="dcard__pill dcard__pill--fast">
+              <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="fastest_channel" data-reduce="first" data-fmt="raw">—</span>:
+              <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="fastest_dias" data-reduce="first" data-fmt="int">—</span>d ↑ más rápido
+            </span>
+            <button type="button" class="dcard__pill dcard__pill--sales" data-kpi-detail-open="days-close-sales" aria-label="Ver detalle Sales">Sales: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="sales_dias" data-reduce="first" data-fmt="int">—</span>d ›</button>
+            <button type="button" class="dcard__pill dcard__pill--mkt" data-kpi-detail-open="days-close-mkt" aria-label="Ver detalle Marketing">Marketing: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="mkt_dias" data-reduce="first" data-fmt="int">—</span>d ›</button>
+            <button type="button" class="dcard__pill dcard__pill--ref" data-kpi-detail-open="days-close-ref" aria-label="Ver detalle Referrals">Referrals: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="ref_dias" data-reduce="first" data-fmt="int">—</span>d ›</button>
           </div>
         </div>
       </div>
@@ -5627,6 +5918,193 @@
           </div>
         </div>
 
+        <!-- Panel · Sales · Days to Close Win · TOTAL (todos los canales) · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="days-close-all">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">Days to Close Win · Total</h3>
+            <p class="kpi-drawer__sub">Todos los deals Close Win (AE) de los últimos 30d, días desde NDA firmado hasta cierre, con su canal.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Promedio · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="deal_count" data-reduce="first" data-fmt="int">—</span> deals Close Win · más rápido: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="fastest_channel" data-reduce="first" data-fmt="raw">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deals · todos los canales</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_days_to_close_win_30d_detail" data-bind="dtable"
+                   data-cols="channel|Canal|raw,close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,avg_days|Días NDA→cierre|int"
+                   data-empty-text="Sin Close Win (AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panels · Sales · Days to Close Win por canal · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="days-close-sales">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE · Sales (Outbound)</span>
+            <h3 class="kpi-drawer__title">Days to Close Win · Sales</h3>
+            <p class="kpi-drawer__sub">Deals Close Win de origen Outbound, días desde NDA firmado hasta cierre · 30d.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Sales · días avg</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="sales_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="sales_count" data-reduce="first" data-fmt="int">—</span> deals Close Win</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deals · Sales</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_days_to_close_win_30d_detail" data-override-channel="sales" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,avg_days|Días NDA→cierre|int"
+                   data-empty-text="Sin Close Win de Sales en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="days-close-mkt">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE · Marketing</span>
+            <h3 class="kpi-drawer__title">Days to Close Win · Marketing</h3>
+            <p class="kpi-drawer__sub">Deals Close Win de origen Marketing (resto), días desde NDA firmado hasta cierre · 30d.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Marketing · días avg</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="mkt_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="mkt_count" data-reduce="first" data-fmt="int">—</span> deals Close Win</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deals · Marketing</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_days_to_close_win_30d_detail" data-override-channel="marketing" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,avg_days|Días NDA→cierre|int"
+                   data-empty-text="Sin Close Win de Marketing en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="days-close-ref">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE · Referrals</span>
+            <h3 class="kpi-drawer__title">Days to Close Win · Referrals</h3>
+            <p class="kpi-drawer__sub">Deals Close Win de origen Referral, días desde NDA firmado hasta cierre · 30d.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Referrals · días avg</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="ref_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="ref_count" data-reduce="first" data-fmt="int">—</span> deals Close Win</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deals · Referrals</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_days_to_close_win_30d_detail" data-override-channel="referrals" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,avg_days|Días NDA→cierre|int"
+                   data-empty-text="Sin Close Win de Referrals en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Deep Dive → NDA · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-deepdive-nda">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">Deep Dive → NDA Signed · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Cada deep dive (opp con deep_dive_date) por origen, y si firmó NDA (nda_signature_or_start_date). Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Deep Dive → NDA · 30d</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                      data-field="total_nda" data-reduce="first" data-fmt="int">—</span> firmaron NDA de
+                <span data-chart="sa_kpi_deepdive_to_nda_30d" data-bind="text"
+                      data-field="total_dd" data-reduce="first" data-fmt="int">—</span> deep dives
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de deep dives por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_deepdive_to_nda_30d_detail" data-bind="dtable"
+                   data-cols="deep_dive_date|Deep Dive|raw,channel|Canal|raw,client_name|Cuenta|raw,opp_position_name|Posición|raw,lead_source|Origen|raw,status|Estado|raw"
+                   data-empty-text="Sin deep dives (M+B) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · SQL → Deep Dive · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-deepdive">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">SQL → Deep Dive · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Cada SQL (account creada) clasificada por origen, y si avanzó a Deep Dive (opp con deep_dive_date). Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">SQL → Deep Dive · 30d</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                      data-field="total_dd" data-reduce="first" data-fmt="int">—</span> avanzaron de
+                <span data-chart="sa_kpi_sql_to_deepdive_30d" data-bind="text"
+                      data-field="total_sqls" data-reduce="first" data-fmt="int">—</span> SQLs
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de SQLs por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_sql_to_deepdive_30d_detail" data-bind="dtable"
+                   data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cuenta|raw,lead_source|Origen|raw,status|Estado|raw"
+                   data-empty-text="Sin SQLs (accounts creadas) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · Win rate por canal · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-lead-channel-winrate">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">SQL → Client Win · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Cada cerrada (Close Win / Closed Lost) clasificada por origen: Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Win rate total · 30d</span>
+              <span class="kpi-drawer__hero__value"
+                    data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                    data-field="total_win_rate" data-reduce="first" data-fmt="percent">—</span>
+              <span class="kpi-drawer__hero__delta">
+                <span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                      data-field="total_win" data-reduce="first" data-fmt="int">—</span> ganadas de
+                <span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
+                      data-field="total_total" data-reduce="first" data-fmt="int">—</span> cerradas
+              </span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de cerradas por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_lead_channel_winrate_30d_detail" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,channel|Canal|raw,client_name|Cliente|raw,lead_source|Origen|raw,result|Resultado|raw"
+                   data-empty-text="Sin cerradas (M+B) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
         <!-- Panel · Sales · Avg Staffing Fee · 30d (AE) -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-avg-staffing-fee">
           <header class="kpi-drawer__head">
@@ -5760,7 +6238,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=53" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=54" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>
