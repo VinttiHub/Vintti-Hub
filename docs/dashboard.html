@@ -288,6 +288,32 @@
 
         <div class="skpi-group s-6">
           <div class="skpi-group__head">
+            <span class="skpi-group__title">New contractors</span>
+            <span class="skpi-group__tag">By window</span>
+          </div>
+          <div class="skpi-group__grid">
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">Last week</span>
+              <span class="skpi-sub__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="week" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">Last 30d</span>
+              <span class="skpi-sub__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="30d" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">Last month</span>
+              <span class="skpi-sub__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="month" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+            </div>
+            <div class="skpi-sub">
+              <span class="skpi-sub__label">MTD</span>
+              <span class="skpi-sub__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="mtd" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+            </div>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-contractors" aria-label="Ver detalle New contractors">Ver detalle</button>
+        </div>
+
+        <div class="skpi-group s-6">
+          <div class="skpi-group__head">
             <span class="skpi-group__title">Churn clients</span>
             <span class="skpi-group__tag">By window</span>
           </div>
@@ -316,37 +342,8 @@
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-clients" aria-label="Ver detalle Churn clients">Ver detalle</button>
         </div>
 
-        <!-- Row 3 · Active clients / Active contractors / Buyouts -->
-        <div class="skpi-tile skpi-tile--big s-3">
-          <div class="skpi-tile__head">
-            <span class="skpi-tile__title">Active clients</span>
-          </div>
-          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-clients" aria-label="Ver detalle Active clients">Ver detalle</button>
-        </div>
-
-        <div class="skpi-tile skpi-tile--big s-5">
-          <div class="skpi-tile__head">
-            <span class="skpi-tile__title">Active contractors</span>
-          </div>
-          <div class="skpi-tile__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-contractors" aria-label="Ver detalle Active contractors">Ver detalle</button>
-        </div>
-
-        <div class="skpi-tile skpi-tile--big s-4">
-          <div class="skpi-tile__head">
-            <span class="skpi-tile__title">Buyouts</span>
-            <span class="skpi-tile__tag">Last 30d</span>
-          </div>
-          <div class="skpi-tile__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</div>
-          <div class="skpi-tile__delta skpi-tile__delta--muted">
-            ≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate
-          </div>
-          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="buyouts" aria-label="Ver detalle Buyouts">Ver detalle</button>
-        </div>
-
-        <!-- Row 4 · Churn contractors (by window) / Churn M3 -->
-        <div class="skpi-group s-7">
+        <!-- Row 3 · Churn contractors (by window) -->
+        <div class="skpi-group s-6">
           <div class="skpi-group__head">
             <span class="skpi-group__title">Churn contractors</span>
             <span class="skpi-group__tag">By window</span>
@@ -376,7 +373,37 @@
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="churn-contractors" aria-label="Ver detalle Churn contractors">Ver detalle</button>
         </div>
 
-        <div class="skpi-group s-5">
+        <!-- Row 4 · Active clients / Active contractors / Buyouts -->
+        <div class="skpi-tile skpi-tile--big s-3">
+          <div class="skpi-tile__head">
+            <span class="skpi-tile__title">Active clients</span>
+          </div>
+          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-clients" aria-label="Ver detalle Active clients">Ver detalle</button>
+        </div>
+
+        <div class="skpi-tile skpi-tile--big s-5">
+          <div class="skpi-tile__head">
+            <span class="skpi-tile__title">Active contractors</span>
+          </div>
+          <div class="skpi-tile__value" data-chart="gr_kpi_active_30d" data-bind="text" data-field="active_count" data-reduce="first" data-fmt="int">—</div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-contractors" aria-label="Ver detalle Active contractors">Ver detalle</button>
+        </div>
+
+        <div class="skpi-tile skpi-tile--big s-4">
+          <div class="skpi-tile__head">
+            <span class="skpi-tile__title">Buyouts</span>
+            <span class="skpi-tile__tag">Last 30d</span>
+          </div>
+          <div class="skpi-tile__value" data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="bajas_buyout" data-reduce="first" data-fmt="int">—</div>
+          <div class="skpi-tile__delta skpi-tile__delta--muted">
+            ≈ <span data-chart="am_kpi_candidate_churn_30d" data-override-window="30d" data-bind="text" data-field="buyout_pct" data-reduce="first" data-fmt="percent">—</span> buyout rate
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="buyouts" aria-label="Ver detalle Buyouts">Ver detalle</button>
+        </div>
+
+        <!-- Row 5 · Churn M3 -->
+        <div class="skpi-group s-12">
           <div class="skpi-group__head">
             <span class="skpi-group__title">Churn M3</span>
             <span class="skpi-group__tag">Last 30d</span>
@@ -4138,6 +4165,70 @@
                    data-list-name="client_name" data-list-sub="candidate_name" data-list-date="start_date" data-limit="60"
                    data-month-aware
                    data-drawer-window-target="new-clients"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · New contractors -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="new-contractors">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · Multi-window</span>
+            <h3 class="kpi-drawer__title">New contractors</h3>
+            <p class="kpi-drawer__sub">Contractors que arrancaron su primer contrato en cada ventana, con la tendencia mensual y el detalle.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero kpi-drawer__hero--lime">
+              <span class="kpi-drawer__hero__label">Nuevos contractors · Last 30d</span>
+              <span class="kpi-drawer__hero__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="30d" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta">contractors que arrancaron en los últimos 30 días</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Por ventana</h4>
+              <div class="kpi-drawer__stats" data-drawer-window-group="new-contractors">
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="week">
+                  <span class="kpi-drawer__stat__label">Last week</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="week" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="month">
+                  <span class="kpi-drawer__stat__label">Last month</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="month" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="mtd">
+                  <span class="kpi-drawer__stat__label">MTD</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="mtd" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+                <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="30d">
+                  <span class="kpi-drawer__stat__label">Last 30d</span>
+                  <span class="kpi-drawer__stat__value" data-chart="sa_kpi_new_contractors_30d" data-override-window="30d" data-bind="text" data-field="new_contractors_30d" data-reduce="first" data-fmt="int">—</span>
+                </button>
+              </div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Tendencia 12 meses</h4>
+              <div class="kpi-drawer__mini-chart">
+                <svg data-chart="sa_area_new_contractors_per_month" data-bind="line"
+                     data-x="mes" data-y="new_contractors" data-color="lime"
+                     data-labels="Nuevos contractors" data-fmt-y="int"
+                     data-axis="x" viewBox="0 0 480 138" preserveAspectRatio="none">
+                  <g class="chart-grid">
+                    <line x1="0" y1="32" x2="480" y2="32"/>
+                    <line x1="0" y1="65" x2="480" y2="65"/>
+                    <line x1="0" y1="98" x2="480" y2="98"/>
+                  </g>
+                </svg>
+              </div>
+            </section>
+            <section class="kpi-drawer__section" data-drawer-detail-section="new-contractors">
+              <h4 class="kpi-drawer__section-title">Detalle <span class="count" data-chart="sa_table_new_contractors_30d_detail" data-bind="text" data-reduce="count" data-fmt="int" data-month-aware>—</span>
+                <button type="button" class="kpi-drawer__month-chip is-clickable" data-kpi-drawer-month-chip data-drawer-window-target="new-contractors" aria-label="Volver a vista por mes">—</button>
+                <span class="kpi-drawer__window-chip" data-drawer-window-chip="new-contractors" hidden></span>
+              </h4>
+              <div class="kpi-drawer__list dlist"
+                   data-chart="sa_table_new_contractors_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="start_date" data-limit="60"
+                   data-month-aware
+                   data-drawer-window-target="new-contractors"></div>
             </section>
           </div>
         </div>

@@ -128,6 +128,10 @@ RESET_CHART_KEYS = {
         "sa_table_new_clients_month_detail",
         "sa_kpi_new_clients_30d",
         "sa_table_new_clients_30d_detail",
+        "sa_area_new_contractors_per_month",
+        "sa_table_new_contractors_month_detail",
+        "sa_kpi_new_contractors_30d",
+        "sa_table_new_contractors_30d_detail",
         "op_bar_new_placements",
         "op_table_new_placements_detail",
         "op_line_placement_time",
@@ -1556,6 +1560,61 @@ MAIN_CHARTS = [
         },
         "position": {"x": 6, "y": 25, "w": 6, "h": 5},
         "sort_order": 120,
+    },
+    {
+        "chart_key": "sa_area_new_contractors_per_month",
+        "tab_key": "sales",
+        "title": "New Contractors Per Month",
+        "type": "area",
+        "dataset_key": "new_contractors_history",
+        "config": {
+            "mapping": {
+                "x": "mes",
+                "y": ["new_contractors"],
+                "formatter": "number",
+                "drillKey": "fecha_new_contractors",
+            },
+        },
+        "position": {"x": 0, "y": 30, "w": 6, "h": 5},
+        "sort_order": 130,
+    },
+    {
+        "chart_key": "sa_table_new_contractors_month_detail",
+        "tab_key": "sales",
+        "title": "Details New Contractors Per Month",
+        "type": "table",
+        "dataset_key": "new_contractors_month_detail",
+        "config": {
+            "mapping": {
+                "columns": ["start_date", "candidate_name", "client_name"],
+            },
+        },
+        "position": {"x": 6, "y": 30, "w": 6, "h": 5},
+        "sort_order": 140,
+    },
+    {
+        "chart_key": "sa_kpi_new_contractors_30d",
+        "tab_key": "sales",
+        "title": "Nuevos Contractors en ventana de 30 días",
+        "type": "kpi",
+        "dataset_key": "new_contractors_30d_total",
+        "config": {"mapping": {"value": "new_contractors_30d", "formatter": "number"}},
+        "position": {"x": 0, "y": 35, "w": 6, "h": 5},
+        "sort_order": 150,
+    },
+    {
+        "chart_key": "sa_table_new_contractors_30d_detail",
+        "tab_key": "sales",
+        "title": "Detalle Contractors - 30",
+        "type": "table",
+        "dataset_key": "new_contractors_30d_detail",
+        "config": {
+            "mapping": {
+                "columns": ["start_date", "candidate_name", "client_name"],
+            },
+        },
+        "position": {"x": 6, "y": 35, "w": 6, "h": 5},
+        "sort_order": 160,
     },
 
     # Operations
