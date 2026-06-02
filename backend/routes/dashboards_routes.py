@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
 import traceback
+from threading import Lock
 
 from flask import Blueprint, jsonify, request
 from psycopg2.extras import Json
@@ -13,6 +16,59 @@ from dashboards.datasets import get as get_dataset, list_all as list_datasets
 from dashboards.executor import run_dataset, sample_dataset, DatasetError
 
 bp = Blueprint("dashboards", __name__, url_prefix="/dashboards")
+
+
+# ---------------------------------------------------------------------------
+# Chart-data cache (TTL, in-memory per process).
+#
+# The chart-data endpoint runs a SQL query on every request; a single dashboard
+# load fires ~150-250 of them. Dashboard data changes slowly (by the day), so we
+# cache the full JSON response keyed by (slug, chart_key, query-args) for a short
+# TTL. A cache hit returns WITHOUT opening a DB connection or running SQL — which
+# cuts App Runner active-vCPU, RDS CPU credits and latency.
+#
+# Tune/disable with env vars:
+#   DASHBOARD_CACHE_TTL   seconds (default 300). Set 0 to disable.
+# Bypass a single request with ?nocache=1.
+# ---------------------------------------------------------------------------
+_CHART_CACHE: dict = {}
+_CHART_CACHE_LOCK = Lock()
+
+
+def _cache_ttl() -> int:
+    try:
+        return int(os.environ.get("DASHBOARD_CACHE_TTL", "300"))
+    except (TypeError, ValueError):
+        return 300
+
+
+def _cache_key(slug: str, chart_key: str, args: dict) -> tuple:
+    items = tuple(sorted((str(k), str(v)) for k, v in args.items()))
+    return (slug, chart_key, items)
+
+
+def _cache_get(key: tuple):
+    ttl = _cache_ttl()
+    if ttl <= 0:
+        return None
+    now = time.time()
+    with _CHART_CACHE_LOCK:
+        entry = _CHART_CACHE.get(key)
+        if entry and (now - entry[0]) < ttl:
+            return entry[1]
+        if entry:
+            _CHART_CACHE.pop(key, None)
+    return None
+
+
+def _cache_set(key: tuple, value) -> None:
+    if _cache_ttl() <= 0:
+        return
+    with _CHART_CACHE_LOCK:
+        # Cheap bound: clear if it grows unreasonably (filters explosion).
+        if len(_CHART_CACHE) > 5000:
+            _CHART_CACHE.clear()
+        _CHART_CACHE[key] = (time.time(), value)
 
 
 ALLOWED_CHART_TYPES = {
@@ -95,6 +151,17 @@ def get_dashboard(slug: str):
 
 @bp.route("/<slug>/charts/<chart_key>/data", methods=["GET"])
 def get_chart_data(slug: str, chart_key: str):
+    # Build a stable cache key from the query args (config-level filters are
+    # static per chart_key, so request args fully determine the variant).
+    args = request.args.to_dict(flat=True)
+    args.pop("user_email", None)
+    nocache = str(args.pop("nocache", "")).strip() in ("1", "true", "yes")
+    ckey = _cache_key(slug, chart_key, args)
+    if not nocache:
+        cached = _cache_get(ckey)
+        if cached is not None:
+            return jsonify(cached)
+
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -120,7 +187,10 @@ def get_chart_data(slug: str, chart_key: str):
             filters.pop("user_email")
 
         rows = run_dataset(dataset_key, filters=filters)
-        return jsonify({"rows": rows, "meta": {"dataset": dataset_key, "count": len(rows)}})
+        result = {"rows": rows, "meta": {"dataset": dataset_key, "count": len(rows)}}
+        if not nocache:
+            _cache_set(ckey, result)
+        return jsonify(result)
     except DatasetError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:

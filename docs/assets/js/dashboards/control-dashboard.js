@@ -2102,6 +2102,10 @@
       // SVGs inside a panel that was display:none at hydrate-time often render
       // with zero geometry. Re-paint them with cached rows now that the panel is visible.
       requestAnimationFrame(() => {
+        // Lazy: el drawer es global (fuera de los channels), así que sus charts
+        // NO se cargan en el hydrate por pestaña. Los cargamos on-demand al abrir
+        // (los no cacheados); los month-aware se ajustan al mes seleccionado.
+        hydrate(activePanel);
         rerenderChartsInScope(activePanel);
         // Sync any [data-month-aware] elements in this panel to the currently-selected month
         refetchMonthAwareElements(activePanel);
@@ -2357,8 +2361,26 @@
   }
 
   /* ---------- hydrate ---------- */
-  let hydrateInflight = false;
+  let hydrateInflight = 0;
   const lastFetchedRows = new Map(); // compositeKey -> rows
+  const hydratedScopes = new Set();  // scopeKeys ya cargados desde el último cambio de filtro
+
+  // El channel (pestaña) visible: el radio name="tab" tildado → .channel[data-channel].
+  function activeChannelEl() {
+    const checked = document.querySelector('input[name="tab"]:checked');
+    const ch = checked ? checked.id.replace(/^tab-/, '') : null;
+    return (ch && document.querySelector(`.channel[data-channel="${ch}"]`)) || document.body;
+  }
+  function scopeKeyOf(scope) {
+    return (scope && scope.dataset && (scope.dataset.channel || scope.dataset.kpiDetailPanel)) || 'doc';
+  }
+  // Invalidación: un cambio que afecta datos (filtro/ventana/reset) limpia todo y
+  // recarga SOLO el channel activo; los demás se recargan al revisitarse.
+  function refetchActive() {
+    lastFetchedRows.clear();
+    hydratedScopes.clear();
+    hydrate(activeChannelEl(), { force: true });
+  }
   function readOverridesFor(el) {
     const out = {};
     for (const attr of el.attributes) {
@@ -2386,18 +2408,34 @@
       renderBinding(el, rows);
     });
   }
-  async function hydrate() {
-    if (hydrateInflight) return;
-    hydrateInflight = true;
+  // hydrate(scope, {force}) — carga SOLO los charts dentro de `scope` (por defecto
+  // el channel/pestaña activa). Idempotente: lo ya cacheado se re-renderiza desde
+  // cache (sin re-fetch) salvo force. Esto evita cargar las 4 pestañas + drawers de
+  // una; cada pestaña/drawer carga on-demand → muchísimas menos queries por load.
+  async function hydrate(scope, opts) {
+    opts = opts || {};
+    scope = scope || activeChannelEl();
+    const scopeKey = scopeKeyOf(scope);
+    if (!opts.force && hydratedScopes.has(scopeKey)) {
+      rerenderChartsInScope(scope); // ya cargado → solo re-pinta desde cache
+      return;
+    }
+    hydrateInflight++;
     document.body.classList.add('is-loading');
 
     try {
-      const cards = document.querySelectorAll('[data-chart]');
+      const cards = scope.querySelectorAll('[data-chart]');
       const groups = new Map(); // compositeKey -> { chartKey, overrides, els: [] }
       cards.forEach(el => {
         const chartKey = el.dataset.chart;
+        if (!chartKey) return;
         const overrides = readOverridesFor(el);
         const compKey = compKeyFor(chartKey, overrides);
+        // ya en cache y no forzamos → render desde cache, no re-fetch
+        if (!opts.force && lastFetchedRows.has(compKey)) {
+          renderBinding(el, lastFetchedRows.get(compKey));
+          return;
+        }
         if (!groups.has(compKey)) {
           groups.set(compKey, { chartKey, overrides, els: [] });
         }
@@ -2413,11 +2451,12 @@
           els.forEach(el => renderBinding(el, rows));
         } catch (e) {
           console.error(`fetch ${chartKey}`, e);
-          lastFetchedRows.set(compKey, []);
-          els.forEach(el => renderBinding(el, []));
+          if (!lastFetchedRows.has(compKey)) lastFetchedRows.set(compKey, []);
+          els.forEach(el => renderBinding(el, lastFetchedRows.get(compKey)));
         }
       }));
 
+      hydratedScopes.add(scopeKey);
       renderDetailTable();
       renderAmDetailTable();
       renderSalesDetailTable();
@@ -2437,8 +2476,8 @@
         refetchMonthDetails(monthState.selected);
       }
     } finally {
-      document.body.classList.remove('is-loading');
-      hydrateInflight = false;
+      hydrateInflight = Math.max(0, hydrateInflight - 1);
+      if (hydrateInflight === 0) document.body.classList.remove('is-loading');
     }
   }
 
@@ -2542,7 +2581,7 @@
             setSelectedMonth(ym);
           }
         }
-        hydrate();
+        refetchActive();
       });
     });
 
@@ -2581,7 +2620,7 @@
         const defaultSub = document.getElementById('gsub-' + (FILTER_DEFAULTS.subtab || 'staffing'));
         if (defaultSub) defaultSub.checked = true;
         // 6) Refetch everything
-        hydrate();
+        refetchActive();
       });
     }
   }
@@ -2616,8 +2655,15 @@
           state[key] = value;
           if (key === 'grain') applyGrainLabels();
           // Both window and grain change backend data → refetch
-          hydrate();
+          refetchActive();
         });
+      });
+    });
+
+    // Cambio de pestaña (tab) → cargar ese channel (solo la primera vez por filtro).
+    document.querySelectorAll('input[name="tab"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.checked) hydrate(activeChannelEl());
       });
     });
 
