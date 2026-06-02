@@ -1543,29 +1543,15 @@ async function captureInactiveMetadataFromModal({ candidateName, clientName, rol
       endInp.dataset.previousEndDate = endInp.value || '';
     }
 
-    // ⬅️ cuando cambia START_DATE → guardar start_date y carga_active_date
+    // ⬅️ cuando cambia START_DATE → guardar start_date normal
     if (startInp) {
       startInp.addEventListener('change', async () => {
         const ymd = startInp.value || '';
 
-        // 1) actualiza start_date normal
         await updateHireField(
           'start_date',
           ymd ? normalizeDateForAPI(ymd) : ''
         );
-
-        // 2) registra la “fecha de carga active”
-        //    (usa hoy; si prefieres usar la misma ymd, cambia todayYmd() por ymd)
-        if (ymd) {
-          const today = todayYmd();
-          await updateHireField(
-            'carga_active',    
-            normalizeDateForAPI(today)
-          );
-        } else {
-          // si borran la fecha, limpiamos el campo de carga
-          await updateHireField('carga_active', '');
-        }
       });
     }
 

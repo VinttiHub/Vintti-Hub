@@ -1888,16 +1888,7 @@ def handle_candidate_hire_data(candidate_id):
                 set_cols.append(f"{col} = %s")
                 set_vals.append(v)
 
-        # 👇 lógica especial para las fechas de carga (solo cuando hay start/end en el payload)
-        if "start_date" in data:
-            # si setean start_date a una fecha real -> marca carga_active, si lo limpian -> null
-            if _clean_date(data.get("start_date")) is not None:
-                set_cols.append("carga_active = %s")
-                set_vals.append(date.today())
-            else:
-                set_cols.append("carga_active = %s")
-                set_vals.append(None)
-
+        # carga_active is set when the opportunity moves to Signed, not when start_date changes.
         if "end_date" in data:
             # si setean end_date a una fecha real -> marca carga_inactive, si lo limpian -> null
             if _clean_date(data.get("end_date")) is not None:

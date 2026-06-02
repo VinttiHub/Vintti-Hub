@@ -42,6 +42,39 @@ def _is_nda_sent_stage(stage):
     return str(stage or "").strip().lower() == "nda sent"
 
 
+def _is_signed_stage(stage):
+    return str(stage or "").strip().lower() == "signed"
+
+
+def _mark_signed_hire_active(cursor, opportunity_id):
+    cursor.execute(
+        """
+        SELECT candidato_contratado, account_id
+        FROM opportunity
+        WHERE opportunity_id = %s
+        LIMIT 1
+        """,
+        (opportunity_id,),
+    )
+    row = cursor.fetchone() or {}
+    candidate_id = row.get("candidato_contratado")
+    if not candidate_id:
+        return False
+
+    cursor.execute(
+        """
+        INSERT INTO hire_opportunity (candidate_id, opportunity_id, account_id, carga_active)
+        VALUES (%s, %s, %s, CURRENT_DATE)
+        ON CONFLICT (candidate_id, opportunity_id)
+        DO UPDATE SET
+            account_id = COALESCE(hire_opportunity.account_id, EXCLUDED.account_id),
+            carga_active = COALESCE(hire_opportunity.carga_active, CURRENT_DATE)
+        """,
+        (candidate_id, opportunity_id, row.get("account_id")),
+    )
+    return True
+
+
 PAIN_POINT_NORMALIZATION = {
     'high salary': 'High salary',
     'no real pain point': 'No real pain point',
@@ -999,6 +1032,8 @@ def update_opportunity_stage(opportunity_id):
 
                 if stage_changed:
                     create_stage_todos(cursor, opportunity_id, new_stage)
+                    if _is_signed_stage(new_stage):
+                        _mark_signed_hire_active(cursor, opportunity_id)
 
                 if str(new_stage or "").strip().lower() == "close win" and account_id:
                     credit_notice = maybe_send_credit_available_email(cursor, opportunity_id)
