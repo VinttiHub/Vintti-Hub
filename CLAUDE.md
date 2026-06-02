@@ -69,4 +69,21 @@ Third-party clients and helpers are grouped under `backend/utils/` and `backend/
 - `backend/.env` is gitignored and must exist for `init_services()` to populate clients. Missing env vars silently leave clients as `None` rather than raising — expect `AttributeError` on first use if you forgot to set one.
 - The repo root also contains `icons/` and `docs/assets/` which are static assets served by GitHub Pages, not part of any build step.
 
-- Don´t work on the frontend file, everything that is related to React, Do not touch the files 
+- Don´t work on the frontend file, everything that is related to React, Do not touch the files
+
+## Brand color palette (dashboards)
+
+When coloring dashboard cards/charts (especially the Sales-tab funnel & KPI cards in `docs/dashboard.html` + `docs/assets/css/control-dashboard-retro.css`), use ONLY these 5 brand primaries (each has 100/80/60/40/20% shade steps toward white):
+
+| Color | Hex (100%) | Notes |
+|-------|-----------|-------|
+| Blue | `#003bff` | |
+| Violet | `#6c38ff` | also `--c-violet` |
+| **Lime green** | `#c1ff72` | the brand "green" — NOT forest/emerald green. Light: use a dark text color (e.g. `#3a6b00` / `var(--ink)`) on top, since the lime itself is too light to read as text. |
+| Cyan / celeste | `#4ba9ff` | also `--c-cyan` |
+| Magenta | `#ff1fdb` | also `--c-mag` |
+
+Rules of thumb:
+- "Green" ALWAYS means lime `#c1ff72` (use it for arcs/fills/tints; keep big numbers/labels dark for legibility). Do NOT substitute `#2e9b5d`, `#33b277`, etc.
+- The funnel gauge cards use one primary each: SQL→Deep Dive=violet, Deep Dive→NDA=lime, NDA→Client Win=cyan, SQL→Client Win=magenta, SQL→Close Win=blue (via `.wr-violet/.wr-lime/.wr-cyan/.wr-magenta/.wr-blue` → `--wr`).
+- Monochrome shades are generated with `color-mix(in srgb, var(--wr) N%, #fff)`. 
