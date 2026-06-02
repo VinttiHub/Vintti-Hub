@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    parts = raw.split("-")
+    try:
+        if len(parts) == 3:
+            return date(int(parts[0]), int(parts[1]), int(parts[2]))
+        if len(parts) == 2:
+            return date(int(parts[0]), int(parts[1]), 1)
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
+def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+    corte = (
+        _parse_date(filters.get("corte"))
+        or _parse_date(filters.get("cutoff"))
+        or datetime.utcnow().date()
+    )
+
+    # Referrals Generated = SQLs (accounts creadas) de origen Referral, AE (M+B por
+    # account_manager), en 3 ventanas: últimos 30 días, últimos 7 días (semana) y
+    # mes en curso (MTD). También el mes anterior (para delta) y target mensual.
+    sql = """
+        WITH base AS (
+          SELECT a.creation_date AS d
+          FROM account a
+          WHERE a.creation_date IS NOT NULL
+            AND LOWER(TRIM(COALESCE(a.where_come_from,''))) = 'referral'
+            AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE d BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date)::int AS cnt_30d,
+          COUNT(*) FILTER (WHERE d BETWEEN (%(corte)s::date - INTERVAL '6 days')::date  AND %(corte)s::date)::int AS cnt_week,
+          COUNT(*) FILTER (WHERE d BETWEEN DATE_TRUNC('month', %(corte)s::date)::date    AND %(corte)s::date)::int AS cnt_month,
+          COUNT(*) FILTER (WHERE d BETWEEN DATE_TRUNC('month', %(corte)s::date - INTERVAL '1 month')::date
+                                       AND (DATE_TRUNC('month', %(corte)s::date)::date - 1))::int AS cnt_prev_month
+        FROM base;
+    """
+
+    return sql, {"corte": corte}
+
+
+DATASET = {
+    "key": "referrals_generated",
+    "label": "Referrals Generated — SQLs de origen Referral (AE)",
+    "dimensions": [],
+    "measures": [
+        {"key": "cnt_30d", "label": "Últimos 30 días", "type": "number"},
+        {"key": "cnt_week", "label": "Semana (7d)", "type": "number"},
+        {"key": "cnt_month", "label": "Mes (MTD)", "type": "number"},
+        {"key": "cnt_prev_month", "label": "Mes anterior", "type": "number"},
+    ],
+    "default_filters": {},
+    "query": query,
+}

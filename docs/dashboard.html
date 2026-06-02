@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=40">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=51">
 </head>
 <body>
 
@@ -2523,17 +2523,18 @@
 
       <header class="skpi-header s-12">
         <div class="skpi-header__lead">
-          <div class="skpi-header__avatar skpi-header__avatar--rec">C</div>
+          <div class="skpi-header__avatar skpi-header__avatar--cyan">C</div>
           <h2 class="skpi-header__title">Conversion Rate</h2>
         </div>
       </header>
 
+      <div class="funnel-row s-12">
       <!-- ============================================================
            SQL → Deep Dive por canal (AE · last 30 days)
            "SQL generada" = account creada (creation_date) · canal por where_come_from.
            Avanzó = la account tiene una opp con deep_dive_date. Total gauge + 3 barras.
            ============================================================ -->
-      <div class="card s-4 wrchan-card wr-violet setupfee-card">
+        <div class="card wrchan-card wr-violet setupfee-card">
         <div class="card__head">
           <div>
             <h3 class="card__title">SQL → Deep Dive</h3>
@@ -2619,7 +2620,7 @@
            % de deep dives (opp con deep_dive_date) que firman NDA
            (nda_signature_or_start_date). M+B vía account_manager.
            ============================================================ -->
-      <div class="card s-4 wrchan-card wr-lime setupfee-card">
+        <div class="card wrchan-card wr-lime setupfee-card">
         <div class="card__head">
           <div>
             <h3 class="card__title">Deep Dive → NDA Signed</h3>
@@ -2699,15 +2700,99 @@
       </div>
 
       <!-- ============================================================
+           NDA Signed → Client Win por canal (AE · last 30 days)
+           % de NDAs firmadas que llegan a Client Win (= Close Win).
+           Window por fecha de NDA. M+B vía opp_sales_lead.
+           ============================================================ -->
+        <div class="card wrchan-card wr-cyan setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">NDA Signed → Client Win</h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-nda-clientwin"
+                  aria-label="Ver detalle NDA a Client Win">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                    data-field="total_win" data-reduce="first" data-fmt="int">—</span> /
+              <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                    data-field="total_nda" data-reduce="first" data-fmt="int">—</span>
+            </span>
+          </div>
+
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
+                      data-field="sales_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                      data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="sales_nda" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
+                      data-field="mkt_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="mkt_nda" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
+                      data-field="ref_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
+                      data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="ref_nda" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
            Win rate por canal · Sales / Referrals / Marketing (AE · last 30 days)
            Total gauge + delta vs 30d previos · 3 barras por origen.
            Agrupa account.where_come_from: Sales=Outbound · Referrals=Referral ·
            Marketing=resto. Win rate = Close Win / (Win + Lost). M+B only.
            ============================================================ -->
-      <div class="card s-4 wrchan-card wr-magenta setupfee-card">
+        <div class="card wrchan-card wr-magenta setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">SQL → Client Win</h3>
+            <h3 class="card__title">Sourcing → Close Win</h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-lead-channel-winrate"
@@ -2785,6 +2870,87 @@
         </div>
       </div>
 
+        <!-- SQL → Close Win · funnel completo (AE · 30d) -->
+        <div class="card wrchan-card wr-blue setupfee-card">
+          <div class="card__head">
+            <div>
+              <h3 class="card__title">SQL → Close Win</h3>
+            </div>
+            <button type="button" class="skpi-tile__detail-btn"
+                    data-kpi-detail-open="sql-clientwin"
+                    aria-label="Ver detalle SQL a Close Win">Ver detalle</button>
+          </div>
+
+          <div class="wrchan">
+            <div class="wrchan-total">
+              <div class="wrchan-gauge"
+                   data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                   data-field="total_pct" data-reduce="first"
+                   data-axis="css-var" data-css-var="--pct"></div>
+              <div class="wrchan-total__row">
+                <span class="wrchan-total__pct"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+              </div>
+              <span class="wrchan-total__cap">
+                <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="total_win" data-reduce="first" data-fmt="int">—</span> /
+                <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="total_sql" data-reduce="first" data-fmt="int">—</span>
+              </span>
+            </div>
+
+            <div class="wrchan-bars">
+              <div class="wrchan-bar">
+                <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+                <span class="wrchan-bar__label">Sales</span>
+                <span class="wrchan-bar__track">
+                  <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                        data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                        data-field="sales_pct" data-reduce="first"></span>
+                </span>
+                <span class="wrchan-bar__val">
+                  <span class="wrchan-bar__pct"
+                        data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                        data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="sales_sql" data-reduce="first" data-fmt="int">—</span></span>
+                </span>
+              </div>
+              <div class="wrchan-bar">
+                <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+                <span class="wrchan-bar__label">Mkt</span>
+                <span class="wrchan-bar__track">
+                  <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                        data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                        data-field="mkt_pct" data-reduce="first"></span>
+                </span>
+                <span class="wrchan-bar__val">
+                  <span class="wrchan-bar__pct"
+                        data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                        data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="mkt_sql" data-reduce="first" data-fmt="int">—</span></span>
+                </span>
+              </div>
+              <div class="wrchan-bar">
+                <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+                <span class="wrchan-bar__label">Ref</span>
+                <span class="wrchan-bar__track">
+                  <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                        data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                        data-field="ref_pct" data-reduce="first"></span>
+                </span>
+                <span class="wrchan-bar__val">
+                  <span class="wrchan-bar__pct"
+                        data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                        data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
+                  <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="ref_sql" data-reduce="first" data-fmt="int">—</span></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /.funnel-row -->
+
       <!-- Days to Close Win · NDA Signed → Close Win (AE · 30d) · banda clara.
            La card entera abre el detalle TOTAL; cada pill de canal abre su canal. -->
       <div class="dcard dcard--clickable s-12" data-kpi-detail-open="days-close-all"
@@ -2801,6 +2967,118 @@
             <button type="button" class="dcard__pill dcard__pill--sales" data-kpi-detail-open="days-close-sales" aria-label="Ver detalle Sales">Sales: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="sales_dias" data-reduce="first" data-fmt="int">—</span>d ›</button>
             <button type="button" class="dcard__pill dcard__pill--mkt" data-kpi-detail-open="days-close-mkt" aria-label="Ver detalle Marketing">Marketing: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="mkt_dias" data-reduce="first" data-fmt="int">—</span>d ›</button>
             <button type="button" class="dcard__pill dcard__pill--ref" data-kpi-detail-open="days-close-ref" aria-label="Ver detalle Referrals">Referrals: <span data-chart="sa_kpi_days_to_close_win_30d" data-bind="text" data-field="ref_dias" data-reduce="first" data-fmt="int">—</span>d ›</button>
+          </div>
+        </div>
+      </div>
+
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar skpi-header__avatar--mag">R</div>
+          <h2 class="skpi-header__title">Retention</h2>
+        </div>
+      </header>
+
+      <!-- Churn Rate · Candidatos (M1 + M3) · AE (Mariano+Bahía) -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Churn Rate · Candidatos</h3>
+            <p class="card__sub">AE · candidatos que churnan en M1 y M3</p>
+          </div>
+        </div>
+        <div class="churn-panels">
+          <div class="churn-panel churn-panel--m1" data-kpi-detail-open="retention-cand-m1" role="button" tabindex="0" aria-label="Ver detalle M1 Churn Candidato">
+            <span class="churn-panel__label">M1 — Primer mes</span>
+            <div class="churn-panel__pct" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="churn-panel__desc">de candidatos churnan en el mes 1</div>
+            <div class="churn-panel__bar-labels">
+              <span><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="retention_pct" data-reduce="first" data-fmt="percent">—</span> retención</span>
+              <span><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn</span>
+            </div>
+            <div class="churn-panel__bar-track">
+              <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
+            </div>
+          </div>
+          <div class="churn-panel churn-panel--m3" data-kpi-detail-open="retention-cand-m3" role="button" tabindex="0" aria-label="Ver detalle M3 Churn Candidato">
+            <span class="churn-panel__label">M3 — Primeros 3 meses</span>
+            <div class="churn-panel__pct" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="churn-panel__desc">de candidatos churnan antes del mes 3</div>
+            <div class="churn-panel__bar-labels">
+              <span><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="retention_pct" data-reduce="first" data-fmt="percent">—</span> retención</span>
+              <span><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn</span>
+            </div>
+            <div class="churn-panel__bar-track">
+              <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Churn Rate · Clientes (M1 + M3) · AE (Mariano+Bahía) -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Churn Rate · Clientes</h3>
+            <p class="card__sub">AE · clientes que churnan en M1 y M3</p>
+          </div>
+        </div>
+        <div class="churn-panels">
+          <div class="churn-panel churn-panel--m1" data-kpi-detail-open="retention-client-m1" role="button" tabindex="0" aria-label="Ver detalle M1 Churn Cliente">
+            <span class="churn-panel__label">M1 — Primer mes</span>
+            <div class="churn-panel__pct" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="churn-panel__desc">de clientes churnan en el mes 1</div>
+            <div class="churn-panel__bar-labels">
+              <span><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="retention_pct" data-reduce="first" data-fmt="percent">—</span> retención</span>
+              <span><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn</span>
+            </div>
+            <div class="churn-panel__bar-track">
+              <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
+            </div>
+          </div>
+          <div class="churn-panel churn-panel--m3" data-kpi-detail-open="retention-client-m3" role="button" tabindex="0" aria-label="Ver detalle M3 Churn Cliente">
+            <span class="churn-panel__label">M3 — Primeros 3 meses</span>
+            <div class="churn-panel__pct" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="churn-panel__desc">de clientes churnan antes del mes 3</div>
+            <div class="churn-panel__bar-labels">
+              <span><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="retention_pct" data-reduce="first" data-fmt="percent">—</span> retención</span>
+              <span><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span> churn</span>
+            </div>
+            <div class="churn-panel__bar-track">
+              <span class="churn-panel__bar-fill" data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="progress-fill" data-field="retention_pct" data-reduce="first"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar skpi-header__avatar--lime">R</div>
+          <h2 class="skpi-header__title">Referrals</h2>
+        </div>
+        <div class="skpi-header__sub">Referidos que son SQL</div>
+      </header>
+
+      <!-- Referrals Generated · SQLs de origen Referral (AE) · 30d / semana / mes -->
+      <div class="card s-6 refgen">
+        <div class="profile-ring refgen__ring">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="58" fill="none" stroke="#eef0f4" stroke-width="6"/>
+            <circle cx="64" cy="64" r="58" fill="none" stroke="#c1ff72" stroke-width="6"
+                    stroke-linecap="round" stroke-dasharray="250 364" stroke-dashoffset="58"
+                    transform="rotate(-90 64 64)"/>
+          </svg>
+          <div class="profile-ring__face refgen__face">
+            <span class="refgen__num" data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_30d" data-reduce="first" data-fmt="int">—</span>
+            <span class="refgen__unit">referrals</span>
+          </div>
+        </div>
+        <div class="refgen__body">
+          <h3 class="refgen__title">Referrals Generated</h3>
+          <p class="refgen__desc">Cantidad de referidos recibidos que califican como SQL activa. Los referrals tienen el mayor win rate del funnel.</p>
+          <div class="refgen__pills">
+            <button type="button" class="refgen__pill" data-kpi-detail-open="referrals-30d" aria-label="Ver detalle referrals últimos 30d"><b data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_30d" data-reduce="first" data-fmt="int">—</b> · últimos 30d ›</button>
+            <button type="button" class="refgen__pill" data-kpi-detail-open="referrals-week" aria-label="Ver detalle referrals semana"><b data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_week" data-reduce="first" data-fmt="int">—</b> · semana ›</button>
+            <button type="button" class="refgen__pill" data-kpi-detail-open="referrals-month" aria-label="Ver detalle referrals mes"><b data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_month" data-reduce="first" data-fmt="int">—</b> · mes ›</button>
           </div>
         </div>
       </div>
@@ -5918,6 +6196,166 @@
           </div>
         </div>
 
+        <!-- Panels · Referrals Generated por ventana -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="referrals-30d">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Referrals · AE</span>
+            <h3 class="kpi-drawer__title">Referrals Generated · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Accounts de origen Referral (AE) creadas en los últimos 30 días.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Referrals · últimos 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_30d" data-reduce="first" data-fmt="int">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de referrals · 30d</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_referrals_generated_detail" data-override-window="30d" data-bind="dtable"
+                   data-cols="creation_d|Creación|raw,client_name|Cliente|raw,referal_source|Referido por|raw,account_manager|AE|raw"
+                   data-empty-text="Sin referrals (AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="referrals-week">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Referrals · AE</span>
+            <h3 class="kpi-drawer__title">Referrals Generated · semana (7d)</h3>
+            <p class="kpi-drawer__sub">Accounts de origen Referral (AE) creadas en los últimos 7 días.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Referrals · semana</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_week" data-reduce="first" data-fmt="int">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de referrals · semana</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_referrals_generated_detail" data-override-window="week" data-bind="dtable"
+                   data-cols="creation_d|Creación|raw,client_name|Cliente|raw,referal_source|Referido por|raw,account_manager|AE|raw"
+                   data-empty-text="Sin referrals (AE) en los últimos 7 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="referrals-month">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Referrals · AE</span>
+            <h3 class="kpi-drawer__title">Referrals Generated · mes (MTD)</h3>
+            <p class="kpi-drawer__sub">Accounts de origen Referral (AE) creadas en el mes en curso.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Referrals · mes</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_referrals_generated" data-bind="text" data-field="cnt_month" data-reduce="first" data-fmt="int">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de referrals · mes</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_referrals_generated_detail" data-override-window="month" data-bind="dtable"
+                   data-cols="creation_d|Creación|raw,client_name|Cliente|raw,referal_source|Referido por|raw,account_manager|AE|raw"
+                   data-empty-text="Sin referrals (AE) en el mes en curso."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panels · Retention · M1/M3 Churn (AE) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="retention-cand-m1">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Retention · AE · Candidato</span>
+            <h3 class="kpi-drawer__title">M1 Churn · Candidato (30d)</h3>
+            <p class="kpi-drawer__sub">Candidatos (Staffing, AE) que arrancaron en los últimos 30 días y su estado al corte. Churn = baja real (excluye buyout).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">M1 Churn real · Candidato</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="1" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> candidatos</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle cohorte · M1 Candidato</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_ae_candidate_churn_detail" data-override-meses="1" data-bind="dtable"
+                   data-cols="estado|Estado|raw,candidate_name|Candidato|raw,account_name|Cliente|raw,start_d|Start|raw,end_d|End|raw"
+                   data-empty-text="Sin candidatos (AE) que arrancaron en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="retention-cand-m3">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Retention · AE · Candidato</span>
+            <h3 class="kpi-drawer__title">M3 Churn · Candidato (90d)</h3>
+            <p class="kpi-drawer__sub">Candidatos (Staffing, AE) que arrancaron en los últimos 90 días y su estado al corte. Churn = baja real (excluye buyout).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">M3 Churn real · Candidato</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_candidate_churn" data-override-meses="3" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> candidatos</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle cohorte · M3 Candidato</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_ae_candidate_churn_detail" data-override-meses="3" data-bind="dtable"
+                   data-cols="estado|Estado|raw,candidate_name|Candidato|raw,account_name|Cliente|raw,start_d|Start|raw,end_d|End|raw"
+                   data-empty-text="Sin candidatos (AE) que arrancaron en los últimos 90 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="retention-client-m1">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Retention · AE · Cliente</span>
+            <h3 class="kpi-drawer__title">M1 Churn · Cliente (30d)</h3>
+            <p class="kpi-drawer__sub">Cuentas (AE) cuyo primer hire arrancó en los últimos 30 días. Churn = sin contractors activos al corte (excluye buyout).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">M1 Churn real · Cliente</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_client_churn" data-override-meses="1" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span> clientes</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle cohorte · M1 Cliente</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_ae_client_churn_detail" data-override-meses="1" data-bind="dtable"
+                   data-cols="estado|Estado|raw,client_name|Cliente|raw,first_start|Primer hire|raw,last_end|Fecha churn|raw"
+                   data-empty-text="Sin clientes (AE) cuyo primer hire fue en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="retention-client-m3">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Retention · AE · Cliente</span>
+            <h3 class="kpi-drawer__title">M3 Churn · Cliente (90d)</h3>
+            <p class="kpi-drawer__sub">Cuentas (AE) cuyo primer hire arrancó en los últimos 90 días. Churn = sin contractors activos al corte (excluye buyout).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">M3 Churn real · Cliente</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> bajas de <span data-chart="sa_kpi_ae_client_churn" data-override-meses="3" data-bind="text" data-field="clientes" data-reduce="first" data-fmt="int">—</span> clientes</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle cohorte · M3 Cliente</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_ae_client_churn_detail" data-override-meses="3" data-bind="dtable"
+                   data-cols="estado|Estado|raw,client_name|Cliente|raw,first_start|Primer hire|raw,last_end|Fecha churn|raw"
+                   data-empty-text="Sin clientes (AE) cuyo primer hire fue en los últimos 90 días."></div>
+            </section>
+          </div>
+        </div>
+
         <!-- Panel · Sales · Days to Close Win · TOTAL (todos los canales) · 30d -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="days-close-all">
           <header class="kpi-drawer__head">
@@ -6012,6 +6450,54 @@
           </div>
         </div>
 
+        <!-- Panel · Sales · SQL → Close Win (funnel completo) · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sql-clientwin">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">SQL → Close Win · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">De todas las SQLs (accounts creadas, AE) de los últimos 30 días, cuántas llegaron a Close Win. El funnel completo tarda meses, así que casi todas aparecen "En proceso".</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">SQL → Close Win · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> Close Win de <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> SQLs</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de SQLs por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_sql_to_clientwin_30d_detail" data-bind="dtable"
+                   data-cols="estado|Estado|raw,channel|Canal|raw,client_name|Cuenta|raw,sql_date|SQL date|raw"
+                   data-empty-text="Sin SQLs (AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Sales · NDA Signed → Client Win · 30d -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-nda-clientwin">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales · AE</span>
+            <h3 class="kpi-drawer__title">NDA Signed → Client Win · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Cada NDA firmada (AE) por origen y si llegó a Client Win (= Close Win). El salto tarda meses, así que las recientes aparecen "En proceso".</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">NDA → Client Win · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> Client Win de <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_nda" data-reduce="first" data-fmt="int">—</span> NDAs</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de NDAs por canal</h4>
+              <div class="dtable-wrap"
+                   data-chart="sa_table_nda_to_clientwin_30d_detail" data-bind="dtable"
+                   data-cols="nda_date|NDA date|raw,channel|Canal|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,estado|Estado|raw"
+                   data-empty-text="Sin NDAs firmadas (AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
         <!-- Panel · Sales · Deep Dive → NDA · 30d -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-deepdive-nda">
           <header class="kpi-drawer__head">
@@ -6038,7 +6524,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_deepdive_to_nda_30d_detail" data-bind="dtable"
                    data-cols="deep_dive_date|Deep Dive|raw,channel|Canal|raw,client_name|Cuenta|raw,opp_position_name|Posición|raw,lead_source|Origen|raw,status|Estado|raw"
-                   data-empty-text="Sin deep dives (M+B) en los últimos 30 días."></div>
+                   data-empty-text="Sin deep dives (AE) en los últimos 30 días."></div>
             </section>
           </div>
         </div>
@@ -6078,7 +6564,7 @@
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-lead-channel-winrate">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE</span>
-            <h3 class="kpi-drawer__title">SQL → Client Win · últimos 30 días</h3>
+            <h3 class="kpi-drawer__title">Soucing → Close Win · últimos 30 días</h3>
             <p class="kpi-drawer__sub">Cada cerrada (Close Win / Closed Lost) clasificada por origen: Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
@@ -6100,7 +6586,7 @@
               <div class="dtable-wrap"
                    data-chart="sa_table_lead_channel_winrate_30d_detail" data-bind="dtable"
                    data-cols="close_date|Close date|raw,channel|Canal|raw,client_name|Cliente|raw,lead_source|Origen|raw,result|Resultado|raw"
-                   data-empty-text="Sin cerradas (M+B) en los últimos 30 días."></div>
+                   data-empty-text="Sin cerradas (AE) en los últimos 30 días."></div>
             </section>
           </div>
         </div>
