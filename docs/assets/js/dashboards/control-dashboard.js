@@ -494,6 +494,15 @@
 
     barEntries.forEach(({ rect, row, color, fmtName, label, xLabel, cx, cy }) => {
       rect.style.cursor = 'pointer';
+      // Click en una barra-mes → drill al detalle de ese mes (igual que el área).
+      // stopPropagation: si las barras están dentro de una card clickeable, evita
+      // que también se abra el drawer del total.
+      rect.addEventListener('click', (e) => {
+        if (xLabel && /^\d{4}-\d{2}/.test(String(xLabel))) {
+          e.stopPropagation();
+          setSelectedMonth(String(xLabel).slice(0, 7));
+        }
+      });
       rect.addEventListener('mouseenter', () => {
         rect.setAttribute('opacity', '0.85');
         const fn = fmt.pick(fmtName);
@@ -2119,6 +2128,10 @@
 
     document.querySelectorAll('[data-kpi-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        // Clicks inside a nested expander / month-detail panel have their own
+        // per-month drill behavior — the card-level drawer ("ver todo el YTD")
+        // should only fire for clicks on the card body, not on its detail.
+        if (e.target.closest('.expander')) return;
         e.preventDefault();
         // Stop bubbling so a clickable element nested inside another
         // [data-kpi-detail-open] (e.g. channel pills inside a clickable card)

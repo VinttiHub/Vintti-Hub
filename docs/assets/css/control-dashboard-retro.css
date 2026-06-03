@@ -1862,6 +1862,7 @@ body.is-loading .kpi-card::after {
 .skpi-header__avatar--cyan { background: #dcedff; color: #2b7fd1; }
 .skpi-header__avatar--mag  { background: #ffe0fa; color: #c81faf; }
 .skpi-header__avatar--lime { background: #ebffce; color: #5a8a00; }
+.skpi-header__avatar--violet { background: #e7e0ff; color: #6c38ff; }
 .skpi-header__title {
   margin: 0;
   font-size: 28px;
@@ -4050,6 +4051,48 @@ button.dcard__pill:hover { filter: brightness(0.96); transform: translateY(-1px)
 .refgen__pill b { font-weight: 800; }
 button.refgen__pill { cursor: pointer; transition: filter 120ms ease, transform 120ms ease; }
 button.refgen__pill:hover { filter: brightness(0.96); transform: translateY(-1px); }
+
+/* Accum card — número grande + barras mensuales + chips (Client Wins / Candidates) */
+.accum-card {
+  border: 1px solid transparent;
+  border-radius: 22px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.accum-card[data-kpi-detail-open] { cursor: pointer; transition: transform 140ms ease, box-shadow 140ms ease; }
+.accum-card[data-kpi-detail-open]:hover,
+.accum-card[data-kpi-detail-open]:focus-visible { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(15,23,42,0.10); outline: none; }
+.accum-card--wins  { background: linear-gradient(135deg, rgba(193,255,114,0.16) 0%, #f7ffe9 72%); border-color: rgba(140,200,40,0.28); }
+.accum-card--cands { background: linear-gradient(135deg, rgba(255,31,219,0.12) 0%, #fff0fb 72%); border-color: rgba(255,31,219,0.22); }
+.accum-card__head { display: flex; align-items: center; justify-content: space-between; }
+.accum-card__icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; }
+.accum-card--wins  .accum-card__icon { background: rgba(193,255,114,0.5); }
+.accum-card--cands .accum-card__icon { background: rgba(255,31,219,0.16); }
+.accum-card__pill { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 5px 11px; border-radius: 99px; }
+.accum-card--wins  .accum-card__pill { background: rgba(140,200,40,0.20); color: #3a6b00; }
+.accum-card--cands .accum-card__pill { background: rgba(255,31,219,0.16); color: #c01a9f; }
+.accum-card__title { margin: 0; font-size: 18px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+.accum-card__big { font-size: 72px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 2px 0 -2px; }
+.accum-card--wins  .accum-card__big { color: #3a6b00; }
+.accum-card--cands .accum-card__big { color: #c01a9f; }
+.accum-card__sub { font-size: 13px; color: var(--ink-3); margin: 0; }
+.accum-card__bars { width: 100%; height: 92px; }
+.accum-card__chips { display: flex; gap: 10px; margin-top: 4px; }
+.accum-card__chip { flex: 1; border-radius: 14px; padding: 12px 8px; text-align: center; background: rgba(255,255,255,0.62); }
+.accum-card__chip b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.accum-card--wins  .accum-card__chip b { color: #3a6b00; }
+.accum-card--cands .accum-card__chip b { color: #c01a9f; }
+.accum-card__chip span { font-size: 11px; color: var(--ink-3); }
+@media (max-width: 720px) { .accum-card__chips { flex-wrap: wrap; } }
+
+/* Collapsible month-detail inside the accum cards (expander, opens full-height) */
+.accum-card__expander { margin-top: 12px; }
+.accum-card__expander .expander__panel { max-height: none; overflow: visible; }
+.accum-card--wins  .accum-card__expander .expander__toggle { color: #3a6b00; }
+.accum-card--cands .accum-card__expander .expander__toggle { color: #c01a9f; }
+
 @media (max-width: 620px) { .refgen { flex-direction: column; align-items: flex-start; } }
 
 /* SQL → Close Win — card gradiente suave (funnel completo) */
