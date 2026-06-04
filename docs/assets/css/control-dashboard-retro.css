@@ -475,6 +475,19 @@ body.is-loading .kpi-card::after {
   display: none;
 }
 
+/* Sales sub-tabs · AE's Performance / Outbound Performance / Sales Management */
+#ssub-ae:checked       ~ .shell .channel[data-channel="sales"] .subtabs label[for="ssub-ae"],
+#ssub-outbound:checked ~ .shell .channel[data-channel="sales"] .subtabs label[for="ssub-outbound"],
+#ssub-mgmt:checked     ~ .shell .channel[data-channel="sales"] .subtabs label[for="ssub-mgmt"] {
+  background: var(--ink);
+  color: #fff;
+}
+#ssub-ae:checked       ~ .shell .channel[data-channel="sales"] .sub-channel[data-sub-channel="ae"],
+#ssub-outbound:checked ~ .shell .channel[data-channel="sales"] .sub-channel[data-sub-channel="outbound"],
+#ssub-mgmt:checked     ~ .shell .channel[data-channel="sales"] .sub-channel[data-sub-channel="mgmt"] {
+  display: block;
+}
+
 /* ---------- VIEW MODE PILLS (Window / Grain) ---------- */
 .view-mode {
   display: inline-flex;
@@ -3895,12 +3908,11 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
 /* Fila del funnel — 3 arriba y 2 abajo, las 2 de abajo centradas. */
 .funnel-row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   align-items: start;
 }
-.funnel-row > .card { grid-column: span 2; }                    /* 3 por fila */
-.funnel-row > .card:nth-of-type(4) { grid-column: 2 / span 2; } /* la 4ª arranca en col 2 → fila de abajo centrada */
+.funnel-row > .card { grid-column: span 1; }                    /* 4 en una sola línea */
 @media (max-width: 980px) {
   .funnel-row { grid-template-columns: repeat(2, 1fr); }
   .funnel-row > .card,
@@ -4038,7 +4050,22 @@ button.dcard__pill:hover { filter: brightness(0.96); transform: translateY(-1px)
 @media (max-width: 720px) { .churn-panels { grid-template-columns: 1fr; } }
 
 /* Referrals Generated — anillo + texto + pills por ventana */
-.refgen { display: flex; align-items: center; gap: 30px; }
+.refgen { display: flex; flex-direction: row; align-items: center; gap: 28px; }
+/* Banner layout (número total a un costado, siempre verde) — estilo Days-to-Close */
+.refgen--banner .refgen__num {
+  flex-shrink: 0;
+  min-width: 96px;
+  padding: 14px 22px;
+  text-align: center;
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #3a6b00;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, rgba(193, 255, 114, 0.55) 0%, #f3ffe3 100%);
+  border-radius: 20px;
+}
 .refgen__ring { flex-shrink: 0; }
 .refgen__face { background: linear-gradient(135deg, rgba(193, 255, 114, 0.55) 0%, #f3ffe3 100%) !important; flex-direction: column; gap: 2px; font-size: 30px !important; }
 .refgen__face .refgen__num { font-size: 30px; font-weight: 800; color: var(--ink); line-height: 1; }
