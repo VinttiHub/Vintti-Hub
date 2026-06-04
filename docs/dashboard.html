@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=60">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=66">
 </head>
 <body>
 
@@ -534,7 +534,7 @@
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">YTD</span>
-              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-ftes-recruiting" aria-label="Ver detalle New FTEs placed">Ver detalle</button>
@@ -563,7 +563,7 @@
             </div>
             <div class="skpi-sub">
               <span class="skpi-sub__label">YTD</span>
-              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+              <span class="skpi-sub__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
             </div>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="new-clients-recruiting" aria-label="Ver detalle New clients Recruiting">Ver detalle</button>
@@ -3830,14 +3830,452 @@
     <div class="grid">
       <header class="skpi-header s-12">
         <div class="skpi-header__lead">
-          <div class="skpi-header__avatar skpi-header__avatar--violet">M</div>
-          <h2 class="skpi-header__title">Sales Management</h2>
+          <div class="skpi-header__avatar skpi-header__avatar--violet">O</div>
+          <h2 class="skpi-header__title">Objetivo 1 · Revenue Engine</h2>
         </div>
-        <div class="skpi-header__sub">Métricas en construcción · próximamente</div>
+        <div class="skpi-header__sub">Objetivos &amp; Key Results del equipo de Sales</div>
       </header>
-      <div class="section s-12"><div><p style="color:var(--ink-3)">Métricas de Sales Management — próximamente.</p></div></div>
+
+      <!-- KR1 · Revenue de nuevos clientes (new logos · AM+AE) · toggle YTD/30d -->
+      <div class="ae-card s-12" data-ae-card data-window-active="30d">
+        <header class="ae-card__head">
+          <div>
+            <h2 class="ae-card__title">KR1 · Revenue de nuevos clientes</h2>
+            <p class="ae-card__sub">Primer close win · Staffing + Recruiting · AM + AE</p>
+          </div>
+          <div class="ae-card__window-toggle" role="tablist" aria-label="Ventana">
+            <button type="button" class="is-active" data-window-toggle="30d" role="tab" aria-selected="true">Últimos 30d</button>
+            <button type="button" data-window-toggle="week" role="tab" aria-selected="false">Semana</button>
+          </div>
+        </header>
+        <div class="ae-card__body">
+          <div class="ae-battery-wrap">
+            <div class="ae-battery" data-window-pane="week">
+              <span class="ae-battery__cap" aria-hidden="true"></span>
+              <div class="ae-battery__shell"><div class="ae-battery__fills">
+                <div class="ae-battery__fill ae-battery__fill--recruiting" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="progress-fill" data-axis="height" data-field="recruiting_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="ae-battery__fill ae-battery__fill--staffing" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="progress-fill" data-axis="height" data-field="staffing_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+              </div></div>
+            </div>
+            <div class="ae-battery" data-window-pane="30d">
+              <span class="ae-battery__cap" aria-hidden="true"></span>
+              <div class="ae-battery__shell"><div class="ae-battery__fills">
+                <div class="ae-battery__fill ae-battery__fill--recruiting" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="progress-fill" data-axis="height" data-field="recruiting_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="ae-battery__fill ae-battery__fill--staffing" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="progress-fill" data-axis="height" data-field="staffing_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+              </div></div>
+            </div>
+          </div>
+          <div class="ae-card__metrics">
+            <div data-window-pane="week" class="ae-pane">
+              <div class="ae-hero">
+                <span class="ae-hero__period" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="window_label" data-reduce="first" data-fmt="raw">Semana</span>
+                <span class="ae-hero__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="total_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                <div class="ae-hero__inline"><span class="ae-hero__meta"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="total_closes" data-reduce="first" data-fmt="int">—</span> nuevos clientes</span></div>
+              </div>
+              <ul class="ae-rows">
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--staffing" aria-hidden="true"></span>Staffing</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr1-staffing-week" aria-label="Ver detalle Staffing · nuevos clientes semana"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--staffing" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="progress-fill" data-field="staffing_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> nuevos</div>
+                </li>
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--recruiting" aria-hidden="true"></span>Recruiting</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr1-recruiting-week" aria-label="Ver detalle Recruiting · nuevos clientes semana"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--recruiting" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="progress-fill" data-field="recruiting_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> nuevos</div>
+                </li>
+              </ul>
+            </div>
+            <div data-window-pane="30d" class="ae-pane">
+              <div class="ae-hero">
+                <span class="ae-hero__period" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="window_label" data-reduce="first" data-fmt="raw">Últimos 30 días</span>
+                <span class="ae-hero__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="total_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                <div class="ae-hero__inline"><span class="ae-hero__meta"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="total_closes" data-reduce="first" data-fmt="int">—</span> nuevos clientes</span></div>
+              </div>
+              <ul class="ae-rows">
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--staffing" aria-hidden="true"></span>Staffing</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr1-staffing-30d" aria-label="Ver detalle Staffing · nuevos clientes 30d"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--staffing" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="progress-fill" data-field="staffing_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> nuevos</div>
+                </li>
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--recruiting" aria-hidden="true"></span>Recruiting</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr1-recruiting-30d" aria-label="Ver detalle Recruiting · nuevos clientes 30d"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--recruiting" data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="progress-fill" data-field="recruiting_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> nuevos</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KR2 · Revenue generado por Outbound (AM+AE) · toggle YTD/30d -->
+      <div class="ae-card s-12" data-ae-card data-window-active="30d">
+        <header class="ae-card__head">
+          <div>
+            <h2 class="ae-card__title">KR2 · Revenue generado por Outbound</h2>
+            <p class="ae-card__sub">Close wins de origen Outbound · Staffing + Recruiting · AM + AE</p>
+          </div>
+          <div class="ae-card__window-toggle" role="tablist" aria-label="Ventana">
+            <button type="button" class="is-active" data-window-toggle="30d" role="tab" aria-selected="true">Últimos 30d</button>
+            <button type="button" data-window-toggle="week" role="tab" aria-selected="false">Semana</button>
+          </div>
+        </header>
+        <div class="ae-card__body">
+          <div class="ae-battery-wrap">
+            <div class="ae-battery" data-window-pane="week">
+              <span class="ae-battery__cap" aria-hidden="true"></span>
+              <div class="ae-battery__shell"><div class="ae-battery__fills">
+                <div class="ae-battery__fill ae-battery__fill--recruiting" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="progress-fill" data-axis="height" data-field="recruiting_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="ae-battery__fill ae-battery__fill--staffing" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="progress-fill" data-axis="height" data-field="staffing_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+              </div></div>
+            </div>
+            <div class="ae-battery" data-window-pane="30d">
+              <span class="ae-battery__cap" aria-hidden="true"></span>
+              <div class="ae-battery__shell"><div class="ae-battery__fills">
+                <div class="ae-battery__fill ae-battery__fill--recruiting" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="progress-fill" data-axis="height" data-field="recruiting_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+                <div class="ae-battery__fill ae-battery__fill--staffing" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="progress-fill" data-axis="height" data-field="staffing_pct_of_total" data-reduce="first">
+                  <span class="ae-battery__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                </div>
+              </div></div>
+            </div>
+          </div>
+          <div class="ae-card__metrics">
+            <div data-window-pane="week" class="ae-pane">
+              <div class="ae-hero">
+                <span class="ae-hero__period" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="window_label" data-reduce="first" data-fmt="raw">Semana</span>
+                <span class="ae-hero__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="total_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                <div class="ae-hero__inline"><span class="ae-hero__meta"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="total_closes" data-reduce="first" data-fmt="int">—</span> close wins</span></div>
+              </div>
+              <ul class="ae-rows">
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--staffing" aria-hidden="true"></span>Staffing</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr2-staffing-week" aria-label="Ver detalle Staffing · Outbound semana"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--staffing" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="progress-fill" data-field="staffing_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> close wins</div>
+                </li>
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--recruiting" aria-hidden="true"></span>Recruiting</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr2-recruiting-week" aria-label="Ver detalle Recruiting · Outbound semana"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--recruiting" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="progress-fill" data-field="recruiting_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> close wins</div>
+                </li>
+              </ul>
+            </div>
+            <div data-window-pane="30d" class="ae-pane">
+              <div class="ae-hero">
+                <span class="ae-hero__period" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="window_label" data-reduce="first" data-fmt="raw">Últimos 30 días</span>
+                <span class="ae-hero__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="total_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                <div class="ae-hero__inline"><span class="ae-hero__meta"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="total_closes" data-reduce="first" data-fmt="int">—</span> close wins</span></div>
+              </div>
+              <ul class="ae-rows">
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--staffing" aria-hidden="true"></span>Staffing</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr2-staffing-30d" aria-label="Ver detalle Staffing · Outbound 30d"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--staffing" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="progress-fill" data-field="staffing_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="staffing_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> close wins</div>
+                </li>
+                <li class="ae-rows__row">
+                  <div class="ae-rows__head">
+                    <span class="ae-rows__name"><span class="ae-rows__dot ae-rows__dot--recruiting" aria-hidden="true"></span>Recruiting</span>
+                    <span class="ae-rows__amount" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span>
+                    <button type="button" class="ae-rows__action" data-kpi-detail-open="kr2-recruiting-30d" aria-label="Ver detalle Recruiting · Outbound 30d"><svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  </div>
+                  <div class="ae-rows__bar"><span class="ae-rows__bar-fill ae-rows__bar-fill--recruiting" data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="progress-fill" data-field="recruiting_pct_of_total" data-reduce="first"></span></div>
+                  <div class="ae-rows__legend"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="recruiting_pct_of_total" data-reduce="first" data-fmt="percent">—</span> del total · <span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> close wins</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KR3 · Avg Staffing Fee por candidato colocado (AM+AE · 30d) -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">KR3 · Avg Staffing Fee por candidato colocado ($)</h3>
+            <p class="card__sub">Fee mensual promedio de Vintti por candidato colocado (Staffing) · últimos 30 días</p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="kr3-avg-staffing-fee"
+                  aria-label="Ver detalle KR3 Avg Staffing Fee">Ver detalle</button>
+        </div>
+        <div class="ae-gmrr-stats ae-gmrr-stats--two">
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Avg fee mensual / candidato · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="sa_kpi_kr_avg_staffing_fee" data-bind="text"
+                  data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span>
+          </div>
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Candidatos colocados · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="sa_kpi_kr_avg_staffing_fee" data-bind="text"
+                  data-field="candidate_count" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KR4 · Avg Recruiting Fee por candidato colocado (AM+AE · 30d) -->
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">KR4 · Avg Recruiting Fee por candidato colocado ($)</h3>
+            <p class="card__sub">Fee promedio de Vintti por candidato colocado (Recruiting) · últimos 30 días</p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="kr4-avg-recruiting-fee"
+                  aria-label="Ver detalle KR4 Avg Recruiting Fee">Ver detalle</button>
+        </div>
+        <div class="ae-gmrr-stats ae-gmrr-stats--two">
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Avg fee / candidato · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="sa_kpi_kr_avg_recruiting_fee" data-bind="text"
+                  data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span>
+          </div>
+          <div class="ae-gmrr-stat">
+            <span class="ae-gmrr-stat__label">Candidatos colocados · last 30d</span>
+            <span class="ae-gmrr-stat__value"
+                  data-chart="sa_kpi_kr_avg_recruiting_fee" data-bind="text"
+                  data-field="candidate_count" data-reduce="first" data-fmt="int">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KR5 · New Clients Generated (#) (AM+AE · 30d) -->
+      <div class="card s-6 krcount-card krcount-card--clients">
+        <div class="card__head">
+          <div>
+            <span class="krcount-card__eyebrow">KR5</span>
+            <h3 class="card__title">New Clients Generated</h3>
+          </div>
+          <span class="skpi-tile__tag">Últimos 30d</span>
+        </div>
+        <div class="krcount-card__main">
+          <div class="krcount-card__big" data-chart="sa_kpi_kr_new_clients" data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</div>
+          <div class="kravatars" aria-hidden="true">
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+          </div>
+        </div>
+        <div class="krcount-card__foot">
+          <span><b data-chart="sa_kpi_kr_new_clients" data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</b> clientes nuevos cerrados</span>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="kr5-new-clients" aria-label="Ver detalle KR5 New Clients Generated">Ver detalle</button>
+        </div>
+      </div>
+
+      <!-- KR6 · New Candidates Allocated (#) (AM+AE · 30d) -->
+      <div class="card s-6 krcount-card krcount-card--cands">
+        <div class="card__head">
+          <div>
+            <span class="krcount-card__eyebrow">KR6</span>
+            <h3 class="card__title">New Candidates Allocated</h3>
+          </div>
+          <span class="skpi-tile__tag">Últimos 30d</span>
+        </div>
+        <div class="krcount-card__main">
+          <div class="krcount-card__big" data-chart="sa_kpi_kr_new_candidates" data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</div>
+          <div class="kravatars" aria-hidden="true">
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+            <span class="kravatar"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.4 7-6.4s7 2.5 7 6.4z"/></svg></span>
+          </div>
+        </div>
+        <div class="krcount-card__foot">
+          <span><b data-chart="sa_kpi_kr_new_candidates" data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</b> candidatos colocados</span>
+          <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="kr6-new-candidates" aria-label="Ver detalle KR6 New Candidates Allocated">Ver detalle</button>
+        </div>
+      </div>
+
+      <!-- ===== Subtitle · Objetivo 2 - Ops Generation ===== -->
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar skpi-header__avatar--cyan">O</div>
+          <h2 class="skpi-header__title">Objetivo 2 · Ops Generation</h2>
+        </div>
+        <div class="skpi-header__sub">Generación de pipeline por el equipo BDR · Outbound · AE</div>
+      </header>
+
+      <!-- Obj2 KR1 · SQLs generados por BDRs · histórico semanal (barras) -->
+      <div class="card s-8 krweek-card">
+        <div class="card__head">
+          <div>
+            <span class="krcount-card__eyebrow">KR1</span>
+            <h3 class="card__title">SQLs generados por BDRs · semanal</h3>
+          </div>
+        </div>
+        <svg class="krweek-card__bars" data-chart="sa_bars_kr_sql_bdr_week_history" data-bind="bars"
+             data-x="week_label" data-y="sqls" data-color="blue" data-labels="SQLs" data-fmt-y="int"
+             data-value-labels data-x-labels data-no-tooltip
+             data-week-detail-panel="kr-ops-sql-week" data-week-key="wk_mon"
+             viewBox="0 0 560 200" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="krweek-card__foot">
+          <span><b data-chart="sa_bars_kr_sql_bdr_week_history" data-bind="text" data-field="current_count" data-reduce="last" data-fmt="int">—</b> SQLs · semana en curso</span>
+          <span class="krweek-card__delta"><b data-chart="sa_bars_kr_sql_bdr_week_history" data-bind="text" data-field="pct_vs_prev" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</b> vs semana ant.</span>
+        </div>
+      </div>
+
+      <!-- Obj2 KR2 + KR3 · columna derecha (KR2 arriba, KR3 abajo) -->
+      <div class="s-4 kr-rightcol">
+      <!-- Obj2 KR2 · Pipeline Worth · Outbound (reusa pipeline_outbound_ae) -->
+      <div class="skpi-tile">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">KR2 · Pipeline Worth · Outbound</span>
+          <span class="skpi-tile__tag">$ · AE</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="sa_kpi_pipeline_outbound_ae" data-bind="text"
+             data-field="pipeline_worth" data-reduce="first" data-fmt="currency-k">—</div>
+        <div class="skpi-tile__sub">
+          Valor total del pipeline abierto generado por BDRs ·
+          <span data-chart="sa_kpi_pipeline_outbound_ae" data-bind="text" data-field="pipeline_count" data-reduce="first" data-fmt="int">—</span> opps
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="pipeline-outbound-worth" aria-label="Ver detalle Pipeline Worth">Ver detalle</button>
+      </div>
+
+      <!-- Obj2 KR3 · Pipeline LTV · AE (reusa pipeline_outbound_ae) -->
+      <div class="skpi-tile">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">KR3 · Pipeline LTV · AE</span>
+          <span class="skpi-tile__tag">$ · AE</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="sa_kpi_pipeline_outbound_ae" data-bind="text"
+             data-field="pipeline_ltv" data-reduce="first" data-fmt="currency-k">—</div>
+        <div class="skpi-tile__sub">
+          Worth × LTV · LTV
+          <span data-chart="sa_kpi_pipeline_outbound_ae" data-bind="text" data-field="ltv_months" data-reduce="first" data-fmt="int">—</span>
+          meses prom. por cliente
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="pipeline-outbound-worth" aria-label="Ver detalle Pipeline LTV">Ver detalle</button>
+      </div>
+      </div><!-- /.kr-rightcol -->
+
+      <!-- ===== Subtitle · Objetivo 3 - Deal Win ===== -->
+      <header class="skpi-header s-12">
+        <div class="skpi-header__lead">
+          <div class="skpi-header__avatar skpi-header__avatar--lime">O</div>
+          <h2 class="skpi-header__title">Objetivo 3 · Deal Win</h2>
+        </div>
+        <div class="skpi-header__sub">Conversión NDA → Close Win y velocidad de cierre · AM + AE</div>
+      </header>
+
+      <!-- Obj3 KR1 · NDA → Close Win · Total (win rate, AM+AE) -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">KR1 · NDA → Close Win · Total</span>
+          <span class="skpi-tile__tag">% · 30d</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text"
+             data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__sub">
+          <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+          <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+          <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="kr-nda-cw-total" aria-label="Ver detalle NDA → Close Win Total">Ver detalle</button>
+      </div>
+
+      <!-- Obj3 KR2 · NDA → Close Win · Outbound (mismo, filtrado a outbound) -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">KR2 · NDA → Close Win · Outbound</span>
+          <span class="skpi-tile__tag">% · 30d</span>
+        </div>
+        <div class="skpi-tile__value"
+             data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text"
+             data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__sub">
+          <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+          <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+          <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="kr-nda-cw-outbound" aria-label="Ver detalle NDA → Close Win Outbound">Ver detalle</button>
+      </div>
+
+      <!-- Obj3 KR3 · Time to Close Win desde NDA Signed -->
+      <div class="skpi-tile s-4">
+        <div class="skpi-tile__head">
+          <span class="skpi-tile__title">KR3 · Time to Close Win (NDA → cierre)</span>
+          <span class="skpi-tile__tag">días · 30d</span>
+        </div>
+        <div class="skpi-tile__value">
+          <span data-chart="sa_kpi_kr_time_to_closewin" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span><span class="skpi-tile__unit">d</span>
+        </div>
+        <div class="skpi-tile__sub">
+          Días promedio desde NDA firmado hasta Close Win ·
+          <span data-chart="sa_kpi_kr_time_to_closewin" data-bind="text" data-field="deal_count" data-reduce="first" data-fmt="int">—</span> close wins (30d)
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="kr-time-closewin" aria-label="Ver detalle Time to Close Win">Ver detalle</button>
+      </div>
     </div>
     </div>
+
+    <!-- Toggle YTD/30d para las baterías de Sales Management (bind tras parsear las cards) -->
+    <script>
+      (function () {
+        document.querySelectorAll('[data-sub-channel="mgmt"] [data-ae-card] [data-window-toggle]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const card = btn.closest('[data-ae-card]');
+            if (!card) return;
+            card.dataset.windowActive = btn.dataset.windowToggle;
+            card.querySelectorAll('[data-window-toggle]').forEach(b => {
+              const active = b === btn;
+              b.classList.toggle('is-active', active);
+              b.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+          });
+        });
+      })();
+    </script>
 
   </section>
 
@@ -6006,7 +6444,7 @@
                 </button>
                 <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="ytd">
                   <span class="kpi-drawer__stat__label">YTD</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_ftes_window" data-reduce="first" data-fmt="int">—</span>
                 </button>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Active</span>
@@ -6065,7 +6503,7 @@
                 </button>
                 <button type="button" class="kpi-drawer__stat is-clickable" data-drawer-window="ytd">
                   <span class="kpi-drawer__stat__label">YTD</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="ytd" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_recruiting_window" data-override-window="week" data-bind="text" data-field="new_clients_window" data-reduce="first" data-fmt="int">—</span>
                 </button>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">FTEs · 30d</span>
@@ -6594,6 +7032,355 @@
           </div>
         </div>
 
+        <!-- Panels · KR1 nuevos clientes (new logos) · Staffing/Recruiting × 30d/semana -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr1-staffing-30d">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Staffing · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Primer Close Win Staffing cerrados en últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Staffing · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> nuevos clientes</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de nuevos clientes Staffing</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_new_logos_detail" data-override-window="30d" data-override-model="Staffing" data-bind="dtable"
+                   data-cols="close_date|Primer cierre|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin nuevos clientes Staffing (AM+AE) · últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr1-recruiting-30d">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Recruiting · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">pPrimer Close Win Recruiting cerrados en últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Recruiting · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="30d" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> nuevos clientes</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de nuevos clientes Recruiting</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_new_logos_detail" data-override-window="30d" data-override-model="Recruiting" data-bind="dtable"
+                   data-cols="close_date|Primer cierre|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin nuevos clientes Recruiting (AM+AE) · últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr1-staffing-week">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Staffing · semana previa</h3>
+            <p class="kpi-drawer__sub">Primer Close Win Staffing cerrados en semana previa · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Staffing · semana</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> nuevos clientes</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de nuevos clientes Staffing</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_new_logos_detail" data-override-window="week" data-override-model="Staffing" data-bind="dtable"
+                   data-cols="close_date|Primer cierre|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin nuevos clientes Staffing (AM+AE) · semana previa."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr1-recruiting-week">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR1 · Nuevos clientes · Recruiting · semana previa</h3>
+            <p class="kpi-drawer__sub">Primer Close Win Recruiting cerrados en semana previa · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Recruiting · semana</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_new_logos" data-override-window="week" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> nuevos clientes</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de nuevos clientes Recruiting</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_new_logos_detail" data-override-window="week" data-override-model="Recruiting" data-bind="dtable"
+                   data-cols="close_date|Primer cierre|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin nuevos clientes Recruiting (AM+AE) · semana previa."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panels · KR2 Revenue Outbound · Staffing/Recruiting × 30d/semana -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr2-staffing-30d">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Staffing · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Close wins Staffing de origen Outbound cerrados en últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Staffing · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> close wins</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de close wins Outbound Staffing</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_outbound_detail" data-override-window="30d" data-override-model="Staffing" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin close wins Staffing Outbound (AM+AE) · últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr2-recruiting-30d">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Recruiting · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Close wins Recruiting de origen Outbound cerrados en últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Recruiting · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="30d" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> close wins</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de close wins Outbound Recruiting</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_outbound_detail" data-override-window="30d" data-override-model="Recruiting" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin close wins Recruiting Outbound (AM+AE) · últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr2-staffing-week">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Staffing · semana previa</h3>
+            <p class="kpi-drawer__sub">Close wins Staffing de origen Outbound cerrados en semana previa · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Staffing · semana</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="staffing_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="staffing_closes" data-reduce="first" data-fmt="int">—</span> close wins</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de close wins Outbound Staffing</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_outbound_detail" data-override-window="week" data-override-model="Staffing" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin close wins Staffing Outbound (AM+AE) · semana previa."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr2-recruiting-week">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR2 · Revenue Outbound · Recruiting · semana previa</h3>
+            <p class="kpi-drawer__sub">Close wins Recruiting de origen Outbound cerrados en semana previa · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Revenue · Recruiting · semana</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="recruiting_revenue" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_revenue_outbound" data-override-window="week" data-bind="text" data-field="recruiting_closes" data-reduce="first" data-fmt="int">—</span> close wins</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de close wins Outbound Recruiting</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_revenue_outbound_detail" data-override-window="week" data-override-model="Recruiting" data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,revenue|Revenue|currency-k"
+                   data-empty-text="Sin close wins Recruiting Outbound (AM+AE) · semana previa."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panels · KR3 / KR4 Avg Fee por candidato colocado (AM+AE · 30d) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr3-avg-staffing-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR3 · Avg Staffing Fee por candidato · 30d</h3>
+            <p class="kpi-drawer__sub">Fee mensual de Vintti (sin salario) por candidato colocado en deals Staffing Close Win de los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Avg fee / candidato · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_avg_staffing_fee" data-bind="text" data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_avg_staffing_fee" data-bind="text" data-field="candidate_count" data-reduce="first" data-fmt="int">—</span> candidatos · <span data-chart="sa_kpi_kr_avg_staffing_fee" data-bind="text" data-field="total_fee" data-reduce="first" data-fmt="currency-k">—</span> total</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Fee por candidato colocado</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_avg_staffing_fee_detail" data-bind="dtable"
+                   data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,start_date|Start|raw,fee|Fee|currency-k"
+                   data-empty-text="Sin candidatos Staffing colocados (AM+AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr4-avg-recruiting-fee">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR4 · Avg Recruiting Fee por candidato · 30d</h3>
+            <p class="kpi-drawer__sub">Fee de Vintti (placement) por candidato colocado en deals Recruiting Close Win de los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Avg fee / candidato · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_avg_recruiting_fee" data-bind="text" data-field="avg_fee" data-reduce="first" data-fmt="currency-k">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_avg_recruiting_fee" data-bind="text" data-field="candidate_count" data-reduce="first" data-fmt="int">—</span> candidatos · <span data-chart="sa_kpi_kr_avg_recruiting_fee" data-bind="text" data-field="total_fee" data-reduce="first" data-fmt="currency-k">—</span> total</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Fee por candidato colocado</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_avg_recruiting_fee_detail" data-bind="dtable"
+                   data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,start_date|Start|raw,fee|Fee|currency-k"
+                   data-empty-text="Sin candidatos Recruiting colocados (AM+AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panels · KR5 / KR6 New Clients / Candidates (AM+AE · 30d) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr5-new-clients">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR5 · New Clients Generated · 30d</h3>
+            <p class="kpi-drawer__sub">Clientes nuevos (Primer Close Win de la cuenta) cerrados en los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Clientes nuevos · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_new_clients" data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</span></span>
+              <span class="kpi-drawer__hero__delta">new logos cerrados · AM + AE</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de clientes nuevos</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_new_clients_detail" data-bind="dtable"
+                   data-cols="close_date|Primer cierre|raw,client_name|Cliente|raw,model|Modelo|raw,opp_position_name|Posición|raw"
+                   data-empty-text="Sin clientes nuevos (AM+AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr6-new-candidates">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR6 · New Candidates Allocated · 30d</h3>
+            <p class="kpi-drawer__sub">Candidatos colocados (por fecha de inicio) en los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Candidatos colocados · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_new_candidates" data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</span></span>
+              <span class="kpi-drawer__hero__delta">por fecha de inicio · AM + AE</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de candidatos colocados</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_new_candidates_detail" data-bind="dtable"
+                   data-cols="start_date|Start|raw,candidate_name|Contractor|raw,client_name|Cliente|raw,model|Modelo|raw,opp_position_name|Posición|raw"
+                   data-empty-text="Sin candidatos colocados (AM+AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panel · Obj2 KR1 · SQLs por BDRs (semana) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr-ops-sql-week">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · Ops Generation</span>
+            <h3 class="kpi-drawer__title">KR1 · SQLs generados por BDRs · semana</h3>
+            <p class="kpi-drawer__sub">Cuentas de origen Outbound (owner AE) que entraron al CRM (SQL) en la semana seleccionada (Lun–Dom). Click en una barra para cambiar de semana.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">SQLs · semana</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_sql_bdr_week" data-week-aware data-bind="text" data-field="count" data-reduce="first" data-fmt="int">—</span></span>
+              <span class="kpi-drawer__hero__delta">semana del <span data-chart="sa_kpi_kr_sql_bdr_week" data-week-aware data-bind="text" data-field="week_label" data-reduce="first" data-fmt="raw">—</span></span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle de SQLs outbound</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_sql_bdr_week_detail" data-week-aware data-bind="dtable"
+                   data-cols="creation_date|Creación (SQL)|raw,client_name|Cuenta|raw,account_manager|Owner|raw"
+                   data-empty-text="Sin SQLs outbound (AE) esa semana."></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Panels · Obj3 KR1/KR2 NDA → Close Win (Total / Outbound · AM+AE · 30d) -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr-nda-cw-total">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · Deal Win · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR1 · NDA → Close Win · Total · 30d</h3>
+            <p class="kpi-drawer__sub">Win rate de deals cerrados (Close Win + Closed Lost) en los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Win rate · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Deals cerrados (últimos 30 días)</h4>
+              <div class="dtable-wrap" data-chart="op_table_nda_close_win_30d_detail" data-bind="dtable"
+                   data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw"
+                   data-empty-text="Sin deals cerrados (AM+AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr-nda-cw-outbound">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · Deal Win · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR2 · NDA → Close Win · Outbound · 30d</h3>
+            <p class="kpi-drawer__sub">Win rate de deals cerrados de origen Outbound en los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Win rate Outbound · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="conversion_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="close_lost" data-reduce="first" data-fmt="int">—</span> lost · <span data-chart="op_kpi_nda_close_win_30d" data-override-resultado="Close Win" data-override-channel="outbound" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Deals cerrados Outbound (últimos 30 días)</h4>
+              <div class="dtable-wrap" data-chart="op_table_nda_close_win_30d_detail" data-override-channel="outbound" data-bind="dtable"
+                   data-cols="close_d|Close date|raw,client_name|Cliente|raw,opp_stage|Resultado|raw,opp_model|Modelo|raw"
+                   data-empty-text="Sin deals cerrados Outbound (AM+AE) en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+        <!-- Panel · Obj3 KR3 time-to-close -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="kr-time-closewin">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Sales Management · Deal Win · AM + AE</span>
+            <h3 class="kpi-drawer__title">KR3 · Time to Close Win desde NDA · 30d</h3>
+            <p class="kpi-drawer__sub">Días desde NDA firmado hasta Close Win, para cierres (opp New) de los últimos 30 días · AM + AE.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <div class="kpi-drawer__hero">
+              <span class="kpi-drawer__hero__label">Días avg · 30d</span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_kr_time_to_closewin" data-bind="text" data-field="promedio_dias" data-reduce="first" data-fmt="int">—</span>d</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_kr_time_to_closewin" data-bind="text" data-field="deal_count" data-reduce="first" data-fmt="int">—</span> close wins</span>
+            </div>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Detalle por deal</h4>
+              <div class="dtable-wrap" data-chart="sa_table_kr_time_to_closewin_detail" data-bind="dtable"
+                   data-cols="days|Días|int,client_name|Cliente|raw,opp_position_name|Posición|raw,nda_date|NDA firmado|raw,close_date|Close date|raw"
+                   data-empty-text="Sin close wins (AM+AE) con NDA en los últimos 30 días."></div>
+            </section>
+          </div>
+        </div>
+
         <!-- Panels · Referrals Generated por ventana -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="referrals-30d">
           <header class="kpi-drawer__head">
@@ -7098,7 +7885,7 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=57" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=59" defer></script>
 <script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
 </body>
 </html>

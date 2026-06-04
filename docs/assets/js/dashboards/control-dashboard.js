@@ -480,6 +480,10 @@
     });
   }
 
+  // Drill por semana: setea data-override-week en los elementos week-aware del
+  // panel y abre el drawer. Se asigna la impl real dentro de bindKpiDrawers.
+  let openWeekDrawer = function () {};
+
   /* ---------- bar hover tooltip ---------- */
   function attachBarHover(svg, barEntries, opts) {
     const w = svg.viewBox.baseVal.width, h = svg.viewBox.baseVal.height;
@@ -498,11 +502,22 @@
       // stopPropagation: si las barras están dentro de una card clickeable, evita
       // que también se abra el drawer del total.
       rect.addEventListener('click', (e) => {
+        // Drill por semana: abre el drawer del panel con la semana clickeada.
+        if (opts.weekDetailPanel && opts.weekKey && row && row[opts.weekKey]) {
+          e.stopPropagation();
+          openWeekDrawer(opts.weekDetailPanel, String(row[opts.weekKey]));
+          return;
+        }
         if (xLabel && /^\d{4}-\d{2}/.test(String(xLabel))) {
           e.stopPropagation();
           setSelectedMonth(String(xLabel).slice(0, 7));
         }
       });
+      if (opts.noTooltip) {
+        rect.addEventListener('mouseenter', () => rect.setAttribute('opacity', '0.85'));
+        rect.addEventListener('mouseleave', () => rect.setAttribute('opacity', '1'));
+        return;
+      }
       rect.addEventListener('mouseenter', () => {
         rect.setAttribute('opacity', '0.85');
         const fn = fmt.pick(fmtName);
@@ -576,7 +591,10 @@
     if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
     const vb = svg.viewBox.baseVal;
     const w = vb.width, h = vb.height;
-    const padX = 8, padY = 12;
+    const padX = 8;
+    // Reservar espacio extra arriba (valor) / abajo (eje X) si se piden labels.
+    const padTop = opts.valueLabels ? 20 : 12;
+    const padBottom = opts.xLabels ? 22 : 12;
     const yKey = opts.y;
     const xKey = opts.x;
     const col = opts.color || 'violet';
@@ -592,18 +610,20 @@
 
     const n = rows.length;
     const slot = (w - 2 * padX) / Math.max(n, 1);
-    const barW = Math.max(8, Math.min(34, slot * 0.62));
+    const barW = Math.max(8, Math.min(42, slot * 0.62));
     const barEntries = [];
 
     rows.forEach((r, i) => {
       const v = +r[yKey];
       if (!isFinite(v)) return;
+      const cxSlot = padX + slot * i + slot / 2;
       const x = padX + slot * i + (slot - barW) / 2;
-      const barH = Math.max(2, ((v / maxV) * (h - 2 * padY)));
-      const y = h - padY - barH;
+      const barH = Math.max(2, ((v / maxV) * (h - padTop - padBottom)));
+      const y = h - padBottom - barH;
 
       const intensity = 0.32 + (i / Math.max(n - 1, 1)) * 0.68;
-      const fill = i === n - 1 ? baseColor : tintColor(baseColor, 1 - intensity);
+      const isLast = i === n - 1;
+      const fill = isLast ? baseColor : tintColor(baseColor, 1 - intensity);
 
       const rect = document.createElementNS(SVG_NS, 'rect');
       rect.setAttribute('x', x.toFixed(2));
@@ -614,6 +634,31 @@
       rect.setAttribute('fill', fill);
       rect.setAttribute('data-rendered', '');
       svg.appendChild(rect);
+
+      if (opts.valueLabels) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', cxSlot.toFixed(2));
+        t.setAttribute('y', (y - 5).toFixed(2));
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '13');
+        t.setAttribute('font-weight', '800');
+        t.setAttribute('fill', isLast ? baseColor : '#0e1117');
+        t.setAttribute('data-rendered', '');
+        t.textContent = fmt.pick(fmtName)(v);
+        svg.appendChild(t);
+      }
+      if (opts.xLabels && xKey) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', cxSlot.toFixed(2));
+        t.setAttribute('y', (h - 6).toFixed(2));
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '11');
+        t.setAttribute('font-weight', isLast ? '700' : '500');
+        t.setAttribute('fill', isLast ? baseColor : '#8a93a3');
+        t.setAttribute('data-rendered', '');
+        t.textContent = String(r[xKey] != null ? r[xKey] : '');
+        svg.appendChild(t);
+      }
 
       barEntries.push({
         rect,
@@ -628,7 +673,12 @@
     });
 
     if (barEntries.length) {
-      attachBarHover(svg, barEntries, { y: yKey });
+      attachBarHover(svg, barEntries, {
+        y: yKey,
+        noTooltip: opts.noTooltip,
+        weekDetailPanel: opts.weekDetailPanel,
+        weekKey: opts.weekKey,
+      });
     }
   }
 
@@ -801,6 +851,11 @@
           color: el.dataset.color,
           label: el.dataset.label || (el.dataset.labels || '').split(',')[0],
           fmtY: el.dataset.fmtY,
+          valueLabels: 'valueLabels' in el.dataset,
+          xLabels: 'xLabels' in el.dataset,
+          noTooltip: 'noTooltip' in el.dataset,
+          weekDetailPanel: el.dataset.weekDetailPanel,
+          weekKey: el.dataset.weekKey,
         });
       }
     } catch (e) {
@@ -2125,6 +2180,47 @@
       drawer.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
     };
+
+    // Drill por semana: setea data-override-week en los week-aware del panel,
+    // abre el drawer y REFETCHEA esos elementos con la semana (hydrate saltea
+    // scopes ya cargados, así que el refetch es directo).
+    openWeekDrawer = (panelKey, wkMon) => {
+      const panel = drawer.querySelector(`[data-kpi-detail-panel="${panelKey}"]`);
+      if (panel) {
+        panel.querySelectorAll('[data-week-aware]').forEach(el => { el.dataset.overrideWeek = wkMon; });
+      }
+      openDrawer(panelKey);
+      if (!panel) return;
+      requestAnimationFrame(async () => {
+        const groups = new Map();
+        panel.querySelectorAll('[data-week-aware][data-chart]').forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (e) { console.error('week drill', chartKey, e); }
+        }
+      });
+    };
+    // Botón "Ver detalle" del card semanal → semana en curso.
+    const _currentMondayYmd = () => {
+      const d = new Date();
+      const dow = (d.getDay() + 6) % 7;
+      const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow);
+      const z = (n) => String(n).padStart(2, '0');
+      return `${mon.getFullYear()}-${z(mon.getMonth() + 1)}-${z(mon.getDate())}`;
+    };
+    document.querySelectorAll('[data-week-detail-open]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openWeekDrawer(btn.getAttribute('data-week-detail-open'), _currentMondayYmd());
+      });
+    });
 
     document.querySelectorAll('[data-kpi-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {

@@ -48,6 +48,7 @@ def _resolve_resultado(filters: dict) -> str:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     modelo = _resolve_modelo(filters)
     resultado = _resolve_resultado(filters)
+    canal = (filters.get("canal") or filters.get("channel") or "").strip().lower() or None
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
     corte = (
@@ -76,6 +77,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE NULLIF(o.opp_close_date::text,'') IS NOT NULL
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
             AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+            AND (%(canal)s::text IS NULL OR LOWER(TRIM(COALESCE(a.where_come_from,''))) = %(canal)s)
             AND (%(desde)s::date  IS NULL OR NULLIF(o.opp_close_date::text,'')::date >= %(desde)s::date)
             AND (%(hasta)s::date  IS NULL OR NULLIF(o.opp_close_date::text,'')::date <= %(hasta)s::date)
         ),
@@ -99,6 +101,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     return sql, {
         "sales_leads": SALES_LEADS,
         "modelo": modelo,
+        "canal": canal,
         "resultado": resultado,
         "desde": desde,
         "hasta": hasta,
