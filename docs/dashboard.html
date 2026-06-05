@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=66">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=67">
 </head>
 <body>
 
@@ -4900,82 +4900,76 @@
   <section class="channel" data-channel="marketing">
     <div class="grid">
 
-      <!-- ===== CARD: SQLs by Channel ===== -->
-      <div class="card s-12" id="mktSqlsCard">
+      <!-- ===== Marketing · rankings por período ===== -->
+      <div class="card s-12 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
-            <div class="card__title">SQLs by Channel</div>
-            <div class="muted" style="font-size:12px;">Accounts that entered the CRM (creation date) grouped by conversion channel</div>
+            <h3 class="card__title">SQLs aperturados por origin</h3>
+            <p class="card__sub">Cuentas que entraron al CRM en el período, por origen</p>
           </div>
-          <div class="mkt-period" role="tablist" aria-label="SQLs period">
-            <button type="button" class="mkt-period__btn is-active" data-period="thisMonth" role="tab" aria-selected="true">This month</button>
-            <button type="button" class="mkt-period__btn" data-period="last30" role="tab" aria-selected="false">Last 30 days</button>
+          <div class="period-toggle" data-period-toggle role="tablist" aria-label="Período">
+            <button type="button" data-period-set="semana" role="tab" aria-selected="false">Semana</button>
+            <button type="button" class="is-active" data-period-set="mes" role="tab" aria-selected="true">Mes</button>
+            <button type="button" data-period-set="q" role="tab" aria-selected="false">Q</button>
+            <button type="button" data-period-set="anio" role="tab" aria-selected="false">Año</button>
           </div>
         </div>
-        <div class="mkt-summary">
-          <div class="mkt-summary__label">Total SQLs</div>
-          <div class="mkt-summary__value" id="mktSqlsTotal">—</div>
-          <div class="mkt-summary__sub muted" id="mktSqlsRange">—</div>
+        <div class="mkt-rank__total">
+          <span class="mkt-rank__total-num" data-chart="mk_rank_sqls_by_origin" data-override-periodo="mes" data-bind="text" data-field="total" data-reduce="first" data-fmt="int">—</span>
+          <span class="mkt-rank__total-lab">SQLs · <span data-chart="mk_rank_sqls_by_origin" data-override-periodo="mes" data-bind="text" data-field="period_label" data-reduce="first" data-fmt="raw">Mes</span></span>
         </div>
-        <div class="mkt-table-wrap">
-          <table class="mkt-table">
-            <thead>
-              <tr><th>Channel</th><th>Count</th><th>Share</th></tr>
-            </thead>
-            <tbody id="mktSqlsTbody">
-              <tr><td colspan="3" class="muted">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="rk" data-chart="mk_rank_sqls_by_origin" data-override-periodo="mes" data-bind="ranking"
+             data-x="origin" data-y="count" data-share="share_pct" data-color="violet" data-fmt-y="int"
+             data-empty-text="Sin datos en el período."></div>
+        <button type="button" class="skpi-tile__detail-btn" data-period-detail-open="mkt-sqls-detail" aria-label="Ver detalle SQLs por origin">Ver detalle</button>
       </div>
 
-      <!-- ===== CARD: Active Clients by Channel ===== -->
-      <div class="card s-6" id="mktActiveCard">
+      <div class="card s-6 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
-            <div class="card__title">New Active Clients by Channel</div>
-            <div class="muted" style="font-size:12px;" id="mktActiveAsOf">As of —</div>
+            <h3 class="card__title">New active clients por origin</h3>
+            <p class="card__sub">Clientes nuevos (primer Close Win) en el período, por origen</p>
+          </div>
+          <div class="period-toggle" data-period-toggle role="tablist" aria-label="Período">
+            <button type="button" data-period-set="semana" role="tab" aria-selected="false">Semana</button>
+            <button type="button" class="is-active" data-period-set="mes" role="tab" aria-selected="true">Mes</button>
+            <button type="button" data-period-set="q" role="tab" aria-selected="false">Q</button>
+            <button type="button" data-period-set="anio" role="tab" aria-selected="false">Año</button>
           </div>
         </div>
-        <div class="mkt-summary">
-          <div class="mkt-summary__label">Total active clients</div>
-          <div class="mkt-summary__value" id="mktActiveTotal">—</div>
+        <div class="mkt-rank__total">
+          <span class="mkt-rank__total-num" data-chart="mk_rank_new_clients_by_origin" data-override-periodo="mes" data-bind="text" data-field="total" data-reduce="first" data-fmt="int">—</span>
+          <span class="mkt-rank__total-lab">clientes · <span data-chart="mk_rank_new_clients_by_origin" data-override-periodo="mes" data-bind="text" data-field="period_label" data-reduce="first" data-fmt="raw">Mes</span></span>
         </div>
-        <div class="mkt-table-wrap">
-          <table class="mkt-table">
-            <thead>
-              <tr><th>Channel</th><th>Clients</th><th>Share</th></tr>
-            </thead>
-            <tbody id="mktActiveTbody">
-              <tr><td colspan="3" class="muted">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="rk" data-chart="mk_rank_new_clients_by_origin" data-override-periodo="mes" data-bind="ranking"
+             data-x="origin" data-y="count" data-share="share_pct" data-color="cyan" data-fmt-y="int"
+             data-empty-text="Sin datos en el período."></div>
+        <button type="button" class="skpi-tile__detail-btn" data-period-detail-open="mkt-clients-detail" aria-label="Ver detalle New active clients">Ver detalle</button>
       </div>
 
-      <!-- ===== CARD: Open Opportunities by Industry ===== -->
-      <div class="card s-6" id="mktOppsCard">
+      <div class="card s-6 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
-            <div class="card__title">Open Opportunities by Industry</div>
-            <div class="muted" style="font-size:12px;">All opps excluding Close Win / Close Lost</div>
+            <h3 class="card__title">Oportunidades abiertas por industria</h3>
+            <p class="card__sub">Opps abiertas de cuentas que entraron en el período, por industria</p>
+          </div>
+          <div class="period-toggle" data-period-toggle role="tablist" aria-label="Período">
+            <button type="button" data-period-set="semana" role="tab" aria-selected="false">Semana</button>
+            <button type="button" class="is-active" data-period-set="mes" role="tab" aria-selected="true">Mes</button>
+            <button type="button" data-period-set="q" role="tab" aria-selected="false">Q</button>
+            <button type="button" data-period-set="anio" role="tab" aria-selected="false">Año</button>
           </div>
         </div>
-        <div class="mkt-summary">
-          <div class="mkt-summary__label">Total open opps</div>
-          <div class="mkt-summary__value" id="mktOppsTotal">—</div>
+        <div class="mkt-rank__total">
+          <span class="mkt-rank__total-num" data-chart="mk_rank_open_opps_by_industry" data-override-periodo="mes" data-bind="text" data-field="total" data-reduce="first" data-fmt="int">—</span>
+          <span class="mkt-rank__total-lab">opps · <span data-chart="mk_rank_open_opps_by_industry" data-override-periodo="mes" data-bind="text" data-field="period_label" data-reduce="first" data-fmt="raw">Mes</span></span>
         </div>
-        <div class="mkt-table-wrap">
-          <table class="mkt-table">
-            <thead>
-              <tr><th>Industry</th><th>Open opps</th><th>Expected revenue</th></tr>
-            </thead>
-            <tbody id="mktOppsTbody">
-              <tr><td colspan="3" class="muted">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <div class="rk" data-chart="mk_rank_open_opps_by_industry" data-override-periodo="mes" data-bind="ranking"
+             data-x="industry" data-y="count" data-share="share_pct" data-rev="expected_revenue" data-rev-fmt="currency-k" data-color="blue" data-fmt-y="int"
+             data-empty-text="Sin datos en el período."></div>
+        <button type="button" class="skpi-tile__detail-btn" data-period-detail-open="mkt-opps-detail" aria-label="Ver detalle Open opps por industria">Ver detalle</button>
       </div>
+
 
     </div>
   </section>
@@ -7381,6 +7375,56 @@
           </div>
         </div>
 
+        <!-- Panels · Marketing · detalle por período -->
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="mkt-sqls-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Marketing · por origin</span>
+            <h3 class="kpi-drawer__title">SQLs aperturados · detalle</h3>
+            <p class="kpi-drawer__sub">Cuentas que entraron al CRM en el período seleccionado, con su origen.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Cuentas (SQLs) del período</h4>
+              <div class="dtable-wrap" data-chart="mk_table_sqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="creation_date|Creación|raw,client_name|Cuenta|raw,origin|Origin|raw"
+                   data-empty-text="Sin SQLs en el período."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="mkt-clients-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Marketing · por origin</span>
+            <h3 class="kpi-drawer__title">New active clients · detalle</h3>
+            <p class="kpi-drawer__sub">Cuentas cuyo primer Close Win cae en el período seleccionado, con su origen.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Clientes nuevos del período</h4>
+              <div class="dtable-wrap" data-chart="mk_table_new_clients_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="first_close|Primer Close Win|raw,client_name|Cliente|raw,origin|Origin|raw"
+                   data-empty-text="Sin clientes nuevos en el período."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="mkt-opps-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Marketing · por industria</span>
+            <h3 class="kpi-drawer__title">Oportunidades abiertas · detalle</h3>
+            <p class="kpi-drawer__sub">Opps abiertas de cuentas que entraron al CRM en el período seleccionado, con su industria.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Opps abiertas del período</h4>
+              <div class="dtable-wrap" data-chart="mk_table_open_opps_by_industry_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="expected_revenue|Expected rev|currency-k,client_name|Cliente|raw,industry|Industria|raw,opp_position_name|Posición|raw,opp_stage|Stage|raw"
+                   data-empty-text="Sin opps abiertas en el período."></div>
+            </section>
+          </div>
+        </div>
+
         <!-- Panels · Referrals Generated por ventana -->
         <div class="kpi-drawer__panel-content" data-kpi-detail-panel="referrals-30d">
           <header class="kpi-drawer__head">
@@ -7885,7 +7929,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=59" defer></script>
-<script src="./assets/js/dashboards/marketing-tab.js?v=1" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=61" defer></script>
 </body>
 </html>

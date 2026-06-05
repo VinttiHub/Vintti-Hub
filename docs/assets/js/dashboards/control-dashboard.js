@@ -483,6 +483,9 @@
   // Drill por semana: setea data-override-week en los elementos week-aware del
   // panel y abre el drawer. Se asigna la impl real dentro de bindKpiDrawers.
   let openWeekDrawer = function () {};
+  // Drill por período (Marketing): setea data-override-periodo en los elementos
+  // period-aware del panel y abre el drawer. Impl real en bindKpiDrawers.
+  let openPeriodDrawer = function () {};
 
   /* ---------- bar hover tooltip ---------- */
   function attachBarHover(svg, barEntries, opts) {
@@ -834,6 +837,13 @@
       if (bind === 'grouped-list') return renderGroupedList(el, scopedRows);
       if (bind === 'donut') return renderDonut(el, scopedRows);
       if (bind === 'donut-legend') return renderDonutLegend(el, scopedRows);
+      if (bind === 'ranking') return renderRanking(el, scopedRows, {
+        x: el.dataset.x, y: el.dataset.y, share: el.dataset.share,
+        rev: el.dataset.rev, revFmt: el.dataset.revFmt,
+        color: el.dataset.color, fmtY: el.dataset.fmtY,
+        limit: el.dataset.limit ? +el.dataset.limit : 12,
+        empty: el.dataset.emptyText,
+      });
       if (bind === 'bar-list') return renderBarList(el, scopedRows);
       if (bind === 'risk-table') return renderRiskTable(el, scopedRows);
       if (bind === 'triple-retention') {
@@ -873,6 +883,35 @@
 
   function colorForLabel(label, idx) {
     return RISK_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
+  }
+
+  // Ranking de barras horizontales (categoría · barra · valor [+ share/rev]).
+  function renderRanking(el, rows, opts) {
+    const labelKey = opts.x, valKey = opts.y;
+    const colorName = opts.color || 'violet';
+    const color = COLOR[colorName] || COLOR.violet;
+    const limit = opts.limit || 12;
+    const fmtV = fmt.pick(opts.fmtY || 'int');
+    const valid = (rows || []).filter(r => isFinite(+r[valKey]));
+    if (!valid.length) {
+      el.innerHTML = `<div class="rk-empty">${esc(opts.empty || 'Sin datos en el período.')}</div>`;
+      return;
+    }
+    const sorted = valid.sort((a, b) => (+b[valKey]) - (+a[valKey])).slice(0, limit);
+    const max = Math.max(...sorted.map(r => +r[valKey]), 1);
+    el.innerHTML = sorted.map(r => {
+      const v = +r[valKey];
+      const w = Math.max(3, (v / max) * 100);
+      const share = (opts.share && r[opts.share] != null)
+        ? `<span class="rk-row__share">${fmt.percent(r[opts.share])}</span>` : '';
+      const rev = (opts.rev && r[opts.rev] != null)
+        ? `<span class="rk-row__rev">${fmt.pick(opts.revFmt || 'currency-k')(r[opts.rev])}</span>` : '';
+      return `<div class="rk-row">
+        <span class="rk-row__label" title="${esc(r[labelKey])}">${esc(r[labelKey])}</span>
+        <span class="rk-row__track"><span class="rk-row__fill" style="width:${w.toFixed(1)}%;background:${color}"></span></span>
+        <span class="rk-row__val">${fmtV(v)}${share}${rev}</span>
+      </div>`;
+    }).join('');
   }
 
   function renderDonut(svg, rows) {
@@ -2135,6 +2174,39 @@
     });
   }
 
+  // Toggle de período (Semana/Mes/Q/Año) por card: setea data-override-periodo
+  // en las charts del card y las refetchea.
+  function bindPeriodToggles() {
+    document.querySelectorAll('[data-period-toggle]').forEach(group => {
+      const card = group.closest('[data-period-card]') || group.closest('.card');
+      group.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-period-set]');
+        if (!btn || !card) return;
+        const periodo = btn.dataset.periodSet;
+        group.querySelectorAll('[data-period-set]').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        const els = [...card.querySelectorAll('[data-chart]')];
+        els.forEach(el => { el.dataset.overridePeriodo = periodo; });
+        const groups = new Map();
+        els.forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (err) { console.error('period toggle', chartKey, err); }
+        }
+      });
+    });
+  }
+
   function syncMonthChips(month) {
     const txt = month ? formatMonthHuman(month) : '';
     document.querySelectorAll('[data-kpi-drawer-month-chip]').forEach(el => {
@@ -2219,6 +2291,41 @@
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         openWeekDrawer(btn.getAttribute('data-week-detail-open'), _currentMondayYmd());
+      });
+    });
+
+    // Drill por período (Marketing): igual que week, con data-override-periodo.
+    openPeriodDrawer = (panelKey, periodo) => {
+      const panel = drawer.querySelector(`[data-kpi-detail-panel="${panelKey}"]`);
+      if (panel) {
+        panel.querySelectorAll('[data-period-aware]').forEach(el => { el.dataset.overridePeriodo = periodo; });
+      }
+      openDrawer(panelKey);
+      if (!panel) return;
+      requestAnimationFrame(async () => {
+        const groups = new Map();
+        panel.querySelectorAll('[data-period-aware][data-chart]').forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (e) { console.error('period drill', chartKey, e); }
+        }
+      });
+    };
+    // Botón "Ver detalle" de un card de período → usa el período activo del card.
+    document.querySelectorAll('[data-period-detail-open]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const card = btn.closest('[data-period-card]');
+        const active = card && card.querySelector('[data-period-set].is-active');
+        const periodo = active ? active.dataset.periodSet : 'mes';
+        openPeriodDrawer(btn.getAttribute('data-period-detail-open'), periodo);
       });
     });
 
@@ -2798,6 +2905,7 @@
     bindKpiDrawers();
     bindViewModes();
     bindCohortMetricToggle();
+    bindPeriodToggles();
     hydrate();
   }
 

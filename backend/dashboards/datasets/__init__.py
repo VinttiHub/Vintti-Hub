@@ -196,6 +196,12 @@ from . import (
     avg_setup_fee_30d_detail,
     equipment_ytd,
     equipment_ytd_detail,
+    mkt_sqls_by_origin,
+    mkt_new_clients_by_origin,
+    mkt_open_opps_by_industry,
+    mkt_sqls_by_origin_detail,
+    mkt_new_clients_by_origin_detail,
+    mkt_open_opps_by_industry_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -397,6 +403,12 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     avg_setup_fee_30d_detail.DATASET["key"]: avg_setup_fee_30d_detail.DATASET,
     equipment_ytd.DATASET["key"]: equipment_ytd.DATASET,
     equipment_ytd_detail.DATASET["key"]: equipment_ytd_detail.DATASET,
+    mkt_sqls_by_origin.DATASET["key"]: mkt_sqls_by_origin.DATASET,
+    mkt_new_clients_by_origin.DATASET["key"]: mkt_new_clients_by_origin.DATASET,
+    mkt_open_opps_by_industry.DATASET["key"]: mkt_open_opps_by_industry.DATASET,
+    mkt_sqls_by_origin_detail.DATASET["key"]: mkt_sqls_by_origin_detail.DATASET,
+    mkt_new_clients_by_origin_detail.DATASET["key"]: mkt_new_clients_by_origin_detail.DATASET,
+    mkt_open_opps_by_industry_detail.DATASET["key"]: mkt_open_opps_by_industry_detail.DATASET,
 }
 
 
