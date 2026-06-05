@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -30,6 +32,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     hasta = _parse_date(filters.get("hasta"))
 
     # Una fila por opp con NDA firmado en la ventana, con su canal y si llegó a Client Win.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         SELECT
           TO_CHAR(NULLIF(o.nda_signature_or_start_date::text,'')::date, 'YYYY-MM-DD') AS nda_date,
@@ -50,13 +53,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE NULLIF(o.nda_signature_or_start_date::text,'')::date IS NOT NULL
           AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
           AND NULLIF(o.nda_signature_or_start_date::text,'')::date
-              BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+              BETWEEN %(win_ini)s::date AND %(win_fin)s::date
           AND (%(desde)s::date IS NULL OR NULLIF(o.nda_signature_or_start_date::text,'')::date >= %(desde)s::date)
           AND (%(hasta)s::date IS NULL OR NULLIF(o.nda_signature_or_start_date::text,'')::date <= %(hasta)s::date)
         ORDER BY channel, estado, nda_date DESC;
     """
 
-    return sql, {"corte": corte, "desde": desde, "hasta": hasta}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {

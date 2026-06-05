@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -49,6 +51,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # the window — NDA cohort is NOT required (an opp counts even with no NDA).
     # Two windows: current 30d (corte-29..corte) and prior 30d (corte-59..corte-30),
     # so the total win rate can show a delta vs the previous period.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH closed AS (
           SELECT
@@ -71,7 +74,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         cur AS (
           SELECT * FROM closed
-          WHERE close_d BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+          WHERE close_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         ),
         prev_rate AS (
           SELECT ROUND(
@@ -126,6 +129,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     """
 
     return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,
         "corte": corte,
         "desde": desde,
         "hasta": hasta,

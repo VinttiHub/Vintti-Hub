@@ -21,6 +21,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM first_close fc
         JOIN account a ON a.account_id = fc.account_id
         WHERE fc.first_d BETWEEN %(ini)s::date AND %(fin)s::date
+          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
         ORDER BY fc.first_d DESC, a.client_name;
     """
     return sql, {"ini": ini, "fin": fin}

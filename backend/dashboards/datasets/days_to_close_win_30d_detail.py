@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -48,10 +50,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
     # One row per Close Win deal in the window, with days NDA→close. Mirrors
     # days_to_close_win_30d.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH ventana AS (
-          SELECT (%(corte)s::date - INTERVAL '29 day')::date AS win_ini,
-                 %(corte)s::date AS win_fin
+          SELECT %(win_ini)s::date AS win_ini,
+                 %(win_fin)s::date AS win_fin
         )
         SELECT
           CASE
@@ -84,7 +87,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY channel, avg_days DESC;
     """
 
-    return sql, {"corte": corte, "modelo": modelo, "channel": channel}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "modelo": modelo, "channel": channel}
 
 
 DATASET = {

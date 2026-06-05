@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value) -> date | None:
     if not value:
@@ -49,10 +51,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("cutoff"))
         or datetime.utcnow().date()
     )
+    win_ini, win_fin = window_bounds(filters)
 
     sql = """
         WITH params_final AS (
-          SELECT %(corte)s::date AS corte_d, 30::int AS window_days
+          SELECT %(win_fin)s::date AS corte_d, %(win_ini)s::date AS win_ini
         ),
         opp AS (
           SELECT
@@ -81,7 +84,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM batch b
           CROSS JOIN params_final p
           WHERE NULLIF(b.presentation_date::text,'') IS NOT NULL
-            AND NULLIF(b.presentation_date::text,'')::date >  (p.corte_d - (p.window_days || ' days')::interval)::date
+            AND NULLIF(b.presentation_date::text,'')::date >= p.win_ini
             AND NULLIF(b.presentation_date::text,'')::date <= p.corte_d
         ),
         pedidos AS (
@@ -137,7 +140,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY batch_d, opportunity_id, batch_number;
     """
 
-    return sql, {"modelo": modelo, "cliente": cliente, "corte": corte}
+    return sql, {"modelo": modelo, "cliente": cliente, "corte": corte,
+                 "win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

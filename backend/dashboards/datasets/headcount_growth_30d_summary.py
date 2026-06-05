@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -42,6 +44,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
     modelo = _norm_modelo(filters.get("modelo") or filters.get("model") or filters.get("segmento"))
+    win_ini, win_fin = window_bounds(filters)
 
     sql = """
         WITH hires AS (
@@ -62,17 +65,25 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.opp_model IN ('Staffing', 'Recruiting')
         ),
         cutoff_filtrado AS (
-          SELECT %(corte)s::date AS cutoff
-          WHERE (%(desde)s::date IS NULL OR %(corte)s::date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR %(corte)s::date <= %(hasta)s::date)
+          SELECT %(win_fin)s::date AS cutoff
         ),
         ventanas AS (
           SELECT
             cf.cutoff,
-            (cf.cutoff - INTERVAL '29 day')::date AS win_ini,
+            %(win_ini)s::date AS win_ini,
             cf.cutoff::date                       AS win_fin,
-            (cf.cutoff - INTERVAL '60 day')::date AS prev_ini,
-            (cf.cutoff - INTERVAL '29 day')::date AS prev_fin
+            -- Si la ventana es un MES calendario completo (filtro Mes), el período
+            -- anterior es el mes calendario previo → coincide con el LAG mensual de
+            -- la gráfica headcount_growth_history. Si no (default 30d rolling o rango
+            -- desde/hasta), se usa la ventana de 30 días inmediatamente anterior.
+            CASE WHEN %(win_ini)s::date = DATE_TRUNC('month', cf.cutoff)::date
+                  AND cf.cutoff::date = (DATE_TRUNC('month', cf.cutoff) + INTERVAL '1 month - 1 day')::date
+                 THEN (DATE_TRUNC('month', cf.cutoff)::date - INTERVAL '1 month')::date
+                 ELSE (cf.cutoff - INTERVAL '60 day')::date END AS prev_ini,
+            CASE WHEN %(win_ini)s::date = DATE_TRUNC('month', cf.cutoff)::date
+                  AND cf.cutoff::date = (DATE_TRUNC('month', cf.cutoff) + INTERVAL '1 month - 1 day')::date
+                 THEN (DATE_TRUNC('month', cf.cutoff)::date - INTERVAL '1 day')::date
+                 ELSE (cf.cutoff - INTERVAL '29 day')::date END AS prev_fin
           FROM cutoff_filtrado cf
         ),
         activos_win AS (
@@ -119,7 +130,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         )
         SELECT
           TO_CHAR(p.cutoff, 'YYYY-MM-DD')                                                   AS cutoff,
-          TO_CHAR((p.cutoff - INTERVAL '29 day')::date, 'YYYY-MM-DD')                       AS cutoff_prev,
+          TO_CHAR(
+            CASE WHEN %(win_ini)s::date = DATE_TRUNC('month', p.cutoff)::date
+                  AND p.cutoff = (DATE_TRUNC('month', p.cutoff) + INTERVAL '1 month - 1 day')::date
+                 THEN (DATE_TRUNC('month', p.cutoff)::date - INTERVAL '1 day')::date
+                 ELSE (p.cutoff - INTERVAL '29 day')::date END,
+            'YYYY-MM-DD')                                                                       AS cutoff_prev,
           COUNT(*) FILTER (WHERE p.candidatos_activos >= 1)::int                            AS clientes_activos,
           COUNT(*) FILTER (
             WHERE p.candidatos_activos >= 1
@@ -150,7 +166,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY p.cutoff;
     """
 
-    return sql, {"corte": corte, "desde": desde, "hasta": hasta, "modelo": modelo}
+    return sql, {"corte": corte, "desde": desde, "hasta": hasta, "modelo": modelo, "win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

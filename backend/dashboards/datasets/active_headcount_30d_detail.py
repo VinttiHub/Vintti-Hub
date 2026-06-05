@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -145,8 +147,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     if event_mode:
         win_ini, win_fin = _window_bounds(window_raw, corte)
     else:
-        win_ini = corte - timedelta(days=29)
-        win_fin = corte
+        win_ini, win_fin = window_bounds(filters)
 
     sql = _BASE_CTES
 

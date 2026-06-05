@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+from ._periods import window_bounds
+
 
 def _parse_date(value) -> date | None:
     if not value:
@@ -36,11 +38,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or datetime.now(timezone.utc).date()
     )
 
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH ventana AS (
           SELECT
-            (%(corte)s::date - INTERVAL '29 day')::date AS win_ini,
-            %(corte)s::date                              AS win_fin
+            %(win_ini)s::date AS win_ini,
+            %(win_fin)s::date AS win_fin
         ),
         base AS (
           SELECT
@@ -82,7 +85,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ORDER BY b.opportunity_id;
     """
 
-    return sql, {"resultado": resultado, "corte": corte}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"resultado": resultado, "corte": corte}
 
 
 DATASET = {

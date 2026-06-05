@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._periods import window_bounds
+
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
 AM_LEADS = ("lara@vintti.com",)
@@ -30,7 +32,7 @@ def _parse_date(value):
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
              or datetime.utcnow().date())
-    cur_ini, cur_fin = corte - timedelta(days=29), corte
+    cur_ini, cur_fin = window_bounds(filters)
     prev_ini, prev_fin = corte - timedelta(days=59), corte - timedelta(days=30)
 
     sql = """

@@ -155,6 +155,8 @@
     mag: '#ff1fdb', lime: '#c1ff72', amber: '#f5b94a',
     rose: '#f590ad', green: '#6cd391', ink: '#0e1117',
   };
+  // Paleta para series apiladas (origins) — colores distintos por índice.
+  const STACK_PALETTE = ['#6c38ff', '#4ba9ff', '#c1ff72', '#f5b94a', '#ff1fdb', '#003bff', '#6cd391', '#f590ad', '#8a93a3', '#b0782e'];
 
   /* ---------- render: line / area ---------- */
   function renderLine(svg, rows, opts) {
@@ -486,6 +488,8 @@
   // Drill por período (Marketing): setea data-override-periodo en los elementos
   // period-aware del panel y abre el drawer. Impl real en bindKpiDrawers.
   let openPeriodDrawer = function () {};
+  // Drill por bucket (histórico apilado): setea periodo + bucket y abre el drawer.
+  let openBucketDrawer = function () {};
 
   /* ---------- bar hover tooltip ---------- */
   function attachBarHover(svg, barEntries, opts) {
@@ -844,6 +848,18 @@
         limit: el.dataset.limit ? +el.dataset.limit : 12,
         empty: el.dataset.emptyText,
       });
+      if (bind === 'stacked-bars') return renderStackedBars(el, scopedRows, {
+        x: el.dataset.x, xLabel: el.dataset.xLabel, series: el.dataset.series, y: el.dataset.y,
+        fmtY: el.dataset.fmtY, valueLabels: 'valueLabels' in el.dataset, xLabels: 'xLabels' in el.dataset,
+        detailPanel: el.dataset.bucketDetailPanel,
+      });
+      if (bind === 'stacked-legend') return renderStackedLegend(el, scopedRows, {
+        series: el.dataset.series, y: el.dataset.y,
+      });
+      if (bind === 'scatter') return renderScatter(el, scopedRows, {
+        x: el.dataset.x, y: el.dataset.y, size: el.dataset.size, label: el.dataset.label,
+        fmtX: el.dataset.fmtX, fmtY: el.dataset.fmtY, xTitle: el.dataset.xTitle, yTitle: el.dataset.yTitle,
+      });
       if (bind === 'bar-list') return renderBarList(el, scopedRows);
       if (bind === 'risk-table') return renderRiskTable(el, scopedRows);
       if (bind === 'triple-retention') {
@@ -912,6 +928,148 @@
         <span class="rk-row__val">${fmtV(v)}${share}${rev}</span>
       </div>`;
     }).join('');
+  }
+
+  // Barras apiladas históricas (x = bucket, segmentos = series/origin). Click en
+  // un bucket → openBucketDrawer(detailPanel, periodo, bucketKey).
+  function renderStackedBars(svg, rows, opts) {
+    if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
+    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
+    const padX = 8;
+    const padTop = opts.valueLabels ? 22 : 14;
+    const padBottom = opts.xLabels ? 24 : 14;
+    const xKey = opts.x, xLabelKey = opts.xLabel || opts.x, sKey = opts.series, yKey = opts.y;
+    svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
+    if (!rows || !rows.length) return;
+
+    const buckets = [], bMap = new Map(), series = [];
+    rows.forEach(r => {
+      const bk = String(r[xKey]);
+      if (!bMap.has(bk)) { const o = { key: bk, label: r[xLabelKey], items: [], total: 0 }; bMap.set(bk, o); buckets.push(o); }
+      const s = String(r[sKey] == null ? '—' : r[sKey]);
+      const v = +r[yKey] || 0;
+      if (v > 0) {
+        bMap.get(bk).items.push({ series: s, value: v });
+        bMap.get(bk).total += v;
+        if (!series.includes(s)) series.push(s);
+      }
+    });
+    const maxTotal = Math.max(...buckets.map(b => b.total), 1);
+    const colorOf = s => STACK_PALETTE[series.indexOf(s) % STACK_PALETTE.length];
+    const n = buckets.length;
+    const slot = (w - 2 * padX) / Math.max(n, 1);
+    const barW = Math.max(10, Math.min(54, slot * 0.6));
+    const fmtV = fmt.pick(opts.fmtY || 'currency-k');
+    const tip = getTip();
+    const periodo = svg.dataset.overridePeriodo || 'mes';
+    const pageXY = (vbX, vbY) => {
+      const rect = svg.getBoundingClientRect();
+      return { x: rect.left + (vbX / w) * rect.width + window.scrollX, y: rect.top + (vbY / h) * rect.height + window.scrollY };
+    };
+    const drill = (bk) => { if (opts.detailPanel) openBucketDrawer(opts.detailPanel, periodo, bk); };
+
+    buckets.forEach((b, i) => {
+      const cx = padX + slot * i + slot / 2;
+      const x = cx - barW / 2;
+      const hit = document.createElementNS(SVG_NS, 'rect');
+      hit.setAttribute('x', (cx - slot / 2).toFixed(2)); hit.setAttribute('y', padTop.toFixed(2));
+      hit.setAttribute('width', slot.toFixed(2)); hit.setAttribute('height', (h - padTop - padBottom).toFixed(2));
+      hit.setAttribute('fill', 'transparent'); hit.setAttribute('data-rendered', ''); hit.style.cursor = 'pointer';
+      hit.addEventListener('click', () => drill(b.key));
+      svg.appendChild(hit);
+
+      let yc = h - padBottom;
+      b.items.forEach(it => {
+        const segH = (it.value / maxTotal) * (h - padTop - padBottom);
+        if (segH <= 0.5) return;
+        const y = yc - segH;
+        const rect = document.createElementNS(SVG_NS, 'rect');
+        rect.setAttribute('x', x.toFixed(2)); rect.setAttribute('y', y.toFixed(2));
+        rect.setAttribute('width', barW.toFixed(2)); rect.setAttribute('height', segH.toFixed(2));
+        rect.setAttribute('fill', colorOf(it.series)); rect.setAttribute('data-rendered', ''); rect.style.cursor = 'pointer';
+        rect.addEventListener('mouseenter', () => {
+          rect.setAttribute('opacity', '0.85');
+          tip.innerHTML = `<div class="chart-tip__x">${esc(b.label)}</div><div class="chart-tip__row"><span class="chart-tip__dot" style="background:${colorOf(it.series)}"></span><span class="chart-tip__lab">${esc(it.series)}</span><span class="chart-tip__val">${fmtV(it.value)}</span></div>`;
+          const p = pageXY(cx, y); tip.style.left = p.x + 'px'; tip.style.top = p.y + 'px'; tip.classList.add('show');
+        });
+        rect.addEventListener('mouseleave', () => { rect.setAttribute('opacity', '1'); tip.classList.remove('show'); });
+        rect.addEventListener('click', () => drill(b.key));
+        svg.appendChild(rect);
+        yc = y;
+      });
+      if (opts.valueLabels && b.total > 0) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (yc - 5).toFixed(2)); t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '11'); t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#0e1117'); t.setAttribute('data-rendered', '');
+        t.textContent = fmtV(b.total); svg.appendChild(t);
+      }
+      if (opts.xLabels) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (h - 7).toFixed(2)); t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '10.5'); t.setAttribute('font-weight', i === n - 1 ? '700' : '500');
+        t.setAttribute('fill', i === n - 1 ? '#0e1117' : '#8a93a3'); t.setAttribute('data-rendered', '');
+        t.textContent = String(b.label == null ? '' : b.label); svg.appendChild(t);
+      }
+    });
+  }
+
+  function renderStackedLegend(el, rows, opts) {
+    const sKey = opts.series, yKey = opts.y;
+    const series = [];
+    (rows || []).forEach(r => {
+      const s = String(r[sKey] == null ? '—' : r[sKey]);
+      if ((+r[yKey] || 0) > 0 && !series.includes(s)) series.push(s);
+    });
+    el.innerHTML = series.map((s, i) =>
+      `<span class="rk-legend__item"><span class="rk-legend__dot" style="background:${STACK_PALETTE[i % STACK_PALETTE.length]}"></span>${esc(s)}</span>`
+    ).join('');
+  }
+
+  // Scatter (X · Y · tamaño = burbuja · color por fila). Para CLTV: X=vida, Y=MRR.
+  function renderScatter(svg, rows, opts) {
+    if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
+    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
+    const padL = 48, padR = 16, padT = 14, padB = 30;
+    const xKey = opts.x, yKey = opts.y, sizeKey = opts.size, labelKey = opts.label;
+    const fmtX = fmt.pick(opts.fmtX || 'number'), fmtY = fmt.pick(opts.fmtY || 'number');
+    svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
+    const pts = (rows || []).filter(r => isFinite(+r[xKey]) && isFinite(+r[yKey]));
+    if (!pts.length) return;
+    const xMax = Math.max(...pts.map(r => +r[xKey]), 1) * 1.15;
+    const yMax = Math.max(...pts.map(r => +r[yKey]), 1) * 1.15;
+    const sMax = Math.max(...pts.map(r => +r[sizeKey] || 1), 1);
+    const plotW = w - padL - padR, plotH = h - padT - padB;
+    const sx = v => padL + (v / xMax) * plotW;
+    const sy = v => padT + plotH - (v / yMax) * plotH;
+    const tip = getTip();
+    const pageXY = (vbX, vbY) => {
+      const rect = svg.getBoundingClientRect();
+      return { x: rect.left + (vbX / w) * rect.width + window.scrollX, y: rect.top + (vbY / h) * rect.height + window.scrollY };
+    };
+    const mk = (tag, attrs) => { const e = document.createElementNS(SVG_NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); e.setAttribute('data-rendered', ''); svg.appendChild(e); return e; };
+    // ejes
+    mk('line', { x1: padL, y1: padT, x2: padL, y2: padT + plotH, stroke: '#e3e6ec', 'stroke-width': 1 });
+    mk('line', { x1: padL, y1: padT + plotH, x2: padL + plotW, y2: padT + plotH, stroke: '#e3e6ec', 'stroke-width': 1 });
+    // ticks (0 y max) en cada eje
+    [0, yMax].forEach(v => { const t = mk('text', { x: padL - 6, y: (sy(v) + 3).toFixed(1), 'text-anchor': 'end', 'font-size': 9, fill: '#8a93a3' }); t.textContent = fmtY(v); });
+    [0, xMax].forEach(v => { const t = mk('text', { x: sx(v).toFixed(1), y: (padT + plotH + 16).toFixed(1), 'text-anchor': 'middle', 'font-size': 9, fill: '#8a93a3' }); t.textContent = fmtX(v); });
+    // títulos
+    if (opts.xTitle) { const t = mk('text', { x: (padL + plotW / 2).toFixed(1), y: (h - 2).toFixed(1), 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 600, fill: '#5a6472' }); t.textContent = opts.xTitle; }
+    if (opts.yTitle) { const t = mk('text', { x: 10, y: (padT + plotH / 2).toFixed(1), 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 600, fill: '#5a6472', transform: `rotate(-90 10 ${(padT + plotH / 2).toFixed(1)})` }); t.textContent = opts.yTitle; }
+    // puntos
+    pts.forEach((r, i) => {
+      const cx = sx(+r[xKey]), cy = sy(+r[yKey]);
+      const rad = 6 + Math.sqrt((+r[sizeKey] || 1) / sMax) * 16;
+      const color = STACK_PALETTE[i % STACK_PALETTE.length];
+      const c = mk('circle', { cx: cx.toFixed(1), cy: cy.toFixed(1), r: rad.toFixed(1), fill: color, 'fill-opacity': 0.72, stroke: '#fff', 'stroke-width': 1.5 });
+      c.style.cursor = 'pointer';
+      c.addEventListener('mouseenter', () => {
+        c.setAttribute('fill-opacity', '0.95');
+        tip.innerHTML = `<div class="chart-tip__x">${esc(r[labelKey])}</div><div class="chart-tip__row"><span class="chart-tip__lab">${esc(opts.xTitle || 'X')}</span><span class="chart-tip__val">${fmtX(+r[xKey])}</span></div><div class="chart-tip__row"><span class="chart-tip__lab">${esc(opts.yTitle || 'Y')}</span><span class="chart-tip__val">${fmtY(+r[yKey])}</span></div><div class="chart-tip__row"><span class="chart-tip__lab">Clientes</span><span class="chart-tip__val">${(+r[sizeKey] || 0)}</span></div>`;
+        const p = pageXY(cx, cy - rad); tip.style.left = p.x + 'px'; tip.style.top = p.y + 'px'; tip.classList.add('show');
+      });
+      c.addEventListener('mouseleave', () => { c.setAttribute('fill-opacity', '0.72'); tip.classList.remove('show'); });
+    });
   }
 
   function renderDonut(svg, rows) {
@@ -2318,6 +2476,35 @@
         }
       });
     };
+    // Drill por bucket (histórico apilado): setea periodo (granularidad) + bucket
+    // en los period-aware del panel, abre el drawer y refetchea.
+    openBucketDrawer = (panelKey, periodo, bucket) => {
+      const panel = drawer.querySelector(`[data-kpi-detail-panel="${panelKey}"]`);
+      if (panel) {
+        panel.querySelectorAll('[data-period-aware]').forEach(el => {
+          el.dataset.overridePeriodo = periodo;
+          el.dataset.overrideBucket = bucket;
+        });
+      }
+      openDrawer(panelKey);
+      if (!panel) return;
+      requestAnimationFrame(async () => {
+        const groups = new Map();
+        panel.querySelectorAll('[data-period-aware][data-chart]').forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (e) { console.error('bucket drill', chartKey, e); }
+        }
+      });
+    };
+
     // Botón "Ver detalle" de un card de período → usa el período activo del card.
     document.querySelectorAll('[data-period-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -2595,7 +2782,29 @@
   function refetchActive() {
     lastFetchedRows.clear();
     hydratedScopes.clear();
+    updateWindowLabels();
     hydrate(activeChannelEl(), { force: true });
+  }
+  // Cartel de ventana de las cards de 30d: refleja el filtro activo
+  // (Desde/Hasta > Mes > 30d) — mismo orden que el backend (_periods.window_bounds).
+  function windowLabelText() {
+    const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const fmtD = (s) => {
+      const p = String(s).split('-');
+      return p.length >= 3 ? `${p[2]} ${MES[+p[1] - 1] || ''}` : s;
+    };
+    if (state.desde || state.hasta) {
+      return `${state.desde ? fmtD(state.desde) : '…'}–${state.hasta ? fmtD(state.hasta) : 'hoy'}`;
+    }
+    if (state.mes) {
+      const p = String(state.mes).split('-');
+      return `${MES[+p[1] - 1] || ''} ${p[0]}`;
+    }
+    return '30d';
+  }
+  function updateWindowLabels() {
+    const txt = windowLabelText();
+    document.querySelectorAll('[data-window-label]').forEach(el => { el.textContent = txt; });
   }
   function readOverridesFor(el) {
     const out = {};
@@ -2906,6 +3115,7 @@
     bindViewModes();
     bindCohortMetricToggle();
     bindPeriodToggles();
+    updateWindowLabels();
     hydrate();
   }
 

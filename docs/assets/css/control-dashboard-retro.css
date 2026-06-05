@@ -4186,6 +4186,13 @@ button.refgen__pill:hover { filter: brightness(0.96); transform: translateY(-1px
 .rk-empty { color: var(--ink-3); font-size: 13px; padding: 14px 2px; }
 @media (max-width: 620px) { .rk-row { grid-template-columns: 96px 1fr auto; gap: 8px; } }
 
+/* Marketing · histórico apilado (Net revenue) */
+.mkt-stack__bars { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
+.rk-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0 2px; }
+.rk-legend__item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.rk-legend__dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.mkt-scatter { width: 100%; height: auto; display: block; margin-top: 4px; overflow: visible; }
+
 @media (max-width: 620px) { .refgen { flex-direction: column; align-items: flex-start; } }
 
 /* SQL → Close Win — card gradiente suave (funnel completo) */

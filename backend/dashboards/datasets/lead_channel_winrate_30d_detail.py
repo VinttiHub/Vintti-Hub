@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -47,6 +49,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # One row per closed deal in the current 30d window, with its channel.
     # Same population as lead_channel_winrate_30d (all CW+CL with sales_lead M+B,
     # no NDA cohort) so it reconciles with the card total.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         SELECT
           TO_CHAR(NULLIF(o.opp_close_date::text,'')::date, 'YYYY-MM-DD') AS close_date,
@@ -66,13 +69,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com','mariano@vintti.com')
           AND (%(modelo)s::text IS NULL OR LOWER(TRIM(o.opp_model)) = LOWER(%(modelo)s))
           AND NULLIF(o.opp_close_date::text,'')::date
-              BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+              BETWEEN %(win_ini)s::date AND %(win_fin)s::date
           AND (%(desde)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date >= %(desde)s::date)
           AND (%(hasta)s::date IS NULL OR NULLIF(o.opp_close_date::text,'')::date <= %(hasta)s::date)
         ORDER BY channel, NULLIF(o.opp_close_date::text,'')::date DESC, a.client_name;
     """
 
     return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,
         "corte": corte,
         "desde": desde,
         "hasta": hasta,

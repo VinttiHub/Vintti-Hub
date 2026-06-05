@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -34,6 +36,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # que tienen nda_signature_or_start_date. Canal = account.where_come_from.
     # M+B: account.account_manager (consistente con SQL → Deep Dive; funnel temprano).
     # Window = deep_dive_date (cohorte). Delta vs los 30d previos.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH dd AS (
           SELECT
@@ -53,7 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         cur AS (
           SELECT * FROM dd
-          WHERE dd_d BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+          WHERE dd_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         ),
         prev_rate AS (
           SELECT ROUND(
@@ -93,7 +96,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY pr.prev_total_pct;
     """
 
-    return sql, {"corte": corte, "desde": desde, "hasta": hasta}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {

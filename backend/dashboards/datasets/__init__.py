@@ -202,6 +202,12 @@ from . import (
     mkt_sqls_by_origin_detail,
     mkt_new_clients_by_origin_detail,
     mkt_open_opps_by_industry_detail,
+    mkt_net_revenue_by_origin,
+    mkt_net_revenue_by_origin_detail,
+    mkt_net_revenue_history,
+    mkt_net_revenue_history_detail,
+    mkt_cltv_by_channel,
+    mkt_cltv_by_channel_detail,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -409,6 +415,12 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     mkt_sqls_by_origin_detail.DATASET["key"]: mkt_sqls_by_origin_detail.DATASET,
     mkt_new_clients_by_origin_detail.DATASET["key"]: mkt_new_clients_by_origin_detail.DATASET,
     mkt_open_opps_by_industry_detail.DATASET["key"]: mkt_open_opps_by_industry_detail.DATASET,
+    mkt_net_revenue_by_origin.DATASET["key"]: mkt_net_revenue_by_origin.DATASET,
+    mkt_net_revenue_by_origin_detail.DATASET["key"]: mkt_net_revenue_by_origin_detail.DATASET,
+    mkt_net_revenue_history.DATASET["key"]: mkt_net_revenue_history.DATASET,
+    mkt_net_revenue_history_detail.DATASET["key"]: mkt_net_revenue_history_detail.DATASET,
+    mkt_cltv_by_channel.DATASET["key"]: mkt_cltv_by_channel.DATASET,
+    mkt_cltv_by_channel_detail.DATASET["key"]: mkt_cltv_by_channel_detail.DATASET,
 }
 
 

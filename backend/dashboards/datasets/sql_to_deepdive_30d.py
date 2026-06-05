@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -34,6 +36,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # "Avanzó a Deep Dive" = la account tiene al menos una opp con deep_dive_date no nulo.
     # Window = fecha de creación de la account (cohorte). Delta vs los 30d previos.
     # M+B: account.account_manager ∈ (mariano, bahia) — owner a nivel account.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH acc AS (
           SELECT
@@ -57,7 +60,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         cur AS (
           SELECT * FROM acc
-          WHERE sql_d BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+          WHERE sql_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         ),
         prev_rate AS (
           SELECT ROUND(
@@ -97,7 +100,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY pr.prev_total_pct;
     """
 
-    return sql, {"corte": corte, "desde": desde, "hasta": hasta}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {

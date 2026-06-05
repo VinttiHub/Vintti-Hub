@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -41,7 +43,7 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
         last_prev = first_this - timedelta(days=1)
         first_prev = last_prev.replace(day=1)
         return first_prev, last_prev
-    return corte - timedelta(days=29), corte
+    return window_bounds(filters)
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -55,7 +57,7 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
         first_prev = last_prev.replace(day=1)
         return first_prev, last_prev
     if raw == "30d":
-        return corte - timedelta(days=29), corte
+        return window_bounds(filters)
     # default: YTD (Jan 1 of the corte year through corte)
     return corte.replace(month=1, day=1), corte
 

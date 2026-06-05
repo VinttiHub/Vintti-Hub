@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -33,12 +35,15 @@ def _parse_meses(value) -> int:
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     meses = _parse_meses(filters.get("meses"))
     window_days = 180 if meses == 6 else 90
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-        or datetime.utcnow().date()
-    )
+    if filters and (filters.get("desde") or filters.get("hasta") or filters.get("mes")):
+        _, corte = window_bounds(filters)
+    else:
+        corte = (
+            _parse_date(filters.get("corte"))
+            or _parse_date(filters.get("cutoff"))
+            or _parse_date(filters.get("fecha_corte"))
+            or datetime.utcnow().date()
+        )
 
     sql = """
         WITH ventana AS (

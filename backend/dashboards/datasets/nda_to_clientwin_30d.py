@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -34,6 +36,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # que llegaron a Close Win. Canal = account.where_come_from. M+B por opp_sales_lead.
     # Window = fecha de NDA (cohorte). OJO: el salto NDA→cierre tarda meses, así que
     # una ventana corta puede verse baja (muchas siguen en proceso).
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH base AS (
           SELECT
@@ -53,7 +56,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         cur AS (
           SELECT * FROM base
-          WHERE nda_d BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+          WHERE nda_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
         )
         SELECT
           COUNT(*) FILTER (WHERE channel='sales')::int                  AS sales_nda,
@@ -78,7 +81,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM cur;
     """
 
-    return sql, {"corte": corte, "desde": desde, "hasta": hasta}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {

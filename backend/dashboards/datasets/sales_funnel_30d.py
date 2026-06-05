@@ -18,6 +18,8 @@ import logging
 import os
 import threading
 from datetime import date, datetime, timedelta
+
+from ._periods import window_bounds
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -130,8 +132,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("cutoff"))
         or datetime.utcnow().date()
     )
-    win_ini = corte - timedelta(days=29)
-    win_fin = corte
+    win_ini, win_fin = window_bounds(filters)
     sales_leads = _sales_leads()
 
     sql_count = _fetch_sql_count(win_ini, win_fin, sales_leads)

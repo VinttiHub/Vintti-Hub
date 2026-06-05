@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._periods import window_bounds
+
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
 AM_LEADS = ("lara@vintti.com",)
@@ -28,7 +30,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         prev_sunday = corte - timedelta(days=corte.weekday() + 1)
         win_ini, win_fin = prev_sunday - timedelta(days=6), prev_sunday
     else:
-        win_ini, win_fin = corte - timedelta(days=29), corte
+        win_ini, win_fin = window_bounds(filters)
     model = str(filters.get("model") or "").strip()
     model_clause = "AND o.opp_model = %(model)s" if model in ("Staffing", "Recruiting") else ""
 

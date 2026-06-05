@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -30,6 +32,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     hasta = _parse_date(filters.get("hasta"))
 
     # Una fila por SQL (account creada en la ventana, AE) y si llegó a Close Win.
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         SELECT
           TO_CHAR(a.creation_date, 'YYYY-MM-DD') AS sql_date,
@@ -46,13 +49,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM account a
         WHERE a.creation_date IS NOT NULL
           AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-          AND a.creation_date BETWEEN (%(corte)s::date - INTERVAL '29 days')::date AND %(corte)s::date
+          AND a.creation_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
           AND (%(desde)s::date IS NULL OR a.creation_date >= %(desde)s::date)
           AND (%(hasta)s::date IS NULL OR a.creation_date <= %(hasta)s::date)
         ORDER BY estado, channel, a.creation_date DESC;
     """
 
-    return sql, {"corte": corte, "desde": desde, "hasta": hasta}
+    return sql, {
+        "win_ini": win_ini, "win_fin": win_fin,"corte": corte, "desde": desde, "hasta": hasta}
 
 
 DATASET = {

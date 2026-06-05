@@ -42,8 +42,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             ho.account_id,
             ho.candidate_id,
-            ho.start_date::date AS start_d,
+            -- Fechas EFECTIVAS de carga (coinciden con el tile "Active clients"
+            -- y con la card clients_multi_30d_summary).
             CASE
+              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+              ELSE ho.start_date::date
+            END AS start_d,
+            CASE
+              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
               WHEN ho.end_date IS NULL OR ho.end_date::text = '' THEN NULL
               ELSE ho.end_date::date
             END AS end_d,
@@ -52,8 +58,23 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE ho.account_id IS NOT NULL
             AND ho.candidate_id IS NOT NULL
-            AND ho.start_date IS NOT NULL
+            AND (ho.carga_active IS NOT NULL OR NULLIF(ho.start_date::text, '') IS NOT NULL)
             AND o.opp_model IN ('Staffing', 'Recruiting')
+
+          UNION ALL
+
+          -- Buyouts: cuentan como cuenta activa (denominador) pero con
+          -- candidate_id NULL, así NO suman a 'mayor_a_1'. Igual que la card.
+          SELECT
+            b.account_id,
+            NULL::integer AS candidate_id,
+            CASE WHEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '') IS NOT NULL
+                 THEN NULLIF(TRIM(CAST(b.start_date AS TEXT)), '')::date END AS start_d,
+            CASE WHEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '') IS NOT NULL
+                 THEN NULLIF(TRIM(CAST(b.end_date AS TEXT)), '')::date END AS end_d,
+            'Recruiting' AS model
+          FROM buyouts b
+          WHERE b.account_id IS NOT NULL
         ),
         meses AS (
           SELECT DATE_TRUNC('month', gs)::date AS mes

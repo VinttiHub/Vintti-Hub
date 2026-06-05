@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 def _parse_date(value: str | None) -> date | None:
     if not value:
@@ -47,6 +49,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     #   - Includes buyouts as Recruiting account rows (their candidate_id is NULL
     #     so they don't add to "mayor_a_1" but DO count toward "clientes_activos")
     #   - For the current month, falls back to ho.status='active' when dates fall short
+    win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH hire_rows AS (
           SELECT
@@ -96,9 +99,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         ),
         corte AS (
           SELECT
-            %(corte)s::date AS fecha_corte,
-            DATE_TRUNC('month', %(corte)s::date)::date AS mes_ini,
-            (DATE_TRUNC('month', %(corte)s::date) + INTERVAL '1 month - 1 day')::date AS mes_fin
+            %(win_fin)s::date AS fecha_corte,
+            %(win_ini)s::date AS mes_ini,
+            %(win_fin)s::date AS mes_fin
         ),
         activos_al_corte AS (
           SELECT DISTINCT
@@ -138,7 +141,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY fecha_corte;
     """
 
-    return sql, {"corte": corte, "modelo": modelo}
+    return sql, {"win_ini": win_ini, "win_fin": win_fin, "corte": corte, "modelo": modelo}
 
 
 DATASET = {

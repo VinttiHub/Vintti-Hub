@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from ._periods import window_bounds
+
 
 SALES_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
 ALLOWED_MODELS = ("Staffing", "Recruiting")
@@ -46,7 +48,7 @@ def _window_bounds(filters: dict, corte: date) -> tuple[date, date]:
         return prev_monday, prev_sunday
     if raw in ("7d", "7"):
         return corte - timedelta(days=6), corte
-    return corte - timedelta(days=29), corte
+    return window_bounds(filters)
 
 
 def _modelo(filters: dict) -> str:
