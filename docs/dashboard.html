@@ -2698,90 +2698,6 @@
       </div>
 
       <!-- ============================================================
-           NDA Signed → Client Win por canal (AE · last 30 days)
-           % de NDAs firmadas que llegan a Client Win (= Close Win).
-           Window por fecha de NDA. M+B vía opp_sales_lead.
-           ============================================================ -->
-        <div class="card wrchan-card wr-cyan setupfee-card">
-        <div class="card__head">
-          <div>
-            <h3 class="card__title">NDA Signed → Client Win</h3>
-          </div>
-          <button type="button" class="skpi-tile__detail-btn"
-                  data-kpi-detail-open="sales-nda-clientwin"
-                  aria-label="Ver detalle NDA a Client Win">Ver detalle</button>
-        </div>
-
-        <div class="wrchan">
-          <div class="wrchan-total">
-            <div class="wrchan-gauge"
-                 data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
-                 data-field="total_pct" data-reduce="first"
-                 data-axis="css-var" data-css-var="--pct"></div>
-            <div class="wrchan-total__row">
-              <span class="wrchan-total__pct"
-                    data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
-            </div>
-            <span class="wrchan-total__cap">
-              <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                    data-field="total_win" data-reduce="first" data-fmt="int">—</span> /
-              <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                    data-field="total_nda" data-reduce="first" data-fmt="int">—</span>
-            </span>
-          </div>
-
-          <div class="wrchan-bars">
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
-              <span class="wrchan-bar__label">Sales</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
-                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
-                      data-field="sales_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                      data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="sales_nda" data-reduce="first" data-fmt="int">—</span></span>
-              </span>
-            </div>
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
-              <span class="wrchan-bar__label">Mkt</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
-                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
-                      data-field="mkt_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="mkt_nda" data-reduce="first" data-fmt="int">—</span></span>
-              </span>
-            </div>
-            <div class="wrchan-bar">
-              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
-              <span class="wrchan-bar__label">Ref</span>
-              <span class="wrchan-bar__track">
-                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
-                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="progress-fill"
-                      data-field="ref_pct" data-reduce="first"></span>
-              </span>
-              <span class="wrchan-bar__val">
-                <span class="wrchan-bar__pct"
-                      data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text"
-                      data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
-                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="ref_nda" data-reduce="first" data-fmt="int">—</span></span>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============================================================
            Win rate por canal · Sales / Referrals / Marketing (AE · last 30 days)
            Total gauge + delta vs 30d previos · 3 barras por origen.
            Agrupa account.where_come_from: Sales=Outbound · Referrals=Referral ·
@@ -2790,11 +2706,11 @@
         <div class="card wrchan-card wr-magenta setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">SQL → Close Win</h3>
+            <h3 class="card__title">NDA → Close Win</h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-lead-channel-winrate"
-                  aria-label="Ver detalle Win rate por canal">Ver detalle</button>
+                  aria-label="Ver detalle NDA a Close Win">Ver detalle</button>
         </div>
 
         <div class="wrchan">
@@ -2862,6 +2778,93 @@
                       data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text"
                       data-field="ref_win_rate" data-reduce="first" data-fmt="percent">—</span>
                 <span class="wrchan-bar__xy"><span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_lead_channel_winrate_30d" data-bind="text" data-field="ref_total" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           SQL → Close Win por canal (AE · last 30 days)
+           "SQL generada" = account creada (creation_date) con account_manager ∈ M+B
+           que entra al hub del CRM. Numerador = la account tiene una opp en Close Win.
+           Canal = where_come_from. Window por creation_date.
+           ============================================================ -->
+        <div class="card wrchan-card wr-blue setupfee-card">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">SQL → Close Win</h3>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn"
+                  data-kpi-detail-open="sales-sql-clientwin"
+                  aria-label="Ver detalle SQL a Close Win">Ver detalle</button>
+        </div>
+
+        <div class="wrchan">
+          <!-- Total · gauge + detalle -->
+          <div class="wrchan-total">
+            <div class="wrchan-gauge"
+                 data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                 data-field="total_pct" data-reduce="first"
+                 data-axis="css-var" data-css-var="--pct"></div>
+            <div class="wrchan-total__row">
+              <span class="wrchan-total__pct"
+                    data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                    data-field="total_pct" data-reduce="first" data-fmt="percent">—</span>
+            </div>
+            <span class="wrchan-total__cap">
+              <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                    data-field="total_win" data-reduce="first" data-fmt="int">—</span> /
+              <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                    data-field="total_sql" data-reduce="first" data-fmt="int">—</span>
+            </span>
+          </div>
+
+          <!-- Desglose por origen -->
+          <div class="wrchan-bars">
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--sales" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Sales</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--sales"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                      data-field="sales_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="sales_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="sales_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="sales_sql" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--mkt" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Mkt</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--mkt"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                      data-field="mkt_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="mkt_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="mkt_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="mkt_sql" data-reduce="first" data-fmt="int">—</span></span>
+              </span>
+            </div>
+            <div class="wrchan-bar">
+              <span class="wrchan-bar__dot wrchan-bar__dot--ref" aria-hidden="true"></span>
+              <span class="wrchan-bar__label">Ref</span>
+              <span class="wrchan-bar__track">
+                <span class="wrchan-bar__fill wrchan-bar__fill--ref"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="progress-fill"
+                      data-field="ref_pct" data-reduce="first"></span>
+              </span>
+              <span class="wrchan-bar__val">
+                <span class="wrchan-bar__pct"
+                      data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text"
+                      data-field="ref_pct" data-reduce="first" data-fmt="percent">—</span>
+                <span class="wrchan-bar__xy"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="ref_win" data-reduce="first" data-fmt="int">—</span>/<span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="ref_sql" data-reduce="first" data-fmt="int">—</span></span>
               </span>
             </div>
           </div>
@@ -7792,25 +7795,25 @@
         </div>
 
         <!-- Panel · Sales · NDA Signed → Client Win · <span data-window-label>30d</span> -->
-        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-nda-clientwin">
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="sales-sql-clientwin">
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
-            <h3 class="kpi-drawer__title">NDA Signed → Client Win · últimos 30 días</h3>
-            <p class="kpi-drawer__sub">Cada NDA firmada (AE's) por origen y si llegó a Client Win (= Close Win). El salto tarda meses, así que las recientes aparecen "En proceso".</p>
+            <h3 class="kpi-drawer__title">SQL → Close Win · últimos 30 días</h3>
+            <p class="kpi-drawer__sub">Todas las SQL (account creada con account_manager ∈ Mariano + Bahía) que entran al hub del CRM, y cuántas llegaron a Close Win. Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero">
-              <span class="kpi-drawer__hero__label">NDA → Client Win · <span data-window-label>30d</span></span>
-              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> Client Win de <span data-chart="sa_kpi_nda_to_clientwin_30d" data-bind="text" data-field="total_nda" data-reduce="first" data-fmt="int">—</span> NDAs</span>
+              <span class="kpi-drawer__hero__label">SQL → Close Win · <span data-window-label>30d</span></span>
+              <span class="kpi-drawer__hero__value"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_pct" data-reduce="first" data-fmt="percent">—</span></span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> Close Win de <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> SQLs</span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Detalle de NDAs por canal</h4>
+              <h4 class="kpi-drawer__section-title">Detalle de SQLs por canal</h4>
               <div class="dtable-wrap"
-                   data-chart="sa_table_nda_to_clientwin_30d_detail" data-bind="dtable"
-                   data-cols="nda_date|NDA date|raw,channel|Canal|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,estado|Estado|raw"
-                   data-empty-text="Sin NDAs firmadas (AE's) en los últimos 30 días."></div>
+                   data-chart="sa_table_sql_to_clientwin_30d_detail" data-bind="dtable"
+                   data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cliente|raw,estado|Estado|raw"
+                   data-empty-text="Sin SQLs (accounts creadas, M+B) en los últimos 30 días."></div>
             </section>
           </div>
         </div>
@@ -7840,7 +7843,7 @@
               <h4 class="kpi-drawer__section-title">Detalle de deep dives por canal</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_deepdive_to_nda_30d_detail" data-bind="dtable"
-                   data-cols="deep_dive_date|Deep Dive|raw,channel|Canal|raw,client_name|Cuenta|raw,opp_position_name|Posición|raw,lead_source|Origen|raw,status|Estado|raw"
+                   data-cols="deep_dive_date|Deep Dive|raw,channel|Canal|raw,client_name|Cliente|raw,status|Estado|raw"
                    data-empty-text="Sin deep dives (AE's) en los últimos 30 días."></div>
             </section>
           </div>
@@ -7871,7 +7874,7 @@
               <h4 class="kpi-drawer__section-title">Detalle de SQLs por canal</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_deepdive_30d_detail" data-bind="dtable"
-                   data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cuenta|raw,lead_source|Origen|raw,status|Estado|raw"
+                   data-cols="sql_date|SQL date|raw,channel|Canal|raw,client_name|Cliente|raw,status|Estado|raw"
                    data-empty-text="Sin SQLs (accounts creadas) en los últimos 30 días."></div>
             </section>
           </div>
@@ -7902,7 +7905,7 @@
               <h4 class="kpi-drawer__section-title">Detalle de cerradas por canal</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_lead_channel_winrate_30d_detail" data-bind="dtable"
-                   data-cols="close_date|Close date|raw,channel|Canal|raw,client_name|Cliente|raw,lead_source|Origen|raw,result|Resultado|raw"
+                   data-cols="close_date|Close date|raw,channel|Canal|raw,client_name|Cliente|raw,result|Resultado|raw"
                    data-empty-text="Sin cerradas (AE's) en los últimos 30 días."></div>
             </section>
           </div>
