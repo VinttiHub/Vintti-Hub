@@ -45,6 +45,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE o.opp_model = 'Staffing'
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
+            -- YTD: solo deals cuya Close Win fue este año (a partir del 1 de enero).
+            AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
         ),
         meses AS (
           SELECT

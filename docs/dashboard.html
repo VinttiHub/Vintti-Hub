@@ -2302,9 +2302,6 @@
           <div>
             <h3 class="card__title">Gross MRR Staffing</h3>
           </div>
-          <!-- Drawer open is triggered by clicking a chart point — this hidden
-               button is the target the SVG-click handler simulates. -->
-          <button type="button" hidden data-kpi-detail-open="ae-gmrr-detail" aria-hidden="true"></button>
         </div>
 
         <div class="ae-gmrr-stats ae-gmrr-stats--two">
@@ -2322,7 +2319,6 @@
                data-area="true"
                data-fmt-y="currency-k"
                data-tooltip-extras="monthly_gmrr|GMRR mensual|currency-k,active_contractors|Contractors|int,active_accounts|Clientes|int"
-               data-drill-drawer="ae-gmrr-detail"
                viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%;cursor:pointer">
             <g class="chart-grid">
@@ -2331,6 +2327,18 @@
               <line x1="0" y1="160" x2="720" y2="160"/>
             </g>
           </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="ae_table_gmrr_detail" data-bind="month-detail"
+                 data-list-name="candidate_name" data-list-sub="client_name"
+                 data-list-date="start_date" data-nav-current-year="true"
+                 data-list-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,start_date|Start|raw,salary|Salary|currency-k,fee|Fee|currency-k,gmrr|GMRR mensual|currency-k"
+                 data-empty-text="Sin contractors Staffing activos en el mes seleccionado."></div>
+          </div>
         </div>
       </div>
 
@@ -2342,7 +2350,6 @@
           <div>
             <h3 class="card__title">MRR Staffing · Vintti fee</h3>
           </div>
-          <button type="button" hidden data-kpi-detail-open="ae-mrr-fee-detail" aria-hidden="true"></button>
         </div>
 
         <div class="ae-gmrr-stats ae-gmrr-stats--two">
@@ -2360,7 +2367,6 @@
                data-area="true"
                data-fmt-y="currency-k"
                data-tooltip-extras="monthly_fee|Fee mensual|currency-k,active_contractors|Contractors|int,active_accounts|Clientes|int"
-               data-drill-drawer="ae-mrr-fee-detail"
                viewBox="0 0 720 200" preserveAspectRatio="none"
                style="width:100%;height:100%;cursor:pointer">
             <g class="chart-grid">
@@ -2369,6 +2375,18 @@
               <line x1="0" y1="160" x2="720" y2="160"/>
             </g>
           </svg>
+        </div>
+        <div class="expander">
+          <button type="button" class="expander__toggle" data-expand-toggle>
+            Ver detalle mensual <span class="arrow">▾</span>
+          </button>
+          <div class="expander__panel">
+            <div data-chart="ae_table_mrr_fee_detail" data-bind="month-detail"
+                 data-list-name="candidate_name" data-list-sub="client_name"
+                 data-list-date="start_date" data-nav-current-year="true"
+                 data-list-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,start_date|Start|raw,fee|Fee Vintti|currency-k"
+                 data-empty-text="Sin contractors Staffing activos en el mes seleccionado."></div>
+          </div>
         </div>
       </div>
 
@@ -8044,6 +8062,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=64" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=67" defer></script>
 </body>
 </html>

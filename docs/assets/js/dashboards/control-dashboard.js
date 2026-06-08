@@ -2174,11 +2174,35 @@
     const startField = el.dataset.listStart || 'start_d';
     const endField   = el.dataset.listEnd   || 'end_d';
     const stateField = el.dataset.listState;  // optional: when set, dedupe + show badge
+    const colsSpec   = el.dataset.listCols;    // optional: when set, render a flat table (field|Label|fmt,...)
     const emptyText  = el.dataset.emptyText || 'No data';
     const month      = (opts && opts.month) || monthState.selected;
 
     const monthKeys = lastNMonths(12);
     const currentMonth = month || monthKeys[monthKeys.length - 1];
+
+    // Table mode: render the same flat dtable the drawer used (e.g. Contractor ·
+    // Cliente · Start · Salary · Fee · GMRR), keeping the month nav + head.
+    function buildTable(entries) {
+      const cols = (colsSpec || '').split(',').map(spec => {
+        const parts = spec.trim().split('|');
+        return { field: parts[0] || '', label: parts[1] || parts[0] || '', fmt: parts[2] || 'raw' };
+      }).filter(c => c.field);
+      const headCells = cols.map(c => {
+        const isNum = c.fmt && c.fmt !== 'raw' && c.fmt !== 'date';
+        return `<th${isNum ? ' class="num"' : ''}>${esc(c.label)}</th>`;
+      }).join('');
+      if (!entries.length) {
+        return `<table class="dtable"><thead><tr>${headCells}</tr></thead>` +
+          `<tbody><tr><td colspan="${cols.length}" class="muted" style="text-align:center;padding:18px">${esc(emptyText)}</td></tr></tbody></table>`;
+      }
+      const body = entries.map(r => '<tr>' + cols.map(c => {
+        const f = fmt.pick(c.fmt);
+        const isNum = c.fmt && c.fmt !== 'raw' && c.fmt !== 'date';
+        return `<td${isNum ? ' class="num"' : ''}>${esc(f(r[c.field]))}</td>`;
+      }).join('') + '</tr>').join('');
+      return `<table class="dtable"><thead><tr>${headCells}</tr></thead><tbody>${body}</tbody></table>`;
+    }
 
     function buildBody(entries) {
       if (!entries.length) {
@@ -2267,7 +2291,13 @@
 
     function buildNav(currMonth) {
       if (el.dataset.noNav === 'true') return '';  // suppress nav (used when nav is shared across panels)
-      const pills = monthKeys.map(m => `
+      // Opt-in: only show months of the current year (e.g. YTD-only details like MRR).
+      let navKeys = monthKeys;
+      if (el.dataset.navCurrentYear === 'true') {
+        const curYear = monthKeys[monthKeys.length - 1].slice(0, 4);
+        navKeys = monthKeys.filter(m => m.slice(0, 4) === curYear);
+      }
+      const pills = navKeys.map(m => `
         <button type="button" class="mdetail__pill ${m === currMonth ? 'is-selected' : ''}" data-mdetail-month="${esc(m)}">
           ${esc(formatMonthHuman(m))}
         </button>
@@ -2284,7 +2314,7 @@
         <span class="meta"><strong>${entries.length}</strong> ${entries.length === 1 ? 'entry' : 'entries'} · <strong>${uniqueNames}</strong> distinct</span>
       </div>
       <div class="mdetail__body">
-        ${buildBody(entries)}
+        ${colsSpec ? buildTable(entries) : buildBody(entries)}
       </div>
     `;
     // Wire month-pill clicks
@@ -2300,7 +2330,10 @@
       const chartKey = el.dataset.chart;
       if (!chartKey) return;
       try {
-        const res = await fetchChart(chartKey, { mes: month });
+        // Pass both `mes` (cohort datasets) and `corte` = end-of-month
+        // (point-in-time snapshot datasets like the MRR contractor details).
+        // Each dataset reads only the param it understands; the other is ignored.
+        const res = await fetchChart(chartKey, { mes: month, corte: endOfMonth(month) });
         renderMonthDetail(el, res.rows || [], { month });
       } catch (e) {
         console.error('month-detail fetch failed', chartKey, e);

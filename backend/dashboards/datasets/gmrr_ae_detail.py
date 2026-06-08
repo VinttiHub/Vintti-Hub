@@ -40,6 +40,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or _parse_date(filters.get("hasta"))
         or datetime.utcnow().date()
     )
+    # YTD: limitar a deals cuya Close Win fue este año (el año del mes consultado).
+    year_start = date(corte.year, 1, 1)
 
     sql = """
         WITH hires AS (
@@ -67,6 +69,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE o.opp_model = 'Staffing'
             AND TRIM(LOWER(o.opp_sales_lead)) IN %(sales_leads)s
             AND ho.candidate_id IS NOT NULL
+            -- YTD: solo deals cuya Close Win fue este año (a partir del 1 de enero).
+            AND NULLIF(o.opp_close_date::text, '')::date >= %(year_start)s::date
         )
         SELECT
           h.candidate_name,
@@ -86,6 +90,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     return sql, {
         "sales_leads": SALES_LEADS,
         "corte": corte,
+        "year_start": year_start,
     }
 
 
