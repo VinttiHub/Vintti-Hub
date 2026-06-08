@@ -3228,6 +3228,16 @@ MAIN_CHARTS = [
         "position": {"x": 0, "y": 120, "w": 12, "h": 8},
         "sort_order": 600,
     },
+    {
+        "chart_key": "mg_table_cohort_by_client",
+        "tab_key": "growth",
+        "title": "Cohort by client — GMRR / MRR / Margin / Weight (current month)",
+        "type": "table",
+        "dataset_key": "cohort_by_client",
+        "config": {"mapping": {"columns": ["client_name", "total_employees", "gmrr", "mrr", "margin_pct", "weight_pct"]}},
+        "position": {"x": 0, "y": 128, "w": 12, "h": 8},
+        "sort_order": 601,
+    },
 
     # AE Metrics tab — combined M+B fuel-tank card (YTD vs annual goal) plus
     # window-based detail (30d/week) tables below. The card has no sales_lead

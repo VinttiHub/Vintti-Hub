@@ -48,6 +48,7 @@
       return '$' + n.toFixed(0);
     },
     percent: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : Math.round(+v) + '%',
+    percent2: (v) => (v == null || v === '' || isNaN(+v)) ? '—' : (+v).toFixed(2) + '%',
     'percent-pp': (v) => {
       if (v == null || v === '' || isNaN(+v)) return '—';
       const n = Math.round(+v);
@@ -2050,6 +2051,120 @@
     document.addEventListener('input', onFilterEvent);
   }
 
+  /* ---------- Cohort by client (per-client MRR summary, month-switchable) ---------- */
+  function bindCohortByClient() {
+    const card = document.querySelector('[data-cohort-client-card]');
+    if (!card) return;
+    const tableEl = card.querySelector('[data-cohort-client-table]');
+    if (!tableEl) return;
+    const chartKey = tableEl.dataset.cohortChart;
+    const searchInput = card.querySelector('[data-cohort-client-search]');
+    const monthSel = card.querySelector('[data-cohort-client-month]');
+    const clearBtn = card.querySelector('[data-cohort-client-clear]');
+    const datalist = card.querySelector('#cohort-client-options');
+    const cols = (tableEl.dataset.cols || '').split(',').map(s => {
+      const p = s.trim().split('|');
+      return { field: p[0] || '', label: p[1] || p[0] || '', fmt: p[2] || 'raw' };
+    }).filter(c => c.field);
+    const emptyText = tableEl.dataset.emptyText || 'Sin datos';
+    let rows = [];
+
+    // Month options: últimos 12 meses, mes actual seleccionado por defecto.
+    if (monthSel && monthSel.options.length === 0) {
+      const ms = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      [...lastNMonths(12)].reverse().forEach((m, i) => {
+        const o = document.createElement('option');
+        o.value = m;
+        const mt = m.match(/^(\d{4})-(\d{2})/);
+        o.textContent = mt ? `${ms[+mt[2] - 1]} ${mt[1]}` : m;
+        if (i === 0) o.selected = true;
+        monthSel.appendChild(o);
+      });
+    }
+
+    function renderTable(view) {
+      if (!cols.length) { tableEl.innerHTML = ''; return; }
+      if (!view.length) {
+        tableEl.innerHTML = `<div class="muted" style="padding:18px;text-align:center">${esc(emptyText)}</div>`;
+        return;
+      }
+      const head = '<thead><tr>' + cols.map((c, i) => i === 0
+        ? `<th class="cohort-th-name">${esc(c.label)}</th>`
+        : `<th>${esc(c.label)}</th>`).join('') + '</tr></thead>';
+      const body = '<tbody>' + view.map(r => '<tr>' + cols.map((c, i) => {
+        const f = fmt.pick(c.fmt);
+        return i === 0
+          ? `<td class="cohort-td-name"><span class="cohort-td-name__primary">${esc(f(r[c.field]))}</span></td>`
+          : `<td>${esc(f(r[c.field]))}</td>`;
+      }).join('') + '</tr>').join('') + '</tbody>';
+
+      // Footer · totales de lo visible. Margin = ΣMRR/ΣGMRR (no es un promedio simple);
+      // Weight = Σ weight (100% sin filtrar, menos si hay búsqueda).
+      const totGmrr = view.reduce((a, r) => a + (+r.gmrr || 0), 0);
+      const totMrr  = view.reduce((a, r) => a + (+r.mrr  || 0), 0);
+      const footerVal = (c) => {
+        if (c.field === 'margin_pct') return totGmrr ? (100 * totMrr / totGmrr) : 0;
+        return view.reduce((a, r) => a + (+r[c.field] || 0), 0);
+      };
+      const tfoot = '<tfoot><tr>' + cols.map((c, i) => {
+        if (i === 0) return `<td class="cohort-td-name cohort-td-name--total">Total month</td>`;
+        // En el total, los montos van abreviados ($259.1K) aunque el cuerpo use el número completo.
+        const footFmt = c.fmt === 'currency' ? 'currency-k' : c.fmt;
+        return `<td class="cohort-td-total cohort-td-total--col">${esc(fmt.pick(footFmt)(footerVal(c)))}</td>`;
+      }).join('') + '</tr></tfoot>';
+
+      tableEl.innerHTML = `<div class="cohort-scroll"><table class="cohort-table">${head}${body}${tfoot}</table></div>`;
+    }
+
+    function applyFilter() {
+      const needle = (searchInput && searchInput.value || '').trim().toLowerCase();
+      const view = needle
+        ? rows.filter(r => String(r.client_name || '').toLowerCase().includes(needle))
+        : rows;
+      renderTable(view);
+    }
+
+    function fillDatalist() {
+      if (!datalist) return;
+      datalist.innerHTML = '';
+      [...new Set(rows.map(r => r.client_name).filter(Boolean))].sort().forEach(c => {
+        const o = document.createElement('option');
+        o.value = c;
+        datalist.appendChild(o);
+      });
+    }
+
+    let reqId = 0;
+    async function load() {
+      const month = (monthSel && monthSel.value) || '';
+      const overrides = month ? { corte: endOfMonth(month) } : {};
+      const myReq = ++reqId;
+      tableEl.innerHTML = `<div class="muted" style="padding:18px;text-align:center">Cargando…</div>`;
+      try {
+        const res = await fetchChart(chartKey, overrides);
+        if (myReq !== reqId) return;  // superseded by a newer month change
+        rows = res.rows || [];
+      } catch (e) {
+        console.error('cohort-by-client load', e);
+        if (myReq !== reqId) return;
+        rows = [];
+      }
+      fillDatalist();
+      applyFilter();
+    }
+
+    if (searchInput) searchInput.addEventListener('input', applyFilter);
+    if (monthSel) monthSel.addEventListener('change', load);
+    if (clearBtn) clearBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (searchInput) searchInput.value = '';
+      if (monthSel && monthSel.options.length) monthSel.selectedIndex = 0;  // volver al mes actual
+      load();
+    });
+
+    load();
+  }
+
   function bindFunnelDetailToggles() {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-funnel-detail-toggle]');
@@ -3147,6 +3262,7 @@
     bindKpiDrawers();
     bindViewModes();
     bindCohortMetricToggle();
+    bindCohortByClient();
     bindPeriodToggles();
     updateWindowLabels();
     hydrate();

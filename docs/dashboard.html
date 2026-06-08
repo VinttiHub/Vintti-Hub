@@ -1010,7 +1010,7 @@
         <div class="skpi-header__avatar skpi-header__avatar--cohort">#</div>
         <h2 class="skpi-header__title">Cohort by contractor</h2>
       </div>
-      <div class="skpi-header__sub">Monthly client payment vs Salary · Staffing</div>
+      <div class="skpi-header__sub">Monthly client payment by contractor · Staffing</div>
     </header>
 
     <div class="grid skpi-grid">
@@ -1055,6 +1055,38 @@
              data-chart="mg_table_cohort_by_contractor" data-bind="cohort"
              data-metric="client_payment"
              data-empty-text="Sin datos de contractors."></div>
+      </div>
+    </div>
+
+    <!-- ============== SHARED SECTION · Cohort by client ============== -->
+    <header class="skpi-header skpi-header--cohort">
+      <div class="skpi-header__lead">
+        <div class="skpi-header__avatar skpi-header__avatar--cohort">#</div>
+        <h2 class="skpi-header__title">Cohort by client</h2>
+      </div>
+      <div class="skpi-header__sub">Monthly client payment by client · Staffing</div>
+    </header>
+
+    <div class="grid skpi-grid">
+      <div class="cohort-card s-12" data-cohort-client-card>
+        <div class="cohort-card__filters">
+          <label class="cohort-filter">
+            <span class="cohort-filter__label">Account</span>
+            <input type="text" class="cohort-filter__input" data-cohort-client-search
+                   list="cohort-client-options" placeholder="Buscar cliente…" autocomplete="off">
+            <datalist id="cohort-client-options"></datalist>
+          </label>
+          <label class="cohort-filter">
+            <span class="cohort-filter__label">Mes</span>
+            <select class="cohort-filter__select" data-cohort-client-month></select>
+          </label>
+          <button type="button" class="cohort-filter__clear" data-cohort-client-clear>Limpiar</button>
+        </div>
+        <div class="cohort-table-wrap"
+             data-cohort-client-table
+             data-cohort-chart="mg_table_cohort_by_client"
+             data-cols="client_name|Clientes|raw,total_employees|Total empleados|int,gmrr|GMRR|currency,mrr|MRR|currency,margin_pct|Margin|percent2,weight_pct|Weight over|percent2"
+             data-empty-text="Sin datos de clientes."></div>
       </div>
     </div>
 
@@ -8062,6 +8094,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=67" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=71" defer></script>
 </body>
 </html>
