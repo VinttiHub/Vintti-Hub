@@ -4186,6 +4186,18 @@ button.refgen__pill:hover { filter: brightness(0.96); transform: translateY(-1px
 .rk-empty { color: var(--ink-3); font-size: 13px; padding: 14px 2px; }
 @media (max-width: 620px) { .rk-row { grid-template-columns: 96px 1fr auto; gap: 8px; } }
 
+/* Origin chip (pill de color por canal en tablas) */
+.origin-chip { display: inline-block; padding: 3px 11px; border-radius: 999px; font-weight: 700; font-size: 12.5px; line-height: 1.45; white-space: nowrap; letter-spacing: -0.01em; }
+
+/* Ranking con chips: el label se ajusta al pill (sin recorte) */
+.rk--chips .rk-row { grid-template-columns: minmax(110px, max-content) 1fr auto; }
+.rk--chips .rk-row__label { overflow: visible; text-overflow: clip; }
+
+/* Barra de período GENERAL del tab */
+.mkt-period-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mkt-period-bar__label { font-weight: 800; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.mkt-period-bar__hint { font-size: 12px; color: var(--ink-3); }
+
 /* Marketing · histórico apilado (Net revenue) */
 .mkt-stack__bars { width: 100%; height: auto; display: block; margin-top: 6px; overflow: visible; }
 .rk-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0 2px; }

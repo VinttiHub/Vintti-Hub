@@ -1,11 +1,52 @@
-"""Marketing · detalle CLTV por canal — un cliente por fila (CLTV = MRR × vida real)."""
+"""Marketing · detalle CLTV por canal — un cliente por fila, por modelo.
+
+Staffing  → CLTV = MRR × vida real (fee mensual × meses activos).
+Recruiting → CLTV = Σ fee de placement (one-time); muestra # placements y fee prom.
+"""
 from __future__ import annotations
 
 
+def _model(filters: dict) -> str:
+    m = str(filters.get("model") or "").strip().lower()
+    return "Recruiting" if m == "recruiting" else "Staffing"
+
+
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+    model = _model(filters)
     channel = str(filters.get("channel") or filters.get("origin") or "").strip()
     ch_clause = "AND COALESCE(NULLIF(TRIM(a.where_come_from, ''), ''), '(Sin origen)') = %(channel)s" if channel else ""
+    params = {"channel": channel} if channel else {}
 
+    if model == "Recruiting":
+        sql = f"""
+            WITH acct AS (
+              SELECT a.account_id, a.client_name,
+                     COALESCE(NULLIF(TRIM(a.where_come_from, ''), ''), '(Sin origen)') AS origin
+              FROM account a
+              WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+                {ch_clause}
+            ),
+            rec AS (
+              SELECT o.opportunity_id, o.account_id, ac.client_name, ac.origin,
+                     COALESCE(SUM(ho.revenue), 0)::numeric AS deal_fee
+              FROM opportunity o
+              JOIN acct ac ON ac.account_id = o.account_id
+              LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
+              WHERE o.opp_model = 'Recruiting' AND TRIM(o.opp_stage) = 'Close Win'
+              GROUP BY o.opportunity_id, o.account_id, ac.client_name, ac.origin
+            )
+            SELECT
+              client_name, origin,
+              COUNT(*)::int                                          AS placements,
+              ROUND(AVG(deal_fee))::bigint                           AS avg_fee,
+              ROUND(SUM(deal_fee))::bigint                           AS cltv
+            FROM rec
+            GROUP BY client_name, origin
+            ORDER BY cltv DESC, client_name;
+        """
+        return sql, params
+
+    # STAFFING
     sql = f"""
         WITH acct AS (
           SELECT a.account_id, a.client_name,
@@ -47,23 +88,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY client_name, origin
         ORDER BY cltv DESC, client_name;
     """
-    params = {"channel": channel} if channel else {}
     return sql, params
 
 
 DATASET = {
     "key": "mkt_cltv_by_channel_detail",
-    "label": "Marketing · detalle CLTV por canal (por cliente)",
+    "label": "Marketing · detalle CLTV por canal (Staffing | Recruiting)",
     "dimensions": [
         {"key": "client_name", "label": "Cliente", "type": "string"},
         {"key": "origin", "label": "Canal", "type": "string"},
         {"key": "estado", "label": "Estado", "type": "string"},
         {"key": "lifetime_months", "label": "Vida (meses)", "type": "number"},
+        {"key": "placements", "label": "# Placements", "type": "number"},
     ],
     "measures": [
         {"key": "cltv", "label": "CLTV", "type": "currency"},
         {"key": "mrr", "label": "MRR", "type": "currency"},
+        {"key": "avg_fee", "label": "Fee promedio", "type": "currency"},
     ],
-    "default_filters": {},
+    "default_filters": {"model": "Staffing"},
     "query": query,
 }

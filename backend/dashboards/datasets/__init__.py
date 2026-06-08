@@ -209,6 +209,8 @@ from . import (
     mkt_net_revenue_history_detail,
     mkt_cltv_by_channel,
     mkt_cltv_by_channel_detail,
+    mkt_close_rate_by_channel,
+    mkt_efficiency_by_channel,
 )
 
 _REGISTRY: dict[str, dict[str, Any]] = {
@@ -423,6 +425,8 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     mkt_net_revenue_history_detail.DATASET["key"]: mkt_net_revenue_history_detail.DATASET,
     mkt_cltv_by_channel.DATASET["key"]: mkt_cltv_by_channel.DATASET,
     mkt_cltv_by_channel_detail.DATASET["key"]: mkt_cltv_by_channel_detail.DATASET,
+    mkt_close_rate_by_channel.DATASET["key"]: mkt_close_rate_by_channel.DATASET,
+    mkt_efficiency_by_channel.DATASET["key"]: mkt_efficiency_by_channel.DATASET,
 }
 
 

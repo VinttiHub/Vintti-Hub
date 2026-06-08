@@ -848,6 +848,7 @@
         color: el.dataset.color, fmtY: el.dataset.fmtY,
         limit: el.dataset.limit ? +el.dataset.limit : 12,
         empty: el.dataset.emptyText,
+        labelChip: 'labelChip' in el.dataset,
       });
       if (bind === 'stacked-bars') return renderStackedBars(el, scopedRows, {
         x: el.dataset.x, xLabel: el.dataset.xLabel, series: el.dataset.series, y: el.dataset.y,
@@ -909,6 +910,7 @@
     const color = COLOR[colorName] || COLOR.violet;
     const limit = opts.limit || 12;
     const fmtV = fmt.pick(opts.fmtY || 'int');
+    el.classList.toggle('rk--chips', !!opts.labelChip);
     const valid = (rows || []).filter(r => isFinite(+r[valKey]));
     if (!valid.length) {
       el.innerHTML = `<div class="rk-empty">${esc(opts.empty || 'Sin datos en el período.')}</div>`;
@@ -923,8 +925,9 @@
         ? `<span class="rk-row__share">${fmt.percent(r[opts.share])}</span>` : '';
       const rev = (opts.rev && r[opts.rev] != null)
         ? `<span class="rk-row__rev">${fmt.pick(opts.revFmt || 'currency-k')(r[opts.rev])}</span>` : '';
+      const labelHtml = opts.labelChip ? originChipHtml(r[labelKey]) : esc(r[labelKey]);
       return `<div class="rk-row">
-        <span class="rk-row__label" title="${esc(r[labelKey])}">${esc(r[labelKey])}</span>
+        <span class="rk-row__label" title="${esc(r[labelKey])}">${labelHtml}</span>
         <span class="rk-row__track"><span class="rk-row__fill" style="width:${w.toFixed(1)}%;background:${color}"></span></span>
         <span class="rk-row__val">${fmtV(v)}${share}${rev}</span>
       </div>`;
@@ -1449,6 +1452,35 @@
     }).join('');
   }
 
+  /* ---------- origin chip (colored pill, UNIQUE stable color per origin) ----------
+     Cada origin conocido tiene un índice fijo → tono (hue) separado por ángulo áureo
+     → color único y consistente en TODAS las tablas. Origins no listados caen a un
+     hash estable de su nombre, así que igual son determinísticos. */
+  const ORIGIN_ORDER = [
+    '(Sin origen)', 'Website Organic', 'Social Media', 'Connected Inbox',
+    'Referral', 'ChatGPT', 'Events', 'Google', 'AI', 'HubSpot', 'Import',
+    'Campaign', 'SEO', 'Email', 'Paid', 'Eventos', 'Social', 'Lead mag.',
+    'LinkedIn', 'Outbound',
+  ];
+  const GOLDEN_ANGLE = 137.508;
+  function chipColor(label) {
+    const s = String(label == null ? '' : label).trim();
+    let idx = ORIGIN_ORDER.indexOf(s);
+    if (idx < 0) {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      idx = ORIGIN_ORDER.length + (h % 997);
+    }
+    const hue = Math.round((idx * GOLDEN_ANGLE) % 360);
+    return { fg: `hsl(${hue}, 52%, 36%)`, bg: `hsl(${hue}, 68%, 95%)` };
+  }
+  function originChipHtml(label) {
+    const s = (label == null || label === '') ? '—' : String(label);
+    const c = chipColor(s);
+    return `<span class="origin-chip" style="background:${c.bg};color:${c.fg}">${esc(s)}</span>`;
+  }
+  const isNumFmt = (f) => f && f !== 'raw' && f !== 'date' && f !== 'chip';
+
   /* ---------- dtable (generic data table from data-cols="field|Label|fmt,...") ---------- */
   function renderDtable(el, rows) {
     const cols = (el.dataset.cols || '').split(',').map(spec => {
@@ -1466,13 +1498,13 @@
       return;
     }
     const head = cols.map(c => {
-      const isNum = c.fmt && c.fmt !== 'raw' && c.fmt !== 'date';
-      return `<th${isNum ? ' class="num"' : ''}>${esc(c.label)}</th>`;
+      return `<th${isNumFmt(c.fmt) ? ' class="num"' : ''}>${esc(c.label)}</th>`;
     }).join('');
     const body = rows.map(r => {
       return '<tr>' + cols.map(c => {
+        if (c.fmt === 'chip') return `<td>${originChipHtml(r[c.field])}</td>`;
         const f = fmt.pick(c.fmt);
-        const isNum = c.fmt && c.fmt !== 'raw' && c.fmt !== 'date';
+        const isNum = isNumFmt(c.fmt);
         const cell = f(r[c.field]);
         return `<td${isNum ? ' class="num"' : ''}>${esc(cell)}</td>`;
       }).join('') + '</tr>';
@@ -2165,6 +2197,64 @@
     load();
   }
 
+  /* ---------- CLTV model toggle (Staffing | Recruiting) ---------- */
+  // Aplica a TODAS las gráficas de CLTV: cambia el override `model`, intercambia
+  // los atributos de render por modelo (data-<attr>-staffing / -recruiting) y los
+  // textos de títulos, y refetchea + re-renderiza.
+  function bindCltvModelToggle() {
+    const toggle = document.querySelector('[data-cltv-model-toggle]');
+    if (!toggle) return;
+    const CHART_SEL = '[data-chart="mk_rank_cltv_by_channel"], [data-chart="mk_table_cltv_by_channel_detail"]';
+
+    // Copia los data-*-<Model> al data-* base (ej. data-cols-recruiting → data-cols).
+    function applyVariantAttrs(el, model) {
+      Object.keys(el.dataset).forEach(key => {
+        if (key.length > model.length && key.endsWith(model)) {
+          const base = key.slice(0, -model.length);
+          el.dataset[base.charAt(0).toLowerCase() + base.slice(1)] = el.dataset[key];
+        }
+      });
+    }
+
+    async function setModel(model) {
+      toggle.querySelectorAll('[data-cltv-model]').forEach(b =>
+        b.classList.toggle('is-active', b.dataset.cltvModel === model));
+      // Textos por modelo (títulos / subtítulos de las cards).
+      document.querySelectorAll('[data-cltv-text]').forEach(el => {
+        const t = el.dataset['text' + model];
+        if (t != null) el.textContent = t;
+      });
+      // Charts: aplica variantes de render + setea el override de modelo.
+      const charts = [...document.querySelectorAll(CHART_SEL)];
+      charts.forEach(el => {
+        applyVariantAttrs(el, model);
+        el.dataset.overrideModel = model;
+      });
+      // Refetch agrupado por (chartKey + overrides) y re-render.
+      const groups = new Map();
+      charts.forEach(el => {
+        const ck = el.dataset.chart;
+        const ov = readOverridesFor(el);
+        const compKey = compKeyFor(ck, ov);
+        if (!groups.has(compKey)) groups.set(compKey, { chartKey: ck, overrides: ov, els: [] });
+        groups.get(compKey).els.push(el);
+      });
+      for (const { chartKey, overrides, els } of groups.values()) {
+        try {
+          const r = await fetchChart(chartKey, overrides);
+          els.forEach(el => renderBinding(el, r.rows || []));
+        } catch (e) { console.error('cltv model toggle', chartKey, e); }
+      }
+    }
+
+    toggle.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cltv-model]');
+      if (!btn) return;
+      e.preventDefault();
+      setModel(btn.dataset.cltvModel);
+    });
+  }
+
   function bindFunnelDetailToggles() {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-funnel-detail-toggle]');
@@ -2513,6 +2603,39 @@
     });
   }
 
+  // Toggle GENERAL de período: un solo control que aplica a TODAS las cards
+  // período-aware (las que tienen data-override-periodo) de su sección.
+  function bindGlobalPeriodToggles() {
+    document.querySelectorAll('[data-period-global]').forEach(group => {
+      const section = group.closest('.channel') || document;
+      group.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-period-set]');
+        if (!btn) return;
+        const periodo = btn.dataset.periodSet;
+        group.querySelectorAll('[data-period-set]').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        const els = [...section.querySelectorAll('[data-chart][data-override-periodo]')];
+        els.forEach(el => { el.dataset.overridePeriodo = periodo; });
+        const groups = new Map();
+        els.forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try {
+            const r = await fetchChart(chartKey, overrides);
+            els.forEach(el => renderBinding(el, r.rows || []));
+          } catch (err) { console.error('global period toggle', chartKey, err); }
+        }
+      });
+    });
+  }
+
   function syncMonthChips(month) {
     const txt = month ? formatMonthHuman(month) : '';
     document.querySelectorAll('[data-kpi-drawer-month-chip]').forEach(el => {
@@ -2653,12 +2776,13 @@
       });
     };
 
-    // Botón "Ver detalle" de un card de período → usa el período activo del card.
+    // Botón "Ver detalle" de un card de período → usa el período activo del
+    // toggle GENERAL de la sección.
     document.querySelectorAll('[data-period-detail-open]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        const card = btn.closest('[data-period-card]');
-        const active = card && card.querySelector('[data-period-set].is-active');
+        const section = btn.closest('.channel');
+        const active = (section || document).querySelector('[data-period-global] [data-period-set].is-active');
         const periodo = active ? active.dataset.periodSet : 'mes';
         openPeriodDrawer(btn.getAttribute('data-period-detail-open'), periodo);
       });
@@ -3263,7 +3387,9 @@
     bindViewModes();
     bindCohortMetricToggle();
     bindCohortByClient();
+    bindCltvModelToggle();
     bindPeriodToggles();
+    bindGlobalPeriodToggles();
     updateWindowLabels();
     hydrate();
   }
