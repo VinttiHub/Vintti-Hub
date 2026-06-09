@@ -660,6 +660,10 @@ body[data-pdf-export="true"] .resume-rating {
   vertical-align: text-bottom;
 }
 
+.candidate-name-redaction {
+  vertical-align: -0.12em;
+}
+
 body[data-talent-drop="true"] .resume-rating {
   display: none;
 }

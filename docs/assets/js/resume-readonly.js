@@ -313,8 +313,9 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     const nameRes = await fetch(`${API_BASE}/candidates/${candidateId}`);
     const nameData = await nameRes.json();
     const displayName = nameData.name || "Unnamed Candidate";
-    document.getElementById("candidateNameTitle").textContent = displayName;
-    candidateFileName = isTalentDrop ? `${displayName}-talent-drop` : displayName;
+    const candidateNameTitle = document.getElementById("candidateNameTitle");
+    const firstName = renderCandidateName(candidateNameTitle, displayName, isTalentDrop);
+    candidateFileName = isTalentDrop ? `${firstName}-talent-drop` : displayName;
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     if (ratingEl) {
@@ -725,7 +726,9 @@ if (languages.length === 0) {
 // 📹 Video Link
 const videoSection = document.getElementById("videoLinkSection");
 const videoDiv = document.getElementById("readonly-video-link");
-  if (data.video_link && data.video_link.trim() !== "") {
+  if (isTalentDrop) {
+    if (videoSection) videoSection.style.display = "none";
+  } else if (data.video_link && data.video_link.trim() !== "") {
     if (isPdfExport) {
       const linkText = document.createElement("div");
       linkText.className = "video-link-button";
@@ -865,18 +868,23 @@ function blurCanvasPixels(canvas, radius = 10, passes = 3) {
   context.putImageData(imageData, 0, 0);
 }
 
-function createCompanyRedaction(companyName) {
+function createCompanyRedaction(companyName, options = {}) {
   const redaction = document.createElement("canvas");
   redaction.className = "company-redaction";
   const label = String(companyName || "").trim();
+  const isCandidateName = options.variant === "candidate-name";
+  const fontSize = isCandidateName ? 58 : 25;
+  const canvasHeight = isCandidateName ? 72 : 44;
+  const horizontalPadding = isCandidateName ? 44 : 36;
   const measureContext = document.createElement("canvas").getContext("2d");
-  if (measureContext) measureContext.font = "600 25px Onest, Arial, sans-serif";
+  if (measureContext) measureContext.font = `700 ${fontSize}px Onest, Arial, sans-serif`;
   const textWidth = measureContext?.measureText(label).width || 220;
-  redaction.width = Math.max(90, Math.ceil(textWidth + 36));
-  redaction.height = 44;
+  redaction.width = Math.max(90, Math.ceil(textWidth + horizontalPadding));
+  redaction.height = canvasHeight;
   redaction.style.width = `${redaction.width / 2}px`;
-  redaction.style.height = "22px";
-  redaction.setAttribute("aria-label", "Company name hidden");
+  redaction.style.height = `${redaction.height / 2}px`;
+  redaction.setAttribute("aria-label", options.ariaLabel || "Company name hidden");
+  if (isCandidateName) redaction.classList.add("candidate-name-redaction");
 
   const context = redaction.getContext("2d");
   if (context) {
@@ -901,16 +909,37 @@ function createCompanyRedaction(companyName) {
     context.fill();
 
     if (textContext) {
-      textContext.font = "600 25px Onest, Arial, sans-serif";
+      textContext.font = `700 ${fontSize}px Onest, Arial, sans-serif`;
       textContext.fillStyle = "rgba(100, 116, 139, 0.62)";
       textContext.textBaseline = "middle";
-      textContext.fillText(label, 18, redaction.height / 2);
-      blurCanvasPixels(blurredText, 6, 2);
+      textContext.fillText(label, horizontalPadding / 2, redaction.height / 2);
+      blurCanvasPixels(blurredText, isCandidateName ? 9 : 6, 2);
       context.drawImage(blurredText, 0, 0);
     }
   }
 
   return redaction;
+}
+
+function renderCandidateName(element, fullName, shouldRedact) {
+  const nameParts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  const firstName = nameParts[0] || "Candidate";
+
+  if (!element) return firstName;
+  element.replaceChildren();
+  element.appendChild(document.createTextNode(firstName));
+
+  if (shouldRedact && nameParts.length > 1) {
+    element.appendChild(document.createTextNode(" "));
+    element.appendChild(createCompanyRedaction(nameParts.slice(1).join(" "), {
+      variant: "candidate-name",
+      ariaLabel: "Additional names hidden",
+    }));
+  } else if (!shouldRedact && nameParts.length > 1) {
+    element.appendChild(document.createTextNode(` ${nameParts.slice(1).join(" ")}`));
+  }
+
+  return firstName;
 }
 
 function renderCompanyName(element, company, shouldRedact) {
