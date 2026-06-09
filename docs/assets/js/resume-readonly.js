@@ -913,7 +913,7 @@ function createCompanyRedaction(companyName, options = {}) {
       textContext.fillStyle = "rgba(100, 116, 139, 0.62)";
       textContext.textBaseline = "middle";
       textContext.fillText(label, horizontalPadding / 2, redaction.height / 2);
-      blurCanvasPixels(blurredText, isCandidateName ? 9 : 6, 2);
+      blurCanvasPixels(blurredText, isCandidateName ? 14 : 6, isCandidateName ? 4 : 2);
       context.drawImage(blurredText, 0, 0);
     }
   }
