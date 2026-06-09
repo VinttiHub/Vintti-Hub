@@ -1954,7 +1954,8 @@ select:focus {
 
 /* HOVER */
 #ai-action-button:hover,
-#client-version-btn:hover {
+#client-version-btn:hover,
+#talent-drop-btn:hover {
   background-color: #7b2cbf;
   transform: scale(1.05);
 }
@@ -5210,6 +5211,7 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 
 /* Reutiliza el estilo morado, pero ya no fijo */
 #client-version-btn,
+#talent-drop-btn,
 #ai-action-button {
   position: static;
   background-color: #003BFF;
@@ -5230,6 +5232,7 @@ html body #resume #educationSection      .cv-card-entry input.edu-title {
 }
 
 #client-version-btn:hover,
+#talent-drop-btn:hover,
 #ai-action-button:hover {
   background-color: #003BFF;
   transform: scale(1.05);

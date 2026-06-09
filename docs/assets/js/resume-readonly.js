@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const candidateId = urlParams.get("id");
   const isPdfExport = urlParams.has("pdf_export");
+  const isTalentDrop = urlParams.get("view") === "talent-drop";
   const API_BASE = "https://7m6mw95m8y.us-east-2.awsapprunner.com";
   const bodyEl = document.body;
   const downloadBtn = document.getElementById("readonly-download-btn");
@@ -22,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (bodyEl) {
     bodyEl.dataset.resumeReady = "loading";
     if (isPdfExport) bodyEl.dataset.pdfExport = "true";
+    if (isTalentDrop) bodyEl.dataset.talentDrop = "true";
   }
   if (isPdfExport && downloadBtn) {
     downloadBtn.remove();
@@ -312,7 +314,7 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
     const nameData = await nameRes.json();
     const displayName = nameData.name || "Unnamed Candidate";
     document.getElementById("candidateNameTitle").textContent = displayName;
-    candidateFileName = displayName;
+    candidateFileName = isTalentDrop ? `${displayName}-talent-drop` : displayName;
     document.getElementById("candidateCountry").textContent = nameData.country || "—";
 
     if (ratingEl) {
@@ -332,13 +334,6 @@ function formatDurationLabel(startValue, endValue, isCurrent = false) {
       setRatingOpen(false);
     }
 
-    // 🧠 About
-// 🧠 About
-const aboutP = document.getElementById("aboutField");
-aboutP.innerHTML = data.about || "—";
-cleanInlineStyles(aboutP);
-
-
 // 💼 Work Experience
 // 💼 Work Experience (LinkedIn-like multi-roles)
 const workExperienceList = document.getElementById("workExperienceList");
@@ -350,6 +345,16 @@ try {
   workExperience = JSON.parse(data.work_experience || "[]");
 } catch (e) {
   console.error("❌ Error parsing work_experience:", e);
+}
+
+const companyNames = getCompanyNames(workExperience);
+
+// 🧠 About
+const aboutP = document.getElementById("aboutField");
+aboutP.innerHTML = data.about || "—";
+cleanInlineStyles(aboutP);
+if (isTalentDrop) {
+  redactCompanyMentions(aboutP, companyNames);
 }
 
 /* Helpers locales */
@@ -451,7 +456,7 @@ function renderExperienceEntry(exp) {
 
     const companyDiv = document.createElement("div");
     companyDiv.className = "cv-entry-company";
-    companyDiv.textContent = exp.company || "—";
+    renderCompanyName(companyDiv, exp.company, isTalentDrop);
 
     const summaryDiv = document.createElement("div");
     summaryDiv.className = "cv-entry-summary resume-description";
@@ -513,7 +518,7 @@ function renderExperienceEntry(exp) {
 
   const companyDiv = document.createElement("div");
   companyDiv.className = "cv-entry-company";
-  companyDiv.textContent = exp.company || "—";
+  renderCompanyName(companyDiv, exp.company, isTalentDrop);
   right.appendChild(companyDiv);
 
   const rolesContainer = document.createElement("div");
@@ -798,6 +803,168 @@ function cleanInlineStyles(element) {
     el.style.fontFamily = 'Onest, sans-serif';
   });
 }
+
+function getCompanyNames(workExperience) {
+  return [...new Set(
+    workExperience
+      .map((experience) => String(experience?.company || "").trim())
+      .filter((company) => company && company !== "—")
+  )].sort((a, b) => b.length - a.length);
+}
+
+function blurCanvasPixels(canvas, radius = 10, passes = 3) {
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  const { width, height } = canvas;
+  let imageData = context.getImageData(0, 0, width, height);
+
+  for (let pass = 0; pass < passes; pass += 1) {
+    const source = imageData.data;
+    const horizontal = new Uint8ClampedArray(source.length);
+    const output = new Uint8ClampedArray(source.length);
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const startX = Math.max(0, x - radius);
+        const endX = Math.min(width - 1, x + radius);
+        const count = endX - startX + 1;
+        const target = (y * width + x) * 4;
+
+        for (let channel = 0; channel < 4; channel += 1) {
+          let sum = 0;
+          for (let sampleX = startX; sampleX <= endX; sampleX += 1) {
+            sum += source[(y * width + sampleX) * 4 + channel];
+          }
+          horizontal[target + channel] = sum / count;
+        }
+      }
+    }
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const startY = Math.max(0, y - radius);
+        const endY = Math.min(height - 1, y + radius);
+        const count = endY - startY + 1;
+        const target = (y * width + x) * 4;
+
+        for (let channel = 0; channel < 4; channel += 1) {
+          let sum = 0;
+          for (let sampleY = startY; sampleY <= endY; sampleY += 1) {
+            sum += horizontal[(sampleY * width + x) * 4 + channel];
+          }
+          output[target + channel] = sum / count;
+        }
+      }
+    }
+
+    imageData = new ImageData(output, width, height);
+  }
+
+  context.clearRect(0, 0, width, height);
+  context.putImageData(imageData, 0, 0);
+}
+
+function createCompanyRedaction(companyName) {
+  const redaction = document.createElement("canvas");
+  redaction.className = "company-redaction";
+  const label = String(companyName || "").trim();
+  const measureContext = document.createElement("canvas").getContext("2d");
+  if (measureContext) measureContext.font = "600 25px Onest, Arial, sans-serif";
+  const textWidth = measureContext?.measureText(label).width || 220;
+  redaction.width = Math.max(90, Math.ceil(textWidth + 36));
+  redaction.height = 44;
+  redaction.style.width = `${redaction.width / 2}px`;
+  redaction.style.height = "22px";
+  redaction.setAttribute("aria-label", "Company name hidden");
+
+  const context = redaction.getContext("2d");
+  if (context) {
+    const blurredText = document.createElement("canvas");
+    blurredText.width = redaction.width;
+    blurredText.height = redaction.height;
+    const textContext = blurredText.getContext("2d");
+
+    const radius = 12;
+    context.beginPath();
+    context.moveTo(radius, 0);
+    context.lineTo(redaction.width - radius, 0);
+    context.quadraticCurveTo(redaction.width, 0, redaction.width, radius);
+    context.lineTo(redaction.width, redaction.height - radius);
+    context.quadraticCurveTo(redaction.width, redaction.height, redaction.width - radius, redaction.height);
+    context.lineTo(radius, redaction.height);
+    context.quadraticCurveTo(0, redaction.height, 0, redaction.height - radius);
+    context.lineTo(0, radius);
+    context.quadraticCurveTo(0, 0, radius, 0);
+    context.closePath();
+    context.fillStyle = "#dbe3f2";
+    context.fill();
+
+    if (textContext) {
+      textContext.font = "600 25px Onest, Arial, sans-serif";
+      textContext.fillStyle = "rgba(30, 41, 59, 0.9)";
+      textContext.textBaseline = "middle";
+      textContext.fillText(label, 18, redaction.height / 2);
+      blurCanvasPixels(blurredText, 8, 3);
+      context.drawImage(blurredText, 0, 0);
+    }
+  }
+
+  return redaction;
+}
+
+function renderCompanyName(element, company, shouldRedact) {
+  element.replaceChildren();
+  if (shouldRedact && String(company || "").trim()) {
+    element.appendChild(createCompanyRedaction(company));
+    return;
+  }
+  element.textContent = company || "—";
+}
+
+function redactCompanyMentions(root, companyNames) {
+  if (!root || !companyNames.length) return;
+
+  const escapedNames = companyNames.map((company) =>
+    company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  );
+  const companyPattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}])(${escapedNames.join("|")})(?=$|[^\\p{L}\\p{N}])`,
+    "giu"
+  );
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+
+  while (walker.nextNode()) {
+    if (walker.currentNode.nodeValue.trim()) textNodes.push(walker.currentNode);
+  }
+
+  textNodes.forEach((textNode) => {
+    const text = textNode.nodeValue;
+    companyPattern.lastIndex = 0;
+    if (!companyPattern.test(text)) return;
+
+    companyPattern.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    let match;
+
+    while ((match = companyPattern.exec(text)) !== null) {
+      const companyStart = match.index + match[1].length;
+      if (companyStart > cursor) {
+        fragment.appendChild(document.createTextNode(text.slice(cursor, companyStart)));
+      }
+      fragment.appendChild(createCompanyRedaction(match[2]));
+      cursor = match.index + match[0].length;
+    }
+
+    if (cursor < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor)));
+    }
+    textNode.replaceWith(fragment);
+  });
+}
+
 function sortByEndDateDescending(entries) {
   return entries.sort((a, b) => {
     const dateA = a.current || !a.end_date ? new Date(2100, 0, 1) : new Date(a.end_date);

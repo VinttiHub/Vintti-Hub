@@ -654,6 +654,16 @@ body[data-pdf-export="true"] .resume-rating {
   margin-bottom: 4px;
 }
 
+.company-redaction {
+  display: inline-block;
+  user-select: none;
+  vertical-align: text-bottom;
+}
+
+body[data-talent-drop="true"] .resume-rating {
+  display: none;
+}
+
 .cv-entry-summary {
   margin: 4px 0 8px;
 }

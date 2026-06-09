@@ -548,6 +548,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Tabs + visibilidad de pills (UNA sola implementación) ---
   const aiButton   = document.getElementById('ai-action-button');
   const clientBtn  = document.getElementById('client-version-btn');
+  const talentDropBtn = document.getElementById('talent-drop-btn');
 
   function setActiveTab(tabId) {
     // pestañas
@@ -568,6 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const onResume = tabId === 'resume';
     aiButton?.classList.toggle('hidden', !onResume);
     clientBtn?.classList.toggle('hidden', !onResume);
+    talentDropBtn?.classList.toggle('hidden', !onResume);
   }
 
 document.querySelectorAll('.tab').forEach(t => {
@@ -4041,6 +4043,9 @@ if (drop) {
 if (clientBtn && candidateId) {
   clientBtn.href = `resume-readonly.html?id=${candidateId}`;
 }
+if (talentDropBtn && candidateId) {
+  talentDropBtn.href = `resume-readonly.html?id=${candidateId}&view=talent-drop`;
+}
 
 // muéstralos solo cuando la pestaña activa sea "resume"
 document.querySelectorAll('.tab').forEach(tab => {
@@ -4049,6 +4054,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     const show = tabId === 'resume';
     if (aiButton) aiButton.classList.toggle('hidden', !show);
     if (clientBtn) clientBtn.classList.toggle('hidden', !show);
+    if (talentDropBtn) talentDropBtn.classList.toggle('hidden', !show);
   });
 });
 
@@ -4056,6 +4062,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 if (document.querySelector('.tab.active')?.dataset.tab === 'resume') {
   if (aiButton) aiButton.classList.remove('hidden');
   if (clientBtn) clientBtn.classList.remove('hidden');
+  if (talentDropBtn) talentDropBtn.classList.remove('hidden');
 }
 
 (function wireHireReminders(){
