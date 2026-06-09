@@ -241,6 +241,10 @@ function registerAccountTableFilters(table) {
 
 function doesRowMatchCrmFilters(row) {
   const ds = row?.dataset || {};
+  // 🏷️ Workspace (Vintti / Vintti.ai / All) — por account_manager (salesLeadCode = email)
+  if (window.Workspace && typeof window.Workspace.matchEmails === 'function') {
+    if (!window.Workspace.matchEmails(ds.salesLeadCode || '')) return false;
+  }
   if (CRM_FILTER_STATE.salesLead) {
     const code = ds.salesLeadCode || CRM_UNASSIGNED_SALES_LEAD_VALUE;
     if (code !== CRM_FILTER_STATE.salesLead) return false;
@@ -355,6 +359,11 @@ function renderSalesLeadOptions() {
 function upsertSalesLeadOption(value, label) {
   const key = (value || '').toLowerCase().trim();
   if (!key) return false;
+  // 🏷️ Acotar al workspace activo: Vintti quita a Mia, Vintti.ai deja solo vintti.ai.
+  if (window.Workspace && typeof window.Workspace.matchEmails === 'function'
+      && !window.Workspace.matchEmails(key)) {
+    return false;
+  }
   const display = (label || '').trim() || value;
   const prev = CRM_SALES_LEAD_OPTIONS.get(key);
   if (prev === display) return false;
@@ -2389,6 +2398,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       accountTableInstance = table;
       registerAccountTableFilters(table);
+      // El ext.search se registra después del draw inicial; forzamos un redraw
+      // para que el filtro de workspace (Vintti / Vintti.ai / All) aplique al cargar.
+      table.draw();
       $tbl.on('draw.dt', () => updateCrmEmptyState(table));
       updateCrmEmptyState(table);
 

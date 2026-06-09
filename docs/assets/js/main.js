@@ -1336,7 +1336,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
   fetch('https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/light')
     .then(response => response.json())
     .then(async data => {
-      
+
       const tbody = document.getElementById('opportunityTableBody');
       tbody.innerHTML = '';
       // 🔄 Enriquecer con latest_sourcing_date solo para oportunidades en 'Sourcing'
@@ -1526,6 +1526,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
 
           `;
           tr.dataset.filterDate = getOpportunityReferenceDate(opp);
+          tr.dataset.salesLead = String(opp.opp_sales_lead || '').toLowerCase();
 
           // const batchCell = tr.querySelector('.batch-count-cell');
           // hydrateBatchCountCell(opp.opportunity_id, batchCell);
@@ -1649,6 +1650,20 @@ if (!window.__typeFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
     return selection.has(value);
   });
   window.__typeFilterExtRegistered = true;
+}
+
+// 🏷️ Filtro de workspace (Vintti / Vintti.ai / Todos) — por sales lead, a nivel
+// de fila. Se construye sobre el dataset completo (no toca las opciones de los
+// demás dropdowns) para no romper la resolución de nombres de HR/Sales.
+if (!window.__workspaceFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
+  $.fn.dataTable.ext.search.push((settings, rowData, rowIndex) => {
+    if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
+    if (!window.Workspace || typeof window.Workspace.matchEmails !== 'function') return true;
+    const row = settings.aoData?.[rowIndex]?.nTr;
+    const salesLead = row?.dataset?.salesLead || '';
+    return window.Workspace.matchEmails(salesLead);
+  });
+  window.__workspaceFilterExtRegistered = true;
 }
 
 window.__daysRangeFilterState = window.__daysRangeFilterState || { min: null, max: null };
@@ -1890,9 +1905,16 @@ const uniqueStages = [...new Set([
   return idxA - idxB;
 });
 
-// SALES LEAD: agrega 'Unassigned' si hay filas sin nombre
-let uniqueSalesLeads = [...new Set(data.map(d => d.sales_lead_name).filter(Boolean))];
-if (data.some(d => !d.sales_lead_name)) {
+// SALES LEAD: agrega 'Unassigned' si hay filas sin nombre.
+// 🏷️ Las opciones del dropdown se acotan al workspace activo: en Vintti se
+// quita a Mia, en Vintti.ai quedan solo los de vintti.ai. (Solo el de Sales
+// Lead — su nombre sale de la misma fuente que rinde la celda, así que es
+// seguro; HR/Stage/Type siguen usando el dataset completo.)
+const salesLeadSource = (window.Workspace && typeof window.Workspace.matchOpp === 'function')
+  ? data.filter(d => window.Workspace.matchOpp(d))
+  : data;
+let uniqueSalesLeads = [...new Set(salesLeadSource.map(d => d.sales_lead_name).filter(Boolean))];
+if (salesLeadSource.some(d => !d.sales_lead_name)) {
   uniqueSalesLeads.push('Unassigned'); // coincide con regex ^$ que pondremos abajo
 }
 

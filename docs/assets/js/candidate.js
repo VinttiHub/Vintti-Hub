@@ -552,6 +552,8 @@ function buildCandidateRow(candidate) {
   tr.dataset.status = (candidate.status || '').toLowerCase();
   tr.dataset.model = (candidate.opp_model || '').trim();
   tr.dataset.resume = isTrueResumeFlag(candidate.has_resume) ? 'with' : 'without';
+  // 🏷️ Sales lead de la opp vinculada → workspace (vintti.ai = Mia)
+  tr.dataset.salesLead = (candidate.opp_sales_lead || '').toLowerCase();
 
   const rawPhone = candidate.phone ? String(candidate.phone) : '';
   const phone = rawPhone.replace(/\D/g, '');
@@ -658,6 +660,9 @@ function initDataTable() {
   moveLengthControl();
   bindNameSearchInput(candidateState.dataTable);
   installAdvancedFilters(candidateState.dataTable);
+  // El ext.search se registra tras el draw inicial → forzamos un redraw para
+  // que el filtro de workspace aplique al cargar.
+  candidateState.dataTable.draw();
 }
 
 function moveLengthControl() {
@@ -1383,6 +1388,18 @@ document.addEventListener('click', (e) => {
   }
 });
 function installAdvancedFilters(table) {
+  // 🏷️ Filtro de workspace (Vintti / Vintti.ai / All) por sales lead de la opp.
+  // Independiente de los selects de status/model/resume → siempre se registra.
+  if (!window.__candWorkspaceExtRegistered) {
+    $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
+      if (settings.nTable !== document.getElementById('candidatesTable')) return true;
+      if (!window.Workspace || typeof window.Workspace.matchEmails !== 'function') return true;
+      const tr = table.row(dataIndex).node();
+      return window.Workspace.matchEmails(tr?.dataset?.salesLead || '');
+    });
+    window.__candWorkspaceExtRegistered = true;
+  }
+
   const statusSel = document.getElementById('statusFilter');
   const modelSel  = document.getElementById('modelFilter');
   const resumeSel = document.getElementById('resumeFilter');

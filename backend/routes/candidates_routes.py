@@ -2334,6 +2334,9 @@ def get_candidates_light_fast():
                 ) THEN 'Recruiting'
                 ELSE NULL
               END AS opp_model,
+              -- Sales lead de la opp vinculada (hire activo o buyout): permite
+              -- atribuir el candidato a un workspace (vintti.ai = Mia).
+              COALESCE(o.opp_sales_lead, bo.opp_sales_lead) AS opp_sales_lead,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
             FROM candidates c
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id
