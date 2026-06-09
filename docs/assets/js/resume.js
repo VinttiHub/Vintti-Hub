@@ -326,7 +326,7 @@ function coerceLanguages(raw) {
   }).filter(Boolean);
 }
 
-  const EDU_COUNTRIES = ["","Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Dominican Republic","Ecuador","El Salvador","Guatemala","Honduras","Mexico","Nicaragua","Panama","Paraguay","Peru","Uruguay","Venezuela","United States","Canada","Spain","Portugal","United Kingdom","Germany","France","Italy","Netherlands","Poland","India","China","Japan","Australia"];
+  const EDU_COUNTRIES = ["","Argentina","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Dominican Republic","Ecuador","El Salvador","Guatemala","Honduras","Mexico","Nicaragua","Panama","Paraguay","Peru","Uruguay","Venezuela","United States","Canada","Spain","Portugal","United Kingdom","Austria","Germany","France","Italy","Netherlands","Poland","India","China","Japan","Australia"];
   const countryOptions = (sel="") => EDU_COUNTRIES.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c||'Select country'}</option>`).join('');
 
   // ---------- Month-Year Picker (self-contained) ----------

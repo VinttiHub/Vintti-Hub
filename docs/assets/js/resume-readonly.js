@@ -1025,7 +1025,7 @@ function getFlagEmoji(countryName) {
     "Cuba":"🇨🇺","Dominican Republic":"🇩🇴","Ecuador":"🇪🇨","El Salvador":"🇸🇻","Guatemala":"🇬🇹",
     "Honduras":"🇭🇳","Mexico":"🇲🇽","Nicaragua":"🇳🇮","Panama":"🇵🇦","Paraguay":"🇵🇾","Peru":"🇵🇪",
     "Uruguay":"🇺🇾","Venezuela":"🇻🇪","United States":"🇺🇸","Canada":"🇨🇦","Spain":"🇪🇸","Portugal":"🇵🇹",
-    "United Kingdom":"🇬🇧","Germany":"🇩🇪","France":"🇫🇷","Italy":"🇮🇹","Netherlands":"🇳🇱","Poland":"🇵🇱",
+    "United Kingdom":"🇬🇧","Austria":"🇦🇹","Germany":"🇩🇪","France":"🇫🇷","Italy":"🇮🇹","Netherlands":"🇳🇱","Poland":"🇵🇱",
     "India":"🇮🇳","China":"🇨🇳","Japan":"🇯🇵","Australia":"🇦🇺"
   };
   const normalized = normalizeCountryKey(countryName);
