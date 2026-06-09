@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+from ._periods import window_bounds
+
 
 def _parse_date(value) -> date | None:
     if not value:
@@ -46,22 +48,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     modelo = _resolve_modelo(filters)
     resultado = _resolve_resultado(filters)
     cliente = (filters.get("cliente") or filters.get("client_name") or "").strip() or None
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or _parse_date(filters.get("fecha_corte"))
-        or _parse_date(filters.get("mes"))
-    )
+    # Ventana efectiva compartida: MES/desde-hasta → mes calendario; CORTE → 30d
+    # rodante terminando en el corte (igual que el resto de las cards de 30d).
+    win_ini, win_fin = window_bounds(filters)
 
     sql = """
-        WITH cutoff_sel AS (
-          SELECT COALESCE(%(corte)s::date, CURRENT_DATE)::date AS cutoff_d
-        ),
-        ventana AS (
+        WITH ventana AS (
           SELECT
-            (c.cutoff_d - INTERVAL '29 day')::date AS win_ini,
-            c.cutoff_d::date                       AS win_fin
-          FROM cutoff_sel c
+            %(win_ini)s::date AS win_ini,
+            %(win_fin)s::date AS win_fin
         ),
         base AS (
           SELECT
@@ -129,7 +124,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         "modelo": modelo,
         "resultado": resultado,
         "cliente": cliente,
-        "corte": corte,
+        "win_ini": win_ini,
+        "win_fin": win_fin,
     }
 
 
