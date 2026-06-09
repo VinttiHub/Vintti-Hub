@@ -898,9 +898,11 @@
     'Bajo': '#c1ff72', 'Low': '#c1ff72', 'Safe': '#c1ff72',
   };
   const DEFAULT_PALETTE = ['#003bff', '#6c38ff', '#4ba9ff', '#ff1fdb', '#c1ff72', '#f5b94a', '#6cd391', '#f590ad'];
+  // Modelos de negocio con color de marca Vintti (Recruiting verde lima · Staffing magenta).
+  const MODEL_COLORS = { 'Recruiting': '#c1ff72', 'Staffing': '#ff1fdb' };
 
   function colorForLabel(label, idx) {
-    return RISK_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
+    return RISK_COLORS[label] || MODEL_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
   }
 
   // Ranking de barras horizontales (categoría · barra · valor [+ share/rev]).
@@ -959,7 +961,7 @@
       }
     });
     const maxTotal = Math.max(...buckets.map(b => b.total), 1);
-    const colorOf = s => STACK_PALETTE[series.indexOf(s) % STACK_PALETTE.length];
+    const colorOf = s => originSeriesColor(s);
     const n = buckets.length;
     const slot = (w - 2 * padX) / Math.max(n, 1);
     const barW = Math.max(10, Math.min(54, slot * 0.6));
@@ -1024,8 +1026,8 @@
       const s = String(r[sKey] == null ? '—' : r[sKey]);
       if ((+r[yKey] || 0) > 0 && !series.includes(s)) series.push(s);
     });
-    el.innerHTML = series.map((s, i) =>
-      `<span class="rk-legend__item"><span class="rk-legend__dot" style="background:${STACK_PALETTE[i % STACK_PALETTE.length]}"></span>${esc(s)}</span>`
+    el.innerHTML = series.map((s) =>
+      `<span class="rk-legend__item">${originChipHtml(s)}</span>`
     ).join('');
   }
 
@@ -1140,7 +1142,7 @@
     txt1.setAttribute('font-size', '26');
     txt1.setAttribute('font-weight', '700');
     txt1.setAttribute('font-family', 'Onest, system-ui, sans-serif');
-    txt1.textContent = String(total);
+    txt1.textContent = fmt.pick(svg.dataset.centerFmt || 'int')(total);
     svg.appendChild(txt1);
 
     const txt2 = document.createElementNS(SVG_NS, 'text');
@@ -1149,7 +1151,7 @@
     txt2.setAttribute('fill', '#8a90a0');
     txt2.setAttribute('font-size', '11');
     txt2.setAttribute('font-family', 'Onest, system-ui, sans-serif');
-    txt2.textContent = 'total';
+    txt2.textContent = svg.dataset.centerLabel || 'total';
     svg.appendChild(txt2);
 
     attachDonutHover(svg, segments, {});
@@ -1164,17 +1166,22 @@
     }
     const list = el.querySelector('ul');
     list.innerHTML = '';
+    const valFmt = fmt.pick(el.dataset.valFmt || 'int');
+    const pctOnly = 'pctOnly' in el.dataset;
     const total = rows.reduce((a, r) => a + (+r[valueKey] || 0), 0) || 1;
     rows.forEach((row, i) => {
       const v = +row[valueKey] || 0;
       const pct = Math.round((v / total) * 100) + '%';
       const color = colorForLabel(String(row[labelKey] || ''), i);
+      const valHtml = pctOnly
+        ? `<span class="val">${pct}</span>`
+        : `<span class="val">${valFmt(v)} <span class="muted" style="font-weight:500;color:var(--ink-3);font-size:11px">${pct}</span></span>`;
       const li = document.createElement('li');
       li.innerHTML = `
         <span class="swatch" style="background:${color}"></span>
         <span>${esc(row[labelKey] || '—')}</span>
         <span class="leader"></span>
-        <span class="val">${v} <span class="muted" style="font-weight:500;color:var(--ink-3);font-size:11px">${pct}</span></span>
+        ${valHtml}
       `;
       list.appendChild(li);
     });
@@ -1463,7 +1470,7 @@
     'LinkedIn', 'Outbound',
   ];
   const GOLDEN_ANGLE = 137.508;
-  function chipColor(label) {
+  function chipHue(label) {
     const s = String(label == null ? '' : label).trim();
     let idx = ORIGIN_ORDER.indexOf(s);
     if (idx < 0) {
@@ -1471,8 +1478,16 @@
       for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
       idx = ORIGIN_ORDER.length + (h % 997);
     }
-    const hue = Math.round((idx * GOLDEN_ANGLE) % 360);
+    return Math.round((idx * GOLDEN_ANGLE) % 360);
+  }
+  function chipColor(label) {
+    const hue = chipHue(label);
     return { fg: `hsl(${hue}, 52%, 36%)`, bg: `hsl(${hue}, 68%, 95%)` };
+  }
+  // Color de canal para barras/segmentos: sólido del MISMO hue de la pill, con
+  // cuerpo (ni lavado como el fondo, ni neón) para que se lea igual que la pill.
+  function originSeriesColor(label) {
+    return `hsl(${chipHue(label)}, 48%, 60%)`;
   }
   function originChipHtml(label) {
     const s = (label == null || label === '') ? '—' : String(label);

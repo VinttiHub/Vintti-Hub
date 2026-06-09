@@ -4953,20 +4953,73 @@
   <section class="channel" data-channel="marketing">
     <div class="grid">
 
-      <!-- ===== Filtro de período GENERAL · aplica a todas las cards del tab ===== -->
-      <div class="section s-12 mkt-period-bar">
-        <span class="mkt-period-bar__label">Período</span>
+      <!-- ===== MÉTRICAS DE NEGOCIO · resumen + filtro de período GENERAL ===== -->
+      <div class="section s-12 mkt-metrics-head">
+        <div>
+          <h2>Métricas de negocio</h2>
+        </div>
         <div class="period-toggle" data-period-global role="tablist" aria-label="Período (general)">
           <button type="button" data-period-set="semana" role="tab" aria-selected="false">Semana</button>
           <button type="button" class="is-active" data-period-set="mes" role="tab" aria-selected="true">Mes</button>
           <button type="button" data-period-set="q" role="tab" aria-selected="false">Q</button>
           <button type="button" data-period-set="anio" role="tab" aria-selected="false">Año</button>
         </div>
-        <span class="mkt-period-bar__hint">aplica a todas las cards con filtro de período</span>
+      </div>
+
+      <div class="skpi-tile s-3">
+        <div class="skpi-tile__head"><span class="skpi-tile__title">SQLs totales</span></div>
+        <div class="skpi-tile__value" data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="sqls" data-reduce="first" data-fmt="int">—</div>
+        <div class="skpi-tile__delta skpi-tile__delta--arrow">
+          <span data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="sqls_delta" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs ant.
+        </div>
+      </div>
+
+      <div class="skpi-tile s-3">
+        <div class="skpi-tile__head"><span class="skpi-tile__title">New active clients</span></div>
+        <div class="skpi-tile__value" data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="new_clients" data-reduce="first" data-fmt="int">—</div>
+        <div class="skpi-tile__delta skpi-tile__delta--arrow">
+          <span data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="new_clients_delta" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs ant.
+        </div>
+      </div>
+
+      <div class="skpi-tile s-3">
+        <div class="skpi-tile__head"><span class="skpi-tile__title">Tasa de cierre</span></div>
+        <div class="skpi-tile__value" data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="close_rate" data-reduce="first" data-fmt="percent">—</div>
+        <div class="skpi-tile__delta skpi-tile__delta--arrow">
+          <span data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="close_rate_delta" data-reduce="first" data-fmt="percent-pp" data-class-on-sign>—</span> vs ant.
+        </div>
+      </div>
+
+      <div class="skpi-tile s-3">
+        <div class="skpi-tile__head"><span class="skpi-tile__title">Net revenue</span></div>
+        <div class="skpi-tile__value" data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="net_rev" data-reduce="first" data-fmt="currency-k">—</div>
+        <div class="skpi-tile__delta skpi-tile__delta--arrow">
+          <span data-chart="mk_business_metrics" data-override-periodo="mes" data-bind="text" data-field="net_rev_delta" data-reduce="first" data-fmt="delta-percent" data-class-on-sign>—</span> vs ant.
+        </div>
+      </div>
+
+      <!-- ===== Revenue mix · Recruiting vs Staffing (sigue el período global) ===== -->
+      <div class="card s-4">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Revenue mix</h3>
+            <p class="card__sub">Recruiting vs Staffing · net revenue del período</p>
+          </div>
+        </div>
+        <div class="donut__legend mkt-revmix__legend" data-chart="mk_donut_revenue_mix" data-override-periodo="mes" data-bind="donut-legend"
+             data-label="model" data-value="net_rev" data-pct-only>
+          <ul></ul>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg data-chart="mk_donut_revenue_mix" data-override-periodo="mes" data-bind="donut"
+               data-label="model" data-value="net_rev" data-center-fmt="currency-k" data-center-label="net rev"
+               viewBox="0 0 180 180"></svg>
+        </div>
+        <button type="button" class="skpi-tile__detail-btn" data-period-detail-open="mkt-revmix-detail" aria-label="Ver detalle Revenue mix">Ver detalle</button>
       </div>
 
       <!-- ===== Marketing · rankings por período ===== -->
-      <div class="card s-12 mkt-rank-card" data-period-card>
+      <div class="card s-8 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
             <h3 class="card__title">SQLs aperturados por origin</h3>
@@ -5021,7 +5074,7 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">Net revenue generado por origin · histórico</h3>
-            <p class="card__sub">Barras apiladas por origen (fee Vintti de close wins) · click en un bucket para su detalle · sin outbound</p>
+            <p class="card__sub">Barras apiladas por origen (fee Vintti de close wins) · click en un bucket para su detalle</p>
           </div>
         </div>
         <div class="rk-legend mkt-stack__legend" data-chart="mk_stack_net_revenue_history" data-override-periodo="mes" data-bind="stacked-legend"
@@ -7574,6 +7627,22 @@
               <div class="dtable-wrap" data-chart="mk_table_sqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
                    data-cols="creation_date|Creación|raw,client_name|Cuenta|raw,origin|Origin|chip"
                    data-empty-text="Sin SQLs en el período."></div>
+            </section>
+          </div>
+        </div>
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="mkt-revmix-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Marketing · Recruiting vs Staffing</span>
+            <h3 class="kpi-drawer__title">Revenue mix · detalle</h3>
+            <p class="kpi-drawer__sub">Deals (Close Win) cerrados en el período seleccionado, con su modelo, cliente, posición y fee · sin outbound.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Deals del período</h4>
+              <div class="dtable-wrap" data-chart="mk_table_revmix_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="net_revenue|Net rev|currency-k,model|Modelo|chip,close_date|Close date|raw,client_name|Cliente|raw,origin|Origin|chip,opp_position_name|Posición|raw"
+                   data-empty-text="Sin deals en el período."></div>
             </section>
           </div>
         </div>
