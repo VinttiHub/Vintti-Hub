@@ -902,10 +902,10 @@ function createCompanyRedaction(companyName) {
 
     if (textContext) {
       textContext.font = "600 25px Onest, Arial, sans-serif";
-      textContext.fillStyle = "rgba(30, 41, 59, 0.9)";
+      textContext.fillStyle = "rgba(100, 116, 139, 0.62)";
       textContext.textBaseline = "middle";
       textContext.fillText(label, 18, redaction.height / 2);
-      blurCanvasPixels(blurredText, 8, 3);
+      blurCanvasPixels(blurredText, 6, 2);
       context.drawImage(blurredText, 0, 0);
     }
   }
