@@ -27,8 +27,9 @@ def _parse_date(value):
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    corte = (_parse_date(filters.get("corte")) or _parse_date(filters.get("hasta"))
-             or datetime.utcnow().date())
+    # Semanas de CALENDARIO (Lun–Dom, últimas 6) → siempre relativas a HOY. NO
+    # siguen el filtro CORTE (solo las cards de 30d lo siguen).
+    corte = datetime.utcnow().date()
     this_monday = corte - timedelta(days=corte.weekday())
     first_monday = this_monday - timedelta(days=7 * (WEEKS - 1))
 

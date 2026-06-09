@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -40,7 +40,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     hasta = _parse_date(filters.get("hasta")) or _parse_date(filters.get("to"))
     modelo = _resolve_modelo(filters)
 
-    sql = """
+    corte = _parse_date(filters.get("corte"))
+    corte_mode = bool(corte) and not (filters.get("mes") or filters.get("desde") or filters.get("hasta"))
+    prev = (corte - timedelta(days=30)) if corte else None
+
+    base_sql = """
         WITH hire_rows AS (
           SELECT
             ('hire_' || ho.hire_opp_id::text) AS row_id,
@@ -238,6 +242,60 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             ROUND(p.arpc_fee_raw, 2)     AS arpc_fee
           FROM arpc_per_mes p
         )
+    """
+
+    if corte_mode:
+        anchor_with = """,
+        arpc_anchor AS (
+          SELECT k.kind,
+            CASE
+              WHEN %(modelo)s = 'Staffing'
+                THEN COUNT(DISTINCT r.candidate_id) FILTER (WHERE r.model='staffing' AND r.candidate_id IS NOT NULL)::numeric
+              WHEN %(modelo)s = 'Recruiting'
+                THEN COUNT(DISTINCT r.row_id) FILTER (WHERE r.model='recruiting')::numeric
+              ELSE (COUNT(DISTINCT r.candidate_id) FILTER (WHERE r.model='staffing' AND r.candidate_id IS NOT NULL)
+                    + COUNT(DISTINCT r.row_id) FILTER (WHERE r.model='recruiting'))::numeric
+            END AS candidatos,
+            SUM(r.rev_m)::numeric AS rev,
+            SUM(r.fee_m)::numeric AS fee
+          FROM (VALUES (%(corte)s::date, 'cur'), (%(prev)s::date, 'prev')) AS k(d, kind)
+          JOIN all_rows r
+            ON r.start_d IS NOT NULL
+           AND r.start_d <= k.d
+           AND COALESCE(r.end_d, DATE '9999-12-31') >= k.d
+           AND (%(modelo)s = 'Total' OR r.model = LOWER(%(modelo)s))
+          GROUP BY k.kind
+        ),
+        arpc_corte_vals AS (
+          SELECT
+            MAX(CASE WHEN kind='cur'  THEN rev / NULLIF(candidatos,0) END) AS arpc_rev_cur,
+            MAX(CASE WHEN kind='prev' THEN rev / NULLIF(candidatos,0) END) AS arpc_rev_prev,
+            MAX(CASE WHEN kind='cur'  THEN fee / NULLIF(candidatos,0) END) AS arpc_fee_cur,
+            MAX(CASE WHEN kind='prev' THEN fee / NULLIF(candidatos,0) END) AS arpc_fee_prev,
+            MAX(CASE WHEN kind='cur'  THEN rev END) AS rev_total_cur
+          FROM arpc_anchor
+        )
+    """
+        kpi_cols = """,
+          ROUND(cv.arpc_rev_cur, 2)::numeric AS arpc_revenue_corte,
+          ROUND(100.0 * (cv.arpc_rev_cur - cv.arpc_rev_prev) / NULLIF(cv.arpc_rev_prev, 0), 2)::numeric AS arpc_revenue_corte_delta,
+          ROUND(cv.arpc_fee_cur, 2)::numeric AS arpc_fee_corte,
+          ROUND(100.0 * (cv.arpc_fee_cur - cv.arpc_fee_prev) / NULLIF(cv.arpc_fee_prev, 0), 2)::numeric AS arpc_fee_corte_delta,
+          ROUND(cv.rev_total_cur, 2)::numeric AS revenue_total_mes_corte"""
+        kpi_join = "\n        CROSS JOIN arpc_corte_vals cv"
+        params = {"desde": desde, "hasta": hasta, "modelo": modelo, "corte": corte, "prev": prev}
+    else:
+        anchor_with = ""
+        kpi_cols = """,
+          NULL::numeric AS arpc_revenue_corte,
+          NULL::numeric AS arpc_revenue_corte_delta,
+          NULL::numeric AS arpc_fee_corte,
+          NULL::numeric AS arpc_fee_corte_delta,
+          NULL::numeric AS revenue_total_mes_corte"""
+        kpi_join = ""
+        params = {"desde": desde, "hasta": hasta, "modelo": modelo}
+
+    final_select = f"""
         SELECT
           TO_CHAR(r.mes, 'YYYY-MM') AS mes,
           r.candidatos_activos::int AS candidatos_activos,
@@ -262,12 +320,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               ELSE (r.arpc_fee - LAG(r.arpc_fee) OVER (ORDER BY r.mes))
                    / LAG(r.arpc_fee) OVER (ORDER BY r.mes) * 100
             END, 2
-          ) AS arpc_fee_mom_pct
-        FROM arpc_rounded r
+          ) AS arpc_fee_mom_pct{kpi_cols}
+        FROM arpc_rounded r{kpi_join}
         ORDER BY 1;
     """
 
-    return sql, {"desde": desde, "hasta": hasta, "modelo": modelo}
+    return base_sql + anchor_with + final_select, params
 
 
 DATASET = {

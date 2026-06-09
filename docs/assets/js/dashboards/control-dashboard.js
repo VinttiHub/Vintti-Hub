@@ -748,9 +748,28 @@
   }
 
   /* ---------- render: KPI text ---------- */
+  // Modo-corte: el usuario eligió CORTE y NO hay mes/desde/hasta. En ese caso las
+  // cards mensuales (con data-corte-field) muestran el valor a 30d-terminando-en-corte.
+  function isCorteMode() {
+    return !!state.corte && !state.mes && !state.desde && !state.hasta;
+  }
+
+  // Cambia el sufijo "MoM" ↔ "vs 30d" de las cards mensuales según el modo.
+  function syncPeriodSuffixes() {
+    const corte = isCorteMode();
+    document.querySelectorAll('.js-period-suffix').forEach(el => {
+      const t = corte ? el.dataset.corte : el.dataset.mom;
+      if (t != null) el.textContent = t;
+    });
+  }
+
   function renderText(el, rows) {
-    const field = el.dataset.field;
-    const mode = el.dataset.reduce || 'last';
+    let field = el.dataset.field;
+    let mode = el.dataset.reduce || 'last';
+    if (el.dataset.corteField && isCorteMode()) {
+      field = el.dataset.corteField;   // columna constante (kpi_corte / *_delta)
+      mode = 'first';
+    }
     const fmtName = el.dataset.fmt || 'number';
     const v = reduce(rows, field, mode);
     el.textContent = fmt.pick(fmtName)(v);
@@ -1897,9 +1916,16 @@
   }
   async function refetchMonthAwareElements(scope, month) {
     if (!scope) return;
-    const m = month || monthState.selected;
-    if (!m) return;
-    const corte = endOfMonth(m);
+    // En modo-corte el snapshot se evalúa al DÍA DEL CORTE (no a fin del mes
+    // seleccionado), para que los detalles sigan los últimos 30d como las cards.
+    let corte;
+    if (isCorteMode()) {
+      corte = state.corte;
+    } else {
+      const m = month || monthState.selected;
+      if (!m) return;
+      corte = endOfMonth(m);
+    }
     if (!corte) return;
     const els = scope.querySelectorAll('[data-month-aware]');
     // Group by (chartKey + overrides) so we make one fetch per dataset/filter combo.
@@ -3093,6 +3119,12 @@
     const txt = windowLabelText();
     document.querySelectorAll('[data-window-label]').forEach(el => { el.textContent = txt; });
   }
+  // Ventanas de CALENDARIO (no rolling): se anclan a HOY, NO al corte. Solo las
+  // rolling (30d / 7d) siguen el filtro CORTE.
+  const CALENDAR_WINDOWS = new Set([
+    'week', 'semana', 'last_week', 'last-week', 'prev_week',
+    'month', 'last_month', 'last-month', 'prev_month', 'mtd',
+  ]);
   function readOverridesFor(el) {
     const out = {};
     for (const attr of el.attributes) {
@@ -3100,6 +3132,11 @@
         const key = attr.name.slice('data-override-'.length).replace(/-/g, '_');
         if (key) out[key] = attr.value;
       }
+    }
+    // Una sub-tile de window calendario (Last week / Last month / MTD) ignora el
+    // CORTE global: se mantiene relativa a hoy. Así solo "Last 30d" sigue el corte.
+    if (out.window && CALENDAR_WINDOWS.has(String(out.window).trim().toLowerCase())) {
+      out.corte = '';
     }
     return out;
   }
@@ -3127,6 +3164,7 @@
   async function hydrate(scope, opts) {
     opts = opts || {};
     scope = scope || activeChannelEl();
+    syncPeriodSuffixes();
     const scopeKey = scopeKeyOf(scope);
     if (!opts.force && hydratedScopes.has(scopeKey)) {
       rerenderChartsInScope(scope); // ya cargado → solo re-pinta desde cache

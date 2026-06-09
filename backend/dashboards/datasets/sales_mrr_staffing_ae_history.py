@@ -9,7 +9,7 @@ se obtiene sumando la columna (reduce=sum).
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 
 AE_LEADS = ("mariano@vintti.com", "bahia@vintti.com")
@@ -40,7 +40,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         or datetime.utcnow().date()
     )
 
-    sql = """
+    # Modo-corte: el usuario eligió CORTE y NO hay mes/desde/hasta → las cards
+    # last/MoM muestran el run-rate AL día del corte (vs 30d antes). Las de YTD
+    # (reduce=sum) no se tocan.
+    corte_mode = bool(filters.get("corte") or filters.get("cutoff")) and not (
+        filters.get("mes") or filters.get("desde") or filters.get("hasta")
+    )
+    prev = corte - timedelta(days=30)
+
+    base_sql = """
         WITH params AS (
           SELECT %(corte)s::date AS corte_d, DATE_TRUNC('year', %(corte)s::date)::date AS year_start
         ),
@@ -100,16 +108,83 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             SUM(fee)::bigint AS mrr_fee
           FROM eff GROUP BY mes
         )
+    """
+
+    if corte_mode:
+        anchor_with = """,
+        anchors AS (
+          SELECT %(corte)s::date AS fin, 'cur'::text AS kind
+          UNION ALL
+          SELECT %(prev)s::date  AS fin, 'prev'::text AS kind
+        ),
+        a_opps AS (
+          SELECT DISTINCT ON (an.kind, h.opportunity_id, h.candidate_id)
+            an.kind, an.fin, h.opportunity_id, h.candidate_id, h.account_id,
+            h.start_d, h.hire_salary, h.hire_fee
+          FROM anchors an
+          JOIN staffing_hires h
+            ON h.start_d IS NOT NULL AND h.start_d <= an.fin
+           AND (h.end_d IS NULL OR h.end_d >= an.fin)
+          ORDER BY an.kind, h.opportunity_id, h.candidate_id, h.start_d DESC NULLS LAST
+        ),
+        a_marked AS (
+          SELECT *, ROW_NUMBER() OVER (
+            PARTITION BY kind, candidate_id, account_id
+            ORDER BY start_d DESC NULLS LAST, opportunity_id DESC) AS rn
+          FROM a_opps
+        ),
+        a_eff AS (
+          SELECT am.kind,
+            CASE WHEN am.rn=1 THEN COALESCE(su.salary::numeric, am.hire_salary) ELSE am.hire_salary END AS salary,
+            CASE WHEN am.rn=1 THEN COALESCE(su.fee::numeric, am.hire_fee) ELSE am.hire_fee END AS fee
+          FROM a_marked am
+          LEFT JOIN LATERAL (
+            SELECT s.salary, s.fee FROM salary_updates s
+            WHERE s.candidate_id = am.candidate_id AND s.date IS NOT NULL AND s.date::date <= am.fin
+            ORDER BY s.date::date DESC, s.update_id DESC LIMIT 1
+          ) su ON TRUE
+        ),
+        a_mrr AS (
+          SELECT kind, SUM(salary + fee)::bigint AS gmrr, SUM(fee)::bigint AS mrr_fee
+          FROM a_eff GROUP BY kind
+        ),
+        a_vals AS (
+          SELECT
+            MAX(CASE WHEN kind='cur'  THEN gmrr END)    AS gmrr_cur,
+            MAX(CASE WHEN kind='prev' THEN gmrr END)    AS gmrr_prev,
+            MAX(CASE WHEN kind='cur'  THEN mrr_fee END) AS fee_cur,
+            MAX(CASE WHEN kind='prev' THEN mrr_fee END) AS fee_prev
+          FROM a_mrr
+        )
+    """
+        kpi_cols = """,
+          cv.gmrr_cur::bigint AS gmrr_corte,
+          ROUND(100.0 * (cv.gmrr_cur - cv.gmrr_prev) / NULLIF(cv.gmrr_prev, 0), 2)::float AS gmrr_corte_delta,
+          cv.fee_cur::bigint AS mrr_fee_corte,
+          ROUND(100.0 * (cv.fee_cur - cv.fee_prev) / NULLIF(cv.fee_prev, 0), 2)::float AS mrr_fee_corte_delta"""
+        kpi_join = "\n        CROSS JOIN a_vals cv"
+        params = {"corte": corte, "prev": prev, "ae_leads": AE_LEADS}
+    else:
+        anchor_with = ""
+        kpi_cols = """,
+          NULL::bigint AS gmrr_corte,
+          NULL::float  AS gmrr_corte_delta,
+          NULL::bigint AS mrr_fee_corte,
+          NULL::float  AS mrr_fee_corte_delta"""
+        kpi_join = ""
+        params = {"corte": corte, "ae_leads": AE_LEADS}
+
+    final_select = f"""
         SELECT
           TO_CHAR(m.mes, 'YYYY-MM') AS mes,
           COALESCE(pm.gmrr, 0)::bigint    AS gmrr,
-          COALESCE(pm.mrr_fee, 0)::bigint AS mrr_fee
+          COALESCE(pm.mrr_fee, 0)::bigint AS mrr_fee{kpi_cols}
         FROM meses m
-        LEFT JOIN per_month pm ON pm.mes = m.mes
+        LEFT JOIN per_month pm ON pm.mes = m.mes{kpi_join}
         ORDER BY m.mes;
     """
 
-    return sql, {"corte": corte, "ae_leads": AE_LEADS}
+    return base_sql + anchor_with + final_select, params
 
 
 DATASET = {

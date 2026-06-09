@@ -30,11 +30,9 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or datetime.utcnow().date()
-    )
+    # Ventanas de CALENDARIO (last week / WTD / last month / MTD) → siempre
+    # relativas a HOY. NO siguen el filtro CORTE (solo las cards de 30d lo siguen).
+    corte = datetime.utcnow().date()
 
     # Windows (mirror sql_leads_windows._windows):
     #   last_week  = previous full calendar week (Mon-Sun)

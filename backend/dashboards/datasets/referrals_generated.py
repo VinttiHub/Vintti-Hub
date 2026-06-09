@@ -23,16 +23,13 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or datetime.utcnow().date()
-    )
-
     # Referrals Generated = SQLs (accounts creadas) de origen Referral, AE (M+B por
     # account_manager), en 3 ventanas: últimos 30 días, últimos 7 días (semana) y
     # mes en curso (MTD). También el mes anterior (para delta) y target mensual.
+    # cnt_30d sigue el filtro (MES → mes, CORTE → 30d rodante). Las ventanas de
+    # CALENDARIO (semana 7d / MTD / mes anterior) se anclan a HOY e ignoran el corte.
     win_ini, win_fin = window_bounds(filters)
+    hoy = datetime.utcnow().date()
     sql = """
         WITH base AS (
           SELECT a.creation_date AS d
@@ -43,15 +40,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         )
         SELECT
           COUNT(*) FILTER (WHERE d BETWEEN %(win_ini)s::date AND %(win_fin)s::date)::int AS cnt_30d,
-          COUNT(*) FILTER (WHERE d BETWEEN (%(corte)s::date - INTERVAL '6 days')::date  AND %(corte)s::date)::int AS cnt_week,
-          COUNT(*) FILTER (WHERE d BETWEEN DATE_TRUNC('month', %(corte)s::date)::date    AND %(corte)s::date)::int AS cnt_month,
-          COUNT(*) FILTER (WHERE d BETWEEN DATE_TRUNC('month', %(corte)s::date - INTERVAL '1 month')::date
-                                       AND (DATE_TRUNC('month', %(corte)s::date)::date - 1))::int AS cnt_prev_month
+          COUNT(*) FILTER (WHERE d BETWEEN (%(hoy)s::date - INTERVAL '6 days')::date  AND %(hoy)s::date)::int AS cnt_week,
+          COUNT(*) FILTER (WHERE d BETWEEN DATE_TRUNC('month', %(hoy)s::date)::date    AND %(hoy)s::date)::int AS cnt_month,
+          COUNT(*) FILTER (WHERE d BETWEEN DATE_TRUNC('month', %(hoy)s::date - INTERVAL '1 month')::date
+                                       AND (DATE_TRUNC('month', %(hoy)s::date)::date - 1))::int AS cnt_prev_month
         FROM base;
     """
 
     return sql, {
-        "win_ini": win_ini, "win_fin": win_fin,"corte": corte}
+        "win_ini": win_ini, "win_fin": win_fin, "hoy": hoy}
 
 
 DATASET = {

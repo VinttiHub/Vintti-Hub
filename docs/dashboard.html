@@ -233,9 +233,9 @@
             <span class="skpi-tile__title">GMRR</span>
             <span class="skpi-tile__tag">Revenue</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--pos">
-            <span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
+            <span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent">—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="gmrr" aria-label="Ver detalle GMRR">Ver detalle</button>
         </div>
@@ -245,9 +245,9 @@
             <span class="skpi-tile__title">MRR</span>
             <span class="skpi-tile__tag">Fee</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</div>
           <div class="skpi-tile__delta skpi-tile__delta--pos">
-            <span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent">—</span> MoM
+            <span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent">—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="mrr-fee" aria-label="Ver detalle MRR Fee">Ver detalle</button>
         </div>
@@ -381,7 +381,7 @@
           <div class="skpi-tile__head">
             <span class="skpi-tile__title">Active clients</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-clients" aria-label="Ver detalle Active clients">Ver detalle</button>
         </div>
 
@@ -575,7 +575,7 @@
             <span class="skpi-tile__title">Active clients</span>
             <span class="skpi-tile__tag">Actual</span>
           </div>
-          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</div>
+          <div class="skpi-tile__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</div>
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="active-clients-recruiting" aria-label="Ver detalle Active clients Recruiting">Ver detalle</button>
         </div>
 
@@ -1831,16 +1831,16 @@
         </div>
         <div class="metric-row">
           <div>
-            <span class="num" data-chart="gr_line_arpa" data-bind="text" data-field="arpa_revenue" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpa" data-bind="text" data-field="arpa_revenue" data-reduce="last" data-corte-field="arpa_revenue_corte" data-fmt="currency-k">—</span>
             <span class="lab">ARPA · latest</span>
           </div>
           <div>
-            <span class="num" data-chart="gr_line_arpa" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpa" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-corte-field="revenue_total_mes_corte" data-fmt="currency-k">—</span>
             <span class="lab">ARPA Total</span>
           </div>
           <div>
-            <span class="num green" data-chart="gr_line_arpa" data-bind="text" data-field="arpa_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
-            <span class="lab">Δ MoM</span>
+            <span class="num green" data-chart="gr_line_arpa" data-bind="text" data-field="arpa_revenue_mom_pct" data-reduce="last" data-corte-field="arpa_revenue_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span>
+            <span class="lab">Δ <span class="js-period-suffix" data-mom="MoM" data-corte="30d">MoM</span></span>
           </div>
         </div>
         <div class="chart" style="position:relative">
@@ -1868,16 +1868,16 @@
         </div>
         <div class="metric-row">
           <div>
-            <span class="num" data-chart="gr_line_arpc" data-bind="text" data-field="arpc_revenue" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpc" data-bind="text" data-field="arpc_revenue" data-reduce="last" data-corte-field="arpc_revenue_corte" data-fmt="currency-k">—</span>
             <span class="lab">ARPC · latest</span>
           </div>
           <div>
-            <span class="num" data-chart="gr_line_arpc" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-fmt="currency-k">—</span>
+            <span class="num" data-chart="gr_line_arpc" data-bind="text" data-field="revenue_total_mes" data-reduce="last" data-corte-field="revenue_total_mes_corte" data-fmt="currency-k">—</span>
             <span class="lab">Total revenue</span>
           </div>
           <div>
-            <span class="num green" data-chart="gr_line_arpc" data-bind="text" data-field="arpc_revenue_mom_pct" data-reduce="last" data-fmt="delta-percent" data-class-on-sign>—</span>
-            <span class="lab">Δ MoM</span>
+            <span class="num green" data-chart="gr_line_arpc" data-bind="text" data-field="arpc_revenue_mom_pct" data-reduce="last" data-corte-field="arpc_revenue_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span>
+            <span class="lab">Δ <span class="js-period-suffix" data-mom="MoM" data-corte="30d">MoM</span></span>
           </div>
         </div>
         <div class="chart" style="position:relative">
@@ -1910,8 +1910,8 @@
             <p class="card__sub">Mes a mes</p>
           </div>
           <span class="callout">
-            <span data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="decimal">—</span>
-            <span class="pos" data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="delta-yoy" data-fmt="delta-percent">—</span> YoY
+            <span data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="last" data-corte-field="acpa_corte" data-fmt="decimal">—</span>
+            <span class="pos" data-chart="gr_line_acpa" data-bind="text" data-field="acpa" data-reduce="delta-yoy" data-corte-field="acpa_corte_delta" data-fmt="delta-percent">—</span> <span class="js-period-suffix" data-mom="YoY" data-corte="30d">YoY</span>
           </span>
         </div>
         <div class="chart">
@@ -3614,8 +3614,8 @@
             <p class="card__sub">Fee total (salario + Vintti) · mensual · AE's</p>
           </div>
           <span class="callout callout--soft">
-            <span style="color:#0e1117;font-weight:700" data-chart="sa_area_sales_gmrr_ae" data-bind="text" data-field="gmrr" data-reduce="last" data-fmt="currency-k">—</span>
-            <span data-chart="sa_area_sales_gmrr_ae" data-bind="text" data-field="gmrr" data-reduce="delta-mom" data-fmt="delta-percent" data-class-on-sign>—</span> MoM
+            <span style="color:#0e1117;font-weight:700" data-chart="sa_area_sales_gmrr_ae" data-bind="text" data-field="gmrr" data-reduce="last" data-corte-field="gmrr_corte" data-fmt="currency-k">—</span>
+            <span data-chart="sa_area_sales_gmrr_ae" data-bind="text" data-field="gmrr" data-reduce="delta-mom" data-corte-field="gmrr_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
@@ -3655,8 +3655,8 @@
             <p class="card__sub">Fee Vintti only · mensual · AE's</p>
           </div>
           <span class="callout callout--soft">
-            <span style="color:#0e1117;font-weight:700" data-chart="sa_area_sales_mrr_fee_ae" data-bind="text" data-field="mrr_fee" data-reduce="last" data-fmt="currency-k">—</span>
-            <span data-chart="sa_area_sales_mrr_fee_ae" data-bind="text" data-field="mrr_fee" data-reduce="delta-mom" data-fmt="delta-percent" data-class-on-sign>—</span> MoM
+            <span style="color:#0e1117;font-weight:700" data-chart="sa_area_sales_mrr_fee_ae" data-bind="text" data-field="mrr_fee" data-reduce="last" data-corte-field="mrr_fee_corte" data-fmt="currency-k">—</span>
+            <span data-chart="sa_area_sales_mrr_fee_ae" data-bind="text" data-field="mrr_fee" data-reduce="delta-mom" data-corte-field="mrr_fee_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
@@ -5311,9 +5311,9 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero">
-              <span class="kpi-drawer__hero__label">GMRR · último mes</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent" data-class-on-sign>—</span> MoM</span>
+              <span class="kpi-drawer__hero__label">GMRR · <span class="js-period-suffix" data-mom="último mes" data-corte="últimos 30d">último mes</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_mrr" data-override-metric="Revenue" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span></span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Snapshot actual</h4>
@@ -5372,9 +5372,9 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--lime">
-              <span class="kpi-drawer__hero__label">MRR Fee · último mes</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-fmt="currency-k">—</span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-fmt="delta-percent" data-class-on-sign>—</span> MoM</span>
+              <span class="kpi-drawer__hero__label">MRR Fee · <span class="js-period-suffix" data-mom="último mes" data-corte="últimos 30d">último mes</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="last" data-corte-field="kpi_corte" data-fmt="currency-k">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_mrr" data-override-metric="Fee" data-bind="text" data-field="mrr_total" data-reduce="delta-mom" data-corte-field="kpi_corte_delta" data-fmt="delta-percent" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="MoM" data-corte="vs 30d">MoM</span></span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Snapshot · Staffing</h4>
@@ -5432,22 +5432,22 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--cool">
-              <span class="kpi-drawer__hero__label">Cuentas activas · último mes</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="delta-mom-abs" data-fmt="delta-int" data-class-on-sign>—</span> vs mes anterior</span>
+              <span class="kpi-drawer__hero__label">Cuentas activas · <span class="js-period-suffix" data-mom="último mes" data-corte="últimos 30d">último mes</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="delta-mom-abs" data-corte-field="cuentas_corte_abs" data-fmt="delta-int" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="vs mes anterior" data-corte="vs 30d">vs mes anterior</span></span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Comparativa por modelo</h4>
               <div class="kpi-drawer__stats">
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Staffing</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="acpa" data-reduce="last" data-corte-field="acpa_corte" data-fmt="int">—</span> candidatos/cta</span>
                 </div>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Recruiting</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="acpa" data-reduce="last" data-corte-field="acpa_corte" data-fmt="int">—</span> candidatos/cta</span>
                 </div>
               </div>
             </section>
@@ -6750,22 +6750,22 @@
           </header>
           <div class="kpi-drawer__body">
             <div class="kpi-drawer__hero kpi-drawer__hero--lime">
-              <span class="kpi-drawer__hero__label">Cuentas Recruiting · último mes</span>
-              <span class="kpi-drawer__hero__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
-              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="delta-mom-abs" data-fmt="delta-int" data-class-on-sign>—</span> vs mes anterior</span>
+              <span class="kpi-drawer__hero__label">Cuentas Recruiting · <span class="js-period-suffix" data-mom="último mes" data-corte="últimos 30d">último mes</span></span>
+              <span class="kpi-drawer__hero__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</span>
+              <span class="kpi-drawer__hero__delta"><span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="delta-mom-abs" data-corte-field="cuentas_corte_abs" data-fmt="delta-int" data-class-on-sign>—</span> <span class="js-period-suffix" data-mom="vs mes anterior" data-corte="vs 30d">vs mes anterior</span></span>
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Comparativa por modelo</h4>
               <div class="kpi-drawer__stats">
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Recruiting</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Recruiting" data-bind="text" data-field="acpa" data-reduce="last" data-corte-field="acpa_corte" data-fmt="int">—</span> candidatos/cta</span>
                 </div>
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Staffing</span>
-                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-fmt="int">—</span>
-                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="acpa" data-reduce="last" data-fmt="int">—</span> candidatos/cta</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="cuentas_activas" data-reduce="last" data-corte-field="cuentas_corte" data-fmt="int">—</span>
+                  <span class="kpi-drawer__stat__sub">ACPA: <span data-chart="gr_line_acpa" data-override-modelo="Staffing" data-bind="text" data-field="acpa" data-reduce="last" data-corte-field="acpa_corte" data-fmt="int">—</span> candidatos/cta</span>
                 </div>
               </div>
             </section>

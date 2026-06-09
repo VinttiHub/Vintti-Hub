@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -40,7 +40,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     hasta = _parse_date(filters.get("hasta")) or _parse_date(filters.get("to"))
     modelo = _resolve_modelo(filters)
 
-    sql = """
+    # Modo-corte: hay corte y NO hay mes/desde/hasta → snapshot al día del corte.
+    corte = _parse_date(filters.get("corte"))
+    corte_mode = bool(corte) and not (filters.get("mes") or filters.get("desde") or filters.get("hasta"))
+    prev = (corte - timedelta(days=30)) if corte else None
+
+    base_sql = """
         WITH hire_rows AS (
           SELECT
             ('hire_' || ho.hire_opp_id::text) AS row_id,
@@ -165,6 +170,59 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM meses_filtrado m
           LEFT JOIN metricas_mes mm ON mm.mes = m.mes_ini
         )
+    """
+
+    if corte_mode:
+        anchor_with = """,
+        acpa_anchor AS (
+          SELECT k.kind,
+            CASE
+              WHEN %(modelo)s = 'Staffing'
+                THEN COUNT(DISTINCT r.candidate_id) FILTER (WHERE r.model='staffing' AND r.candidate_id IS NOT NULL)::numeric
+              WHEN %(modelo)s = 'Recruiting'
+                THEN COUNT(DISTINCT r.row_id) FILTER (WHERE r.model='recruiting')::numeric
+              ELSE (COUNT(DISTINCT r.candidate_id) FILTER (WHERE r.model='staffing' AND r.candidate_id IS NOT NULL)
+                    + COUNT(DISTINCT r.row_id) FILTER (WHERE r.model='recruiting'))::numeric
+            END AS candidatos_activos,
+            COUNT(DISTINCT r.account_id)::numeric AS cuentas_activas
+          FROM (VALUES (%(corte)s::date, 'cur'), (%(prev)s::date, 'prev')) AS k(d, kind)
+          JOIN account_rows r
+            ON r.model IN ('staffing','recruiting')
+           AND r.start_d IS NOT NULL
+           AND r.start_d <= k.d
+           AND COALESCE(r.end_d, DATE '9999-12-31') >= k.d
+           AND (%(modelo)s = 'Total' OR r.model = LOWER(%(modelo)s))
+          GROUP BY k.kind
+        ),
+        acpa_corte_vals AS (
+          SELECT
+            MAX(CASE WHEN kind='cur'  THEN candidatos_activos / NULLIF(cuentas_activas,0) END) AS acpa_cur,
+            MAX(CASE WHEN kind='prev' THEN candidatos_activos / NULLIF(cuentas_activas,0) END) AS acpa_prev,
+            MAX(CASE WHEN kind='cur'  THEN cuentas_activas END) AS cuentas_cur,
+            MAX(CASE WHEN kind='prev' THEN cuentas_activas END) AS cuentas_prev
+          FROM acpa_anchor
+        )
+    """
+        kpi_cols = """,
+          ROUND(cv.acpa_cur, 2)::numeric AS acpa_corte,
+          ROUND(100.0 * (cv.acpa_cur - cv.acpa_prev) / NULLIF(cv.acpa_prev, 0), 2)::numeric AS acpa_corte_delta,
+          cv.cuentas_cur::int AS cuentas_corte,
+          ROUND(100.0 * (cv.cuentas_cur - cv.cuentas_prev) / NULLIF(cv.cuentas_prev, 0), 2)::numeric AS cuentas_corte_delta,
+          (cv.cuentas_cur - cv.cuentas_prev)::int AS cuentas_corte_abs"""
+        kpi_join = "\n        CROSS JOIN acpa_corte_vals cv"
+        params = {"desde": desde, "hasta": hasta, "modelo": modelo, "corte": corte, "prev": prev}
+    else:
+        anchor_with = ""
+        kpi_cols = """,
+          NULL::numeric AS acpa_corte,
+          NULL::numeric AS acpa_corte_delta,
+          NULL::int     AS cuentas_corte,
+          NULL::numeric AS cuentas_corte_delta,
+          NULL::int     AS cuentas_corte_abs"""
+        kpi_join = ""
+        params = {"desde": desde, "hasta": hasta, "modelo": modelo}
+
+    final_select = f"""
         SELECT
           TO_CHAR(b.mes, 'YYYY-MM')        AS mes,
           b.cuentas_activas::int           AS cuentas_activas,
@@ -179,12 +237,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               ELSE (b.acpa_raw - LAG(b.acpa_raw) OVER (ORDER BY b.mes))
                    / LAG(b.acpa_raw) OVER (ORDER BY b.mes) * 100
             END, 2
-          ) AS acpa_mom_pct
-        FROM acpa_base b
+          ) AS acpa_mom_pct{kpi_cols}
+        FROM acpa_base b{kpi_join}
         ORDER BY 1;
     """
 
-    return sql, {"desde": desde, "hasta": hasta, "modelo": modelo}
+    return base_sql + anchor_with + final_select, params
 
 
 DATASET = {
