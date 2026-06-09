@@ -55,10 +55,11 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     )
     win_ini, win_fin = _window_bounds(filters, corte)
 
-    # % Reemplazos colocados — per user definition:
-    #   - Numerator   `placed_count`: Replacement opps OPENED in the window.
+    # % Reemplazos colocados = cerradas ÷ abiertas (de los reemplazos ABIERTOS en
+    # la ventana, qué % ya se cerró/colocó):
+    #   - Denominator `placed_count`: Replacement opps OPENED in the window.
     #                                  "Opened" = nda_signature_or_start_date in window.
-    #   - Denominator `churn_count` : Replacement opps CLOSED in the window (any
+    #   - Numerator   `churn_count` : Replacement opps CLOSED in the window (any
     #                                  closing stage, not only Close Win).
     #                                  "Closed" = opp_close_date in window.
     sql = """
@@ -94,8 +95,8 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           rt.placed_count                            AS placed_count,
           ROUND(
             CASE
-              WHEN rt.churn_count = 0 THEN NULL
-              ELSE 100.0 * rt.placed_count::numeric / rt.churn_count
+              WHEN rt.placed_count = 0 THEN NULL
+              ELSE 100.0 * rt.churn_count::numeric / rt.placed_count
             END, 2
           )::float                                   AS placed_pct
         FROM replacement_totals rt;
@@ -114,7 +115,7 @@ DATASET = {
     "measures": [
         {"key": "placed_count", "label": "Replacements abiertas en ventana", "type": "number"},
         {"key": "churn_count", "label": "Replacements cerradas en ventana", "type": "number"},
-        {"key": "placed_pct", "label": "% Reemplazos colocados (abiertas / cerradas)", "type": "percent"},
+        {"key": "placed_pct", "label": "% Reemplazos colocados (cerradas / abiertas)", "type": "percent"},
     ],
     "default_filters": {"window": "30d"},
     "query": query,

@@ -77,6 +77,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM hire_opportunity ho
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE o.opp_model = 'Recruiting'
+            -- Solo cuentan los que realmente arrancaron: deben tener start date
+            -- (carga_active o start_date). Aplica a FTEs, revenue, new clients y activos.
+            AND (ho.carga_active IS NOT NULL OR NULLIF(ho.start_date::text, '') IS NOT NULL)
         ),
         revenue_in_window AS (
           SELECT COALESCE(SUM(rh.revenue), 0)::numeric AS revenue_window
@@ -86,11 +89,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND rh.close_d BETWEEN p.win_ini AND p.win_fin
         ),
         new_ftes_in_window AS (
+          -- FTE colocado = close win en la ventana, con candidato asignado y start
+          -- date (el start date ya viene garantizado por el filtro de recruiting_hires).
           SELECT COUNT(*)::int AS new_ftes_window
           FROM recruiting_hires rh
           CROSS JOIN params p
           WHERE rh.close_d IS NOT NULL
             AND rh.close_d BETWEEN p.win_ini AND p.win_fin
+            AND rh.candidate_id IS NOT NULL
         ),
         first_close AS (
           SELECT account_id, MIN(close_d) AS first_close_d

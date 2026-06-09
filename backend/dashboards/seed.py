@@ -353,6 +353,20 @@ MAIN_CHARTS = [
         "sort_order": 100,
     },
     {
+        "chart_key": "gr_table_recruiting_new_ftes_detail",
+        "tab_key": "growth",
+        "title": "New FTEs placed (Recruiting) · detalle",
+        "type": "table",
+        "dataset_key": "recruiting_new_ftes_detail",
+        "config": {
+            "mapping": {
+                "columns": ["candidate_name", "client_name", "start_date", "close_date"],
+            },
+        },
+        "position": {"x": 0, "y": 25, "w": 6, "h": 5},
+        "sort_order": 100.5,
+    },
+    {
         "chart_key": "gr_table_inactive_candidates",
         "tab_key": "growth",
         "title": "Candidatos inactivos (detalle por mes)",
