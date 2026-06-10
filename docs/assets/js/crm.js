@@ -2098,6 +2098,7 @@ document.addEventListener('DOMContentLoaded', initSidebarProfileCRM);
     'pgonzales@vintti.com',
     'lara@vintti.com',
     'bahia@vintti.com',
+    'mariano@vintti.com',
     'agostina@vintti.com',
     'mia@vintti.com',
     'jazmin@vintti.com'
