@@ -24,6 +24,12 @@ def run_dataset(dataset_key: str, filters: dict | None = None, limit: int = 5000
     if not dataset:
         raise DatasetError(f"Unknown dataset '{dataset_key}'")
 
+    # Datasets calculados (ej. live HubSpot): devuelven filas directo, sin SQL.
+    compute = dataset.get("compute")
+    if callable(compute):
+        rows = compute(filters or {}) or []
+        return [{k: _jsonable(v) for k, v in r.items()} for r in rows[:limit]]
+
     sql, params = dataset["query"](filters or {})
 
     conn = get_connection()

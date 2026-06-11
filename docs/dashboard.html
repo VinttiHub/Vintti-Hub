@@ -5036,6 +5036,24 @@
         <button type="button" class="skpi-tile__detail-btn" data-period-detail-open="mkt-sqls-detail" aria-label="Ver detalle SQLs por origin">Ver detalle</button>
       </div>
 
+      <!-- ===== Marketing · MQLs por origin (live HubSpot) ===== -->
+      <div class="card s-8 mkt-rank-card" data-period-card>
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">MQLs aperturados por origin</h3>
+            <p class="card__sub">MQLs (HubSpot) creados en el período, por origen · sin outbound</p>
+          </div>
+        </div>
+        <div class="mkt-rank__total">
+          <span class="mkt-rank__total-num" data-chart="mk_rank_mqls_by_origin" data-override-periodo="mes" data-bind="text" data-field="total" data-reduce="first" data-fmt="int">—</span>
+          <span class="mkt-rank__total-lab">MQLs · <span data-chart="mk_rank_mqls_by_origin" data-override-periodo="mes" data-bind="text" data-field="period_label" data-reduce="first" data-fmt="raw">Mes</span></span>
+        </div>
+        <div class="rk" data-chart="mk_rank_mqls_by_origin" data-override-periodo="mes" data-bind="ranking"
+             data-x="origin" data-y="count" data-share="share_pct" data-color="cyan" data-fmt-y="int" data-label-chip
+             data-empty-text="Sin datos en el período."></div>
+        <button type="button" class="skpi-tile__detail-btn" data-period-detail-open="mkt-mqls-detail" aria-label="Ver detalle MQLs por origin">Ver detalle</button>
+      </div>
+
       <div class="card s-6 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
@@ -6169,7 +6187,7 @@
             </div>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Componentes · Staffing</h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+              <div class="kpi-drawer__stats kpi-drawer__stats--four">
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Pipeline</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_staffing" data-reduce="first" data-fmt="int">—</span>
@@ -6184,6 +6202,11 @@
                   <span class="kpi-drawer__stat__label">Churn rate 30d</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_rate_pct" data-reduce="first" data-fmt="percent">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_staffing_30d" data-reduce="first" data-fmt="int">—</span> bajas / activos</span>
+                </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MRR</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="mrr_fee_base_staffing_30d" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">base fee activa</span>
                 </div>
               </div>
             </section>
@@ -6207,7 +6230,7 @@
                 </div>
               </div>
             </section>
-            <p class="kpi-drawer__note">Fórmula: <code>net = pipeline × (CR<sub>30d</sub> − churn_rate<sub>30d</sub>)</code>. Si es negativo, el % de churn supera al CR — señal de presión sobre el headcount neto.</p>
+            <p class="kpi-drawer__note">Fórmula — Net adds: <code>(pipeline × CR<sub>30d</sub>) − churn<sub>30d</sub></code> (bajas reales). En dinero: <code>Net MRR fee = (pipeline fee × CR<sub>30d</sub>) − (MRR base × churn_rate<sub>30d</sub>)</code> — el churn pega sobre el MRR activo, no sobre el pipeline.</p>
           </div>
         </div>
 
@@ -6247,7 +6270,7 @@
             </section>
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Componentes · Staffing</h4>
-              <div class="kpi-drawer__stats kpi-drawer__stats--three">
+              <div class="kpi-drawer__stats kpi-drawer__stats--four">
                 <div class="kpi-drawer__stat">
                   <span class="kpi-drawer__stat__label">Pipeline</span>
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="pipe_staffing" data-reduce="first" data-fmt="int">—</span>
@@ -6263,11 +6286,16 @@
                   <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_rate_pct" data-reduce="first" data-fmt="percent">—</span>
                   <span class="kpi-drawer__stat__sub"><span data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="churn_staffing_30d" data-reduce="first" data-fmt="int">—</span> bajas / activos</span>
                 </div>
+                <div class="kpi-drawer__stat">
+                  <span class="kpi-drawer__stat__label">MRR</span>
+                  <span class="kpi-drawer__stat__value" data-chart="gr_kpi_pipeline_cr_minus_churn" data-bind="text" data-field="mrr_fee_base_staffing_30d" data-reduce="first" data-fmt="currency-k">—</span>
+                  <span class="kpi-drawer__stat__sub">base fee activa</span>
+                </div>
               </div>
             </section>
             <p class="kpi-drawer__note">
-              Net MRR fee = <code>pipeline fee × (CR<sub>30d</sub> − churn_rate<sub>30d</sub>)</code>.
-              Aplica el rate de churn directamente al pipeline fee — mismo enfoque que el tile de Net adds.
+              Net MRR fee = <code>(pipeline fee × CR<sub>30d</sub>) − (MRR base × churn_rate<sub>30d</sub>)</code>.
+              El churn se aplica sobre la base de MRR activa (fee recurrente de los contractors activos), no sobre el pipeline.
             </p>
           </div>
         </div>
@@ -7627,6 +7655,23 @@
               <div class="dtable-wrap" data-chart="mk_table_sqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
                    data-cols="creation_date|Creación|raw,client_name|Cuenta|raw,origin|Origin|chip"
                    data-empty-text="Sin SQLs en el período."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="mkt-mqls-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Marketing · por origin</span>
+            <h3 class="kpi-drawer__title">MQLs aperturados · detalle</h3>
+            <p class="kpi-drawer__sub">MQLs (HubSpot) creados en el período seleccionado, con su origen, fecha de meeting y lost reason · sin outbound.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">MQLs del período</h4>
+              <div class="dtable-wrap" data-chart="mk_table_mqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="created|Creación|raw,meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip,lost_reason|Lost reason|raw"
+                   data-empty-text="Sin MQLs en el período."></div>
             </section>
           </div>
         </div>

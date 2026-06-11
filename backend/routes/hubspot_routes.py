@@ -979,6 +979,142 @@ def preview_mariano_sql_contacts():
         }), 500
 
 
+@bp.route("/hubspot/preview/mql-contacts", methods=["GET", "OPTIONS"])
+def preview_mql_contacts():
+    """Read-only preview de MQLs desde HubSpot (todos los owners por defecto).
+
+    Espejo de preview_mariano_sql_contacts con tres diferencias:
+      - lead_life = "MQL (AE)" (override por ?lead_life_value=).
+      - SIN filtro HAS_PROPERTY de meeting (un MQL puede no tener meeting aún).
+      - owner opcional: filtra por owner solo si llega ?owner_email=.
+    Agrega las propiedades MQL (date_of_meeting_scheduled, mql_ae_lost_reason)
+    a las pedidas y las expone por fila. No escribe a la DB.
+    """
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    try:
+        owner_email = (request.args.get("owner_email") or "").strip().lower()
+        lead_life_property = (
+            request.args.get("lead_life_property")
+            or os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY")
+            or "lead_life"
+        ).strip()
+        lead_life_value = (
+            request.args.get("lead_life_value")
+            or os.environ.get("HUBSPOT_LEAD_LIFE_MQL_VALUE")
+            or "MQL (AE)"
+        ).strip()
+        mql_date_property = (
+            request.args.get("mql_date_property")
+            or os.environ.get("HUBSPOT_MQL_DATE_PROPERTY")
+            or "date_of_meeting_scheduled"
+        ).strip()
+        mql_lost_reason_property = (
+            request.args.get("mql_lost_reason_property")
+            or os.environ.get("HUBSPOT_MQL_LOST_REASON_PROPERTY")
+            or "mql_ae_lost_reason"
+        ).strip()
+
+        client = HubSpotClient()
+        property_maps = _resolve_account_property_maps(client)
+
+        contact_extra_properties = (
+            [lead_life_property, mql_date_property, mql_lost_reason_property]
+            + _mapped_property_names(property_maps, "contacts")
+        )
+        company_extra_properties = _mapped_property_names(property_maps, "companies")
+        deal_extra_properties = _mapped_property_names(property_maps, "deals")
+
+        search_filters = [
+            {"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value},
+        ]
+        owner_id = None
+        if owner_email:
+            owner_id = client.get_owner_id_by_email(owner_email)
+            search_filters.insert(0, {"propertyName": "hubspot_owner_id", "operator": "EQ", "value": str(owner_id)})
+
+        contacts = client.search_contacts(
+            search_filters,
+            extra_properties=contact_extra_properties,
+        )
+
+        rows = []
+        conn = get_connection()
+        try:
+            with conn:
+                with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                    _ensure_hubspot_account_columns(cursor)
+                    for contact_summary in contacts:
+                        contact_id = str(contact_summary.get("id") or "")
+                        contact = client.get_contact(
+                            contact_id,
+                            extra_properties=contact_extra_properties,
+                            associations=["companies", "deals"],
+                        )
+                        company_ids = association_ids(contact, "companies")
+                        deal_ids = association_ids(contact, "deals")
+                        company = client.get_company(company_ids[0], extra_properties=company_extra_properties) if company_ids else None
+                        deal = client.get_deal_with_associations(deal_ids[0], extra_properties=deal_extra_properties) if deal_ids else {}
+                        payload = build_account_payload(
+                            deal,
+                            company=company,
+                            contact=contact,
+                            owner_email=owner_email or None,
+                        )
+                        payload = _apply_account_field_overrides(
+                            payload,
+                            contact=contact,
+                            company=company,
+                            deal=deal,
+                            property_maps=property_maps,
+                        )
+                        existing = _preview_existing_account(cursor, payload)
+                        row = _normalize_contact_preview_row(
+                            contact,
+                            deal,
+                            payload,
+                            existing,
+                            lead_life_property,
+                        )
+                        contact_props = contact.get("properties") or {}
+                        row["mql_date_property"] = mql_date_property
+                        row["mql_date_of_meeting_scheduled"] = contact_props.get(mql_date_property)
+                        row["mql_lost_reason_property"] = mql_lost_reason_property
+                        row["mql_ae_lost_reason"] = contact_props.get(mql_lost_reason_property)
+                        rows.append(row)
+        finally:
+            conn.close()
+
+        return jsonify({
+            "success": True,
+            "owner_email": owner_email or None,
+            "owner_id": owner_id,
+            "lead_life_property": lead_life_property,
+            "lead_life_value": lead_life_value,
+            "mql_date_property": mql_date_property,
+            "mql_lost_reason_property": mql_lost_reason_property,
+            "property_maps": property_maps,
+            "contacts_found": len(contacts),
+            "would_create": sum(1 for row in rows if row["action"] == "would_create"),
+            "already_exists": sum(1 for row in rows if row["action"] == "already_exists"),
+            "items": rows,
+        })
+    except HubSpotError as exc:
+        return jsonify({
+            "success": False,
+            "token_configured": bool(os.environ.get("HUBSPOT_PRIVATE_APP_TOKEN")),
+            "error": str(exc),
+        }), 502
+    except Exception as exc:
+        logging.exception("HubSpot MQL contact preview failed")
+        return jsonify({
+            "success": False,
+            "token_configured": bool(os.environ.get("HUBSPOT_PRIVATE_APP_TOKEN")),
+            "error": str(exc),
+        }), 500
+
+
 @bp.route("/hubspot/sync/mariano-sql-contacts", methods=["POST", "OPTIONS"])
 def sync_mariano_sql_contacts():
     if request.method == "OPTIONS":

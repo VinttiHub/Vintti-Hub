@@ -2381,6 +2381,7 @@ button.skpi-sub--clickable:hover {
   gap: 10px;
 }
 .kpi-drawer__stats--three { grid-template-columns: repeat(3, 1fr); }
+.kpi-drawer__stats--four { grid-template-columns: repeat(4, 1fr); }
 .kpi-drawer__stat {
   padding: 14px 16px;
   border-radius: var(--radius-chip);
@@ -2540,6 +2541,7 @@ button.kpi-drawer__stat.is-clickable.is-active .kpi-drawer__stat__label { color:
   .kpi-drawer__body { padding: 18px 18px 24px; }
   .kpi-drawer__stats { grid-template-columns: 1fr 1fr; }
   .kpi-drawer__stats--three { grid-template-columns: 1fr; }
+  .kpi-drawer__stats--four { grid-template-columns: 1fr 1fr; }
   .kpi-drawer__hero__value { font-size: 36px; }
 }
 

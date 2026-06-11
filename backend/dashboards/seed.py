@@ -3518,6 +3518,16 @@ MAIN_CHARTS = [
         "sort_order": 810,
     },
     {
+        "chart_key": "mk_rank_mqls_by_origin",
+        "tab_key": "marketing",
+        "title": "Marketing · MQLs por origin (ranking)",
+        "type": "bar",
+        "dataset_key": "mkt_mqls_by_origin",
+        "config": {"mapping": {"x": "origin", "y": "count"}},
+        "position": {"x": 0, "y": 6, "w": 12, "h": 6},
+        "sort_order": 811,
+    },
+    {
         "chart_key": "mk_rank_new_clients_by_origin",
         "tab_key": "marketing",
         "title": "Marketing · New active clients por origin (ranking)",
@@ -3636,6 +3646,16 @@ MAIN_CHARTS = [
         "config": {"mapping": {"columns": ["creation_date", "client_name", "origin"]}},
         "position": {"x": 0, "y": 12, "w": 6, "h": 5},
         "sort_order": 813,
+    },
+    {
+        "chart_key": "mk_table_mqls_by_origin_detail",
+        "tab_key": "marketing",
+        "title": "Marketing · detalle MQLs (período)",
+        "type": "table",
+        "dataset_key": "mkt_mqls_by_origin_detail",
+        "config": {"mapping": {"columns": ["created", "meeting_date", "client_name", "origin", "lost_reason"]}},
+        "position": {"x": 6, "y": 12, "w": 6, "h": 5},
+        "sort_order": 814,
     },
     {
         "chart_key": "mk_table_new_clients_by_origin_detail",
