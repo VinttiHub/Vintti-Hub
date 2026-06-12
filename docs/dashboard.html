@@ -7667,14 +7667,14 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Marketing · por origin</span>
             <h3 class="kpi-drawer__title">MQLs aperturados · detalle</h3>
-            <p class="kpi-drawer__sub">MQLs (HubSpot) creados en el período seleccionado, con su origen y fecha de meeting · solo canales de marketing.</p>
+            <p class="kpi-drawer__sub">MQLs (HubSpot) que agendaron reunión en el período (por fecha de meeting), etapa alcanzada MQL(AE)+ · solo canales de marketing.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">MQLs del período</h4>
               <div class="dtable-wrap" data-chart="mk_table_mqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
-                   data-cols="created|Creación|raw,meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip"
+                   data-cols="meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip,lead_life|Etapa|raw,created|Creación|raw"
                    data-empty-text="Sin MQLs en el período."></div>
             </section>
           </div>

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import os
 
-from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms, SNAPSHOT_MODE
+from .mkt_mqls_by_origin import (
+    period_bounds, _parse_hs_date_ms, SNAPSHOT_MODE, _REACHED_MQL, _IN_VALUES,
+)
 
 
 def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
@@ -23,9 +25,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     ini, fin, _ = period_bounds(filters)
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    lead_life_value = (os.environ.get("HUBSPOT_LEAD_LIFE_MQL_VALUE") or "MQL (AE)").strip()
     meeting_property = (os.environ.get("HUBSPOT_MQL_DATE_PROPERTY") or "date_of_meeting_scheduled").strip()
-    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "createdate").strip()
+    # Ancla = fecha del meeting agendado (= se volvió MQL AE), igual que el card.
+    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
     lost_property = (os.environ.get("HUBSPOT_MQL_LOST_REASON_PROPERTY") or "mql_ae_lost_reason").strip()
 
     client = HubSpotClient()
@@ -34,7 +36,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     company_prop = (property_maps.get("contacts") or {}).get("client_name") or "company"
 
     contacts = client.search_contacts(
-        [{"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value}],
+        [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
         extra_properties=[
             lead_life_property, "createdate", anchor_property, meeting_property,
             lost_property, origin_prop, company_prop,
@@ -44,7 +46,11 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     rows = []
     for c in contacts:
         props = c.get("properties") or {}
-        # Filtramos por el ancla (createdate por defecto), mostrando ambas fechas.
+        # Cohorte por etapa alcanzada: tiene que haber llegado a MQL (AE) o más allá.
+        ll = str(props.get(lead_life_property) or "").strip()
+        if ll.lower() not in _REACHED_MQL:
+            continue
+        # Filtramos por el ancla (date_of_meeting_scheduled), mostrando ambas fechas.
         # En SNAPSHOT_MODE no filtramos por fecha ni excluimos outbound (mostrar todo).
         if not SNAPSHOT_MODE:
             anchor_d = _parse_hs_date_ms(props.get(anchor_property))
@@ -69,6 +75,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
             "meeting_date": meeting_d.isoformat() if meeting_d else "",
             "client_name": str(name),
             "origin": origin,
+            "lead_life": ll,
             "lost_reason": props.get(lost_property) or "",
         })
 
@@ -85,6 +92,7 @@ DATASET = {
         {"key": "meeting_date", "label": "Meeting agendado", "type": "date"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
         {"key": "origin", "label": "Origin", "type": "string"},
+        {"key": "lead_life", "label": "Etapa (lead_life)", "type": "string"},
         {"key": "lost_reason", "label": "MQL (AE) Lost Reason", "type": "string"},
     ],
     "measures": [],

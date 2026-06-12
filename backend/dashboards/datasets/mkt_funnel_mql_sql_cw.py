@@ -13,8 +13,10 @@ from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
 
 # DQL (descalificados) se EXCLUYE del embudo (no son conversiones reales).
 _WON = {"active client", "inactive client"}
-_REACHED_SQL = _WON | {"sql (ae)", "closed lost"}
-_REACHED_MQL = _REACHED_SQL | {"mql (ae)"}
+# SQL = llegó a SQL y calificó — NO cuenta los Closed Lost (los perdidos no son SQL).
+_REACHED_SQL = _WON | {"sql (ae)"}
+# MQL = agendó reunión: SÍ incluye los que después se perdieron (Closed Lost) o avanzaron.
+_REACHED_MQL = _REACHED_SQL | {"mql (ae)", "closed lost"}
 # Valores exactos de lead_life que cuentan en el embudo — para acotar el search.
 _IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Closed Lost"]
 _EXCLUDE = ("outbound", "connected inbox", "referral")
@@ -28,7 +30,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
     ini, fin, label = period_bounds(filters)
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "createdate").strip()
+    # MQL = agendó reunión → ancla `date_of_meeting_scheduled` (mismo criterio que
+    # los cards de MQL: mkt_mqls_by_origin / mkt_mqls_business_metric).
+    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)

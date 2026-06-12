@@ -58,6 +58,13 @@ def period_bounds(filters: dict) -> tuple[date, date, str]:
 # excluyendo outbound, igual que el card de SQLs.
 SNAPSHOT_MODE = False
 
+# MQL = etapa ALCANZADA MQL (AE) o más allá (agendó reunión), excluye DQL y los
+# MQL pre-meeting (BDRs / MKT TOFU-MOFU-BOFU). Mismo criterio que el card de MQLs
+# totales (mkt_mqls_business_metric).
+_WON = {"active client", "inactive client"}
+_REACHED_MQL = _WON | {"sql (ae)", "closed lost", "mql (ae)"}
+_IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Closed Lost"]
+
 
 def _parse_hs_date_ms(raw) -> date | None:
     """date_of_meeting_scheduled puede venir como epoch-millis (str/int) o ISO."""
@@ -84,20 +91,18 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     ini, fin, label = period_bounds(filters)
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    lead_life_value = (os.environ.get("HUBSPOT_LEAD_LIFE_MQL_VALUE") or "MQL (AE)").strip()
-    # "MQL aperturado" = createdate (= la fecha de meeting en la práctica, pero
-    # siempre poblada). Override por HUBSPOT_MQL_ANCHOR_PROPERTY.
-    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "createdate").strip()
+    # "MQL aperturado" = agendó reunión → ancla `date_of_meeting_scheduled`.
+    # Override por HUBSPOT_MQL_ANCHOR_PROPERTY.
+    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
 
     client = HubSpotClient()
     property_maps = _resolve_account_property_maps(client)
     origin_prop = (property_maps.get("contacts") or {}).get("where_come_from") or "origin"
 
-    # Solo filtramos lead_life en el search; la ventana de fechas se aplica en
-    # Python a partir del ancla (más robusto ante el tipo date/datetime de HubSpot,
-    # y el volumen de MQLs es chico + se cachea).
+    # Cohorte por etapa alcanzada: filtramos lead_life ∈ {MQL(AE) o más allá} en el
+    # search; la ventana de fechas se aplica en Python a partir del ancla.
     search_filters = [
-        {"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value},
+        {"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES},
     ]
     contacts = client.search_contacts(
         search_filters,
@@ -106,6 +111,10 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
     counts: dict[str, int] = {}
     for c in contacts:
+        # Tiene que haber ALCANZADO MQL (AE) o más allá (excluye DQL).
+        ll = str((c.get("properties") or {}).get(lead_life_property) or "").strip().lower()
+        if ll not in _REACHED_MQL:
+            continue
         if not SNAPSHOT_MODE:
             d = _parse_hs_date_ms((c.get("properties") or {}).get(anchor_property))
             if d is None or d < ini or d > fin:

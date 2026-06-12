@@ -90,21 +90,24 @@ def _mql_counts(ini: date, fin: date, unit: str):
     from routes.hubspot_routes import (
         _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
     )
-    from .mkt_mqls_by_origin import _parse_hs_date_ms
+    from .mkt_mqls_by_origin import _parse_hs_date_ms, _REACHED_MQL, _IN_VALUES
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    lead_life_value = (os.environ.get("HUBSPOT_LEAD_LIFE_MQL_VALUE") or "MQL (AE)").strip()
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "createdate").strip()
+    # MQL = agendó reunión → ancla `date_of_meeting_scheduled`, etapa ALCANZADA
+    # MQL(AE)+ (mismo criterio que mkt_mqls_by_origin).
+    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
     origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
     contacts = client.search_contacts(
-        [{"propertyName": lead_life_property, "operator": "EQ", "value": lead_life_value}],
+        [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
         extra_properties=[lead_life_property, anchor, origin_prop],
     )
     counts, totals = {}, {}
     for c in contacts:
+        if str((c.get("properties") or {}).get(lead_life_property) or "").strip().lower() not in _REACHED_MQL:
+            continue
         d = _parse_hs_date_ms((c.get("properties") or {}).get(anchor))
         if d is None or d < ini or d > fin:
             continue
