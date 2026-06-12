@@ -3220,6 +3220,19 @@ if (hireRevenue){
   }
 
   // --- Opportunities del candidato ---
+  const PIPELINE_STAGE_LABELS = {
+    Applicant: 'Applicant',
+    Contactado: 'Contacted',
+    'No avanza primera': 'No Advance',
+    'Primera entrevista': 'First Interview',
+    'En proceso con Cliente': 'In Client Process'
+  };
+
+  function formatCandidatePipelineStage(stage) {
+    const normalizedStage = String(stage || '').trim();
+    return PIPELINE_STAGE_LABELS[normalizedStage] || normalizedStage;
+  }
+
   window.loadOpportunitiesForCandidate = function () {
     fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/candidates/${candidateId}/opportunities`)
       .then(res => res.json())
@@ -3243,6 +3256,7 @@ if (hireRevenue){
             <td>${opp.opp_position_name || ''}</td>
             <td>${opp.opp_sales_lead || ''}</td>
             <td>${opp.opp_stage || ''}</td>
+            <td>${formatCandidatePipelineStage(opp.candidate_stage)}</td>
             <td>${opp.client_name || ''}</td>
             <td>${opp.opp_hr_lead || ''}</td>
           `;

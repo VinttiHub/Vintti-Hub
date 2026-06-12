@@ -1462,6 +1462,7 @@ def get_opportunities_by_candidate(candidate_id):
                 o.opp_sales_lead,
                 o.opp_stage,
                 o.opp_hr_lead,
+                oc.stage_pipeline AS candidate_stage,
                 a.client_name,
                 a.client_name AS account_name,
                 b.batch_id,
