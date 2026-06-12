@@ -877,6 +877,14 @@
       if (bind === 'stacked-legend') return renderStackedLegend(el, scopedRows, {
         series: el.dataset.series, y: el.dataset.y,
       });
+      if (bind === 'grouped-bars') return renderGroupedBars(el, scopedRows, {
+        x: el.dataset.x, series: el.dataset.series, y: el.dataset.y,
+        fmtY: el.dataset.fmtY, valueLabels: 'valueLabels' in el.dataset, xLabels: 'xLabels' in el.dataset,
+      });
+      if (bind === 'multi-line') return renderMultiLine(el, scopedRows, {
+        x: el.dataset.x, xLabel: el.dataset.xLabel, series: el.dataset.series, y: el.dataset.y, fmtY: el.dataset.fmtY,
+      });
+      if (bind === 'funnel') return renderFunnel(el, scopedRows);
       if (bind === 'scatter') return renderScatter(el, scopedRows, {
         x: el.dataset.x, y: el.dataset.y, size: el.dataset.size, label: el.dataset.label,
         fmtX: el.dataset.fmtX, fmtY: el.dataset.fmtY, xTitle: el.dataset.xTitle, yTitle: el.dataset.yTitle,
@@ -919,6 +927,8 @@
   const DEFAULT_PALETTE = ['#003bff', '#6c38ff', '#4ba9ff', '#ff1fdb', '#c1ff72', '#f5b94a', '#6cd391', '#f590ad'];
   // Modelos de negocio con color de marca Vintti (Recruiting verde lima · Staffing magenta).
   const MODEL_COLORS = { 'Recruiting': '#c1ff72', 'Staffing': '#ff1fdb' };
+  // Series MQL / SQL con color de marca Vintti (MQL azul · SQL verde lima).
+  const SERIES_COLORS = { 'MQLs': '#003bff', 'MQL': '#003bff', 'SQLs': '#c1ff72', 'SQL': '#c1ff72' };
 
   function colorForLabel(label, idx) {
     return RISK_COLORS[label] || MODEL_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
@@ -1035,6 +1045,211 @@
         t.setAttribute('fill', i === n - 1 ? '#0e1117' : '#8a93a3'); t.setAttribute('data-rendered', '');
         t.textContent = String(b.label == null ? '' : b.label); svg.appendChild(t);
       }
+    });
+  }
+
+  // Barras verticales AGRUPADAS (clustered): x = categoría (origin), varias series
+  // lado a lado por categoría. Colores fijos por serie (SERIES_COLORS).
+  function renderGroupedBars(svg, rows, opts) {
+    if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
+    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
+    const padX = 12;
+    const padTop = opts.valueLabels ? 22 : 14;
+    const padBottom = opts.xLabels ? 26 : 14;
+    const xKey = opts.x, sKey = opts.series, yKey = opts.y;
+    svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
+    if (!rows || !rows.length) return;
+
+    const buckets = [], bMap = new Map(), series = [];
+    rows.forEach(r => {
+      const bk = String(r[xKey] == null ? '—' : r[xKey]);
+      if (!bMap.has(bk)) { const o = { key: bk, label: bk, items: [] }; bMap.set(bk, o); buckets.push(o); }
+      const s = String(r[sKey] == null ? '—' : r[sKey]);
+      bMap.get(bk).items.push({ series: s, value: +r[yKey] || 0 });
+      if (!series.includes(s)) series.push(s);
+    });
+    const maxV = Math.max(...rows.map(r => +r[yKey] || 0), 1);
+    const colorOf = (s, i) => SERIES_COLORS[s] || DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
+    const n = buckets.length, ns = Math.max(series.length, 1);
+    const slot = (w - 2 * padX) / Math.max(n, 1);
+    const groupW = Math.min(slot * 0.74, 90);
+    const gap = 4;
+    const barW = Math.max(5, (groupW - gap * (ns - 1)) / ns);
+    const fmtV = fmt.pick(opts.fmtY || 'int');
+    const tip = getTip();
+    const trunc = s => { s = String(s == null ? '' : s); return s.length > 16 ? s.slice(0, 15) + '…' : s; };
+    const pageXY = (vbX, vbY) => { const rect = svg.getBoundingClientRect(); return { x: rect.left + (vbX / w) * rect.width + window.scrollX, y: rect.top + (vbY / h) * rect.height + window.scrollY }; };
+
+    buckets.forEach((b, i) => {
+      const cx = padX + slot * i + slot / 2;
+      const x0 = cx - groupW / 2;
+      series.forEach((s, si) => {
+        const it = b.items.find(t => t.series === s);
+        const v = it ? it.value : 0;
+        const barH = v > 0 ? Math.max(2, (v / maxV) * (h - padTop - padBottom)) : 0;
+        const x = x0 + si * (barW + gap);
+        const y = h - padBottom - barH;
+        const color = colorOf(s, si);
+        if (barH > 0) {
+          const rect = document.createElementNS(SVG_NS, 'rect');
+          rect.setAttribute('x', x.toFixed(2)); rect.setAttribute('y', y.toFixed(2));
+          rect.setAttribute('width', barW.toFixed(2)); rect.setAttribute('height', barH.toFixed(2));
+          rect.setAttribute('rx', Math.min(3, barW / 3).toFixed(1));
+          rect.setAttribute('fill', color); rect.setAttribute('data-rendered', ''); rect.style.cursor = 'default';
+          rect.addEventListener('mouseenter', () => {
+            rect.setAttribute('opacity', '0.85');
+            tip.innerHTML = `<div class="chart-tip__x">${esc(b.label)}</div><div class="chart-tip__row"><span class="chart-tip__dot" style="background:${color}"></span><span class="chart-tip__lab">${esc(s)}</span><span class="chart-tip__val">${fmtV(v)}</span></div>`;
+            const p = pageXY(x + barW / 2, y); tip.style.left = p.x + 'px'; tip.style.top = p.y + 'px'; tip.classList.add('show');
+          });
+          rect.addEventListener('mouseleave', () => { rect.setAttribute('opacity', '1'); tip.classList.remove('show'); });
+          svg.appendChild(rect);
+        }
+        if (opts.valueLabels && v > 0) {
+          const t = document.createElementNS(SVG_NS, 'text');
+          t.setAttribute('x', (x + barW / 2).toFixed(2)); t.setAttribute('y', (y - 3).toFixed(2)); t.setAttribute('text-anchor', 'middle');
+          t.setAttribute('font-size', '6.5'); t.setAttribute('font-weight', '600'); t.setAttribute('fill', '#475569'); t.setAttribute('data-rendered', '');
+          t.textContent = fmtV(v); svg.appendChild(t);
+        }
+      });
+      if (opts.xLabels) {
+        const t = document.createElementNS(SVG_NS, 'text');
+        t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (h - 7).toFixed(2)); t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-size', '7'); t.setAttribute('font-weight', '500'); t.setAttribute('fill', '#8a93a3'); t.setAttribute('data-rendered', '');
+        t.textContent = trunc(b.label);
+        const full = document.createElementNS(SVG_NS, 'title');
+        full.textContent = String(b.label == null ? '' : b.label);
+        t.appendChild(full);
+        svg.appendChild(t);
+      }
+    });
+  }
+
+  // Multi-línea en el tiempo: x = bucket temporal, una línea por serie (canal).
+  // Formato largo {x, xLabel, series, value}. Color por canal (originSeriesColor).
+  // Llena una leyenda hermana ([data-multi-line-legend]) con los canales.
+  function renderMultiLine(svg, rows, opts) {
+    if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
+    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
+    const padL = 26, padR = 14, padTop = 14, padBottom = 26;
+    const xKey = opts.x, xLabelKey = opts.xLabel || opts.x, sKey = opts.series, yKey = opts.y;
+    svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
+    const legendEl = (svg.closest('.card') || document).querySelector('[data-multi-line-legend]');
+    if (!rows || !rows.length) { if (legendEl) legendEl.innerHTML = ''; return; }
+
+    const labelOf = new Map();
+    rows.forEach(r => { const k = String(r[xKey]); if (!labelOf.has(k)) labelOf.set(k, r[xLabelKey]); });
+    const buckets = [...labelOf.keys()].sort();
+    const bIdx = new Map(buckets.map((b, i) => [b, i]));
+    const seriesOrder = [], seriesData = new Map();
+    rows.forEach(r => {
+      const s = String(r[sKey]);
+      if (!seriesData.has(s)) { seriesData.set(s, new Map()); seriesOrder.push(s); }
+      seriesData.get(s).set(bIdx.get(String(r[xKey])), +r[yKey] || 0);
+    });
+    const maxV = Math.max(1, ...rows.map(r => +r[yKey] || 0));
+    const n = buckets.length;
+    const xAt = i => padL + (n <= 1 ? (w - padL - padR) / 2 : (i / (n - 1)) * (w - padL - padR));
+    const yAt = v => h - padBottom - (v / Math.max(maxV, 1)) * (h - padTop - padBottom);
+    const tip = getTip();
+    const pageXY = (vbX, vbY) => { const rect = svg.getBoundingClientRect(); return { x: rect.left + (vbX / w) * rect.width + window.scrollX, y: rect.top + (vbY / h) * rect.height + window.scrollY }; };
+
+    // Gridlines y/labels (0 y max)
+    [0, maxV].forEach(v => {
+      const y = yAt(v);
+      const ln = document.createElementNS(SVG_NS, 'line');
+      ln.setAttribute('x1', padL); ln.setAttribute('x2', w - padR); ln.setAttribute('y1', y.toFixed(1)); ln.setAttribute('y2', y.toFixed(1));
+      ln.setAttribute('stroke', '#eef1f5'); ln.setAttribute('stroke-width', '1'); ln.setAttribute('data-rendered', '');
+      svg.appendChild(ln);
+      const t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', '2'); t.setAttribute('y', (y + 2.5).toFixed(1)); t.setAttribute('font-size', '7'); t.setAttribute('fill', '#9aa3b2'); t.setAttribute('data-rendered', '');
+      t.textContent = String(v); svg.appendChild(t);
+    });
+
+    seriesOrder.forEach(s => {
+      const color = originSeriesColor(s);
+      const map = seriesData.get(s);
+      const pts = buckets.map((b, i) => ({ x: xAt(i), y: yAt(map.get(i) || 0), v: map.get(i) || 0, i }));
+      const d = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ');
+      const lp = document.createElementNS(SVG_NS, 'path');
+      lp.setAttribute('d', d); lp.setAttribute('fill', 'none'); lp.setAttribute('stroke', color);
+      lp.setAttribute('stroke-width', '2.4'); lp.setAttribute('stroke-linecap', 'round'); lp.setAttribute('stroke-linejoin', 'round');
+      lp.setAttribute('data-rendered', '');
+      svg.appendChild(lp);
+      pts.forEach(p => {
+        const dot = document.createElementNS(SVG_NS, 'circle');
+        dot.setAttribute('cx', p.x.toFixed(1)); dot.setAttribute('cy', p.y.toFixed(1)); dot.setAttribute('r', '2.6');
+        dot.setAttribute('fill', color); dot.setAttribute('data-rendered', '');
+        dot.addEventListener('mouseenter', () => {
+          tip.innerHTML = `<div class="chart-tip__x">${esc(labelOf.get(buckets[p.i]))}</div><div class="chart-tip__row"><span class="chart-tip__dot" style="background:${color}"></span><span class="chart-tip__lab">${esc(s)}</span><span class="chart-tip__val">${p.v}</span></div>`;
+          const q = pageXY(p.x, p.y); tip.style.left = q.x + 'px'; tip.style.top = q.y + 'px'; tip.classList.add('show');
+        });
+        dot.addEventListener('mouseleave', () => tip.classList.remove('show'));
+        svg.appendChild(dot);
+      });
+    });
+
+    buckets.forEach((b, i) => {
+      const t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', xAt(i).toFixed(1)); t.setAttribute('y', (h - 8).toFixed(1)); t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('font-size', '7'); t.setAttribute('font-weight', '500'); t.setAttribute('fill', '#8a93a3'); t.setAttribute('data-rendered', '');
+      t.textContent = labelOf.get(b); svg.appendChild(t);
+    });
+
+    if (legendEl) {
+      legendEl.innerHTML = seriesOrder.map(s =>
+        `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#475569;"><span style="width:10px;height:10px;border-radius:50%;background:${originSeriesColor(s)};display:inline-block;"></span>${esc(s)}</span>`
+      ).join('');
+    }
+  }
+
+  // Embudo de conversión (pirámide invertida): trapecios decrecientes centrados,
+  // ancho ∝ valor; labels a la izquierda con conector. Recibe una fila
+  // {mql, sql, close_win, sql_pct, cw_of_mql_pct}. SVG.
+  function renderFunnel(svg, rows) {
+    if (!svg.viewBox || !svg.viewBox.baseVal.width) return;
+    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
+    svg.querySelectorAll('[data-rendered]').forEach(n => n.remove());
+    const r = (rows && rows[0]) || {};
+    const pct = x => (x == null || x === '' ? '—' : (Math.round(x * 10) / 10) + '%');
+    const stages = [
+      { v: +r.mql || 0, name: 'MQL (AE)', color: '#6c38ff', pct: 100 },          // violeta Vintti
+      { v: +r.sql || 0, name: 'SQL (AE)', color: '#4ba9ff', pct: r.sql_pct },     // cian Vintti
+      { v: +r.close_win || 0, name: 'Close Win', color: '#c1ff72', pct: r.cw_of_mql_pct }, // lima Vintti
+    ];
+    const maxV = Math.max(1, stages[0].v);
+    const cx = w * 0.62;
+    const maxHW = Math.min(w * 0.30, 210);
+    const padTop = 18, padBottom = 16;
+    const bandH = (h - padTop - padBottom) / stages.length;
+    const hw = v => (v / maxV) * maxHW;
+    const labelX = cx - maxHW - 16;
+    const txt = (x, y, s, opts) => {
+      const t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', x.toFixed(1)); t.setAttribute('y', y.toFixed(1));
+      t.setAttribute('font-size', opts.size); t.setAttribute('font-weight', opts.weight || '600');
+      t.setAttribute('fill', opts.fill || '#0e1117'); t.setAttribute('text-anchor', opts.anchor || 'start');
+      t.setAttribute('data-rendered', ''); t.textContent = s; svg.appendChild(t); return t;
+    };
+
+    stages.forEach((s, i) => {
+      const top = padTop + i * bandH, bot = top + bandH, midY = top + bandH / 2;
+      const wTop = hw(s.v);
+      const wBot = (i < stages.length - 1) ? hw(stages[i + 1].v) : wTop * 0.4;
+      const poly = document.createElementNS(SVG_NS, 'polygon');
+      poly.setAttribute('points',
+        `${(cx - wTop).toFixed(1)},${top.toFixed(1)} ${(cx + wTop).toFixed(1)},${top.toFixed(1)} ` +
+        `${(cx + wBot).toFixed(1)},${bot.toFixed(1)} ${(cx - wBot).toFixed(1)},${bot.toFixed(1)}`);
+      poly.setAttribute('fill', s.color); poly.setAttribute('data-rendered', '');
+      svg.appendChild(poly);
+      // conector label → borde izq de la banda (en el medio)
+      const edgeX = cx - (wTop + wBot) / 2;
+      const ln = document.createElementNS(SVG_NS, 'line');
+      ln.setAttribute('x1', (labelX + 2).toFixed(1)); ln.setAttribute('y1', midY.toFixed(1));
+      ln.setAttribute('x2', edgeX.toFixed(1)); ln.setAttribute('y2', midY.toFixed(1));
+      ln.setAttribute('stroke', s.color); ln.setAttribute('stroke-width', '1'); ln.setAttribute('data-rendered', '');
+      svg.appendChild(ln);
+      txt(labelX, midY - 1.5, `${s.name} · ${s.v}`, { size: '9.5', weight: '700', anchor: 'end' });
+      txt(labelX, midY + 9, pct(s.pct), { size: '8.5', weight: '600', anchor: 'end', fill: '#8a93a3' });
     });
   }
 
@@ -1482,31 +1697,41 @@
      Cada origin conocido tiene un índice fijo → tono (hue) separado por ángulo áureo
      → color único y consistente en TODAS las tablas. Origins no listados caen a un
      hash estable de su nombre, así que igual son determinísticos. */
-  const ORIGIN_ORDER = [
-    '(Sin origen)', 'Website Organic', 'Social Media', 'Connected Inbox',
-    'Referral', 'ChatGPT', 'Events', 'Google', 'AI', 'HubSpot', 'Import',
-    'Campaign', 'SEO', 'Email', 'Paid', 'Eventos', 'Social', 'Lead mag.',
-    'LinkedIn', 'Outbound',
-  ];
-  const GOLDEN_ANGLE = 137.508;
+  // Paleta EXPLÍCITA por canal: un hue bien separado perceptualmente para cada uno
+  // (verde / azul / naranja / violeta / rosa / ...) para que no se confundan.
+  // "(Sin origen)" y NA → gris neutro. Canales no listados → hue por hash de un set
+  // de hues distintos. Esto alimenta las pills, los rankings, las barras y el line chart.
+  const ORIGIN_HUE = {
+    'website organic': 140, 'seo': 125,
+    'social media': 210, 'social': 210, 'linkedin': 205,
+    'ai': 32, 'chatgpt': 185,
+    'events': 268, 'eventos': 268, 'webinar': 162,
+    'import': 330, 'email': 300,
+    'referral': 178, 'connected inbox': 248,
+    'paid media': 358, 'paid': 358,
+    'campaign': 95, 'lead mag.': 80,
+    'google': 222, 'press action': 15, 'hubspot': 45,
+  };
+  const FALLBACK_HUES = [140, 210, 32, 268, 330, 178, 95, 300, 248, 358, 80, 45, 185, 15];
+  const NEUTRAL_ORIGINS = new Set(['(sin origen)', 'sin origen', '—', '-', 'na', 'n/a', '']);
+  function _originKey(label) { return String(label == null ? '' : label).trim().toLowerCase(); }
+  function _originNeutral(label) { return NEUTRAL_ORIGINS.has(_originKey(label)); }
   function chipHue(label) {
-    const s = String(label == null ? '' : label).trim();
-    let idx = ORIGIN_ORDER.indexOf(s);
-    if (idx < 0) {
-      let h = 0;
-      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-      idx = ORIGIN_ORDER.length + (h % 997);
-    }
-    return Math.round((idx * GOLDEN_ANGLE) % 360);
+    const k = _originKey(label);
+    if (Object.prototype.hasOwnProperty.call(ORIGIN_HUE, k)) return ORIGIN_HUE[k];
+    let h = 0;
+    for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+    return FALLBACK_HUES[h % FALLBACK_HUES.length];
   }
   function chipColor(label) {
+    if (_originNeutral(label)) return { fg: '#5b6573', bg: '#eef1f5' };
     const hue = chipHue(label);
-    return { fg: `hsl(${hue}, 52%, 36%)`, bg: `hsl(${hue}, 68%, 95%)` };
+    return { fg: `hsl(${hue}, 50%, 35%)`, bg: `hsl(${hue}, 70%, 93%)` };
   }
-  // Color de canal para barras/segmentos: sólido del MISMO hue de la pill, con
-  // cuerpo (ni lavado como el fondo, ni neón) para que se lea igual que la pill.
+  // Color sólido para barras/líneas: pastel con cuerpo, del MISMO hue de la pill.
   function originSeriesColor(label) {
-    return `hsl(${chipHue(label)}, 48%, 60%)`;
+    if (_originNeutral(label)) return '#aab2bd';
+    return `hsl(${chipHue(label)}, 60%, 62%)`;
   }
   function originChipHtml(label) {
     const s = (label == null || label === '') ? '—' : String(label);
@@ -2646,9 +2871,91 @@
 
   // Toggle GENERAL de período: un solo control que aplica a TODAS las cards
   // período-aware (las que tienen data-override-periodo) de su sección.
+  /* ----- Selector de período específico (qué semana/mes/q/año) ----- */
+  function _pad2(n) { return String(n).padStart(2, '0'); }
+  function _isoD(d) { return d.getFullYear() + '-' + _pad2(d.getMonth() + 1) + '-' + _pad2(d.getDate()); }
+  const _MES_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  // Opciones del selector según la periodicidad. value = ISO del corte (fin del
+  // período, topeado a hoy); '' = más reciente (sin corte → el backend usa hoy).
+  function periodSpecificOptions(periodo) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const cap = d => (d > today ? new Date(today) : d);
+    const out = [];
+    if (periodo === 'semana') {
+      const dow = today.getDay();
+      const monThis = new Date(today); monThis.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow));
+      for (let i = 0; i < 12; i++) {
+        const mon = new Date(monThis); mon.setDate(monThis.getDate() - 7 * i);
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        const lab = `${_pad2(mon.getDate())} ${_MES_ES[mon.getMonth()]} – ${_pad2(sun.getDate())} ${_MES_ES[sun.getMonth()]}`;
+        out.push({ value: i === 0 ? '' : _isoD(cap(sun)), label: i === 0 ? `Esta semana · ${lab}` : lab });
+      }
+    } else if (periodo === 'q') {
+      const curQ = Math.floor(today.getMonth() / 3);
+      for (let i = 0; i < 8; i++) {
+        let q = curQ - i, y = today.getFullYear();
+        while (q < 0) { q += 4; y -= 1; }
+        const last = new Date(y, q * 3 + 3, 0);
+        out.push({ value: i === 0 ? '' : _isoD(cap(last)), label: i === 0 ? `Q${q + 1} ${y} (actual)` : `Q${q + 1} ${y}` });
+      }
+    } else if (periodo === 'anio' || periodo === 'año') {
+      for (let i = 0; i < 5; i++) {
+        const y = today.getFullYear() - i;
+        out.push({ value: i === 0 ? '' : _isoD(cap(new Date(y, 11, 31))), label: i === 0 ? `${y} (actual)` : String(y) });
+      }
+    } else { // mes
+      for (let i = 0; i < 18; i++) {
+        const m = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const last = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+        const lab = `${_MES_ES[m.getMonth()]} ${m.getFullYear()}`;
+        out.push({ value: i === 0 ? '' : _isoD(cap(last)), label: i === 0 ? `${lab} (actual)` : lab });
+      }
+    }
+    return out;
+  }
+
+  function fillPeriodSpecific(sel, periodo) {
+    if (!sel) return;
+    sel.innerHTML = periodSpecificOptions(periodo)
+      .map(o => `<option value="${o.value}">${esc(o.label)}</option>`).join('');
+    sel.value = ''; // default = más reciente
+  }
+
+  // Aplica periodicidad y/o corte a todas las cards período-aware de la sección.
+  async function applyPeriodToSection(section, { periodo, corte }) {
+    const els = [...section.querySelectorAll('[data-chart][data-override-periodo]')];
+    els.forEach(el => {
+      if (periodo != null) el.dataset.overridePeriodo = periodo;
+      if (corte) el.setAttribute('data-override-corte', corte);
+      else el.removeAttribute('data-override-corte');
+    });
+    const groups = new Map();
+    els.forEach(el => {
+      const ov = readOverridesFor(el);
+      const ck = compKeyFor(el.dataset.chart, ov);
+      if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+      groups.get(ck).els.push(el);
+    });
+    for (const { chartKey, overrides, els } of groups.values()) {
+      try {
+        const r = await fetchChart(chartKey, overrides);
+        els.forEach(el => renderBinding(el, r.rows || []));
+      } catch (err) { console.error('apply period', chartKey, err); }
+    }
+  }
+
+  // Toggle de período (Semana/Mes/Q/Año) + selector específico — globales: afectan
+  // todas las cards período-aware de su sección. Sin selección → más reciente.
   function bindGlobalPeriodToggles() {
     document.querySelectorAll('[data-period-global]').forEach(group => {
       const section = group.closest('.channel') || document;
+      const head = group.closest('.mkt-metrics-head') || group.parentElement || document;
+      const sel = head.querySelector('[data-period-specific]');
+      const activePeriodo = () => (group.querySelector('[data-period-set].is-active')?.dataset.periodSet) || 'mes';
+
+      if (sel) fillPeriodSpecific(sel, activePeriodo());
+
       group.addEventListener('click', async (e) => {
         const btn = e.target.closest('[data-period-set]');
         if (!btn) return;
@@ -2658,8 +2965,32 @@
           b.classList.toggle('is-active', active);
           b.setAttribute('aria-selected', active ? 'true' : 'false');
         });
-        const els = [...section.querySelectorAll('[data-chart][data-override-periodo]')];
-        els.forEach(el => { el.dataset.overridePeriodo = periodo; });
+        if (sel) fillPeriodSpecific(sel, periodo); // reset a "más reciente"
+        await applyPeriodToSection(section, { periodo, corte: '' });
+      });
+
+      if (sel) sel.addEventListener('change', async () => {
+        await applyPeriodToSection(section, { periodo: activePeriodo(), corte: sel.value || '' });
+      });
+    });
+  }
+
+  // Toggle MQL/SQL del card de líneas en el tiempo. Setea data-override-lead-type
+  // en los charts del card y refetchea (preserva periodo/corte vía readOverridesFor).
+  function bindLeadTypeToggles() {
+    document.querySelectorAll('[data-leadtype-toggle]').forEach(group => {
+      const card = group.closest('.card') || document;
+      group.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-leadtype-set]');
+        if (!btn) return;
+        const lt = btn.dataset.leadtypeSet;
+        group.querySelectorAll('[data-leadtype-set]').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('is-active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        const els = [...card.querySelectorAll('[data-chart][data-override-lead-type]')];
+        els.forEach(el => el.setAttribute('data-override-lead-type', lt));
         const groups = new Map();
         els.forEach(el => {
           const ov = readOverridesFor(el);
@@ -2668,10 +2999,8 @@
           groups.get(ck).els.push(el);
         });
         for (const { chartKey, overrides, els } of groups.values()) {
-          try {
-            const r = await fetchChart(chartKey, overrides);
-            els.forEach(el => renderBinding(el, r.rows || []));
-          } catch (err) { console.error('global period toggle', chartKey, err); }
+          try { const r = await fetchChart(chartKey, overrides); els.forEach(el => renderBinding(el, r.rows || [])); }
+          catch (err) { console.error('leadtype toggle', chartKey, err); }
         }
       });
     });
@@ -2765,10 +3094,14 @@
     });
 
     // Drill por período (Marketing): igual que week, con data-override-periodo.
-    openPeriodDrawer = (panelKey, periodo) => {
+    openPeriodDrawer = (panelKey, periodo, corte) => {
       const panel = drawer.querySelector(`[data-kpi-detail-panel="${panelKey}"]`);
       if (panel) {
-        panel.querySelectorAll('[data-period-aware]').forEach(el => { el.dataset.overridePeriodo = periodo; });
+        panel.querySelectorAll('[data-period-aware]').forEach(el => {
+          el.dataset.overridePeriodo = periodo;
+          if (corte) el.setAttribute('data-override-corte', corte);
+          else el.removeAttribute('data-override-corte');
+        });
       }
       openDrawer(panelKey);
       if (!panel) return;
@@ -2825,7 +3158,9 @@
         const section = btn.closest('.channel');
         const active = (section || document).querySelector('[data-period-global] [data-period-set].is-active');
         const periodo = active ? active.dataset.periodSet : 'mes';
-        openPeriodDrawer(btn.getAttribute('data-period-detail-open'), periodo);
+        const specSel = (section || document).querySelector('[data-period-specific]');
+        const corte = specSel ? (specSel.value || '') : '';
+        openPeriodDrawer(btn.getAttribute('data-period-detail-open'), periodo, corte);
       });
     });
 
@@ -3443,6 +3778,7 @@
     bindCltvModelToggle();
     bindPeriodToggles();
     bindGlobalPeriodToggles();
+    bindLeadTypeToggles();
     updateWindowLabels();
     hydrate();
   }

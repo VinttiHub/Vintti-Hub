@@ -22,7 +22,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
           WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model IN ('Staffing', 'Recruiting')
-            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
           GROUP BY o.opportunity_id, o.opp_model, cdte
         ),

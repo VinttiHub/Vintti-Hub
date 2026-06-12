@@ -14,7 +14,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         FROM account a
         WHERE a.creation_date IS NOT NULL
           AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
-          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
         ORDER BY a.creation_date DESC, a.client_name;
     """
     return sql, {"ini": ini, "fin": fin}

@@ -31,34 +31,24 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
-    # SQL → Close Win (funnel completo). "SQL" = account creada (creation_date) en la
-    # ventana, con account_manager ∈ M+B (mismo criterio que SQL→Deep Dive y
-    # sql_funnel_30d_detail). Numerador = la account tiene una opp en Close Win.
-    # Canal = where_come_from. Window por creation_date.
+    # SQL → Close Win = WIN RATE sobre las DECIDIDAS (cerradas) en la ventana:
+    # Close Win / (Close Win + Closed Lost), a nivel OPP (deal), por canal
+    # (where_come_from), M+B por opp_sales_lead. Window por opp_close_date.
     win_ini, win_fin = window_bounds(filters)
     sql = """
-        WITH acc AS (
+        WITH cur AS (
           SELECT
-            a.account_id,
-            a.creation_date AS sql_d,
             CASE
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'sales'
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'referrals'
               ELSE 'marketing'
             END AS channel,
-            EXISTS (
-              SELECT 1 FROM opportunity o
-              WHERE o.account_id = a.account_id AND TRIM(o.opp_stage) = 'Close Win'
-            ) AS won
-          FROM account a
-          WHERE a.creation_date IS NOT NULL
-            AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-            AND (%(desde)s::date IS NULL OR a.creation_date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR a.creation_date <= %(hasta)s::date)
-        ),
-        cur AS (
-          SELECT * FROM acc
-          WHERE sql_d BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+            (TRIM(o.opp_stage) = 'Close Win') AS won
+          FROM opportunity o
+          JOIN account a ON a.account_id = o.account_id
+          WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
+            AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+            AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com', 'mariano@vintti.com')
         )
         SELECT
           COUNT(*) FILTER (WHERE channel='sales')::int             AS sales_sql,

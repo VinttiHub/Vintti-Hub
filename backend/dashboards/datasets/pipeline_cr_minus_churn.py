@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from ._periods import window_bounds
+
 
 # Reuse the same stage exclusion as active_pipeline so both KPIs are consistent.
 # `%` doubled to `%%` so psycopg2's pyformat substitution leaves the SQL
@@ -34,20 +36,20 @@ def _parse_date(value: str | None) -> date | None:
 
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    corte = (
-        _parse_date(filters.get("corte"))
-        or _parse_date(filters.get("cutoff"))
-        or datetime.utcnow().date()
-    )
+    # Ventana efectiva: respeta los filtros globales igual que el resto de las
+    # cards de 30d → Desde/Hasta > Mes > rolling 30d terminando en `corte` (hoy).
+    # Sin filtros = comportamiento histórico (corte-29 .. corte). El CONTEO de
+    # pipeline sigue siendo el snapshot actual (no cambia por mes); lo que sí
+    # cambia con la ventana es CR, churn, MRR base y por ende net adds / net MRR.
+    win_ini, win_fin = window_bounds(filters)
 
-    # Net adds (30d) per model = (pipeline_count × CR_30d) − Churn_30d (actual count)
-    # Both CR and Churn use the same 30d window so the values match the
-    # adjacent KPI tiles (NDA → Close Win 30d, Candidate churn 30d).
+    # Net adds per model = (pipeline_count × CR) − Churn (actual count) sobre la
+    # ventana [win_ini, corte_d]. CR, churn y MRR base comparten esa ventana.
     sql = f"""
         WITH params AS (
           SELECT
-            %(corte)s::date                                AS corte_d,
-            (%(corte)s::date - INTERVAL '29 days')::date   AS win_ini
+            %(win_fin)s::date  AS corte_d,
+            %(win_ini)s::date  AS win_ini
         ),
         pipeline AS (
           SELECT
@@ -311,7 +313,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN ltv_months           l;
     """
 
-    return sql, {"corte": corte}
+    return sql, {"win_ini": win_ini, "win_fin": win_fin}
 
 
 DATASET = {

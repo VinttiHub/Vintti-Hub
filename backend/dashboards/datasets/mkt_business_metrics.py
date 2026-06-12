@@ -51,7 +51,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH acct AS (
           SELECT a.account_id, a.creation_date::date AS cd
           FROM account a
-          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
         ),
         sqls AS (
           SELECT
@@ -72,7 +72,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             COUNT(*) FILTER (WHERE fc.fd BETWEEN %(pi)s::date AND %(pf)s::date)::int AS prev
           FROM first_close fc
           JOIN account a ON a.account_id = fc.account_id
-          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
         ),
         dec AS (
           SELECT a.account_id,
@@ -86,7 +86,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               FILTER (WHERE NULLIF(o.opp_close_date::text, '')::date BETWEEN %(pi)s::date AND %(pf)s::date) AS dec_prev
           FROM account a
           JOIN opportunity o ON o.account_id = a.account_id
-          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
             AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
           GROUP BY a.account_id
@@ -107,7 +107,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN account a ON a.account_id = o.account_id
           LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
           WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model IN ('Staffing', 'Recruiting')
-            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) <> 'outbound'
+            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
           GROUP BY o.opportunity_id, cdte
         ),

@@ -31,28 +31,25 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     desde = _parse_date(filters.get("desde"))
     hasta = _parse_date(filters.get("hasta"))
 
-    # Una fila por SQL (account creada en la ventana, AE) y si llegó a Close Win.
+    # Una fila por OPP DECIDIDA (Close Win / Closed Lost) cerrada en la ventana, M+B.
     win_ini, win_fin = window_bounds(filters)
     sql = """
         SELECT
-          TO_CHAR(a.creation_date, 'YYYY-MM-DD') AS sql_date,
+          TO_CHAR(NULLIF(o.opp_close_date::text, '')::date, 'YYYY-MM-DD') AS close_date,
           CASE
             WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'Sales'
             WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'Referrals'
             ELSE 'Marketing'
           END AS channel,
           a.client_name,
-          CASE WHEN EXISTS (
-            SELECT 1 FROM opportunity o
-            WHERE o.account_id = a.account_id AND TRIM(o.opp_stage) = 'Close Win'
-          ) THEN 'Close Win' ELSE 'En proceso / no ganada' END AS estado
-        FROM account a
-        WHERE a.creation_date IS NOT NULL
-          AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-          AND a.creation_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-          AND (%(desde)s::date IS NULL OR a.creation_date >= %(desde)s::date)
-          AND (%(hasta)s::date IS NULL OR a.creation_date <= %(hasta)s::date)
-        ORDER BY estado, channel, a.creation_date DESC;
+          o.opp_position_name AS position,
+          TRIM(o.opp_stage) AS estado
+        FROM opportunity o
+        JOIN account a ON a.account_id = o.account_id
+        WHERE TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
+          AND NULLIF(o.opp_close_date::text, '')::date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+          AND TRIM(LOWER(o.opp_sales_lead)) IN ('bahia@vintti.com', 'mariano@vintti.com')
+        ORDER BY estado, channel, NULLIF(o.opp_close_date::text, '')::date DESC;
     """
 
     return sql, {
@@ -61,11 +58,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
 
 DATASET = {
     "key": "sql_to_clientwin_30d_detail",
-    "label": "SQL → Close Win — Detalle SQLs (30d, AE)",
+    "label": "SQL → Close Win — Detalle decididas (30d, AE)",
     "dimensions": [
-        {"key": "sql_date", "label": "SQL date", "type": "date"},
+        {"key": "close_date", "label": "Close date", "type": "date"},
         {"key": "channel", "label": "Canal", "type": "string"},
         {"key": "client_name", "label": "Cuenta", "type": "string"},
+        {"key": "position", "label": "Posición", "type": "string"},
         {"key": "estado", "label": "Estado", "type": "string"},
     ],
     "measures": [],

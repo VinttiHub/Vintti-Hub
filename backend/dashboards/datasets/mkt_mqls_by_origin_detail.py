@@ -54,7 +54,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
             _first_mapped_value(property_maps, "where_come_from", contact=c)
         )
         origin = (str(origin or "").strip()) or "(Sin origen)"
-        if not SNAPSHOT_MODE and origin.lower() == "outbound":
+        if not SNAPSHOT_MODE and origin.lower() in ("outbound", "connected inbox", "referral"):
             continue
         name = (
             _first_mapped_value(property_maps, "client_name", contact=c)

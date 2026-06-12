@@ -538,6 +538,10 @@ body.is-loading .kpi-card::after {
 .s-9  { grid-column: span 9;  }
 .s-12 { grid-column: span 12; }
 
+/* Strip de KPIs de negocio (Marketing): 5 cards parejas en una fila */
+.mkt-kpi-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; }
+@media (max-width: 1100px) { .mkt-kpi-strip { grid-template-columns: 1fr 1fr; } }
+
 /* ---------- CARD ---------- */
 .card {
   background: var(--card);
@@ -2055,6 +2059,11 @@ body.is-loading .kpi-card::after {
 .skpi-tile--big {
   min-height: 160px;
 }
+
+/* KPI tile clickeable (abre su drawer de detalle) */
+.skpi-tile--clickable { cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
+.skpi-tile--clickable:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,18,30,.10); }
+.skpi-tile--clickable::after { content: "Ver detalle →"; display: block; margin-top: 8px; font-size: 11px; font-weight: 600; color: #9aa3b2; }
 .skpi-tile--big .skpi-tile__value {
   font-size: 44px;
   margin-top: auto;
@@ -4175,6 +4184,27 @@ button.refgen__pill:hover { filter: brightness(0.96); transform: translateY(-1px
 .period-toggle button { padding: 6px 13px; border: none; background: transparent; border-radius: var(--radius-pill); font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; transition: background .14s, color .14s; }
 .period-toggle button:hover { color: var(--ink); }
 .period-toggle button.is-active { background: var(--ink); color: #fff; }
+
+/* Selector de período específico (qué semana/mes/q/año) */
+.mkt-period-controls { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.period-specific {
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(13,18,30,0.04);
+  border: 1px solid rgba(13,18,30,0.08);
+  border-radius: var(--radius-pill);
+  padding: 7px 30px 7px 13px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b6573' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+}
+.period-specific:hover { background-color: rgba(13,18,30,0.07); }
+.period-specific:focus { outline: none; border-color: var(--c-violet, #6c38ff); }
 .mkt-rank__total { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 14px; }
 .mkt-rank__total-num { font-size: 34px; font-weight: 800; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .mkt-rank__total-lab { font-size: 12.5px; color: var(--ink-3); }

@@ -114,7 +114,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
             _first_mapped_value(property_maps, "where_come_from", contact=c)
         )
         origin = (str(origin or "").strip()) or "(Sin origen)"
-        if not SNAPSHOT_MODE and origin.lower() == "outbound":  # espejo del card de SQLs
+        if not SNAPSHOT_MODE and origin.lower() in ("outbound", "connected inbox", "referral"):  # espejo del card de SQLs
             continue
         counts[origin] = counts.get(origin, 0) + 1
 
