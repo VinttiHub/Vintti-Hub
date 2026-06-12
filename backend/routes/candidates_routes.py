@@ -1464,7 +1464,6 @@ def get_opportunities_by_candidate(candidate_id):
                 o.opp_hr_lead,
                 COALESCE(
                     NULLIF(TRIM(oc.stage_pipeline), ''),
-                    NULLIF(TRIM(c.stage), ''),
                     'Contactado'
                 ) AS candidate_stage,
                 a.client_name,
