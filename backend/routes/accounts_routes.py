@@ -1084,13 +1084,22 @@ def get_candidates_by_opportunity(opportunity_id):
                 c.candidate_id,
                 c.name,
                 c.email,
-                c.stage,
+                c.stage AS candidate_stage,
                 c.country,
                 c.employee_salary,
                 c.salary_range,
                 COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted,
                 oc.stage_batch,
-                oc.stage_pipeline AS stage,
+                COALESCE(
+                    NULLIF(TRIM(oc.stage_pipeline), ''),
+                    NULLIF(TRIM(c.stage), ''),
+                    'Contactado'
+                ) AS stage_pipeline,
+                COALESCE(
+                    NULLIF(TRIM(oc.stage_pipeline), ''),
+                    NULLIF(TRIM(c.stage), ''),
+                    'Contactado'
+                ) AS stage,
                 oc.sign_off,
                 oc.star
             FROM candidates c
@@ -1954,10 +1963,11 @@ def link_or_create_candidate(opportunity_id):
             return jsonify({"error": "This candidate is already linked to this opportunity."}), 400
 
         # Si no existe la relación, insertarla
+        stage_pipeline = (data.get('stage') or data.get('stage_pipeline') or 'Contactado').strip() or 'Contactado'
         cur.execute("""
-            INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
-            VALUES (%s, %s)
-        """, (opportunity_id, candidate_id))
+            INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
+            VALUES (%s, %s, %s)
+        """, (opportunity_id, candidate_id, stage_pipeline))
         conn.commit()
         cur.close(); conn.close()
         return jsonify({"message": "Linked existing candidate"}), 200
@@ -1998,9 +2008,9 @@ def link_or_create_candidate(opportunity_id):
             ))
             # Insertar en tabla intermedia
             cursor.execute("""
-                INSERT INTO opportunity_candidates (opportunity_id, candidate_id)
-                VALUES (%s, %s)
-            """, (opportunity_id, new_candidate_id))
+                INSERT INTO opportunity_candidates (opportunity_id, candidate_id, stage_pipeline)
+                VALUES (%s, %s, %s)
+            """, (opportunity_id, new_candidate_id, stage))
 
             conn.commit()
             cursor.close()
