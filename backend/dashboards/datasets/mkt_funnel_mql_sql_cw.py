@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 
 from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
+from ._marketing_scope import is_inbound_lead
 
 # DQL (descalificados) se EXCLUYE del embudo (no son conversiones reales).
 _WON = {"active client", "inactive client"}
@@ -19,13 +20,12 @@ _REACHED_SQL = _WON | {"sql (ae)"}
 _REACHED_MQL = _REACHED_SQL | {"mql (ae)", "closed lost"}
 # Valores exactos de lead_life que cuentan en el embudo — para acotar el search.
 _IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Closed Lost"]
-_EXCLUDE = ("outbound", "connected inbox", "referral")
 
 
 def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     from utils.hubspot import HubSpotClient
     from routes.hubspot_routes import (
-        _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
+        _resolve_account_property_maps, _first_mapped_value,
     )
 
     ini, fin, label = period_bounds(filters)
@@ -37,10 +37,11 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
     origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
+    channel_prop = (pm.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor, origin_prop],
+        extra_properties=[lead_life_property, anchor, origin_prop, channel_prop],
     )
 
     mql = sqlc = cw = 0
@@ -49,8 +50,11 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         d = _parse_hs_date_ms(props.get(anchor))
         if d is None or d < ini or d > fin:
             continue
-        origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
-        if str(origin or "").strip().lower() in _EXCLUDE:
+        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
+        if not is_inbound_lead(
+            _first_mapped_value(pm, "where_come_from", contact=c),
+            _first_mapped_value(pm, "conversion_channel", contact=c),
+        ):
             continue
         ll = str(props.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_MQL:

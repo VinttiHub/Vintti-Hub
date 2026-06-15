@@ -1,34 +1,106 @@
-"""Marketing · detalle SQLs aperturados (cuentas creadas en el período)."""
+"""Marketing · detalle SQLs (live HubSpot).
+
+Una fila por SQL contado en el card de Métricas de Negocio / embudo: contactos
+cuyo lead_life ALCANZÓ la etapa SQL (AE) o más (active/inactive client), anclados
+por `date_of_meeting_scheduled` en el período, excluyendo outbound/connected inbox/
+referral. Misma definición y mismas bounds que `mkt_business_metrics` (sqls) y
+`mkt_funnel_mql_sql_cw`, para que el detalle cuadre con el conteo.
+"""
 from __future__ import annotations
 
+import os
+
 from .mkt_sqls_by_origin import period_bounds
+from .mkt_mqls_by_origin import _parse_hs_date_ms, SNAPSHOT_MODE, _IN_VALUES
+from ._marketing_scope import is_inbound_lead
+
+# SQL = etapa ALCANZADA (idéntico a mkt_funnel_mql_sql_cw / mkt_business_metrics).
+_REACHED_SQL = {"active client", "inactive client", "sql (ae)"}
 
 
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
+    from utils.hubspot import HubSpotClient
+    from routes.hubspot_routes import (
+        _resolve_account_property_maps,
+        _first_mapped_value,
+        _normalize_lead_source,
+    )
+
     ini, fin, _ = period_bounds(filters)
-    sql = """
-        SELECT
-          a.client_name,
-          COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin,
-          TO_CHAR(a.creation_date::date, 'YYYY-MM-DD') AS creation_date
-        FROM account a
-        WHERE a.creation_date IS NOT NULL
-          AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
-          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
-        ORDER BY a.creation_date DESC, a.client_name;
-    """
-    return sql, {"ini": ini, "fin": fin}
+
+    lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
+    meeting_property = (os.environ.get("HUBSPOT_MQL_DATE_PROPERTY") or "date_of_meeting_scheduled").strip()
+    # Ancla = fecha del meeting agendado, igual que el card de SQLs.
+    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+
+    client = HubSpotClient()
+    property_maps = _resolve_account_property_maps(client)
+    origin_prop = (property_maps.get("contacts") or {}).get("where_come_from") or "origin"
+    channel_prop = (property_maps.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
+    company_prop = (property_maps.get("contacts") or {}).get("client_name") or "company"
+
+    contacts = client.search_contacts(
+        [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
+        extra_properties=[
+            lead_life_property, "createdate", anchor_property, meeting_property,
+            origin_prop, channel_prop, company_prop,
+        ],
+    )
+
+    rows = []
+    for c in contacts:
+        props = c.get("properties") or {}
+        # Cohorte por etapa alcanzada: tiene que haber llegado a SQL (AE) o más allá.
+        ll = str(props.get(lead_life_property) or "").strip()
+        if ll.lower() not in _REACHED_SQL:
+            continue
+        # Filtramos por el ancla (date_of_meeting_scheduled). En SNAPSHOT_MODE no
+        # filtramos por fecha ni excluimos outbound (mostrar todo).
+        if not SNAPSHOT_MODE:
+            anchor_d = _parse_hs_date_ms(props.get(anchor_property))
+            if anchor_d is None or anchor_d < ini or anchor_d > fin:
+                continue
+        origin = _normalize_lead_source(
+            _first_mapped_value(property_maps, "where_come_from", contact=c)
+        )
+        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
+        if not SNAPSHOT_MODE and not is_inbound_lead(
+            origin, _first_mapped_value(property_maps, "conversion_channel", contact=c)
+        ):
+            continue
+        origin = (str(origin or "").strip()) or "(Sin origen)"
+        name = (
+            _first_mapped_value(property_maps, "client_name", contact=c)
+            or " ".join(p for p in [props.get("firstname") or "", props.get("lastname") or ""] if p).strip()
+            or props.get("email")
+            or "—"
+        )
+        created_d = _parse_hs_date_ms(props.get("createdate"))
+        meeting_d = _parse_hs_date_ms(props.get(meeting_property))
+        rows.append({
+            "created": created_d.isoformat() if created_d else "",
+            "meeting_date": meeting_d.isoformat() if meeting_d else "",
+            "client_name": str(name),
+            "origin": origin,
+            "lead_life": ll,
+        })
+
+    rows.sort(key=lambda r: r["client_name"])
+    rows.sort(key=lambda r: r["meeting_date"], reverse=True)
+    return rows
 
 
 DATASET = {
     "key": "mkt_sqls_by_origin_detail",
-    "label": "Marketing · detalle SQLs (período)",
+    "label": "Marketing · detalle SQLs (período, live HubSpot)",
     "dimensions": [
-        {"key": "client_name", "label": "Cuenta", "type": "string"},
+        {"key": "meeting_date", "label": "Meeting agendado", "type": "date"},
+        {"key": "created", "label": "Creación (SQL)", "type": "date"},
+        {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
         {"key": "origin", "label": "Origin", "type": "string"},
-        {"key": "creation_date", "label": "Creación (SQL)", "type": "date"},
+        {"key": "lead_life", "label": "Etapa (lead_life)", "type": "string"},
     ],
     "measures": [],
     "default_filters": {"periodo": "mes"},
-    "query": query,
+    "compute": compute,
 }

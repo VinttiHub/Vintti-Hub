@@ -3693,7 +3693,7 @@ MAIN_CHARTS = [
         "title": "Marketing · detalle SQLs (período)",
         "type": "table",
         "dataset_key": "mkt_sqls_by_origin_detail",
-        "config": {"mapping": {"columns": ["creation_date", "client_name", "origin"]}},
+        "config": {"mapping": {"columns": ["meeting_date", "created", "client_name", "origin", "lead_life"]}},
         "position": {"x": 0, "y": 12, "w": 6, "h": 5},
         "sort_order": 813,
     },

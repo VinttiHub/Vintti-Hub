@@ -7650,14 +7650,14 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Marketing · por origin</span>
             <h3 class="kpi-drawer__title">SQLs aperturados · detalle</h3>
-            <p class="kpi-drawer__sub">Cuentas que entraron al CRM en el período seleccionado, con su origen.</p>
+            <p class="kpi-drawer__sub">Contactos (HubSpot) que alcanzaron etapa SQL (AE) en el período (por fecha de meeting), etapa alcanzada SQL(AE)+ · solo canales de marketing.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Cuentas (SQLs) del período</h4>
+              <h4 class="kpi-drawer__section-title">SQLs del período</h4>
               <div class="dtable-wrap" data-chart="mk_table_sqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
-                   data-cols="creation_date|Creación|raw,client_name|Cuenta|raw,origin|Origin|chip"
+                   data-cols="meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip,lead_life|Etapa|raw,created|Creación|raw"
                    data-empty-text="Sin SQLs en el período."></div>
             </section>
           </div>

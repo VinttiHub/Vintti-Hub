@@ -19,6 +19,7 @@ import os
 
 from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
 from .mkt_business_metrics import _prev_bounds
+from ._marketing_scope import is_inbound_lead
 
 # Etapa ALCANZADA = MQL (AE) o más allá (excluye DQL y los MQL pre-meeting como
 # MQL (BDRs) / MQL (MKT) TOFU-MOFU-BOFU, que NO agendaron reunión).
@@ -26,7 +27,6 @@ _WON = {"active client", "inactive client"}
 _REACHED_MQL = _WON | {"sql (ae)", "closed lost", "mql (ae)"}
 # Valores exactos de lead_life para acotar el search en HubSpot.
 _IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Closed Lost"]
-_EXCLUDE_ORIGINS = ("outbound", "connected inbox", "referral")
 
 
 def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
@@ -34,7 +34,6 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     from routes.hubspot_routes import (
         _resolve_account_property_maps,
         _first_mapped_value,
-        _normalize_lead_source,
     )
 
     ini, fin, label = period_bounds(filters)
@@ -47,10 +46,11 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     client = HubSpotClient()
     property_maps = _resolve_account_property_maps(client)
     origin_prop = (property_maps.get("contacts") or {}).get("where_come_from") or "origin"
+    channel_prop = (property_maps.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor_property, origin_prop],
+        extra_properties=[lead_life_property, anchor_property, origin_prop, channel_prop],
     )
 
     cur = prev = 0
@@ -63,10 +63,11 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         d = _parse_hs_date_ms(props.get(anchor_property))
         if d is None:
             continue
-        origin = _normalize_lead_source(
-            _first_mapped_value(property_maps, "where_come_from", contact=c)
-        )
-        if str(origin or "").strip().lower() in _EXCLUDE_ORIGINS:
+        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
+        if not is_inbound_lead(
+            _first_mapped_value(property_maps, "where_come_from", contact=c),
+            _first_mapped_value(property_maps, "conversion_channel", contact=c),
+        ):
             continue
         if ini <= d <= fin:
             cur += 1

@@ -1,12 +1,27 @@
 """Marketing · SQLs aperturados por origin — ranking por período.
 
-SQL = cuenta que entra al CRM (account.creation_date). Segmentado por origin
-(account.where_come_from). Período (a la fecha): semana / mes / q / anio.
-Devuelve una fila por origin con count, share_pct y total (constante).
+SQL = contacto que ALCANZÓ la etapa SQL (AE) o más (active/inactive client) en
+HubSpot, anclado por `date_of_meeting_scheduled`. Misma definición que el card de
+SQLs (mkt_business_metrics) y el embudo (mkt_funnel_mql_sql_cw) — ya NO es
+account.creation_date sobre Postgres. Marketing-scope = Inbound en AMBAS dimensiones
+(origin/MQL Source + conversion_channel/Booking Source). Segmentado por origin.
+Período (a la fecha): semana / mes / q / anio. Devuelve una fila por origin con
+count, share_pct y total.
+
+NOTA: `period_bounds` y `_parse_date` se mantienen acá porque los importan
+mkt_business_metrics y mkt_sqls_by_origin_detail.
 """
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta
+
+from ._marketing_scope import is_inbound_lead
+
+# SQL = etapa ALCANZADA SQL (AE) o más (idéntico a mkt_business_metrics / embudo).
+_WON = {"active client", "inactive client"}
+_REACHED_SQL = _WON | {"sql (ae)"}
+_IN_VALUES = ["MQL (AE)", "SQL (AE)", "Active Client", "Inactive Client", "Closed Lost"]
 
 
 def _parse_date(value):
@@ -36,32 +51,73 @@ def period_bounds(filters: dict) -> tuple[date, date, str]:
     return date(corte.year, corte.month, 1), corte, "Mes"
 
 
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
+    # Imports lazy: evita acoplar el registro de datasets a las rutas/HubSpot.
+    from utils.hubspot import HubSpotClient
+    from routes.hubspot_routes import (
+        _resolve_account_property_maps,
+        _first_mapped_value,
+        _normalize_lead_source,
+    )
+    from .mkt_mqls_by_origin import _parse_hs_date_ms, SNAPSHOT_MODE
+
     ini, fin, label = period_bounds(filters)
-    sql = """
-        WITH base AS (
-          SELECT COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
-          FROM account a
-          WHERE a.creation_date IS NOT NULL
-            AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
-            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
-        ),
-        agg AS (SELECT origin, COUNT(*)::int AS c FROM base GROUP BY origin)
-        SELECT
-          origin,
-          c AS count,
-          ROUND(100.0 * c / NULLIF(SUM(c) OVER (), 0), 1)::float AS share_pct,
-          SUM(c) OVER ()::int AS total,
-          %(label)s::text AS period_label
-        FROM agg
-        ORDER BY c DESC, origin;
-    """
-    return sql, {"ini": ini, "fin": fin, "label": label}
+
+    lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
+    # Ancla = fecha del meeting agendado (= se volvió SQL AE), igual que el card de SQLs.
+    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+
+    client = HubSpotClient()
+    property_maps = _resolve_account_property_maps(client)
+    origin_prop = (property_maps.get("contacts") or {}).get("where_come_from") or "origin"
+    channel_prop = (property_maps.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
+
+    contacts = client.search_contacts(
+        [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
+        extra_properties=[lead_life_property, anchor_property, origin_prop, channel_prop],
+    )
+
+    counts: dict[str, int] = {}
+    for c in contacts:
+        # Tiene que haber ALCANZADO SQL (AE) o más allá.
+        ll = str((c.get("properties") or {}).get(lead_life_property) or "").strip().lower()
+        if ll not in _REACHED_SQL:
+            continue
+        if not SNAPSHOT_MODE:
+            d = _parse_hs_date_ms((c.get("properties") or {}).get(anchor_property))
+            if d is None or d < ini or d > fin:
+                continue
+        origin = _normalize_lead_source(
+            _first_mapped_value(property_maps, "where_come_from", contact=c)
+        )
+        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
+        # El desglose se sigue agrupando por origin (MQL Source).
+        if not SNAPSHOT_MODE and not is_inbound_lead(
+            origin, _first_mapped_value(property_maps, "conversion_channel", contact=c)
+        ):
+            continue
+        origin = (str(origin or "").strip()) or "(Sin origen)"
+        counts[origin] = counts.get(origin, 0) + 1
+
+    total = sum(counts.values())
+    label = "Snapshot (todos)" if SNAPSHOT_MODE else label
+    rows = [
+        {
+            "origin": origin,
+            "count": n,
+            "share_pct": round(100.0 * n / total, 1) if total else 0.0,
+            "total": total,
+            "period_label": label,
+        }
+        for origin, n in counts.items()
+    ]
+    rows.sort(key=lambda r: (-r["count"], r["origin"]))
+    return rows
 
 
 DATASET = {
     "key": "mkt_sqls_by_origin",
-    "label": "Marketing · SQLs por origin (ranking, período)",
+    "label": "Marketing · SQLs por origin (live HubSpot, período)",
     "dimensions": [
         {"key": "origin", "label": "Origin", "type": "string"},
         {"key": "period_label", "label": "Período", "type": "string"},
@@ -72,5 +128,5 @@ DATASET = {
         {"key": "total", "label": "Total SQLs", "type": "number"},
     ],
     "default_filters": {"periodo": "mes"},
-    "query": query,
+    "compute": compute,
 }
