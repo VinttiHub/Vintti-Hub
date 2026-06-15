@@ -41,6 +41,7 @@ def data_light():
               a.contract,
               a.account_status,
               a.account_manager,
+              COALESCE(a.vintti_ai, FALSE) AS vintti_ai,
               a.where_come_from,
               a.referal_source,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
@@ -49,7 +50,7 @@ def data_light():
             FROM account a
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager, a.where_come_from, a.referal_source
+            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager, a.vintti_ai, a.where_come_from, a.referal_source
             ORDER BY LOWER(a.client_name) ASC;
         """)
 
@@ -89,7 +90,8 @@ def get_opportunities_light():
                 o.expected_fee,
                 o.expected_revenue,
                 u.user_name AS sales_lead_name,
-                a.client_name AS client_name
+                a.client_name AS client_name,
+                COALESCE(a.vintti_ai, FALSE) AS vintti_ai
             FROM opportunity o
             LEFT JOIN users u ON o.opp_sales_lead = u.email_vintti
             LEFT JOIN account a ON o.account_id = a.account_id

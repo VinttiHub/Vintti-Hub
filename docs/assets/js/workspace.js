@@ -3,9 +3,9 @@
    ---------------------------------------------------------
    "Hub dentro del hub": un switch global, recordado por usuario,
    que filtra las listas (opportunities, clients, candidates) por
-   entidad. La detección es por email del owner (rápido, sin tocar
-   la base): un registro es de vintti.ai si su sales lead / account
-   manager está en VINTTI_AI_EMAILS (hoy = mia@vintti.com).
+   entidad. La fuente de verdad es el booleano vintti_ai sincronizado
+   desde HubSpot. El email del owner se conserva como fallback para
+   respuestas antiguas que todavía no incluyan ese campo.
 
    Estados: 'all' (todo, default) | 'vintti' | 'vintti_ai'.
    Al cambiar se guarda en localStorage y se recarga la página para
@@ -34,18 +34,50 @@
     return VINTTI_AI_EMAILS.has(norm(email));
   }
 
+  function parseBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1;
+    const normalized = norm(value);
+    if (['true', 't', '1', 'yes', 'y', 'si', 'sí'].includes(normalized)) return true;
+    if (['false', 'f', '0', 'no', 'n'].includes(normalized)) return false;
+    return null;
+  }
+
+  function matchRecord(vinttiAi, ...fallbackEmails) {
+    const ws = get();
+    if (ws === 'all') return true;
+    const parsed = parseBoolean(vinttiAi);
+    const isAi = parsed === null ? fallbackEmails.some(isVinttiAiEmail) : parsed;
+    return ws === 'vintti_ai' ? isAi : !isAi;
+  }
+
+  function decorateRow(row, vinttiAi, targetCell, ...fallbackEmails) {
+    if (!row) return false;
+    const parsed = parseBoolean(vinttiAi);
+    const isAi = parsed === null ? fallbackEmails.some(isVinttiAiEmail) : parsed;
+    if (!isAi) return false;
+    row.classList.add('vintti-ai-row');
+    const badgeCell = targetCell || row.querySelector('.vintti-ai-badge-cell');
+    if (!badgeCell || badgeCell.querySelector('.vintti-ai-row-badge')) return true;
+    const badge = document.createElement('span');
+    badge.className = 'vintti-ai-row-badge';
+    badge.textContent = '✨🤖';
+    badge.title = 'Vintti AI';
+    badge.setAttribute('aria-label', 'Vintti AI');
+    badgeCell.classList.add('vintti-ai-badge-cell');
+    badgeCell.insertBefore(badge, badgeCell.firstChild);
+    return true;
+  }
+
   /* ¿este registro pertenece al workspace activo? Recibe el/los
      email(s) de owner (sales lead, account manager, etc.). */
   function matchEmails(...emails) {
-    const ws = get();
-    if (ws === 'all') return true;
-    const isAi = emails.some(isVinttiAiEmail);
-    return ws === 'vintti_ai' ? isAi : !isAi;
+    return matchRecord(null, ...emails);
   }
 
   /* Helper específico para una oportunidad (filtra por sales lead). */
   function matchOpp(opp) {
-    return matchEmails(opp && opp.opp_sales_lead);
+    return matchRecord(opp && opp.vintti_ai, opp && opp.opp_sales_lead);
   }
 
   function set(value) {
@@ -117,7 +149,7 @@
   }
 
   window.Workspace = {
-    get, set, isVinttiAiEmail, matchEmails, matchOpp, VINTTI_AI_EMAILS,
+    get, set, isVinttiAiEmail, matchRecord, matchEmails, matchOpp, decorateRow, VINTTI_AI_EMAILS,
   };
 
   document.addEventListener('sidebar:loaded', () => { applyBodyAttr(); injectSwitch(); injectHeaderBadge(); });

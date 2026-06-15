@@ -552,8 +552,9 @@ function buildCandidateRow(candidate) {
   tr.dataset.status = (candidate.status || '').toLowerCase();
   tr.dataset.model = (candidate.opp_model || '').trim();
   tr.dataset.resume = isTrueResumeFlag(candidate.has_resume) ? 'with' : 'without';
-  // 🏷️ Sales lead de la opp vinculada → workspace (vintti.ai = Mia)
+  // Sales lead remains available as a fallback during rollout.
   tr.dataset.salesLead = (candidate.opp_sales_lead || '').toLowerCase();
+  tr.dataset.vinttiAi = String(candidate.vintti_ai ?? '');
 
   const rawPhone = candidate.phone ? String(candidate.phone) : '';
   const phone = rawPhone.replace(/\D/g, '');
@@ -581,7 +582,7 @@ function buildCandidateRow(candidate) {
   const formattedCountry = formatCountryDisplay(candidate.country);
   tr.innerHTML = `
     <td class="condition-cell"><span class="status-chip ${chipClass}">${condition}</span></td>
-    <td class="${nameCellClasses.join(' ')}">${nameContent}</td>
+    <td class="${nameCellClasses.join(' ')} vintti-ai-badge-cell">${nameContent}</td>
     <td>${formattedCountry}</td>
     <td>
       ${
@@ -607,6 +608,12 @@ function buildCandidateRow(candidate) {
       </span>
     </td>
   `;
+  window.Workspace?.decorateRow?.(
+    tr,
+    candidate.vintti_ai,
+    tr.querySelector('.vintti-ai-badge-cell'),
+    candidate.opp_sales_lead
+  );
 
   return tr;
 }
@@ -1393,9 +1400,12 @@ function installAdvancedFilters(table) {
   if (!window.__candWorkspaceExtRegistered) {
     $.fn.dataTable.ext.search.push((settings, data, dataIndex) => {
       if (settings.nTable !== document.getElementById('candidatesTable')) return true;
-      if (!window.Workspace || typeof window.Workspace.matchEmails !== 'function') return true;
+      if (!window.Workspace || typeof window.Workspace.matchRecord !== 'function') return true;
       const tr = table.row(dataIndex).node();
-      return window.Workspace.matchEmails(tr?.dataset?.salesLead || '');
+      return window.Workspace.matchRecord(
+        tr?.dataset?.vinttiAi,
+        tr?.dataset?.salesLead || ''
+      );
     });
     window.__candWorkspaceExtRegistered = true;
   }

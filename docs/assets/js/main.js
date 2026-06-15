@@ -1496,7 +1496,7 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           const plainComment = htmlToPlainText(opp[commentField] || '');
           const typeLabel = opp.opp_type || '';
           tr.innerHTML = `
-            <td>${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
+            <td class="vintti-ai-badge-cell">${getStageDropdown(opp.opp_stage, opp.opportunity_id)}</td>
             <td>${opp.client_name || ''}</td>
             <td>${opp.opp_position_name || ''}</td>
             <td data-type-value="${escapeAttribute(typeLabel)}">
@@ -1527,6 +1527,13 @@ document.querySelectorAll('.filter-header').forEach((header) => setupFilterToggl
           `;
           tr.dataset.filterDate = getOpportunityReferenceDate(opp);
           tr.dataset.salesLead = String(opp.opp_sales_lead || '').toLowerCase();
+          tr.dataset.vinttiAi = String(opp.vintti_ai ?? '');
+          window.Workspace?.decorateRow?.(
+            tr,
+            opp.vintti_ai,
+            tr.querySelector('.vintti-ai-badge-cell'),
+            opp.opp_sales_lead
+          );
 
           // const batchCell = tr.querySelector('.batch-count-cell');
           // hydrateBatchCountCell(opp.opportunity_id, batchCell);
@@ -1658,10 +1665,10 @@ if (!window.__typeFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
 if (!window.__workspaceFilterExtRegistered && $.fn?.dataTable?.ext?.search) {
   $.fn.dataTable.ext.search.push((settings, rowData, rowIndex) => {
     if (!settings?.nTable || settings.nTable.id !== 'opportunityTable') return true;
-    if (!window.Workspace || typeof window.Workspace.matchEmails !== 'function') return true;
+    if (!window.Workspace || typeof window.Workspace.matchRecord !== 'function') return true;
     const row = settings.aoData?.[rowIndex]?.nTr;
     const salesLead = row?.dataset?.salesLead || '';
-    return window.Workspace.matchEmails(salesLead);
+    return window.Workspace.matchRecord(row?.dataset?.vinttiAi, salesLead);
   });
   window.__workspaceFilterExtRegistered = true;
 }

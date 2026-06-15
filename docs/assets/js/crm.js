@@ -241,9 +241,9 @@ function registerAccountTableFilters(table) {
 
 function doesRowMatchCrmFilters(row) {
   const ds = row?.dataset || {};
-  // 🏷️ Workspace (Vintti / Vintti.ai / All) — por account_manager (salesLeadCode = email)
-  if (window.Workspace && typeof window.Workspace.matchEmails === 'function') {
-    if (!window.Workspace.matchEmails(ds.salesLeadCode || '')) return false;
+  // Workspace classification comes from HubSpot's vintti_ai property.
+  if (window.Workspace && typeof window.Workspace.matchRecord === 'function') {
+    if (!window.Workspace.matchRecord(ds.vinttiAi, ds.salesLeadCode || '')) return false;
   }
   if (CRM_FILTER_STATE.salesLead) {
     const code = ds.salesLeadCode || CRM_UNASSIGNED_SALES_LEAD_VALUE;
@@ -359,11 +359,6 @@ function renderSalesLeadOptions() {
 function upsertSalesLeadOption(value, label) {
   const key = (value || '').toLowerCase().trim();
   if (!key) return false;
-  // 🏷️ Acotar al workspace activo: Vintti quita a Mia, Vintti.ai deja solo vintti.ai.
-  if (window.Workspace && typeof window.Workspace.matchEmails === 'function'
-      && !window.Workspace.matchEmails(key)) {
-    return false;
-  }
   const display = (label || '').trim() || value;
   const prev = CRM_SALES_LEAD_OPTIONS.get(key);
   if (prev === display) return false;
@@ -420,6 +415,7 @@ function decorateRowFilterMeta(row, item) {
   const leadMeta = deriveSalesLeadMeta(item);
   row.dataset.salesLeadLabel = leadMeta.label;
   row.dataset.salesLeadCode = leadMeta.code;
+  row.dataset.vinttiAi = String(item?.vintti_ai ?? '');
 
   const statusRaw = getPreferredAccountStatus(item);
   row.dataset.statusLabel = statusRaw || '—';
@@ -2303,7 +2299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const statusOrder = statusRank(statusTxt);
         return `
           <tr data-id="${item.account_id}">
-            <td>${item.client_name || '—'}</td>
+            <td class="vintti-ai-badge-cell">${item.client_name || '—'}</td>
             <td class="status-td" data-id="${item.account_id}" data-order="${statusOrder}">
               ${renderAccountStatusChip(statusTxt)}
             </td>
@@ -2344,6 +2340,12 @@ document.addEventListener('DOMContentLoaded', () => {
       data.forEach(item => {
         const row = rowById.get(Number(item.account_id));
         const meta = decorateRowFilterMeta(row, item);
+        window.Workspace?.decorateRow?.(
+          row,
+          item.vintti_ai,
+          row?.querySelector('.vintti-ai-badge-cell'),
+          item.account_manager
+        );
         if (meta?.contractLabel) contractLabels.add(meta.contractLabel);
         const statusTxt = getPreferredAccountStatus(item);
         if (statusTxt && statusTxt !== '—') statusLabels.add(statusTxt);

@@ -2338,9 +2338,22 @@ def get_candidates_light_fast():
                 ) THEN 'Recruiting'
                 ELSE NULL
               END AS opp_model,
-              -- Sales lead de la opp vinculada (hire activo o buyout): permite
-              -- atribuir el candidato a un workspace (vintti.ai = Mia).
+              -- Sales lead kept for display and legacy workspace fallback.
               COALESCE(o.opp_sales_lead, bo.opp_sales_lead) AS opp_sales_lead,
+              EXISTS (
+                SELECT 1
+                FROM opportunity_candidates oc_ai
+                JOIN opportunity o_ai ON o_ai.opportunity_id = oc_ai.opportunity_id
+                JOIN account a_ai ON a_ai.account_id = o_ai.account_id
+                WHERE oc_ai.candidate_id = c.candidate_id
+                  AND COALESCE(a_ai.vintti_ai, FALSE)
+              ) OR EXISTS (
+                SELECT 1
+                FROM hire_opportunity h_ai
+                JOIN account a_ai ON a_ai.account_id = h_ai.account_id
+                WHERE h_ai.candidate_id = c.candidate_id
+                  AND COALESCE(a_ai.vintti_ai, FALSE)
+              ) AS vintti_ai,
               COALESCE(bl.is_blacklisted, FALSE) AS is_blacklisted
             FROM candidates c
             LEFT JOIN active_or_latest a ON a.candidate_id = c.candidate_id

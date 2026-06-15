@@ -117,6 +117,7 @@ def _ensure_hubspot_account_columns(cursor):
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_company_id TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_contact_id TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS hubspot_synced_at TIMESTAMPTZ")
+    cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS vintti_ai BOOLEAN NOT NULL DEFAULT FALSE")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS lead_source_detail TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS conversion_channel TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS credit_loop TEXT")
@@ -219,6 +220,15 @@ def _normalize_credit_loop_value(value):
     return raw
 
 
+def _normalize_boolean_value(value):
+    if isinstance(value, bool):
+        return value
+    raw = str(value or "").strip().lower()
+    if raw in ("yes", "true", "1", "y", "si", "sí"):
+        return True
+    return False
+
+
 def _account_name_candidates(value):
     raw = str(value or "").strip()
     if not raw:
@@ -266,6 +276,7 @@ HUBSPOT_ACCOUNT_FIELD_ALIASES = {
     "lead_source_detail": ["origin_detail", "Origin detail"],
     "conversion_channel": ["conversion_channel", "Conversion Channel"],
     "credit_loop": ["credit_loop", "Credit Loop?", "Credit Loop"],
+    "vintti_ai": ["vintti_ai", "Vintti AI"],
 }
 
 MEETING_DATE_TIME_ALIASES = [
@@ -437,6 +448,7 @@ def _preview_account_fields(payload):
         "hubspot_company_id",
         "hubspot_contact_id",
         "credit_loop",
+        "vintti_ai",
     ]
     return {key: payload.get(key) for key in keys}
 
@@ -463,6 +475,7 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
         "pain_points": "pain_points",
         "position": "position",
         "credit_loop": "credit_loop",
+        "vintti_ai": "vintti_ai",
     }
     for field, payload_key in field_to_payload.items():
         value = _first_mapped_value(property_maps, field, contact=contact, company=company, deal=deal)
@@ -472,6 +485,7 @@ def _apply_account_field_overrides(payload, contact=None, company=None, deal=Non
     payload["pain_points"] = _normalize_pain_point(payload.get("pain_points"))
     payload["where_come_from"] = _normalize_lead_source(payload.get("where_come_from"))
     payload["credit_loop"] = _normalize_credit_loop_value(payload.get("credit_loop"))
+    payload["vintti_ai"] = _normalize_boolean_value(payload.get("vintti_ai"))
 
     return payload
 
@@ -768,6 +782,7 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
             surname = COALESCE(NULLIF(%s, ''), surname),
             account_manager = COALESCE(NULLIF(%s, ''), account_manager),
             credit_loop = COALESCE(NULLIF(%s, ''), credit_loop),
+            vintti_ai = %s,
             hubspot_deal_id = COALESCE(NULLIF(hubspot_deal_id, ''), NULLIF(%s, '')),
             hubspot_company_id = COALESCE(NULLIF(hubspot_company_id, ''), NULLIF(%s, '')),
             hubspot_contact_id = COALESCE(NULLIF(hubspot_contact_id, ''), NULLIF(%s, '')),
@@ -796,6 +811,7 @@ def _link_existing_account_to_hubspot(cursor, account_id, payload):
             payload.get("contact_surname"),
             payload.get("account_manager"),
             _normalize_credit_loop_value(payload.get("credit_loop")),
+            _normalize_boolean_value(payload.get("vintti_ai")),
             payload.get("hubspot_deal_id"),
             payload.get("hubspot_company_id"),
             payload.get("hubspot_contact_id"),
@@ -1466,6 +1482,7 @@ def _insert_or_update_account(cursor, payload):
         "hubspot_company_id": payload.get("hubspot_company_id"),
         "hubspot_contact_id": payload.get("hubspot_contact_id"),
         "credit_loop": _normalize_credit_loop_value(payload.get("credit_loop")),
+        "vintti_ai": _normalize_boolean_value(payload.get("vintti_ai")),
         "hubspot_synced_at": now,
     }
 
@@ -1495,6 +1512,7 @@ def _insert_or_update_account(cursor, payload):
                 surname = COALESCE(NULLIF(%(surname)s, ''), surname),
                 account_manager = COALESCE(NULLIF(%(account_manager)s, ''), account_manager),
                 credit_loop = COALESCE(NULLIF(%(credit_loop)s, ''), credit_loop),
+                vintti_ai = %(vintti_ai)s,
                 hubspot_deal_id = COALESCE(NULLIF(%(hubspot_deal_id)s, ''), hubspot_deal_id),
                 hubspot_company_id = COALESCE(NULLIF(%(hubspot_company_id)s, ''), hubspot_company_id),
                 hubspot_contact_id = COALESCE(NULLIF(%(hubspot_contact_id)s, ''), hubspot_contact_id),
@@ -1512,14 +1530,14 @@ def _insert_or_update_account(cursor, payload):
             website, linkedin, comments, mail,
             where_come_from, lead_source_detail, conversion_channel, referal_source,
             industry, outsource, pain_points, contract, position, type,
-            name, surname, account_manager, credit_loop,
+            name, surname, account_manager, credit_loop, vintti_ai,
             hubspot_deal_id, hubspot_company_id, hubspot_contact_id, hubspot_synced_at
         ) VALUES (
             %(client_name)s, %(size)s, %(timezone)s, %(state)s,
             %(website)s, %(linkedin)s, %(comments)s, %(mail)s,
             COALESCE(%(where_come_from)s, 'HubSpot'), %(lead_source_detail)s, %(conversion_channel)s, %(referal_source)s,
             %(industry)s, %(outsource)s, %(pain_points)s, %(contract)s, %(position)s, COALESCE(%(type)s, 'NA'),
-            %(name)s, %(surname)s, COALESCE(%(account_manager)s, %(default_account_manager)s), %(credit_loop)s,
+            %(name)s, %(surname)s, COALESCE(%(account_manager)s, %(default_account_manager)s), %(credit_loop)s, %(vintti_ai)s,
             %(hubspot_deal_id)s, %(hubspot_company_id)s, %(hubspot_contact_id)s, %(hubspot_synced_at)s
         )
         RETURNING account_id
