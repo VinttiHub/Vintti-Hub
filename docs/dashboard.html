@@ -1099,82 +1099,52 @@
     <div class="grid">
 
       <!-- Hero KPI 1 · Client Churn 30d (flip → 30d list) -->
-      <div class="hero-kpi is-flippable s-4" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">Client churn<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver listado de clientes">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_client_churn_30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="am_kpi_client_churn_30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
-                de <span data-chart="am_kpi_client_churn_30d" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes activos
-              </div>
-            </div>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Client churn<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-client-churn" aria-label="Ver detalle Client churn">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>Clients · last 30d <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_client_churn_30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="am_kpi_client_churn_30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
+              de <span data-chart="am_kpi_client_churn_30d" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes activos
             </div>
-            <div class="dlist" data-chart="am_table_client_churn_30d_detail" data-bind="list"
-                 data-list-name="client_name" data-list-sub="estado_cliente_ventana" data-list-date="fecha_baja" data-limit="80"></div>
           </div>
         </div>
       </div>
 
       <!-- Hero KPI 2 · Candidate Churn 30d (flip → 30d list) -->
-      <div class="hero-kpi is-flippable s-4" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-warm">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">Candidate churn<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver listado de candidatos">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_candidate_churn_30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="am_kpi_candidate_churn_30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
-                de <span data-chart="am_kpi_candidate_churn_30d" data-bind="text" data-field="candidatos_activos" data-reduce="first" data-fmt="int">—</span> candidatos activos
-              </div>
-            </div>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-warm">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Candidate churn<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-candidate-churn" aria-label="Ver detalle Candidate churn">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>Candidates · last 30d <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_candidate_churn_30d" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="am_kpi_candidate_churn_30d" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
+              de <span data-chart="am_kpi_candidate_churn_30d" data-bind="text" data-field="candidatos_activos" data-reduce="first" data-fmt="int">—</span> candidatos activos
             </div>
-            <div class="dlist" data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
-                 data-list-name="candidate_name" data-list-sub="client_name" data-list-date="estado" data-limit="120"></div>
           </div>
         </div>
       </div>
 
       <!-- Hero KPI 3 · Cohort Churn (3 / 6 m windowed) (flip → cohort list) -->
-      <div class="hero-kpi is-flippable s-4" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">3 / 6m Churn<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver listado de 3 / 6m Churn · <span data-window-label>30d</span>">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
-                de <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> en cohort
-              </div>
-            </div>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">3 / 6m Churn<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-cohort-churn" aria-label="Ver detalle 3 / 6m Churn">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>3 / 6m Churn <span class="count" data-chart="am_table_candidate_churn_window_cohort_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="churn_real_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="bajas_real" data-reduce="first" data-fmt="int">—</span> baja(s) ·
+              de <span data-chart="am_kpi_candidate_churn_window" data-bind="text" data-field="candidatos" data-reduce="first" data-fmt="int">—</span> en cohort
             </div>
-            <div class="dlist" data-chart="am_table_candidate_churn_window_cohort_detail" data-bind="list"
-                 data-list-name="candidate_name" data-list-sub="account_name" data-list-date="baja_tipo" data-limit="80"></div>
           </div>
         </div>
       </div>
@@ -1182,144 +1152,94 @@
       <!-- 3 hero retention cards · CRR+GRR / NRR / Multi-candidate (flip → 30d detail) -->
 
       <!-- CRR + GRR · <span data-window-label>30d</span> (combined) -->
-      <div class="hero-kpi is-flippable s-4" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">CRR + GRR<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-lime">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">CRR + GRR<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-crr-grr" aria-label="Ver detalle CRR + GRR">⚐</button>
+          </div>
+          <div class="hero-kpi__split-vals">
+            <div>
+              <div class="hero-kpi__split-lab">CRR</div>
+              <div class="hero-kpi__split-val" data-chart="am_kpi_crr_30d" data-bind="text" data-field="grr_pct" data-reduce="first" data-fmt="percent">—</div>
             </div>
-            <div class="hero-kpi__split-vals">
-              <div>
-                <div class="hero-kpi__split-lab">CRR</div>
-                <div class="hero-kpi__split-val" data-chart="am_kpi_crr_30d" data-bind="text" data-field="grr_pct" data-reduce="first" data-fmt="percent">—</div>
-              </div>
-              <div>
-                <div class="hero-kpi__split-lab">GRR</div>
-                <div class="hero-kpi__split-val" data-chart="am_kpi_crr_30d" data-bind="text" data-field="crr_pct" data-reduce="first" data-fmt="percent">—</div>
-              </div>
-            </div>
-            <div class="hero-kpi__label">
-              <span data-chart="am_kpi_crr_30d" data-bind="text" data-field="retenidos" data-reduce="first" data-fmt="int">—</span> de
-              <span data-chart="am_kpi_crr_30d" data-bind="text" data-field="inicio" data-reduce="first" data-fmt="int">—</span> clientes retenidos
+            <div>
+              <div class="hero-kpi__split-lab">GRR</div>
+              <div class="hero-kpi__split-val" data-chart="am_kpi_crr_30d" data-bind="text" data-field="crr_pct" data-reduce="first" data-fmt="percent">—</div>
             </div>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>CRR / GRR · last 30d <span class="count" data-chart="am_table_crr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
-            </div>
-            <div class="dlist" data-chart="am_table_crr_30d_detail" data-bind="list"
-                 data-list-name="client_name" data-list-sub="tipo" data-limit="80"></div>
+          <div class="hero-kpi__label">
+            <span data-chart="am_kpi_crr_30d" data-bind="text" data-field="retenidos" data-reduce="first" data-fmt="int">—</span> de
+            <span data-chart="am_kpi_crr_30d" data-bind="text" data-field="inicio" data-reduce="first" data-fmt="int">—</span> clientes retenidos
           </div>
         </div>
       </div>
 
       <!-- NRR · <span data-window-label>30d</span> -->
-      <div class="hero-kpi is-flippable s-4" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">NRR<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle NRR">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                +<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="upsells_lara" data-reduce="first" data-fmt="currency-k">—</span> upsells ·
-                −<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="churn_no_recorte" data-reduce="first" data-fmt="currency-k">—</span> churn
-              </div>
-            </div>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-violet">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">NRR<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-nrr" aria-label="Ver detalle NRR">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>NRR · last 30d <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_nrr_30d" data-bind="text" data-field="nrr_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              +<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="upsells_lara" data-reduce="first" data-fmt="currency-k">—</span> upsells ·
+              −<span data-chart="am_kpi_nrr_30d" data-bind="text" data-field="churn_no_recorte" data-reduce="first" data-fmt="currency-k">—</span> churn
             </div>
-            <div class="dlist" data-chart="am_table_nrr_30d_detail" data-bind="list"
-                 data-list-name="candidate_name" data-list-sub="componente" data-list-date="end_d" data-limit="120"></div>
           </div>
         </div>
       </div>
 
       <!-- Multi-candidate clients · <span data-window-label>30d</span> -->
-      <div class="hero-kpi is-flippable s-4" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-cool">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">Clients > 1<br/>candidate · <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_clients_multi_30d" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="am_kpi_clients_multi_30d" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> de
-                <span data-chart="am_kpi_clients_multi_30d" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> con > 1 candidato
-              </div>
-            </div>
+      <div class="hero-kpi s-4">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-cool">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Clients > 1<br/>candidate · <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-clients-multi" aria-label="Ver detalle Clients > 1 candidate">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>Multi · last 30d <span class="count" data-chart="am_table_clients_multi_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_clients_multi_30d" data-bind="text" data-field="pct_percent" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="am_kpi_clients_multi_30d" data-bind="text" data-field="mayor_a_1" data-reduce="first" data-fmt="int">—</span> de
+              <span data-chart="am_kpi_clients_multi_30d" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> con > 1 candidato
             </div>
-            <div class="dlist" data-chart="am_table_clients_multi_30d_detail" data-bind="list"
-                 data-list-name="candidate_name" data-list-sub="client_name" data-limit="120"></div>
           </div>
         </div>
       </div>
 
       <!-- Account Management Conversion Rate · <span data-window-label>30d</span> -->
-      <div class="hero-kpi is-flippable s-6" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">Account Management<br/>Conversion Rate · <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle Account Management Conversion Rate">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="conversion_30d_pct" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
-                <span data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="closed_lost" data-reduce="first" data-fmt="int">—</span> lost ·
-                <span data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
-              </div>
-            </div>
+      <div class="hero-kpi s-6">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-mag">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Account Management<br/>Conversion Rate · <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-conversion-rate" aria-label="Ver detalle Account Management Conversion Rate">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>Account Management Conversion Rate · last 30d <span class="count" data-chart="am_table_lara_winrate_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="conversion_30d_pct" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="close_win" data-reduce="first" data-fmt="int">—</span> wins ·
+              <span data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="closed_lost" data-reduce="first" data-fmt="int">—</span> lost ·
+              <span data-chart="am_kpi_lara_winrate_30d" data-bind="text" data-field="total_closed" data-reduce="first" data-fmt="int">—</span> closed
             </div>
-            <div class="dlist" data-chart="am_table_lara_winrate_30d_detail" data-bind="list"
-                 data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="close_d" data-limit="80"></div>
           </div>
         </div>
       </div>
 
       <!-- Headcount Growth · <span data-window-label>30d</span> -->
-      <div class="hero-kpi is-flippable s-6" data-flip-card>
-        <div class="hero-kpi__inner">
-          <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
-            <div class="hero-kpi__head">
-              <div class="hero-kpi__title">Headcount growth<br/>· <span data-window-label>30d</span></div>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle aria-label="Ver detalle Headcount">⚐</button>
-            </div>
-            <div>
-              <div class="hero-kpi__value" data-chart="am_kpi_headcount_growth_30d" data-bind="text" data-field="pct_activos_que_aumentaron" data-reduce="first" data-fmt="percent">—</div>
-              <div class="hero-kpi__label">
-                <span data-chart="am_kpi_headcount_growth_30d" data-bind="text" data-field="clientes_que_aumentaron" data-reduce="first" data-fmt="int">—</span> de
-                <span data-chart="am_kpi_headcount_growth_30d" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes ↑
-              </div>
-            </div>
+      <div class="hero-kpi s-6">
+        <div class="hero-kpi__face hero-kpi__face--front bg-grad-cyan">
+          <div class="hero-kpi__head">
+            <div class="hero-kpi__title">Headcount growth<br/>· <span data-window-label>30d</span></div>
+            <button type="button" class="hero-kpi__icon" data-kpi-detail-open="am-headcount-growth" aria-label="Ver detalle Headcount growth">⚐</button>
           </div>
-          <div class="hero-kpi__face hero-kpi__face--back">
-            <div class="hero-kpi__back-head">
-              <h4>Headcount ↑ · last 30d <span class="count" data-chart="am_table_headcount_growth_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <button type="button" class="hero-kpi__icon" data-flip-toggle>×</button>
+          <div>
+            <div class="hero-kpi__value" data-chart="am_kpi_headcount_growth_30d" data-bind="text" data-field="pct_activos_que_aumentaron" data-reduce="first" data-fmt="percent">—</div>
+            <div class="hero-kpi__label">
+              <span data-chart="am_kpi_headcount_growth_30d" data-bind="text" data-field="clientes_que_aumentaron" data-reduce="first" data-fmt="int">—</span> de
+              <span data-chart="am_kpi_headcount_growth_30d" data-bind="text" data-field="clientes_activos" data-reduce="first" data-fmt="int">—</span> clientes ↑
             </div>
-            <div class="dlist" data-chart="am_table_headcount_growth_30d_detail" data-bind="list"
-                 data-list-name="client_name" data-list-sub="aumento" data-list-date="candidatos_activos" data-limit="80"></div>
           </div>
         </div>
       </div>
@@ -5113,9 +5033,9 @@
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="mkt-cltv-detail" aria-label="Ver detalle CLTV por cliente">Ver detalle por cliente</button>
         </div>
         <div class="dtable-wrap" data-chart="mk_rank_cltv_by_channel" data-bind="dtable"
-             data-cols="origin|Canal|chip,clients|Clientes|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k,total_cltv|CLTV total|currency-k"
-             data-cols-staffing="origin|Canal|raw,clients|Clientes|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k,total_cltv|CLTV total|currency-k"
-             data-cols-recruiting="origin|Canal|raw,clients|Clientes|int,placements|# Placements|int,avg_fee|Fee prom|currency-k,avg_cltv|CLTV prom|currency-k,total_cltv|CLTV total|currency-k"
+             data-cols="origin|Canal|chip,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
+             data-cols-staffing="origin|Canal|raw,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
+             data-cols-recruiting="origin|Canal|raw,placements|# Placements|int,avg_fee|Fee prom|currency-k,avg_cltv|CLTV prom|currency-k"
              data-empty-text="Sin clientes."></div>
       </div>
 
@@ -8318,6 +8238,134 @@
                    data-cols="candidate_name|Contractor|raw,client_name|Cliente|raw,start_date|Start|raw,salary|Salary|currency-k,fee|Fee|currency-k,gmrr|GMRR mensual|currency-k"
                    data-empty-text="Sin contractors Staffing AE's activos en el mes seleccionado."
                    data-month-aware></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-client-churn">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · churn</span>
+            <h3 class="kpi-drawer__title">Client churn · 30d</h3>
+            <p class="kpi-drawer__sub">Clientes dados de baja en los últimos 30 días, sobre el total de clientes activos.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Clients · last 30d <span class="count" data-chart="am_table_client_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_client_churn_30d_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="estado_cliente_ventana" data-list-date="fecha_baja" data-limit="80"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-candidate-churn">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · churn</span>
+            <h3 class="kpi-drawer__title">Candidate churn · 30d</h3>
+            <p class="kpi-drawer__sub">Candidatos dados de baja en los últimos 30 días, sobre el total de candidatos activos.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Candidates · last 30d <span class="count" data-chart="am_table_candidate_churn_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_candidate_churn_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-list-date="estado" data-limit="120"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-cohort-churn">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · churn</span>
+            <h3 class="kpi-drawer__title">3 / 6m Churn · 30d</h3>
+            <p class="kpi-drawer__sub">Bajas de candidatos en la cohorte de 3 / 6 meses.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">3 / 6m Churn <span class="count" data-chart="am_table_candidate_churn_window_cohort_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_candidate_churn_window_cohort_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="account_name" data-list-date="baja_tipo" data-limit="80"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-crr-grr">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · retención</span>
+            <h3 class="kpi-drawer__title">CRR + GRR · 30d</h3>
+            <p class="kpi-drawer__sub">Clientes retenidos en los últimos 30 días (gross y net retention).</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">CRR / GRR · last 30d <span class="count" data-chart="am_table_crr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_crr_30d_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="tipo" data-limit="80"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-nrr">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · retención</span>
+            <h3 class="kpi-drawer__title">NRR · 30d</h3>
+            <p class="kpi-drawer__sub">Net Revenue Retention: upsells menos churn en los últimos 30 días.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">NRR · last 30d <span class="count" data-chart="am_table_nrr_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_nrr_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="componente" data-list-date="end_d" data-limit="120"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-clients-multi">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management · retención</span>
+            <h3 class="kpi-drawer__title">Clients > 1 candidate · 30d</h3>
+            <p class="kpi-drawer__sub">Clientes con más de un candidato activo, sobre el total de clientes activos.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Multi · last 30d <span class="count" data-chart="am_table_clients_multi_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_clients_multi_30d_detail" data-bind="list"
+                   data-list-name="candidate_name" data-list-sub="client_name" data-limit="120"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-conversion-rate">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management</span>
+            <h3 class="kpi-drawer__title">Account Management Conversion Rate · 30d</h3>
+            <p class="kpi-drawer__sub">Oportunidades cerradas en los últimos 30 días: wins sobre el total cerrado.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Conversion Rate · last 30d <span class="count" data-chart="am_table_lara_winrate_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_lara_winrate_30d_detail" data-bind="list"
+                   data-list-name="opp_position_name" data-list-sub="client_name" data-list-date="close_d" data-limit="80"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="am-headcount-growth">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Account Management</span>
+            <h3 class="kpi-drawer__title">Headcount growth · 30d</h3>
+            <p class="kpi-drawer__sub">Clientes que aumentaron su headcount en los últimos 30 días, sobre el total de clientes activos.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Headcount ↑ · last 30d <span class="count" data-chart="am_table_headcount_growth_30d_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dlist" data-chart="am_table_headcount_growth_30d_detail" data-bind="list"
+                   data-list-name="client_name" data-list-sub="aumento" data-list-date="candidatos_activos" data-limit="80"></div>
             </section>
           </div>
         </div>
