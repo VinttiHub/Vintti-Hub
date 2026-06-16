@@ -27,7 +27,7 @@ from calendar import monthrange
 from datetime import date
 
 from .mkt_sqls_by_origin import period_bounds
-from ._marketing_scope import is_inbound_lead
+from ._marketing_scope import is_marketing_mql_source
 
 # Definición de SQL = etapa ALCANZADA en HubSpot (idéntica a mkt_funnel_mql_sql_cw):
 #   SQL = llegó a SQL (AE) o más (active/inactive client). NO cuenta Closed Lost.
@@ -73,11 +73,10 @@ def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, i
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
     origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
-    channel_prop = (pm.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor, origin_prop, channel_prop],
+        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
     )
 
     cur = prev = 0
@@ -86,11 +85,8 @@ def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, i
         d = _parse_hs_date_ms(props.get(anchor))
         if d is None:
             continue
-        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
-        if not is_inbound_lead(
-            _first_mapped_value(pm, "where_come_from", contact=c),
-            _first_mapped_value(pm, "conversion_channel", contact=c),
-        ):
+        # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
+        if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
             continue
         ll = str(props.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_SQL:
@@ -117,7 +113,7 @@ _PG_SQL = """
         COUNT(*) FILTER (WHERE fc.fd BETWEEN %(pi)s::date AND %(pf)s::date)::int AS prev
       FROM first_close fc
       JOIN account a ON a.account_id = fc.account_id
-      WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+      WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
     ),
     dec AS (
       SELECT a.account_id,
@@ -131,7 +127,7 @@ _PG_SQL = """
           FILTER (WHERE NULLIF(o.opp_close_date::text, '')::date BETWEEN %(pi)s::date AND %(pf)s::date) AS dec_prev
       FROM account a
       JOIN opportunity o ON o.account_id = a.account_id
-      WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+      WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         AND TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost')
         AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
       GROUP BY a.account_id
@@ -152,7 +148,7 @@ _PG_SQL = """
       JOIN account a ON a.account_id = o.account_id
       LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
       WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model IN ('Staffing', 'Recruiting')
-        AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+        AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
       GROUP BY o.opportunity_id, cdte
     ),

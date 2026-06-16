@@ -77,7 +77,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           WHERE TRIM(o.opp_stage) = 'Close Win'
             AND o.opp_model IN ('Staffing', 'Recruiting')
             AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
-            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         ),
         per_opp AS (
           SELECT w.origin, w.close_d,

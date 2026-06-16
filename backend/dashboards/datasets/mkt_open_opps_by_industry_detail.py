@@ -18,7 +18,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WHERE TRIM(COALESCE(o.opp_stage, '')) NOT IN ('Close Win', 'Close Lost', 'Closed Lost')
           AND a.creation_date IS NOT NULL
           AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
-          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         ORDER BY expected_revenue DESC, a.client_name;
     """
     return sql, {"ini": ini, "fin": fin}

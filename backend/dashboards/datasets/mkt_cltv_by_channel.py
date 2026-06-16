@@ -22,9 +22,41 @@ def _model(filters: dict) -> str:
     return "Recruiting" if m == "recruiting" else "Staffing"
 
 
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
-    model = _model(filters)
+def _mql_sql_by_origin() -> tuple[dict, dict]:
+    """Conteo all-time de MQLs y SQLs por origin (where_come_from), filtro de
+    marketing OFICIAL `mql_source ∈ {Inbound MQL, Event MQL}`. Vive en HubSpot."""
+    from utils.hubspot import HubSpotClient
+    from routes.hubspot_routes import (
+        _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
+    )
+    from .mkt_mqls_by_origin import _IN_VALUES, _REACHED_MQL
+    from .mkt_funnel_mql_sql_cw import _REACHED_SQL
+    from ._marketing_scope import is_marketing_mql_source
 
+    client = HubSpotClient()
+    pm = _resolve_account_property_maps(client)
+    origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
+    contacts = client.search_contacts(
+        [{"propertyName": "lead_life", "operator": "IN", "values": _IN_VALUES}],
+        extra_properties=["lead_life", origin_prop, "mql_source"],
+    )
+    mql, sql = {}, {}
+    for c in contacts:
+        p = c.get("properties") or {}
+        ll = str(p.get("lead_life") or "").strip().lower()
+        if ll not in _REACHED_MQL:
+            continue
+        if not is_marketing_mql_source(p.get("mql_source")):
+            continue
+        origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
+        origin = (str(origin or "").strip()) or "(Sin origen)"
+        mql[origin] = mql.get(origin, 0) + 1
+        if ll in _REACHED_SQL:
+            sql[origin] = sql.get(origin, 0) + 1
+    return mql, sql
+
+
+def _sql_for(model: str) -> str:
     if model == "Recruiting":
         # One-time: el ingreso del cliente es la suma de fees de placement (ho.revenue)
         # de sus oportunidades Recruiting ganadas. Sin MRR / vida / activo.
@@ -33,7 +65,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               SELECT a.account_id,
                      COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
               FROM account a
-              WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+              WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
             ),
             rec AS (
               SELECT
@@ -70,7 +102,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             GROUP BY origin
             ORDER BY total_cltv DESC, origin;
         """
-        return sql, {}
+        return sql
 
     # STAFFING (default)
     sql = """
@@ -78,7 +110,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT a.account_id,
                  COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
           FROM account a
-          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+          WHERE LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         ),
         hires AS (
           SELECT
@@ -135,7 +167,30 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         GROUP BY origin
         ORDER BY avg_cltv DESC, origin;
     """
-    return sql, {}
+    return sql
+
+
+def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
+    from db import get_connection
+
+    sql = _sql_for(_model(filters))
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(sql)
+        cols = [d[0] for d in cur.description]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur.close()
+    finally:
+        conn.close()
+
+    # MQL / SQL por canal (HubSpot, all-time, filtro mql_source). Se unen por origin.
+    mql_o, sql_o = _mql_sql_by_origin()
+    for r in rows:
+        o = r.get("origin")
+        r["mql"] = mql_o.get(o, 0)
+        r["sql"] = sql_o.get(o, 0)
+    return rows
 
 
 DATASET = {
@@ -143,6 +198,8 @@ DATASET = {
     "label": "Marketing · CLTV por canal (Staffing | Recruiting)",
     "dimensions": [{"key": "origin", "label": "Canal", "type": "string"}],
     "measures": [
+        {"key": "mql", "label": "MQL", "type": "number"},
+        {"key": "sql", "label": "SQL", "type": "number"},
         {"key": "clients", "label": "Clientes", "type": "number"},
         {"key": "active_clients", "label": "Activos", "type": "number"},
         {"key": "placements", "label": "# Placements", "type": "number"},
@@ -153,5 +210,5 @@ DATASET = {
         {"key": "total_cltv", "label": "CLTV total", "type": "currency"},
     ],
     "default_filters": {"model": "Staffing"},
-    "query": query,
+    "compute": compute,
 }

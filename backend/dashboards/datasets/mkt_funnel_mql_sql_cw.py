@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 from .mkt_mqls_by_origin import period_bounds, _parse_hs_date_ms
-from ._marketing_scope import is_inbound_lead
+from ._marketing_scope import is_marketing_mql_source
 
 # DQL (descalificados) se EXCLUYE del embudo (no son conversiones reales).
 _WON = {"active client", "inactive client"}
@@ -37,11 +37,10 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
     origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
-    channel_prop = (pm.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor, origin_prop, channel_prop],
+        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
     )
 
     mql = sqlc = cw = 0
@@ -50,11 +49,8 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         d = _parse_hs_date_ms(props.get(anchor))
         if d is None or d < ini or d > fin:
             continue
-        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
-        if not is_inbound_lead(
-            _first_mapped_value(pm, "where_come_from", contact=c),
-            _first_mapped_value(pm, "conversion_channel", contact=c),
-        ):
+        # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
+        if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
             continue
         ll = str(props.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_MQL:

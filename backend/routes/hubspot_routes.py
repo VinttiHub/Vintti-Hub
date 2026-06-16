@@ -61,7 +61,7 @@ LEAD_SOURCE_NORMALIZATION = {
     'linkedin - agus': 'Social Media',
     'linkedin': 'Social Media',
     'social media': 'Social Media',
-    'events': 'Events',
+    'events': 'Event',
     'outbound': 'Outbound',
     'outbound - linkedin': 'Outbound',
     'outbound – linkedin': 'Outbound',

@@ -13,9 +13,9 @@ import os
 from datetime import date, timedelta
 
 from .mkt_sqls_by_origin import period_bounds
+from ._marketing_scope import is_marketing_mql_source
 
 _MES_ES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-_EXCLUDE = ('outbound', 'connected inbox', 'referral')
 
 
 def _gran(periodo) -> str:
@@ -70,7 +70,7 @@ def _sql_counts(ini: date, fin: date, unit: str):
             FROM account a
             WHERE a.creation_date IS NOT NULL
               AND a.creation_date::date BETWEEN %s::date AND %s::date
-              AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+              AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
             GROUP BY 1, 2
             """,
             (unit, ini, fin),
@@ -102,7 +102,7 @@ def _mql_counts(ini: date, fin: date, unit: str):
     origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor, origin_prop],
+        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
     )
     counts, totals = {}, {}
     for c in contacts:
@@ -112,9 +112,10 @@ def _mql_counts(ini: date, fin: date, unit: str):
         if d is None or d < ini or d > fin:
             continue
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
-        origin = (str(origin or "").strip()) or "(Sin origen)"
-        if origin.lower() in _EXCLUDE:
+        # Filtro de marketing OFICIAL del equipo: mql_source ∈ {Inbound MQL, Event MQL}.
+        if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
             continue
+        origin = (str(origin or "").strip()) or "(Sin origen)"
         b = _trunc(d, unit)
         counts[(b, origin)] = counts.get((b, origin), 0) + 1
         totals[origin] = totals.get(origin, 0) + 1

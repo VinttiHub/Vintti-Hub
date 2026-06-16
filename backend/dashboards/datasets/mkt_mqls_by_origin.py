@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from datetime import date, datetime, timedelta, timezone
 
-from ._marketing_scope import is_inbound_lead
+from ._marketing_scope import is_marketing_mql_source
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -100,7 +100,6 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     client = HubSpotClient()
     property_maps = _resolve_account_property_maps(client)
     origin_prop = (property_maps.get("contacts") or {}).get("where_come_from") or "origin"
-    channel_prop = (property_maps.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
 
     # Cohorte por etapa alcanzada: filtramos lead_life ∈ {MQL(AE) o más allá} en el
     # search; la ventana de fechas se aplica en Python a partir del ancla.
@@ -109,7 +108,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     ]
     contacts = client.search_contacts(
         search_filters,
-        extra_properties=[lead_life_property, anchor_property, origin_prop, channel_prop],
+        extra_properties=[lead_life_property, anchor_property, origin_prop, "mql_source"],
     )
 
     counts: dict[str, int] = {}
@@ -125,11 +124,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         origin = _normalize_lead_source(
             _first_mapped_value(property_maps, "where_come_from", contact=c)
         )
-        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
+        # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
         # El desglose se sigue agrupando por origin (MQL Source).
-        if not SNAPSHOT_MODE and not is_inbound_lead(
-            origin, _first_mapped_value(property_maps, "conversion_channel", contact=c)
-        ):
+        if not SNAPSHOT_MODE and not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         counts[origin] = counts.get(origin, 0) + 1

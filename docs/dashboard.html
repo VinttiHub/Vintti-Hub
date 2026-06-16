@@ -4979,12 +4979,12 @@
         </div>
         <div style="display:flex;align-items:center;gap:16px;margin:4px 4px 10px;flex-wrap:wrap;">
           <div class="period-toggle" data-leadtype-toggle role="tablist" aria-label="MQL / SQL">
-            <button type="button" class="is-active" data-leadtype-set="sql" role="tab" aria-selected="true">SQLs</button>
-            <button type="button" data-leadtype-set="mql" role="tab" aria-selected="false">MQLs</button>
+            <button type="button" class="is-active" data-leadtype-set="mql" role="tab" aria-selected="true">MQLs</button>
+            <button type="button" data-leadtype-set="sql" role="tab" aria-selected="false">SQLs</button>
           </div>
           <div class="mkt-line__legend" data-multi-line-legend style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;"></div>
         </div>
-        <svg class="mkt-grouped__bars" data-chart="mk_line_leads_by_channel_history" data-override-periodo="mes" data-override-lead-type="sql" data-bind="multi-line"
+        <svg class="mkt-grouped__bars" data-chart="mk_line_leads_by_channel_history" data-override-periodo="mes" data-override-lead-type="mql" data-bind="multi-line"
              data-x="bucket_start" data-x-label="bucket_label" data-series="origin" data-y="value" data-fmt-y="int"
              viewBox="0 0 760 240" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block;overflow:visible;margin-top:4px;"></svg>
         <div style="display:flex;gap:8px;margin-top:8px;">
@@ -5033,9 +5033,9 @@
           <button type="button" class="skpi-tile__detail-btn" data-kpi-detail-open="mkt-cltv-detail" aria-label="Ver detalle CLTV por cliente">Ver detalle por cliente</button>
         </div>
         <div class="dtable-wrap" data-chart="mk_rank_cltv_by_channel" data-bind="dtable"
-             data-cols="origin|Canal|chip,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
-             data-cols-staffing="origin|Canal|raw,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
-             data-cols-recruiting="origin|Canal|raw,placements|# Placements|int,avg_fee|Fee prom|currency-k,avg_cltv|CLTV prom|currency-k"
+             data-cols="origin|Canal|chip,mql|MQL|int,sql|SQL|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
+             data-cols-staffing="origin|Canal|raw,mql|MQL|int,sql|SQL|int,active_clients|Activos|int,avg_mrr|MRR prom|currency-k,avg_lifetime|Vida prom|number,avg_cltv|CLTV prom|currency-k"
+             data-cols-recruiting="origin|Canal|raw,mql|MQL|int,sql|SQL|int,clients|Clientes|int,placements|# Placements|int,avg_fee|Fee prom|currency-k,avg_cltv|CLTV prom|currency-k"
              data-empty-text="Sin clientes."></div>
       </div>
 
@@ -5085,31 +5085,6 @@
         <div class="dtable-wrap" data-chart="mk_table_efficiency_by_channel" data-override-periodo="mes" data-bind="dtable"
              data-cols="origin|Canal|chip,sqls|SQLs|int,clients|Clients|int,net_rev|Net rev.|currency-k,cltv_months|CLTV (meses)|months,ratio|CW / Total|raw,close_rate|Tasa cierre|percent"
              data-empty-text="Sin actividad en el período."></div>
-      </div>
-
-      <!-- ===== Tasa de cierre por canal ===== -->
-      <div class="section s-12">
-        <div>
-          <h2>Tasa de cierre por canal</h2>
-          <p>Win rate por cliente · de las cuentas DECIDIDAS de cada canal (con cierre en el período), qué % se volvió cliente · Close Win ÷ (Close Win + solo Closed Lost) · solo canales de marketing</p>
-        </div>
-      </div>
-
-      <!-- Ranking · Tasa de cierre (período) -->
-      <div class="card s-12 mkt-rank-card" data-period-card>
-        <div class="card__head">
-          <div>
-            <h3 class="card__title">Tasa de cierre</h3>
-            <p class="card__sub">% · por canal · close win / total</p>
-          </div>
-        </div>
-        <div class="mkt-rank__total">
-          <span class="mkt-rank__total-num" data-chart="mk_rank_close_rate_by_channel" data-override-periodo="mes" data-bind="text" data-field="total_ratio" data-reduce="first" data-fmt="raw">—</span>
-          <span class="mkt-rank__total-lab">close win / total · <span data-chart="mk_rank_close_rate_by_channel" data-override-periodo="mes" data-bind="text" data-field="period_label" data-reduce="first" data-fmt="raw">Mes</span></span>
-        </div>
-        <div class="rk" data-chart="mk_rank_close_rate_by_channel" data-override-periodo="mes" data-bind="ranking"
-             data-x="origin" data-y="close_rate" data-rev="ratio" data-rev-fmt="raw" data-color="green" data-fmt-y="percent" data-label-chip
-             data-empty-text="Sin cuentas decididas en el período."></div>
       </div>
 
       <!-- ===== Embudo de conversión · MQL → SQL → Close Win (solo marketing) ===== -->
@@ -7690,7 +7665,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Marketing · por canal</span>
             <h3 class="kpi-drawer__title">Tasa de cierre · detalle</h3>
-            <p class="kpi-drawer__sub">Win rate por cliente de las cuentas decididas en el período (Close Win ÷ decididas), por canal · solo canales de marketing.</p>
+            <p class="kpi-drawer__sub">Win rate por cliente de las cuentas totales en el período (Close Win ÷ Total), por canal · solo canales de marketing.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -7703,7 +7678,7 @@
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Desglose por canal</h4>
               <div class="dtable-wrap" data-chart="mk_rank_close_rate_by_channel" data-period-aware data-override-periodo="mes" data-bind="dtable"
-                   data-cols="origin|Canal|chip,won|Close Win|int,lost|Closed Lost|int,decided|Decididas|int,close_rate|Tasa cierre|percent,ratio|CW / Total|raw"
+                   data-cols="origin|Canal|chip,won|Close Win|int,lost|Closed Lost|int,decided|Total|int,ratio|CW / Total|raw,close_rate|Tasa cierre|percent"
                    data-empty-text="Sin cuentas decididas en el período."></div>
             </section>
           </div>
@@ -8001,7 +7976,7 @@
           <header class="kpi-drawer__head">
             <span class="kpi-drawer__eyebrow">Sales · AE's</span>
             <h3 class="kpi-drawer__title">SQL → Close Win · win rate sobre las cerradas</h3>
-            <p class="kpi-drawer__sub">De las opps DECIDIDAS (Close Win + Closed Lost, M+B) cerradas en la ventana, qué % son Close Win. Por deal. Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
+            <p class="kpi-drawer__sub">De las opps TOTALES (Close Win + Closed Lost, M+B) cerradas en la ventana, qué % son Close Win. Por deal. Sales=Outbound · Referrals=Referral · Marketing=resto.</p>
             <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
           </header>
           <div class="kpi-drawer__body">
@@ -8011,7 +7986,7 @@
               <span class="kpi-drawer__hero__delta"><span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_win" data-reduce="first" data-fmt="int">—</span> Close Win de <span data-chart="sa_kpi_sql_to_clientwin_30d" data-bind="text" data-field="total_sql" data-reduce="first" data-fmt="int">—</span> cerradas</span>
             </div>
             <section class="kpi-drawer__section">
-              <h4 class="kpi-drawer__section-title">Decididas por canal</h4>
+              <h4 class="kpi-drawer__section-title">Totales por canal</h4>
               <div class="dtable-wrap"
                    data-chart="sa_table_sql_to_clientwin_30d_detail" data-bind="dtable"
                    data-cols="close_date|Close date|raw,channel|Canal|raw,client_name|Cliente|raw,estado|Estado|raw"
@@ -8374,6 +8349,6 @@
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=82" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=83" defer></script>
 </body>
 </html>

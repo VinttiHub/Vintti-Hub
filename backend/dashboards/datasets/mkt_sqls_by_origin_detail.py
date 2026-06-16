@@ -12,7 +12,7 @@ import os
 
 from .mkt_sqls_by_origin import period_bounds
 from .mkt_mqls_by_origin import _parse_hs_date_ms, SNAPSHOT_MODE, _IN_VALUES
-from ._marketing_scope import is_inbound_lead
+from ._marketing_scope import is_marketing_mql_source
 
 # SQL = etapa ALCANZADA (idéntico a mkt_funnel_mql_sql_cw / mkt_business_metrics).
 _REACHED_SQL = {"active client", "inactive client", "sql (ae)"}
@@ -36,14 +36,13 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     client = HubSpotClient()
     property_maps = _resolve_account_property_maps(client)
     origin_prop = (property_maps.get("contacts") or {}).get("where_come_from") or "origin"
-    channel_prop = (property_maps.get("contacts") or {}).get("conversion_channel") or "conversion_channel"
     company_prop = (property_maps.get("contacts") or {}).get("client_name") or "company"
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
         extra_properties=[
             lead_life_property, "createdate", anchor_property, meeting_property,
-            origin_prop, channel_prop, company_prop,
+            origin_prop, "mql_source", company_prop,
         ],
     )
 
@@ -63,10 +62,8 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
         origin = _normalize_lead_source(
             _first_mapped_value(property_maps, "where_come_from", contact=c)
         )
-        # Marketing-scope = Inbound en AMBAS (MQL Source origin + Booking Source channel).
-        if not SNAPSHOT_MODE and not is_inbound_lead(
-            origin, _first_mapped_value(property_maps, "conversion_channel", contact=c)
-        ):
+        # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
+        if not SNAPSHOT_MODE and not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
             continue
         origin = (str(origin or "").strip()) or "(Sin origen)"
         name = (

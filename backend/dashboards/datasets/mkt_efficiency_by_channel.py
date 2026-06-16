@@ -34,7 +34,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM account a
           WHERE a.creation_date IS NOT NULL
             AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
-            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral')
+            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
         ),
         -- Resultado de oportunidades por cuenta de la cohorte (acumulado a hoy)
         opp_agg AS (
