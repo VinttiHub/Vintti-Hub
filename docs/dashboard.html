@@ -5039,11 +5039,15 @@
              data-empty-text="Sin clientes."></div>
       </div>
 
-      <!-- Ranking · CLTV promedio -->
+      <!-- Ranking · MRR promedio (Staffing) / Fee promedio (Recruiting) -->
       <div class="card s-4 mkt-rank-card">
-        <div class="card__head"><div><h3 class="card__title">CLTV promedio</h3><p class="card__sub">por canal</p></div></div>
+        <div class="card__head"><div>
+          <h3 class="card__title" data-cltv-text data-text-staffing="MRR promedio" data-text-recruiting="Fee promedio">MRR promedio</h3>
+          <p class="card__sub" data-cltv-text data-text-staffing="fee mensual · por canal" data-text-recruiting="por placement · por canal">fee mensual · por canal</p>
+        </div></div>
         <div class="rk" data-chart="mk_rank_cltv_by_channel" data-bind="ranking"
-             data-x="origin" data-y="avg_cltv" data-color="green" data-fmt-y="currency-k" data-label-chip data-empty-text="—"></div>
+             data-x="origin" data-y="avg_mrr" data-color="violet" data-fmt-y="currency-k" data-label-chip data-empty-text="—"
+             data-y-staffing="avg_mrr" data-y-recruiting="avg_fee"></div>
       </div>
       <!-- Ranking · Vida promedio (Staffing) / Placements (Recruiting) -->
       <div class="card s-4 mkt-rank-card">
@@ -5056,36 +5060,13 @@
              data-y-staffing="avg_lifetime" data-y-recruiting="placements"
              data-fmt-y-staffing="number" data-fmt-y-recruiting="int"></div>
       </div>
-      <!-- Ranking · MRR promedio (Staffing) / Fee promedio (Recruiting) -->
+      <!-- Ranking · CLTV promedio -->
       <div class="card s-4 mkt-rank-card">
-        <div class="card__head"><div>
-          <h3 class="card__title" data-cltv-text data-text-staffing="MRR promedio" data-text-recruiting="Fee promedio">MRR promedio</h3>
-          <p class="card__sub" data-cltv-text data-text-staffing="fee mensual · por canal" data-text-recruiting="por placement · por canal">fee mensual · por canal</p>
-        </div></div>
+        <div class="card__head"><div><h3 class="card__title">CLTV promedio</h3><p class="card__sub">por canal</p></div></div>
         <div class="rk" data-chart="mk_rank_cltv_by_channel" data-bind="ranking"
-             data-x="origin" data-y="avg_mrr" data-color="violet" data-fmt-y="currency-k" data-label-chip data-empty-text="—"
-             data-y-staffing="avg_mrr" data-y-recruiting="avg_fee"></div>
+             data-x="origin" data-y="avg_cltv" data-color="green" data-fmt-y="currency-k" data-label-chip data-empty-text="—"></div>
       </div>
 
-      <!-- ===== Eficiencia por canal (resumen) ===== -->
-      <div class="section s-12">
-        <div>
-          <h2>Eficiencia por canal</h2>
-          <p>Cohorte por SQL: las cuentas que ENTRARON al CRM en el período y qué pasó con ellas (clientes · net revenue · vida · tasa de cierre) · todas las columnas describen las MISMAS cuentas · solo canales de marketing · cohortes recientes se ven inmaduras (los deals tardan meses), mirá Q / Año</p>
-        </div>
-      </div>
-
-      <div class="card s-12 mkt-rank-card" data-period-card>
-        <div class="card__head">
-          <div>
-            <h3 class="card__title">Eficiencia por canal</h3>
-            <p class="card__sub">cohorte por SQL del período · CW / Total = close win / total (de esas cuentas)</p>
-          </div>
-        </div>
-        <div class="dtable-wrap" data-chart="mk_table_efficiency_by_channel" data-override-periodo="mes" data-bind="dtable"
-             data-cols="origin|Canal|chip,sqls|SQLs|int,clients|Clients|int,net_rev|Net rev.|currency-k,cltv_months|CLTV (meses)|months,ratio|CW / Total|raw,close_rate|Tasa cierre|percent"
-             data-empty-text="Sin actividad en el período."></div>
-      </div>
 
       <!-- ===== Embudo de conversión · MQL → SQL → Close Win (solo marketing) ===== -->
       <div class="card s-12" data-period-card>
@@ -7555,6 +7536,13 @@
                    data-cols="meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip,lead_life|Etapa|raw,created|Creación|raw"
                    data-empty-text="Sin SQLs en el período."></div>
             </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Eficiencia por canal · cohorte SQL</h4>
+              <p class="kpi-drawer__sub">Qué pasó con las cuentas de esos SQLs (mismas cuentas en todas las columnas): clients · net rev · CLTV · tasa de cierre. Cohortes recientes se ven inmaduras — los deals tardan meses, mirá Q / Año.</p>
+              <div class="dtable-wrap" data-chart="mk_table_efficiency_by_channel" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="origin|Canal|chip,mql|MQL|int,sqls|SQLs|int,clients|Clients|int,net_rev|Net rev.|currency-k,cltv_months|CLTV (meses)|months,ratio|CW / Total|raw,close_rate|Tasa cierre|percent"
+                   data-empty-text="Sin actividad en el período."></div>
+            </section>
           </div>
         </div>
 
@@ -7571,6 +7559,13 @@
               <div class="dtable-wrap" data-chart="mk_table_mqls_by_origin_detail" data-period-aware data-override-periodo="mes" data-bind="dtable"
                    data-cols="meeting_date|Meeting|raw,client_name|Cuenta/contacto|raw,origin|Origin|chip,lead_life|Etapa|raw,created|Creación|raw"
                    data-empty-text="Sin MQLs en el período."></div>
+            </section>
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Eficiencia por canal · cohorte SQL</h4>
+              <p class="kpi-drawer__sub">Qué pasó con las cuentas de los SQLs del período (cohorte SQL, mismas cuentas en todas las columnas): clients · net rev · CLTV · tasa de cierre. Cohortes recientes se ven inmaduras — mirá Q / Año.</p>
+              <div class="dtable-wrap" data-chart="mk_table_efficiency_by_channel" data-period-aware data-override-periodo="mes" data-bind="dtable"
+                   data-cols="origin|Canal|chip,mql|MQL|int,sqls|SQLs|int,clients|Clients|int,net_rev|Net rev.|currency-k,cltv_months|CLTV (meses)|months,ratio|CW / Total|raw,close_rate|Tasa cierre|percent"
+                   data-empty-text="Sin actividad en el período."></div>
             </section>
           </div>
         </div>

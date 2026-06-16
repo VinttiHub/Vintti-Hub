@@ -1,11 +1,13 @@
 """Marketing · MQLs/SQLs por canal EN EL TIEMPO (multi-línea, una línea por canal).
 
-`lead_type` (filtro) elige la métrica: 'sql' (Postgres, account.creation_date) o
-'mql' (live HubSpot, createdate). La periodicidad define la granularidad del eje X
-DENTRO del período seleccionado:
+`lead_type` (filtro) elige la métrica, AMBAS live desde HubSpot con la misma
+definición que los cards/detalles: 'mql' = etapa alcanzada MQL(AE)+, 'sql' = etapa
+alcanzada SQL(AE)+; ancla `date_of_meeting_scheduled`, filtro `mql_source` ∈
+{Inbound MQL, Event MQL}. La periodicidad define la granularidad del eje X DENTRO
+del período seleccionado:
   semana → días · mes → semanas · q/año → meses
 Devuelve la grilla completa (buckets × canales) con value=0 donde no hay, para que
-las líneas sean continuas. Excluye outbound/connected inbox/referral.
+las líneas sean continuas.
 """
 from __future__ import annotations
 
@@ -58,31 +60,41 @@ def _spine(ini: date, fin: date, unit: str) -> list[date]:
 
 
 def _sql_counts(ini: date, fin: date, unit: str):
-    from db import get_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT DATE_TRUNC(%s, a.creation_date::date)::date AS bs,
-                   COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin,
-                   COUNT(*)::int
-            FROM account a
-            WHERE a.creation_date IS NOT NULL
-              AND a.creation_date::date BETWEEN %s::date AND %s::date
-              AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
-            GROUP BY 1, 2
-            """,
-            (unit, ini, fin),
-        )
-        counts, totals = {}, {}
-        for bs, origin, c in cur.fetchall():
-            counts[(bs, origin)] = c
-            totals[origin] = totals.get(origin, 0) + c
-        cur.close()
-        return counts, sorted(totals, key=lambda o: -totals[o])
-    finally:
-        conn.close()
+    # SQL = etapa ALCANZADA SQL (AE) en HubSpot, ancla date_of_meeting_scheduled,
+    # filtro mql_source — MISMA definición que el card de SQLs y el detalle.
+    from utils.hubspot import HubSpotClient
+    from routes.hubspot_routes import (
+        _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
+    )
+    from .mkt_mqls_by_origin import _parse_hs_date_ms, _IN_VALUES
+    from .mkt_funnel_mql_sql_cw import _REACHED_SQL
+
+    lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
+    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+
+    client = HubSpotClient()
+    pm = _resolve_account_property_maps(client)
+    origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
+    contacts = client.search_contacts(
+        [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
+        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
+    )
+    counts, totals = {}, {}
+    for c in contacts:
+        p = c.get("properties") or {}
+        if str(p.get(lead_life_property) or "").strip().lower() not in _REACHED_SQL:
+            continue
+        d = _parse_hs_date_ms(p.get(anchor))
+        if d is None or d < ini or d > fin:
+            continue
+        if not is_marketing_mql_source(p.get("mql_source")):
+            continue
+        origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
+        origin = (str(origin or "").strip()) or "(Sin origen)"
+        b = _trunc(d, unit)
+        counts[(b, origin)] = counts.get((b, origin), 0) + 1
+        totals[origin] = totals.get(origin, 0) + 1
+    return counts, sorted(totals, key=lambda o: -totals[o])
 
 
 def _mql_counts(ini: date, fin: date, unit: str):

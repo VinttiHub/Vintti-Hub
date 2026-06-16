@@ -1,113 +1,191 @@
-"""Marketing · Eficiencia por canal — COHORTE POR SQL, por origin / período.
+"""Marketing · Eficiencia por canal — COHORTE POR SQL (def HubSpot), por origin / período.
 
-Una fila por canal (origin = account.where_come_from, sin outbound, '(Sin origen)'
-aparte). TODAS las columnas describen LAS MISMAS cuentas: las que entraron al CRM
-(SQL = account.creation_date) dentro del período (semana / mes / q / anio, default
-'mes'). Para esa cohorte, medimos qué pasó con ellas (outcomes acumulados a hoy):
+Una fila por canal (origin = where_come_from normalizado). La COHORTE son los
+contactos que ALCANZARON la etapa SQL (AE) en HubSpot en el período (ancla
+`date_of_meeting_scheduled`, filtro `mql_source` ∈ {Inbound MQL, Event MQL}) — MISMA
+definición de SQL que el card / detalle / embudo. Esos contactos se mapean a sus
+cuentas (`account.hubspot_contact_id`) y medimos qué pasó con ellas (outcomes
+acumulados a hoy, Postgres):
 
-  - sqls        → tamaño de la cohorte (cuentas que entraron en el período).
-  - clients     → cuántas de esas cuentas se volvieron cliente (≥1 Close Win, ever).
+  - sqls        → tamaño de la cohorte (contactos que llegaron a SQL en el período).
+  - clients     → cuántas de esas CUENTAS se volvieron cliente (≥1 Close Win, ever).
   - net_rev     → fee de Vintti (Staffing ho.fee + Recruiting ho.revenue) de los
                   Close Win de esas cuentas.
-  - close_rate  → win rate de lo DECIDIDO dentro de la cohorte: Close Win ÷
-                  (Close Win + solo Closed Lost). + ratio "won/decided".
+  - close_rate  → win rate de lo DECIDIDO de la cohorte: Close Win ÷ (Close Win +
+                  solo Closed Lost), a nivel cuenta. + ratio "won/decided".
   - cltv_months → vida promedio real en meses (Staffing) de esas cuentas.
 
-Por construcción: clients ≤ sqls, decididos ≤ sqls → la fila es internamente
-consistente. OJO: cohortes recientes (semana/mes) se ven inmaduras porque los deals
-tardan meses en cerrar; mirá Q / Año para conversión madura.
-
-NO incluye MQLs ni CAC: no hay etapa MQL en el CRM ni data de gasto de marketing
-por canal en la base, así que no se pueden calcular hoy.
+OJO: cohortes recientes (semana/mes) se ven inmaduras porque los deals tardan meses
+en cerrar; mirá Q / Año para conversión madura. clients ≤ sqls (sqls cuenta
+contactos; clients cuenta cuentas ganadas).
 """
 from __future__ import annotations
+
+import os
+from collections import Counter
 
 from .mkt_sqls_by_origin import period_bounds
 
 
-def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
+    """Una sola pasada por HubSpot (mql_source de marketing, meeting en [ini, fin]):
+      - sql_contacts: (contact_id, origin) de los que alcanzaron SQL (AE) — para
+        outcomes + conteo de SQLs.
+      - mql_by_origin: Counter de MQLs (alcanzaron MQL(AE)+) por origin — para la
+        columna MQL del funnel. MQL ≥ SQL por canal."""
+    from utils.hubspot import HubSpotClient
+    from routes.hubspot_routes import (
+        _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
+    )
+    from .mkt_mqls_by_origin import _parse_hs_date_ms, _IN_VALUES, _REACHED_MQL
+    from .mkt_funnel_mql_sql_cw import _REACHED_SQL
+    from ._marketing_scope import is_marketing_mql_source
+
+    lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
+    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    client = HubSpotClient()
+    pm = _resolve_account_property_maps(client)
+    origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
+    contacts = client.search_contacts(
+        [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
+        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
+    )
+    sql_contacts, mql_by_origin = [], Counter()
+    for c in contacts:
+        p = c.get("properties") or {}
+        ll = str(p.get(lead_life_property) or "").strip().lower()
+        if ll not in _REACHED_MQL:
+            continue
+        d = _parse_hs_date_ms(p.get(anchor))
+        if d is None or d < ini or d > fin:
+            continue
+        if not is_marketing_mql_source(p.get("mql_source")):
+            continue
+        origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
+        origin = (str(origin or "").strip()) or "(Sin origen)"
+        mql_by_origin[origin] += 1
+        if ll in _REACHED_SQL:
+            sql_contacts.append((str(c.get("id") or "").strip(), origin))
+    return sql_contacts, mql_by_origin
+
+
+# Outcomes (a hoy) por cuenta, para un set de account_ids dado.
+_OUTCOMES_SQL = """
+    WITH ids AS (SELECT UNNEST(%(aids)s::int[]) AS account_id),
+    opp_agg AS (
+      SELECT i.account_id,
+             BOOL_OR(TRIM(o.opp_stage) = 'Close Win')                      AS won,
+             BOOL_OR(TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost'))     AS decided
+      FROM ids i JOIN opportunity o ON o.account_id = i.account_id
+      GROUP BY i.account_id
+    ),
+    rev_per_opp AS (
+      SELECT i.account_id, o.opportunity_id,
+             COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(ho.revenue, 0)
+                               ELSE COALESCE(ho.fee, 0) END), 0)::numeric AS rev
+      FROM ids i
+      JOIN opportunity o ON o.account_id = i.account_id
+        AND TRIM(o.opp_stage) = 'Close Win' AND o.opp_model IN ('Staffing', 'Recruiting')
+      LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
+      GROUP BY i.account_id, o.opportunity_id
+    ),
+    rev AS (SELECT account_id, SUM(rev)::numeric AS net_rev FROM rev_per_opp GROUP BY account_id),
+    hires AS (
+      SELECT i.account_id,
+             CASE WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+                  ELSE NULLIF(ho.start_date::text, '')::date END AS start_d,
+             CASE WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
+                  WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
+                  ELSE ho.end_date::date END AS end_d
+      FROM ids i
+      JOIN hire_opportunity ho ON ho.account_id = i.account_id
+      JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
+      WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model = 'Staffing'
+    ),
+    life AS (
+      SELECT account_id,
+             (DATE_PART('year',  AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) * 12
+            + DATE_PART('month', AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) + 1)::int AS lifetime_months
+      FROM hires WHERE start_d IS NOT NULL GROUP BY account_id
+    )
+    SELECT i.account_id,
+           COALESCE(oa.won, false)      AS won,
+           COALESCE(oa.decided, false)  AS decided,
+           COALESCE(r.net_rev, 0)       AS net_rev,
+           l.lifetime_months            AS lifetime_months
+    FROM ids i
+    LEFT JOIN opp_agg oa ON oa.account_id = i.account_id
+    LEFT JOIN rev     r  ON r.account_id  = i.account_id
+    LEFT JOIN life    l  ON l.account_id  = i.account_id;
+"""
+
+
+def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
+    from db import get_connection
+
     ini, fin, label = period_bounds(filters)
-    sql = """
-        WITH cohort AS (
-          SELECT a.account_id,
-                 COALESCE(NULLIF(TRIM(a.where_come_from), ''), '(Sin origen)') AS origin
-          FROM account a
-          WHERE a.creation_date IS NOT NULL
-            AND a.creation_date::date BETWEEN %(ini)s::date AND %(fin)s::date
-            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) NOT IN ('outbound', 'connected inbox', 'referral', 'import')
-        ),
-        -- Resultado de oportunidades por cuenta de la cohorte (acumulado a hoy)
-        opp_agg AS (
-          SELECT c.account_id,
-                 BOOL_OR(TRIM(o.opp_stage) = 'Close Win')                          AS won,
-                 BOOL_OR(TRIM(o.opp_stage) IN ('Close Win', 'Closed Lost'))         AS decided
-          FROM cohort c
-          JOIN opportunity o ON o.account_id = c.account_id
-          GROUP BY c.account_id
-        ),
-        -- Net revenue por cuenta de la cohorte (fees de Close Win)
-        rev_per_opp AS (
-          SELECT c.account_id, o.opportunity_id, o.opp_model,
-                 COALESCE(SUM(CASE WHEN o.opp_model = 'Recruiting' THEN COALESCE(ho.revenue, 0)
-                                   ELSE COALESCE(ho.fee, 0) END), 0)::numeric AS rev
-          FROM cohort c
-          JOIN opportunity o ON o.account_id = c.account_id
-          LEFT JOIN hire_opportunity ho ON ho.opportunity_id = o.opportunity_id
-          WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model IN ('Staffing', 'Recruiting')
-          GROUP BY c.account_id, o.opportunity_id, o.opp_model
-        ),
-        rev_per_acct AS (
-          SELECT account_id, SUM(rev)::numeric AS net_rev
-          FROM rev_per_opp GROUP BY account_id
-        ),
-        -- Vida (meses) por cuenta de la cohorte (Staffing)
-        hires AS (
-          SELECT c.account_id,
-                 CASE WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
-                      ELSE NULLIF(ho.start_date::text, '')::date END AS start_d,
-                 CASE WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
-                      WHEN NULLIF(ho.end_date::text, '') IS NULL THEN NULL
-                      ELSE ho.end_date::date END AS end_d
-          FROM cohort c
-          JOIN hire_opportunity ho ON ho.account_id = c.account_id
-          JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
-          WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model = 'Staffing'
-        ),
-        life_per_acct AS (
-          SELECT account_id,
-                 (DATE_PART('year',  AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) * 12
-                + DATE_PART('month', AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) + 1)::int AS lifetime_months
-          FROM hires
-          WHERE start_d IS NOT NULL
-          GROUP BY account_id
-        ),
-        joined AS (
-          SELECT c.origin, c.account_id,
-                 COALESCE(oa.won, false)     AS won,
-                 COALESCE(oa.decided, false) AS decided,
-                 COALESCE(ra.net_rev, 0)     AS net_rev,
-                 la.lifetime_months
-          FROM cohort c
-          LEFT JOIN opp_agg      oa ON oa.account_id = c.account_id
-          LEFT JOIN rev_per_acct ra ON ra.account_id = c.account_id
-          LEFT JOIN life_per_acct la ON la.account_id = c.account_id
-        )
-        SELECT
-          origin,
-          COUNT(*)::int                                              AS sqls,
-          COUNT(*) FILTER (WHERE won)::int                           AS clients,
-          ROUND(SUM(net_rev))::bigint                                AS net_rev,
-          ROUND(AVG(lifetime_months) FILTER (WHERE lifetime_months IS NOT NULL), 1)::float AS cltv_months,
-          ROUND(COUNT(*) FILTER (WHERE won)::numeric * 100.0
-                / NULLIF(COUNT(*) FILTER (WHERE decided), 0), 1)::float AS close_rate,
-          (COUNT(*) FILTER (WHERE won)::text || '/'
-           || COUNT(*) FILTER (WHERE decided)::text)                 AS ratio,
-          %(label)s::text                                            AS period_label
-        FROM joined
-        GROUP BY origin
-        ORDER BY sqls DESC, clients DESC, net_rev DESC, origin;
-    """
-    return sql, {"ini": ini, "fin": fin, "label": label}
+    cohort, mql_by_origin = _cohort(ini, fin)   # sql_contacts [(contact_id, origin)], mqls por origin
+    sqls = Counter(o for _, o in cohort)        # contactos SQL por origin
+
+    acc_origin = {}                              # account_id -> origin (de su contacto SQL)
+    out = {}                                     # account_id -> outcomes
+    cids = [cid for cid, _ in cohort if cid]
+    if cids:
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT hubspot_contact_id, account_id FROM account "
+                "WHERE hubspot_contact_id = ANY(%s)",
+                (cids,),
+            )
+            c2a = {str(hcid): aid for hcid, aid in cur.fetchall()}
+            for cid, o in cohort:
+                aid = c2a.get(str(cid))
+                if aid is not None and aid not in acc_origin:
+                    acc_origin[aid] = o
+            aids = list(acc_origin.keys())
+            if aids:
+                cur.execute(_OUTCOMES_SQL, {"aids": aids})
+                cols = [d[0] for d in cur.description]
+                for row in cur.fetchall():
+                    rd = dict(zip(cols, row))
+                    out[rd["account_id"]] = rd
+            cur.close()
+        finally:
+            conn.close()
+
+    # Agregar outcomes por origin (a nivel cuenta).
+    agg: dict[str, dict] = {}
+    for aid, o in acc_origin.items():
+        a = agg.setdefault(o, {"clients": 0, "net_rev": 0.0, "life": [], "won": 0, "decided": 0})
+        od = out.get(aid, {})
+        if od.get("won"):
+            a["clients"] += 1
+            a["won"] += 1
+        if od.get("decided"):
+            a["decided"] += 1
+        a["net_rev"] += float(od.get("net_rev") or 0)
+        if od.get("lifetime_months") is not None:
+            a["life"].append(od["lifetime_months"])
+
+    rows = []
+    for o in mql_by_origin:                      # todos los canales con MQL (MQL ≥ SQL)
+        a = agg.get(o, {})
+        won, dec, life = a.get("won", 0), a.get("decided", 0), a.get("life", [])
+        rows.append({
+            "origin": o,
+            "mql": mql_by_origin[o],
+            "sqls": sqls.get(o, 0),
+            "clients": a.get("clients", 0),
+            "net_rev": round(a.get("net_rev", 0.0)),
+            "cltv_months": round(sum(life) / len(life), 1) if life else None,
+            "close_rate": round(won * 100.0 / dec, 1) if dec else None,
+            "ratio": f"{won}/{dec}",
+            "period_label": label,
+        })
+    rows.sort(key=lambda r: (-r["mql"], -r["sqls"], -r["clients"], r["origin"]))
+    return rows
 
 
 DATASET = {
@@ -118,6 +196,7 @@ DATASET = {
         {"key": "period_label", "label": "Período", "type": "string"},
     ],
     "measures": [
+        {"key": "mql", "label": "MQL", "type": "number"},
         {"key": "sqls", "label": "SQLs", "type": "number"},
         {"key": "clients", "label": "Clients", "type": "number"},
         {"key": "net_rev", "label": "Net rev.", "type": "currency"},
@@ -126,5 +205,5 @@ DATASET = {
         {"key": "ratio", "label": "CW / Total", "type": "string"},
     ],
     "default_filters": {"periodo": "mes"},
-    "query": query,
+    "compute": compute,
 }
