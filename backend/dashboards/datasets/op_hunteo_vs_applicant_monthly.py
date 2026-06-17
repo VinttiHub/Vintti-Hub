@@ -1,8 +1,11 @@
-"""Operations · Close wins mensuales (YTD) — TODOS los close wins (AM + AE).
+"""Operations · Hunteados vs Postulados (mensual, YTD).
 
-Cuenta `opportunity.opp_stage = 'Close Win'` por mes de `opp_close_date`, del año en
-curso (year_start → corte). SIN filtro de `opp_sales_lead` (incluye AM y AE) ni de
-canal. Una fila por (mes, modelo) con `wins`, para barras apiladas Staffing/Recruiting.
+Cuenta candidatos por mes de `candidates.created_at` (año en curso), clasificando
+`candidate_origin`:
+  - 'Hunteo'                           → Hunteo (hunteado)
+  - 'Applicant' / 'Talentum applicant' → Applicant (postulado)
+Universo = TODOS los candidatos taggeados (sin importar etapa). Los sin origen quedan
+fuera. Una fila por (mes, origen) con `cnt`, para barras apiladas Hunteo/Applicant.
 """
 from __future__ import annotations
 
@@ -38,41 +41,43 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT DATE_TRUNC('month', gs)::date AS mes
           FROM params p, generate_series(p.lo_mes, p.hi_d, INTERVAL '1 month') gs
         ),
-        models AS (SELECT UNNEST(ARRAY['Staffing', 'Recruiting']) AS model),
-        wins AS (
-          SELECT TRIM(o.opp_model) AS model,
-                 DATE_TRUNC('month', NULLIF(o.opp_close_date::text, '')::date)::date AS mes,
-                 COUNT(*)::int AS wins
-          FROM opportunity o, params p
-          WHERE TRIM(o.opp_stage) = 'Close Win'
-            AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
-            AND TRIM(o.opp_model) IN ('Staffing', 'Recruiting')
-            AND NULLIF(o.opp_close_date::text, '')::date BETWEEN p.lo_real AND p.hi_d
+        origins AS (SELECT UNNEST(ARRAY['Hunteo', 'Applicant']) AS origin),
+        counts AS (
+          SELECT CASE
+                   WHEN LOWER(TRIM(c.candidate_origin)) = 'hunteo' THEN 'Hunteo'
+                   ELSE 'Applicant'
+                 END AS origin,
+                 DATE_TRUNC('month', c.created_at)::date AS mes,
+                 COUNT(*)::int AS cnt
+          FROM candidates c, params p
+          WHERE c.created_at IS NOT NULL
+            AND LOWER(TRIM(c.candidate_origin)) IN ('hunteo', 'applicant', 'talentum applicant')
+            AND c.created_at BETWEEN p.lo_real AND p.hi_d
           GROUP BY 1, 2
         )
         SELECT
           TO_CHAR(m.mes, 'YYYY-MM-DD') AS bucket_start,
           (ARRAY['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
                  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'])[EXTRACT(MONTH FROM m.mes)::int] AS bucket_label,
-          md.model AS model,
-          COALESCE(w.wins, 0)::int AS wins
+          o.origin AS origin,
+          COALESCE(ct.cnt, 0)::int AS cnt
         FROM meses m
-        CROSS JOIN models md
-        LEFT JOIN wins w ON w.mes = m.mes AND w.model = md.model
-        ORDER BY m.mes, md.model;
+        CROSS JOIN origins o
+        LEFT JOIN counts ct ON ct.mes = m.mes AND ct.origin = o.origin
+        ORDER BY m.mes, o.origin;
     """
     return sql, {"lo": lo, "hi": hi}
 
 
 DATASET = {
-    "key": "op_close_wins_monthly",
-    "label": "Operations · Close wins mensuales (YTD, por modelo)",
+    "key": "op_hunteo_vs_applicant_monthly",
+    "label": "Operations · Hunteados vs Postulados (mensual, YTD)",
     "dimensions": [
         {"key": "bucket_start", "label": "Mes", "type": "date"},
         {"key": "bucket_label", "label": "Mes", "type": "string"},
-        {"key": "model", "label": "Modelo", "type": "string"},
+        {"key": "origin", "label": "Origen", "type": "string"},
     ],
-    "measures": [{"key": "wins", "label": "Close wins", "type": "number"}],
+    "measures": [{"key": "cnt", "label": "Candidatos", "type": "number"}],
     "default_filters": {},
     "query": query,
 }

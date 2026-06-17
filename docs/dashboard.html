@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=75">
+  <link rel="stylesheet" href="./assets/css/control-dashboard-retro.css?v=79">
 </head>
 <body>
 
@@ -1336,7 +1336,7 @@
       <div class="card s-12">
         <div class="card__head">
           <div>
-            <h3 class="card__title">3 / 6m Churn</h3>
+            <h3 class="card__title">3 / 6m Churn <span data-window-label>30d</span></h3>
             <p class="card__sub">Sobrevivencia de cohortes en su ventana de exposure (filtro Meses 3 / 6).</p>
           </div>
           <div class="metric-row" style="gap:32px">
@@ -1399,7 +1399,7 @@
           </div>
           <span class="callout">
             <span style="color:#fff;font-weight:600" data-chart="am_kpi_crr_30d" data-bind="text" data-field="grr_pct" data-reduce="first" data-fmt="percent">—</span>
-            · CRR 30d
+            · CRR <span data-window-label>30d</span>
           </span>
         </div>
         <div class="chart" style="position:relative">
@@ -1472,7 +1472,7 @@
       <div class="card s-12">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Candidate retention rate · cohort survival</h3>
+            <h3 class="card__title">Candidate retention rate · cohort survival <span data-window-label>30d</span></h3>
             <p class="card__sub">% de cohorte que llega a 3 / 6 / 12 meses activa. Pickeá <em>Número</em> en el filter bar para aislar una sola ventana.</p>
           </div>
           <span class="card__menu">⋯</span>
@@ -1520,7 +1520,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">% reemplazos realizados</h3>
+            <h3 class="card__title">% reemplazos realizados <span data-window-label>30d</span></h3>
             <p class="card__sub">Sobre el total de oportunidades cerradas como reemplazo.</p>
           </div>
           <span class="card__menu">⋯</span>
@@ -1744,7 +1744,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">ARPA · revenue per account</h3>
+            <h3 class="card__title">ARPA · revenue per account <span data-window-label>30d</span></h3>
             <p class="card__sub">Promedio mensual + total ponderado</p>
           </div>
           <span class="card__menu">⋯</span>
@@ -1781,7 +1781,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">ARPC · revenue per candidate</h3>
+            <h3 class="card__title">ARPC · revenue per candidate <span data-window-label>30d</span></h3>
             <p class="card__sub">Promedio mensual + total ponderado</p>
           </div>
           <span class="card__menu">⋯</span>
@@ -2252,7 +2252,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Gross MRR Staffing</h3>
+            <h3 class="card__title">Gross MRR Staffing <span data-window-label>30d</span></h3>
           </div>
         </div>
 
@@ -2300,7 +2300,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">MRR Staffing · Vintti fee</h3>
+            <h3 class="card__title">MRR Staffing · Vintti fee <span data-window-label>30d</span></h3>
           </div>
         </div>
 
@@ -2348,7 +2348,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Avg Recruiting Fee</h3>
+            <h3 class="card__title">Avg Recruiting Fee <span data-window-label>30d</span></h3>
             <p class="card__sub">Promedio del fee cobrado en deals Recruiting · últimos 30 días.</p>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
@@ -2377,7 +2377,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Avg Staffing Fee</h3>
+            <h3 class="card__title">Avg Staffing Fee <span data-window-label>30d</span></h3>
             <p class="card__sub">Promedio del fee mensual cobrado en deals Staffing · últimos 30 días.</p>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
@@ -2408,7 +2408,7 @@
       <div class="card s-12 setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Avg Setup Fee · Breakdown</h3>
+            <h3 class="card__title">Avg Setup Fee · Breakdown <span data-window-label>30d</span></h3>
             <p class="card__sub">Con computadora vs sin computadora · Staffing · last 30 days · AE's</p>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
@@ -2505,7 +2505,7 @@
         <div class="card wrchan-card wr-violet setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">SQL → Deep Dive</h3>
+            <h3 class="card__title">SQL → Deep Dive <span data-window-label>30d</span></h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-sql-deepdive"
@@ -2591,7 +2591,7 @@
         <div class="card wrchan-card wr-lime setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Deep Dive → NDA Signed</h3>
+            <h3 class="card__title">Deep Dive → NDA Signed <span data-window-label>30d</span></h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-deepdive-nda"
@@ -2676,7 +2676,7 @@
         <div class="card wrchan-card wr-magenta setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">NDA → Close Win</h3>
+            <h3 class="card__title">NDA → Close Win <span data-window-label>30d</span></h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-lead-channel-winrate"
@@ -2762,7 +2762,7 @@
         <div class="card wrchan-card wr-blue setupfee-card">
         <div class="card__head">
           <div>
-            <h3 class="card__title">SQL → Close Win</h3>
+            <h3 class="card__title">SQL → Close Win <span data-window-label>30d</span></h3>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
                   data-kpi-detail-open="sales-sql-clientwin"
@@ -2873,7 +2873,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Churn Rate · Candidatos</h3>
+            <h3 class="card__title">Churn Rate · Candidatos <span data-window-label>30d</span></h3>
           </div>
         </div>
         <div class="churn-panels">
@@ -2908,7 +2908,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Churn Rate · Clientes</h3>
+            <h3 class="card__title">Churn Rate · Clientes <span data-window-label>30d</span></h3>
           </div>
         </div>
         <div class="churn-panels">
@@ -3056,7 +3056,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">SQL → NDA Sent · monthly</h3>
+            <h3 class="card__title">SQL → NDA Sent · monthly <span data-window-label>30d</span></h3>
             <p class="card__sub">Cohort por mes (creation_date) — % de accounts creadas que firmaron NDA</p>
           </div>
         </div>
@@ -3090,7 +3090,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">NDA Sent → Sourcing · monthly</h3>
+            <h3 class="card__title">NDA Sent → Sourcing · monthly <span data-window-label>30d</span></h3>
             <p class="card__sub">Cohort por mes (NDA signed) — % de opps que pasaron a Sourcing</p>
           </div>
         </div>
@@ -3124,7 +3124,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Sourcing → Close Win · monthly</h3>
+            <h3 class="card__title">Sourcing → Close Win · monthly <span data-window-label>30d</span></h3>
             <p class="card__sub">Por mes de cierre (opp_close_date) — % de Close Wins que pasaron por sourcing</p>
           </div>
         </div>
@@ -3158,7 +3158,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">SQL → Close Win · monthly</h3>
+            <h3 class="card__title">SQL → Close Win · monthly <span data-window-label>30d</span></h3>
             <p class="card__sub">Cohort por mes (creation_date) — % de accounts que llegaron a Close Win</p>
           </div>
         </div>
@@ -3358,7 +3358,7 @@
       <div class="card s-12">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Lead source · Close Win vs Closed Lost</h3>
+            <h3 class="card__title">Lead source · Close Win vs Closed Lost <span data-window-label>30d</span></h3>
             <p class="card__sub">Mes actual · cuántas oportunidades cerraron por fuente</p>
           </div>
           <span class="card__menu">⋯</span>
@@ -4004,7 +4004,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">KR3 · Avg Staffing Fee por candidato colocado ($)</h3>
+            <h3 class="card__title">KR3 · Avg Staffing Fee por candidato colocado ($) <span data-window-label>30d</span></h3>
             <p class="card__sub">Fee mensual promedio de Vintti por candidato colocado (Staffing) · últimos 30 días</p>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
@@ -4031,7 +4031,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">KR4 · Avg Recruiting Fee por candidato colocado ($)</h3>
+            <h3 class="card__title">KR4 · Avg Recruiting Fee por candidato colocado ($) <span data-window-label>30d</span></h3>
             <p class="card__sub">Fee promedio de Vintti por candidato colocado (Recruiting) · últimos 30 días</p>
           </div>
           <button type="button" class="skpi-tile__detail-btn"
@@ -4059,7 +4059,7 @@
         <div class="card__head">
           <div>
             <span class="krcount-card__eyebrow">KR5</span>
-            <h3 class="card__title">New Clients Generated</h3>
+            <h3 class="card__title">New Clients Generated <span data-window-label>30d</span></h3>
           </div>
           <span class="skpi-tile__tag">Últimos 30d</span>
         </div>
@@ -4085,7 +4085,7 @@
         <div class="card__head">
           <div>
             <span class="krcount-card__eyebrow">KR6</span>
-            <h3 class="card__title">New Candidates Allocated</h3>
+            <h3 class="card__title">New Candidates Allocated <span data-window-label>30d</span></h3>
           </div>
           <span class="skpi-tile__tag">Últimos 30d</span>
         </div>
@@ -4120,7 +4120,7 @@
         <div class="card__head">
           <div>
             <span class="krcount-card__eyebrow">KR1</span>
-            <h3 class="card__title">SQLs generados por BDRs · semanal</h3>
+            <h3 class="card__title">SQLs generados por BDRs · semanal <span data-window-label>30d</span></h3>
           </div>
         </div>
         <svg class="krweek-card__bars" data-chart="sa_bars_kr_sql_bdr_week_history" data-bind="bars"
@@ -4505,7 +4505,7 @@
       <div class="card s-6">
         <div class="card__head">
           <div>
-            <h3 class="card__title">New placements · monthly</h3>
+            <h3 class="card__title">New placements · monthly <span data-window-label>30d</span></h3>
             <p class="card__sub">Hires que arrancaron en el mes (Staffing + Recruiting).</p>
           </div>
           <span class="card__menu">⋯</span>
@@ -4844,7 +4844,7 @@
         <div class="card__head">
           <div>
             <h3 class="card__title">Close wins por mes</h3>
-            <p class="card__sub">YTD · barras apiladas por modelo</p>
+            <p class="card__sub"><span class="period-badge" data-period-label data-period-default="YTD">YTD</span> · barras apiladas por modelo</p>
           </div>
         </div>
         <div class="rk-legend mkt-stack__legend" data-chart="op_bars_close_wins_monthly" data-bind="stacked-legend"
@@ -4856,18 +4856,36 @@
         <p class="card__sub" style="margin:8px 4px 0;">Click en un mes para ver el detalle de esos close wins.</p>
       </div>
 
-      <!-- ===== Razones de caída de candidatos (donut) ===== -->
+      <!-- ===== Razones de rechazo y caída de candidatos (donuts lado a lado) ===== -->
       <div class="section s-12">
         <div>
-          <h2>Razones de caída de candidatos</h2>
-          <p>% por razón de baja (`inactive_reason`) · solo candidatos con razón cargada</p>
+          <h2>Razones de rechazo y caída de candidatos</h2>
+          <p>% por razón · rechazos (status del pipeline) y caídas (inactive reason)</p>
         </div>
       </div>
       <div class="card s-6">
         <div class="card__head">
           <div>
+            <h3 class="card__title">Razones de rechazo</h3>
+            <p class="card__sub"><span data-chart="op_donut_rejection_reasons" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> candidatos<span data-window-label>30d</span></p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-rejection-reasons-detail" data-category-key="reason" aria-label="Ver detalle de todas las razones de rechazo">Ver detalle</button>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg data-chart="op_donut_rejection_reasons" data-bind="donut" data-label="reason" data-value="count"
+               data-detail-panel="op-rejection-reasons-detail" data-detail-key="reason" viewBox="0 0 180 180"></svg>
+          <div class="donut__legend" data-chart="op_donut_rejection_reasons" data-bind="donut-legend" data-label="reason" data-value="count"
+               data-detail-panel="op-rejection-reasons-detail" data-detail-key="reason">
+            <ul></ul>
+          </div>
+        </div>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en una porción para ver los candidatos de esa razón.</p>
+      </div>
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
             <h3 class="card__title">Razones de caída</h3>
-            <p class="card__sub">% por razón · <span data-chart="op_donut_churn_reasons" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> candidatos con razón cargada</p>
+            <p class="card__sub"><span data-chart="op_donut_churn_reasons" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> candidatos<span data-window-label>30d</span></p>
           </div>
           <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-churn-reasons-detail" data-category-key="reason" aria-label="Ver detalle de todas las razones">Ver detalle</button>
         </div>
@@ -4879,7 +4897,56 @@
             <ul></ul>
           </div>
         </div>
-        <p class="card__sub" style="margin:8px 4px 0;">Click en una porción (o en la leyenda) para ver los candidatos de esa razón.</p>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en una porción para ver los candidatos de esa razón.</p>
+      </div>
+
+      <!-- ===== Close wins por origen del candidato (Hunteo vs Applicant) ===== -->
+      <div class="section s-12">
+        <div>
+          <h2>Close wins por origen del candidato</h2>
+          <p>% sobre todos los close-win placements · Hunteo vs Applicant</p>
+        </div>
+      </div>
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Origen del candidato</h3>
+            <p class="card__sub"><span data-chart="op_donut_closewin_origin" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> placements<span data-window-label>30d</span></p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-closewin-origin-detail" data-category-key="candorigin" aria-label="Ver detalle de todos los orígenes">Ver detalle</button>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg data-chart="op_donut_closewin_origin" data-bind="donut" data-label="origin" data-value="count"
+               data-detail-panel="op-closewin-origin-detail" data-detail-key="candorigin" viewBox="0 0 180 180"></svg>
+          <div class="donut__legend" data-chart="op_donut_closewin_origin" data-bind="donut-legend" data-label="origin" data-value="count"
+               data-detail-panel="op-closewin-origin-detail" data-detail-key="candorigin">
+            <ul></ul>
+          </div>
+        </div>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en una porción para ver los candidatos de ese origen.</p>
+      </div>
+
+      <!-- ===== Hunteados vs Postulados (barras mensuales) ===== -->
+      <div class="section s-12">
+        <div>
+          <h2>Hunteados vs Postulados</h2>
+          <p>Cantidad de candidatos por mes (año en curso) según origen · Hunteo vs Applicant</p>
+        </div>
+      </div>
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Hunteados vs Postulados por mes</h3>
+            <p class="card__sub"><span class="period-badge" data-period-label data-period-default="YTD">YTD</span> · barras apiladas por origen del candidato</p>
+          </div>
+        </div>
+        <div class="rk-legend mkt-stack__legend" data-chart="op_bars_hunteo_vs_applicant" data-bind="stacked-legend"
+             data-series="origin" data-y="cnt"></div>
+        <svg class="mkt-stack__bars" data-chart="op_bars_hunteo_vs_applicant" data-bind="stacked-bars"
+             data-x="bucket_start" data-x-label="bucket_label" data-series="origin" data-y="cnt" data-fmt-y="int"
+             data-value-labels data-x-labels data-bucket-detail-panel="op-hunteo-applicant-detail"
+             viewBox="0 0 760 220" preserveAspectRatio="xMidYMid meet"></svg>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en un mes para ver los candidatos de ese mes.</p>
       </div>
 
       <!-- ============== Detail roll-up ============== -->
@@ -4983,7 +5050,7 @@
       <div class="card s-4">
         <div class="card__head">
           <div>
-            <h3 class="card__title">Revenue mix</h3>
+            <h3 class="card__title">Revenue mix <span data-window-label>30d</span></h3>
             <p class="card__sub">Recruiting vs Staffing · net revenue del período</p>
           </div>
         </div>
@@ -5003,7 +5070,7 @@
       <div class="card s-8 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
-            <h3 class="card__title">Oportunidades abiertas por industria</h3>
+            <h3 class="card__title">Oportunidades abiertas por industria <span data-window-label>30d</span></h3>
             <p class="card__sub">Opps abiertas de cuentas que entraron en el período, por industria</p>
           </div>
         </div>
@@ -5022,7 +5089,7 @@
       <div class="card s-12 mkt-rank-card" data-period-card>
         <div class="card__head">
           <div>
-            <h3 class="card__title">MQLs y SQLs por canal · en el tiempo</h3>
+            <h3 class="card__title">MQLs y SQLs por canal · en el tiempo <span data-window-label>30d</span></h3>
             <p class="card__sub">Tendencia por canal en el período · solo canales de marketing</p>
           </div>
         </div>
@@ -5046,7 +5113,7 @@
       <div class="card s-12 mkt-stack-card" data-period-card>
         <div class="card__head">
           <div>
-            <h3 class="card__title">Net revenue generado por origin · histórico</h3>
+            <h3 class="card__title">Net revenue generado por origin · histórico <span data-window-label>30d</span></h3>
             <p class="card__sub">Barras apiladas por origen (fee Vintti de close wins) · click en un bucket para su detalle</p>
           </div>
         </div>
@@ -5121,7 +5188,7 @@
       <div class="card s-12" data-period-card>
         <div class="card__head">
           <div>
-            <h3 class="card__title">Embudo de conversión · MQL → SQL → Close Win</h3>
+            <h3 class="card__title">Embudo de conversión · MQL → SQL → Close Win <span data-window-label>30d</span></h3>
             <p class="card__sub">Solo marketing · de los que llegaron a MQL (AE), cuántos pasaron a SQL (AE) y a Close Win · cohorte por createdate del período (cuenta etapa alcanzada)</p>
           </div>
         </div>
@@ -8399,9 +8466,46 @@
           <div class="kpi-drawer__body">
             <section class="kpi-drawer__section">
               <h4 class="kpi-drawer__section-title">Caídas con razón <span class="count" data-chart="op_table_churn_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
-              <div class="dtable-wrap" data-chart="op_table_churn_reasons_detail" data-bind="dtable"
+              <input type="text" class="dtable-filter" data-dtable-filter="op_table_churn_reasons_detail" placeholder="Filtrar por account…" aria-label="Filtrar por account" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
+              <div class="dtable-wrap" data-chart="op_table_churn_reasons_detail" data-bind="dtable" data-filter-col="2"
                    data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw,inactive_date|Fecha baja|raw"
                    data-empty-text="Sin caídas con razón cargada."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-rejection-reasons-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · rechazos de candidatos</span>
+            <h3 class="kpi-drawer__title">Razones de rechazo · detalle</h3>
+            <p class="kpi-drawer__sub">Candidatos rechazados (status negativo en el pipeline), por razón · con account y posición.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Rechazos <span class="count" data-chart="op_table_rejection_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <input type="text" class="dtable-filter" data-dtable-filter="op_table_rejection_reasons_detail" placeholder="Filtrar por account…" aria-label="Filtrar por account" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
+              <div class="dtable-wrap" data-chart="op_table_rejection_reasons_detail" data-bind="dtable" data-filter-col="2"
+                   data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw"
+                   data-empty-text="Sin rechazos."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-closewin-origin-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · close wins por origen</span>
+            <h3 class="kpi-drawer__title">Origen del candidato · detalle</h3>
+            <p class="kpi-drawer__sub">Close-win placements por origen del candidato (Hunteo / Applicant / Sin origen) · con account y posición.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Placements <span class="count" data-chart="op_table_closewin_origin_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <input type="text" class="dtable-filter" data-dtable-filter="op_table_closewin_origin_detail" placeholder="Filtrar por account…" aria-label="Filtrar por account" style="width:100%;margin:6px 0 10px;padding:8px 12px;border:1px solid #e6e8ee;border-radius:10px;font:inherit;box-sizing:border-box;">
+              <div class="dtable-wrap" data-chart="op_table_closewin_origin_detail" data-bind="dtable" data-filter-col="2"
+                   data-cols="origin|Origen|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw"
+                   data-empty-text="Sin placements."></div>
             </section>
           </div>
         </div>
@@ -8423,10 +8527,27 @@
           </div>
         </div>
 
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-hunteo-applicant-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · hunteados vs postulados</span>
+            <h3 class="kpi-drawer__title">Hunteados vs Postulados · detalle del mes</h3>
+            <p class="kpi-drawer__sub">Candidatos taggeados (Hunteo / Applicant) creados en el mes seleccionado.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Candidatos del mes <span class="count" data-chart="op_table_hunteo_vs_applicant_detail" data-period-aware data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dtable-wrap" data-chart="op_table_hunteo_vs_applicant_detail" data-period-aware data-bind="dtable"
+                   data-cols="created_at|Creado|raw,candidate_name|Candidato|raw,origin|Origen|chip,candidate_source|Source|raw"
+                   data-empty-text="Sin candidatos en el mes."></div>
+            </section>
+          </div>
+        </div>
+
       </aside>
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=85" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=97" defer></script>
 </body>
 </html>

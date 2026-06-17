@@ -6,10 +6,13 @@ donut de razones de caída.
 """
 from __future__ import annotations
 
+from ._periods import window_bounds
+
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # `reason` = razón clickeada en la dona (vacío = todas).
     reason = str(filters.get("reason") or "").strip()
+    lo, hi = window_bounds(filters)
     sql = """
         SELECT
           TRIM(ho.inactive_reason) AS reason,
@@ -23,9 +26,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         LEFT JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
         WHERE NULLIF(TRIM(ho.inactive_reason), '') IS NOT NULL
           AND (%(reason)s = '' OR TRIM(ho.inactive_reason) = %(reason)s)
+          AND ho.carga_inactive BETWEEN %(w_lo)s AND %(w_hi)s
         ORDER BY TRIM(ho.inactive_reason), ho.carga_inactive DESC NULLS LAST, c.name;
     """
-    return sql, {"reason": reason}
+    return sql, {"reason": reason, "w_lo": lo, "w_hi": hi}
 
 
 DATASET = {

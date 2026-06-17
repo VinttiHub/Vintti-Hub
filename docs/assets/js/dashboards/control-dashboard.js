@@ -936,11 +936,22 @@
   // Razones de caída (inactive_reason) con color de marca FIJO, para que la dona y
   // los chips del detalle usen el mismo color por razón (no índice/hash).
   const REASON_COLORS = {
-    'Poor candidate performance': '#003bff',
-    'Candidate resigned': '#6c38ff',
-    'Company layoffs / downsizing': '#4ba9ff',
-    'Accepted a better offer': '#ff1fdb',
-    'Buy out fee': '#c1ff72',
+    // Razones de caída (inactive_reason) — evita azul+violeta contiguos
+    'Poor candidate performance': '#003bff',   // azul (el más grande)
+    'Candidate resigned': '#ff1fdb',           // magenta (2º, contrasta con azul)
+    'Company layoffs / downsizing': '#c1ff72', // lime
+    'Accepted a better offer': '#4ba9ff',      // cyan
+    'Buy out fee': '#6c38ff',                  // violeta (slice chico)
+    // Razones de rechazo (candidates_batches.status, negativas)
+    'Rejected By Sales': '#003bff',
+    'Client Rejected CV': '#6c38ff',
+    'Client Rejected after interviewing': '#4ba9ff',
+    'Candidate Failed Test': '#ff1fdb',
+    'Candidate abandoned process': '#c1ff72',
+    // Origen del candidato en close wins (Hunteo vs Applicant)
+    'Hunteo': '#c1ff72',      // verde lime
+    'Applicant': '#ff1fdb',   // rosado magenta
+    '(Sin origen)': '#aab2bd',
   };
 
   function colorForLabel(label, idx) {
@@ -1054,7 +1065,7 @@
       if (opts.xLabels) {
         const t = document.createElementNS(SVG_NS, 'text');
         t.setAttribute('x', cx.toFixed(2)); t.setAttribute('y', (h - 7).toFixed(2)); t.setAttribute('text-anchor', 'middle');
-        t.setAttribute('font-size', '10.5'); t.setAttribute('font-weight', i === n - 1 ? '700' : '500');
+        t.setAttribute('font-size', '6.5'); t.setAttribute('font-weight', i === n - 1 ? '700' : '500');
         t.setAttribute('fill', i === n - 1 ? '#0e1117' : '#8a93a3'); t.setAttribute('data-rendered', '');
         t.textContent = String(b.label == null ? '' : b.label); svg.appendChild(t);
       }
@@ -1763,6 +1774,7 @@
   }
   // Color sólido para barras/líneas: pastel con cuerpo, del MISMO hue de la pill.
   function originSeriesColor(label) {
+    if (REASON_COLORS[label]) return REASON_COLORS[label];  // colores de marca fijos (Hunteo/Applicant, razones)
     if (_originNeutral(label)) return '#aab2bd';
     return `hsl(${chipHue(label)}, 60%, 62%)`;
   }
@@ -1784,7 +1796,16 @@
       el.innerHTML = `<div class="muted" style="padding:18px;text-align:center">${esc(empty)}</div>`;
       return;
     }
-    if (!rows || !rows.length) {
+    // Filtro client-side por columna (ej. account): si el dtable tiene data-filter-col
+    // y data-filter-value, mostramos solo las filas que matchean (sin pegarle al backend).
+    let viewRows = rows || [];
+    const fVal = (el.dataset.filterValue || '').trim().toLowerCase();
+    const fColIdx = (el.dataset.filterCol != null && el.dataset.filterCol !== '') ? +el.dataset.filterCol : null;
+    if (fVal && fColIdx != null && cols[fColIdx]) {
+      const ff = cols[fColIdx].field;
+      viewRows = viewRows.filter(r => String(r[ff] == null ? '' : r[ff]).toLowerCase().includes(fVal));
+    }
+    if (!viewRows.length) {
       el.innerHTML = `<table class="dtable"><thead><tr>${cols.map(c => `<th>${esc(c.label)}</th>`).join('')}</tr></thead>` +
         `<tbody><tr><td colspan="${cols.length}" class="muted" style="text-align:center;padding:18px">${esc(empty)}</td></tr></tbody></table>`;
       return;
@@ -1792,7 +1813,7 @@
     const head = cols.map(c => {
       return `<th${isNumFmt(c.fmt) ? ' class="num"' : ''}>${esc(c.label)}</th>`;
     }).join('');
-    const body = rows.map(r => {
+    const body = viewRows.map(r => {
       return '<tr>' + cols.map(c => {
         if (c.fmt === 'chip') return `<td>${originChipHtml(r[c.field])}</td>`;
         const f = fmt.pick(c.fmt);
@@ -1802,6 +1823,30 @@
       }).join('') + '</tr>';
     }).join('');
     el.innerHTML = `<table class="dtable"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  // Filtro client-side (ej. por account) para las tablas de detalle del drawer: el
+  // input setea data-filter-value en el dtable destino, lo re-renderiza desde cache
+  // (renderDtable aplica el filtro) y refleja el conteo filtrado en el header .count.
+  function bindDtableFilters() {
+    document.querySelectorAll('[data-dtable-filter]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const chartKey = inp.dataset.dtableFilter;
+        const scope = inp.closest('.kpi-drawer__panel-content') || document;
+        const el = scope.querySelector(`[data-chart="${chartKey}"][data-bind="dtable"]`);
+        if (!el) return;
+        el.dataset.filterValue = inp.value;
+        const rows = lastFetchedRows.get(compKeyFor(el.dataset.chart, readOverridesFor(el))) || [];
+        renderBinding(el, rows);
+        const cols = (el.dataset.cols || '').split(',').map(s => s.split('|')[0]);
+        const fc = (el.dataset.filterCol != null && el.dataset.filterCol !== '') ? +el.dataset.filterCol : null;
+        const q = inp.value.trim().toLowerCase();
+        const n = (q && fc != null && cols[fc])
+          ? rows.filter(r => String(r[cols[fc]] == null ? '' : r[cols[fc]]).toLowerCase().includes(q)).length
+          : rows.length;
+        scope.querySelectorAll(`.count[data-chart="${chartKey}"]`).forEach(c => { c.textContent = String(n); });
+      });
+    });
   }
 
   /* ---------- cohort by contractor (pivot long → wide month-by-month table) ---------- */
@@ -3497,6 +3542,7 @@
     lastFetchedRows.clear();
     hydratedScopes.clear();
     updateWindowLabels();
+    updatePeriodLabels();
     hydrate(activeChannelEl(), { force: true });
   }
   // Cartel de ventana de las cards de 30d: refleja el filtro activo
@@ -3518,7 +3564,37 @@
   }
   function updateWindowLabels() {
     const txt = windowLabelText();
-    document.querySelectorAll('[data-window-label]').forEach(el => { el.textContent = txt; });
+    const filtered = !!(state.desde || state.hasta || state.mes || state.corte);  // rango/mes/corte elegido
+    document.querySelectorAll('[data-window-label]').forEach(el => {
+      el.textContent = txt;
+      el.classList.toggle('is-filtered', filtered);
+    });
+  }
+  // Etiqueta de período para cards all-time/YTD que pueden filtrarse (donas Ops,
+  // barras mensuales): muestra el rango activo (ej. "01 may–31 may") o el default
+  // de la card (data-period-default, ej. "Todo el período" / "YTD") si no hay filtro.
+  function periodRangeText() {
+    const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const fmtD = (s) => {
+      const p = String(s).split('-');
+      return p.length >= 3 ? `${p[2]} ${MES[+p[1] - 1] || ''}` : s;
+    };
+    if (state.desde || state.hasta) {
+      return `${state.desde ? fmtD(state.desde) : '…'}–${state.hasta ? fmtD(state.hasta) : 'hoy'}`;
+    }
+    if (state.mes) {
+      const p = String(state.mes).split('-');
+      return `${MES[+p[1] - 1] || ''} ${p[0]}`;
+    }
+    if (state.corte) return '30d';  // corte presionado → ventana rodante de 30d
+    return '';
+  }
+  function updatePeriodLabels() {
+    const txt = periodRangeText();
+    document.querySelectorAll('[data-period-label]').forEach(el => {
+      el.textContent = txt || (el.dataset.periodDefault || 'Todo el período');
+      el.classList.toggle('is-filtered', !!txt);
+    });
   }
   // Ventanas de CALENDARIO (no rolling): se anclan a HOY, NO al corte. Solo las
   // rolling (30d / 7d) siguen el filtro CORTE.
@@ -3845,7 +3921,9 @@
     bindPeriodToggles();
     bindGlobalPeriodToggles();
     bindLeadTypeToggles();
+    bindDtableFilters();
     updateWindowLabels();
+    updatePeriodLabels();
     hydrate();
   }
 

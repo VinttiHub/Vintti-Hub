@@ -1,12 +1,14 @@
 """Operations · detalle de Close wins de UN mes (bucket clickeado en las barras).
 
-Lista todos los Close Wins (AM + AE, Staffing + Recruiting) cuyo `opp_close_date`
-cae en el mes del bucket seleccionado. Filtro `bucket` = inicio del mes clickeado
-(lo setea el drawer de barras apiladas); default = mes actual.
+Lista los Close Wins (AM + AE, Staffing + Recruiting) cuyo `opp_close_date` cae en el
+mes del bucket seleccionado, CRUZADO con la ventana activa (Mes/Desde-Hasta > Corte
+30d > YTD) — así con un corte de 30d sólo muestra la parte del mes dentro de la ventana.
 """
 from __future__ import annotations
 
 from datetime import date
+
+from ._period import monthly_range
 
 
 def _parse_date(value):
@@ -25,10 +27,13 @@ def _parse_date(value):
 
 def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     bucket = _parse_date(filters.get("bucket")) or _parse_date(filters.get("mes"))
+    lo, hi = monthly_range(filters)
     sql = """
         WITH params AS (
           SELECT COALESCE(DATE_TRUNC('month', %(bucket)s::date)::date,
-                          DATE_TRUNC('month', CURRENT_DATE)::date) AS mes_ini
+                          DATE_TRUNC('month', CURRENT_DATE)::date) AS mes_ini,
+                 %(lo)s::date AS w_lo,
+                 %(hi)s::date AS w_hi
         )
         SELECT
           TO_CHAR(o.opp_close_date, 'YYYY-MM-DD') AS close_date,
@@ -41,12 +46,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         CROSS JOIN params p
         WHERE TRIM(o.opp_stage) = 'Close Win'
           AND NULLIF(o.opp_close_date::text, '') IS NOT NULL
-          AND o.opp_close_date >= p.mes_ini
-          AND o.opp_close_date <  (p.mes_ini + INTERVAL '1 month')
+          AND o.opp_close_date::date >= GREATEST(p.mes_ini, p.w_lo)
+          AND o.opp_close_date::date <= LEAST((p.mes_ini + INTERVAL '1 month - 1 day')::date, p.w_hi)
           AND TRIM(o.opp_model) IN ('Staffing', 'Recruiting')
         ORDER BY o.opp_close_date DESC, TRIM(o.opp_model), a.client_name;
     """
-    return sql, {"bucket": bucket}
+    return sql, {"bucket": bucket, "lo": lo, "hi": hi}
 
 
 DATASET = {

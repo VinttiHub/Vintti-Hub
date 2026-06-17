@@ -10,6 +10,12 @@ from . import (
     op_close_wins_monthly_detail,
     op_churn_reasons,
     op_churn_reasons_detail,
+    op_rejection_reasons,
+    op_rejection_reasons_detail,
+    op_closewin_candidate_origin,
+    op_closewin_candidate_origin_detail,
+    op_hunteo_vs_applicant_monthly,
+    op_hunteo_vs_applicant_monthly_detail,
     batch_sourcing,
     mrr_history,
     active_headcount_history,
@@ -455,6 +461,12 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     op_close_wins_monthly_detail.DATASET["key"]: op_close_wins_monthly_detail.DATASET,
     op_churn_reasons.DATASET["key"]: op_churn_reasons.DATASET,
     op_churn_reasons_detail.DATASET["key"]: op_churn_reasons_detail.DATASET,
+    op_rejection_reasons.DATASET["key"]: op_rejection_reasons.DATASET,
+    op_rejection_reasons_detail.DATASET["key"]: op_rejection_reasons_detail.DATASET,
+    op_closewin_candidate_origin.DATASET["key"]: op_closewin_candidate_origin.DATASET,
+    op_closewin_candidate_origin_detail.DATASET["key"]: op_closewin_candidate_origin_detail.DATASET,
+    op_hunteo_vs_applicant_monthly.DATASET["key"]: op_hunteo_vs_applicant_monthly.DATASET,
+    op_hunteo_vs_applicant_monthly_detail.DATASET["key"]: op_hunteo_vs_applicant_monthly_detail.DATASET,
 }
 
 

@@ -4273,3 +4273,58 @@ button.refgen__pill:hover { filter: brightness(0.96); transform: translateY(-1px
   .setupfee-sub__value { font-size: 32px; }
   .wrchan { gap: 24px; }
 }
+
+/* Period chip — indicador de período de TODAS las cards que reaccionan al filtro
+   global: donas/barras Ops (.period-badge) y los rolling/month labels de todas las
+   pestañas ([data-window-label]). Fondo TRANSLÚCIDO para que se funda en cualquier
+   card (blanca o pastel) sin chocar. Default gris suave; filtrado violeta translúcido. */
+.period-badge,
+[data-window-label] {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1.5px 9px;
+  border-radius: 999px;
+  background: rgba(20, 22, 40, 0.06);
+  color: #5b6573;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.period-badge.is-filtered,
+[data-window-label].is-filtered {
+  background: rgba(108, 56, 255, 0.12);
+  color: #6c38ff;
+}
+/* En contenedores OSCUROS (callout negro "103% · 30d", tag negro YTD/Revenue) el
+   chip translúcido claro no se ve: misma forma de chip pero violeta legible sobre
+   oscuro, así sigue siendo "morado" y consistente con el resto. */
+.callout:not(.callout--soft) [data-window-label],
+.skpi-tile__tag [data-window-label] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.callout:not(.callout--soft) [data-window-label].is-filtered,
+.skpi-tile__tag [data-window-label].is-filtered {
+  background: rgba(150, 116, 255, 0.55);
+  color: #f1ecff;
+}
+/* En los títulos/labels del drawer (headings grandes del panel de detalle) queda
+   inline para no meter pills dentro de un título. */
+.kpi-drawer__hero__label [data-window-label],
+.kpi-drawer__title [data-window-label],
+.kpi-drawer__sub [data-window-label],
+.kpi-drawer__stat__label [data-window-label],
+.kpi-drawer__section-title [data-window-label] {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+}
