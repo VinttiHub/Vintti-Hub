@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -24,18 +25,28 @@ class HubSpotClient:
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         })
-        response = requests.request(
-            method,
-            f"{HUBSPOT_API_BASE}{path}",
-            headers=headers,
-            timeout=30,
-            **kwargs,
-        )
-        if not response.ok:
-            raise HubSpotError(f"HubSpot {method} {path} failed: {response.status_code} {response.text}")
-        if response.status_code == 204:
-            return {}
-        return response.json()
+        url = f"{HUBSPOT_API_BASE}{path}"
+        # Reintenta ante rate-limit (429) y errores transitorios (502/503/504), con
+        # backoff exponencial. El dashboard de Marketing dispara muchos charts que
+        # pegan a HubSpot en vivo a la vez → ráfaga que sin retry termina en 500.
+        last_status = None
+        for attempt in range(5):
+            response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+            if response.status_code in (429, 502, 503, 504) and attempt < 4:
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    delay = float(retry_after)
+                except (TypeError, ValueError):
+                    delay = 0.5 * (2 ** attempt)
+                time.sleep(min(delay, 8))
+                last_status = response.status_code
+                continue
+            if not response.ok:
+                raise HubSpotError(f"HubSpot {method} {path} failed: {response.status_code} {response.text}")
+            if response.status_code == 204:
+                return {}
+            return response.json()
+        raise HubSpotError(f"HubSpot {method} {path} rate-limited after retries (last={last_status})")
 
     def get_owner_id_by_email(self, email):
         target = (email or DEFAULT_MARIANO_EMAIL).strip().lower()

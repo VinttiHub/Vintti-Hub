@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from datetime import date, datetime, timezone
 
 from flask import Blueprint, jsonify, request
@@ -342,11 +343,23 @@ def _resolve_property_map_for_object(client, object_type):
     return by_alias, option_labels
 
 
+# Cache (TTL) de los property maps: se resuelven con 3 llamadas a get_properties
+# (contacts/companies/deals) y son idénticos para TODOS los datasets de cada request.
+# Sin cache, cada chart del tab de Marketing las repetía → ráfaga que rate-limitea
+# HubSpot. Los nombres/opciones de propiedades casi no cambian → TTL holgado.
+_PROPERTY_MAPS_CACHE = {"data": None, "ts": 0.0}
+_PROPERTY_MAPS_TTL = 600  # 10 minutos
+
+
 def _resolve_account_property_maps(client):
+    cache = _PROPERTY_MAPS_CACHE
+    now = time.time()
+    if cache["data"] is not None and (now - cache["ts"]) < _PROPERTY_MAPS_TTL:
+        return cache["data"]
     contacts, contact_options = _resolve_property_map_for_object(client, "contacts")
     companies, company_options = _resolve_property_map_for_object(client, "companies")
     deals, deal_options = _resolve_property_map_for_object(client, "deals")
-    return {
+    result = {
         "contacts": contacts,
         "companies": companies,
         "deals": deals,
@@ -356,6 +369,9 @@ def _resolve_account_property_maps(client):
             "deals": deal_options,
         },
     }
+    cache["data"] = result
+    cache["ts"] = now
+    return result
 
 
 def _resolve_named_property(client, object_type, aliases):
