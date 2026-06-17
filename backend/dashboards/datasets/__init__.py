@@ -6,6 +6,10 @@ from . import (
     ts_history,
     management_dashboard,
     opportunities,
+    op_close_wins_monthly,
+    op_close_wins_monthly_detail,
+    op_churn_reasons,
+    op_churn_reasons_detail,
     batch_sourcing,
     mrr_history,
     active_headcount_history,
@@ -447,6 +451,10 @@ _REGISTRY: dict[str, dict[str, Any]] = {
     mkt_efficiency_by_channel.DATASET["key"]: mkt_efficiency_by_channel.DATASET,
     mkt_business_metrics.DATASET["key"]: mkt_business_metrics.DATASET,
     mkt_revenue_mix.DATASET["key"]: mkt_revenue_mix.DATASET,
+    op_close_wins_monthly.DATASET["key"]: op_close_wins_monthly.DATASET,
+    op_close_wins_monthly_detail.DATASET["key"]: op_close_wins_monthly_detail.DATASET,
+    op_churn_reasons.DATASET["key"]: op_churn_reasons.DATASET,
+    op_churn_reasons_detail.DATASET["key"]: op_churn_reasons_detail.DATASET,
 }
 
 

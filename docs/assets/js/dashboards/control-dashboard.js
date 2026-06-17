@@ -491,6 +491,9 @@
   let openPeriodDrawer = function () {};
   // Drill por bucket (histórico apilado): setea periodo + bucket y abre el drawer.
   let openBucketDrawer = function () {};
+  // Drill por categoría (ej. dona): setea data-override-<key>=<valor> en los charts
+  // del panel y abre el drawer. Valor vacío = limpia el filtro. Impl en bindKpiDrawers.
+  let openCategoryDrawer = function () {};
 
   /* ---------- bar hover tooltip ---------- */
   function attachBarHover(svg, barEntries, opts) {
@@ -930,8 +933,18 @@
   // Series MQL / SQL con color de marca Vintti (MQL azul · SQL verde lima).
   const SERIES_COLORS = { 'MQLs': '#003bff', 'MQL': '#003bff', 'SQLs': '#c1ff72', 'SQL': '#c1ff72' };
 
+  // Razones de caída (inactive_reason) con color de marca FIJO, para que la dona y
+  // los chips del detalle usen el mismo color por razón (no índice/hash).
+  const REASON_COLORS = {
+    'Poor candidate performance': '#003bff',
+    'Candidate resigned': '#6c38ff',
+    'Company layoffs / downsizing': '#4ba9ff',
+    'Accepted a better offer': '#ff1fdb',
+    'Buy out fee': '#c1ff72',
+  };
+
   function colorForLabel(label, idx) {
-    return RISK_COLORS[label] || MODEL_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
+    return REASON_COLORS[label] || RISK_COLORS[label] || MODEL_COLORS[label] || DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length];
   }
 
   // Ranking de barras horizontales (categoría · barra · valor [+ share/rev]).
@@ -1389,6 +1402,16 @@
     svg.appendChild(txt2);
 
     attachDonutHover(svg, segments, {});
+
+    // Click en un segmento → abre el detalle filtrado por esa categoría.
+    const detailPanel = svg.dataset.detailPanel;
+    const detailKey = svg.dataset.detailKey;
+    if (detailPanel && detailKey) {
+      segments.forEach(seg => {
+        seg.arc.style.cursor = 'pointer';
+        seg.arc.addEventListener('click', () => openCategoryDrawer(detailPanel, detailKey, seg.label));
+      });
+    }
   }
 
   function renderDonutLegend(el, rows) {
@@ -1417,6 +1440,10 @@
         <span class="leader"></span>
         ${valHtml}
       `;
+      if (el.dataset.detailPanel && el.dataset.detailKey) {
+        li.style.cursor = 'pointer';
+        li.addEventListener('click', () => openCategoryDrawer(el.dataset.detailPanel, el.dataset.detailKey, String(row[labelKey] || '')));
+      }
       list.appendChild(li);
     });
   }
@@ -1725,6 +1752,12 @@
   }
   function chipColor(label) {
     if (_originNeutral(label)) return { fg: '#5b6573', bg: '#eef1f5' };
+    // Razones de caída: mismo color de marca que la dona (tinte claro + texto fuerte).
+    const rc = REASON_COLORS[label];
+    if (rc) {
+      const fg = (rc.toLowerCase() === '#c1ff72') ? '#3a6b00' : rc;  // lime es muy claro para texto
+      return { fg, bg: rc + '22' };
+    }
     const hue = chipHue(label);
     return { fg: `hsl(${hue}, 50%, 35%)`, bg: `hsl(${hue}, 70%, 93%)` };
   }
@@ -3149,6 +3182,39 @@
         }
       });
     };
+    // Drill por categoría (dona): setea data-override-<key>=<valor> en TODOS los
+    // charts del panel (valor vacío = limpia el filtro), abre el drawer y refetchea.
+    openCategoryDrawer = (panelKey, filterKey, value) => {
+      const panel = drawer.querySelector(`[data-kpi-detail-panel="${panelKey}"]`);
+      const attr = 'data-override-' + filterKey;
+      if (panel) {
+        panel.querySelectorAll('[data-chart]').forEach(el => {
+          if (value == null || value === '') el.removeAttribute(attr);
+          else el.setAttribute(attr, value);
+        });
+      }
+      openDrawer(panelKey);
+      if (!panel) return;
+      requestAnimationFrame(async () => {
+        const groups = new Map();
+        panel.querySelectorAll('[data-chart]').forEach(el => {
+          const ov = readOverridesFor(el);
+          const ck = compKeyFor(el.dataset.chart, ov);
+          if (!groups.has(ck)) groups.set(ck, { chartKey: el.dataset.chart, overrides: ov, els: [] });
+          groups.get(ck).els.push(el);
+        });
+        for (const { chartKey, overrides, els } of groups.values()) {
+          try { const r = await fetchChart(chartKey, overrides); els.forEach(el => renderBinding(el, r.rows || [])); }
+          catch (e) { console.error('category drill', chartKey, e); }
+        }
+      });
+    };
+    // Botón "Ver detalle (todas)" de una dona categórica → abre SIN filtro (limpia).
+    document.querySelectorAll('[data-category-detail-open]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openCategoryDrawer(btn.dataset.categoryDetailOpen, btn.dataset.categoryKey || 'reason', '');
+      });
+    });
 
     // Botón "Ver detalle" de un card de período → usa el período activo del
     // toggle GENERAL de la sección.

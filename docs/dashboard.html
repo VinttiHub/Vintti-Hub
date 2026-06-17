@@ -4833,6 +4833,55 @@
         </div>
       </div>
 
+      <!-- ===== Close wins mensuales (YTD · Staffing/Recruiting) ===== -->
+      <div class="section s-12">
+        <div>
+          <h2>Close wins mensuales</h2>
+          <p>Cantidad de Close Wins por mes (año en curso) · incluye AM y AE · apilado por modelo (Staffing / Recruiting)</p>
+        </div>
+      </div>
+      <div class="card s-12">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Close wins por mes</h3>
+            <p class="card__sub">YTD · barras apiladas por modelo</p>
+          </div>
+        </div>
+        <div class="rk-legend mkt-stack__legend" data-chart="op_bars_close_wins_monthly" data-bind="stacked-legend"
+             data-series="model" data-y="wins"></div>
+        <svg class="mkt-stack__bars" data-chart="op_bars_close_wins_monthly" data-bind="stacked-bars"
+             data-x="bucket_start" data-x-label="bucket_label" data-series="model" data-y="wins" data-fmt-y="int"
+             data-value-labels data-x-labels data-bucket-detail-panel="op-close-wins-detail"
+             viewBox="0 0 760 220" preserveAspectRatio="xMidYMid meet"></svg>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en un mes para ver el detalle de esos close wins.</p>
+      </div>
+
+      <!-- ===== Razones de caída de candidatos (donut) ===== -->
+      <div class="section s-12">
+        <div>
+          <h2>Razones de caída de candidatos</h2>
+          <p>% por razón de baja (`inactive_reason`) · solo candidatos con razón cargada</p>
+        </div>
+      </div>
+      <div class="card s-6">
+        <div class="card__head">
+          <div>
+            <h3 class="card__title">Razones de caída</h3>
+            <p class="card__sub">% por razón · <span data-chart="op_donut_churn_reasons" data-bind="text" data-field="count" data-reduce="sum" data-fmt="int">—</span> candidatos con razón cargada</p>
+          </div>
+          <button type="button" class="skpi-tile__detail-btn" data-category-detail-open="op-churn-reasons-detail" data-category-key="reason" aria-label="Ver detalle de todas las razones">Ver detalle</button>
+        </div>
+        <div class="donut" style="margin-top:8px">
+          <svg data-chart="op_donut_churn_reasons" data-bind="donut" data-label="reason" data-value="count"
+               data-detail-panel="op-churn-reasons-detail" data-detail-key="reason" viewBox="0 0 180 180"></svg>
+          <div class="donut__legend" data-chart="op_donut_churn_reasons" data-bind="donut-legend" data-label="reason" data-value="count"
+               data-detail-panel="op-churn-reasons-detail" data-detail-key="reason">
+            <ul></ul>
+          </div>
+        </div>
+        <p class="card__sub" style="margin:8px 4px 0;">Click en una porción (o en la leyenda) para ver los candidatos de esa razón.</p>
+      </div>
+
       <!-- ============== Detail roll-up ============== -->
       <div class="section s-12">
         <div>
@@ -8340,10 +8389,44 @@
           </div>
         </div>
 
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-churn-reasons-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · caídas de candidatos</span>
+            <h3 class="kpi-drawer__title">Razones de caída · detalle</h3>
+            <p class="kpi-drawer__sub">Candidatos caídos con razón cargada, ordenados por razón · con account y posición.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Caídas con razón <span class="count" data-chart="op_table_churn_reasons_detail" data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dtable-wrap" data-chart="op_table_churn_reasons_detail" data-bind="dtable"
+                   data-cols="reason|Razón|chip,candidate_name|Candidato|raw,client_name|Account|raw,opp_position_name|Posición|raw,inactive_date|Fecha baja|raw"
+                   data-empty-text="Sin caídas con razón cargada."></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="kpi-drawer__panel-content" data-kpi-detail-panel="op-close-wins-detail">
+          <header class="kpi-drawer__head">
+            <span class="kpi-drawer__eyebrow">Operations · close wins</span>
+            <h3 class="kpi-drawer__title">Close wins del mes · detalle</h3>
+            <p class="kpi-drawer__sub">Todos los Close Wins (AM + AE · Staffing + Recruiting) del mes seleccionado.</p>
+            <button type="button" class="kpi-drawer__close" data-kpi-drawer-close aria-label="Cerrar">×</button>
+          </header>
+          <div class="kpi-drawer__body">
+            <section class="kpi-drawer__section">
+              <h4 class="kpi-drawer__section-title">Close wins del mes <span class="count" data-chart="op_table_close_wins_monthly_detail" data-period-aware data-bind="text" data-reduce="count" data-fmt="int">—</span></h4>
+              <div class="dtable-wrap" data-chart="op_table_close_wins_monthly_detail" data-period-aware data-bind="dtable"
+                   data-cols="close_date|Close date|raw,client_name|Cliente|raw,opp_position_name|Posición|raw,model|Modelo|chip"
+                   data-empty-text="Sin close wins en el mes."></div>
+            </section>
+          </div>
+        </div>
+
       </aside>
     </div>
 </div>
 
-<script src="./assets/js/dashboards/control-dashboard.js?v=83" defer></script>
+<script src="./assets/js/dashboards/control-dashboard.js?v=85" defer></script>
 </body>
 </html>
