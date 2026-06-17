@@ -712,6 +712,8 @@ function showTinyToast(msg){
 // ===== Turbo =====
 let turvoGameInterval = null;
 let turvoGameScore = 0;
+let turvoRefreshPromise = null;
+let turvoAutoRefreshStarted = false;
 
 function formatTurvoDate(value) {
   if (!value) return '—';
@@ -834,6 +836,14 @@ async function loadTurvoMeetings() {
   }
 }
 
+function syncTurvoMeetingsOnce() {
+  const opportunityId = getOpportunityId();
+  if (!opportunityId) return null;
+  if (turvoAutoRefreshStarted) return turvoRefreshPromise;
+  turvoAutoRefreshStarted = true;
+  return refreshTurvoMeetings({ silent: true });
+}
+
 function startTurvoGame() {
   const arena = document.getElementById('turvo-game-arena');
   const target = document.getElementById('turvo-game-target');
@@ -881,10 +891,15 @@ function closeTurvoRefreshModal() {
   turvoGameInterval = null;
 }
 
-async function refreshTurvoMeetings() {
+async function refreshTurvoMeetings(options = {}) {
   const opportunityId = getOpportunityId();
   if (!opportunityId) return;
-  openTurvoRefreshModal();
+  if (turvoRefreshPromise) return turvoRefreshPromise;
+
+  const silent = Boolean(options && options.silent);
+  if (!silent) openTurvoRefreshModal();
+
+  turvoRefreshPromise = (async () => {
   try {
     const res = await fetch(`${API_BASE}/turvo/refresh`, {
       method: 'POST',
@@ -901,10 +916,14 @@ async function refreshTurvoMeetings() {
     setTurvoLastRefresh(payload.last_refresh_date, rows);
   } catch (err) {
     console.error('Failed to refresh Turbo meetings:', err);
-    showTinyToast('⚠️ refresh failed');
+    if (!silent) showTinyToast('⚠️ refresh failed');
   } finally {
-    closeTurvoRefreshModal();
+    if (!silent) closeTurvoRefreshModal();
+    turvoRefreshPromise = null;
   }
+  })();
+
+  return turvoRefreshPromise;
 }
 
 function getStoredUserEmail(){
@@ -1477,6 +1496,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
         }
         if (tab.textContent.trim() === 'Turbo') {
           loadTurvoMeetings();
+          syncTurvoMeetingsOnce();
         }
       });
     });
@@ -1506,6 +1526,7 @@ document.getElementById('popupAddExistingBtn').addEventListener('click', async (
   // ✅ Cargar datos reales de la oportunidad
   loadOpportunityData();
   loadTurvoMeetings();
+  syncTurvoMeetingsOnce();
   console.log('🔎 hireCandidateId after load:', window.hireCandidateId);
 
   document.querySelector('.job-header-right .header-btn').addEventListener('click', async () => {
