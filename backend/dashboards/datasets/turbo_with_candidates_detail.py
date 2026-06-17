@@ -1,0 +1,88 @@
+from __future__ import annotations
+
+from datetime import date, datetime, timezone
+
+from ._periods import window_bounds
+
+
+def _parse_date(value) -> date | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    parts = raw.split("-")
+    try:
+        if len(parts) == 3:
+            return date(int(parts[0]), int(parts[1]), int(parts[2]))
+        if len(parts) == 2:
+            return date(int(parts[0]), int(parts[1]), 1)
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
+def _resolve_modelo(filters: dict) -> str | None:
+    raw = (
+        filters.get("modelo")
+        or filters.get("modelo1")
+        or filters.get("model")
+        or filters.get("opp_model")
+        or ""
+    ).strip().lower()
+    if raw in {"staffing", "staff"}:
+        return "Staffing"
+    if raw in {"recruiting", "recru"}:
+        return "Recruiting"
+    return None
+
+
+def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
+    modelo = _resolve_modelo(filters)
+    corte = (
+        _parse_date(filters.get("corte"))
+        or _parse_date(filters.get("cutoff"))
+        or _parse_date(filters.get("mes"))
+        or datetime.now(timezone.utc).date()
+    )
+
+    win_ini, win_fin = window_bounds(filters)
+    sql = """
+        WITH ventana AS (
+          SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
+        )
+        SELECT
+          a.client_name,
+          t.meeting_name,
+          t.hr_lead,
+          t.candidates::int                                     AS candidates,
+          CASE WHEN t.candidates > 0 THEN 'Sí' ELSE 'No' END    AS con_candidatos,
+          TO_CHAR(t.meeting_date::date, 'YYYY-MM-DD')           AS meeting_date
+        FROM turvo t
+        JOIN opportunity o ON o.opportunity_id = t.opportunity_id
+        LEFT JOIN account a ON a.account_id = o.account_id
+        CROSS JOIN ventana v
+        WHERE t.meeting_date::date BETWEEN v.win_ini AND v.win_fin
+          AND (%(modelo)s::text IS NULL OR o.opp_model = %(modelo)s)
+        ORDER BY t.meeting_date DESC, a.client_name;
+    """
+
+    return sql, {"win_ini": win_ini, "win_fin": win_fin, "modelo": modelo, "corte": corte}
+
+
+DATASET = {
+    "key": "turbo_with_candidates_detail",
+    "label": "% Turbos con candidatos — Detalle por turbo (ventana)",
+    "dimensions": [
+        {"key": "client_name", "label": "Cliente", "type": "string"},
+        {"key": "meeting_name", "label": "Reunión", "type": "string"},
+        {"key": "hr_lead", "label": "HR lead", "type": "string"},
+        {"key": "con_candidatos", "label": "Con candidatos", "type": "string"},
+        {"key": "meeting_date", "label": "Fecha", "type": "date"},
+    ],
+    "measures": [
+        {"key": "candidates", "label": "Candidatos", "type": "number"},
+    ],
+    "default_filters": {},
+    "query": query,
+}
