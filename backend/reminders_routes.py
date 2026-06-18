@@ -813,7 +813,7 @@ def _client_check_email_html(row: Dict[str, Any]) -> str:
 def _fetch_due_client_check_rows(cur) -> List[Dict[str, Any]]:
     cur.execute(
         """
-        WITH due_checks AS (
+        WITH monthly_checks AS (
             SELECT
                 h.hire_opp_id,
                 h.candidate_id,
@@ -821,7 +821,7 @@ def _fetch_due_client_check_rows(cur) -> List[Dict[str, Any]]:
                 COALESCE(h.account_id, o.account_id) AS account_id,
                 h.start_date::date AS start_date,
                 gs.check_month,
-                (h.start_date::date + (gs.check_month || ' months')::interval)::date AS check_date
+                (h.start_date::date + (gs.check_month || ' months')::interval)::date AS original_check_date
             FROM hire_opportunity h
             LEFT JOIN opportunity o ON o.opportunity_id = h.opportunity_id
             CROSS JOIN generate_series(1, 6) AS gs(check_month)
@@ -830,6 +830,21 @@ def _fetch_due_client_check_rows(cur) -> List[Dict[str, Any]]:
                     h.end_date IS NULL
                     OR h.end_date::date >= (h.start_date::date + (gs.check_month || ' months')::interval)::date
                   )
+        ),
+        due_checks AS (
+            SELECT
+                hire_opp_id,
+                candidate_id,
+                opportunity_id,
+                account_id,
+                start_date,
+                check_month,
+                CASE
+                    WHEN EXTRACT(ISODOW FROM original_check_date) = 6 THEN original_check_date - INTERVAL '1 day'
+                    WHEN EXTRACT(ISODOW FROM original_check_date) = 7 THEN original_check_date - INTERVAL '2 days'
+                    ELSE original_check_date
+                END::date AS check_date
+            FROM monthly_checks
         )
         SELECT
             d.hire_opp_id,
