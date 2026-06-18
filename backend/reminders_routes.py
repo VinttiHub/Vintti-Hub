@@ -766,7 +766,8 @@ def _client_check_subject(candidate_name: str, client_name: str, check_month: in
 
 def _client_check_email_html(row: Dict[str, Any]) -> str:
     candidate_id = row.get("candidate_id")
-    link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id)) if candidate_id else ""
+    candidate_link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id)) if candidate_id else ""
+    todo_link = _anchor("Open ToDo", "https://vinttihub.vintti.com/to-do-details.html")
     details = [
         ("Candidate", row.get("candidate_name") or f"Candidate #{candidate_id}"),
         ("Position", row.get("opp_position_name") or "—"),
@@ -786,7 +787,7 @@ def _client_check_email_html(row: Dict[str, Any]) -> str:
         """
         for label, value in details
     )
-    link_html = f"<p>Please log the client check here:<br>{link}</p>" if link else ""
+    candidate_link_html = f"<p>Candidate profile:<br>{candidate_link}</p>" if candidate_link else ""
     return f"""
 <div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#243B53;line-height:1.6;">
   <p>Hi team,</p>
@@ -799,7 +800,11 @@ def _client_check_email_html(row: Dict[str, Any]) -> str:
   <table style="border-collapse:collapse;width:100%;max-width:680px;background:#f8fafc;border-radius:12px;overflow:hidden;margin:0 0 18px;">
     <tbody>{rows_html}</tbody>
   </table>
-  {link_html}
+  {candidate_link_html}
+  <p>
+    Once you check in with the client, please mark the ToDo as completed here:<br>
+    {todo_link}
+  </p>
   <p style="margin-top:16px;color:#52606d;">Thanks!<br><strong>Vintti Hub</strong></p>
 </div>
     """.strip()
