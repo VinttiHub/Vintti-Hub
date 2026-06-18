@@ -1192,6 +1192,7 @@ def get_candidate_by_id(candidate_id):
                 c.other_process,
                 c.vacations,
                 c.usa_nationality,
+                c.quickbooks,
                 c.created_by,
                 c.created_at,
                 c.linkedin_scrapper,
@@ -1369,6 +1370,7 @@ def update_candidate_fields(candidate_id):
         'other_process',
         'vacations',
         'usa_nationality',
+        'quickbooks',
         'compu_propia',
         'references_notes',
         'reference_1_name',
@@ -1395,6 +1397,8 @@ def update_candidate_fields(candidate_id):
             if field == 'check_hr_lead':
                 val = to_bool(val)
             if field == 'usa_nationality':
+                val = to_bool(val)
+            if field == 'quickbooks':
                 val = to_bool(val)
             if field == 'compu_propia':
                 val = to_bool(val)

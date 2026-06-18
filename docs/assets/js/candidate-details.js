@@ -2035,6 +2035,14 @@ function paintWaBtn(){
         });
       }
 
+      const quickbooksInput = document.getElementById('quickbooks');
+      if (quickbooksInput) {
+        quickbooksInput.checked = Boolean(data.quickbooks);
+        quickbooksInput.addEventListener('change', () => {
+          ensureCandidatePatch('quickbooks', quickbooksInput.checked);
+        });
+      }
+
       // Otros metadatos
       const by = document.getElementById("field-created-by");
       const at = document.getElementById("field-created-at");
