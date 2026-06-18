@@ -40,28 +40,59 @@ def users_list_or_by_email():
         conn = get_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             base_select = """
+                WITH pto_usage AS (
+                  SELECT
+                    user_id,
+                    SUM(
+                      CASE
+                        WHEN LOWER(kind) = 'vintti_day' AND LOWER(status) = 'approved'
+                          THEN (
+                            LEAST(end_date::date, (date_trunc('year', CURRENT_DATE)::date + INTERVAL '1 year' - INTERVAL '1 day')::date)
+                            - GREATEST(start_date::date, date_trunc('year', CURRENT_DATE)::date)
+                            + 1
+                          )
+                        ELSE 0
+                      END
+                    ) AS approved_vintti_days,
+                    SUM(
+                      CASE
+                        WHEN LOWER(kind) = 'holiday' AND LOWER(status) = 'approved'
+                          THEN (
+                            LEAST(end_date::date, (date_trunc('year', CURRENT_DATE)::date + INTERVAL '1 year' - INTERVAL '1 day')::date)
+                            - GREATEST(start_date::date, date_trunc('year', CURRENT_DATE)::date)
+                            + 1
+                          )
+                        ELSE 0
+                      END
+                    ) AS approved_holidays
+                  FROM time_off_requests
+                  WHERE end_date::date >= date_trunc('year', CURRENT_DATE)::date
+                    AND start_date::date < (date_trunc('year', CURRENT_DATE) + INTERVAL '1 year')::date
+                  GROUP BY user_id
+                )
                 SELECT
-                  user_id,
-                  user_name,
-                  nickname,
-                  email_vintti,
-                  role,
-                  emergency_contact,
-                  ingreso_vintti_date,
-                  fecha_nacimiento,
-                  avatar_url,
-                  COALESCE(vacaciones_acumuladas, 0)   AS vacaciones_acumuladas,
-                  COALESCE(vacaciones_habiles, 0)      AS vacaciones_habiles,
-                  COALESCE(vacaciones_consumidas, 0)   AS vacaciones_consumidas,
-                  COALESCE(vintti_days_consumidos, 0)  AS vintti_days_consumidos,
-                  COALESCE(feriados_consumidos, 0)     AS feriados_consumidos,
-                  team,
-                  lider
-                FROM users
+                  u.user_id,
+                  u.user_name,
+                  u.nickname,
+                  u.email_vintti,
+                  u.role,
+                  u.emergency_contact,
+                  u.ingreso_vintti_date,
+                  u.fecha_nacimiento,
+                  u.avatar_url,
+                  COALESCE(u.vacaciones_acumuladas, 0)    AS vacaciones_acumuladas,
+                  COALESCE(u.vacaciones_habiles, 0)       AS vacaciones_habiles,
+                  COALESCE(u.vacaciones_consumidas, 0)    AS vacaciones_consumidas,
+                  COALESCE(pto_usage.approved_vintti_days, 0) AS vintti_days_consumidos,
+                  COALESCE(pto_usage.approved_holidays, 0) AS feriados_consumidos,
+                  u.team,
+                  u.lider
+                FROM users u
+                LEFT JOIN pto_usage ON pto_usage.user_id = u.user_id
             """
 
             if email:
-                cur.execute(base_select + " WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
+                cur.execute(base_select + " WHERE LOWER(u.email_vintti) = LOWER(%s)", (email,))
             else:
                 cur.execute(base_select)
 

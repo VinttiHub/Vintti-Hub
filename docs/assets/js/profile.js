@@ -165,6 +165,7 @@ function syncModalBodyLock(){
 function openTimeoffModal(){
   $("#timeoffModal").classList.add("active");
   $("#timeoffModal").setAttribute("open","");
+  syncTimeoffLimitState();
   syncModalBodyLock();
 }
 function ensureMobileTimeoffButton(){
@@ -2305,6 +2306,47 @@ function formatDaysLabel(n){
   return `${formatDayNumber(safe)} day${safe === 1 ? "" : "s"}`;
 }
 
+function availableDaysForRequestKind(kind){
+  const key = String(kind || "").toLowerCase();
+  if (key === "vintti_day") return LAST_BALANCES?.vd_available;
+  if (key === "holiday") return LAST_BALANCES?.hol_available;
+  if (key === "vacation") return LAST_BALANCES?.vac_available;
+  return null;
+}
+
+function syncTimeoffLimitState(){
+  const form = document.getElementById("timeoffForm");
+  const kindEl = document.getElementById("kind");
+  const startEl = document.getElementById("start_date");
+  const endEl = document.getElementById("end_date");
+  const durEl = document.getElementById("vacation_duration");
+  const banner = document.getElementById("timeoffLimitBanner");
+  const submitBtn = document.getElementById("timeoffSubmitBtn") || form?.querySelector('button[type="submit"]');
+  if (!form || !kindEl || !startEl || !endEl || !banner || !submitBtn) return;
+
+  const kind = kindEl.value;
+  const shouldLimit = kind === "vintti_day" || kind === "holiday";
+  const start = startEl.value;
+  const isHalfDay = kind === "vacation" && durEl?.value === "half_day";
+  const end = isHalfDay ? start : endEl.value;
+  const available = Number(availableDaysForRequestKind(kind));
+  const requested = requestDaysValue({ kind, start_date: start, end_date: end, is_half_day: isHalfDay });
+  const isBlocked = shouldLimit && Number.isFinite(available) && (available <= 0 || requested > available);
+
+  submitBtn.disabled = isBlocked;
+  submitBtn.hidden = isBlocked;
+  submitBtn.setAttribute("aria-disabled", isBlocked ? "true" : "false");
+  banner.hidden = !isBlocked;
+  form.classList.toggle("is-timeoff-blocked", isBlocked);
+  if (isBlocked){
+    const label = kind === "vintti_day" ? "Vintti Days" : "Public Holidays";
+    banner.innerHTML = `<strong>No ${label} available.</strong> You have ${formatDaysLabel(Math.max(0, available))} left. Sending is blocked for this request.`;
+  } else {
+    submitBtn.removeAttribute("hidden");
+    banner.textContent = "";
+  }
+}
+
 function syncVacationDurationUI(){
   const kindEl = document.getElementById("kind");
   const durWrap = document.getElementById("vacationDurationField");
@@ -2320,6 +2362,7 @@ function syncVacationDurationUI(){
   const isHalf = isVacation && durEl.value === "half_day";
   endEl.disabled = isHalf;
   if (isHalf && startEl.value) endEl.value = startEl.value;
+  syncTimeoffLimitState();
 }
 
 function setupTimeoffFormBehavior(){
@@ -2336,7 +2379,7 @@ function setupTimeoffFormBehavior(){
   });
   durEl.addEventListener("change", syncVacationDurationUI);
   startEl.addEventListener("change", syncVacationDurationUI);
-  endEl.addEventListener("change", syncVacationDurationUI);
+  endEl.addEventListener("change", syncTimeoffLimitState);
 
   kindEl.dataset.timeoffBehaviorBound = "1";
   syncVacationDurationUI();
@@ -2522,6 +2565,7 @@ function renderBalances({
       </div>
     </div>
   `;
+  syncTimeoffLimitState();
 }
 
 async function loadBalances(uid){
@@ -2573,6 +2617,22 @@ async function onTimeoffSubmit(e){
   };
 
   try{
+    const requestedDays = requestDaysValue(payload);
+    const availableByKind = {
+      vacation: LAST_BALANCES?.vac_available,
+      vintti_day: LAST_BALANCES?.vd_available,
+      holiday: LAST_BALANCES?.hol_available,
+    };
+    const availableDays = availableByKind[kind];
+    if (kind !== "vacation" && Number.isFinite(Number(availableDays)) && requestedDays > Number(availableDays)){
+      showToast(
+        toast,
+        `You only have ${formatDaysLabel(Math.max(0, Number(availableDays)))} available for this request.`,
+        false
+      );
+      return;
+    }
+
     const r = await fetch(`${API_BASE}/time_off_requests`, {
       method: "POST",
       headers: { "Content-Type":"application/json" },
@@ -2580,7 +2640,16 @@ async function onTimeoffSubmit(e){
       body: JSON.stringify(payload)
     });
     if (!r.ok){
-      const msg = await r.text();
+      const raw = await r.text();
+      let msg = raw;
+      try{
+        const parsed = JSON.parse(raw);
+        if (parsed?.error === "not enough time off available"){
+          msg = `You only have ${formatDaysLabel(Number(parsed.available_days || 0))} available for this request.`;
+        } else {
+          msg = parsed?.error || raw;
+        }
+      }catch{}
       throw new Error(msg || "Failed");
     }
 

@@ -22,6 +22,9 @@ LEADER_ACCESS_EMAILS = {
     "camila@vintti.com",
     "mia@vintti.com",
 }
+VACATION_ROLLOVER_CAP_DAYS = 7
+VACATION_ROLLOVER_AUTO_START_YEAR = 2027
+VACATION_ROLLOVER_LOCK_KEY = 2026061801
 
 # ✅ declarar UNA sola vez
 bp = Blueprint("profile", __name__, url_prefix="")
@@ -201,6 +204,228 @@ def _prorated_vacation_days_for_year(start_value: Optional[Any], annual_days: fl
     months_worked = max(0, 12 - start.month + 1)
     return int((months_worked * annual_days * 2) / 12) / 2
 
+def _prorated_holiday_days_for_year(start_value: Optional[Any]) -> float:
+    if not start_value:
+        return 4
+    try:
+        start = start_value
+        if isinstance(start, str):
+            start = datetime.strptime(start[:10], "%Y-%m-%d").date()
+        elif hasattr(start, "date"):
+            start = start.date()
+    except Exception:
+        return 4
+
+    current_year = datetime.now(BOGOTA_TZ).year
+    if start.year < current_year:
+        return 4
+    if start.year > current_year:
+        return 0
+
+    quarter = ((start.month - 1) // 3) + 1
+    return max(0, 5 - quarter)
+
+def _timeoff_usage_for_year(cur, user_id: int, year: int, statuses=("approved",)) -> Dict[str, float]:
+    year = int(year)
+    year_start = date(year, 1, 1)
+    year_end = date(year, 12, 31)
+    cur.execute("""
+        SELECT kind, start_date, end_date, reason, status
+        FROM time_off_requests
+        WHERE user_id = %s
+          AND LOWER(status) = ANY(%s)
+          AND end_date >= %s
+          AND start_date <= %s
+    """, (int(user_id), [str(s).lower() for s in statuses], year_start, year_end))
+    totals = {"vacation": 0.0, "vintti_day": 0.0, "holiday": 0.0}
+    for rec in cur.fetchall():
+        if isinstance(rec, dict):
+            row = dict(rec)
+        else:
+            row = dict(zip([desc[0] for desc in cur.description], rec))
+        kind = str(row.get("kind") or "").lower()
+        if kind not in totals:
+            continue
+        clean_reason, is_half_day = _parse_timeoff_reason_meta(row.get("reason"))
+        row["reason"] = clean_reason
+        sd = row.get("start_date")
+        ed = row.get("end_date")
+        if isinstance(sd, str):
+            sd = datetime.strptime(sd, "%Y-%m-%d").date()
+        if isinstance(ed, str):
+            ed = datetime.strptime(ed, "%Y-%m-%d").date()
+        clipped_start = max(sd, year_start)
+        clipped_end = min(ed, year_end)
+        if clipped_end < clipped_start:
+            continue
+        totals[kind] += float(_timeoff_total_days(
+            kind,
+            clipped_start,
+            clipped_end,
+            is_half_day=is_half_day and sd == clipped_start and ed == clipped_end,
+        ))
+    return totals
+
+def _timeoff_usage_for_user(cur, user_id: int, statuses=("approved",)) -> Dict[str, float]:
+    current_year = datetime.now(BOGOTA_TZ).year
+    return _timeoff_usage_for_year(cur, user_id, current_year, statuses=statuses)
+
+def _apply_computed_timeoff_usage(cur, row: Dict[str, Any]) -> Dict[str, Any]:
+    if not row or row.get("user_id") is None:
+        return row
+    usage = _timeoff_usage_for_user(cur, int(row["user_id"]), statuses=("approved",))
+    row["vacaciones_consumidas"] = _as_day_number(usage["vacation"])
+    row["vintti_days_consumidos"] = _as_day_number(usage["vintti_day"])
+    row["feriados_consumidos"] = _as_day_number(usage["holiday"])
+    return row
+
+def _timeoff_available_for_kind(user_row: Dict[str, Any], kind: str, usage: Dict[str, float]) -> float:
+    kind = str(kind or "").lower()
+    if kind == "vacation":
+        accrued = float(user_row.get("vacaciones_acumuladas") or 0)
+        annual = _prorated_vacation_days_for_year(user_row.get("ingreso_vintti_date"), 15)
+        return accrued + annual - usage.get("vacation", 0)
+    if kind == "vintti_day":
+        return 2 - usage.get("vintti_day", 0)
+    if kind == "holiday":
+        return _prorated_holiday_days_for_year(user_row.get("ingreso_vintti_date")) - usage.get("holiday", 0)
+    return 0
+
+def _ensure_vacation_rollover_column(cur):
+    cur.execute("""
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS vacation_rollover_year INTEGER
+    """)
+
+def _prorated_vacation_days_for_specific_year(start_value: Optional[Any], year: int, annual_days: float = 15) -> float:
+    if not start_value:
+        return annual_days
+    try:
+        start = start_value
+        if isinstance(start, str):
+            start = datetime.strptime(start[:10], "%Y-%m-%d").date()
+        elif hasattr(start, "date"):
+            start = start.date()
+    except Exception:
+        return annual_days
+
+    if start.year < year:
+        return annual_days
+    if start.year > year:
+        return 0
+
+    months_worked = max(0, 12 - start.month + 1)
+    return int((months_worked * annual_days * 2) / 12) / 2
+
+def _vacation_rollover_amount(previous_available: float) -> float:
+    if previous_available < 0:
+        return previous_available
+    return min(previous_available, VACATION_ROLLOVER_CAP_DAYS)
+
+def _build_vacation_rollover_rows(cur, target_year: int, user_id: Optional[int] = None):
+    target_year = int(target_year)
+    source_year = target_year - 1
+    params = []
+    where = ""
+    if user_id is not None:
+        where = "WHERE user_id = %s"
+        params.append(int(user_id))
+
+    cur.execute(f"""
+        SELECT user_id, user_name, email_vintti, ingreso_vintti_date,
+               COALESCE(vacaciones_acumuladas, 0) AS vacaciones_acumuladas,
+               COALESCE(vacaciones_habiles, 15) AS vacaciones_habiles,
+               COALESCE(vacation_rollover_year, 0) AS vacation_rollover_year
+        FROM users
+        {where}
+        ORDER BY user_id
+    """, tuple(params))
+
+    rows = []
+    for user in cur.fetchall():
+        user = dict(user)
+        uid = int(user["user_id"])
+        previous_usage = _timeoff_usage_for_year(cur, uid, source_year, statuses=("approved",))
+        current_usage = _timeoff_usage_for_year(cur, uid, target_year, statuses=("approved",))
+        previous_accrued = float(user.get("vacaciones_acumuladas") or 0)
+        previous_entitlement = _prorated_vacation_days_for_specific_year(
+            user.get("ingreso_vintti_date"),
+            source_year,
+            15,
+        )
+        previous_used = float(previous_usage.get("vacation", 0))
+        previous_available = previous_accrued + previous_entitlement - previous_used
+        rollover = _vacation_rollover_amount(previous_available)
+        current_entitlement = _prorated_vacation_days_for_specific_year(
+            user.get("ingreso_vintti_date"),
+            target_year,
+            15,
+        )
+        rows.append({
+            "user_id": uid,
+            "user_name": user.get("user_name"),
+            "email_vintti": user.get("email_vintti"),
+            "target_year": target_year,
+            "source_year": source_year,
+            "already_applied": int(user.get("vacation_rollover_year") or 0) >= target_year,
+            "vacation_rollover_year": int(user.get("vacation_rollover_year") or 0),
+            "previous_accrued": _as_day_number(previous_accrued),
+            "previous_entitlement": _as_day_number(previous_entitlement),
+            "previous_used": _as_day_number(previous_used),
+            "previous_available": _as_day_number(previous_available),
+            "rollover_days": _as_day_number(rollover),
+            "current_entitlement": _as_day_number(current_entitlement),
+            "current_used": _as_day_number(float(current_usage.get("vacation", 0))),
+            "current_vintti_used": _as_day_number(float(current_usage.get("vintti_day", 0))),
+            "current_holidays_used": _as_day_number(float(current_usage.get("holiday", 0))),
+        })
+    return rows
+
+def _apply_vacation_rollover_rows(cur, rows, target_year: int, *, force: bool = False):
+    applied = []
+    skipped = []
+    for row in rows:
+        if row["already_applied"] and not force:
+            skipped.append(row)
+            continue
+        cur.execute("""
+            UPDATE users
+               SET vacaciones_acumuladas = %s,
+                   vacaciones_habiles = %s,
+                   vacaciones_consumidas = %s,
+                   vintti_days_consumidos = %s,
+                   feriados_consumidos = %s,
+                   vacation_rollover_year = %s,
+                   updated_at = NOW() AT TIME ZONE 'UTC'
+             WHERE user_id = %s
+        """, (
+            row["rollover_days"],
+            row["current_entitlement"],
+            row["current_used"],
+            row["current_vintti_used"],
+            row["current_holidays_used"],
+            int(target_year),
+            row["user_id"],
+        ))
+        applied.append(row)
+    return applied, skipped
+
+def _maybe_apply_current_year_vacation_rollover(cur):
+    current_year = datetime.now(BOGOTA_TZ).year
+    if current_year < VACATION_ROLLOVER_AUTO_START_YEAR:
+        return {"applied": [], "skipped": [], "ran": False}
+
+    _ensure_vacation_rollover_column(cur)
+    cur.execute("SELECT pg_try_advisory_xact_lock(%s) AS locked", (VACATION_ROLLOVER_LOCK_KEY,))
+    lock_row = cur.fetchone()
+    locked = lock_row.get("locked") if isinstance(lock_row, dict) else bool(lock_row and lock_row[0])
+    if not locked:
+        return {"applied": [], "skipped": [], "ran": False}
+
+    rows = _build_vacation_rollover_rows(cur, current_year)
+    applied, skipped = _apply_vacation_rollover_rows(cur, rows, current_year)
+    return {"applied": applied, "skipped": skipped, "ran": bool(applied)}
+
 def _normalize_avatar_url(raw: Optional[Any]) -> Optional[str]:
     if raw is None:
         return None
@@ -250,9 +475,15 @@ def get_user(user_id: int):
     WHERE user_id = %s
     """
     conn = get_connection()
+    should_commit = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        should_commit = bool(_maybe_apply_current_year_vacation_rollover(cur).get("ran"))
         cur.execute(q, (user_id,))
         row = cur.fetchone()
+        if row:
+            row = _apply_computed_timeoff_usage(cur, dict(row))
+    if should_commit:
+        conn.commit()
     conn.close()
     if not row: return jsonify({"error":"user not found"}), 404
     return jsonify(_add_initials(_row_to_json(dict(row))))
@@ -343,6 +574,53 @@ def me():
     conn.close()
     if not row: return jsonify({"error":"not found"}), 404
     return jsonify(_add_initials(_row_to_json(dict(row))))
+
+@bp.route("/admin/vacation_rollover", methods=["GET", "POST"])
+def admin_vacation_rollover():
+    caller = _current_user_id()
+    if not caller:
+        return jsonify({"error": "forbidden"}), 403
+
+    today = datetime.now(BOGOTA_TZ).date()
+    data = request.get_json(silent=True) or {}
+    target_year = _int_or_none(request.args.get("target_year") or data.get("target_year")) or today.year
+    user_id = _int_or_none(request.args.get("user_id") or data.get("user_id"))
+    force = str(request.args.get("force") or data.get("force") or "").lower() in {"1", "true", "yes"}
+    dry_run = request.method == "GET" or str(request.args.get("dry_run") or data.get("dry_run") or "").lower() in {"1", "true", "yes"}
+
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if not _is_allowed_leader(cur, caller):
+                conn.rollback()
+                return jsonify({"error": "forbidden"}), 403
+
+            _ensure_vacation_rollover_column(cur)
+            rows = _build_vacation_rollover_rows(cur, target_year, user_id=user_id)
+            applied, skipped = ([], [])
+            if not dry_run:
+                applied, skipped = _apply_vacation_rollover_rows(cur, rows, target_year, force=force)
+
+            conn.commit()
+            return jsonify({
+                "ok": True,
+                "dry_run": dry_run,
+                "target_year": target_year,
+                "source_year": target_year - 1,
+                "cap_days": VACATION_ROLLOVER_CAP_DAYS,
+                "applied_count": len(applied),
+                "skipped_count": len(skipped),
+                "rows": rows if dry_run else applied,
+                "skipped": skipped,
+            })
+    except Exception as exc:
+        conn.rollback()
+        return jsonify({"error": "db error", "detail": str(exc)}), 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 @bp.get("/leader/time_off_requests")
 def leader_list_timeoff():
@@ -614,12 +892,17 @@ def list_time_off():
 def list_users():
     email = request.args.get("email")
     conn = get_connection()
+    should_commit = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        should_commit = bool(_maybe_apply_current_year_vacation_rollover(cur).get("ran"))
         if email:
             cur.execute("SELECT * FROM users WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
         else:
             cur.execute("SELECT * FROM users")
         rows = cur.fetchall()
+        rows = [_apply_computed_timeoff_usage(cur, dict(row)) for row in rows]
+    if should_commit:
+        conn.commit()
     conn.close()
     payload = []
     for row in rows:
@@ -673,6 +956,43 @@ def create_time_off():
     leader_email = None
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            _maybe_apply_current_year_vacation_rollover(cur)
+            cur.execute("""
+                SELECT u.user_id, u.user_name, u.email_vintti, u.lider,
+                       u.ingreso_vintti_date,
+                       COALESCE(u.vacaciones_acumuladas, 0) AS vacaciones_acumuladas,
+                       l.email_vintti AS leader_email
+                FROM users u
+                LEFT JOIN users l ON l.user_id = u.lider
+                WHERE u.user_id = %s
+            """, (int(user_id),))
+            requester = cur.fetchone()
+            if not requester:
+                conn.rollback()
+                return jsonify({"error": "user not found"}), 404
+
+            try:
+                requested_days = float(_timeoff_total_days(
+                    kind_raw,
+                    start_date,
+                    end_date,
+                    is_half_day=is_half_day,
+                ))
+            except Exception:
+                conn.rollback()
+                return jsonify({"error": "invalid dates"}), 400
+
+            reserved_usage = _timeoff_usage_for_user(cur, int(user_id), statuses=("approved", "pending"))
+            available_days = _timeoff_available_for_kind(dict(requester), kind_raw, reserved_usage)
+            if kind_raw in {"vintti_day", "holiday"} and requested_days > available_days:
+                conn.rollback()
+                return jsonify({
+                    "error": "not enough time off available",
+                    "kind": kind_raw,
+                    "requested_days": _as_day_number(requested_days),
+                    "available_days": _as_day_number(max(0, available_days)),
+                }), 409
+
             # 1) insert
             cur.execute("""
                 INSERT INTO time_off_requests (user_id, kind, start_date, end_date, reason, status, created_at)
@@ -681,16 +1001,6 @@ def create_time_off():
             """, (int(user_id), kind_raw, start_date, end_date, stored_reason))
             row = cur.fetchone()
             new_id = row["id"]
-
-            # 2) requester & leader email
-            cur.execute("""
-                SELECT u.user_name, u.email_vintti, u.lider,
-                       l.email_vintti AS leader_email
-                FROM users u
-                LEFT JOIN users l ON l.user_id = u.lider
-                WHERE u.user_id = %s
-            """, (int(user_id),))
-            requester = cur.fetchone()
 
         conn.commit()
     except Exception as e:
