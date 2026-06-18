@@ -1,0 +1,17 @@
+name: Daily reminders
+
+on:
+  schedule:
+    # Runs every day at 06:00 Guatemala time / 07:00 Colombia time.
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vintti Hub reminders
+        run: |
+          curl --fail-with-body --retry 3 --retry-delay 10 \
+            -X POST \
+            https://7m6mw95m8y.us-east-2.awsapprunner.com/reminders/due

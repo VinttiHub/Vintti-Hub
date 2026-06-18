@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from psycopg2.extras import RealDictCursor
 from db import get_connection   # ya lo tienes
 from utils.credit_loop import run_due_credit_loop_reminders
-from utils.hr_lead_todo import run_scheduled_todos
+from utils.hr_lead_todo import _ensure_todo, run_scheduled_todos
 import requests
 import html
 from typing import List, Optional, Dict, Any
@@ -22,6 +22,7 @@ BAHIA_EMAIL = "bahia@vintti.com"
 MIA_EMAIL = "mia@vintti.com"
 # LUCIA_EMAIL = "lucia@vintti.com"  # Hire reminders desactivado: solo Jazmin y Lara.
 PGONZALES_EMAIL = "pgonzales@vintti.com"
+CLIENT_CHECK_EMAIL_RECIPIENTS = [JAZ_EMAIL, LAR_EMAIL, PGONZALES_EMAIL]
 
 
 def _fetch_opportunity_type(opportunity_id: int, cur) -> str:
@@ -734,6 +735,258 @@ def _dedupe_emails(values: List[str]) -> List[str]:
     return out
 
 
+def _ensure_client_check_reminders_table(cur):
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_check_reminders (
+            reminder_id BIGSERIAL PRIMARY KEY,
+            hire_opp_id BIGINT NOT NULL,
+            candidate_id BIGINT NOT NULL,
+            opportunity_id BIGINT NOT NULL,
+            check_month SMALLINT NOT NULL,
+            check_date DATE NOT NULL,
+            sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            recipients TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+            UNIQUE (hire_opp_id, check_month)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_client_check_reminders_check_date
+        ON client_check_reminders (check_date)
+        """
+    )
+
+
+def _client_check_subject(candidate_name: str, client_name: str, check_month: int) -> str:
+    subject = f"Client check reminder M{check_month}: {candidate_name or 'Candidate'} — {client_name or 'Client'}"
+    return subject if len(subject) <= 120 else (subject[:117] + "...")
+
+
+def _client_check_email_html(row: Dict[str, Any]) -> str:
+    candidate_id = row.get("candidate_id")
+    link = _anchor("Open candidate in Vintti Hub", _candidate_link(candidate_id)) if candidate_id else ""
+    details = [
+        ("Candidate", row.get("candidate_name") or f"Candidate #{candidate_id}"),
+        ("Position", row.get("opp_position_name") or "—"),
+        ("Client", row.get("client_name") or "—"),
+        ("Start date", row.get("start_date") or "—"),
+        ("Check month", f"Month {row.get('check_month')} of 6"),
+        ("Suggested check date", row.get("check_date") or "—"),
+        ("Client email", row.get("client_mail") or "—"),
+        ("Opportunity ID", row.get("opportunity_id") or "—"),
+    ]
+    rows_html = "".join(
+        f"""
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;font-weight:600;color:#111927;width:180px;">{html.escape(str(label))}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e6eaf0;color:#243B53;">{html.escape(str(value))}</td>
+        </tr>
+        """
+        for label, value in details
+    )
+    link_html = f"<p>Please log the client check here:<br>{link}</p>" if link else ""
+    return f"""
+<div style="font-family:Inter,Arial,sans-serif;font-size:14px;color:#243B53;line-height:1.6;">
+  <p>Hi team,</p>
+  <p>
+    This is the scheduled client check reminder for
+    <strong>{html.escape(str(row.get('candidate_name') or 'the candidate'))}</strong>.
+    Please ask the client how the candidate is working out, how they are performing,
+    and whether there is anything important we should follow up on.
+  </p>
+  <table style="border-collapse:collapse;width:100%;max-width:680px;background:#f8fafc;border-radius:12px;overflow:hidden;margin:0 0 18px;">
+    <tbody>{rows_html}</tbody>
+  </table>
+  {link_html}
+  <p style="margin-top:16px;color:#52606d;">Thanks!<br><strong>Vintti Hub</strong></p>
+</div>
+    """.strip()
+
+
+def _fetch_due_client_check_rows(cur) -> List[Dict[str, Any]]:
+    cur.execute(
+        """
+        WITH due_checks AS (
+            SELECT
+                h.hire_opp_id,
+                h.candidate_id,
+                h.opportunity_id,
+                COALESCE(h.account_id, o.account_id) AS account_id,
+                h.start_date::date AS start_date,
+                gs.check_month,
+                (h.start_date::date + (gs.check_month || ' months')::interval)::date AS check_date
+            FROM hire_opportunity h
+            LEFT JOIN opportunity o ON o.opportunity_id = h.opportunity_id
+            CROSS JOIN generate_series(1, 6) AS gs(check_month)
+            WHERE h.start_date IS NOT NULL
+              AND (
+                    h.end_date IS NULL
+                    OR h.end_date::date >= (h.start_date::date + (gs.check_month || ' months')::interval)::date
+                  )
+        )
+        SELECT
+            d.hire_opp_id,
+            d.candidate_id,
+            d.opportunity_id,
+            d.account_id,
+            d.start_date,
+            d.check_month,
+            d.check_date,
+            c.name AS candidate_name,
+            o.opp_position_name,
+            a.client_name,
+            a.mail AS client_mail
+        FROM due_checks d
+        LEFT JOIN candidates c ON c.candidate_id = d.candidate_id
+        LEFT JOIN opportunity o ON o.opportunity_id = d.opportunity_id
+        LEFT JOIN account a ON a.account_id = d.account_id
+        LEFT JOIN client_check_reminders r
+          ON r.hire_opp_id = d.hire_opp_id
+         AND r.check_month = d.check_month
+        WHERE d.check_date = CURRENT_DATE
+          AND r.reminder_id IS NULL
+        ORDER BY d.check_date, a.client_name, c.name
+        """
+    )
+    return cur.fetchall() or []
+
+
+def _record_client_check_sent(cur, row: Dict[str, Any], recipients: List[str]) -> bool:
+    cur.execute(
+        """
+        INSERT INTO client_check_reminders (
+            hire_opp_id,
+            candidate_id,
+            opportunity_id,
+            check_month,
+            check_date,
+            recipients
+        )
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (hire_opp_id, check_month) DO NOTHING
+        RETURNING reminder_id
+        """,
+        (
+            row.get("hire_opp_id"),
+            row.get("candidate_id"),
+            row.get("opportunity_id"),
+            row.get("check_month"),
+            row.get("check_date"),
+            recipients,
+        ),
+    )
+    return cur.fetchone() is not None
+
+
+def _fetch_todo_users_by_email(cur, emails: List[str]) -> Dict[str, Dict[str, Any]]:
+    normalized = _dedupe_emails(emails)
+    if not normalized:
+        return {}
+    cur.execute(
+        """
+        SELECT user_id, user_name, LOWER(TRIM(email_vintti)) AS email_vintti
+        FROM users
+        WHERE LOWER(TRIM(email_vintti)) = ANY(%s)
+        """,
+        (normalized,),
+    )
+    return {
+        row["email_vintti"]: row
+        for row in (cur.fetchall() or [])
+        if row.get("email_vintti")
+    }
+
+
+def _client_check_todo_description(row: Dict[str, Any]) -> str:
+    candidate_id = row.get("candidate_id")
+    candidate = row.get("candidate_name") or f"Candidate #{candidate_id}"
+    client = row.get("client_name") or "Client"
+    position = row.get("opp_position_name") or "the role"
+    check_month = row.get("check_month") or "?"
+    opportunity_id = row.get("opportunity_id") or "?"
+    link = _candidate_link(candidate_id) if candidate_id else "https://vinttihub.vintti.com/"
+    return (
+        f"Client check M{check_month}: ask {client} how {candidate} is working out "
+        f"and performing as {position}. Opportunity ID: {opportunity_id}. {link}"
+    )
+
+
+def _create_client_check_todos(cur, row: Dict[str, Any], recipients: List[str]) -> Dict[str, Any]:
+    users_by_email = _fetch_todo_users_by_email(cur, recipients)
+    description = _client_check_todo_description(row)
+    due_date = row.get("check_date")
+    cache: Dict[str, Any] = {}
+    created = []
+    already_exists = []
+    missing_users = []
+
+    for email in _dedupe_emails(recipients):
+        user = users_by_email.get(email)
+        if not user:
+            missing_users.append(email)
+            continue
+        did_create = _ensure_todo(
+            cur,
+            cache,
+            int(user["user_id"]),
+            description,
+            due_date,
+            dedupe_by_due_date=True,
+        )
+        target = {
+            "email": email,
+            "user_id": user.get("user_id"),
+            "user_name": user.get("user_name"),
+        }
+        if did_create:
+            created.append(target)
+        else:
+            already_exists.append(target)
+
+    return {
+        "created": created,
+        "already_exists": already_exists,
+        "missing_users": missing_users,
+    }
+
+
+def run_due_client_check_reminders(cur) -> List[Dict[str, Any]]:
+    _ensure_client_check_reminders_table(cur)
+    recipients = _dedupe_emails(CLIENT_CHECK_EMAIL_RECIPIENTS)
+    sent: List[Dict[str, Any]] = []
+    for row in _fetch_due_client_check_rows(cur):
+        todos = _create_client_check_todos(cur, row, recipients)
+        ok = _send_email(
+            subject=_client_check_subject(
+                row.get("candidate_name") or f"Candidate #{row.get('candidate_id')}",
+                row.get("client_name") or "Client",
+                int(row.get("check_month") or 0),
+            ),
+            html_body=_client_check_email_html(row),
+            to=recipients,
+        )
+        if not ok:
+            logging.error(
+                "Client check reminder failed for hire_opp_id=%s month=%s",
+                row.get("hire_opp_id"),
+                row.get("check_month"),
+            )
+            continue
+        if _record_client_check_sent(cur, row, recipients):
+            sent.append({
+                "hire_opp_id": row.get("hire_opp_id"),
+                "candidate_id": row.get("candidate_id"),
+                "opportunity_id": row.get("opportunity_id"),
+                "check_month": row.get("check_month"),
+                "check_date": str(row.get("check_date")),
+                "to": recipients,
+                "todos": todos,
+            })
+    return sent
+
+
 def _send_hr_lead_signed_resig_ref_email(cur, opportunity_id: int, *, force: bool = False) -> Dict[str, Any]:
     _ensure_hr_lead_signed_resig_ref_table(cur)
 
@@ -1038,6 +1291,14 @@ def send_due_hr_lead_signed_resig_ref_reminders():
         return jsonify({"sent": sent}), 200
 
 
+@bp.route("/reminders/client_checks/due", methods=["POST"])
+def send_due_client_check_reminders():
+    with get_connection() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
+        sent = run_due_client_check_reminders(cur)
+        conn.commit()
+        return jsonify({"sent": sent}), 200
+
+
 @bp.route("/candidates/<int:candidate_id>/hire_reminders/ensure", methods=["POST","GET"])
 def ensure_reminder_row(candidate_id):
     """Crea una fila en hire_reminders si no existe todavía (por candidato).
@@ -1169,12 +1430,14 @@ def send_due_reminders():
 
         hr_lead_signed_resig_ref_sent = _run_due_hr_lead_signed_resig_ref_reminders(cur)
         credit_loop_sent = run_due_credit_loop_reminders(cur)
+        client_check_sent = run_due_client_check_reminders(cur)
 
         conn.commit()
         return jsonify({
             "sent": sent,
             "hr_lead_signed_resig_ref_sent": hr_lead_signed_resig_ref_sent,
             "credit_loop_sent": credit_loop_sent,
+            "client_check_sent": client_check_sent,
         })
 
 
