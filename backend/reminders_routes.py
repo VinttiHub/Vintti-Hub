@@ -826,6 +826,7 @@ def _fetch_due_client_check_rows(cur) -> List[Dict[str, Any]]:
             LEFT JOIN opportunity o ON o.opportunity_id = h.opportunity_id
             CROSS JOIN generate_series(1, 6) AS gs(check_month)
             WHERE h.start_date IS NOT NULL
+              AND LOWER(COALESCE(o.opp_model, '')) = 'staffing'
               AND (
                     h.end_date IS NULL
                     OR h.end_date::date >= (h.start_date::date + (gs.check_month || ' months')::interval)::date
