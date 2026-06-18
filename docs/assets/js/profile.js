@@ -140,6 +140,19 @@ function proratedVacationDaysForYear(startDateValue, fallbackDays = 15){
   return Math.floor((monthsWorked * 15 * 2) / 12) / 2;
 }
 
+function proratedHolidayDaysForYear(startDateValue){
+  const start = parseISODateLocal(startDateValue);
+  if (!start) return 4;
+
+  const currentYear = new Date().getFullYear();
+  const startYear = start.getFullYear();
+  if (startYear < currentYear) return 4;
+  if (startYear > currentYear) return 0;
+
+  const quarter = Math.floor(start.getMonth() / 3) + 1;
+  return Math.max(0, 5 - quarter);
+}
+
 function showToast(el, text, ok=true){
   el.textContent = text;
   el.style.color = ok ? "#0f766e" : "#b91c1c";
@@ -742,7 +755,7 @@ function calcVintti(user){
 
 function calcHoliday(user){
   const used  = _nz(user.feriados_consumidos);
-  const total = 4;                          
+  const total = proratedHolidayDaysForYear(user.ingreso_vintti_date);
   const avail = Math.max(0, total - used);  
   return { total, used, avail };
 }
@@ -2444,8 +2457,8 @@ function renderBalances({
   const usedVD    = _toNum(vintti_days_consumidos);
   const availVD   = Math.max(0, totalVD - usedVD);
 
-  // 🔹 Holidays (total fijo = 4)
-  const totalHol  = 4;
+  // 🔹 Holidays (prorrateados por trimestre de ingreso)
+  const totalHol  = proratedHolidayDaysForYear(ingreso_vintti_date);
   const usedHol   = _toNum(feriados_consumidos);
   const availHol  = Math.max(0, totalHol - usedHol);
 
