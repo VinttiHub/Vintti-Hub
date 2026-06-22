@@ -775,7 +775,6 @@ function renderTeamPtoTable(users){
   // Header (with group markers + rounded corners handled by CSS)
   const header = `
     <div class="th th--name">Name</div>
-    <div class="th th--address">Address</div>
 
     <div class="th th--vac group-vac" data-col="vac-acc"  title="Vacation Accrued">VAC ACC</div>
     <div class="th th--vac group-vac" data-col="vac-work" title="Vacation Current">VAC</div>
@@ -814,8 +813,6 @@ function renderTeamPtoTable(users){
 
   const rows = users.map(u=>{
     const name = u.user_name || "—";
-    const address = String(u.address || "").trim();
-    const addressLabel = address || "—";
 
     const vac = calcVacation(u); // {acc, work, total, used, avail}
     const vd  = calcVintti(u);   // {total, used, avail}
@@ -842,9 +839,6 @@ function renderTeamPtoTable(users){
         <div class="cell cell--name">
           <button class="name-link" data-uid="${u.user_id || ''}" type="button" title="View profile">${escapeHtml(name)}</button>
         </div>
-        <div class="cell cell--address" title="${escapeHtml(addressLabel)}">
-          ${escapeHtml(addressLabel)}
-        </div>
 
         <div class="cell t-center group-vac border-l">${valEl(vac.acc)}</div>
         <div class="cell t-center group-vac">${valEl(vac.work)}</div>
@@ -867,7 +861,6 @@ function renderTeamPtoTable(users){
   const summary = `
     <div class="row summary">
       <div class="cell cell--name summary__label">Team Total</div>
-      <div class="cell cell--address summary__label">—</div>
 
       <div class="cell t-center group-vac border-l">${valEl(totals.vac_acc)}</div>
       <div class="cell t-center group-vac">${valEl(totals.vac_work)}</div>
@@ -2184,14 +2177,393 @@ function ensureAvatarField(){
   const grid = form?.querySelector(".grid");
   if (!grid) return null;
   const wrapper = document.createElement("label");
-  wrapper.className = "field";
+  wrapper.className = "field field--full avatar-field";
   wrapper.innerHTML = `
-    <span class="label">Avatar URL</span>
-    <input name="avatar_url" id="avatar_url" type="url" placeholder="https://example.com/photo.jpg" inputmode="url" />
+    <span class="label">Profile Photo</span>
+    <div class="avatar-editor">
+      <div class="avatar-editor__preview" id="avatarEditorPreview" aria-hidden="true">
+        <img id="avatarEditorPreviewImg" alt="Profile photo preview" />
+        <span id="avatarEditorPreviewInitials"></span>
+      </div>
+      <div class="avatar-editor__controls">
+        <input name="avatar_url" id="avatar_url" type="hidden" />
+        <input id="avatar_file" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+        <div class="avatar-editor__actions">
+          <button type="button" class="btn" id="avatarUploadBtn">Upload photo</button>
+          <button type="button" class="btn" id="avatarRemoveBtn">Remove</button>
+        </div>
+        <p class="avatar-editor__hint">Upload PNG, JPG or WEBP. You can crop it before saving.</p>
+        <p class="avatar-editor__status" id="avatarEditorStatus">No custom photo selected.</p>
+      </div>
+    </div>
   `;
   grid.appendChild(wrapper);
-  input = wrapper.querySelector("input");
+  input = wrapper.querySelector("#avatar_url");
+  bindAvatarFieldControls();
+  syncAvatarEditorPreview(input.value || "");
   return input;
+}
+
+const AVATAR_EDITOR_ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const AVATAR_EDITOR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_CROP_OUTPUT_SIZE = 512;
+const AVATAR_CROP_VIEWPORT_SIZE = 320;
+
+const AVATAR_CROP_STATE = {
+  image: null,
+  sourceUrl: "",
+  scale: 1,
+  minScale: 1,
+  maxScale: 3,
+  offsetX: 0,
+  offsetY: 0,
+  dragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  dragOriginX: 0,
+  dragOriginY: 0,
+  uploadPending: false,
+};
+
+function avatarEditorInitials(){
+  const currentName = document.getElementById("user_name")?.value?.trim();
+  return resolveInitials(currentName || PROFILE_CACHE?.user_name || "");
+}
+
+function avatarEditorPreviewNodes(){
+  return {
+    img: document.getElementById("avatarEditorPreviewImg"),
+    initials: document.getElementById("avatarEditorPreviewInitials"),
+    status: document.getElementById("avatarEditorStatus"),
+    hiddenInput: document.getElementById("avatar_url"),
+    removeBtn: document.getElementById("avatarRemoveBtn"),
+  };
+}
+
+function syncAvatarEditorPreview(url, statusText){
+  const { img, initials, status, removeBtn } = avatarEditorPreviewNodes();
+  if (!img || !initials || !status) return;
+
+  const trimmed = typeof url === "string" ? url.trim() : "";
+  const nextInitials = avatarEditorInitials() || "VH";
+  initials.textContent = nextInitials;
+
+  const showFallback = ()=>{
+    img.removeAttribute("src");
+    img.style.display = "none";
+    initials.style.display = "grid";
+  };
+
+  if (trimmed){
+    img.onload = ()=>{
+      img.style.display = "block";
+      initials.style.display = "none";
+    };
+    img.onerror = showFallback;
+    if (img.src !== trimmed){
+      img.src = trimmed;
+    } else if (img.complete && img.naturalWidth > 0){
+      img.style.display = "block";
+      initials.style.display = "none";
+    }
+    status.textContent = statusText || "Custom photo ready to save.";
+    removeBtn?.removeAttribute("disabled");
+  } else {
+    showFallback();
+    status.textContent = statusText || "No custom photo selected.";
+    removeBtn?.setAttribute("disabled", "disabled");
+  }
+}
+
+function setAvatarFieldValue(url, statusText){
+  const hiddenInput = ensureAvatarField();
+  if (!hiddenInput) return;
+  hiddenInput.value = typeof url === "string" ? url.trim() : "";
+  syncAvatarEditorPreview(hiddenInput.value, statusText);
+}
+
+function clearAvatarFileInput(){
+  const fileInput = document.getElementById("avatar_file");
+  if (fileInput) fileInput.value = "";
+}
+
+function ensureAvatarCropModal(){
+  let modal = document.getElementById("avatarCropModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "avatarCropModal";
+  modal.className = "modal";
+  modal.setAttribute("aria-hidden", "true");
+  modal.innerHTML = `
+    <div class="modal__backdrop" data-avatar-crop-close></div>
+    <div class="modal__dialog avatar-crop-modal" role="dialog" aria-modal="true" aria-labelledby="avatarCropTitle">
+      <header class="modal__head">
+        <h3 id="avatarCropTitle">Crop profile photo</h3>
+        <button class="modal__close" type="button" title="Close" data-avatar-crop-close>×</button>
+      </header>
+      <div class="avatar-cropper">
+        <p class="avatar-cropper__copy">Center your photo inside the circle. Drag to reposition and use zoom if needed.</p>
+        <div class="avatar-cropper__stage" id="avatarCropStage">
+          <div class="avatar-cropper__viewport" id="avatarCropViewport">
+            <img id="avatarCropImage" class="avatar-cropper__image" alt="Avatar crop preview" />
+          </div>
+        </div>
+        <label class="avatar-cropper__zoom" for="avatarCropZoom">
+          <span>Zoom</span>
+          <input id="avatarCropZoom" type="range" min="1" max="3" step="0.01" value="1" />
+        </label>
+      </div>
+      <div class="avatar-cropper__actions">
+        <button type="button" class="btn" data-avatar-crop-close>Cancel</button>
+        <button type="button" class="btn primary" id="avatarCropApplyBtn">Use this photo</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll("[data-avatar-crop-close]").forEach((node)=>{
+    node.addEventListener("click", closeAvatarCropModal);
+  });
+  document.getElementById("avatarCropZoom")?.addEventListener("input", onAvatarCropZoomChange);
+  document.getElementById("avatarCropApplyBtn")?.addEventListener("click", onAvatarCropApply);
+
+  const viewport = document.getElementById("avatarCropViewport");
+  viewport?.addEventListener("pointerdown", onAvatarCropPointerDown);
+  window.addEventListener("pointermove", onAvatarCropPointerMove);
+  window.addEventListener("pointerup", onAvatarCropPointerUp);
+
+  return modal;
+}
+
+function openAvatarCropModal(){
+  const modal = ensureAvatarCropModal();
+  modal?.classList.add("active");
+  modal?.setAttribute("open", "");
+  syncModalBodyLock();
+}
+
+function closeAvatarCropModal(){
+  const modal = document.getElementById("avatarCropModal");
+  modal?.classList.remove("active");
+  modal?.removeAttribute("open");
+  syncModalBodyLock();
+  AVATAR_CROP_STATE.dragging = false;
+  clearAvatarFileInput();
+}
+
+function avatarCropImageNode(){
+  return document.getElementById("avatarCropImage");
+}
+
+function avatarCropZoomNode(){
+  return document.getElementById("avatarCropZoom");
+}
+
+function clampAvatarCropOffsets(){
+  const img = AVATAR_CROP_STATE.image;
+  if (!img) return;
+  const halfW = (img.naturalWidth * AVATAR_CROP_STATE.scale) / 2;
+  const halfH = (img.naturalHeight * AVATAR_CROP_STATE.scale) / 2;
+  const limitX = Math.max(0, halfW - (AVATAR_CROP_VIEWPORT_SIZE / 2));
+  const limitY = Math.max(0, halfH - (AVATAR_CROP_VIEWPORT_SIZE / 2));
+  AVATAR_CROP_STATE.offsetX = Math.min(limitX, Math.max(-limitX, AVATAR_CROP_STATE.offsetX));
+  AVATAR_CROP_STATE.offsetY = Math.min(limitY, Math.max(-limitY, AVATAR_CROP_STATE.offsetY));
+}
+
+function syncAvatarCropImage(){
+  const imgNode = avatarCropImageNode();
+  if (!imgNode || !AVATAR_CROP_STATE.image) return;
+  clampAvatarCropOffsets();
+  imgNode.style.transform = `translate(-50%, -50%) translate(${AVATAR_CROP_STATE.offsetX}px, ${AVATAR_CROP_STATE.offsetY}px) scale(${AVATAR_CROP_STATE.scale})`;
+}
+
+function resetAvatarCropState(img){
+  const coverScale = Math.max(
+    AVATAR_CROP_VIEWPORT_SIZE / img.naturalWidth,
+    AVATAR_CROP_VIEWPORT_SIZE / img.naturalHeight
+  );
+  AVATAR_CROP_STATE.image = img;
+  AVATAR_CROP_STATE.scale = coverScale;
+  AVATAR_CROP_STATE.minScale = coverScale;
+  AVATAR_CROP_STATE.maxScale = Math.max(coverScale * 4, coverScale + 1);
+  AVATAR_CROP_STATE.offsetX = 0;
+  AVATAR_CROP_STATE.offsetY = 0;
+
+  const zoom = avatarCropZoomNode();
+  if (zoom){
+    zoom.min = String(AVATAR_CROP_STATE.minScale);
+    zoom.max = String(AVATAR_CROP_STATE.maxScale);
+    zoom.value = String(coverScale);
+  }
+
+  syncAvatarCropImage();
+}
+
+function loadAvatarCropSource(sourceUrl){
+  ensureAvatarCropModal();
+  const imgNode = avatarCropImageNode();
+  if (!imgNode) return;
+  AVATAR_CROP_STATE.sourceUrl = sourceUrl;
+  imgNode.onload = ()=>{
+    resetAvatarCropState(imgNode);
+    openAvatarCropModal();
+  };
+  imgNode.src = sourceUrl;
+}
+
+function onAvatarCropZoomChange(event){
+  const nextScale = Number(event.target.value);
+  if (!Number.isFinite(nextScale)) return;
+  AVATAR_CROP_STATE.scale = Math.max(
+    AVATAR_CROP_STATE.minScale,
+    Math.min(AVATAR_CROP_STATE.maxScale, nextScale)
+  );
+  syncAvatarCropImage();
+}
+
+function onAvatarCropPointerDown(event){
+  if (!AVATAR_CROP_STATE.image) return;
+  event.preventDefault();
+  AVATAR_CROP_STATE.dragging = true;
+  AVATAR_CROP_STATE.dragStartX = event.clientX;
+  AVATAR_CROP_STATE.dragStartY = event.clientY;
+  AVATAR_CROP_STATE.dragOriginX = AVATAR_CROP_STATE.offsetX;
+  AVATAR_CROP_STATE.dragOriginY = AVATAR_CROP_STATE.offsetY;
+}
+
+function onAvatarCropPointerMove(event){
+  if (!AVATAR_CROP_STATE.dragging) return;
+  event.preventDefault();
+  AVATAR_CROP_STATE.offsetX = AVATAR_CROP_STATE.dragOriginX + (event.clientX - AVATAR_CROP_STATE.dragStartX);
+  AVATAR_CROP_STATE.offsetY = AVATAR_CROP_STATE.dragOriginY + (event.clientY - AVATAR_CROP_STATE.dragStartY);
+  syncAvatarCropImage();
+}
+
+function onAvatarCropPointerUp(){
+  AVATAR_CROP_STATE.dragging = false;
+}
+
+function renderCroppedAvatarBlob(){
+  if (!AVATAR_CROP_STATE.image) return Promise.reject(new Error("No image to crop"));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_CROP_OUTPUT_SIZE;
+  canvas.height = AVATAR_CROP_OUTPUT_SIZE;
+
+  const ctx = canvas.getContext("2d");
+  const ratio = AVATAR_CROP_OUTPUT_SIZE / AVATAR_CROP_VIEWPORT_SIZE;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.translate(canvas.width / 2 + AVATAR_CROP_STATE.offsetX * ratio, canvas.height / 2 + AVATAR_CROP_STATE.offsetY * ratio);
+  ctx.scale(AVATAR_CROP_STATE.scale * ratio, AVATAR_CROP_STATE.scale * ratio);
+  ctx.drawImage(
+    AVATAR_CROP_STATE.image,
+    -AVATAR_CROP_STATE.image.naturalWidth / 2,
+    -AVATAR_CROP_STATE.image.naturalHeight / 2
+  );
+
+  return new Promise((resolve, reject)=>{
+    canvas.toBlob((blob)=>{
+      if (blob) resolve(blob);
+      else reject(new Error("Could not prepare image"));
+    }, "image/png", 0.95);
+  });
+}
+
+async function uploadCroppedAvatar(blob){
+  const formData = new FormData();
+  formData.append("file", new File([blob], `avatar-${CURRENT_USER_ID || "user"}.png`, { type: "image/png" }));
+
+  const uploadUrl = CURRENT_USER_ID
+    ? `${API_BASE}/profile/avatar_upload?user_id=${encodeURIComponent(CURRENT_USER_ID)}`
+    : `${API_BASE}/profile/avatar_upload`;
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  if (!response.ok){
+    const raw = await response.text();
+    let message = raw || "Could not upload image";
+    try { message = JSON.parse(raw)?.error || message; } catch {}
+    throw new Error(message);
+  }
+  const data = await response.json();
+  return data.url || "";
+}
+
+async function onAvatarCropApply(){
+  if (AVATAR_CROP_STATE.uploadPending) return;
+  const applyBtn = document.getElementById("avatarCropApplyBtn");
+  try{
+    AVATAR_CROP_STATE.uploadPending = true;
+    if (applyBtn) applyBtn.disabled = true;
+    const blob = await renderCroppedAvatarBlob();
+    const uploadedUrl = await uploadCroppedAvatar(blob);
+    setAvatarFieldValue(uploadedUrl, "Photo uploaded. Save changes to apply it to your profile.");
+    closeAvatarCropModal();
+  }catch(err){
+    console.error(err);
+    const toast = document.getElementById("profileToast");
+    if (toast) showToast(toast, err.message || "Could not upload photo.", false);
+  }finally{
+    AVATAR_CROP_STATE.uploadPending = false;
+    if (applyBtn) applyBtn.disabled = false;
+  }
+}
+
+function onAvatarFileSelected(event){
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!AVATAR_EDITOR_ALLOWED_TYPES.has(file.type)){
+    const toast = document.getElementById("profileToast");
+    if (toast) showToast(toast, "Please choose a PNG, JPG or WEBP image.", false);
+    clearAvatarFileInput();
+    return;
+  }
+  if (file.size > AVATAR_EDITOR_MAX_BYTES){
+    const toast = document.getElementById("profileToast");
+    if (toast) showToast(toast, "The image is too large. Max size is 5 MB.", false);
+    clearAvatarFileInput();
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    if (typeof reader.result === "string") loadAvatarCropSource(reader.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function bindAvatarFieldControls(){
+  const uploadBtn = document.getElementById("avatarUploadBtn");
+  const removeBtn = document.getElementById("avatarRemoveBtn");
+  const fileInput = document.getElementById("avatar_file");
+  const nameInput = document.getElementById("user_name");
+
+  if (uploadBtn && uploadBtn.dataset.bound !== "1"){
+    uploadBtn.addEventListener("click", ()=> fileInput?.click());
+    uploadBtn.dataset.bound = "1";
+  }
+  if (removeBtn && removeBtn.dataset.bound !== "1"){
+    removeBtn.addEventListener("click", ()=>{
+      setAvatarFieldValue("", "Photo removed. Save changes if you want to keep this.");
+      clearAvatarFileInput();
+    });
+    removeBtn.dataset.bound = "1";
+  }
+  if (fileInput && fileInput.dataset.bound !== "1"){
+    fileInput.addEventListener("change", onAvatarFileSelected);
+    fileInput.dataset.bound = "1";
+  }
+  if (nameInput && nameInput.dataset.avatarBound !== "1"){
+    nameInput.addEventListener("input", ()=>{
+      const avatarUrl = document.getElementById("avatar_url")?.value || "";
+      syncAvatarEditorPreview(avatarUrl);
+    });
+    nameInput.dataset.avatarBound = "1";
+  }
 }
 
 // Format helpers for date inputs (YYYY-MM-DD)
@@ -2679,6 +3051,11 @@ async function onTimeoffSubmit(e){
 // ============================= PROFILEEEE =============================
 $("#profileForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
+  if (AVATAR_CROP_STATE.uploadPending){
+    const toast = $("#profileToast");
+    showToast(toast, "Your photo is still uploading. Please wait a moment.", false);
+    return;
+  }
   const avatarInput = ensureAvatarField();
   const avatarUrlValue = avatarInput ? avatarInput.value.trim() : "";
   const payload = {
@@ -2711,6 +3088,8 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     );
     if (!r.ok) throw new Error(await r.text());
     showToast(toast, "Saved. Done & dusted 💫");
+    if (payload.avatar_url) localStorage.setItem("user_avatar", payload.avatar_url);
+    else localStorage.removeItem("user_avatar");
     PROFILE_CACHE = {
       ...(PROFILE_CACHE || {}),
       user_id: CURRENT_USER_ID,
@@ -2730,6 +3109,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       avatar_url: payload.avatar_url,
       initials: resolveInitials(payload.user_name)
     };
+    setAvatarFieldValue(payload.avatar_url || "", payload.avatar_url ? "Profile photo saved." : "No custom photo selected.");
     renderProfileView(PROFILE_CACHE);
     showProfileView();
   }catch(err){
@@ -2894,8 +3274,8 @@ async function loadMe(uid){
   $("#hobbies").value = PROFILE_CACHE.hobbies || "";
   $("#favorite_food").value = PROFILE_CACHE.favorite_food || "";
   $("#fun_fact").value = PROFILE_CACHE.fun_fact || "";
-  const avatarInput = ensureAvatarField();
-  if (avatarInput) avatarInput.value = PROFILE_CACHE.avatar_url || "";
+  ensureAvatarField();
+  setAvatarFieldValue(PROFILE_CACHE.avatar_url || "");
 
   const normalizedEmail = (PROFILE_CACHE.email_vintti || "").toLowerCase();
   if (ADMIN_ALLOWED_EMAILS.has(normalizedEmail)){
@@ -2927,8 +3307,8 @@ document.addEventListener("click", (e)=>{
       $("#hobbies").value = PROFILE_CACHE.hobbies || "";
       $("#favorite_food").value = PROFILE_CACHE.favorite_food || "";
       $("#fun_fact").value = PROFILE_CACHE.fun_fact || "";
-      const avatarInput = ensureAvatarField();
-      if (avatarInput) avatarInput.value = PROFILE_CACHE.avatar_url || "";
+      ensureAvatarField();
+      setAvatarFieldValue(PROFILE_CACHE.avatar_url || "");
     }
     showProfileEdit();
   }
@@ -2955,6 +3335,8 @@ PROFILE_CACHE = {
   avatar_url: (_avatarFieldInit ? _avatarFieldInit.value.trim() : "") || null,
   initials: resolveInitials($("#user_name").value.trim())
 };
+
+setAvatarFieldValue(PROFILE_CACHE.avatar_url || "");
 
 // Repinta tarjeta y vuelve a modo vista
 renderProfileView(PROFILE_CACHE);

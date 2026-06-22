@@ -1,15 +1,18 @@
 # profile_routes.py  (extracto limpio y consolidado)
 import logging
+import uuid
 from datetime import date, datetime, timezone, timedelta
 from typing import Optional, Dict, Any, Set, Tuple
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, redirect
 from psycopg2.extras import RealDictCursor
 from db import get_connection
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email
 from calendar import monthrange
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
+from werkzeug.utils import secure_filename
+from utils import services
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 LEADER_ACCESS_EMAILS = {
@@ -25,6 +28,13 @@ LEADER_ACCESS_EMAILS = {
 VACATION_ROLLOVER_CAP_DAYS = 7
 VACATION_ROLLOVER_AUTO_START_YEAR = 2027
 VACATION_ROLLOVER_LOCK_KEY = 2026061801
+PROFILE_AVATAR_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+PROFILE_AVATAR_ALLOWED_MIME_TYPES = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+}
+PROFILE_AVATAR_MAX_BYTES = 5 * 1024 * 1024
 
 # ✅ declarar UNA sola vez
 bp = Blueprint("profile", __name__, url_prefix="")
@@ -445,6 +455,19 @@ def _normalize_avatar_url(raw: Optional[Any]) -> Optional[str]:
         raise ValueError("avatar_url must be an http(s) URL")
     return value
 
+def _guess_avatar_extension(file_storage) -> Optional[str]:
+    filename = secure_filename((getattr(file_storage, "filename", "") or "").strip()).lower()
+    if "." in filename:
+        ext = filename.rsplit(".", 1)[-1]
+        if ext in PROFILE_AVATAR_ALLOWED_EXTENSIONS:
+            return ext
+    mimetype = (getattr(file_storage, "mimetype", "") or "").lower()
+    return PROFILE_AVATAR_ALLOWED_MIME_TYPES.get(mimetype)
+
+def _build_avatar_proxy_url(s3_key: str) -> str:
+    encoded_key = quote(s3_key, safe="")
+    return f"{request.host_url.rstrip('/')}/profile/avatar-file?key={encoded_key}"
+
 def _initials_from_name(name: Optional[Any]) -> str:
     text = str(name or "").strip()
     if not text:
@@ -584,6 +607,81 @@ def me():
     conn.close()
     if not row: return jsonify({"error":"not found"}), 404
     return jsonify(_add_initials(_row_to_json(dict(row))))
+
+@bp.post("/profile/avatar_upload")
+def upload_profile_avatar():
+    user_id = _current_user_id()
+    if not user_id:
+        return jsonify({"error": "unauthorized"}), 401
+
+    avatar_file = request.files.get("file")
+    if not avatar_file:
+        return jsonify({"error": "Missing file"}), 400
+
+    ext = _guess_avatar_extension(avatar_file)
+    if not ext:
+        return jsonify({"error": "Unsupported image type. Allowed: png, jpg, jpeg, webp"}), 400
+
+    try:
+        avatar_file.stream.seek(0, os.SEEK_END)
+        size_bytes = avatar_file.stream.tell()
+        avatar_file.stream.seek(0)
+    except Exception:
+        size_bytes = getattr(avatar_file, "content_length", None)
+        try:
+            avatar_file.stream.seek(0)
+        except Exception:
+            pass
+
+    if size_bytes and size_bytes > PROFILE_AVATAR_MAX_BYTES:
+        return jsonify({"error": "Image is too large. Max size is 5 MB"}), 400
+
+    s3_key = f"profile-avatars/{user_id}/{uuid.uuid4()}.{ext}"
+    content_type = (avatar_file.mimetype or "").lower() or {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+    }.get(ext, "application/octet-stream")
+
+    try:
+        try:
+            avatar_file.stream.seek(0)
+        except Exception:
+            pass
+        services.s3_client.upload_fileobj(
+            avatar_file,
+            services.S3_BUCKET,
+            s3_key,
+            ExtraArgs={"ContentType": content_type}
+        )
+    except Exception as exc:
+        logging.exception("profile avatar upload failed")
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({
+        "ok": True,
+        "key": s3_key,
+        "url": _build_avatar_proxy_url(s3_key),
+    })
+
+@bp.get("/profile/avatar-file")
+def get_profile_avatar_file():
+    raw_key = (request.args.get("key") or "").strip()
+    if not raw_key or not raw_key.startswith("profile-avatars/"):
+        return jsonify({"error": "invalid key"}), 400
+
+    try:
+        presigned_url = services.s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": services.S3_BUCKET, "Key": raw_key},
+            ExpiresIn=3600,
+        )
+    except Exception as exc:
+        logging.exception("profile avatar proxy failed")
+        return jsonify({"error": str(exc)}), 500
+
+    return redirect(presigned_url, code=302)
 
 @bp.route("/admin/vacation_rollover", methods=["GET", "POST"])
 def admin_vacation_rollover():
@@ -861,6 +959,9 @@ def leader_update_timeoff(req_id: int):
             subject=subj,
             html_content=html
         )
+        if new_status == "approved":
+            for cc_email in ("lara@vintti.com", "jazmin@vintti.com", "pgonzales@vintti.com"):
+                msg.add_cc(Email(cc_email))
         sg = SendGridAPIClient(api_key)
         sg.send(msg)
     except Exception as e:
