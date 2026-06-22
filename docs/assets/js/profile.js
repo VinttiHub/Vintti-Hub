@@ -775,6 +775,7 @@ function renderTeamPtoTable(users){
   // Header (with group markers + rounded corners handled by CSS)
   const header = `
     <div class="th th--name">Name</div>
+    <div class="th th--address">Address</div>
 
     <div class="th th--vac group-vac" data-col="vac-acc"  title="Vacation Accrued">VAC ACC</div>
     <div class="th th--vac group-vac" data-col="vac-work" title="Vacation Current">VAC</div>
@@ -813,6 +814,8 @@ function renderTeamPtoTable(users){
 
   const rows = users.map(u=>{
     const name = u.user_name || "—";
+    const address = String(u.address || "").trim();
+    const addressLabel = address || "—";
 
     const vac = calcVacation(u); // {acc, work, total, used, avail}
     const vd  = calcVintti(u);   // {total, used, avail}
@@ -833,11 +836,14 @@ function renderTeamPtoTable(users){
     totals.hol_used  += hol.used;
     totals.hol_left  += hol.avail;
 
-    // one row (display: contents so hover/background applies to all 12 cells)
+    // one row (display: contents so hover/background applies to all cells)
     return `
       <div class="row" data-uid="${u.user_id || ''}">
         <div class="cell cell--name">
-          <button class="name-link" data-uid="${u.user_id || ''}" type="button" title="View profile">${name}</button>
+          <button class="name-link" data-uid="${u.user_id || ''}" type="button" title="View profile">${escapeHtml(name)}</button>
+        </div>
+        <div class="cell cell--address" title="${escapeHtml(addressLabel)}">
+          ${escapeHtml(addressLabel)}
         </div>
 
         <div class="cell t-center group-vac border-l">${valEl(vac.acc)}</div>
@@ -861,6 +867,7 @@ function renderTeamPtoTable(users){
   const summary = `
     <div class="row summary">
       <div class="cell cell--name summary__label">Team Total</div>
+      <div class="cell cell--address summary__label">—</div>
 
       <div class="cell t-center group-vac border-l">${valEl(totals.vac_acc)}</div>
       <div class="cell t-center group-vac">${valEl(totals.vac_work)}</div>
@@ -1244,6 +1251,7 @@ function renderUserPtoQuick(u){
   $("#upqRole").textContent = fmtText(u.role);
   $("#upqTeam").textContent = fmtText(u.team);
   $("#upqEmergency").textContent = fmtText(u.emergency_contact);
+  $("#upqAddress").textContent = fmtText(u.address);
   $("#upqBirth").textContent = fmtLongDate(u.fecha_nacimiento);
   $("#upqStart").textContent = fmtLongDate(u.ingreso_vintti_date);
 
@@ -1300,6 +1308,7 @@ async function openUserPtoQuickById(uid){
     role: "—",
     team: "—",
     emergency_contact: "—",
+    address: "",
     fecha_nacimiento: null,
     ingreso_vintti_date: null,
     vacaciones_acumuladas: 0,
@@ -1364,6 +1373,7 @@ async function loadTeamPto(){
       email_vintti: u.email_vintti,
       role: u.role,
       emergency_contact: u.emergency_contact,
+      address: u.address,
       team: u.team,
       fecha_nacimiento: u.fecha_nacimiento,
       ingreso_vintti_date: u.ingreso_vintti_date,
@@ -1385,7 +1395,7 @@ async function loadTeamPto(){
     console.error('loadTeamPto error:', err);
     if (host){
       host.innerHTML = `
-        <div class="th">Name</div><div class="th t-right">Vac Acc</div><div class="th t-right">Vac</div>
+        <div class="th">Name</div><div class="th">Address</div><div class="th t-right">Vac Acc</div><div class="th t-right">Vac</div>
         <div class="th t-right">Vac Total</div><div class="th t-right">Vac Used</div><div class="th t-right">Vac Left</div>
         <div class="th t-right">VD Total</div><div class="th t-right">VD Used</div><div class="th t-right">VD Left</div>
         <div class="th t-right">Hol Total</div><div class="th t-right">Hol Used</div><div class="th t-right">Hol Left</div>
@@ -2681,6 +2691,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
     fecha_nacimiento: $("#fecha_nacimiento").value || null,
     country: $("#country").value.trim() || null,
     city: $("#city").value.trim() || null,
+    address: $("#address").value.trim() || null,
     about_me: $("#about_me").value.trim() || null,
     hobbies: $("#hobbies").value.trim() || null,
     favorite_food: $("#favorite_food").value.trim() || null,
@@ -2711,6 +2722,7 @@ $("#profileForm").addEventListener("submit", async (e)=>{
       fecha_nacimiento: payload.fecha_nacimiento,
       country: payload.country,
       city: payload.city,
+      address: payload.address,
       about_me: payload.about_me,
       hobbies: payload.hobbies,
       favorite_food: payload.favorite_food,
@@ -2858,6 +2870,7 @@ async function loadMe(uid){
     fecha_nacimiento: me.fecha_nacimiento || null,       // RAW
     country: me.country || "",
     city: me.city || "",
+    address: me.address || "",
     about_me: me.about_me || "",
     hobbies: me.hobbies || "",
     favorite_food: me.favorite_food || "",
@@ -2875,6 +2888,7 @@ async function loadMe(uid){
   $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
   $("#country").value = PROFILE_CACHE.country || "";
   $("#city").value = PROFILE_CACHE.city || "";
+  $("#address").value = PROFILE_CACHE.address || "";
   $("#about_me").value = PROFILE_CACHE.about_me || "";
   $("#hobbies").value = PROFILE_CACHE.hobbies || "";
   $("#favorite_food").value = PROFILE_CACHE.favorite_food || "";
@@ -2907,6 +2921,7 @@ document.addEventListener("click", (e)=>{
       $("#fecha_nacimiento").value  = toInputDate(PROFILE_CACHE.fecha_nacimiento);
       $("#country").value = PROFILE_CACHE.country || "";
       $("#city").value = PROFILE_CACHE.city || "";
+      $("#address").value = PROFILE_CACHE.address || "";
       $("#about_me").value = PROFILE_CACHE.about_me || "";
       $("#hobbies").value = PROFILE_CACHE.hobbies || "";
       $("#favorite_food").value = PROFILE_CACHE.favorite_food || "";
@@ -2935,6 +2950,7 @@ PROFILE_CACHE = {
   // guardamos las fechas como las entrega el <input type="date"> (YYYY-MM-DD)
   ingreso_vintti_date: $("#ingreso_vintti_date").value || null,
   fecha_nacimiento: $("#fecha_nacimiento").value || null,
+  address: $("#address").value.trim() || null,
   avatar_url: (_avatarFieldInit ? _avatarFieldInit.value.trim() : "") || null,
   initials: resolveInitials($("#user_name").value.trim())
 };

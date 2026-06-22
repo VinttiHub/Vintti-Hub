@@ -274,7 +274,8 @@ def _apply_computed_timeoff_usage(cur, row: Dict[str, Any]) -> Dict[str, Any]:
     if not row or row.get("user_id") is None:
         return row
     usage = _timeoff_usage_for_user(cur, int(row["user_id"]), statuses=("approved",))
-    row["vacaciones_consumidas"] = _as_day_number(usage["vacation"])
+    manual_vacation_used = float(row.get("vacaciones_consumidas") or 0)
+    row["vacaciones_consumidas"] = _as_day_number(max(manual_vacation_used, usage["vacation"]))
     row["vintti_days_consumidos"] = _as_day_number(usage["vintti_day"])
     row["feriados_consumidos"] = _as_day_number(usage["holiday"])
     return row
@@ -295,6 +296,12 @@ def _ensure_vacation_rollover_column(cur):
     cur.execute("""
         ALTER TABLE users
         ADD COLUMN IF NOT EXISTS vacation_rollover_year INTEGER
+    """)
+
+def _ensure_user_address_column(cur):
+    cur.execute("""
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS address TEXT
     """)
 
 def _prorated_vacation_days_for_specific_year(start_value: Optional[Any], year: int, annual_days: float = 15) -> float:
@@ -464,7 +471,7 @@ def get_user(user_id: int):
     SELECT
       user_id, user_name, nickname, email_vintti, role, emergency_contact,
       ingreso_vintti_date, fecha_nacimiento, avatar_url,
-      country, city, about_me, hobbies, favorite_food, fun_fact,
+      country, city, address, about_me, hobbies, favorite_food, fun_fact,
       team, lider,
       COALESCE(vacaciones_acumuladas, 0)    AS vacaciones_acumuladas,
       COALESCE(vacaciones_habiles, 0)       AS vacaciones_habiles,
@@ -477,6 +484,7 @@ def get_user(user_id: int):
     conn = get_connection()
     should_commit = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_user_address_column(cur)
         should_commit = bool(_maybe_apply_current_year_vacation_rollover(cur).get("ran"))
         cur.execute(q, (user_id,))
         row = cur.fetchone()
@@ -500,20 +508,22 @@ def update_user(user_id: int):
     if not ok:
         return jsonify({"error":"forbidden"}), 403
 
-    fields = {
-        "user_name": data.get("user_name"),
-        "email_vintti": data.get("email_vintti"),
-        "role": data.get("role"),
-        "emergency_contact": data.get("emergency_contact"),
-        "ingreso_vintti_date": data.get("ingreso_vintti_date"),
-        "fecha_nacimiento": data.get("fecha_nacimiento"),
-        "country": data.get("country"),
-        "city": data.get("city"),
-        "about_me": data.get("about_me"),
-        "hobbies": data.get("hobbies"),
-        "favorite_food": data.get("favorite_food"),
-        "fun_fact": data.get("fun_fact"),
-    }
+    editable_fields = (
+        "user_name",
+        "email_vintti",
+        "role",
+        "emergency_contact",
+        "ingreso_vintti_date",
+        "fecha_nacimiento",
+        "country",
+        "city",
+        "address",
+        "about_me",
+        "hobbies",
+        "favorite_food",
+        "fun_fact",
+    )
+    fields = {field: data.get(field) for field in editable_fields if field in data}
 
     avatar_specified = "avatar_url" in data
     avatar_value: Optional[str] = None
@@ -525,10 +535,9 @@ def update_user(user_id: int):
 
     sets, vals = [], []
     for col, val in fields.items():
-        if val is not None:
-            sets.append(f"{col} = %s"); vals.append(val)
+        sets.append(f"{col} = %s"); vals.append(val)
 
-    if fields.get("ingreso_vintti_date") is not None:
+    if "ingreso_vintti_date" in fields and fields.get("ingreso_vintti_date") is not None:
         sets.append("vacaciones_habiles = %s")
         vals.append(_prorated_vacation_days_for_year(fields["ingreso_vintti_date"]))
 
@@ -543,6 +552,7 @@ def update_user(user_id: int):
     vals.append(user_id)
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_user_address_column(cur)
         cur.execute(f"""
             UPDATE users
             SET {", ".join(sets)}, updated_at = NOW() AT TIME ZONE 'UTC'
@@ -563,10 +573,11 @@ def me():
         return jsonify({"error":"unauthorized"}), 401
     conn = get_connection()
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_user_address_column(cur)
         cur.execute("""
             SELECT user_id, user_name, email_vintti, role, emergency_contact,
                 ingreso_vintti_date, fecha_nacimiento, avatar_url,
-                country, city, about_me, hobbies, favorite_food, fun_fact,
+                country, city, address, about_me, hobbies, favorite_food, fun_fact,
                 team
             FROM users WHERE user_id = %s
         """, (user_id,))
@@ -894,6 +905,7 @@ def list_users():
     conn = get_connection()
     should_commit = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        _ensure_user_address_column(cur)
         should_commit = bool(_maybe_apply_current_year_vacation_rollover(cur).get("ran"))
         if email:
             cur.execute("SELECT * FROM users WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
