@@ -109,9 +109,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function hydratePage(accountId) {
   try {
-    const [account, snapshotPayload] = await Promise.all([
+    const [account, snapshotPayload, liveOpportunities] = await Promise.all([
       fetchJSON(`${API_BASE}/accounts/${accountId}`),
       fetchOverviewSnapshotCache(accountId),
+      fetchJSON(`${API_BASE}/accounts/${accountId}/opportunities`),
     ]);
 
     currentAccount = account;
@@ -119,7 +120,10 @@ async function hydratePage(accountId) {
     pageState.snapshotCache = snapshotPayload.cache;
     pageState.lastRefreshedAt = snapshotPayload.updatedAt ?? null;
     updateRefreshMeta(pageState.lastRefreshedAt);
-    const hydratedOpportunities = buildOpportunitiesFromSnapshots(snapshotPayload.cache);
+    const hydratedOpportunities = mergeLiveOpportunityStages(
+      buildOpportunitiesFromSnapshots(snapshotPayload.cache),
+      liveOpportunities
+    );
     const visibleOpportunities = hydratedOpportunities.filter(
       (opp) => classifyOpportunity(opp) !== "lost"
     );
@@ -396,6 +400,7 @@ function normalizeCachedSnapshot(entry) {
 function normalizeSnapshotStage(value) {
   if (value === undefined || value === null) return null;
   const normalized = String(value).trim().toLowerCase();
+  if (normalized === "lost") return "lost";
   if (normalized === "closed") return "closed";
   if (normalized === "open") return "open";
   return null;
@@ -549,6 +554,34 @@ function buildOpportunitiesFromSnapshots(cacheMap) {
     .map((entry) => snapshotEntryToOpportunity(entry))
     .filter(Boolean);
   return sortOpportunitiesForDisplay(opportunities);
+}
+
+function mergeLiveOpportunityStages(snapshotOpportunities, liveOpportunities) {
+  const liveById = new Map(
+    (Array.isArray(liveOpportunities) ? liveOpportunities : [])
+      .filter((opportunity) => opportunity?.opportunity_id != null)
+      .map((opportunity) => [String(opportunity.opportunity_id), opportunity])
+  );
+
+  return (Array.isArray(snapshotOpportunities) ? snapshotOpportunities : []).map((snapshotOpportunity) => {
+    const liveOpportunity = liveById.get(String(snapshotOpportunity?.opportunity_id ?? ""));
+    if (!liveOpportunity) return snapshotOpportunity;
+
+    const batches = Array.isArray(snapshotOpportunity.batches) ? snapshotOpportunity.batches : [];
+    const merged = {
+      ...snapshotOpportunity,
+      ...liveOpportunity,
+      batches,
+    };
+    if (snapshotOpportunity.client_overview_id != null) {
+      merged.client_overview_id = snapshotOpportunity.client_overview_id;
+    }
+    if (snapshotOpportunity.__client_overview_updated_at) {
+      merged.__client_overview_updated_at = snapshotOpportunity.__client_overview_updated_at;
+    }
+    delete merged.__client_overview_stage;
+    return merged;
+  });
 }
 
 function snapshotEntryToOpportunity(entry) {

@@ -200,11 +200,44 @@ def normalize_outsource(value):
     return normalized or raw
 
 
+OVERVIEW_CLOSED_WIN_STAGES = {
+    'close win',
+    'close won',
+    'closed win',
+    'closed won',
+    'won',
+    'closewin',
+    'closewon',
+    'closedwin',
+    'closedwon',
+}
+OVERVIEW_LOST_STAGES = {
+    'closed lost',
+    'close lost',
+    'lost',
+    'closedlost',
+    'closelost',
+}
+
+
 def normalize_overview_stage(value):
     stage = str(value or '').strip().lower()
     if stage == 'closed':
         return 'closed'
+    if stage == 'lost':
+        return 'lost'
     return 'open'
+
+
+def classify_overview_opportunity_stage(value):
+    stage = str(value or '').strip().lower()
+    if not stage:
+        return None
+    if stage in OVERVIEW_LOST_STAGES or 'lost' in stage:
+        return 'lost'
+    if stage in OVERVIEW_CLOSED_WIN_STAGES:
+        return 'closed'
+    return normalize_overview_stage(stage)
 
 
 def has_active_hire(cursor, opportunity_id):
@@ -488,17 +521,24 @@ def get_account_overview_cache(account_id):
         cursor = conn.cursor()
         cursor.execute(
             """
-                SELECT client_overview_id, account_id, opportunity_id, candidates_batches, updated_at
-                FROM client_overview
-                WHERE account_id = %s
-                ORDER BY client_overview_id ASC
+                SELECT
+                    co.client_overview_id,
+                    co.account_id,
+                    co.opportunity_id,
+                    co.candidates_batches,
+                    co.updated_at,
+                    o.opp_stage
+                FROM client_overview co
+                LEFT JOIN opportunity o ON o.opportunity_id = co.opportunity_id
+                WHERE co.account_id = %s
+                ORDER BY co.client_overview_id ASC
             """,
             (account_id,),
         )
         rows = cursor.fetchall() or []
         payload = []
         for row in rows:
-            client_overview_id, acc_id, opportunity_id, data, updated_at = row
+            client_overview_id, acc_id, opportunity_id, data, updated_at, live_opp_stage = row
             decoded = None
             stage = None
             if data:
@@ -514,8 +554,15 @@ def get_account_overview_cache(account_id):
                 raw_stage = decoded.get('stage')
                 if raw_stage is not None:
                     normalized = str(raw_stage).strip().lower()
-                    if normalized in ('open', 'closed'):
+                    if normalized in ('open', 'closed', 'lost'):
                         stage = normalized
+            if stage == 'lost':
+                continue
+            live_stage = classify_overview_opportunity_stage(live_opp_stage)
+            if live_stage == 'lost':
+                continue
+            if live_stage in ('open', 'closed'):
+                stage = live_stage
             payload.append(
                 {
                     "client_overview_id": client_overview_id,
@@ -560,7 +607,15 @@ def upsert_account_overview_cache(account_id):
             if not isinstance(snapshot, dict):
                 skipped += 1
                 continue
-            stage = normalize_overview_stage(entry.get('stage') or snapshot.get('stage'))
+            opportunity_snapshot = snapshot.get('opportunity')
+            snapshot_opp_stage = (
+                opportunity_snapshot.get('opp_stage')
+                if isinstance(opportunity_snapshot, dict)
+                else None
+            )
+            stage = classify_overview_opportunity_stage(
+                snapshot_opp_stage or entry.get('stage') or snapshot.get('stage')
+            ) or 'open'
             snapshot['stage'] = stage
             updated_at = entry.get('updated_at')
             snapshot['updated_at'] = updated_at
@@ -600,11 +655,20 @@ def upsert_account_overview_cache(account_id):
             snapshot['client_overview_id'] = target_id
             snapshot['opportunity_id'] = opportunity_id
             snapshot['account_id'] = account_id
-            opportunity_snapshot = snapshot.get('opportunity')
             if isinstance(opportunity_snapshot, dict):
                 opportunity_snapshot.setdefault('client_overview_id', target_id)
 
             payload_json = json.dumps(snapshot, sort_keys=True)
+
+            if stage == 'lost':
+                if existing_id is not None:
+                    cursor.execute(
+                        "DELETE FROM client_overview WHERE client_overview_id = %s",
+                        (existing_id,),
+                    )
+                    deleted += 1
+                skipped += 1
+                continue
 
             should_remove_for_inactive_hire = (
                 stage == 'closed'
@@ -670,16 +734,21 @@ def prune_inactive_client_overview(account_id):
         cursor = conn.cursor()
         cursor.execute(
             """
-                SELECT client_overview_id, opportunity_id, candidates_batches
-                FROM client_overview
-                WHERE account_id = %s
+                SELECT co.client_overview_id, co.opportunity_id, co.candidates_batches, o.opp_stage
+                FROM client_overview co
+                LEFT JOIN opportunity o ON o.opportunity_id = co.opportunity_id
+                WHERE co.account_id = %s
             """,
             (account_id,),
         )
         rows = cursor.fetchall() or []
         stale_ids = []
-        for client_overview_id, opportunity_id, payload in rows:
+        for client_overview_id, opportunity_id, payload, live_opp_stage in rows:
             if not opportunity_id:
+                stale_ids.append(client_overview_id)
+                continue
+            live_stage = classify_overview_opportunity_stage(live_opp_stage)
+            if live_stage == 'lost':
                 stale_ids.append(client_overview_id)
                 continue
             stage = None
