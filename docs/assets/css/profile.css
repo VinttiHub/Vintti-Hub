@@ -1730,8 +1730,11 @@ input:focus, select:focus, textarea:focus{
   align-items:center;
 }
 .pto-quick-meta .dot{ opacity:.45; }
-.pto-quick-grid{
+.pto-address-row{
   margin-top:16px;
+}
+.pto-quick-grid{
+  margin-top:12px;
   display:grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap:12px;
@@ -1761,8 +1764,14 @@ input:focus, select:focus, textarea:focus{
   font-weight:800;
   color:#17203a;
 }
-.pto-field--wide{
-  grid-column: span 2;
+.pto-field--address{
+  min-height: 104px;
+  align-items: flex-start;
+}
+.pto-field--address span:last-child{
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 18px;
 }
 .pto-quick-totals{
   margin-top:16px;
@@ -4781,10 +4790,6 @@ input:focus, select:focus, textarea:focus{
 }
 
 @media (max-width: 900px){
-  .pto-field--wide{
-    grid-column: auto;
-  }
-
   #teamPtoTable > .teampto-grid{
     display: grid !important;
     grid-template-columns: minmax(176px, 1fr) minmax(180px, 1fr) repeat(11, minmax(72px, 1fr)) !important;

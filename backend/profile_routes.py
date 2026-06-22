@@ -482,16 +482,14 @@ def get_user(user_id: int):
     WHERE user_id = %s
     """
     conn = get_connection()
-    should_commit = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         _ensure_user_address_column(cur)
-        should_commit = bool(_maybe_apply_current_year_vacation_rollover(cur).get("ran"))
+        _maybe_apply_current_year_vacation_rollover(cur)
         cur.execute(q, (user_id,))
         row = cur.fetchone()
         if row:
             row = _apply_computed_timeoff_usage(cur, dict(row))
-    if should_commit:
-        conn.commit()
+    conn.commit()
     conn.close()
     if not row: return jsonify({"error":"user not found"}), 404
     return jsonify(_add_initials(_row_to_json(dict(row))))
@@ -582,6 +580,7 @@ def me():
             FROM users WHERE user_id = %s
         """, (user_id,))
         row = cur.fetchone()
+    conn.commit()
     conn.close()
     if not row: return jsonify({"error":"not found"}), 404
     return jsonify(_add_initials(_row_to_json(dict(row))))
@@ -903,18 +902,16 @@ def list_time_off():
 def list_users():
     email = request.args.get("email")
     conn = get_connection()
-    should_commit = False
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         _ensure_user_address_column(cur)
-        should_commit = bool(_maybe_apply_current_year_vacation_rollover(cur).get("ran"))
+        _maybe_apply_current_year_vacation_rollover(cur)
         if email:
             cur.execute("SELECT * FROM users WHERE LOWER(email_vintti) = LOWER(%s)", (email,))
         else:
             cur.execute("SELECT * FROM users")
         rows = cur.fetchall()
         rows = [_apply_computed_timeoff_usage(cur, dict(row)) for row in rows]
-    if should_commit:
-        conn.commit()
+    conn.commit()
     conn.close()
     payload = []
     for row in rows:

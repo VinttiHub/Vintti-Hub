@@ -2814,6 +2814,7 @@ function renderProfileView(me){
   $("#v_birth")?.replaceChildren(document.createTextNode(fmtLongDateSafe(me.fecha_nacimiento)));
   $("#v_country")?.replaceChildren(document.createTextNode(fmtText(me.country)));
   $("#v_city")?.replaceChildren(document.createTextNode(fmtText(me.city)));
+  $("#v_address")?.replaceChildren(document.createTextNode(fmtText(me.address)));
   $("#v_about")?.replaceChildren(document.createTextNode(fmtText(me.about_me)));
   $("#v_hobbies")?.replaceChildren(document.createTextNode(fmtText(me.hobbies)));
   $("#v_favorite_food")?.replaceChildren(document.createTextNode(fmtText(me.favorite_food)));
