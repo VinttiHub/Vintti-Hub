@@ -25,6 +25,8 @@ from utils.storage_utils import (
     make_account_pdf_payload,
     set_account_pdf_keys,
 )
+from utils.html_utils import clean_html_for_webflow as _clean_html_for_webflow
+from utils.html_utils import clean_job_description_html
 
 bp = Blueprint('accounts', __name__)
 
@@ -735,6 +737,9 @@ def get_opportunity_by_id(opportunity_id):
 
         colnames = [desc[0] for desc in cursor.description]
         opportunity = dict(zip(colnames, row))
+        for key in ('hr_job_description', 'career_description', 'career_requirements', 'career_additional_info'):
+            if isinstance(opportunity.get(key), str):
+                opportunity[key] = clean_job_description_html(opportunity[key])
 
         cursor.close()
         conn.close()
@@ -1237,10 +1242,10 @@ def update_opportunity_fields(opportunity_id):
         'details_close_lost'
     ]
 
-    # 🔹 Normaliza HTML ruidoso de Career Site / Webflow antes de persistir
-    for key in ('career_description', 'career_requirements', 'career_additional_info'):
+    # 🔹 Normaliza HTML ruidoso de Job Description / Career Site antes de persistir
+    for key in ('hr_job_description', 'career_description', 'career_requirements', 'career_additional_info'):
         if key in data and isinstance(data[key], str):
-            data[key] = _clean_html_for_webflow(data[key], output='html')
+            data[key] = clean_job_description_html(data[key])
 
     # 👉 Campos que deben guardarse como DATE puro (sin hora)
     DATE_FIELDS = {

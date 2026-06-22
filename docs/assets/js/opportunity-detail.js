@@ -425,14 +425,30 @@ function formatJobDescriptionForHtml(raw) {
     'Summary',
     'Overview',
     'About the Role',
+    'Main Responsibilities',
     'Key Responsibilities',
+    'Core Responsibilities',
+    'Primary Responsibilities',
+    'General Responsibilities',
+    'Job Responsibilities',
+    'Role Responsibilities',
     'Responsibilities',
+    'Main Requirements',
+    'Key Requirements',
     'Requirements',
+    'Main Qualifications',
+    'Key Qualifications',
     'Qualifications',
+    'Skills',
     'Required Skills',
     'Nice to Haves',
+    'Nice-to-Haves',
     'Nice to Have',
+    'Nice-to-Have',
     'Must Haves',
+    'Must-Haves',
+    'Must Have',
+    'Must-Have',
     'Preferred Qualifications',
     'Additional Information',
     "What you'll do",
@@ -442,14 +458,73 @@ function formatJobDescriptionForHtml(raw) {
     'Who you are',
     'Who you’ll work with',
     'What you bring',
+    'Your Qualifications',
+    'Your Requirements',
+    'Your Responsibilities',
     'Benefits',
     'Compensation',
+    'Salary',
+    'Budget',
+    'Pay Range',
+    'Rate',
     'Schedule',
+    'Working Hours',
+    'Work Hours',
+    'Working Days',
+    'Work Days',
+    'Days Off',
+    'Equipment Requirement',
+    'Equipment Requirements',
     'Tools',
     'Location',
     'Details'
   ];
+  const headingPrefixes = [
+    'Main',
+    'Key',
+    'Core',
+    'Primary',
+    'General',
+    'Job',
+    'Role',
+    'Required',
+    'Preferred',
+    'Additional',
+    'Nice to',
+    'Nice-to',
+    'Must',
+    'What you',
+    "What you'll",
+    'What you’ll',
+    'What we',
+    "What we're",
+    'What we’re',
+    'Who you',
+    'Your'
+  ];
+  const scalarHeadings = [
+    'Salary',
+    'Budget',
+    'Pay Range',
+    'Rate',
+    'Working Hours',
+    'Work Hours',
+    'Working Days',
+    'Work Days',
+    'Days Off',
+    'Equipment Requirement',
+    'Equipment Requirements'
+  ];
   const headingPattern = headings.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const headingPrefixPattern = headingPrefixes.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const scalarHeadingPattern = scalarHeadings.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const standaloneMarkerPattern = String.raw`(?:[\p{Extended_Pictographic}\uFE0F\u200D]|\p{Emoji_Modifier})+`;
+  const standaloneMarkerRe = new RegExp(`^${standaloneMarkerPattern}$`, 'u');
+  const headingWithMarkerRe = new RegExp(`^(?:(${standaloneMarkerPattern})\\s+)?(${headingPattern})\\s*[:\\-]?\\s*(.*)$`, 'iu');
+  const scalarHeadingOnlyRe = new RegExp(`^(?:${standaloneMarkerPattern}\\s+)?(?:${scalarHeadingPattern})\\s*:?$`, 'iu');
+  const headingPrefixOnlyRe = new RegExp(`^(?:${standaloneMarkerPattern}\\s+)?(?:${headingPrefixPattern})\\s*:?$`, 'iu');
+  const splitHeadingContinuationRe = /^(?:responsibilities|requirements|qualifications|skills|duties|tasks|overview|summary|information|haves?|to haves?|do|bring|are|looking for|work with)\s*:?$/i;
+  const completeSplitHeadingRe = new RegExp(`^(?:${standaloneMarkerPattern}\\s+)?(?:${headingPattern})\\s*:?$`, 'iu');
 
   let text = markdownizeInlineHtml(source)
     .replace(/\r\n?/g, '\n')
@@ -458,39 +533,86 @@ function formatJobDescriptionForHtml(raw) {
     .replace(/\s+(\*\*[^*]{2,90}\*\*)\s*[-:]\s*/g, '\n$1: ')
     .replace(/^\s*(#{1,6})\s+/gm, '')
     .replace(/^\s*(\d+)[.)]\s+/gm, '- ')
-    .replace(/\s+[-–—]\s+(?=[A-Za-z0-9])/g, '\n- ')
+    .replace(/(^|\n)\s*[-–—]\s+/g, '$1- ')
     .replace(/\s+•\s+/g, '\n- ')
     .trim();
 
   if (!/\*\*[^*]+\*\*/.test(text)) {
-    text = text.replace(new RegExp(`\\b(${headingPattern})\\b([ \\t]*:)?`, 'gi'), (match, heading, colon) => {
+    text = text.replace(new RegExp(`\\b(${headingPattern})\\s+\\(([^)\\n]{2,50})\\)([ \\t]*:)?`, 'gi'), (match, heading, parenthetical, colon) => {
+      if (!colon && heading.charAt(0) !== heading.charAt(0).toUpperCase()) return match;
+      return `\n${heading} (${parenthetical}):`;
+    });
+    text = text.replace(new RegExp(`\\b(${headingPattern})\\b([ \\t]*:)?`, 'gi'), (match, heading, colon, offset, fullText) => {
+      const before = fullText.slice(Math.max(0, offset - 2), offset);
+      const after = fullText.slice(offset + match.length).trimStart();
+      if (before.includes('(') || after.startsWith('(')) return match;
       if (!colon && heading.charAt(0) !== heading.charAt(0).toUpperCase()) return match;
       return `\n${heading}:`;
     });
   }
 
-  const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-  const html = [];
-  let inList = false;
-
-  const closeList = () => {
-    if (inList) {
-      html.push('</ul>');
-      inList = false;
-    }
+  const rawLines = text.split('\n')
+    .map(line => line.trim().replace(/^\.\s+/, ''))
+    .filter(line => line && !/^[-–—]\s*$/.test(line) && !/^[.,;:]+$/.test(line));
+  const lines = [];
+  const falseRangeBulletContextRe = /\b(working\s+hours?|schedule|salary|budget|pay\s+range|rate|compensation)\b\s*:/i;
+  const timeTokenRe = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i;
+  const moneyOrNumberTokenRe = /(?:[$€£]\s*)?\b\d[\d,]*(?:\.\d+)?\s*(?:usd|us\$|k|m|per\s+(?:month|hour|year|week))?/i;
+  const startsLikeRangeContinuation = (value) => {
+    const clean = String(value || '').trim();
+    return timeTokenRe.test(clean) ||
+      /^(?:[$€£]\s*)?\d[\d,]*(?:\.\d+)?\s*(?:usd|us\$|k|m|per\s+(?:month|hour|year|week))?\b/i.test(clean);
   };
-
-  const inline = (value) => escapeHtml(value)
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  const isListHeading = (value) => {
+  const shouldMergeFalseRangeBullet = (previous, bulletText) => {
+    const prev = String(previous || '').trim();
+    if (!prev || !startsLikeRangeContinuation(bulletText)) return false;
+    return falseRangeBulletContextRe.test(prev) ||
+      timeTokenRe.test(prev) ||
+      moneyOrNumberTokenRe.test(prev);
+  };
+  const stripInlineMarkdown = (value) => String(value || '')
+    .trim()
+    .replace(/^\*\*([\s\S]+?)\*\*(\s*:)?$/, '$1$2')
+    .replace(/^\*([\s\S]+?)\*(\s*:)?$/, '$1$2')
+    .trim();
+  const stripTrailingColon = (value) => stripInlineMarkdown(value).replace(/\s*:$/, '');
+  const isLikelyHeadingFragment = (value) => {
+    const clean = stripTrailingColon(value).replace(new RegExp(`^${standaloneMarkerPattern}\\s+`, 'u'), '');
+    if (!clean || clean.length > 35) return false;
+    if (/[.!?;,]$/.test(clean)) return false;
+    return headingPrefixOnlyRe.test(value) || /^[A-Z][A-Za-z'’/&-]*(?:\s+[A-Z][A-Za-z'’/&-]*){0,2}$/.test(clean);
+  };
+  const shouldMergeSplitHeading = (previous, current) => {
+    const prev = stripTrailingColon(previous);
+    const curr = stripTrailingColon(current);
+    if (!prev || !curr || !isLikelyHeadingFragment(prev)) return false;
+    const combined = `${prev} ${curr}`;
+    return completeSplitHeadingRe.test(combined) ||
+      (headingPrefixOnlyRe.test(prev) && splitHeadingContinuationRe.test(curr));
+  };
+  const splitHeadingContinuationWithRestRe = /^(\*\*)?(responsibilities|requirements|qualifications|skills|duties|tasks|overview|summary|information|haves?|to haves?|do|bring|are|looking for|work with)\1\s*[:\-]?\s*(.*)$/i;
+  const mergeSplitHeadingWithRest = (previous, current) => {
+    const prev = stripTrailingColon(previous);
+    if (!prev || !isLikelyHeadingFragment(prev)) return null;
+    const match = String(current || '').trim().match(splitHeadingContinuationWithRestRe);
+    if (!match) return null;
+    const continuation = stripTrailingColon(match[2]);
+    const rest = String(match[3] || '').trim();
+    const combinedHeading = `${prev} ${continuation}`;
+    if (!completeSplitHeadingRe.test(combinedHeading) &&
+        !(headingPrefixOnlyRe.test(prev) && splitHeadingContinuationRe.test(continuation))) {
+      return null;
+    }
+    return rest ? `${combinedHeading} ${rest}` : combinedHeading;
+  };
+  function isListHeading(value) {
     const lower = String(value || '').toLowerCase();
     return lower.includes('responsibilities') ||
       lower.includes('requirements') ||
       lower.includes('qualifications') ||
       lower.includes('required skills') ||
-      lower.includes('must have') ||
-      lower.includes('nice to have') ||
+      /must[-\s]?have/.test(lower) ||
+      /nice[-\s]?to[-\s]?have/.test(lower) ||
       lower.includes('what you') ||
       lower.includes('what we') ||
       lower.includes('who you') ||
@@ -501,7 +623,133 @@ function formatJobDescriptionForHtml(raw) {
       lower.includes('tools') ||
       lower.includes('location') ||
       lower.includes('details');
+  }
+  const isCompleteHeadingOnlyLine = (value) => completeSplitHeadingRe.test(stripTrailingColon(value));
+  const getHeadingTextFromLine = (value) => {
+    const clean = stripTrailingColon(value).replace(new RegExp(`^${standaloneMarkerPattern}\\s+`, 'u'), '');
+    return headings.find(h => h.toLowerCase() === clean.toLowerCase()) || clean;
   };
+  const bulletLineRe = /^[-*•–—]\s+(.+)$/;
+  const shouldContinuePreviousBullet = (previous, current) => {
+    const prevMatch = String(previous || '').match(bulletLineRe);
+    const currentText = String(current || '').trim();
+    const currentPlain = stripInlineMarkdown(currentText);
+    if (!prevMatch || !currentText) return false;
+    if (bulletLineRe.test(currentText)) return false;
+    if (standaloneMarkerRe.test(currentPlain)) return false;
+    if (isCompleteHeadingOnlyLine(currentPlain) || scalarHeadingOnlyRe.test(currentPlain)) return false;
+    if (mergeSplitHeadingWithRest(stripTrailingColon(previous), currentPlain)) return false;
+
+    const prevText = prevMatch[1].trim();
+    const prevLooksOpen = !/[.!?;:]$/.test(prevText) ||
+      /\b(?:and|or|with|including|such as|like|in|of|for|to|from|between|using|across|plus)$/i.test(prevText);
+    const currentLooksLikeContinuation = /^[a-z0-9(]/.test(currentPlain) ||
+      /^[A-Z][A-Za-z0-9+/#.&-]*(?:,|\s+(?:and|or)\b|\s+[a-z])/.test(currentPlain);
+
+    return prevLooksOpen && currentLooksLikeContinuation;
+  };
+  const looksLikeStructuralLine = (value) => {
+    const clean = stripInlineMarkdown(value);
+    return bulletLineRe.test(clean) ||
+      standaloneMarkerRe.test(clean) ||
+      isCompleteHeadingOnlyLine(clean) ||
+      scalarHeadingOnlyRe.test(clean);
+  };
+  const lineLooksOpen = (value) => {
+    const clean = stripInlineMarkdown(value).trim();
+    if (!clean) return false;
+    return !/[.!?;:]$/.test(clean) ||
+      /\b(?:and|or|with|including|such as|like|in|of|for|to|from|between|using|across|plus|via|through|within|without|by|as|on|at)$/i.test(clean);
+  };
+  const lineLooksLikeContinuation = (value) => {
+    const clean = stripInlineMarkdown(value).trim();
+    if (!clean || looksLikeStructuralLine(clean)) return false;
+    if (mergeSplitHeadingWithRest('', clean)) return false;
+    return /^[a-z0-9(]/.test(clean) ||
+      /^(?:and|or|with|including|such as|like|plus|via|through|within|without|by|as|on|at)\b/i.test(clean) ||
+      /^[A-Z][A-Za-z0-9+/#.&-]*(?:,|\s+(?:and|or|with)\b|\s+[a-z])/.test(clean);
+  };
+  const shouldContinuePreviousLine = (previous, current) => {
+    const prev = String(previous || '').trim();
+    const curr = String(current || '').trim();
+    if (!prev || !curr) return false;
+    if (looksLikeStructuralLine(curr)) return false;
+    if (isCompleteHeadingOnlyLine(prev) || scalarHeadingOnlyRe.test(prev)) return false;
+    if (shouldMergeSplitHeading(prev, curr)) return false;
+    return lineLooksOpen(prev) && lineLooksLikeContinuation(curr);
+  };
+
+  for (let i = 0; i < rawLines.length; i += 1) {
+    const line = rawLines[i];
+    const next = rawLines[i + 1];
+    const cleanLine = stripInlineMarkdown(line);
+    const cleanNext = stripInlineMarkdown(next);
+    if (standaloneMarkerRe.test(cleanLine) && cleanNext && !/^[-–—]\s*$/.test(cleanNext)) {
+      lines.push(`${cleanLine} ${cleanNext}`);
+      i += 1;
+      continue;
+    }
+    if (lines.length && scalarHeadingOnlyRe.test(lines[lines.length - 1]) && !/^[-*•–—]\s+/.test(line)) {
+      lines[lines.length - 1] = `${lines[lines.length - 1].replace(/\s*:?\s*$/, ':')} ${line}`;
+      continue;
+    }
+    if (lines.length) {
+      const mergedSplitHeading = mergeSplitHeadingWithRest(lines[lines.length - 1], line);
+      if (mergedSplitHeading) {
+        lines[lines.length - 1] = mergedSplitHeading;
+        continue;
+      }
+    }
+    if (lines.length && shouldMergeSplitHeading(lines[lines.length - 1], line)) {
+      lines[lines.length - 1] = `${stripTrailingColon(lines[lines.length - 1])} ${stripTrailingColon(line)}`;
+      continue;
+    }
+    if (lines.length &&
+        isCompleteHeadingOnlyLine(lines[lines.length - 1]) &&
+        isListHeading(getHeadingTextFromLine(lines[lines.length - 1])) &&
+        !isCompleteHeadingOnlyLine(line) &&
+        !/^[-*•–—]\s+/.test(line)) {
+      lines[lines.length - 1] = `${stripTrailingColon(lines[lines.length - 1])} ${line}`;
+      continue;
+    }
+    if (lines.length && shouldContinuePreviousBullet(lines[lines.length - 1], line)) {
+      lines[lines.length - 1] = `${lines[lines.length - 1]} ${stripInlineMarkdown(line)}`;
+      continue;
+    }
+    if (lines.length && shouldContinuePreviousLine(lines[lines.length - 1], line)) {
+      lines[lines.length - 1] = `${lines[lines.length - 1]} ${stripInlineMarkdown(line)}`;
+      continue;
+    }
+    const bulletContinuation = line.match(bulletLineRe);
+    if (bulletContinuation && lines.length) {
+      const previous = lines[lines.length - 1];
+      const continuation = bulletContinuation[1].trim();
+      if (scalarHeadingOnlyRe.test(previous) && startsLikeRangeContinuation(continuation)) {
+        lines[lines.length - 1] = `${previous.replace(/\s*:?\s*$/, ':')} ${continuation}`;
+        continue;
+      }
+      if (shouldMergeFalseRangeBullet(previous, continuation)) {
+        lines[lines.length - 1] = `${previous} - ${continuation}`;
+        continue;
+      }
+    }
+    lines.push(line);
+  }
+  const html = [];
+  let inList = false;
+  let lastListItemText = '';
+
+  const closeList = () => {
+    if (inList) {
+      html.push('</ul>');
+      inList = false;
+      lastListItemText = '';
+    }
+  };
+
+  const inline = (value) => escapeHtml(value)
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1');
   const openList = () => {
     if (!inList) {
       html.push('<ul>');
@@ -515,26 +763,74 @@ function formatJobDescriptionForHtml(raw) {
       const item = bullet[1].replace(/^[-*•–—]\s+/, '');
       openList();
       html.push(`<li>${inline(item)}</li>`);
+      lastListItemText = item;
+      return;
+    }
+
+    if (inList && lastListItemText && shouldContinuePreviousBullet(`- ${lastListItemText}`, line)) {
+      lastListItemText = `${lastListItemText} ${stripInlineMarkdown(line)}`;
+      html[html.length - 1] = `<li>${inline(lastListItemText)}</li>`;
       return;
     }
 
     closeList();
 
-    const boldHeadingMatch = line.match(/^\*\*([^*]+)\*\*\s*[:\-]?\s*(.*)$/);
-    const headingMatch = boldHeadingMatch || line.match(new RegExp(`^(${headingPattern})\\s*[:\\-]?\\s*(.*)$`, 'i'));
+    const markerParentheticalHeadingMatch = line.match(new RegExp(`^(?:(${standaloneMarkerPattern})\\s+)?(${headingPattern})\\s+\\(([^)\\n]{2,50})\\)\\s*[:\\-]?\\s*(.*)$`, 'iu'));
+    const markerBoldParentheticalHeadingMatch = markerParentheticalHeadingMatch ? null : line.match(new RegExp(`^(?:(${standaloneMarkerPattern})\\s+)?\\*\\*(${headingPattern})\\s+\\(([^)\\n]{2,50})\\)\\*\\*\\s*[:\\-]?\\s*(.*)$`, 'iu'));
+    const markerBoldHeadingMatch = markerParentheticalHeadingMatch || markerBoldParentheticalHeadingMatch ? null : line.match(new RegExp(`^(?:(${standaloneMarkerPattern})\\s+)?\\*\\*(${headingPattern})\\*\\*\\s*[:\\-]?\\s*(.*)$`, 'iu'));
+    const boldHeadingMatch = markerParentheticalHeadingMatch || markerBoldParentheticalHeadingMatch || markerBoldHeadingMatch ? null : line.match(/^\*\*([^*]+)\*\*\s*[:\-]?\s*(.*)$/);
+    const boldHeadingWithMarkerMatch = boldHeadingMatch
+      ? boldHeadingMatch[1].match(new RegExp(`^(?:(${standaloneMarkerPattern})\\s+)?(${headingPattern})$`, 'iu'))
+      : null;
+    const headingMatch = markerParentheticalHeadingMatch || markerBoldParentheticalHeadingMatch || markerBoldHeadingMatch || boldHeadingWithMarkerMatch || boldHeadingMatch || line.match(headingWithMarkerRe);
     if (headingMatch) {
-      const canonicalHeading = headings.find(h => h.toLowerCase() === headingMatch[1].toLowerCase()) || headingMatch[1];
-      const headingLabel = escapeHtml(canonicalHeading);
-      const rest = headingMatch[2] ? inline(headingMatch[2]) : '';
+      const headingText = markerParentheticalHeadingMatch
+        ? markerParentheticalHeadingMatch[2]
+        : markerBoldParentheticalHeadingMatch
+        ? markerBoldParentheticalHeadingMatch[2]
+        : markerBoldHeadingMatch
+        ? markerBoldHeadingMatch[2]
+        : boldHeadingWithMarkerMatch
+        ? boldHeadingWithMarkerMatch[2]
+        : (boldHeadingMatch ? headingMatch[1] : headingMatch[2]);
+      const marker = markerParentheticalHeadingMatch
+        ? (markerParentheticalHeadingMatch[1] || '')
+        : markerBoldParentheticalHeadingMatch
+        ? (markerBoldParentheticalHeadingMatch[1] || '')
+        : markerBoldHeadingMatch
+        ? (markerBoldHeadingMatch[1] || '')
+        : boldHeadingWithMarkerMatch
+        ? (boldHeadingWithMarkerMatch[1] || '')
+        : (boldHeadingMatch ? '' : (headingMatch[1] || ''));
+      const canonicalHeading = headings.find(h => h.toLowerCase() === headingText.toLowerCase()) || headingText;
+      const parenthetical = markerParentheticalHeadingMatch
+        ? markerParentheticalHeadingMatch[3]
+        : markerBoldParentheticalHeadingMatch
+        ? markerBoldParentheticalHeadingMatch[3]
+        : '';
+      const headingLabel = escapeHtml(`${marker ? `${marker} ` : ''}${canonicalHeading}${parenthetical ? ` (${parenthetical})` : ''}`);
+      const restText = markerParentheticalHeadingMatch
+        ? markerParentheticalHeadingMatch[4]
+        : markerBoldParentheticalHeadingMatch
+        ? markerBoldParentheticalHeadingMatch[4]
+        : markerBoldHeadingMatch
+        ? markerBoldHeadingMatch[3]
+        : boldHeadingWithMarkerMatch
+        ? boldHeadingMatch[2]
+        : (boldHeadingMatch ? headingMatch[2] : headingMatch[3]);
+      const rest = restText ? inline(restText) : '';
 
       if (rest && isListHeading(canonicalHeading)) {
         html.push(`<p><strong>${headingLabel}</strong></p>`);
         openList();
         html.push(`<li>${rest}</li>`);
+        lastListItemText = restText;
         return;
       }
 
-      html.push(`<p><strong>${headingLabel}${canonicalHeading === 'Job Title' ? ':' : ''}</strong>${rest ? ` ${rest}` : ''}</p>`);
+      const needsColon = canonicalHeading === 'Job Title' ||
+        scalarHeadings.some(h => h.toLowerCase() === canonicalHeading.toLowerCase());
+      html.push(`<p><strong>${headingLabel}${needsColon ? ':' : ''}</strong>${rest ? ` ${rest}` : ''}</p>`);
       return;
     }
 
@@ -1705,7 +2001,9 @@ document.getElementById('start-date-input').addEventListener('blur', async (e) =
   await updateOpportunityField('nda_signature_or_start_date', e.target.value);
 });
 document.getElementById('job-description-textarea').addEventListener('blur', e => {
-  updateOpportunityField('hr_job_description', e.target.innerHTML);
+  const cleanJobDescription = formatJobDescriptionForHtml(e.target.innerHTML);
+  e.target.innerHTML = cleanJobDescription;
+  updateOpportunityField('hr_job_description', cleanJobDescription);
   logOpportunityDetailTrack('opp-details-jd-save');
 });
 
@@ -2623,9 +2921,21 @@ const reqsEditor = createRichEditor('career-requirements', 'career_requirements'
 const addiEditor = createRichEditor('career-additional', 'career_additional_info', SIG.signal);
 
 // pero si quieres forzar contenido de la última carga:
-if (descEditor) descEditor.innerHTML = (data.career_description || data.hr_job_description || '');
-if (reqsEditor) reqsEditor.innerHTML = (data.career_requirements || '');
-if (addiEditor) addiEditor.innerHTML = (data.career_additional_info || '');
+const cleanCareerDescription = formatJobDescriptionForHtml(data.career_description || data.hr_job_description || '');
+const cleanCareerRequirements = formatJobDescriptionForHtml(data.career_requirements || '');
+const cleanCareerAdditional = formatJobDescriptionForHtml(data.career_additional_info || '');
+if (descEditor) descEditor.innerHTML = cleanCareerDescription;
+if (reqsEditor) reqsEditor.innerHTML = cleanCareerRequirements;
+if (addiEditor) addiEditor.innerHTML = cleanCareerAdditional;
+if ((data.career_description || data.hr_job_description || '') && cleanCareerDescription !== (data.career_description || data.hr_job_description || '')) {
+  saveCareerField('career_description', cleanCareerDescription);
+}
+if ((data.career_requirements || '') && cleanCareerRequirements !== (data.career_requirements || '')) {
+  saveCareerField('career_requirements', cleanCareerRequirements);
+}
+if ((data.career_additional_info || '') && cleanCareerAdditional !== (data.career_additional_info || '')) {
+  saveCareerField('career_additional_info', cleanCareerAdditional);
+}
 // 👉 Enganche del botón ⭐ dentro de openPublishCareerPopup()
 const aiStarBtn   = document.getElementById('career-ai-btn');
 const aiStarStatus = document.getElementById('career-ai-status');
@@ -2667,9 +2977,12 @@ if (aiStarBtn) {
     const reqsEditor = document.getElementById('career-requirements')?.previousElementSibling?.querySelector('.job-description-editor');
     const addiEditor = document.getElementById('career-additional')?.previousElementSibling?.querySelector('.job-description-editor');
 
-    if (descEditor) descEditor.innerHTML = out.career_description || '';
-    if (reqsEditor) reqsEditor.innerHTML = out.career_requirements || '';
-    if (addiEditor) addiEditor.innerHTML = out.career_additional_info || '';
+    const cleanDescription = formatJobDescriptionForHtml(out.career_description || '');
+    const cleanRequirements = formatJobDescriptionForHtml(out.career_requirements || '');
+    const cleanAdditional = formatJobDescriptionForHtml(out.career_additional_info || '');
+    if (descEditor) descEditor.innerHTML = cleanDescription;
+    if (reqsEditor) reqsEditor.innerHTML = cleanRequirements;
+    if (addiEditor) addiEditor.innerHTML = cleanAdditional;
 
     // (opcional) sincroniza los <textarea> ocultos para evitar inconsistencias visuales
     const descTA = document.getElementById('career-description');
@@ -2681,9 +2994,9 @@ if (aiStarBtn) {
 
     // 💾 Guarda inmediatamente en una sola llamada (sin debounce)
     await saveCareerFieldsNow({
-      career_description: descEditor?.innerHTML || '',
-      career_requirements: reqsEditor?.innerHTML || '',
-      career_additional_info: addiEditor?.innerHTML || ''
+      career_description: cleanDescription,
+      career_requirements: cleanRequirements,
+      career_additional_info: cleanAdditional
     });
 
     // feedback UI
@@ -2794,8 +3107,8 @@ function createRichEditor(textareaId, fieldName, acSignal) {
 
   // ✅ Si ya se “enhanced”, reutiliza el editor existente
   if (ta.dataset.enhanced === '1') {
-    const existing = ta.nextElementSibling?.classList?.contains('rich-wrap')
-      ? ta.nextElementSibling.querySelector('.job-description-editor')
+    const existing = ta.previousElementSibling?.classList?.contains('rich-wrap')
+      ? ta.previousElementSibling.querySelector('.job-description-editor')
       : null;
     return existing || null;
   }
@@ -2836,7 +3149,7 @@ function createRichEditor(textareaId, fieldName, acSignal) {
   ed.style.borderRadius = '10px';
   ed.style.padding = '10px';
   ed.style.background = '#fff';
-  ed.innerHTML = ta.value || '';
+  ed.innerHTML = formatJobDescriptionForHtml(ta.value || '');
 const selMem = wireSelectionMemory(ed, bar, acSignal);
 
 const IS_SAFARI = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -2882,9 +3195,15 @@ ed.style.whiteSpace = 'pre-wrap';
   }, { signal: acSignal });
 
   // autosave HTML
-  const onChange = () => saveCareerField(fieldName, ed.innerHTML);
-  ed.addEventListener('input', onChange, { signal: acSignal });
-  ed.addEventListener('blur', onChange, { signal: acSignal });
+  const onInput = () => saveCareerField(fieldName, ed.innerHTML);
+  const onBlur = () => {
+    const clean = formatJobDescriptionForHtml(ed.innerHTML);
+    ed.innerHTML = clean;
+    ta.value = clean;
+    saveCareerField(fieldName, clean);
+  };
+  ed.addEventListener('input', onInput, { signal: acSignal });
+  ed.addEventListener('blur', onBlur, { signal: acSignal });
 
   // montar
   wrap.appendChild(bar);
@@ -3203,7 +3522,13 @@ async function loadOpportunityData() {
     MODEL.setUI(data.opp_model);
     _applyFeeVisibilityFromData(data);
     // JOB DESCRIPTION
-    document.getElementById('job-description-textarea').innerHTML = formatJobDescriptionForHtml(data.hr_job_description || '');
+    const originalJobDescription = data.hr_job_description || '';
+    const formattedJobDescription = formatJobDescriptionForHtml(originalJobDescription);
+    document.getElementById('job-description-textarea').innerHTML = formattedJobDescription;
+    if (originalJobDescription && formattedJobDescription && formattedJobDescription !== originalJobDescription) {
+      window.currentOpportunityData.hr_job_description = formattedJobDescription;
+      updateOpportunityField('hr_job_description', formattedJobDescription);
+    }
     updateJobDescriptionSummary();
 
     // FIRST MEETING INFO
