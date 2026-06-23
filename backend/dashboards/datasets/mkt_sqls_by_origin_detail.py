@@ -1,10 +1,10 @@
 """Marketing · detalle SQLs (live HubSpot).
 
-Una fila por SQL contado en el card de Métricas de Negocio / embudo: contactos
-cuyo lead_life ALCANZÓ la etapa SQL (AE) o más (active/inactive client), anclados
-por `date_of_meeting_scheduled` en el período, excluyendo outbound/connected inbox/
-referral. Misma definición y mismas bounds que `mkt_business_metrics` (sqls) y
-`mkt_funnel_mql_sql_cw`, para que el detalle cuadre con el conteo.
+Una fila por SQL contado en el card de Métricas de Negocio: contactos cuyo lead_life
+ALCANZÓ la etapa SQL (AE) o más (active/inactive client), anclados por
+`meeting_date___time` (la fecha REAL del meeting = cuando se volvió SQL) en el
+período. Misma definición y mismas bounds que `mkt_business_metrics` (sqls) y
+`mkt_sqls_by_origin`, para que el detalle cuadre con el conteo.
 """
 from __future__ import annotations
 
@@ -29,9 +29,15 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     ini, fin, _ = period_bounds(filters)
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    meeting_property = (os.environ.get("HUBSPOT_MQL_DATE_PROPERTY") or "date_of_meeting_scheduled").strip()
-    # Ancla = fecha del meeting agendado, igual que el card de SQLs.
-    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    # Ancla SQL = fecha REAL del meeting (`meeting_date___time`), no la de agendamiento.
+    # Ver mkt_sqls_by_origin: becoming SQL = la reunión ocurrió. La misma propiedad se
+    # muestra como "Meeting" para que el detalle cuadre con el conteo.
+    anchor_property = (
+        os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+        or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+        or "meeting_date___time"
+    ).strip()
+    meeting_property = anchor_property
 
     client = HubSpotClient()
     property_maps = _resolve_account_property_maps(client)
@@ -41,7 +47,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
         extra_properties=[
-            lead_life_property, "createdate", anchor_property, meeting_property,
+            lead_life_property, "createdate", anchor_property,
             origin_prop, "mql_source", company_prop,
         ],
     )
@@ -91,7 +97,7 @@ DATASET = {
     "key": "mkt_sqls_by_origin_detail",
     "label": "Marketing · detalle SQLs (período, live HubSpot)",
     "dimensions": [
-        {"key": "meeting_date", "label": "Meeting agendado", "type": "date"},
+        {"key": "meeting_date", "label": "Meeting (fecha real)", "type": "date"},
         {"key": "created", "label": "Creación (SQL)", "type": "date"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
         {"key": "origin", "label": "Origin", "type": "string"},

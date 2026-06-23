@@ -1,8 +1,9 @@
 """Marketing · SQLs aperturados por origin — ranking por período.
 
 SQL = contacto que ALCANZÓ la etapa SQL (AE) o más (active/inactive client) en
-HubSpot, anclado por `date_of_meeting_scheduled`. Misma definición que el card de
-SQLs (mkt_business_metrics) y el embudo (mkt_funnel_mql_sql_cw) — ya NO es
+HubSpot, anclado por `meeting_date___time` (la fecha REAL del meeting, = cuando se
+volvió SQL; NO la de agendamiento, que es el ancla del MQL). Misma definición que el
+card de SQLs (mkt_business_metrics) — ya NO es
 account.creation_date sobre Postgres. Marketing-scope = Inbound en AMBAS dimensiones
 (origin/MQL Source + conversion_channel/Booking Source). Segmentado por origin.
 Período (a la fecha): semana / mes / q / anio. Devuelve una fila por origin con
@@ -64,8 +65,16 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     ini, fin, label = period_bounds(filters)
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    # Ancla = fecha del meeting agendado (= se volvió SQL AE), igual que el card de SQLs.
-    anchor_property = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    # Ancla SQL = fecha REAL en que ocurrió la reunión (`meeting_date___time`), NO la
+    # fecha en que se agendó/reservó (`date_of_meeting_scheduled`, que es el ancla del
+    # MQL). Becoming SQL = la reunión efectivamente sucedió: un lead que reservó la
+    # semana pasada para reunirse esta semana es MQL la semana pasada pero SQL esta
+    # semana (caso Wesley vs Ameel, confirmado con el equipo).
+    anchor_property = (
+        os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+        or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+        or "meeting_date___time"
+    ).strip()
 
     client = HubSpotClient()
     property_maps = _resolve_account_property_maps(client)

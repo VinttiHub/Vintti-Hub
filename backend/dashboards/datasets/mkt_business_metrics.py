@@ -4,8 +4,9 @@ Una sola fila con los totales del período seleccionado (semana / mes / q / anio
 y su variación vs el MISMO span del período anterior (MTD vs MTD, YTD vs YTD, etc.):
 
   - sqls         → contactos que ALCANZARON la etapa SQL (AE) en HubSpot, anclados
-                   por `date_of_meeting_scheduled`, en el período. MISMA definición
-                   que el embudo (mkt_funnel_mql_sql_cw) para que ambos cuadren.
+                   por `meeting_date___time` (la fecha REAL del meeting = cuando se
+                   volvió SQL; NO la de agendamiento), en el período. Misma definición
+                   que mkt_sqls_by_origin / mkt_sqls_by_origin_detail.
   - new_clients  → cuentas con su PRIMER Close Win (opp_close_date) en el período.
   - close_rate   → win rate por cliente de lo decidido (cierre en el período):
                    Close Win ÷ (Close Win + solo Closed Lost), a nivel cuenta.
@@ -59,8 +60,8 @@ def _prev_bounds(ini: date, fin: date, label: str) -> tuple[date, date]:
 
 
 def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, int]:
-    """SQLs (etapa alcanzada en HubSpot, ancla date_of_meeting_scheduled) para el
-    período actual [ini, fin] y el anterior [pini, pfin]. Misma lógica que el embudo."""
+    """SQLs (etapa alcanzada en HubSpot, ancla meeting_date___time = fecha real del
+    meeting) para el período actual [ini, fin] y el anterior [pini, pfin]."""
     from utils.hubspot import HubSpotClient
     from routes.hubspot_routes import (
         _resolve_account_property_maps, _first_mapped_value,
@@ -68,7 +69,13 @@ def _hs_sql_counts(ini: date, fin: date, pini: date, pfin: date) -> tuple[int, i
     from .mkt_mqls_by_origin import _parse_hs_date_ms
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    # Ancla SQL = fecha REAL del meeting (`meeting_date___time`), no la de agendamiento.
+    # Ver mkt_sqls_by_origin: becoming SQL = la reunión ocurrió.
+    anchor = (
+        os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+        or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+        or "meeting_date___time"
+    ).strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)

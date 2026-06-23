@@ -2,8 +2,9 @@
 
 Una fila por canal (origin = where_come_from normalizado). La COHORTE son los
 contactos que ALCANZARON la etapa SQL (AE) en HubSpot en el período (ancla
-`date_of_meeting_scheduled`, filtro `mql_source` ∈ {Inbound MQL, Event MQL}) — MISMA
-definición de SQL que el card / detalle / embudo. Esos contactos se mapean a sus
+`meeting_date___time` = fecha real del meeting, filtro `mql_source` ∈ {Inbound MQL,
+Event MQL}) — MISMA definición de SQL que el card / detalle / embudo. La columna MQL
+usa su propia ancla `date_of_meeting_scheduled`. Esos contactos se mapean a sus
 cuentas (`account.hubspot_contact_id`) y medimos qué pasó con ellas (outcomes
 acumulados a hoy, Postgres):
 
@@ -42,13 +43,20 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
     from ._marketing_scope import is_marketing_mql_source
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    # Ancla DOBLE: MQL por `date_of_meeting_scheduled` (se agendó), SQL por
+    # `meeting_date___time` (la reunión ocurrió) — para que el SQL cuadre con sus cards.
+    mql_anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    sql_anchor = (
+        os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+        or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+        or "meeting_date___time"
+    ).strip()
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
     origin_prop = (pm.get("contacts") or {}).get("where_come_from") or "origin"
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
+        extra_properties=[lead_life_property, mql_anchor, sql_anchor, origin_prop, "mql_source"],
     )
     sql_contacts, mql_by_origin = [], Counter()
     for c in contacts:
@@ -56,16 +64,17 @@ def _cohort(ini, fin) -> tuple[list[tuple[str, str]], Counter]:
         ll = str(p.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_MQL:
             continue
-        d = _parse_hs_date_ms(p.get(anchor))
-        if d is None or d < ini or d > fin:
-            continue
         if not is_marketing_mql_source(p.get("mql_source")):
             continue
         origin = _normalize_lead_source(_first_mapped_value(pm, "where_come_from", contact=c))
         origin = (str(origin or "").strip()) or "(Sin origen)"
-        mql_by_origin[origin] += 1
+        d_mql = _parse_hs_date_ms(p.get(mql_anchor))
+        if d_mql is not None and ini <= d_mql <= fin:
+            mql_by_origin[origin] += 1
         if ll in _REACHED_SQL:
-            sql_contacts.append((str(c.get("id") or "").strip(), origin))
+            d_sql = _parse_hs_date_ms(p.get(sql_anchor))
+            if d_sql is not None and ini <= d_sql <= fin:
+                sql_contacts.append((str(c.get("id") or "").strip(), origin))
     return sql_contacts, mql_by_origin
 
 
@@ -170,7 +179,9 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
             a["life"].append(od["lifetime_months"])
 
     rows = []
-    for o in mql_by_origin:                      # todos los canales con MQL (MQL ≥ SQL)
+    # Unión: canales con MQL (agendado en el período) Y/O con SQL (meeting en el
+    # período). Con anclas distintas, un canal puede tener SQL sin MQL en el período.
+    for o in set(mql_by_origin) | set(sqls):
         a = agg.get(o, {})
         won, dec, life = a.get("won", 0), a.get("decided", 0), a.get("life", [])
         rows.append({

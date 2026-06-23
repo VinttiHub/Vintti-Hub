@@ -1,9 +1,10 @@
 """Marketing · Embudo de conversión MQL (AE) → SQL (AE) → Close Win (live HubSpot).
 
-Cohorte por etapa ALCANZADA: el lead_life actual de un contacto = la etapa máxima
-a la que llegó. De los contactos (origin de marketing, createdate en el período) que
-llegaron a MQL (AE), cuántos llegaron a SQL (AE) y cuántos a Active Client (won).
-Baja bien: MQL ≥ SQL ≥ CW. Excluye outbound/connected inbox/referral.
+Por etapa ALCANZADA (el lead_life actual = la etapa máxima a la que llegó), filtrado
+por marketing (`mql_source` ∈ {Inbound MQL, Event MQL}). Cada etapa se ancla con su
+PROPIA fecha para cuadrar con sus cards: MQL por `date_of_meeting_scheduled` (se
+agendó), SQL y CW por `meeting_date___time` (la reunión ocurrió). Normalmente
+MQL ≥ SQL ≥ CW; con anclas distintas puede invertirse en bordes de período (raro).
 """
 from __future__ import annotations
 
@@ -30,9 +31,17 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
     ini, fin, label = period_bounds(filters)
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    # MQL = agendó reunión → ancla `date_of_meeting_scheduled` (mismo criterio que
-    # los cards de MQL: mkt_mqls_by_origin / mkt_mqls_business_metric).
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    # Ancla DOBLE (cada etapa con su fecha, para que cuadre con sus cards):
+    #   MQL = agendó reunión → `date_of_meeting_scheduled` (cuando se reservó).
+    #   SQL / CW = la reunión OCURRIÓ → `meeting_date___time` (fecha real del meeting).
+    # Un lead reservado la semana pasada para reunirse esta semana es MQL la pasada y
+    # SQL esta. Mismas anclas que mkt_mqls_* (MQL) y mkt_sqls_* (SQL).
+    mql_anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    sql_anchor = (
+        os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+        or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+        or "meeting_date___time"
+    ).strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
@@ -40,25 +49,27 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
     contacts = client.search_contacts(
         [{"propertyName": lead_life_property, "operator": "IN", "values": _IN_VALUES}],
-        extra_properties=[lead_life_property, anchor, origin_prop, "mql_source"],
+        extra_properties=[lead_life_property, mql_anchor, sql_anchor, origin_prop, "mql_source"],
     )
 
     mql = sqlc = cw = 0
     for c in contacts:
         props = c.get("properties") or {}
-        d = _parse_hs_date_ms(props.get(anchor))
-        if d is None or d < ini or d > fin:
-            continue
         # Marketing-scope = denylist + import sobre origin (sin conversion_channel).
-        if not is_marketing_mql_source((c.get("properties") or {}).get("mql_source")):
+        if not is_marketing_mql_source(props.get("mql_source")):
             continue
         ll = str(props.get(lead_life_property) or "").strip().lower()
         if ll not in _REACHED_MQL:
             continue
-        mql += 1
-        if ll in _REACHED_SQL:
+        d_mql = _parse_hs_date_ms(props.get(mql_anchor))
+        d_sql = _parse_hs_date_ms(props.get(sql_anchor))
+        in_mql = d_mql is not None and ini <= d_mql <= fin
+        in_sql = d_sql is not None and ini <= d_sql <= fin
+        if in_mql:
+            mql += 1
+        if ll in _REACHED_SQL and in_sql:
             sqlc += 1
-        if ll in _WON:
+        if ll in _WON and in_sql:
             cw += 1
 
     return [{

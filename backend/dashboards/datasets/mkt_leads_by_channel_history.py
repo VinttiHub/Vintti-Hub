@@ -1,8 +1,9 @@
 """Marketing · MQLs/SQLs por canal EN EL TIEMPO (multi-línea, una línea por canal).
 
 `lead_type` (filtro) elige la métrica, AMBAS live desde HubSpot con la misma
-definición que los cards/detalles: 'mql' = etapa alcanzada MQL(AE)+, 'sql' = etapa
-alcanzada SQL(AE)+; ancla `date_of_meeting_scheduled`, filtro `mql_source` ∈
+definición que los cards/detalles: 'mql' = etapa alcanzada MQL(AE)+ (ancla
+`date_of_meeting_scheduled`, cuando se agendó), 'sql' = etapa alcanzada SQL(AE)+
+(ancla `meeting_date___time`, cuando ocurrió el meeting); filtro `mql_source` ∈
 {Inbound MQL, Event MQL}. La periodicidad define la granularidad del eje X DENTRO
 del período seleccionado:
   semana → días · mes → semanas · q/año → meses
@@ -60,8 +61,9 @@ def _spine(ini: date, fin: date, unit: str) -> list[date]:
 
 
 def _sql_counts(ini: date, fin: date, unit: str):
-    # SQL = etapa ALCANZADA SQL (AE) en HubSpot, ancla date_of_meeting_scheduled,
-    # filtro mql_source — MISMA definición que el card de SQLs y el detalle.
+    # SQL = etapa ALCANZADA SQL (AE) en HubSpot, ancla `meeting_date___time` (fecha REAL
+    # del meeting = cuando se volvió SQL; NO la de agendamiento) — MISMA definición que el
+    # card de SQLs y el detalle.
     from utils.hubspot import HubSpotClient
     from routes.hubspot_routes import (
         _resolve_account_property_maps, _first_mapped_value, _normalize_lead_source,
@@ -70,7 +72,11 @@ def _sql_counts(ini: date, fin: date, unit: str):
     from .mkt_funnel_mql_sql_cw import _REACHED_SQL
 
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
+    anchor = (
+        os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+        or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+        or "meeting_date___time"
+    ).strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
