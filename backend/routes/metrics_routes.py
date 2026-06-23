@@ -42,15 +42,28 @@ def data_light():
               a.account_status,
               a.account_manager,
               COALESCE(a.vintti_ai, FALSE) AS vintti_ai,
+              a.size,
+              a.state,
+              a.timezone,
               a.where_come_from,
+              a.lead_source_detail,
+              a.conversion_channel,
               a.referal_source,
+              a.industry,
+              a.outsource,
+              a.pain_points,
+              a.position,
+              a.type,
+              a.sql_meeting_date,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'recruiting' THEN COALESCE(h.revenue,0) END), 0) AS trr,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.fee,    0) END), 0) AS tsf,
               COALESCE(SUM(CASE WHEN o.opp_model ILIKE 'staffing'   THEN COALESCE(h.salary, 0) + COALESCE(h.fee, 0) END), 0) AS tsr
             FROM account a
             LEFT JOIN opportunity o ON o.account_id = a.account_id
             LEFT JOIN h_active h     ON h.opportunity_id = o.opportunity_id
-            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager, a.vintti_ai, a.where_come_from, a.referal_source
+            GROUP BY a.account_id, a.client_name, a.priority, a.contract, a.account_status, a.account_manager, a.vintti_ai,
+                     a.size, a.state, a.timezone, a.where_come_from, a.lead_source_detail, a.conversion_channel,
+                     a.referal_source, a.industry, a.outsource, a.pain_points, a.position, a.type, a.sql_meeting_date
             ORDER BY LOWER(a.client_name) ASC;
         """)
 
@@ -83,6 +96,12 @@ def get_opportunities_light():
                 o.opp_sales_lead,
                 o.opp_hr_lead,
                 o.comments,
+                o.years_experience,
+                o.career_job_type,
+                o.career_years_experience,
+                o.career_seniority,
+                o.career_field,
+                o.career_modality,
                 o.nda_signature_or_start_date,
                 o.opp_close_date,
                 o.motive_close_lost,

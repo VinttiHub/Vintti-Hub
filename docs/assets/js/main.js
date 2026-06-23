@@ -1802,6 +1802,26 @@ if (downloadCsvBtn) {
         (Array.isArray(data) ? data : []).map((opp) => [String(opp.opportunity_id), opp])
       );
 
+      const detailedOpportunities = await Promise.all(
+        filteredNodes.map(async (row) => {
+          const stageSelect = row.querySelector('.stage-dropdown');
+          const opportunityId = String(stageSelect?.dataset?.id || '');
+          if (!opportunityId) return null;
+          try {
+            const res = await fetch(`https://7m6mw95m8y.us-east-2.awsapprunner.com/opportunities/${encodeURIComponent(opportunityId)}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const detail = await res.json();
+            return [opportunityId, detail];
+          } catch (err) {
+            console.warn(`Could not hydrate opportunity ${opportunityId} for CSV export:`, err);
+            return [opportunityId, opportunitiesById.get(opportunityId) || {}];
+          }
+        })
+      );
+      const detailedOpportunitiesById = new Map(
+        detailedOpportunities.filter(Boolean)
+      );
+
       const batchSourcingByOpp = await fetchOpportunityBatchSourcingDates();
 
       const headers = [
@@ -1819,6 +1839,12 @@ if (downloadCsvBtn) {
         'candidates_count_visible',
         'interviewed_count_visible',
         'motive_close_lost',
+        'years_experience',
+        'career_job_type',
+        'career_years_experience',
+        'career_seniority',
+        'career_field',
+        'career_modality',
         'matching_sourcing_date',
         'batch_presentation_date',
         'days_from_sourcing_to_batch',
@@ -1835,7 +1861,7 @@ if (downloadCsvBtn) {
       filteredNodes.forEach((row) => {
         const stageSelect = row.querySelector('.stage-dropdown');
         const opportunityId = String(stageSelect?.dataset?.id || '');
-        const opp = opportunitiesById.get(opportunityId) || {};
+        const opp = detailedOpportunitiesById.get(opportunityId) || opportunitiesById.get(opportunityId) || {};
         const batchSourcingRows = batchSourcingByOpp.get(opportunityId) || [];
 
         const batchRows = batchSourcingRows.length ? batchSourcingRows : [{}];
@@ -1856,6 +1882,12 @@ if (downloadCsvBtn) {
             candidates_count_visible: row.children?.[10]?.textContent?.trim() || '',
             interviewed_count_visible: row.children?.[11]?.textContent?.trim() || '',
             motive_close_lost: opp?.motive_close_lost || opp?.details_close_lost || '',
+            years_experience: opp?.years_experience ?? '',
+            career_job_type: opp?.career_job_type ?? '',
+            career_years_experience: opp?.career_years_experience ?? '',
+            career_seniority: opp?.career_seniority ?? '',
+            career_field: opp?.career_field ?? '',
+            career_modality: opp?.career_modality ?? '',
             matching_sourcing_date: batchRow?.matching_sourcing_date ?? '',
             batch_presentation_date: batchRow?.batch_presentation_date ?? '',
             days_from_sourcing_to_batch: batchRow?.days_from_sourcing_to_batch ?? '',

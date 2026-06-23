@@ -488,6 +488,19 @@ function csvNullableTextValue(value) {
   return isoDateMatch ? isoDateMatch[0] : text;
 }
 
+function csvDateValue(value) {
+  if (value === null || value === undefined) return '';
+  const text = String(value).trim();
+  if (!text) return '';
+  const isoDateMatch = text.match(/\d{4}-\d{2}-\d{2}/);
+  if (isoDateMatch) return isoDateMatch[0];
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return text;
+}
+
 function buildCrmExportRecord(item = {}) {
   const accountId = Number(item.account_id);
   if (!accountId) return null;
@@ -500,8 +513,19 @@ function buildCrmExportRecord(item = {}) {
     clientName: (item.client_name || '—').toString().trim() || '—',
     status,
     salesLead,
+    size: csvTextValue(item.size),
+    state: csvTextValue(item.state),
+    timezone: csvTextValue(item.timezone),
     leadSource: csvTextValue(item.where_come_from),
+    leadSourceDetail: csvTextValue(item.lead_source_detail),
+    conversionChannel: csvTextValue(item.conversion_channel),
     referralSource: csvTextValue(item.referal_source),
+    industry: csvTextValue(item.industry),
+    outsource: csvTextValue(item.outsource),
+    painPoints: csvTextValue(item.pain_points),
+    position: csvTextValue(item.position),
+    type: csvTextValue(item.type),
+    sqlMeetingDate: csvDateValue(item.sql_meeting_date),
     contract,
     trr: csvMoneyValue(item.trr),
     tsf: csvMoneyValue(item.tsf),
@@ -526,8 +550,19 @@ function updateCrmExportCache(accountId, patch = {}) {
     clientName: '—',
     status: '—',
     salesLead: 'Unassigned',
+    size: '—',
+    state: '—',
+    timezone: '—',
     leadSource: '—',
+    leadSourceDetail: '—',
+    conversionChannel: '—',
     referralSource: '—',
+    industry: '—',
+    outsource: '—',
+    painPoints: '—',
+    position: '—',
+    type: '—',
+    sqlMeetingDate: '',
     contract: 'No Contract',
     trr: 0,
     tsf: 0,
@@ -537,24 +572,52 @@ function updateCrmExportCache(accountId, patch = {}) {
   CRM_EXPORT_CACHE.set(id, { ...current, ...patch });
 }
 
+function hasCrmExportAccountData(row = {}) {
+  const requiredTextFields = [
+    'size',
+    'state',
+    'timezone',
+    'leadSource',
+    'leadSourceDetail',
+    'conversionChannel',
+    'referralSource',
+    'industry',
+    'outsource',
+    'painPoints',
+    'position',
+    'type'
+  ];
+  return requiredTextFields.every((field) => {
+    const value = (row?.[field] || '').toString().trim();
+    return value && value !== '—';
+  });
+}
+
 async function hydrateCrmExportAccountRow(accountId, row = null) {
   const id = Number(accountId);
   if (!id) return row;
 
   const currentRow = row || CRM_EXPORT_CACHE.get(id);
-  const currentLeadSource = (currentRow?.leadSource || '').toString().trim();
-  const currentReferralSource = (currentRow?.referralSource || '').toString().trim();
-  const hasLeadSource = currentLeadSource && currentLeadSource !== '—';
-  const hasReferralSource = currentReferralSource && currentReferralSource !== '—';
-  if (currentRow && hasLeadSource && hasReferralSource) return currentRow;
+  if (currentRow && hasCrmExportAccountData(currentRow)) return currentRow;
 
   try {
     const res = await fetch(`${API_BASE}/accounts/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error(`Account HTTP ${res.status}`);
     const account = await res.json();
     const patch = {
+      size: csvTextValue(account?.size),
+      state: csvTextValue(account?.state),
+      timezone: csvTextValue(account?.timezone),
       leadSource: csvTextValue(account?.where_come_from),
-      referralSource: csvTextValue(account?.referal_source)
+      leadSourceDetail: csvTextValue(account?.lead_source_detail),
+      conversionChannel: csvTextValue(account?.conversion_channel),
+      referralSource: csvTextValue(account?.referal_source),
+      industry: csvTextValue(account?.industry),
+      outsource: csvTextValue(account?.outsource),
+      painPoints: csvTextValue(account?.pain_points),
+      position: csvTextValue(account?.position),
+      type: csvTextValue(account?.type),
+      sqlMeetingDate: csvDateValue(account?.sql_meeting_date)
     };
     updateCrmExportCache(id, patch);
     return { ...(currentRow || {}), ...patch };
@@ -718,25 +781,25 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
       accountRow.clientName,
       accountRow.status,
       accountRow.salesLead,
+      accountRow.size,
+      accountRow.state,
+      accountRow.timezone,
       accountRow.leadSource,
+      accountRow.leadSourceDetail,
+      accountRow.conversionChannel,
       accountRow.referralSource,
+      accountRow.industry,
+      accountRow.outsource,
+      accountRow.painPoints,
+      accountRow.position,
+      accountRow.type,
+      accountRow.sqlMeetingDate,
       accountRow.contract,
       accountRow.trr,
       accountRow.tsf,
       accountRow.tsr,
       accountRow.priority,
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      ''
+      ...Array(12).fill('')
     ]];
   }
 
@@ -745,8 +808,19 @@ function buildCrmCandidateExportRows(accountRow, candidates = [], { includeEmpty
     accountRow.clientName,
     accountRow.status,
     accountRow.salesLead,
+    accountRow.size,
+    accountRow.state,
+    accountRow.timezone,
     accountRow.leadSource,
+    accountRow.leadSourceDetail,
+    accountRow.conversionChannel,
     accountRow.referralSource,
+    accountRow.industry,
+    accountRow.outsource,
+    accountRow.painPoints,
+    accountRow.position,
+    accountRow.type,
+    accountRow.sqlMeetingDate,
     accountRow.contract,
     accountRow.trr,
     accountRow.tsf,
@@ -795,8 +869,19 @@ async function downloadCrmCsv() {
     'Client Name',
     'Status',
     'Sales Lead',
+    'size',
+    'state',
+    'timezone',
     'lead_source',
+    'lead_source_detail',
+    'conversion_channel',
     'referal_source',
+    'industry',
+    'outsource',
+    'painpoints',
+    'position',
+    'type',
+    'sql_meeting_date',
     'Contract',
     'TRR',
     'TSF',
