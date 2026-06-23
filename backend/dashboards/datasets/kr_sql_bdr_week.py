@@ -43,10 +43,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COUNT(*)::int AS count,
           %(week_label)s::text AS week_label
         FROM account a
-        WHERE a.creation_date IS NOT NULL
+        WHERE a.sql_meeting_date IS NOT NULL  -- R1: ancla = meeting real
           AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
           AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(ae_leads)s
-          AND a.creation_date::date BETWEEN %(week_ini)s::date AND %(week_fin)s::date;
+          AND a.sql_meeting_date BETWEEN %(week_ini)s::date AND %(week_fin)s::date;
     """
     return sql, {
         "ae_leads": AE_LEADS,

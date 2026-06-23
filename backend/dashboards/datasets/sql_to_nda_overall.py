@@ -1,10 +1,9 @@
-"""SQL → NDA Sent · cohort by account.creation_date (Mariano + Bahia).
+"""SQL → NDA Sent · cohort by sql_meeting_date (Mariano + Bahia).
 
 Definition:
-  - Cohort (denominator): accounts whose `creation_date` falls in the period
-    AND that have at least one opportunity with `opp_sales_lead` in
-    (Mariano, Bahia). Accounts with no M+B opp are excluded — same rule as
-    the rest of the Sales tab.
+  - Cohort (denominator): accounts whose `sql_meeting_date` (= fecha real del meeting
+    en HubSpot, ESTRICTO, sin fallback a creation_date) falls in the period AND whose
+    `account_manager` ∈ (Mariano, Bahia). Ver audit R1.
   - Numerator (NDA sent): subset whose M+B opportunity has `nda_sent_date`
     populated.
   - % = NDA-sent cohort / total cohort.
@@ -60,11 +59,12 @@ def _query_snapshot(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
         cohort AS (
+          -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
           SELECT a.account_id
           FROM account a
           CROSS JOIN ventana v
-          WHERE a.creation_date IS NOT NULL
-            AND a.creation_date::date BETWEEN v.win_ini AND v.win_fin
+          WHERE a.sql_meeting_date IS NOT NULL
+            AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         accounts_with_nda_sent AS (
@@ -102,11 +102,12 @@ def _query_history(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
             AND o.account_id IS NOT NULL
         ),
         cohort AS (
+          -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
           SELECT
             a.account_id,
-            DATE_TRUNC('month', a.creation_date)::date AS mes
+            DATE_TRUNC('month', a.sql_meeting_date)::date AS mes
           FROM account a
-          WHERE a.creation_date IS NOT NULL
+          WHERE a.sql_meeting_date IS NOT NULL
             AND TRIM(LOWER(a.account_manager)) = ANY(%(sales_leads)s)
         ),
         bounds AS (

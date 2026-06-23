@@ -42,11 +42,13 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT %(win_ini)s::date AS win_ini, %(win_fin)s::date AS win_fin
         ),
         sql_accounts AS (
-          SELECT a.account_id, a.client_name, a.creation_date::date AS creation_d
+          -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
+          SELECT a.account_id, a.client_name,
+                 a.sql_meeting_date AS creation_d
           FROM account a
           CROSS JOIN ventana v
-          WHERE a.creation_date IS NOT NULL
-            AND a.creation_date::date BETWEEN v.win_ini AND v.win_fin
+          WHERE a.sql_meeting_date IS NOT NULL
+            AND a.sql_meeting_date BETWEEN v.win_ini AND v.win_fin
         ),
         nda_per_account AS (
           SELECT

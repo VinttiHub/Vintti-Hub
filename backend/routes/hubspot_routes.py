@@ -122,6 +122,11 @@ def _ensure_hubspot_account_columns(cursor):
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS lead_source_detail TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS conversion_channel TEXT")
     cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS credit_loop TEXT")
+    # R1: fecha REAL del meeting (meeting_date___time de HubSpot) con la que el contacto
+    # se volvió SQL. La escribe el sync de SQL contacts; las cards de Ventas anclan el
+    # SQL en esta fecha (COALESCE a creation_date para cuentas aún sin backfill), igual
+    # que Marketing. Ver [[project_dashboard_audit]] R1.
+    cursor.execute("ALTER TABLE account ADD COLUMN IF NOT EXISTS sql_meeting_date DATE")
     cursor.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_account_hubspot_deal_id
@@ -1241,6 +1246,16 @@ def sync_mariano_sql_contacts():
                                 action = "created"
 
                             contact_props = contact.get("properties") or {}
+                            # R1: anclar el SQL por la fecha REAL del meeting (igual que
+                            # Marketing). Guardamos meeting_date___time en account.sql_meeting_date
+                            # para AMBAS ramas (creado y linkeado), porque el path "linked" no
+                            # pasa por _insert_or_update_account.
+                            sql_meeting_d = _parse_hubspot_date(contact_props.get(meeting_datetime_property))
+                            if sql_meeting_d is not None:
+                                cursor.execute(
+                                    "UPDATE account SET sql_meeting_date = %s WHERE account_id = %s",
+                                    (sql_meeting_d, account_id),
+                                )
                             synced.append({
                                 "contact_id": contact_id,
                                 "deal_id": payload.get("hubspot_deal_id"),
@@ -1249,6 +1264,7 @@ def sync_mariano_sql_contacts():
                                 "client_name": payload.get("name"),
                                 "contact_email": contact_props.get("email"),
                                 "meeting_datetime": contact_props.get(meeting_datetime_property),
+                                "sql_meeting_date": sql_meeting_d.isoformat() if sql_meeting_d else None,
                                 "lead_life": contact_props.get(lead_life_property),
                             })
                         except Exception as exc:

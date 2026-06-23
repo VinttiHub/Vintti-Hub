@@ -75,11 +75,15 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           COALESCE(NULLIF(TRIM(a.mail), ''), '')                            AS email,
           COALESCE(NULLIF(TRIM(a.conversion_channel), ''), '')              AS channel,
           COALESCE(NULLIF(TRIM(a.account_manager), ''), '')                 AS account_manager,
-          TO_CHAR(a.creation_date::date, 'YYYY-MM-DD')                      AS creation_date
+          TO_CHAR(a.sql_meeting_date, 'YYYY-MM-DD') AS creation_date
         FROM account a
-        WHERE a.creation_date IS NOT NULL
-          AND a.creation_date::date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-        ORDER BY a.creation_date::date DESC, a.client_name;
+        -- SQL SALES = solo Outbound + owner M+B; ancla = fecha real del meeting
+        -- (sql_meeting_date), estricto: solo cuentas con reunión real. Mismo filtro que sql_leads_windows.
+        WHERE a.sql_meeting_date IS NOT NULL
+          AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
+          AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN ('mariano@vintti.com', 'bahia@vintti.com')
+          AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+        ORDER BY a.sql_meeting_date DESC, a.client_name;
     """
 
     return sql, {"win_ini": win_ini, "win_fin": win_fin}

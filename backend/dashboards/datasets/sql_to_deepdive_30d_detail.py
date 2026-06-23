@@ -35,8 +35,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     # and whether it advanced to Deep Dive. Same definition as sql_to_deepdive_30d.
     win_ini, win_fin = window_bounds(filters)
     sql = """
+        -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
         SELECT
-          TO_CHAR(a.creation_date, 'YYYY-MM-DD') AS sql_date,
+          TO_CHAR(a.sql_meeting_date, 'YYYY-MM-DD') AS sql_date,
           CASE
             WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'Sales'
             WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'Referrals'
@@ -50,12 +51,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               AND NULLIF(o.deep_dive_date::text, '')::date IS NOT NULL
           ) THEN 'Deep Dive' ELSE '—' END AS status
         FROM account a
-        WHERE a.creation_date IS NOT NULL
+        WHERE a.sql_meeting_date IS NOT NULL
           AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-          AND a.creation_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
-          AND (%(desde)s::date IS NULL OR a.creation_date >= %(desde)s::date)
-          AND (%(hasta)s::date IS NULL OR a.creation_date <= %(hasta)s::date)
-        ORDER BY channel, a.creation_date DESC, a.client_name;
+          AND a.sql_meeting_date BETWEEN %(win_ini)s::date AND %(win_fin)s::date
+          AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
+          AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)
+        ORDER BY channel, sql_date DESC, a.client_name;
     """
 
     return sql, {

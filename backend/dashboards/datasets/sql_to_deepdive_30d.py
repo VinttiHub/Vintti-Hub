@@ -39,9 +39,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     win_ini, win_fin = window_bounds(filters)
     sql = """
         WITH acc AS (
+          -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
           SELECT
             a.account_id,
-            a.creation_date AS sql_d,
+            a.sql_meeting_date AS sql_d,
             CASE
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound' THEN 'sales'
               WHEN LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'referral' THEN 'referrals'
@@ -53,10 +54,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
                 AND NULLIF(o.deep_dive_date::text, '')::date IS NOT NULL
             ) AS reached_dd
           FROM account a
-          WHERE a.creation_date IS NOT NULL
+          WHERE a.sql_meeting_date IS NOT NULL
             AND TRIM(LOWER(a.account_manager)) IN ('bahia@vintti.com','mariano@vintti.com')
-            AND (%(desde)s::date IS NULL OR a.creation_date >= %(desde)s::date)
-            AND (%(hasta)s::date IS NULL OR a.creation_date <= %(hasta)s::date)
+            AND (%(desde)s::date IS NULL OR a.sql_meeting_date >= %(desde)s::date)
+            AND (%(hasta)s::date IS NULL OR a.sql_meeting_date <= %(hasta)s::date)
         ),
         cur AS (
           SELECT * FROM acc

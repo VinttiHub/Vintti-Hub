@@ -44,9 +44,10 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           FROM params p, generate_series(p.first_mon, p.this_mon, INTERVAL '7 days') gs
         ),
         sqls AS (
-          SELECT a.creation_date::date AS d
+          -- R1: ancla SQL = fecha real del meeting (sql_meeting_date), estricto: solo cuentas con reunión real.
+          SELECT a.sql_meeting_date AS d
           FROM account a
-          WHERE a.creation_date IS NOT NULL
+          WHERE a.sql_meeting_date IS NOT NULL
             AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
             AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN %(ae_leads)s
         ),

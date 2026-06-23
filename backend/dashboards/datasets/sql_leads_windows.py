@@ -1,8 +1,11 @@
 """SQL Sales — leads count by window (Last week / WTD / Last month / MTD).
 
-Source: local CRM (`account` table). An account is considered an "SQL" the
-moment it lands in the CRM, so we use `account.creation_date` as the SQL
-event date. This is the same definition the Marketing tab uses.
+Source: local CRM (`account` table). SQL SALES = solo Outbound (where_come_from =
+'outbound') y owner ∈ {Mariano, Bahía} — los SQL generados por Sales, no inbound. El
+SQL se ancla ESTRICTO por la fecha REAL del meeting (`account.sql_meeting_date`, =
+meeting_date___time de HubSpot): solo cuentan las que tuvieron la reunión de calificación
+(sin fallback a creation_date). (Antes contaba TODAS las cuentas por creation_date crudo,
+sin filtrar canal/owner.) Ver audit R1.
 
 Windows are aligned with `new_opps_am_windows` so both sides of the funnel
 agree on what "Last week / WTD / Last month / MTD" mean.
@@ -52,20 +55,29 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
     lm_ini, lm_fin = last_month_start, last_month_end
     mt_ini, mt_fin = month_start,      corte
 
+    # SQL SALES = solo Outbound (los SQL generados por Sales, no inbound/marketing) y
+    # owner ∈ {Mariano, Bahía} (regla del tab Sales). Ancla = fecha real del meeting
+    # (sql_meeting_date), estricto: solo cuentas con reunión real.
     sql = """
+        WITH sql_acc AS (
+          SELECT a.sql_meeting_date AS sql_d
+          FROM account a
+          WHERE a.sql_meeting_date IS NOT NULL
+            AND LOWER(TRIM(COALESCE(a.where_come_from, ''))) = 'outbound'
+            AND LOWER(TRIM(COALESCE(a.account_manager, ''))) IN ('mariano@vintti.com', 'bahia@vintti.com')
+        )
         SELECT
           %(corte)s::date AS corte,
-          COUNT(*) FILTER (WHERE a.creation_date::date BETWEEN %(lw_ini)s::date AND %(lw_fin)s::date)::int
+          COUNT(*) FILTER (WHERE sql_d BETWEEN %(lw_ini)s::date AND %(lw_fin)s::date)::int
             AS sql_last_week,
-          COUNT(*) FILTER (WHERE a.creation_date::date BETWEEN %(wt_ini)s::date AND %(wt_fin)s::date)::int
+          COUNT(*) FILTER (WHERE sql_d BETWEEN %(wt_ini)s::date AND %(wt_fin)s::date)::int
             AS sql_wtd,
-          COUNT(*) FILTER (WHERE a.creation_date::date BETWEEN %(lm_ini)s::date AND %(lm_fin)s::date)::int
+          COUNT(*) FILTER (WHERE sql_d BETWEEN %(lm_ini)s::date AND %(lm_fin)s::date)::int
             AS sql_last_month,
-          COUNT(*) FILTER (WHERE a.creation_date::date BETWEEN %(mt_ini)s::date AND %(mt_fin)s::date)::int
+          COUNT(*) FILTER (WHERE sql_d BETWEEN %(mt_ini)s::date AND %(mt_fin)s::date)::int
             AS sql_mtd
-        FROM account a
-        WHERE a.creation_date IS NOT NULL
-          AND a.creation_date::date >= LEAST(%(lw_ini)s::date, %(lm_ini)s::date);
+        FROM sql_acc
+        WHERE sql_d >= LEAST(%(lw_ini)s::date, %(lm_ini)s::date);
     """
 
     return sql, {
