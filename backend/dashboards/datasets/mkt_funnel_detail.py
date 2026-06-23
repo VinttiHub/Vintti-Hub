@@ -1,8 +1,10 @@
 """Marketing · Detalle del embudo MQL/SQL/Close Win (live HubSpot).
 
-`stage` (filtro): 'mql' | 'sql' | 'cw'. Lista los contactos (origin de marketing,
-createdate en el período) que alcanzaron esa etapa, con su etapa actual (lead_life).
-Misma cohorte/tiers que mkt_funnel_mql_sql_cw.
+`stage` (filtro): 'mql' | 'sql' | 'cw'. Lista los contactos (marketing por
+`mql_source`) que alcanzaron esa etapa en el período, con su etapa actual (lead_life).
+Mismos tiers y MISMAS anclas que mkt_funnel_mql_sql_cw: MQL por
+`date_of_meeting_scheduled` (se agendó), SQL/CW por `meeting_date___time` (la reunión
+ocurrió), para que el detalle cuadre con el conteo del embudo.
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
     )
 
     stage = str((filters or {}).get("stage") or "mql").strip().lower()
+    is_sql_or_cw = stage in ("cw", "close_win", "win", "sql")
     if stage in ("cw", "close_win", "win"):
         tier = _WON
     elif stage == "sql":
@@ -29,7 +32,16 @@ def compute(filters: dict, *_args, **_kwargs) -> list[dict]:
 
     ini, fin, _label = period_bounds(filters or {})
     lead_life_property = (os.environ.get("HUBSPOT_LEAD_LIFE_PROPERTY") or "lead_life").strip()
-    anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "createdate").strip()
+    # Ancla por etapa, igual que el embudo: MQL = se agendó (`date_of_meeting_scheduled`);
+    # SQL/CW = la reunión ocurrió (`meeting_date___time`).
+    if is_sql_or_cw:
+        anchor = (
+            os.environ.get("HUBSPOT_SQL_ANCHOR_PROPERTY")
+            or os.environ.get("HUBSPOT_MEETING_DATETIME_PROPERTY")
+            or "meeting_date___time"
+        ).strip()
+    else:
+        anchor = (os.environ.get("HUBSPOT_MQL_ANCHOR_PROPERTY") or "date_of_meeting_scheduled").strip()
 
     client = HubSpotClient()
     pm = _resolve_account_property_maps(client)
@@ -77,7 +89,7 @@ DATASET = {
     "key": "mkt_funnel_detail",
     "label": "Marketing · Detalle embudo (por etapa, live HubSpot)",
     "dimensions": [
-        {"key": "created", "label": "Creación", "type": "date"},
+        {"key": "created", "label": "Fecha meeting", "type": "date"},
         {"key": "client_name", "label": "Cuenta / contacto", "type": "string"},
         {"key": "origin", "label": "Origin", "type": "string"},
         {"key": "lead_life", "label": "Etapa actual", "type": "string"},
