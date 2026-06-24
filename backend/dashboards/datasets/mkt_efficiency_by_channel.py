@@ -112,10 +112,18 @@ _OUTCOMES_SQL = """
       WHERE TRIM(o.opp_stage) = 'Close Win' AND o.opp_model = 'Staffing'
     ),
     life AS (
+      -- R6: lifetime = meses calendario ACTIVOS distintos (overlap), igual que
+      -- client_lifetime_avg. Antes usaba AGE(MIN start, MAX end) (incluía huecos).
       SELECT account_id,
-             (DATE_PART('year',  AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) * 12
-            + DATE_PART('month', AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) + 1)::int AS lifetime_months
-      FROM hires WHERE start_d IS NOT NULL GROUP BY account_id
+             COUNT(DISTINCT DATE_TRUNC('month', gs)::date)::int AS lifetime_months
+      FROM hires
+      CROSS JOIN LATERAL generate_series(
+        DATE_TRUNC('month', start_d),
+        DATE_TRUNC('month', COALESCE(end_d, CURRENT_DATE)),
+        interval '1 month'
+      ) gs
+      WHERE start_d IS NOT NULL
+      GROUP BY account_id
     )
     SELECT i.account_id,
            COALESCE(oa.won, false)      AS won,

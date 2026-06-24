@@ -29,7 +29,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           SELECT
             ho.candidate_id,
             ho.account_id,
-            NULLIF(CAST(ho.start_date AS TEXT), '')::date AS start_d,
+            CASE
+              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+              WHEN NULLIF(CAST(ho.start_date AS TEXT), '') IS NOT NULL
+                THEN NULLIF(CAST(ho.start_date AS TEXT), '')::date
+              ELSE NULL
+            END AS start_d,
             CASE
               WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
               WHEN ho.end_date IS NULL OR CAST(ho.end_date AS TEXT) = '' THEN NULL
@@ -39,7 +44,7 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o ON o.opportunity_id = ho.opportunity_id
           WHERE ho.candidate_id IS NOT NULL
             AND ho.account_id IS NOT NULL
-            AND NULLIF(CAST(ho.start_date AS TEXT), '') IS NOT NULL
+            AND (ho.carga_active IS NOT NULL OR NULLIF(CAST(ho.start_date AS TEXT), '') IS NOT NULL)
             AND o.opp_model = 'Staffing'
         ),
         meses AS (

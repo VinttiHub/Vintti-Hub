@@ -39,8 +39,14 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
         WITH ho_norm AS (
           SELECT
             ho.candidate_id,
-            ho.start_date::date AS start_d,
+            -- R6: start_d/end_d canónicos (carga_active/carga_inactive primero),
+            -- igual que el resto de churn/MRR. Antes usaba start_date/end_date crudos.
             CASE
+              WHEN ho.carga_active IS NOT NULL THEN ho.carga_active::date
+              ELSE NULLIF(ho.start_date::text, '')::date
+            END AS start_d,
+            CASE
+              WHEN ho.carga_inactive IS NOT NULL THEN ho.carga_inactive::date
               WHEN ho.end_date IS NULL OR ho.end_date::text = '' THEN NULL
               ELSE ho.end_date::date
             END AS end_d
@@ -48,9 +54,9 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
           JOIN opportunity o
             ON o.opportunity_id = ho.opportunity_id
            AND o.opp_model = 'Staffing'
-          WHERE ho.start_date IS NOT NULL
-            AND (%(desde)s::date IS NULL OR ho.start_date::date >= DATE_TRUNC('month', %(desde)s::date))
-            AND (%(hasta)s::date IS NULL OR ho.start_date::date <  (DATE_TRUNC('month', %(hasta)s::date) + INTERVAL '1 month'))
+          WHERE COALESCE(ho.carga_active::date, NULLIF(ho.start_date::text, '')::date) IS NOT NULL
+            AND (%(desde)s::date IS NULL OR COALESCE(ho.carga_active::date, NULLIF(ho.start_date::text, '')::date) >= DATE_TRUNC('month', %(desde)s::date))
+            AND (%(hasta)s::date IS NULL OR COALESCE(ho.carga_active::date, NULLIF(ho.start_date::text, '')::date) <  (DATE_TRUNC('month', %(hasta)s::date) + INTERVAL '1 month'))
         ),
         placements AS (
           SELECT candidate_id, start_d, MIN(end_d) AS end_d

@@ -126,24 +126,33 @@ def _sql_for(model: str) -> str:
           WHERE ho.account_id IS NOT NULL AND TRIM(o.opp_stage) = 'Close Win'
             AND o.opp_model = 'Staffing'
         ),
-        hire_calc AS (
+        -- R6: lifetime canónico = meses calendario ACTIVOS (overlap), igual que
+        -- client_lifetime_avg. Expandimos cada hire en sus meses calendario:
+        --   CLTV  = Σ fee por cada mes calendario activo del hire.
+        --   lifetime_months = nº de meses calendario DISTINTOS con ≥1 contractor
+        --   (excluye huecos; meses con contractors paralelos cuentan una vez).
+        -- Antes usaba AGE() por hire y MIN/MAX por cliente (incluía huecos).
+        hire_months AS (
           SELECT
-            h.account_id, ac.origin, h.fee, h.start_d, h.end_d,
+            h.account_id, ac.origin, h.fee,
             (h.end_d IS NULL OR h.end_d >= CURRENT_DATE) AS hire_active,
-            GREATEST(1, (DATE_PART('year',  AGE(COALESCE(h.end_d, CURRENT_DATE), h.start_d)) * 12
-                       + DATE_PART('month', AGE(COALESCE(h.end_d, CURRENT_DATE), h.start_d)) + 1))::int AS months
+            DATE_TRUNC('month', gs)::date AS mes
           FROM hires h
           JOIN acct ac ON ac.account_id = h.account_id
+          CROSS JOIN LATERAL generate_series(
+            DATE_TRUNC('month', h.start_d),
+            DATE_TRUNC('month', COALESCE(h.end_d, CURRENT_DATE)),
+            interval '1 month'
+          ) gs
           WHERE h.start_d IS NOT NULL
         ),
         per_client AS (
           SELECT
             account_id, origin,
             BOOL_OR(hire_active) AS is_active,
-            SUM(fee * months)::numeric AS cltv,
-            (DATE_PART('year',  AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) * 12
-           + DATE_PART('month', AGE(MAX(COALESCE(end_d, CURRENT_DATE)), MIN(start_d))) + 1)::int AS lifetime_months
-          FROM hire_calc
+            SUM(fee)::numeric        AS cltv,
+            COUNT(DISTINCT mes)::int AS lifetime_months
+          FROM hire_months
           GROUP BY account_id, origin
         ),
         pc AS (

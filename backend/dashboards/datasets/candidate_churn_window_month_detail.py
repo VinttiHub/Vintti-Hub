@@ -55,8 +55,12 @@ def query(filters: dict, *_args, **_kwargs) -> tuple[str, dict]:
               COALESCE(c.name, '')        AS candidate_name,
               h.account_id,
               COALESCE(a.client_name, '') AS account_name,
-              NULLIF(h.start_date::text, '')::date AS start_d,
               CASE
+                WHEN h.carga_active IS NOT NULL THEN h.carga_active::date
+                ELSE NULLIF(h.start_date::text, '')::date
+              END AS start_d,
+              CASE
+                WHEN h.carga_inactive IS NOT NULL THEN h.carga_inactive::date
                 WHEN h.end_date IS NULL OR h.end_date::text = '' THEN NULL
                 ELSE h.end_date::date
               END AS end_d,
