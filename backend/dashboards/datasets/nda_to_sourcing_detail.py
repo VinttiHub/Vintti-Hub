@@ -12,13 +12,7 @@ import os
 from datetime import date, datetime, timedelta
 
 
-SALES_LEADS_DEFAULT = ("mariano@vintti.com", "bahia@vintti.com")
-
-
-def _sales_leads() -> list[str]:
-    raw = os.environ.get("DASHBOARD_SALES_AES", "")
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or list(SALES_LEADS_DEFAULT)
+from ._sales_scope import sales_leads as _sales_leads
 
 
 def _parse_date(value):

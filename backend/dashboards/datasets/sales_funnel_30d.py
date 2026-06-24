@@ -14,6 +14,8 @@ in the CRM, so the funnel ratios show genuine dropoff.
 """
 from __future__ import annotations
 
+from ._sales_scope import sales_leads as _sales_leads
+
 import logging
 import os
 import threading
@@ -24,7 +26,6 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-SALES_LEADS_DEFAULT = ("mariano@vintti.com", "bahia@vintti.com")
 
 _CACHE: dict[str, tuple[float, int]] = {}
 _CACHE_LOCK = threading.Lock()
@@ -62,12 +63,6 @@ def _parse_hubspot_date(raw: Any) -> date | None:
         return datetime.strptime(s[:10], "%Y-%m-%d").date()
     except ValueError:
         return None
-
-
-def _sales_leads() -> list[str]:
-    raw = os.environ.get("DASHBOARD_SALES_AES", "")
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or list(SALES_LEADS_DEFAULT)
 
 
 def _fetch_sql_count(win_ini: date, win_fin: date, owner_emails: list[str]) -> int:

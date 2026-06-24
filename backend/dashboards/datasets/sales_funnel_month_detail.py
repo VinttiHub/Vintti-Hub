@@ -12,11 +12,12 @@ relevant date for the listed stage.
 """
 from __future__ import annotations
 
+from ._sales_scope import sales_leads as _sales_leads
+
 import os
 from datetime import date, datetime
 
 
-SALES_LEADS_DEFAULT = ("mariano@vintti.com", "bahia@vintti.com")
 
 STAGE_PAST_DEEP_DIVE = (
     "NDA Sent", "Sourcing", "Interviewing", "Negotiating",
@@ -42,12 +43,6 @@ def _parse_date(value):
     except (ValueError, TypeError):
         return None
     return None
-
-
-def _sales_leads() -> list[str]:
-    raw = os.environ.get("DASHBOARD_SALES_AES", "")
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    return parts or list(SALES_LEADS_DEFAULT)
 
 
 def _resolve_stage(filters: dict) -> str:
